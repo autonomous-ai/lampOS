@@ -1451,6 +1451,38 @@ mod tests {
         assert!(lamp.waits.is_empty());
     }
 
+    /// A failed run's line (`LAMP_SKILL_TASK_SURE`,
+    /// `crate::task_sure::failed_line`) goes through a told answer's gate:
+    /// the owner alone, it is said as it is; quiet hours or another face,
+    /// nothing is said.
+    #[test]
+    fn a_failed_runs_line_is_told_only_through_the_gate() {
+        let failed = Ok(serde_json::json!({
+            "ok": false,
+            "error": "run_failed",
+            "message": "Harness didn't start the run (new_failed)",
+        })
+        .to_string());
+        let line = vec![crate::task_sure::failed_line("morning-mail", &failed).unwrap()];
+        let mut lamp = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(tell(&line, &mut lamp), "told 1");
+        assert_eq!(lamp.said, ["Morning mail didn't finish this time."]);
+        let mut quiet = alone();
+        quiet.quiet = true;
+        let mut lamp = Lamp::new(vec![quiet], json!({}));
+        assert_eq!(tell(&line, &mut lamp), "skipped: quiet hours");
+        assert!(lamp.said.is_empty());
+        let mut lamp = Lamp::new(
+            vec![Seen {
+                faces: Some(2),
+                ..alone()
+            }],
+            json!({}),
+        );
+        assert_eq!(tell(&line, &mut lamp), "skipped: not alone");
+        assert!(lamp.said.is_empty());
+    }
+
     /// "Quiet hours: nothing", and no owner's face enrolled: skipped at
     /// once, with nothing said.
     #[test]

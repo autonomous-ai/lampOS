@@ -1025,3 +1025,105 @@ async fn after_the_lamp_asks_a_vietnamese_yes_goes_to_the_model() {
         }
     }
 }
+
+/// The first builder's answer 2 on #7249 (`LAMP_MADE_SKILL_ASKS`): words
+/// two skills give, one made on the lamp ([`crate::skill_named::SHARED`]),
+/// run nothing in code, and the model is asked once, told the words and
+/// each skill by name, to say so: for the owner's line alone (the private
+/// room here). sim-2's P2 on #7249: a line that isn't the owner's (outside
+/// the private room, no owner seen saying it) runs nothing and is told
+/// nothing, so no skill of the owner's is named.
+#[test]
+fn words_two_skills_give_run_neither_and_the_model_is_told_both() {
+    let shared = json!({ "words": "cozy reading time", "skills": ["desk glow", "evening read"] });
+    for owner in [true, false] {
+        crate::person::set_private_room_for_test(Some(owner));
+        let told = shared.clone();
+        let went = went_with(
+            "cozy reading time",
+            vec![said("Here you go.")],
+            booth_told(),
+            move |engine| {
+                engine.calling_skills_named(Arc::new(move |_: &str| {
+                    Some((crate::skill_named::SHARED.to_owned(), told.clone()))
+                }))
+            },
+        );
+        crate::person::set_private_room_for_test(None);
+        assert!(went.ran.is_empty(), "{owner}: nothing runs: {:?}", went.ran);
+        assert_eq!(went.chats, 1, "{owner}");
+        if owner {
+            assert_eq!(went.notes, [crate::skill_named::shared_note(&shared)]);
+            assert!(
+                went.notes[0].contains("“cozy reading time”")
+                    && went.notes[0].contains("desk glow and evening read"),
+                "{:?}",
+                went.notes
+            );
+        } else {
+            assert!(
+                went.notes.is_empty(),
+                "not the owner's line: no skill named: {:?}",
+                went.notes
+            );
+        }
+    }
+}
+
+/// lamp-9adf, 16 Nov 15:36 (`LAMP_MADE_SKILL_ASKS`): "Lamp, moon time."
+/// started its made skill in code, and the lamp said "Moon time is running
+/// now." first; the skill's own line came 20 s after the call. A made
+/// skill its heard words start, run now, that speaks its own words
+/// (`made_run::speaks_itself`) ends the turn with no chat asked and no
+/// line of the lamp's own, so its say is the first thing heard. A run that
+/// says nothing itself, or is refused, still has round 2 say what
+/// happened, the refusal with why.
+#[test]
+fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
+    let by_words = |told: Value, rounds| {
+        went_with("Lamp, moon time.", rounds, told, |engine| {
+            engine.calling_skills_named(Arc::new(|_: &str| {
+                Some(crate::skill_named::call(true, "made:photo_booth"))
+            }))
+        })
+    };
+    let ran = |says: bool| {
+        json!({
+            crate::made_run::RUN: "photo_booth",
+            "ran": true,
+            "says": says,
+            "next": "Say only, in a few words, that photo booth is running now."
+        })
+    };
+    let went = by_words(ran(true), vec![said("Photo booth is running now.")]);
+    assert_eq!(
+        went.ran,
+        [(
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_run::RUN: "photo_booth" })
+        )]
+    );
+    assert_eq!(went.chats, 0, "no round 2: {:?}", went.results);
+    assert!(
+        went.said.is_empty(),
+        "no line of the lamp's: {:?}",
+        went.said
+    );
+    let went = by_words(ran(false), vec![said("Photo booth is running now.")]);
+    assert_eq!(went.chats, 1);
+    assert_eq!(went.said, ["Photo booth is running now."]);
+    let refused = json!({
+        "error": "its 3 runs in 24 hours are spent",
+        "next": "Say plainly that photo booth didn't run now, and why."
+    });
+    let went = by_words(refused, vec![said("Photo booth didn't run today.")]);
+    assert_eq!(went.chats, 1);
+    assert!(
+        went.results
+            .iter()
+            .any(|told| told.contains("runs in 24 hours are spent")),
+        "{:?}",
+        went.results
+    );
+    assert_eq!(went.said, ["Photo booth didn't run today."]);
+}

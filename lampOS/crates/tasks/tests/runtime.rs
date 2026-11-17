@@ -2,7 +2,7 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
-    follow::WatchLane,
+    follow::{FOLLOW_TRIES, WatchLane},
     harness::{
         AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
         Observation, SessionSeen, SignIn, Target, WatchEnd, WatchEvent,
@@ -101,6 +101,9 @@ struct Counts {
     /// What the held `watch` says next, once set; `done` and `failed` end
     /// it, as `Cli::watch` does.
     watch_says: Mutex<Option<WatchEvent>>,
+    /// Each `watch` fails before its first line while set, as a child that
+    /// cannot reach Harness (#7122).
+    watch_fails: AtomicBool,
     /// `show` finds the agent idle with this answer while set, as Harness
     /// gives it: its `ask` is the task's own text.
     plain: Mutex<Option<String>>,
@@ -151,6 +154,13 @@ struct Counts {
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
     hold_launch: AtomicBool,
+    /// How many launches still answer that Harness is not running here
+    /// (`harness_not_running`, build 13373): `Cli::launch`'s outcome for
+    /// `new`'s `NOT_RUNNING` stderr, which tests/harness.rs reads through
+    /// the CLI.
+    not_running: AtomicUsize,
+    /// A daemon start held on the job lane while set: a start under way.
+    hold_daemon: AtomicBool,
     /// What `harness machines engines` says of each machine, by id, and
     /// how many looks were made (#5199). A machine with none is unreachable.
     engines: Mutex<BTreeMap<String, Result<Vec<EngineRow>, String>>>,
@@ -203,6 +213,9 @@ impl WatchLane for ScriptWatch {
     ) -> WatchEnd {
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
         self.0.watches.lock().unwrap().push(agent.to_owned());
+        if self.0.watch_fails.load(Ordering::SeqCst) {
+            return WatchEnd::Failed("DISCONNECTED".into());
+        }
         self.0.watching.fetch_add(1, Ordering::SeqCst);
         // The first line is how the harness stands now.
         on_event(WatchEvent::Working);
@@ -345,6 +358,16 @@ impl Adapter for Script {
                 code: "cancelled".into(),
             };
         }
+        if self
+            .counts
+            .not_running
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok()
+        {
+            return LaunchOutcome::NotSent {
+                code: "harness_not_running".into(),
+            };
+        }
         LaunchOutcome::Created {
             agent_id: AGENT.into(),
         }
@@ -382,6 +405,9 @@ impl Adapter for Script {
     fn start_daemon(&self) -> Result<(), String> {
         self.counts.daemon_starts.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("daemon");
+        while self.counts.hold_daemon.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(5));
+        }
         let fails = &self.counts.daemon_fails;
         if fails
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
@@ -1682,6 +1708,86 @@ fn a_held_watch_reads_the_agent_at_once_on_done_and_is_let_go() {
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
 }
 
+/// #7122: a watch that fails before its first line [`FOLLOW_TRIES`] times
+/// in a row is given up, and none is started again; the task is still the
+/// watch's looks', which find it settled: it settles once on
+/// `tasks/status`, with one read.
+#[test]
+fn a_watch_given_up_still_leaves_the_task_to_the_looks_and_it_settles_once() {
+    let mut s = Running::unstarted(false, true, true, false);
+    s.config.push_watch = true;
+    s.counts.watch_fails.store(true, Ordering::SeqCst);
+    s.start();
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut watch = bus
+        .subscribe_typed(TaskStatus::TOPIC, "tasks_test", TaskStatus::TYPE)
+        .unwrap();
+    thread::sleep(Duration::from_millis(250));
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    let id = prepared["id"].as_u64().unwrap();
+    let places = |status: &TaskStatus| {
+        [
+            status.tasks.iter().any(|task| task.task == id),
+            status.unread.contains(&id),
+            status.settled.iter().any(|settled| settled.task == id),
+        ]
+    };
+    // The watch fails at once, then after 3 s and 10 s: given up.
+    let start = Instant::now();
+    while s.counts.watches.lock().unwrap().len() < FOLLOW_TRIES as usize {
+        assert!(
+            start.elapsed() < Duration::from_secs(20),
+            "watches started: {}",
+            s.counts.watches.lock().unwrap().len()
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(
+        s.counts.watches.lock().unwrap().len(),
+        FOLLOW_TRIES as usize,
+        "a watch started after it was given up"
+    );
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 0);
+    // Still worked on, never settled, while the watch failed.
+    let mut last = None;
+    while let Some(message) = watch.recv(Duration::from_millis(100)).unwrap() {
+        let status: TaskStatus = message.parse().unwrap();
+        assert_ne!(places(&status), [false, false, true], "{status:?}");
+        last = Some(status);
+    }
+    if let Some(status) = last {
+        assert_eq!(places(&status), [true, false, false], "{status:?}");
+    }
+    // The watch's first look finds it settled: one value moves it, once.
+    s.clock.0.lock().unwrap().monotonic_ms = WATCH_EARLY_MS;
+    let moved = loop {
+        let status = next_status(&mut watch);
+        if places(&status) != [true, false, false] {
+            break status;
+        }
+    };
+    assert_eq!(places(&moved), [false, false, true], "{moved:?}");
+    assert_eq!(moved.settled.len(), 1, "{moved:?}");
+    assert_eq!(moved.settled[0].state, AgentState::NeedsInput);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+    // Nothing more: no second settle, no further read, no new watch.
+    let quiet = Instant::now();
+    while let Some(message) = watch.recv(Duration::from_millis(300)).unwrap() {
+        assert!(quiet.elapsed() < Duration::from_secs(3), "values go on");
+        let status: TaskStatus = message.parse().unwrap();
+        assert_eq!(places(&status), [false, false, true], "{status:?}");
+        assert_eq!(status.settled.len(), 1, "{status:?}");
+    }
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        s.counts.watches.lock().unwrap().len(),
+        FOLLOW_TRIES as usize
+    );
+}
+
 /// #5230: a watch held when the part stops is ended with it.
 #[test]
 fn every_held_watch_ends_when_the_part_stops() {
@@ -2573,6 +2679,218 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     assert_eq!(told_targets(&off), 0);
     assert!(!path.exists());
     assert_eq!(off.counts.daemon_starts.load(Ordering::SeqCst), 0);
+}
+
+/// A lamp signed out, its own target with Hermes (#6407), whose daemon
+/// started at boot and then stopped: ready for a hand-over.
+fn signed_out_lamp(not_running: usize) -> (Running, tempfile::TempDir, tempfile::TempDir) {
+    let (s, home, bin) = signed_out_lamp_started(false);
+    // The daemon at boot, once (#6407); it has stopped since.
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 1 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no daemon at boot"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
+    s.counts.order.lock().unwrap().clear();
+    s.counts.not_running.store(not_running, Ordering::SeqCst);
+    (s, home, bin)
+}
+
+/// #7275 (#7273): a sign-out in the Harness app stops its daemon, as a
+/// sign-in does (openharness#1463), and lamp-tasks started it only after a
+/// sign-in and at its start, so every hand-over to the lamp's own target
+/// then said "Harness is not running here". Signed in, the daemon starts at
+/// boot; the read turning signed out starts it again with a plain `harness
+/// start`; a hand-over to the lamp's own target then goes, with no
+/// not-running answer to retry.
+#[test]
+fn a_sign_out_starts_the_daemon_again_for_the_lamps_own_target() {
+    let (s, _home, _bin) = lamp_started(false, false);
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 1 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no daemon at boot"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "not started again after the sign-out"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    targets_until(
+        &s,
+        json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]}]),
+    );
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    // Once, a plain `harness start` (never `--restart`, which waits for
+    // no busy task): later reads, still signed out, start nothing more.
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 2);
+    assert_eq!(s.counts.daemon_restarts.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        s.counts.launched_on.lock().unwrap().last(),
+        Some(&(COMPUTER.to_owned(), EngineKind::Hermes))
+    );
+}
+
+/// As [`signed_out_lamp`], its targets written, with its daemon's start at
+/// boot held while `hold` is set.
+fn signed_out_lamp_started(hold: bool) -> (Running, tempfile::TempDir, tempfile::TempDir) {
+    let (s, home, bin) = lamp_started(true, hold);
+    targets_until(
+        &s,
+        json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]}]),
+    );
+    (s, home, bin)
+}
+
+/// A lamp that may be its own target, Hermes installed, signed out or in,
+/// started, with its daemon's start held while `hold` is set.
+fn lamp_started(signed_out: bool, hold: bool) -> (Running, tempfile::TempDir, tempfile::TempDir) {
+    let home = tempfile::tempdir().unwrap();
+    let bin = tempfile::tempdir().unwrap();
+    let (mut s, _) = engines_running(true);
+    s.config.sign_in_by_code = true;
+    let mut side = lamp_side(Some("on"), None, None, Some(home.path().to_owned())).unwrap();
+    side.bin = bin.path().to_owned();
+    s.config.set_up_later.as_mut().unwrap().lamp = Some(side);
+    s.counts.signed_out.store(signed_out, Ordering::SeqCst);
+    *s.counts.computer.lock().unwrap() = Some(COMPUTER.into());
+    let program = bin.path().join("hermes");
+    fs::write(&program, WRAPPER).unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    s.counts.hold_daemon.store(hold, Ordering::SeqCst);
+    s.start();
+    (s, home, bin)
+}
+
+/// A hand-over confirmed while lamp-tasks' first daemon start (at boot,
+/// signed out) is still under way waits for it, and goes after it: one
+/// start, then the launch, never a second start. The process's gate shows
+/// that start to every other `harness new` caller meanwhile.
+#[test]
+fn a_hand_over_while_the_first_daemon_start_is_under_way_waits_for_that_one() {
+    let (s, _home, _bin) = signed_out_lamp_started(true);
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 1 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no daemon at boot"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert!(lamp_tasks::harness::DaemonGate::shared().busy());
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    thread::sleep(Duration::from_millis(200));
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
+    s.counts.hold_daemon.store(false, Ordering::SeqCst);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(*s.counts.order.lock().unwrap(), ["daemon", "launch"]);
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
+}
+
+/// Build 13373, a product lamp signed out: a hand-over to the lamp's own
+/// target got "Harness is not running here" (`harness_not_running`), as
+/// its daemon was started only at boot and nothing started it again. Now
+/// that answer starts the daemon, and the hand-over goes once more after
+/// it, and is accepted.
+#[test]
+fn a_hand_over_harness_answers_not_running_starts_its_daemon_and_goes_once_more() {
+    let (s, _home, _bin) = signed_out_lamp(1);
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["launch", "daemon", "launch"]
+    );
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        *s.counts.launched_on.lock().unwrap(),
+        [
+            (COMPUTER.to_owned(), EngineKind::Hermes),
+            (COMPUTER.to_owned(), EngineKind::Hermes)
+        ]
+    );
+}
+
+/// The same, and Harness still not running after its daemon's start: the
+/// hand-over is refused once, `not_sent` with `harness_not_running`, and
+/// never tried a third time.
+#[test]
+fn a_hand_over_harness_answers_not_running_twice_is_refused_once_with_no_loop() {
+    let (s, _home, _bin) = signed_out_lamp(10);
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    let task = s.wait(&id, |v| v["task"]["dispatch"]["state"] == "not_sent");
+    assert_eq!(
+        task["task"]["dispatch"]["code"], "harness_not_running",
+        "{task}"
+    );
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["launch", "daemon", "launch"]
+    );
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 2);
+    assert!(s.counts.daemon_starts.load(Ordering::SeqCst) <= 3);
+}
+
+/// The first builder's P2 on #7282: a daemon that never starts. The start
+/// made due by the not-running answer gets one try, never the sign-in's
+/// four (10, 20 and 40 s apart on a lamp); when it fails, the task goes at
+/// once to its final `new` and ends `not_sent` with `harness_not_running`,
+/// which the person is told, never left queued until it expires.
+#[test]
+fn a_hand_over_whose_daemon_never_starts_ends_not_sent_after_one_try() {
+    let (s, _home, _bin) = signed_out_lamp(10);
+    s.counts.daemon_fails.store(100, Ordering::SeqCst);
+    let prepared = prepared_for(&s, "lamp", |answer| answer["ok"] == true);
+    let id = prepared["id"].clone();
+    let confirm = json!({"op":"confirm","guard":s.guard(),"id":id,"prepared_digest":prepared["prepared_digest"],"session_id":s.status()["summary"]["session_id"]});
+    let start = Instant::now();
+    assert_eq!(s.trusted(confirm)["ok"], true);
+    let task = s.wait(&id, |v| v["task"]["dispatch"]["state"] == "not_sent");
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(
+        task["task"]["dispatch"]["code"], "harness_not_running",
+        "{task}"
+    );
+    // Past the retries' 50, 100 and 200 ms here: no second start.
+    thread::sleep(Duration::from_millis(600));
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["launch", "daemon", "launch"]
+    );
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 2);
+    assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 2);
 }
 
 /// #5978, the PM: with `LAMP_HERMES_ON_LAMP` off (unset, `off`, or any

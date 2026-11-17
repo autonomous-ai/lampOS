@@ -14,7 +14,11 @@ trên máy tính (người xây dựng đầu tiên, 3/11, trên Queue;
 (`put_on_made_skill` đã bị bỏ từ #5977: kỹ năng đã tạo được bật ngay khi được
 giữ lại), có hay không có phần
 tasks, và một kỹ năng gõ trong ứng dụng (`LAMP_APP_MAKE_SKILL`) cũng được tạo
-như vậy, không bao giờ được giao đi. Các câu tin của kỹ năng đã tạo (`made`,
+như vậy, không bao giờ được giao đi như một việc. Khi có
+`LAMP_MAKE_SKILL_AGENT=on`, một lần tạo bằng giọng nói hay một lần tạo bằng
+MAKE IT của ứng dụng mà mô hình của đèn không tạo được sẽ được giao cho Hermes
+của chính đèn trong namespace của lần chạy kỹ năng ("Một lần tạo bằng giọng
+nói trong namespace của lần chạy kỹ năng", bên dưới). Các câu tin của kỹ năng đã tạo (`made`,
 `not_kept`) và việc sửa nó qua một việc giao cũng bị bỏ theo. Một việc mà lời
 của nó là bản hướng dẫn của một kỹ năng, do một bản phát hành trước giao đi,
 không bao giờ được kể: câu trả lời của nó là các tệp.
@@ -291,7 +295,16 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
   cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của
-  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc).
+  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc). Với
+  `LAMP_SKILL_TASK_SURE=on` ở lamp-skills (tắt nếu không đặt, không unit
+  sản phẩm nào đặt; docs/skills.md, "A skill's task"), lamp-skills nói lời
+  từ chối hay lần chạy thất bại với chủ đèn bằng một câu cố định sau cổng
+  của câu trả lời cần nói, không bao giờ là lời của tác vụ hay message
+  này, và lần chạy bị từ chối `busy` chờ đến lượt trong hàng duy nhất của
+  lamp-skills (tối đa 4 cái trong hàng, tính cả cái đang được giao, vào
+  trước ra trước, mỗi cái tối đa 15 phút từ lúc bắt đầu chờ) rồi được giao lại khi lần chạy đang diễn ra kết thúc, nên hai kỹ
+  năng đến hạn cùng một phút đều chạy, lần lượt. Ở đây không có gì thay đổi
+  vì nó.
 - **Điều agent tìm thấy** (`tells_answer`): khi `LAMP_AGENT_SERVICES=on` ở
   đây, một lần chạy được cấp quyền đọc một dịch vụ đã liên kết
   (`gmail-read`) mà kết thúc tốt sẽ trả lời
@@ -605,7 +618,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) và là `run_failed` "the run was ended at its
     deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,
-    hay một lần tạo `pending`) cũng là `run_failed`.
+    hay một lần tạo `pending`) cũng là `run_failed`. Một `new` `uncertain`
+    mà câu trả lời vẫn nêu agent của lần chạy theo đúng tên của nó (một
+    `machineId` không phải của đèn, một agent `existing`) thì agent đó được
+    guard đóng: kết thúc token trước, rồi `close --now`
+    (`Cli::launch_naming`, #7171); câu trả lời không nêu agent nào thì không
+    đóng gì. Test:
+    `issue_7171_a_skill_run_refused_as_uncertain_closes_the_agent_harness_named`.
   - **Lần chạy không tới được agent của nó** (#6835 gap 1). Khi engine
     thoát trước khi sẵn sàng, Harness giữ pane của lần chạy làm một shell:
     cùng agent id, agent "Terminal", và `wait` đọc nó là `idle` trong vài
@@ -858,7 +877,9 @@ token.
 ### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
 
 Điều kiện của first builder trên #6643 (12/11 18:15): một lần tạo bằng giọng
-nói mà DeepSeek không giữ được, được giao cho agent của đèn
+nói mà DeepSeek không giữ được (và, theo yêu cầu của chủ sở hữu ngày 13/11,
+một lần tạo bằng MAKE IT của ứng dụng, từ coordinator của lamp-voice trong
+cùng unit), được giao cho agent của đèn
 (`LAMP_MAKE_SKILL_AGENT`, [skills_vi.md](skills_vi.md), "Giao cho agent của
 đèn khi DeepSeek thất bại"), chạy trong namespace của lần chạy kỹ
 năng và không bao giờ chạy như một task Harness có công cụ riêng của
@@ -1115,6 +1136,55 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, tắt, #7245)
+
+Trên lamp-c0a4 (bản build 13333, OpenClaw là mặc định, 16/11 11:46) một
+lần tạo DeepSeek không giữ được chưa bao giờ được giao: "the lamp's agent
+is OpenClaw: only Hermes has a namespace runner for a make today". Sau
+#7133, đèn OpenClaw chạy được việc của một kỹ năng nhưng chưa tạo được kỹ
+năng. Với `LAMP_MAKE_AGENT_ONE_PATH=on` của lamp-voice (tắt trừ khi đặt,
+không unit nào đặt; [switches.md](../switches.md)), lần tạo được giao cho
+agent của đèn mỗi khi lamp-tasks báo agent đó nhận lần chạy, Hermes hay
+OpenClaw, qua đường chạy chung, không có runner thứ hai:
+
+- **Dòng:** `{"op":"skill_make","rules","within_ms","one_path":true}`.
+  `one_path` là boolean, mặc định `false`; không có nó, socket tạo chạy
+  `MakeHermes`, không đổi, giống từng byte.
+- **Runner, chọn theo dữ liệu của agent:** với dòng có trường này, socket
+  tạo chọn runner như lần chạy của kỹ năng
+  (`skill_task::default_agent_takes_runs`). Hermes giữ `MakeHermes` (ở
+  trên). Agent gateway (OpenClaw) nhận `skill_make::MakeGateway`, một
+  `Runner`.
+- **Lần tạo qua gateway:** một thư mục `make-<run id>` mới trong thư mục
+  làm việc, luật trong `rules.md`, gửi thành một lượt qua
+  `harness new <engine>` của Harness trong thư mục đó (`HarnessRunner` của
+  #7133, "Lần chạy kỹ năng trên OpenClaw" bên dưới). `answer.md` được đọc
+  lại như trên. Không token nào được tạo và không lần chạy skill-start nào
+  được mở (không gọi `gateway::open_start`): lần tạo không có quyền nào.
+  Phiên Harness và thư mục bị xoá dù lần tạo kết thúc thế nào: có câu trả
+  lời, `cannot:`, quá hạn hay lỗi.
+- **Không có `lamp-skills pack` trong lần chạy:** danh sách exec cho phép
+  của OpenClaw chỉ có skill-start, nên lần tạo qua gateway bỏ bước kiểm tra
+  của hướng dẫn; giọng nói vẫn đưa câu trả lời qua toàn bộ kiểm tra và sửa
+  của nó.
+- **Câu trả lời `cannot:`** được trả về giọng nói nguyên văn, cho phương án
+  dự phòng của #7234.
+- **Một phiên (`LAMP_TASKS_ONE_SESSION`, #7258):** khi bật, lần tạo sẽ vào
+  phiên chung dưới dạng một tin nhắn thay vì phiên riêng. Lựa chọn nằm ở
+  một hàm seam duy nhất, để #7258 tiếp quản tại đó; mỗi lần tạo một phiên
+  là phương án dự phòng khi công tắc đó tắt.
+- **Nhật ký:** `tasks: make: handed to <engine> on the one run path in
+  <ms> ms`, rồi `tasks: make: <engine> session closed, folder removed`.
+  lamp-voice ghi `a skill made here: the lamp's agent is OpenClaw: handed
+  over on the one run path`.
+
+**Các hàng trên đèn (chưa chạy):** trên lamp-c0a4 với công tắc bật, từ các
+clip phát sẵn: "make me a skill that, when I say apple file, has an agent
+write three apple facts into a file for me" được agent tạo, giữ, đọc lại,
+đồng ý; "apple file" chạy nó trên OpenClaw, tệp có ba sự thật; sau đó
+không còn thư mục `make-*`, phiên Harness hay lần chạy skill-start nào; trên
+đèn Hermes, các hàng tạo kỹ năng hôm nay vẫn đạt.
+
 ### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm)
 
 Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
@@ -1159,6 +1229,26 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
   một task vẫn là `run_failed` trong cả hai trường hợp, như trước. Test:
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
+- **Không được tạo** (#7092): lần launch của một lệnh ghi cố định mà Harness
+  không tạo (`harness new` thất bại, `new_failed`: daemon của nó chưa lên,
+  như ngay sau khi lamp-tasks khởi động lại) được nhờ thêm một lần, cùng
+  lượt chạy, cùng thư mục, cùng file token, khi Harness trả lời: `harness
+  ps` của máy của đèn mỗi `HarnessRunner::retry` (1 s), tối đa
+  `skill_task::ANSWER_WAIT` (60 s) trong hạn của lượt chạy, và chỉ khi không
+  có gì đang chạy trong thư mục của lượt chạy. Journal ghi `Harness didn't
+  make the fixed write's run (new_failed); it answers now with nothing in
+  the run's folder, so it is asked once more`. lamp-services gửi lệnh ghi
+  của một lượt chạy một lần, nên kể cả khi lần launch đầu rốt cuộc được
+  Harness tạo thì cũng không gửi hai lần. Có tác tử trong thư mục của lượt
+  chạy thì không bao giờ nhờ lại (nó có thể đã bắt đầu: `run_failed`). Lần
+  launch thứ hai Harness cũng không tạo hoặc không gửi, hoặc Harness không
+  trả lời trong thời gian chờ, bị từ chối `not_made` (`skill_task::NOT_MADE`,
+  `SkillRun::not_made`): lamp-skills không gửi gì, không gửi thẳng cũng không
+  gửi lại, và đèn báo cho chủ một lần. Lượt chạy đã bắt đầu rồi thất bại, và
+  lượt chạy của một task, không bao giờ được nhờ hai lần. Test:
+  `issue_7092_a_fixed_writes_unmade_launch_is_asked_once_more_once_harness_answers`,
+  `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
+  `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
 ### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT` bật, `LAMP_TASK_NET` tắt)
 
@@ -1398,7 +1488,29 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   `main` và khỏi agent hàng rào đã rút lại `lamp-skill-run` (#7101). Mỗi
   vòng có gateway đang chạy, lamp-update thêm lại mục của `main` (mục đã
   có thì không bị ghi lại), nên một lần khôi phục cài đặt gốc xoá exec
-  approvals của OpenClaw sẽ có lại mục này. Với
+  approvals của OpenClaw sẽ có lại mục này. Một lần gateway (khởi động
+  lại) không chờ vòng đó (#7280): ngay sau lần đọc approvals xác nhận một
+  lần khởi động gateway mới (`gateway::Serving`, ở trên), trước khi giao
+  việc của lần chạy đầu tiên, lamp-tasks chạy đúng lệnh thêm đó
+  (`openclaw approvals allowlist add --gateway --agent main
+  /usr/local/lib/lampos/skill-start`, `gateway::ALLOWLIST_ADD`, dưới
+  quyền `lampos` với môi trường của lần đọc, giới hạn 60 s: trên
+  lamp-c0a4 một gateway vừa khởi động lại trả lời các RPC approvals mất
+  tới 12 s mỗi lần và một lệnh thêm đã vượt giới hạn 20 s trước đây). Lần khởi
+  động mà danh sách đã có mục thì không ghi gì, và các lần chạy sau trên
+  cùng lần khởi động không chạy lệnh thêm. Mỗi lệnh thêm được ghi journal
+  kèm kết quả và thời gian chạy ("tasks: the OpenClaw Gateway's allow-list
+  add for /usr/local/lib/lampos/skill-start succeeded in 840 ms"). Lệnh thêm thất bại hoặc chạm
+  giới hạn được thử lại một lần ngay, trên cùng lần khởi động, với cùng
+  giới hạn; lần thử thứ hai thành công được ghi journal ("tasks: the
+  OpenClaw Gateway's allow-list add for /usr/local/lib/lampos/skill-start
+  succeeded on its second try in 61200 ms (the first: exit 1)", hoặc "killed at its
+  60 s bound") và lần khởi động được giữ. Cả hai lần đều nằm trong giới
+  hạn chờ gateway của chính lần chạy. Lệnh thêm thất bại cả hai lần được ghi
+  journal ("tasks: the OpenClaw Gateway's allow-list add for
+  /usr/local/lib/lampos/skill-start did not succeed in 120000 ms (the
+  first: …, the second: …); the next run tries again") và không giữ lần chạy lại, nhưng lần khởi động không được giữ,
+  nên lần chạy sau đọc và thêm lại. Với
   `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
   thì exec của một lượt không giao diện bị từ chối. Một
   exec bị từ chối vẫn kết thúc lượt là `stopped`, nên phép kiểm tra đóng
@@ -1483,6 +1595,277 @@ Không dòng nào trong số này tự ghi tên engine theo lời của lamp-tas
 `<agent>` là tên mà `show` của Harness đưa ra cho phiên đó, hoặc `the lamp's
 default agent` khi Harness báo stopped, hoặc `not known (harness show: …)`
 khi không đọc được câu trả lời. Hermes và OpenClaw đều như vậy.
+
+### Một phiên cho agent mặc định của đèn (#7246, tắt trừ khi `LAMP_TASKS_ONE_SESSION=on`)
+
+Giai đoạn 1 của #7246, thiết kế cuối của lead: agent mặc định của đèn giữ
+MỘT pane Harness, và mọi việc nói cùng mọi lần chạy kỹ năng là một tin
+nhắn gõ vào pane đó. Tắt (mọi giá trị khác `on` đúng nguyên văn, mặc định,
+không có trong unit nào), mỗi việc và mỗi lần chạy vẫn là `harness new`
+riêng như trên, không đổi một byte (`crates/tasks/src/one_session.rs`).
+
+- **OpenClaw trước.** Pane chỉ được mở khi agent mặc định của đèn là
+  OpenClaw. Đèn mặc định Hermes giữ đường đi hiện nay theo từng việc, một
+  pane cho mỗi việc và mỗi lần chạy, cho tới khi dòng thử H1 chạy được
+  trên một đèn Hermes.
+- **Mở ngay khi khởi động, khi agent sẵn sàng.** Khi công tắc bật (cùng
+  `LAMP_SKILL_TASKS` và `LAMP_SKILL_DEFAULT_AGENT`), một luồng của
+  lamp-tasks (`one-session`) chạy mỗi 2 s. Nó chỉ mở pane khi Harness đã
+  thiết lập, Harness được gọi với tư cách người dùng
+  (`--harness-as-person`, như unit sản phẩm), biết máy của đèn, agent mặc
+  định là OpenClaw và gateway trả lời trong 25 s
+  (`LAMP_PLACE_GATEWAY_WITHIN`: một lần đọc approvals của nó, khoảng 10 s
+  trên đèn kể cả khi đã ấm; chỉ đọc trên luồng này, không bao giờ trên
+  đường giao việc). Lệnh mở là `harness new openclaw` trong
+  `~/harnesses/lamp-tasks/one-session` (project Harness của lamp-tasks
+  `~/harnesses/lamp-tasks` cùng `FOLDER`, thư mục 0700), tên `lamp-one-openclaw` (chỉ để đọc trong `harness ps`),
+  với lời nhắc đầu ngắn; nó chờ tối đa 120 s cho lượt đầu rảnh. `new` lỗi
+  thì thử lại sau 5 s, gấp đôi dần tới 5 phút.
+- **Chưa có agent sẵn sàng: không phiên, không vòng lặp.** Trên đèn mới
+  hoặc đã đăng xuất, hoặc đèn có mặc định không phải OpenClaw, không mở
+  pane nào và không thử `harness new` nào. Đèn được xem lại sau 60 s
+  (`NOT_READY_FIRST`), gấp đôi dần tới 10 phút (`NOT_READY_MOST`), hoặc
+  ngay lập tức khi có tác nhân: daemon của Harness khởi động, hoặc máy hay
+  engine mặc định của đèn đổi (mỗi lượt chỉ đọc nhẹ hai giá trị này, không
+  gọi gateway). Mỗi lý do mới được ghi journal một lần: `tasks: one
+  session: not opened: <why>`, ví dụ `Harness is not set up`, `Harness is
+  called as an agent`, `the lamp's own machine is not known (signed
+  out?)`, `the default engine is hermes, not OpenClaw` hoặc `OpenClaw's
+  gateway is not ready: <why>`. Khi pane đã mở thì không tìm lại nữa.
+- **Chỉ khi gọi với tư cách người dùng.** Harness chỉ đóng pane rảnh sau
+  30 phút khi pane do agent mở, nên khi Harness được gọi với tư cách agent
+  thì không mở pane nào và mọi việc đi đường riêng.
+- **Đường riêng, khi công tắc bật.** Việc nói vẫn có `harness new` riêng
+  chỉ khi nó không dành cho pane (máy hoặc engine khác với mặc định của
+  chính đèn, hoặc người dùng nêu một phiên); lần chạy kỹ năng chỉ khi nó
+  không dành cho OpenClaw là agent mặc định của gateway (ví dụ mặc định
+  Hermes) hoặc Harness được gọi với tư cách agent. Việc dành cho pane
+  không bao giờ lùi về `new` riêng.
+- **Giữ lại khi chưa biết vị trí của đèn.** Việc nói có thể dành cho pane
+  trong lúc vị trí của đèn chưa được biết (ngay sau khi khởi động, hoặc
+  khi daemon của Harness không chạy; đăng nhập hay đăng xuất đều vậy)
+  không đi đường riêng. Nó được giữ trong hàng đợi tới khi biết vị trí,
+  tối đa 15 phút (`QUEUE_WAIT`), rồi thất bại `busy` mà không có
+  `harness new` nào.
+- **Tìm lại theo id đã giữ.** Agent id của pane từ lệnh `new` được giữ
+  trong `one-session.json` ở thư mục store của lamp-tasks
+  (`/var/lib/lampos-tasks/store`, 0600). Lần mở sau (khởi động lại
+  lamp-tasks, hoặc khởi động lại máy, khi Harness tự khôi phục pane với
+  cùng id) tra bằng `show`: còn sống thì nhận lại, không `new`; dừng hoặc
+  mất thì `harness resume <id>` một lần; nếu không được thì `new` mới.
+  Không bao giờ tìm theo tên: `new` với tên đã có sẽ tạo pane thứ hai, và
+  agent có thể đổi tên pane.
+- **Pane đã giữ đang hỏi thì không nhận lại.** Pane đã giữ đọc ra
+  `needs-input` có một câu hỏi không ai giữ. Nó không được nhận lại. Như
+  mọi pane đã giữ mà không lấy lại được (mất và không resume được, resume
+  xong vẫn mất, không đọc được, hoặc của máy hay engine khác), nó bị đóng
+  `--now` và cuộc hội thoại OpenClaw của nó bị xoá (`sessions.delete`)
+  trước khi mở pane mới (`dropped <id> (not taken back)`).
+  Lần đóng thất bại trên máy này thì lùi lại và thử lại, không bao giờ
+  `new` bên cạnh một pane có thể vẫn còn sống (`<id> not closed: <code>`),
+  trừ khi Harness trả lời lần đóng bằng `UNKNOWN_HARNESS` (hoặc `GONE`):
+  pane đó đã mất, nên bị bỏ như một pane đã đóng và pane mới được mở
+  (`<id> already gone (UNKNOWN_HARNESS); a new pane`).
+- **`new` không chắc chắn không bao giờ bị làm hai lần.** `harness new`
+  trả về không chắc chắn hoặc không khởi động ngay có thể đã tạo pane. Pane
+  được tìm bằng một lần `harness ps`, khớp với thư mục riêng của pane
+  (`one-session`). Tìm thấy thì giữ làm pane. Không thấy, hoặc `ps` không
+  trả lời được, thì lần mở thất bại (`harness new: uncertain, looked for
+  next`), lùi lại như một `new` lỗi, và lần mở sau tìm lại trước mọi `new`
+  khác.
+- **Chỉ mở lại khi pane đã chết.** Dừng, lỗi, mất (`UNKNOWN_HARNESS`)
+  hoặc không chạy: mở lại một lần cho lượt đó. `offline`, `unknown`,
+  `starting`, `installing` và `working` thì chờ. Daemon của Harness khởi
+  động lại (đăng nhập, #7141, hoặc file env đổi) chỉ bỏ pane khỏi bộ nhớ;
+  lần mở sau nhận lại theo id đã giữ. Lỗi lần hai được ghi journal
+  `<task> not typed: <why>` và không tạo phiên thứ hai: lần chạy kỹ năng
+  thất bại (`the lamp's one session could not take the run: <why>`), việc
+  nói nhận trả lời `busy` (xem dưới).
+- **Mọi thứ là một tin nhắn.** Việc nói cho chính đèn (machine id của
+  đèn, engine mặc định, không nêu phiên nào) và lần chạy kỹ năng cho agent
+  mặc định của gateway được gõ vào pane bằng
+  `harness reply --machine <id> <pane> --json -- <words>`
+  (`Cli::reply_to`). Lời bắt đầu bằng một dòng `New task <id>:`, rồi tới
+  việc (với lần chạy kỹ năng: việc của launcher như trước). Lời chỉ được
+  gõ khi `show` đọc pane rảnh và lời trước đã được nhận (không có `told`,
+  hoặc `told.taken`): Harness xếp hàng lời gõ trước lúc đó, sẽ trộn hai
+  việc. Pane không bao giờ bị đóng khi một việc xong.
+- **Lượt của việc nói.** Store theo dõi pane như một phiên người dùng đã
+  có (`Joined`) và không bao giờ đóng nó. Store chỉ đọc pane cho việc đó
+  khi lời của việc đã được thấy là đã nhận. Không thấy nhận trong 120 s
+  (`OPEN_IDLE_WITHIN`) hoặc tới khi lamp-tasks dừng, việc thành không chắc
+  chắn (`one_session_not_taken`) và không bao giờ được gõ lại.
+- **Giữ tới khi câu trả lời được nói ra.** Pane được giữ tới khi câu trả
+  lời của việc được giọng nói nói ra, không chỉ được đọc: lượt kế tiếp
+  trong pane chiếm chỗ của việc này trong store. Câu đang được phát thì
+  chưa tính là đã nói. Câu trả lời vẫn chưa nói 60 s sau khi được đọc
+  (`UNTOLD_CLOSE_MS`), hoặc được đọc ở lần khởi động trước, cũng nhả pane.
+  Rồi hàng đợi đi tiếp.
+- **Việc nói kết thúc mà không có câu trả lời.** Việc nói kết thúc không
+  có câu trả lời (bị huỷ, hoặc một câu hỏi không ai trả lời) vẫn giữ pane.
+  Luồng `one-session` sau đó đóng pane `--now`, xoá cuộc hội thoại
+  OpenClaw của nó (`sessions.delete`) và id đã giữ, rồi nhả pane. Lần xem
+  sau mở pane mới.
+- **Lần chờ ngắn của việc nói (`SPOKEN_PANE_WAIT`).** Store chỉ giao việc
+  nói dành cho pane cho worker tasks-harness, worker phục vụ mọi lần giao
+  việc và mọi lần đọc, khi pane rảnh: khi pane đang bị giữ, một việc nói
+  khác đang được giao, hoặc một việc vừa được đưa lại chưa tới 2 s, việc
+  vẫn ở `queued` trong store, đứng đầu hàng đợi của pane. Trên worker,
+  việc chờ tới lượt và chờ pane rảnh bị giới hạn 5 s hoặc tới khi
+  lamp-tasks dừng. Nhận trả lời `busy` sau giới hạn đó hoặc khi dừng, mà
+  chưa gõ gì, việc được đưa lại vào hàng đợi của store đúng chỗ cũ
+  (`Engine::put_back_launch`), có ghi journal, và pane không được thử lại
+  trong 2 s (`PANE_RETRY`). Hàng đợi đầy trả lời ngay và việc thất bại
+  `busy` như trước, việc đã được đưa lại tổng cộng 15 phút kể từ lần giao
+  đầu (`QUEUE_WAIT`) cũng vậy.
+- **Lượt của lần chạy kỹ năng.** Kết thúc khi `harness wait`, rồi `show`,
+  đọc pane rảnh trên đúng dòng đầu của lần chạy đó; pane rảnh trên lời
+  hỏi khác thì chờ tiếp, nên mỗi lần chạy chỉ giữ câu trả lời của lượt
+  mình. `started` của launcher vẫn quyết định kỹ năng đã chạy hay chưa.
+  Lượt dừng lại để hỏi người dùng (`needs-input`) kết thúc lần chạy đó, và
+  pane bị đóng `--now` rồi mở lại ở lần sau.
+- **Lần chạy kỹ năng chờ skill-start có trong allow-list.** Ngay sau khi
+  gateway khởi động, allow-list exec của agent `main` chưa có
+  `/usr/local/lib/lampos/skill-start` cho tới khi lamp-update thêm lại, và
+  lệnh exec của agent sẽ bị từ chối. Nên trước khi gõ lần chạy kỹ năng vào
+  pane, lamp-tasks đọc approvals của gateway
+  (`openclaw approvals get --gateway --json`, trong 20 s). Không có mục cho
+  launcher dưới `main` hoặc `*` thì lần chạy không được gõ: nó thất bại
+  ngay với mã `skill_start_not_allowed` (lần ghi cố định vẫn là
+  `not_started`), không xếp hàng hay tạo gì. Lần đọc lỗi hoặc không phải
+  JSON thì lần chạy vẫn được gõ. Lần đọc đã thấy mục đó được giữ tới khi
+  socket lắng nghe của gateway đổi.
+- **Một hàng đợi, mỗi lúc một lượt.** Harness không có lệnh steer và
+  không có turn id: pane bận trả lời `NOT_IDLE`. Nên việc đến khi pane
+  đang bị giữ sẽ chờ trong một hàng FIFO trong lamp-tasks: tối đa 4 việc
+  chờ, mỗi việc tối đa 15 phút, việc nói đi trước lần chạy kỹ năng. Hàng
+  đợi đầy, hoặc việc đã chờ 15 phút, bị từ chối `busy` ("the lamp's agent
+  session is busy and its queue is full; one task runs at a time"), nên
+  lamp-skills vẫn thử lại (#7239). Không có phiên tràn.
+- **Việc đang chờ thì được báo.** Việc nói phải chờ vẫn ở `queued` trong
+  store, và metadata của việc có `"queued": {"position": <n>}` (1 là kế
+  tiếp), để câu đầu của đèn có thể nói nó đang làm xong việc trước. Câu
+  nói của giọng nói cho việc này là việc tiếp theo.
+- **Không reset sau lần chạy kỹ năng.** Những gì một lần chạy đã đọc vẫn
+  ở lại trong phiên (giai đoạn này chỉ một người dùng, lý do 2 của lead).
+  Lần bắt đầu lại duy nhất là xoay vòng: pane mới sau 40 lượt
+  (`ROTATE_TURNS`) hoặc 250k token (`ROTATE_TOKENS`), như gateway của
+  Hermes xoay vòng (`runtimes/hermes/rotation.go`). Harness không cho biết
+  số token, nên token được ước tính 4 ký tự một token từ lời đã gõ, câu
+  trả lời của các lần chạy kỹ năng đã đọc và câu trả lời của việc nói mà
+  store đã đọc. Bộ đếm bắt đầu từ 0 khi pane được mở hoặc nhận lại. Ở lượt
+  kế tiếp sau khi vượt một trong hai ngưỡng, pane cũ bị đóng `--now`, phiên
+  OpenClaw của nó bị xoá (`sessions.delete`) và id đã giữ bị quên, rồi một
+  pane mới được mở, không bao giờ nhận lại pane cũ. Trong một pane, nén
+  ngữ cảnh là việc của engine.
+- **Theo từng lần chạy, như trước.** Thư mục `skill-<run id>`, claim của
+  launcher, pass và token cho dịch vụ liên kết của lần chạy kỹ năng vẫn là
+  của riêng nó, và được kết thúc và xoá khi nó xong; chỉ phiên là dùng
+  chung. Ghi vào dịch vụ liên kết vẫn cần chủ đèn nói đồng ý.
+- **Huỷ hoặc hết hạn của lần chạy kỹ năng** kết thúc lượt: token của lần
+  chạy bị kết thúc trước, rồi pane bị đóng `--now`, vì Harness không có
+  lệnh ngắt, phiên OpenClaw của nó bị xoá (`sessions.delete`) và file id
+  đã giữ bị xoá; lần mở sau tạo pane mới. Đóng do `needs-input` của lần
+  chạy kỹ năng cũng vậy.
+- **Journal.** Id là 8 ký tự đầu của pane; mỗi dòng bắt đầu bằng
+  `tasks: one session: ` trừ các dòng theo từng việc và từng lần chạy ở
+  cuối.
+  `on (LAMP_TASKS_ONE_SESSION=on)`; `not opened: <why>` (khi chưa có agent
+  sẵn sàng, hoặc `<why>; tried again in <s> s` sau một `new` lỗi);
+  `opened <id> (openclaw) in <ms> ms`, sau `reopened after <why>` khi nó
+  thay một pane; `adopted <id> (<state>)`, `resumed <id> (<state>)`,
+  `<id> resumed <state>; a new pane`, `<id> not resumed: <code>; a new
+  pane`; `rotated after <n> turns, ~<t> tokens`; `reused (<n>th turn) for
+  <task>`; `<task> queued behind <holder>`; `<task> refused busy, <n>
+  already wait`; `<task> waited its most, refused busy`; `<task>'s turn
+  is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
+  typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  `closed --now after <task>'s turn was cancelled; opened again next`,
+  hoặc `not closed after <task>'s turn was cancelled: <why>`;
+  `<task>'s turn asks something; closed --now, opened again next`;
+  `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
+  an uncertain new made`;
+  `let go: Harness's daemon started` hoặc `let go: Harness's daemon
+  restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
+  (<why>)`. Mỗi việc và mỗi lần chạy kỹ năng: `tasks: <task>: turn
+  accepted in <ms> ms (<n>th turn)`, thời gian từ lúc giao việc tới lúc
+  agent nhận lời. Mỗi việc nói được đưa lại: `tasks: <task>: the lamp's
+  pane was not free within 5 s; queued again`. Mỗi việc nói có lời không
+  thấy được nhận: `tasks: <task>: its words were not seen taken in <ms>
+  ms`. Mỗi việc nói được giữ chờ vị trí của đèn: `tasks: <task>: held
+  until the lamp's place is known (at most <n> min)`, rồi `tasks: <task>:
+  the lamp's place is known; held no longer` hoặc `tasks: <task>: the
+  lamp's place not known in <n> min; busy`. Mỗi lần chạy kỹ năng không
+  được gõ: `tasks: <task>: not typed into the one session: <why>`.
+
+#### Phiên chung giữ những gì
+
+Lời trong pane được giữ ở các nơi sau trên đèn, đều thuộc `lampos`:
+
+| Cái gì | Ở đâu | Quyền |
+|--------|-------|-------|
+| Agent id, máy và engine của pane | `/var/lib/lampos-tasks/store/one-session.json` | 0600, trong thư mục trạng thái 0700 |
+| Thư mục của pane, nơi chạy `harness new` | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | thư mục 0700 (lamp-tasks tạo); `/var/lib/lampos-tasks` là 0700 (`StateDirectoryMode=0700`) |
+| Bản ghi của Harness về pane (registry, bản ghi agent đã dừng) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | trong home Harness 0700 |
+| Chính cuộc hội thoại (phiên OpenClaw `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (bản OpenClaw cũ: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` và `state` 0700 (lamp-update tạo); OpenClaw ghi không có `UMask=`, nên chính các thư mục 0700 chặn người dùng khác |
+| Với pane Hermes (không mở ở giai đoạn 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+
+Khi nào bị xoá:
+
+- **Đổi engine mặc định: xoá.** Khi mặc định không còn là OpenClaw, hoặc
+  machine id của đèn đổi, luồng `one-session` đóng pane `--now`, xoá
+  phiên OpenClaw của nó qua gateway
+  (`openclaw gateway call sessions.delete`, kèm transcript), và xoá
+  `one-session.json` (`OneSession::drop_pane`). `close` của Harness giữ
+  nguyên kho của OpenClaw, nên lamp-tasks tự xoá phiên. Chỉ tính khi thật
+  sự đổi: máy và engine cũ lẫn mới đều đã biết và khác nhau. Một lần đọc
+  mà một trong hai chưa biết (Harness chưa thiết lập, danh sách máy lỗi)
+  thì giữ pane; trường khác của vị trí pane, như thư mục, cũng giữ pane.
+- **Reset nhà máy: xoá.** Reset dừng user manager của `lampos` (cùng
+  daemon của Harness và pane), rồi xoá thư mục store,
+  `harnesses/lamp-tasks` và `.harness/cli/data`, trạng thái OpenClaw trừ
+  `openclaw.json`, và `state.db` cùng `sessions/` của Hermes.
+- **Đăng xuất: xoá.** Khi sign-in của Harness, đã đọc là đăng nhập, lần
+  sau đọc là đăng xuất (`harness_sign_in_read`), pane bị xoá theo cùng
+  cách (`OneSession::drop_pane`) ở lượt kế tiếp của luồng `one-session`
+  khi không có gì giữ pane. Riêng daemon của Harness khởi động lại chỉ bỏ
+  id khỏi bộ nhớ; pane được giữ.
+- **Khởi động khi đang đăng xuất.** `one-session.json` cũng giữ
+  `signed_in`: đèn có đăng nhập hay không lúc pane được tạo (chỉ ghi lúc
+  đó). Ở lần khởi động đọc đèn là đăng xuất, pane đã giữ được tạo khi đăng
+  nhập bị xoá theo cùng cách; file không có trường này tính là đăng nhập.
+  Pane đã giữ được tạo khi đăng xuất thì được nhận lại khi đèn vẫn đăng
+  xuất (đèn xuất xưởng chạy đăng xuất, #6407).
+
+#### Pass của lần chạy kỹ năng giới hạn những gì trong một phiên
+
+Pass của lần chạy kỹ năng là token một lần chạy của nó: lamp-control tạo
+token từ lời đồng ý của chủ đèn cho kỹ năng đó, và token ghi tên các grant
+của lời đồng ý ấy (`Tokens::mint`). Trong một phiên, token vẫn là của
+riêng lần chạy, không phải của phiên: launcher `skill-start` nhận lần chạy
+một lần và trao token cho script của kỹ năng qua fd 3 bên trong hàng rào
+(fence) của lần chạy, không bao giờ qua lời gõ vào pane, một file hay một
+đối số. Với token đó, script chạm tới đèn qua socket của lamp-control
+(`LAMP_CONTROL_SOCKET`) cho các grant mà lời đồng ý ghi tên, và chạm tới
+dịch vụ liên kết của chủ đèn chỉ theo các grant `<code>-read` hoặc
+`<code>-write` mà token ghi tên (`SERVICE_GRANTS`), qua lamp-control tới
+lamp-services; token riêng của các dịch vụ không bao giờ rời kho của root.
+Token bị kết thúc khi lần chạy kết thúc, dù kết thúc thế nào (đã trả lời,
+bị huỷ, tới hạn chót hay khi lamp-tasks dừng), cùng với lượt nhận của
+launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên một lượt
+sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
+kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
+chủ đèn đã đồng ý, một lần mỗi lần chạy.
+
+Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
+
+- **Các dòng thử trên c0a4 (#7246):** M1 (bộ nhớ, tắt rồi bật công tắc:
+  một phiên, không bị OOM kill, lamp-voice không thoát, MemAvailable thấp
+  nhất ít nhất 600 MB), rồi L1 khi tắt và L2, G1 khi bật: việc nói và lần
+  chạy kỹ năng đi qua một pane (một `new`, một `reply` cho mỗi việc, không
+  `close`), token của mỗi lần chạy kỹ năng được kết thúc và thư mục bị xoá,
+  và một việc báo `queued` khi việc khác đang làm.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
@@ -1864,22 +2247,74 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
   `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
 - **Khởi động** như Harness khởi động OpenClaw:
-  `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
-  chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
-  cài đặt bên dưới).
-- **Rảnh mà chưa được hỏi vẫn tính là đã giao** (#6499): sau một `new`
-  thành công, lamp-tasks đọc `show` cho đến khi harness được hỏi hoặc rảnh,
-  trong cùng `launch_timeout`. Cả hai trường hợp, việc đều là `Created`, như
-  Harness đã trả lời: trên đèn, `show` của OpenClaw có thể báo rảnh và chưa
-  có `ask` vài giây sau một `new` mà TUI thật ra đã nhận `--message`. Rảnh mà
-  chưa được hỏi chỉ ghi một dòng journal, ngoài ra không làm gì: không đóng
-  harness, không gọi `new` lần nữa, không gõ vào bằng `harness reply`.
-  `show` lỗi thì kết quả là uncertain, kèm mã lỗi. Lỗi mất câu hỏi thật sự,
-  khi OpenClaw bỏ mất `--message` lúc TUI ghép đôi với một Gateway còn
-  nguội, đã được sửa trong Harness 0.6.23 (autonomous-ai/openharness#4172:
-  Harness khởi động OpenClaw không kèm `--message` và gõ task vào khi pane
-  đã sẵn sàng); đèn có bản sửa này khi pin Harness được dời lên (#5957). (Cách
-  tạm thời của #6504, đóng rồi khởi động lại, đã bỏ.)
+  `openclaw tui --session harness-<agentId>`, không có chế độ quyền và không
+  định tuyến model (OpenClaw tự chọn model, theo phần cài đặt bên dưới).
+  Harness 0.6.52 khởi động nó không kèm `--message` và gõ task vào khi pane
+  đã sẵn sàng, chờ tối đa 30 s để Gateway ghi nó thành tin nhắn của người
+  dùng (`sessionInput.ts`); trước đó là `--message "<prompt>"`.
+- **Chỉ tính là đã giao khi có bằng chứng đã nhận** (#7277, thay cho quy tắc
+  "rảnh mà chưa được hỏi vẫn tính là đã giao" của #6499): sau một `new`
+  thành công, lamp-tasks đọc `show` cho đến khi có bằng chứng OpenClaw đã
+  nhận việc: có `ask`, đã dùng công cụ, có câu trả lời, hoặc `working`. Rảnh
+  mà chưa được hỏi không phải bằng chứng: trên c0a4 (build 13373, Harness
+  0.6.52) lần đọc đó là TUI trước lần gửi đầu tiên, lần gửi này ghi khởi động
+  chậm 17,5 s, và ở các lần chạy khác lần gửi không bao giờ đến. Giới hạn là
+  `OPENCLAW_PROOF_WITHIN`, 45 s từ khi `new` trả lời (không quá một
+  `launch_timeout`): 30 s Harness chờ Gateway, lần gửi đầu chậm và phần chuẩn
+  bị sau đó. Có bằng chứng thì việc là `Created` như trước, nên một lần chạy
+  đọc rảnh chưa được hỏi rồi dùng công cụ (trường hợp của #6499) vẫn được
+  tính. Không có bằng chứng: trước khi đóng gì, lamp-tasks đọc bản ghi của
+  chính Gateway về phiên của harness đó (#7287, P2 của Reviewer-lead: trên
+  fc4b câu hỏi đầu đến 65 s sau `new`, nên đóng rồi `new` lần hai có thể chạy
+  câu hỏi hai lần). Bản ghi là cơ sở dữ liệu agent của OpenClaw 2026.11.2,
+  `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite`
+  (dưới `OPENCLAW_STATE_DIR`, như Harness đọc), mở chỉ đọc: lamp-tasks chạy
+  bằng `lampos`, cùng user với Gateway, và namespace của Gateway thấy thư mục
+  đó ở cùng đường dẫn, nên không gọi CLI của OpenClaw. Được tính là đã nhận
+  khi phiên `agent:main:harness-<agentId>` (so theo 8 ký tự đầu của id) có
+  một dòng transcript có vai trò (tin nhắn của người dùng, câu trả lời, kết
+  quả công cụ) hoặc có trạng thái chạy. Đã nhận, hoặc bản ghi không đọc được
+  (không có file, schema khác, bận quá 1 s): harness được giữ, không đóng gì
+  và không bao giờ gọi `new` lần nữa; nó được theo dõi đến giới hạn của lần
+  giao, và vẫn không có bằng chứng thì lần giao là `uncertain`,
+  `openclaw_taken_unseen` hoặc `openclaw_record_unread`. Chỉ khi đọc được bản
+  ghi và nó không có gì của phiên đó thì harness mới được đóng và gọi `new`
+  thêm một lần (`harness reply` tắt trên đèn bán ra), kiểm tra bằng chứng như
+  trên. Vẫn không có: bản ghi của nó cũng được đọc (đã nhận hoặc không đọc
+  được: `uncertain` với cùng các mã, được giữ), và không có gì thì harness
+  thứ hai cũng được đóng và việc là `not_sent`, `openclaw_not_taken`, để
+  giọng nói báo người dùng rằng việc chưa đến được agent, không bao giờ báo là
+  đã bắt đầu. Lệnh đóng bị từ chối với exit 1 `WORKING` là bằng chứng
+  harness đã nhận prompt (Gateway chậm, vừa quá giới hạn 45 s, lamp-c0a4):
+  harness đó, đầu hay thứ hai, được giữ và lần giao là `accepted` trên nó.
+  Harness không đóng được vì lý do khác thì lần giao là `uncertain`
+  (`openclaw_not_closed` với harness đầu, `openclaw_not_taken` với harness
+  thứ hai) và không khởi động thêm gì: một harness còn chạy vẫn có thể nhận
+  việc cùng lúc với harness khác. `new` lần hai lỗi, hoặc không còn thời gian
+  cho nó, là `openclaw_new_again_failed`; harness đã dừng là
+  `stopped_before_message`, lệnh dừng của chủ là `cancelled`, và `show` lỗi
+  là uncertain kèm mã lỗi. Không bao giờ khởi động lần thứ ba.
+- **Một giới hạn cho cả lần giao** (#7287, P2 của Heron): mọi lần chờ bằng
+  chứng, các lần đọc bản ghi, các lần đóng và `new` lần hai đều chạy trong
+  `until` của chính lần giao (lúc bắt đầu cộng `launch_timeout`, 60 s trên
+  đèn), mỗi lệnh bị giới hạn bởi phần thời gian còn lại. Mỗi lần chờ bằng
+  chứng là `OPENCLAW_PROOF_WITHIN` (45 s), không quá ba phần tư
+  `launch_timeout`, và các lần xem cùng `new` lần hai kết thúc trước `until`
+  một phần tám `launch_timeout` (7,5 s), để lần đóng cuối vẫn kịp. Vậy lâu
+  nhất luồng `tasks-harness` (worker duy nhất cũng phục vụ `show`, đóng, trạng
+  thái và đăng nhập của mọi việc khác) bị một lần giao OpenClaw giữ là lần
+  chờ Gateway trước đó (`READY_WITHIN`, tối đa 60 s) cộng 60 s cho chính lần
+  giao, tổng 120 s, trong khi trước đây riêng nhánh đóng rồi khởi động lại có
+  thể mất khoảng 330 s. Lệnh dừng của chủ được kiểm tra ở mỗi lệnh. Kiểm thử:
+  `openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created`,
+  `openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent`,
+  `openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it`,
+  `openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started`,
+  `openclaw_taken_in_the_gateway_record_but_unseen_is_kept_never_started_twice`,
+  `openclaw_with_no_readable_gateway_record_is_never_started_twice`,
+  `openclaw_no_proof_path_ends_within_one_launch_bound`
+  và `openclaw_asked_after_new_is_created_with_nothing_more_called`
+  (`tests/harness.rs`).
 - **Chưa bao giờ bắt đầu: báo và đóng** (#6577): một việc giao cho OpenClaw
   của chính đèn, trong lần khởi động này, mà sau khi được nhận
   `OPENCLAW_BEGIN_WITHIN_MS` (130 s: lần câu hỏi đầu chậm nhất thật đã thấy,
@@ -1992,11 +2427,43 @@ và có `--targets-from-machines`:
   đăng nhập `Harness is signed in, but this lamp is not among its machines
   yet`. Việc đã bắt đầu dưới id máy của tài khoản chỉ đọc
   được khi đã đăng nhập; các máy tính vẫn cần đăng nhập.
+- **Đăng xuất (#7275, #7273).** Đăng xuất trong app Harness cũng dừng daemon,
+  như đăng nhập, và trước đây không gì khởi động lại nó, nên mọi lần giao việc
+  cho target của đèn đều bị trả lời "Harness is not running here". Khi một
+  lần đọc sign-in chuyển từ đã đăng nhập sang chưa đăng nhập trong lúc target
+  của đèn có thể bật, phần tasks chạy `harness start` thường (không
+  `--restart`: nó khởi động daemon đã dừng và để yên daemon đang chạy, nên
+  không bao giờ chờ các việc bận trong lúc mọi lần giao việc đều thất bại;
+  cùng số lần thử) và journal ghi `Harness signed out: its daemon is started again for the lamp's
+  own target (#7275)`.
+- **Trả lời "not running here" (#7275).** Lưới an toàn khi daemon vẫn mất (chết,
+  hoặc lần khởi động trên thất bại): `new` bị Harness từ chối với "Harness is
+  not running here. Start it with `harness start`." (`NOT_RUNNING` của CLI,
+  trên stderr hoặc stdout) kết thúc `not_sent` với `harness_not_running`, vì
+  chưa có gì được khởi động; dòng dispatch mang nguyên dòng "not running" của
+  stderr; mọi dòng stderr khác vẫn bị cắt như thường, và cả stderr cũng vậy khi
+  câu trả lời chỉ nằm trên stdout. Phần tasks đặt lần khởi động daemon đến hạn ngay (`harness start`,
+  đếm lại số lần thử; lần đã đến hạn thì giữ nguyên) và đưa việc đó về đầu
+  hàng đợi, nên cổng daemon khởi động daemon trước khi giao lại. Mỗi việc chỉ
+  một lần: lần trả lời "not running" thứ hai kết thúc `not_sent` với
+  `harness_not_running`, không có `new` thứ ba. Journal ghi `<label>: Harness
+  answered not running here; its daemon is started and the hand-over tried
+  once more`. Quy tắc nằm trong một helper chung (`harness::DaemonOnce`):
+  vòng owner dùng `DaemonOnce::again`/`done`; nơi tự chạy `new` (lần chạy skill,
+  `HarnessRunner`; sau này pane mở trên một session và make runner) dùng `DaemonOnce::run` với `DaemonGate::shared()`,
+  helper này trước hết chờ (tối đa 30 s, `DAEMON_GATE_WAIT`) lần khởi động mà
+  owner đã đặt hoặc đang chạy (ví dụ lần lúc boot) và không bao giờ khởi động
+  lần thứ hai. Giọng nói nói việc `harness_not_running` bằng lời `failed`
+  thường của Task news.
 - **Lời nói.** Dòng health nói `computers_need_sign_in` ("Harness is not signed
   in: tasks go to the lamp's own agent; sign in to hand tasks to your
   computers") thay cho `not_signed_in`, và `harness_status` của giọng nói nói
   như trên.
 - **Test:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`,
+  `a_sign_out_starts_the_daemon_again_for_the_lamps_own_target`,
+  `a_hand_over_harness_answers_not_running_starts_its_daemon_and_goes_once_more`,
+  `a_hand_over_harness_answers_not_running_twice_is_refused_once_with_no_loop`,
+  `a_hand_over_while_the_first_daemon_start_is_under_way_waits_for_that_one`,
   `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`,
   `signed_out_the_computers_own_id_is_read_with_the_sign_in`.
 - **Chưa thử trên đèn:** chưa đăng nhập, "ask Hermes …" được trả lời và câu hỏi
@@ -2268,6 +2735,44 @@ nghe trọn chỉ quyết định có kể lại hay không (`LAMP_TASK_NEWS_RET
   `news_begun_closes_its_harness_at_once_and_is_still_told_once_more`
   (`task_news`).
 
+**Giữ lại khi đèn đang tắt mic hoặc đang nghe** (lamp-c0a4, 16/11 15:35):
+một việc xong đúng lúc voice đang khởi động lại; say service của voice từ
+chối lời hỏi của kỹ năng với "the lamp is muted", và tin phải chờ 12 phút đến
+câu nói tiếp theo của người dùng. Giờ lamp-skills giữ một lời say
+`from: tasks` mà voice từ chối vì đèn tắt mic hoặc đang nghe, và hỏi lại mỗi
+2 s (`lamp_skills::NEWS_HELD_RETRY_MS`) cho đến khi đèn rảnh, nên tin được kể
+lúc đó, một lần (voice kể mỗi tin một lần, dù ai hỏi). Các lần chạy sau của
+kỹ năng xếp hàng sau lần đang giữ, nên các tin được giữ được kể đúng thứ tự.
+Khi đèn ở chế độ riêng tư (công tắc riêng tư đọc là đóng trên
+`voice/privacy`, hoặc voice bị người dùng tắt mic:
+`lamp_skills::routine::private_for_news`) thì tin không được giữ và chờ câu
+trả lời tiếp theo, như trước; công tắc chưa đọc được, như lúc voice khởi động
+lại, không tính là riêng tư, và lệnh tắt mic của restart guard sau một lỗi
+(`muted_by: restart_guard`) cũng không, nên tin lúc đó được giữ. Giữ quá 5 phút (`NEWS_HELD_MOST_MS`) kể từ lần
+từ chối đầu thì tin bị bỏ. Từ chối vì lý do khác thì không giữ. Một lần nhờ
+mà voice đã nhận nhưng không bắt đầu được trước khi hết hạn thì trả về
+`say: expired`; lần đó không được nhờ lại, voice vẫn giữ tin và kể ở câu
+trả lời kế tiếp (lamp-c0a4, 16/11: tin của task 83 hết hạn lúc 20:14:18 khi
+voice còn đang khởi động, và được kể ở câu trả lời kế tiếp lúc 20:18:55). Journal có
+một dòng khi giữ, và một dòng khi kể, khi nhường cho chế độ riêng tư hoặc khi
+bỏ, chỉ có số việc, số đếm và mã, không bao giờ có lời của tin:
+
+```
+lamp-skills: skill:task-news: news held (task 62): say: refused (the lamp is muted); asked again each 2 s, at most 300 s
+lamp-skills: skill:task-news: news asked again after 6 s held (task 62, 4 asks): say: spoken
+lamp-skills: skill:task-news: news dropped: held 300 s (151 asks) for the lamp to be free, past its 300 s bound (task 62)
+```
+
+Test: `news_refused_while_muted_or_listening_is_held_then_told_once`,
+`two_held_news_items_are_told_in_order`,
+`news_held_past_its_bound_is_dropped_with_its_line`,
+`news_refused_with_privacy_on_waits_for_the_next_reply_as_before`
+(lib của lamp-skills), và
+`task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free`,
+`task_news_refused_with_the_privacy_switch_closed_is_not_held`,
+`task_news_refused_under_the_restart_guards_mute_is_held_and_told_once`,
+`task_news_refused_muted_by_the_button_is_not_held` (bin).
+
 ## Việc giao là toàn bộ lời nhờ (#6527)
 
 Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that
@@ -2308,3 +2813,85 @@ khi hỏi phần tasks:
   said that is not part of it." Các từ bị bỏ không bao giờ được nêu lại. Mỗi request chỉ từ chối một lần:
   lần gọi thứ hai trong cùng request được cho qua, nên người dùng không bao
   giờ bị kẹt.
+
+## Các bước của agent (`tasks/step`, #7267, tắt trừ khi `LAMP_TASKS_STEPS=on`)
+
+Khi một việc do lamp-tasks giao cho OpenClaw của chính đèn đang được theo
+dõi, lamp-tasks đọc transcript của phiên đó mỗi giây một lần và đưa từng
+bước lên bus thành `tasks/step` (`TaskStep`, `crates/tasks/src/steps.rs`).
+
+- **Công tắc:** `LAMP_TASKS_STEPS`, đúng chữ `on`. Tắt nếu không đặt, và
+  tắt trong unit sản phẩm (dòng trong `deploy/product/lamp-tasks.service`
+  để ở dạng comment). Khi tắt, không đọc gì, topic không được khai báo, và
+  phần lưu trữ không chuyển danh sách việc đang theo dõi sang.
+- **Transcript ở đâu:** OpenClaw 2026.11 lưu transcript trong SQLite, không
+  phải trong file (đã đọc trên 52e6 ngày 16/11).
+  - Database là `<state>/agents/<agent>/agent/openclaw-agent.sqlite`.
+    `<state>` là `/var/lib/lampos-openclaw/state`, hoặc
+    `LAMP_TASKS_STEPS_STATE` (đường dẫn tuyệt đối) nếu có đặt.
+  - Database được mở chỉ đọc (`mode=ro`, không dùng `immutable` vì
+    OpenClaw ghi ở chế độ WAL), không đi qua link, và chờ tối đa 100 ms khi
+    database đang bận.
+- **Phiên nào:** là dòng `session_nodes` có `session_key` kết thúc bằng
+  `:harness-<agentId>`. Trên 52e6, key có đúng dạng
+  `agent:main:harness-<uuid>`. Các sự kiện là những dòng `transcript_events`
+  có `current_session_id` của dòng đó, đọc theo `seq`.
+- **Khi không đọc được database:** nếu database bị khóa, không có, hoặc
+  thiếu bảng hay cột cần đọc, thì không đăng gì, và journal ghi một dòng.
+  Một lần đọc lỗi không bao giờ được hiểu là "không có phiên". Nếu không
+  đọc được điểm bắt đầu của việc lúc việc được theo dõi lần đầu, việc đó
+  chưa có điểm bắt đầu: không đọc gì cho nó, và một giây sau đọc lại điểm
+  bắt đầu. Điểm bắt đầu không bao giờ được lấy là 0 hay cả phiên. Một lần
+  đọc lỗi về sau thì không đăng gì, và không đặt lại hay dời vị trí đã đọc.
+- **Chỉ lời của chính việc đó:** mỗi việc bắt đầu sau `seq` lớn nhất của
+  phiên vào lúc việc được theo dõi lần đầu. Không đọc gì tới `seq` đó, kể
+  cả với việc giao từ lần khởi động trước. Mỗi việc được giữ kèm agent id
+  của Harness. Khi một việc mới bắt đầu trên cùng agent, việc cũ chỉ đọc
+  tới chỗ việc mới bắt đầu. Điều này vẫn đúng khi việc cũ bắt đầu trước lúc
+  OpenClaw tạo phiên: khi chưa có phiên, việc cũ không đọc gì. Giới hạn
+  này chỉ được xóa khi id của phiên đổi.
+- **Cái gì thành một bước:**
+  - Mỗi `toolCall` thành `call`, được đăng ngay với `ok` trống (đang
+    chạy). `args` là `arguments.command`, hoặc JSON gọn của các tham số.
+  - Khi đọc thấy `toolResult`, cùng số bước đó được đăng lại với `result`
+    và `ok`. Bản mới nhất của mỗi `(task, n)` là bản có hiệu lực.
+  - Lời trả lời của agent thành `reply`, với `tool` trống.
+  - `stopReason: "error"` hoặc `errorMessage` thành `error`.
+  - Lời nhờ của người dùng (role `user`) không bao giờ được đăng.
+  - Bỏ qua các loại sự kiện khác.
+  - Thời gian là `timestamp` dạng số của message, nếu không có thì là
+    `created_at` của dòng. Sự kiện không có thời gian nào thì bỏ qua.
+- **Sự kiện nén:** dòng có `event_json` trống và dữ liệu trong
+  `event_zstd` (27 trên 115 dòng ở 52e6, là các kết quả tool lớn) được giải
+  nén bằng `ruzstd` 0.7.3, thư viện thuần Rust, không cần build C. Việc
+  giải nén chạy theo luồng và dừng ở 64 KiB + 1 byte, không bao giờ giải
+  nén thêm. Dòng giải nén ra quá 64 KiB, bị hỏng, hoặc có frame đòi window
+  lớn hơn 1 MiB (đọc header trước, vì bộ giải nén sẽ giữ trước cả window,
+  tới 100 MiB), thì bị bỏ qua và được đếm.
+- **Không kỹ năng nào được đọc:** `tasks/step` (cùng `voice/decision`) nằm trong `NEVER_READ` của
+  `lamp-skills`.
+- **Giới hạn:**
+  - Tối đa 50 bước một việc; các bước sau bị bỏ và được đếm.
+  - Mỗi lần đọc (mỗi giây) lấy tối đa 200 sự kiện và 256 KiB chữ, cho mọi việc cộng lại; phần còn lại chờ lần đọc sau.
+  - Sự kiện dài quá 256 KiB thì bị bỏ qua.
+- **Không lưu gì:** không ghi gì, và database không bao giờ được mở để
+  ghi. Vị trí chỉ nằm trong bộ nhớ; sự kiện trên bus là bản duy nhất.
+- **Luồng riêng:** việc đọc, giải nén và parse chạy trên luồng riêng
+  `tasks-steps`, không bao giờ trên vòng lặp nhận socket của voice.
+- **Ẩn bí mật:** trước khi cắt ở 40/120 byte, `args`, `result`, lời trả
+  lời và lỗi được thay bằng `***` ở các chỗ sau: chữ sau `Bearer` hoặc
+  `Basic`; giá trị của `NAME=value` có tên giống bí mật (KEY, TOKEN,
+  SECRET, PASSWORD, AUTH, COOKIE), kể cả trong JSON tham số; và từ trông
+  như token (từ 24 ký tự trở lên, có cả chữ lẫn số, hoặc có tiền tố khóa
+  đã biết).
+- **Link:** file database được mở với `NOFOLLOW` (tối đa 64 lời gọi đang
+  chờ kết quả). Thư mục state được resolve trước (`fs::canonicalize`), nên
+  chỉ phần nằm dưới nó không được là link.
+- **Độ trễ:** bước lên bus trong vòng 1 s, và lên trang peek trong khoảng
+  2 s. Peek hiện bước ở mọi chế độ; chỉ tham số và kết quả của bước mới cần
+  chế độ monitor.
+
+Fixture `crates/tasks/tests/fixtures/openclaw-session-research.jsonl` có
+mỗi dòng là một `event_json`, mọi chữ đều là chữ bịa ra. Test nạp nó vào một
+database SQLite có các bảng của OpenClaw. Đây là bản tạm (placeholder) cho
+tới khi có dòng thật đã lược bớt. Chưa thử trên đèn.

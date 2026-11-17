@@ -1131,6 +1131,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A rename's yes judged by its guards (`LAMP_NAMES_RENAME_YES`,
         // #5485): only with names checked.
         rename_yes: settings.names_checked && crate::known_faces::rename_yes_on(),
+        // A name the face paths lost on lamp-74ff kept (`LAMP_NAME_LEARN_FIX`,
+        // #7331): only with names checked.
+        name_learn_fix: settings.names_checked && crate::known_faces::name_learn_fix_on(),
     }
 }
 
@@ -1595,6 +1598,34 @@ pub fn skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec
     asks
 }
 
+/// The key of lamp-skills' tools file that gives each skill made on the
+/// lamp started by its own words (`LAMP_MADE_SKILL_ASKS`): its phrases by
+/// the skill's name, for a skill with `asks` and no tool
+/// (`lamp_skills::tools_file`). Absent with none, as before.
+pub const MADE_ASKS: &str = "made_asks";
+
+/// Each made skill's own words, by its name, from the first skills folder
+/// whose tools file gives them ([`MADE_ASKS`]): what
+/// [`crate::skill_named`] matches a heard line against to run it now
+/// (`crate::made_run`). Empty from an older file.
+pub fn made_skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut asks = std::collections::BTreeMap::new();
+    for file in tools_files(settings) {
+        if let Some(given) = file[MADE_ASKS].as_object() {
+            for (skill, phrases) in given {
+                let phrases: Vec<String> = phrases
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|phrase| phrase.as_str().map(str::to_owned))
+                    .collect();
+                asks.entry(skill.clone()).or_insert(phrases);
+            }
+        }
+    }
+    asks
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();
@@ -1663,7 +1694,15 @@ fn run_spoken_call_inner(
             && context.call_id == call.id
             && context.check().is_ok()
     });
-    let result = if let Route::UseSkill(settings) = route {
+    let result = if let Route::UseSkill(settings) = route
+        && let Some(asked) = crate::skill_about::asked(call)
+    {
+        // A question about a skill on the lamp (`LAMP_SKILL_STATE_TOLD`,
+        // #7335): told from the lamp's own records, no skill run.
+        let told =
+            crate::skill_about::told_here(asked, request, heard, lease, settings.skills.as_deref());
+        (crate::skill_about::WHOM, ToolAnswer::plain(told), true)
+    } else if let Route::UseSkill(settings) = route {
         let skills = skill_tools(settings);
         match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
             Ok(skill) => match self::route(settings, &skill.name) {
@@ -2093,13 +2132,32 @@ fn run_call_with_scope(
                                     eprintln!(
                                         "lamp-voice: request {request}: the forget their yes agreed to runs in their scope by its id (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
                                     );
-                                    crate::remember::run_scoped_for(
+                                    // By its id alone; the words it was
+                                    // about then take their exchanges about
+                                    // it, theirs only, as a forget about
+                                    // does (C128, lamp-06c1 build 13523).
+                                    let by_id = ToolCall {
+                                        args: json!({"source_id": call.args["source_id"]}),
+                                        ..call.clone()
+                                    };
+                                    let told = crate::remember::run_scoped_for(
                                         socket,
-                                        call,
+                                        &by_id,
                                         deadline.saturating_sub(started.elapsed()),
                                         lease,
                                         &person,
-                                    )
+                                    );
+                                    match call.args.get("about") {
+                                        Some(about) => crate::remember::agreed_forget_exchanges(
+                                            socket,
+                                            told,
+                                            about,
+                                            &person,
+                                            deadline.saturating_sub(started.elapsed()),
+                                            lease,
+                                        ),
+                                        None => told,
+                                    }
                                 }
                                 None => {
                                     eprintln!(
@@ -2428,6 +2486,21 @@ fn run_call_with_scope(
                 heard,
                 *held,
                 crate::reports_stop::ANSWER_WITHIN,
+            ),
+        ),
+        // A question about a skill on the lamp (`LAMP_SKILL_STATE_TOLD`,
+        // #7335): told from the lamp's own records, no skill run.
+        Route::UseSkill(settings) if crate::skill_about::asked(call).is_some() => (
+            crate::skill_about::WHOM,
+            (
+                crate::skill_about::told_here(
+                    crate::skill_about::asked(call).unwrap_or_default(),
+                    request,
+                    heard,
+                    lease,
+                    settings.skills.as_deref(),
+                ),
+                true,
             ),
         ),
         Route::UseSkill(settings) => {
@@ -3024,6 +3097,7 @@ mod tests {
             at_setup: false,
             record: false,
             rename_yes: false,
+            name_learn_fix: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
@@ -4931,6 +5005,76 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// A `use_skill` call with `about` is answered from the skills'
+    /// records on both paths, the spoken route's and the generic one, and
+    /// runs no skill: here, with no skills folder at the product's place,
+    /// the lamp can't check, and never guesses; a turn nobody spoke is told
+    /// nothing. Off, it is a `use_skill` call naming no skill, as before.
+    #[test]
+    fn a_question_about_a_skill_is_answered_through_use_skill() {
+        let (dir, mut settings) = many_skills("skill-state-route");
+        settings.use_skill = true;
+        let call = ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"about": "water reminder"}),
+        };
+        let route = route(&settings, &call.name);
+        crate::skill_about::set_on_here(Some(true));
+        let (whom, answer, answered) = run_spoken_call(&settings, &route, &call, 1, true, None);
+        assert_eq!(whom, crate::skill_about::WHOM);
+        assert!(answered);
+        assert_eq!(
+            answer.told,
+            json!({"error": crate::skill_about::CANT_CHECK})
+        );
+        let (whom, (told, answered)) = run_call_with_scope(&route, &call, 2, true, None);
+        assert_eq!(whom, crate::skill_about::WHOM);
+        assert!(answered);
+        assert_eq!(told, json!({"error": crate::skill_about::CANT_CHECK}));
+        let (_, (told, _)) = run_call_with_scope(&route, &call, 3, false, None);
+        assert_eq!(told, json!({"error": crate::skill_about::NOT_ASKED_ALOUD}));
+        crate::skill_about::set_on_here(Some(false));
+        let (whom, answer, _) = run_spoken_call(&settings, &route, &call, 4, true, None);
+        crate::skill_about::set_on_here(None);
+        assert_eq!(whom, crate::use_skill::NAME);
+        assert!(
+            answer.told["error"]
+                .as_str()
+                .is_some_and(|error| error.starts_with("There is no skill named that")),
+            "{}",
+            answer.told
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The first builder's condition on #7335: no new function. With
+    /// `LAMP_SKILL_STATE_TOLD` a session's functions are the same by name
+    /// and count, and its setup line is the same, as without it.
+    #[test]
+    fn a_question_about_a_skill_adds_no_function() {
+        let (dir, mut settings) = many_skills("skill-state-told");
+        settings.use_skill = true;
+        settings.make_skill = true;
+        let names_and_line = || {
+            let tools = declared(&settings);
+            let line = crate::session_tools::setup_line(&tools, &settings);
+            let names: Vec<String> = tools.into_iter().map(|tool| tool.name).collect();
+            (names, line)
+        };
+        crate::skill_about::set_on_here(Some(false));
+        let off = names_and_line();
+        crate::skill_about::set_on_here(Some(true));
+        let on = names_and_line();
+        crate::skill_about::set_on_here(None);
+        assert!(
+            off.0.iter().any(|name| name == crate::use_skill::NAME),
+            "{off:?}"
+        );
+        assert_eq!(on, off);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// #1668: past the 32, one skill was dropped without a word. With
     /// `use_skill` a session is given that one function for every skill,
     /// and none of the skills' own; its instruction lists them.
@@ -6489,6 +6633,96 @@ mod tests {
                         .is_some_and(|note| note.contains("still kept")),
                     "{told}"
                 );
+            }
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
+
+    /// lamp-06c1, build 13523 (C128): the agreed one-face forget held with
+    /// its `about` words runs the kept thing by its id, and then that
+    /// person's exchanges about those words (`exchanges_forget`), as a
+    /// forget about does: in their scope alone, never another's or the
+    /// room's. A by-id forget the memory did not confirm takes no
+    /// exchanges.
+    #[test]
+    fn an_agreed_one_face_forget_about_takes_their_exchanges_about_it() {
+        let nell = crate::remember::person_id("Nell");
+        for (at, confirmed) in [(0u64, true), (1, false)] {
+            let socket = std::env::temp_dir().join(format!(
+                "one-face-agreed-about-{at}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let by_id: &'static [u8] = if confirmed {
+                b"{\"ok\":true,\"removed\":1}\n"
+            } else {
+                b"{\"ok\":false,\"error\":\"busy\"}\n"
+            };
+            // Each line the memory is asked, answered in turn; the next
+            // waited for half a second at most.
+            listener.set_nonblocking(true).unwrap();
+            let served = std::thread::spawn(move || {
+                let mut asked = vec![];
+                for answer in [by_id, b"{\"ok\":true,\"removed\":2}\n".as_slice()] {
+                    let until = Instant::now() + Duration::from_millis(500);
+                    let mut stream = loop {
+                        match listener.accept() {
+                            Ok((stream, _)) => break stream,
+                            Err(_) if Instant::now() < until => {
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(_) => return asked,
+                        }
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    let mut line = String::new();
+                    BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .unwrap();
+                    stream.write_all(answer).unwrap();
+                    asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                }
+                asked
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x58; 16]).unwrap(),
+                    session: 1,
+                    request: 6_674_000 + at,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Nell"),
+            );
+            let lease = owner.lease();
+            assert!(lease.read_by_one_face());
+            let yes = crate::second_provider::one_face_forget_yes_for_test();
+            lease.mark_forget_agreed(&yes, 3);
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "a13523".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({"source_id": 3, "about": "the recheck party"}),
+            };
+            assert!(lease.agreed_forget(&call.args), "agreed with its words");
+            let told = answer_scoped(&settings, &call, 6_674_000 + at, false, &lease);
+            let asked = served.join().unwrap();
+            assert_eq!(asked[0]["person"], json!(nell), "{told}");
+            assert!(asked[0].get("about").is_none(), "by its id: {asked:?}");
+            if confirmed {
+                assert_eq!(asked.len(), 2, "{asked:?} {told}");
+                assert_eq!(asked[1]["op"], json!("exchanges_forget"), "{asked:?}");
+                assert_eq!(asked[1]["person"], json!(nell), "theirs only: {asked:?}");
+                assert_eq!(
+                    asked[1]["about"],
+                    json!([["recheck", "party"]]),
+                    "{asked:?}"
+                );
+                assert_eq!(told["exchanges"], json!(2), "{told}");
+            } else {
+                assert_eq!(asked.len(), 1, "no exchanges asked: {asked:?} {told}");
             }
             std::fs::remove_file(socket).unwrap();
         }

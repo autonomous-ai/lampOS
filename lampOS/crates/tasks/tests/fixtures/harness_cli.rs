@@ -176,6 +176,41 @@ pub fn main() -> io::Result<()> {
             }
         );
     }
+    // `{"write_answer": "TEXT"}`: as a voice make's agent would (#7245),
+    // TEXT written to `answer.md` in the folder the call names (its first
+    // argument that is an absolute folder).
+    if let Some(text) = step["write_answer"].as_str()
+        && let Some(folder) = args
+            .iter()
+            .map(PathBuf::from)
+            .find(|path| path.is_absolute() && path.is_dir())
+    {
+        private_write(folder.join("answer.md"), text.as_bytes())?;
+    }
+    // `{"live_in_new_folder": "ID"}` (`ps`): agent ID live in the folder
+    // the last `new` named (its first absolute folder argument), as an
+    // uncertain `new` Harness finished late would be (#7245).
+    if let Some(id) = step["live_in_new_folder"].as_str() {
+        let folder = fs::read_to_string(home.join("calls.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .rev()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|call| call["args"][0] == "new")
+            .and_then(|call| {
+                call["args"].as_array().and_then(|args| {
+                    args.iter()
+                        .filter_map(Value::as_str)
+                        .find(|arg| arg.starts_with('/'))
+                        .map(str::to_owned)
+                })
+            })
+            .unwrap_or_default();
+        println!(
+            "{}",
+            json!({"harnesses":[{"id":id,"name":"make","folder":folder,"state":"working"}]})
+        );
+    }
     if let Some(ms) = step["delay_ms"].as_u64() {
         thread::sleep(Duration::from_millis(ms.min(5000)));
     }

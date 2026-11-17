@@ -34,12 +34,13 @@ pub const DEFAULT_MOVING_LEAST: f32 = 0.99;
 /// What lamp-body plays of its own at rest, and says on `body/gesture` as it
 /// does a gesture: its shifts at rest (`lamp_body::idle::MOVES`) and its look
 /// around (`scanning`, which the control schema doesn't offer either).
-pub const AT_REST: [&str; 6] = [
+pub const AT_REST: [&str; 7] = [
     "idle",
     "tilt_left",
     "tilt_right",
     "look_up",
     "dip",
+    "settle",
     "scanning",
 ];
 

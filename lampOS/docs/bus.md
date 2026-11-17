@@ -438,12 +438,13 @@ of each, and its kind and period as a declaration, are in
 | `humans/hands/wanted` | Whether anyone wants a hand looked for | latched | lamp-control | When a computer's look at a hand starts or ends |
 | `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
 | `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; Mood reads its kind with `LAMP_MOOD_SEEMS=on` (#1671, mood.md); the second voice tells a known person's turn how they seem with `LAMP_SECOND_SEEMS=on` (second-voice.md) | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
-| `humans/doing` | What the person at the desk was last seen doing this sitting: seconds since a drink, eating or a stretch was seen (from the desk arrival when none was, so always said), the last seen and how sure (#6543); the second voice tells a known person's turn the last thing seen, as context only, with `LAMP_SECOND_DOING=on` (second-voice.md) | latched | `lamp-seen` ([seen.md](seen.md), #6543 phase 2; off unless `LAMP_SEEN_ACTIVITY=on`, no product unit yet) | Every 30 s while a sitting lasts, and at once after a burst that saw something; each good for 90 s; begun again on `room/stood_up` |
+| `humans/doing` | What the person at the desk was last seen doing this sitting: seconds since a drink, eating or a stretch was seen (with `LAMP_SEEN_BREAK_IS_STANDING=on`, the break since their return from a stand-up, not a stretch; from the desk arrival when none was, so always said), the last seen and how sure (#6543); the second voice tells a known person's turn the last thing seen, as context only, with `LAMP_SECOND_DOING=on` (second-voice.md) | latched | `lamp-seen` ([seen.md](seen.md), #6543 phase 2; off unless `LAMP_SEEN_ACTIVITY=on`, no product unit yet) | Every 30 s while a sitting lasts, and at once after a burst that saw something; each good for 90 s; begun again on `room/stood_up` |
 | `humans/doing_seen` | One activity newly seen, drinking, eating or a break, and how sure (#6543) | event | `lamp-seen` ([seen.md](seen.md), #6543 phase 2; off unless `LAMP_SEEN_ACTIVITY=on`) | Once for each kind newly seen, not seen in the burst before |
 | `humans/posture` | How the person at the desk has sat over the current window: its length, the share of samples read as bad, and the region most often bad (#6543) | latched | `lamp-seen` ([seen.md](seen.md#phase-3-posture), #6543 phase 3; off unless `LAMP_SEEN_POSTURE=on`) | Every 30 s while someone sits; each good for 90 s |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
 | `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
+| `voice/decision` | What the lamp decided on a turn (#7267, `VoiceDecision`): `answered` with the functions it called (names only, at most 8, each at most 40 bytes); `handed` with the task's number, the engine it goes to (always named, 1..32 lowercase letters, digits or `_`), and its stage (`prepared`, `started`, `declined`); `held_back`; or `error` with a short code name. With `first_reply_ms` (words heard to first answer audio) and `host_request` (the earlier request it steers or joins) when known; a request may have several, the latest per request wins. Names and numbers only, never words | stream | The second voice, on the bus as `voice/turn` is | `answered` once a turn its model finished (or declined after a tool ran), with that turn's tools; `held_back` as `voice/turn` says it; `handed` once at each step of a hand-over: prepared, started (the yes taken in code, or the model's confirm), declined (the person's no, or a corrected ask replacing it); a turn that handed work over then ends as that hand-over with its tools and time added, never `answered`, so the latest per request still shows it |
 | `voice/tone` | How a line sounded against the person's own way of speaking: its request, its arousal (calm -1 to lively +1, from its prosody), how sure, and its valence (down -1 to glad +1, from its words, when a word says it). Numbers only ([voice-tone.md](voice-tone.md)) | stream | Voice, with `LAMP_VOICE_TONE=on` | Once a line, when its words come |
 | `memory/forgot` | Memory has forgotten everything under a person, asked by the app or by voice: their id only, or none for every person ([memory.md](memory.md#forgets-told-on-the-bus-memoryforgot)) | event | Memory, with `--bus-root` | Once a forget |
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
@@ -524,6 +525,7 @@ that owns it:
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
 | `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
 | `humans/doing`, `humans/doing_seen`, `humans/posture` | `lamp-seen` (`lamp_seen`), from pictures sent to be labelled (#6543); declared in `lamp_msgs::doing_topics()`; `humans/doing` and `humans/doing_seen` published by `lamp-seen` from phase 2 (off unless `LAMP_SEEN_ACTIVITY=on`), `humans/posture` by nobody yet | the voice (`humans/doing`, with `LAMP_SECOND_DOING=on`, second-voice.md), memory, the policy and skills, each as it is built (#6543); a skill names them in `[permissions] topics`, the `seen` use ([cloud.md](cloud.md)) |
+| `humans/doing_more` | `lamp-seen` (`lamp_seen`), only with `LAMP_SEEN_MORE_DOINGS=on`: tiredness, desk work as a coarse kind and celebrating, timed from the same bursts (#6543); declared in `lamp_msgs::doing_topics()` | nobody yet; a skill names it in `[permissions] topics`, the `seen_more` use, apart from `seen` ([cloud.md](cloud.md)) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
 | `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
@@ -670,6 +672,7 @@ are unchanged.
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `tasks/status` | latest, no period, no lifespan | `lamp-tasks serve --progress` | The policy's progress question (`lamp-policy --progress`); the voice's task news, for a task newly settled (#560, [tasks.md](tasks.md), "Telling") and, with `LAMP_PROGRESS_NEWS=on`, for progress; `lamp-peek`'s Tasks section and overview, read as the kept value ([peek.md](peek.md), #7208) |
+| `tasks/step` | event, no period, no lifespan | `lamp-tasks serve` with `LAMP_TASKS_STEPS=on` (off unless set, off in the product): a watched OpenClaw task's steps read from its session in OpenClaw's SQLite (read-only) every second, from its own `seq` on; a call twice, running then with its result, the latest per `(task, n)` winning; at most 50 a task; never a skill's to read ([tasks.md](tasks.md), "An agent's steps", #7267) | `lamp-peek`, in every mode; only a step's arguments and result need monitor mode (#7267 PR 3) |
 
 The [`TaskStatus` message](msgs.md#the-tasks-contract) says, as typed state,
 how each piece of work the lamp handed over is going; the agent's words stay
@@ -677,6 +680,14 @@ in the tasks part and are read from its socket only when the lamp will speak
 ([tasks.md](tasks.md#progress-on-the-bus-serve---progress-732)). One value
 holds every task, so a subscriber that starts late has them all. Without
 `--progress` the topic is never made.
+
+The [`TaskStep` message](msgs.md#the-tasks-contract) (#7267) is one step an
+agent took: the task's number, its engine, the step's number, when, its kind
+(`call`, `reply`, `error`), the tool called (at most 40 bytes), the start of
+its arguments and of its result (each at most 120 bytes, cut on a whole
+character), and whether it succeeded when the transcript says. It carries words, so its publisher will be
+switched and off unless set. The task's number is the same one
+`tasks/status` and `voice/decision` give.
 
 ## Optional skills topic (seventh builder, 2026-10-16)
 

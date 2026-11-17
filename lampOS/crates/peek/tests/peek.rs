@@ -11,6 +11,7 @@ use lamp_peek::{
     page,
     serve::{self, Peek},
     timeline::{self, Timeline},
+    turns::{ReadStatus, Snapshot, Turn},
     units::UnitRow,
     watch::{self, Seen},
 };
@@ -878,7 +879,7 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     safe(&sections);
     assert!(!sections["turns"].contains(PERMISSION));
     assert!(!sections["turns"].contains(STALE));
-    assert_eq!(sections["turns"].matches("<td>432</td>").count(), 1);
+    assert_eq!(sections["turns"].matches(">turn 432<").count(), 1);
     for (boundary, elapsed) in [
         ("first_denied", first),
         ("first_readable", readable),
@@ -996,7 +997,7 @@ fn the_one_page_streams_each_section_and_never_a_word() {
         "{turns}"
     );
     assert!(
-        turns.contains("<td class=\"slow\" title=\"first token\">"),
+        turns.contains("<span class=\"chip slow\" title=\"first token\">"),
         "{turns}"
     );
     assert!(turns.contains("played"), "{turns}");
@@ -1018,7 +1019,7 @@ fn the_one_page_streams_each_section_and_never_a_word() {
     // The timeline has the turn heard, without its words.
     let timeline = &sections["timeline"];
     assert!(
-        timeline.contains("request 4") && timeline.contains("<th>heard</th>"),
+        timeline.contains("request 4") && timeline.contains("heard +0 ms"),
         "{timeline}"
     );
     assert!(!timeline.contains(page::WORDS_SHOWN), "{timeline}");
@@ -1143,17 +1144,20 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     let with = format!("Cookie: peek_session={session}\r\n");
     let sections = stream_until_as(&rig, "lamp-test.local", &with, "It&#39;s blue now.");
     let timeline = &sections["timeline"];
-    assert!(timeline.contains(page::WORDS_SHOWN), "{timeline}");
+    // The banner is the page's, once, not the section's.
+    assert!(!timeline.contains(page::WORDS_SHOWN), "{timeline}");
     let order = [
-        "<th>heard</th>",
-        "&lt;script&gt;blue&lt;/script&gt;",
-        "<th>understood</th>",
-        "answered, final words 250 ms",
-        "<th>did</th>",
+        "<span class=\"lbl\">IN</span> “turn the light &lt;script&gt;blue&lt;/script&gt;”",
+        "<span class=\"lbl\">DID</span>",
         "light blue at 3",
         "skill glow done",
-        "<th>said</th>",
+        "<span class=\"lbl\">OUT</span> “It&#39;s blue now.”",
         "first audio 1100 ms",
+        "heard +0 ms",
+        "understood +",
+        "answered, final words 250 ms",
+        "did +",
+        "said +",
     ];
     let mut from = 0;
     for wanted in order {
@@ -1166,23 +1170,26 @@ fn monitor_mode_the_timeline_shows_a_turn_in_order_with_its_words_escaped() {
     assert!(!timeline.contains("PRIVATE"), "{timeline}");
     assert_eq!(timeline.matches("light blue at 3").count(), 1, "{timeline}");
     // Heard is the end of speech; each later step comes after it.
-    assert!(timeline.contains("<td>+0 ms</td>"), "{timeline}");
     let times: Vec<u64> = timeline
-        .split("<td>+")
+        .split(" +")
         .skip(1)
         .map(|rest| rest.split(" ms").next().unwrap().parse().unwrap())
         .collect();
     assert_eq!(times.len(), 5, "{timeline}");
     assert!(times.windows(2).all(|pair| pair[0] <= pair[1]), "{times:?}");
     assert!(times[4] >= 180, "{times:?}");
-    assert_eq!(timeline.matches("class=\"slow\"").count(), 1, "{timeline}");
+    assert_eq!(
+        timeline.matches("class=\"chip slow\"").count(),
+        1,
+        "{timeline}"
+    );
     // Never on `/bus`.
     let (status, _, body) = rig.ask_as("lamp-test.local", "GET", "/bus", &with, "");
     assert_eq!(status, 200);
     assert!(!body.contains("blue"), "{body}");
     let (status, _, page) = rig.ask_as("lamp-test.local", "GET", "/", &with, "");
     assert_eq!(status, 200);
-    assert!(page.contains(page::WORDS_SHOWN), "{page}");
+    assert_eq!(page.matches(page::WORDS_SHOWN).count(), 1, "{page}");
     assert_eq!(timeline::KEPT, 30);
 }
 
@@ -1623,4 +1630,679 @@ fn a_hostile_lamp_name_and_build_stay_escaped() {
     assert!(!html.contains("<img"), "{html}");
     assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;"));
     assert!(html.contains(page::WORDS_SHOWN));
+}
+
+/// One turn for the cards: heard at `start`, said `total` ms later, with
+/// the voice's record giving `ttft` ms to the first token.
+fn card_turn(request: u64, start: u64, total: u64, words: bool) -> timeline::Entry {
+    let (heard, said) = if words {
+        (
+            Some("heard words".to_owned()),
+            Some("said words".to_owned()),
+        )
+    } else {
+        (None, None)
+    };
+    timeline::Entry {
+        request,
+        steps: vec![
+            (start, timeline::Step::Heard(heard)),
+            (start + total, timeline::Step::Said(said)),
+        ],
+        ended_at: Some(start + total),
+        agent: None,
+    }
+}
+
+fn card_record(request: u64, ttft: u64, outcome: &str) -> Turn {
+    Turn {
+        turn: request,
+        basis: Some("local_speech".into()),
+        chat_ms: Some(ttft),
+        outcome: Some(outcome.into()),
+        ..Turn::default()
+    }
+}
+
+fn current(turns: Vec<Turn>) -> Snapshot {
+    Snapshot {
+        turns,
+        status: ReadStatus::Current,
+    }
+}
+
+/// V1's thresholds (#7208 step 2, `docs/flow-monitor.md`): ⏱ green to
+/// 5 s, amber to 15 s, red past it; ⚡ green to 3 s, amber to 8 s, red
+/// past it. At each edge and one millisecond over.
+#[test]
+fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
+    for (total, ttft, total_class, ttft_class) in [
+        (5_000, 3_000, "ok", "ok"),
+        (5_001, 3_001, "warn", "warn"),
+        (15_000, 8_000, "warn", "warn"),
+        (15_001, 8_001, "error", "error"),
+    ] {
+        let entries = [card_turn(4, 1_000_000, total, false)];
+        let html = page::timeline(
+            &entries,
+            &current(vec![card_record(4, ttft, "played")]),
+            false,
+        );
+        assert!(html.contains("class=\"turn card\""), "{html}");
+        assert!(
+            html.contains(&format!(
+                "<span class=\"lat {total_class}\">⏱ {total} ms</span>"
+            )),
+            "{total}: {html}"
+        );
+        assert!(
+            html.contains(&format!(
+                "<span class=\"lat {ttft_class}\">⚡ {ttft} ms</span>"
+            )),
+            "{ttft}: {html}"
+        );
+        assert!(
+            html.contains("<span class=\"badge badge-green\">DONE</span>"),
+            "{html}"
+        );
+        // No decision on the bus: the neutral path, not a guess (#7267).
+        assert!(
+            html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
+            "{html}"
+        );
+        // The Turns section's cards carry the same ⚡ class.
+        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]));
+        assert!(turns.contains("class=\"turn card\""), "{turns}");
+        assert!(
+            turns.contains(&format!(
+                "<span class=\"lat {ttft_class}\">⚡ {ttft} ms</span>"
+            )),
+            "{ttft}: {turns}"
+        );
+    }
+    // Still going: ACTIVE, pulsing. Failed: ERROR. A skill's, or held back
+    // without a word said, with no decision on the bus: the neutral path.
+    let going = timeline::Entry {
+        request: 7,
+        steps: vec![(1_000, timeline::Step::Heard(None))],
+        ended_at: None,
+        agent: None,
+    };
+    let html = page::timeline(&[going], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-amber pulse\">ACTIVE</span>"),
+        "{html}"
+    );
+    let entries = [card_turn(5, 1_000, 900, false)];
+    let html = page::timeline(
+        &entries,
+        &current(vec![card_record(5, 400, "failed")]),
+        false,
+    );
+    assert!(
+        html.contains("<span class=\"badge badge-red\">ERROR</span>"),
+        "{html}"
+    );
+    let skill = timeline::Entry {
+        request: 6,
+        steps: vec![
+            (1_000, timeline::Step::Heard(None)),
+            (1_200, timeline::Step::Did("skill wave done".into())),
+            (1_500, timeline::Step::Said(None)),
+        ],
+        ended_at: Some(1_500),
+        agent: None,
+    };
+    let html = page::timeline(&[skill], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"chip\">skill wave done</span>"),
+        "{html}"
+    );
+    let held = timeline::Entry {
+        request: 8,
+        steps: vec![
+            (1_000, timeline::Step::Heard(None)),
+            (1_100, timeline::Step::Understood(TurnVerdict::HeldBack)),
+        ],
+        ended_at: Some(1_100),
+        agent: None,
+    };
+    let html = page::timeline(&[held], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"badge badge-grey\">PATH ?</span>"),
+        "{html}"
+    );
+}
+
+/// Words a turn somehow carries never show outside monitor mode: the card
+/// says they are hidden.
+#[test]
+fn without_monitor_mode_no_words_heard_or_said_show() {
+    let entries = [card_turn(4, 1_000, 2_000, true)];
+    let records = current(vec![card_record(4, 900, "played")]);
+    let html = page::timeline(&entries, &records, false);
+    assert!(!html.contains("heard words"), "{html}");
+    assert!(!html.contains("said words"), "{html}");
+    assert!(!html.contains(page::WORDS_SHOWN), "{html}");
+    assert_eq!(html.matches("words hidden").count(), 2, "{html}");
+    let shown = page::timeline(&entries, &records, true);
+    assert!(
+        shown.contains("<span class=\"lbl\">IN</span> “heard words”"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("<span class=\"lbl\">OUT</span> “said words”"),
+        "{shown}"
+    );
+}
+
+/// More than 60 s between one turn's end and the next one's start draws a
+/// break, as V1's session grouping does; 60 s exactly does not.
+#[test]
+fn a_gap_over_a_minute_between_turns_draws_a_break() {
+    let records = current(Vec::new());
+    // Newest first: the older ends at 11_000.
+    let apart = [
+        card_turn(2, 71_001, 1_000, false),
+        card_turn(1, 10_000, 1_000, false),
+    ];
+    let html = page::timeline(&apart, &records, false);
+    assert_eq!(html.matches("class=\"break\"").count(), 1, "{html}");
+    let close = [
+        card_turn(2, 71_000, 1_000, false),
+        card_turn(1, 10_000, 1_000, false),
+    ];
+    let html = page::timeline(&close, &records, false);
+    assert_eq!(html.matches("class=\"break\"").count(), 0, "{html}");
+    assert_eq!(html.matches("class=\"turn card\"").count(), 2, "{html}");
+}
+
+/// In monitor mode the words show, escaped, in the card's IN and OUT lines.
+#[test]
+fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
+    let entries = [timeline::Entry {
+        request: 3,
+        steps: vec![
+            (
+                1_000,
+                timeline::Step::Heard(Some("<script>alert(1)</script>".into())),
+            ),
+            (1_100, timeline::Step::Did("<b>light</b>".into())),
+            (
+                1_900,
+                timeline::Step::Said(Some("\"><img src=x onerror=alert(2)>".into())),
+            ),
+        ],
+        ended_at: Some(1_900),
+        agent: None,
+    }];
+    let mut record = card_record(3, 500, "<i>played</i>");
+    record.basis = Some("<u>basis</u>".into());
+    let html = page::timeline(&entries, &current(vec![record]), true);
+    assert!(!html.contains("<script>"), "{html}");
+    assert!(!html.contains("<img"), "{html}");
+    assert!(
+        !html.contains("<b>light") && !html.contains("<i>") && !html.contains("<u>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"lbl\">IN</span> “&lt;script&gt;alert(1)&lt;/script&gt;”"),
+        "{html}"
+    );
+    assert!(
+        html.contains(
+            "<span class=\"lbl\">OUT</span> “&quot;&gt;&lt;img src=x onerror=alert(2)&gt;”"
+        ),
+        "{html}"
+    );
+}
+
+/// The monitor banner shows once, on top of the page, and never outside
+/// monitor mode: the Timeline section does not repeat it.
+#[test]
+fn the_monitor_banner_shows_once_and_only_in_monitor_mode() {
+    let entries = [card_turn(4, 1_000, 2_000, true)];
+    let records = current(vec![card_record(4, 900, "played")]);
+    for words in [true, false] {
+        let section = page::timeline(&entries, &records, words);
+        let html = page::main_page(words, "lamp-52e6", "0123456789abcdef")
+            .replace("waiting for the lamp...", &section);
+        assert_eq!(
+            html.matches(page::WORDS_SHOWN).count(),
+            usize::from(words),
+            "{html}"
+        );
+    }
+}
+
+/// A monitor-mode rig and the cookie header its one session opens with.
+fn monitor_rig(name: &str) -> (Rig, String) {
+    let monitor = monitor_names();
+    let session = {
+        let mut gate = monitor.gate();
+        let code = gate.issue(Instant::now()).unwrap();
+        match gate.redeem(&code, Instant::now()).unwrap() {
+            Redeemed::Session(session) => session,
+            other => panic!("{other:?}"),
+        }
+    };
+    let rig = Rig::monitor(name, monitor, conn("192.168.1.20:50000", "192.168.1.5:80"));
+    (rig, format!("Cookie: peek_session={session}\r\n"))
+}
+
+/// #7267 PR 3's fixture bus: request 3 a weather turn answered with ⚡;
+/// request 5 handed to OpenClaw as task 2, whose steps come out of order
+/// (one result hostile) and end in a reply; request 6 with no decision;
+/// request 8 a follow-up steered under request 5; request 9 an error with
+/// its code; request 7 handed as task 4, which takes 59 calls and ends in
+/// an error; requests 10 and 11 handed as tasks 6 and 7, which settle
+/// failed and needing input. Then the stream until `wanted` shows (wait on
+/// [`LAST`]). The JSON is `lamp_msgs`' (#7267, 647edf7f56).
+fn agent_turns(rig: &Rig, headers: &str, host: &str, wanted: &str) -> String {
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
+    let mut decision = rig.publisher(
+        lamp_msgs::VoiceDecision::TOPIC,
+        &lamp_msgs::VoiceDecision::declaration(),
+        "voice",
+    );
+    let mut steps = rig.publisher(
+        lamp_msgs::TaskStep::TOPIC,
+        &lamp_msgs::TaskStep::declaration(),
+        "tasks",
+    );
+    let speech = |request: u64, text: &str| Speech {
+        text: text.into(),
+        finished: true,
+        locale: None,
+        request: Some(request),
+    };
+    let step = |task: u64, n: u32, kind: &str, tool: &str, args: &str, result: &str| {
+        serde_json::json!({
+            "task": task, "engine": "openclaw", "n": n, "at_unix_ms": 1_000 + u64::from(n),
+            "kind": kind, "tool": tool, "args": args, "result": result, "ok": kind != "error",
+        })
+    };
+    // Paced: the bus promises no subscriber every message, and a burst can
+    // overrun the watcher's socket while other tests run; a new publisher
+    // also takes a rescan to find the watcher.
+    thread::sleep(Duration::from_millis(100));
+    let mut seq = 0;
+    let mut next = || {
+        thread::sleep(Duration::from_millis(3));
+        seq += 1;
+        seq
+    };
+    for (request, choice) in [
+        (
+            3,
+            serde_json::json!({"request": 3, "kind": "answered", "tools": ["weather"], "first_reply_ms": 1800}),
+        ),
+        (
+            5,
+            serde_json::json!({"request": 5, "kind": "handed", "task": 2, "engine": "openclaw", "stage": "started"}),
+        ),
+        (6, serde_json::Value::Null),
+        (
+            8,
+            serde_json::json!({"request": 8, "kind": "answered", "tools": ["timer"], "host_request": 5}),
+        ),
+        (
+            9,
+            serde_json::json!({"request": 9, "kind": "error", "error": "tool_timeout"}),
+        ),
+        (
+            7,
+            serde_json::json!({"request": 7, "kind": "handed", "task": 4, "engine": "openclaw", "stage": "started"}),
+        ),
+        (
+            10,
+            serde_json::json!({"request": 10, "kind": "handed", "task": 6, "engine": "hermes", "stage": "started"}),
+        ),
+        (
+            11,
+            serde_json::json!({"request": 11, "kind": "handed", "task": 7, "engine": "hermes", "stage": "started"}),
+        ),
+    ] {
+        heard
+            .publish_json(next(), &speech(request, &format!("heard {request}")))
+            .unwrap();
+        if !choice.is_null() {
+            decision.publish_json(next(), &choice).unwrap();
+        }
+        said.publish_json(next(), &speech(request, &format!("said {request}")))
+            .unwrap();
+    }
+    for (n, tool, result) in [
+        (2, "fetch", "<script>alert(1)</script>"),
+        (3, "write", "saved the list"),
+        (1, "search", "found three flights"),
+    ] {
+        steps
+            .publish_json(next(), &step(2, n, "call", tool, "q=flights", result))
+            .unwrap();
+    }
+    steps
+        .publish_json(
+            next(),
+            &step(2, 4, "reply", "reply", "", "Three flights found."),
+        )
+        .unwrap();
+    // Tasks 6 and 7 settle, failed and waiting for the person, with no step.
+    let settled = |task: u64, state: &str| serde_json::json!({"task": task, "engine": "hermes", "state": state, "settled": true, "at_unix_ms": 5_000});
+    rig.publisher(
+        lamp_msgs::TaskStatus::TOPIC,
+        &lamp_msgs::TaskStatus::declaration(),
+        "tasks",
+    )
+    .publish_json(
+        next(),
+        &serde_json::json!({
+            "store_id": "0123456789abcdef0123456789abcdef", "run": 1, "tasks": [],
+            "settled": [settled(6, "failed"), settled(7, "needs_input")],
+        }),
+    )
+    .unwrap();
+    // Task 4: 59 calls, then an error past the 50 shown.
+    for n in 1..=59 {
+        steps
+            .publish_json(
+                next(),
+                &step(4, n, "call", "look", "", &format!("seen {n}")),
+            )
+            .unwrap();
+    }
+    steps
+        .publish_json(next(), &step(4, 60, "error", "", "", "rate limited"))
+        .unwrap();
+    // The stream is read in pieces, so its newest timeline may be cut
+    // mid-event: read again until a whole one holds `wanted`.
+    let started = Instant::now();
+    loop {
+        let timeline = stream_until_as(rig, host, headers, wanted)["timeline"].clone();
+        if timeline.contains(wanted) && timeline.ends_with("</div>") {
+            return timeline;
+        }
+        assert!(started.elapsed() < WAIT, "never whole: {timeline}");
+    }
+}
+
+/// The fixture's last step, shown in every mode.
+const LAST: &str = "<span class=\"lbl\">ERROR</span> 60 ·";
+
+/// `text` holds each of `wanted`, in order.
+fn in_order(text: &str, wanted: &[&str]) {
+    let mut from = 0;
+    for wanted in wanted {
+        let at = text[from..]
+            .find(wanted)
+            .unwrap_or_else(|| panic!("{wanted} not after {from}: {text}"));
+        from += at + wanted.len();
+    }
+}
+
+/// The card of `request`, from its start to its header's request number.
+fn card_head(timeline: &str, request: u64) -> &str {
+    let before = timeline
+        .split(&format!("request {request} ·"))
+        .next()
+        .unwrap();
+    &before[before.rfind("class=\"turn card\"").unwrap()..]
+}
+
+/// A weather turn on a real bus: its row reads LOCAL with the tool, DONE,
+/// and ⚡ from the decision's first reply.
+#[test]
+fn a_weather_turn_reads_local_weather_with_its_first_reply() {
+    let (rig, cookie) = monitor_rig("dec-weather");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", LAST);
+    in_order(
+        card_head(&timeline, 3),
+        &[
+            "<span class=\"badge badge-green\">LOCAL · weather</span>",
+            "<span class=\"badge badge-green\">DONE</span>",
+            "<span class=\"lat ok\">⚡ 1800 ms</span>",
+        ],
+    );
+}
+
+/// A handed turn and three steps of its task: AGENT with the engine and
+/// the task, then the steps in their numbers' order and the reply, escaped.
+#[test]
+fn a_handed_turn_shows_its_task_steps_in_order_with_the_reply() {
+    let (rig, cookie) = monitor_rig("dec-handed");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", LAST);
+    in_order(
+        &timeline,
+        &[
+            "<span class=\"badge badge-blue\">AGENT · OpenClaw · task 2 · started</span>",
+            "<span class=\"lbl\">IN</span> “heard 5”",
+            "<span class=\"lbl\">OUT</span> “said 5”",
+            "<span class=\"lbl\">CALL</span> 1 · search · q=flights → found three flights",
+            "<span class=\"lbl\">CALL</span> 2 · fetch · q=flights → &lt;script&gt;alert(1)&lt;/script&gt;",
+            "<span class=\"lbl\">CALL</span> 3 · write · q=flights → saved the list",
+            "<span class=\"lbl\">REPLY</span> Three flights found.",
+        ],
+    );
+    assert!(!timeline.contains("<script>"), "{timeline}");
+}
+
+/// Outside monitor mode the tool names and numbers show, but no step's
+/// arguments, result or reply.
+#[test]
+fn without_monitor_mode_step_words_are_absent_and_tool_names_shown() {
+    let rig = Rig::new("dec-quiet", None);
+    let timeline = agent_turns(&rig, "", "localhost", LAST);
+    for name in ["1 · search", "2 · fetch", "3 · write", "AGENT · OpenClaw"] {
+        assert!(timeline.contains(name), "{name}: {timeline}");
+    }
+    for words in [
+        "found three flights",
+        "saved the list",
+        "alert(1)",
+        "q=flights",
+        "Three flights found.",
+        "seen 1",
+    ] {
+        assert!(!timeline.contains(words), "{words}: {timeline}");
+    }
+}
+
+/// A task's 60 steps: the first 50 show, the calls past them are counted,
+/// and its final error past them still shows and makes the card ERROR.
+#[test]
+fn a_task_shows_at_most_fifty_steps_and_keeps_its_final_error() {
+    let (rig, cookie) = monitor_rig("dec-fifty");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", LAST);
+    in_order(
+        &timeline,
+        &[
+            "50 · look · – → seen 50",
+            "9 more",
+            "<span class=\"lbl\">ERROR</span> 60 · – · rate limited",
+        ],
+    );
+    assert!(!timeline.contains("51 · look"), "{timeline}");
+    assert!(
+        card_head(&timeline, 7).contains("<span class=\"badge badge-red\">ERROR</span>"),
+        "{timeline}"
+    );
+}
+
+/// A task that settled failed reads ERROR, not DONE; one that settled
+/// waiting for the person reads NEEDS INPUT in grey.
+#[test]
+fn a_task_settled_failed_reads_error_and_needing_input_its_own_label() {
+    let rig = Rig::new("dec-settled", None);
+    let timeline = agent_turns(&rig, "", "localhost", LAST);
+    let failed = card_head(&timeline, 10);
+    assert!(
+        failed.contains("<span class=\"badge badge-red\">ERROR</span>"),
+        "{failed}"
+    );
+    assert!(!failed.contains(">DONE<"), "{failed}");
+    let waiting = card_head(&timeline, 11);
+    assert!(
+        waiting.contains("<span class=\"badge badge-grey\">NEEDS INPUT</span>"),
+        "{waiting}"
+    );
+    assert!(!waiting.contains(">DONE<"), "{waiting}");
+}
+
+/// A turn with no decision on the bus (an older lamp) shows a neutral
+/// path, never a guessed LOCAL, AGENT or SKILL; an error shows its code
+/// and ERROR, outside monitor mode too.
+#[test]
+fn no_decision_shows_a_neutral_path_and_an_error_its_code() {
+    let rig = Rig::new("dec-none", None);
+    let timeline = agent_turns(&rig, "", "localhost", LAST);
+    assert!(
+        card_head(&timeline, 6).contains("<span class=\"badge badge-grey\">PATH ?</span>"),
+        "{timeline}"
+    );
+    for guess in [">LOCAL<", ">AGENT<", ">SKILL<"] {
+        assert!(!timeline.contains(guess), "{guess}: {timeline}");
+    }
+    in_order(
+        card_head(&timeline, 9),
+        &[
+            "<span class=\"badge badge-red\">tool_timeout</span>",
+            "<span class=\"badge badge-red\">ERROR</span>",
+        ],
+    );
+}
+
+/// A follow-up steered under its host turn shows inside the host's card,
+/// not as a row of its own.
+#[test]
+fn a_steered_follow_up_nests_under_its_host_turn() {
+    let (rig, cookie) = monitor_rig("dec-follow");
+    let timeline = agent_turns(&rig, &cookie, "lamp-test.local", LAST);
+    in_order(
+        &timeline,
+        &[
+            "AGENT · OpenClaw · task 2",
+            "request 5 ·",
+            "<div class=\"follow\">",
+            "LOCAL · timer",
+            "request 8 ·",
+        ],
+    );
+    assert_eq!(timeline.matches("request 8 ·").count(), 1, "{timeline}");
+}
+
+/// Request 4 heard at 1 s, handed to OpenClaw as task 9 with ⚡ 700 ms,
+/// said at 2 s, with `agent` as its task's agent.
+fn handed_card(agent: Option<timeline::Agent>) -> timeline::Entry {
+    let mut decision =
+        lamp_msgs::VoiceDecision::handed(4, 9, Some("openclaw"), lamp_msgs::HandStage::Started);
+    decision.first_reply_ms = Some(700);
+    timeline::Entry {
+        request: 4,
+        steps: vec![
+            (1_000, timeline::Step::Heard(None)),
+            (1_200, timeline::Step::Decided(decision)),
+            (2_000, timeline::Step::Said(None)),
+        ],
+        ended_at: Some(2_000),
+        agent,
+    }
+}
+
+/// One step of task 9 at `at`.
+fn task_step(n: u32, kind: lamp_msgs::StepKind, at: u64) -> lamp_msgs::TaskStep {
+    lamp_msgs::TaskStep {
+        task: 9,
+        engine: "openclaw".into(),
+        n,
+        at_unix_ms: at,
+        kind,
+        tool: "look".into(),
+        args: String::new(),
+        result: String::new(),
+        ok: None,
+    }
+}
+
+/// V1's ⏱ runs from the words heard to the run's end: for a hand-over, the
+/// agent's final reply, not the voice's own line. ⚡ is the decision's
+/// first reply (words heard to the answer's first audio), labelled; the
+/// voice's record gives only the first token, labelled as that.
+#[test]
+fn a_handed_turn_times_to_its_agent_reply_and_labels_its_first_reply() {
+    let agent = timeline::Agent {
+        steps: vec![
+            task_step(1, lamp_msgs::StepKind::Call, 3_000),
+            task_step(2, lamp_msgs::StepKind::Reply, 9_000),
+        ],
+        ..timeline::Agent::default()
+    };
+    let html = page::timeline(&[handed_card(Some(agent))], &current(Vec::new()), false);
+    assert!(
+        html.contains("<span class=\"lat warn\">⏱ 8000 ms</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains(
+            "<span title=\"first reply: words heard to the answer's first audio\">\
+             <span class=\"lat ok\">⚡ 700 ms</span></span>"
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"badge badge-green\">DONE</span>"),
+        "{html}"
+    );
+    let entries = [card_turn(5, 1_000, 900, false)];
+    let html = page::timeline(
+        &entries,
+        &current(vec![card_record(5, 400, "played")]),
+        false,
+    );
+    assert!(
+        html.contains(
+            "<span title=\"first token: words heard to the model's first token\">\
+             <span class=\"lat ok\">⚡ 400 ms</span></span>"
+        ),
+        "{html}"
+    );
+}
+
+/// An ACTIVE card with no event for 5 min reads STALE: its task was never
+/// seen (peek restarted, or prepared and never started). A task the tasks
+/// part still lists keeps it ACTIVE.
+#[test]
+fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
+    let going = timeline::Entry {
+        request: 7,
+        steps: vec![(1_000, timeline::Step::Heard(None))],
+        ended_at: None,
+        agent: None,
+    };
+    let active = "<span class=\"badge badge-amber pulse\">ACTIVE</span>";
+    let stale = "<span class=\"badge badge-grey\">STALE</span>";
+    let records = current(Vec::new());
+    let at = |now| page::timeline_at(std::slice::from_ref(&going), &records, false, Some(now));
+    assert!(at(1_000 + page::STALE_MS).contains(active));
+    let html = at(1_000 + page::STALE_MS + 1);
+    assert!(html.contains(stale) && !html.contains(active), "{html}");
+    // Handed, its agent quiet, but listed by the tasks part a second ago.
+    let mut handed = handed_card(Some(timeline::Agent {
+        seen_unix_ms: 10 * page::STALE_MS,
+        ..timeline::Agent::default()
+    }));
+    let html = page::timeline_at(
+        std::slice::from_ref(&handed),
+        &records,
+        false,
+        Some(10 * page::STALE_MS + 1_000),
+    );
+    assert!(html.contains(active), "{html}");
+    handed.agent = None;
+    let html = page::timeline_at(&[handed], &records, false, Some(10 * page::STALE_MS));
+    assert!(html.contains(stale), "{html}");
 }

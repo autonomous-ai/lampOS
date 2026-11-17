@@ -145,6 +145,35 @@ pub const DIP: Clip = Clip {
     frames: &tilt(0, 40),
 };
 
+/// A small sag of the arm toward its fold and back, as a body settles when
+/// nothing asks anything of it (#7301): the shoulder 45 counts (4 degrees)
+/// and the elbow 30, the head lifted 20 so the light stays on the desk.
+/// Eased out over 2 s, held 1.5 s and eased back over 2.5 s; at most about
+/// 35 counts a second, against the pose's 300, so the servos stay quiet.
+/// The body takes the arm's offsets toward the fold whatever their sign
+/// (`crate::idle::sag`); only under `LAMP_BODY_PRESENCE`.
+pub const SETTLE: Clip = Clip {
+    name: "settle",
+    step_ms: 250,
+    frames: &settle(),
+};
+
+const fn settle() -> [[i16; 5]; 25] {
+    const EASE: [i16; 25] = [
+        0, 4, 16, 32, 50, 68, 84, 96, 100, 100, 100, 100, 100, 100, 100, 97, 90, 78, 65, 50, 35,
+        22, 10, 3, 0,
+    ];
+    let mut frames = [[0i16; 5]; 25];
+    let mut index = 0;
+    while index < 25 {
+        frames[index][0] = -20 * EASE[index] / 100;
+        frames[index][3] = 45 * EASE[index] / 100;
+        frames[index][4] = 30 * EASE[index] / 100;
+        index += 1;
+    }
+    frames
+}
+
 /// Eased out, held and eased back: roll `side` times 25 counts, pitch `lift`.
 const fn tilt(side: i16, lift: i16) -> [[i16; 5]; 17] {
     const EASE: [i16; 17] = [

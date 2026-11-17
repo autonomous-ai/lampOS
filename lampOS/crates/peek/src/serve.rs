@@ -564,11 +564,12 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         tasks: tasks.as_ref(),
     });
     events.push(Event::default().event("overview").data(overview));
-    events.push(
-        Event::default()
-            .event("timeline")
-            .data(page::timeline(&entries, &turns, words)),
-    );
+    events.push(Event::default().event("timeline").data(page::timeline_at(
+        &entries,
+        &turns,
+        words,
+        Some(now_unix_ms()),
+    )));
     events.push(Event::default().event("turns").data(page::turns(&turns)));
     let tasks_html = match (&tasks_kept, &tasks) {
         (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),

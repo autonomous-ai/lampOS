@@ -30,7 +30,7 @@ use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     LineBy, LineSource, LinkFault, Room, RoomState, SaidLine, Speech, TurnVerdict, Voice,
-    VoiceLink, VoiceRemarked, VoiceState, VoiceTurn,
+    VoiceDecision, VoiceLink, VoiceRemarked, VoiceState, VoiceTurn,
 };
 use std::{
     io,
@@ -158,6 +158,64 @@ impl TurnOut {
         let _ = self
             .turn
             .publish_json(now_us, &VoiceTurn { request, verdict });
+    }
+}
+
+/// Each turn's decision (`voice/decision`, #7267): answered with its
+/// tools' names, a hand-over's step with its task's number, or held back.
+/// Names and numbers only, so it goes whenever the bus is on.
+pub struct DecisionOut {
+    decision: Publisher,
+    /// The newest hand-over's step said, for its turn's end.
+    handed: Option<VoiceDecision>,
+}
+
+impl DecisionOut {
+    pub fn on(root: &Path) -> io::Result<Self> {
+        let bus = Bus::new(root)?;
+        Ok(Self {
+            decision: bus.publisher_declared(
+                VoiceDecision::TOPIC,
+                &VoiceDecision::declaration(),
+                SOURCE,
+            )?,
+            handed: None,
+        })
+    }
+
+    /// Says `decision`, once ([`keeping_hand_over`]). One its own check
+    /// refuses is not sent; a send that fails changes nothing for the voice.
+    pub fn tell(&mut self, decision: &VoiceDecision, now_us: u64) {
+        let decision = keeping_hand_over(&mut self.handed, decision.clone());
+        if decision.check().is_ok() {
+            let _ = self.decision.publish_json(now_us, &decision);
+        }
+    }
+}
+
+/// The decision to say for `decision`, `handed` the newest hand-over's
+/// step said. A turn that handed work over ends as that hand-over, with the
+/// turn's tools, time and host added, never as `answered`: the latest
+/// decision of a request wins, so its `answered` would hide the hand-over
+/// (Seventh's read on #7288).
+fn keeping_hand_over(handed: &mut Option<VoiceDecision>, decision: VoiceDecision) -> VoiceDecision {
+    match decision.kind {
+        lamp_msgs::DecisionKind::Handed => {
+            *handed = Some(decision.clone());
+            decision
+        }
+        lamp_msgs::DecisionKind::Answered => {
+            match handed.take_if(|step| step.request == decision.request) {
+                Some(step) => VoiceDecision {
+                    tools: decision.tools,
+                    first_reply_ms: decision.first_reply_ms,
+                    host_request: decision.host_request,
+                    ..step
+                },
+                None => decision,
+            }
+        }
+        _ => decision,
     }
 }
 
@@ -1549,6 +1607,41 @@ fn speech(request: Option<u64>, text: &str, finished: bool) -> Speech {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    /// #7267, Seventh's read on #7288: a turn that handed work over ends
+    /// as that hand-over (its tools and time added), so the latest decision
+    /// of its request still shows it; another request's answer is as it is.
+    #[test]
+    fn a_turn_that_handed_work_over_ends_as_its_hand_over() {
+        use lamp_msgs::HandStage;
+        let mut handed = None;
+        let prepared = VoiceDecision::handed(8, 4, Some("openclaw"), HandStage::Prepared);
+        assert_eq!(keeping_hand_over(&mut handed, prepared.clone()), prepared);
+        let answered = VoiceDecision {
+            first_reply_ms: Some(900),
+            ..VoiceDecision::answered(8, ["start_agent_task"])
+        };
+        let ended = keeping_hand_over(&mut handed, answered);
+        assert_eq!(
+            ended,
+            VoiceDecision {
+                tools: vec!["start_agent_task".into()],
+                first_reply_ms: Some(900),
+                ..prepared
+            }
+        );
+        ended.check().unwrap();
+        // Started by the yes in request 9: its turn ends as started.
+        let started = VoiceDecision::handed(9, 4, Some("openclaw"), HandStage::Started);
+        keeping_hand_over(&mut handed, started.clone());
+        assert_eq!(
+            keeping_hand_over(&mut handed, VoiceDecision::answered(9, [])),
+            started
+        );
+        // A later turn with no hand-over is answered.
+        let weather = VoiceDecision::answered(10, ["weather"]);
+        assert_eq!(keeping_hand_over(&mut handed, weather.clone()), weather);
+    }
 
     /// A root short enough for a socket's path, which the system's own
     /// temporary directory on a Mac is not.

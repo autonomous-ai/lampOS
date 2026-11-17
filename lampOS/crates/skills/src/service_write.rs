@@ -34,8 +34,10 @@
 //!   couldn't take it (lamp-tasks not there or not reached, or refusing it
 //!   before its agent began: Harness signed out, no Hermes) has it sent as
 //!   above instead, with one journal line why (the first builder's ruling
-//!   on #6823); once the run may have begun, never ([`hand`]). Off, the
-//!   write goes as above, unchanged.
+//!   on #6823); once the run may have begun, never ([`hand`]). A run
+//!   Harness never made, though lamp-tasks asked once more (#7092,
+//!   [`Unrun::NotMade`]), is not sent either, and the lamp tells the owner
+//!   once ([`NOT_SENT_LINE`]). Off, the write goes as above, unchanged.
 use lamp_services::skill_writes;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -270,7 +272,21 @@ pub enum Unrun {
     /// Its agent may have begun, or what became of the run is not known: it
     /// may have sent, so nothing more is tried.
     Unknown(String),
+    /// Harness never made its run, though asked, once more when it answered
+    /// (lamp-tasks' [`NOT_MADE`], #7092): nothing was sent, but its first
+    /// launch may have reached Harness, so it isn't sent straight either;
+    /// the owner is told once ([`NOT_SENT_LINE`]).
+    NotMade(String),
 }
+
+/// lamp-tasks' code for a fixed write's run Harness never made
+/// (`lamp_tasks::skill_task::NOT_MADE`, #7092).
+pub const NOT_MADE: &str = "not_made";
+
+/// What the lamp says, exactly, when a fixed write's run was never made
+/// (#7092): once, in plain words.
+pub const NOT_SENT_LINE: &str =
+    "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent.";
 
 /// lamp-tasks' refusals that come before a run's agent begins: off, a line
 /// it doesn't take, no token, another run going, or its agent not started
@@ -295,6 +311,7 @@ pub fn agent_answered(answer: &str) -> Result<String, Unrun> {
         .and_then(|answer| answer["error"].as_str().map(str::to_owned));
     crate::task::answered(answer).map_err(|why| match code {
         Some(code) if NOT_TAKEN.contains(&code.as_str()) => Unrun::NotTaken(why),
+        Some(code) if code == NOT_MADE => Unrun::NotMade(why),
         _ => Unrun::Unknown(why),
     })
 }
@@ -309,8 +326,11 @@ pub fn agent_answered(answer: &str) -> Result<String, Unrun> {
 /// `journal` is told the one line why (the first builder's ruling on
 /// #6823: no lamp loses a send it has today). Once the run may have begun
 /// ([`Unrun::Unknown`], or a run that ended, its send refused for its
-/// content or a cap among it), nothing more: never two sends. The
-/// journal's words for the run.
+/// content or a cap among it), nothing more: never two sends. A run
+/// Harness never made ([`Unrun::NotMade`], #7092) is not sent either, and
+/// `tell` says [`NOT_SENT_LINE`] to the owner, once. The journal's words
+/// for the run.
+#[allow(clippy::too_many_arguments)] // the write's ways out: lamp-tasks, straight, the journal and the owner
 pub fn hand(
     skill: &str,
     write: &WriteStep,
@@ -319,6 +339,7 @@ pub fn hand(
     send: impl FnOnce(&Path, &str) -> Result<String, Unrun>,
     direct: impl FnOnce() -> String,
     journal: impl FnOnce(&str),
+    tell: impl FnOnce() -> String,
 ) -> String {
     let why = match (folder, socket) {
         (None, _) => "its folder is not known".to_owned(),
@@ -327,6 +348,12 @@ pub fn hand(
             Ok(said) => return format!("handed to the lamp's agent: {said}"),
             Err(Unrun::Unknown(why)) => {
                 return format!("the lamp's agent's run failed, so nothing more is tried: {why}");
+            }
+            Err(Unrun::NotMade(why)) => {
+                let told = tell();
+                return format!(
+                    "the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told ({told}): {why}"
+                );
             }
             Err(Unrun::NotTaken(why)) => why,
         },
@@ -458,9 +485,21 @@ mod tests {
         socket: Option<&Path>,
         answer: Result<String, Unrun>,
     ) -> (String, Vec<String>, usize, Vec<String>) {
+        let (said, lines, direct, journal, told) = handed_told(folder, socket, answer);
+        assert_eq!(told, 0, "the owner is told only of a run never made");
+        (said, lines, direct, journal)
+    }
+
+    /// [`handed`], with how many times the owner was told.
+    fn handed_told(
+        folder: Option<&Path>,
+        socket: Option<&Path>,
+        answer: Result<String, Unrun>,
+    ) -> (String, Vec<String>, usize, Vec<String>, usize) {
         let mut lines = Vec::new();
         let mut direct = 0;
         let mut journal = Vec::new();
+        let mut told = 0;
         let said = hand(
             "arrive-mail",
             &arrival(),
@@ -475,8 +514,30 @@ mod tests {
                 "sent to gmail-app".into()
             },
             |line| journal.push(line.to_owned()),
+            || {
+                told += 1;
+                "say: spoken".into()
+            },
         );
-        (said, lines, direct, journal)
+        (said, lines, direct, journal, told)
+    }
+
+    /// #7092: a run Harness never made, though asked once more, is sent
+    /// neither straight nor again, and the owner is told once.
+    #[test]
+    fn a_write_whose_run_was_never_made_tells_the_owner_once() {
+        let folder = Path::new("/var/lib/lampOS/skills/arrive-mail");
+        let socket = Path::new("/run/lampos-tasks/skill-task.sock");
+        let (said, lines, direct, journal, told) = handed_told(
+            Some(folder),
+            Some(socket),
+            agent_answered(
+                r#"{"ok":false,"error":"not_made","message":"Harness didn't start the run (new_failed)"}"#,
+            ),
+        );
+        assert_eq!((lines.len(), direct, journal.len(), told), (1, 0, 0, 1));
+        assert!(said.contains("nothing was sent"), "{said}");
+        assert!(said.contains("new_failed"), "{said}");
     }
 
     /// Through the agent, the write goes to lamp-tasks as a skill's run with

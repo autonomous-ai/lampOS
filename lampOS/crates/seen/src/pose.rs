@@ -33,11 +33,20 @@
 //!   `diagnostics` says `warn` until an answer.
 //! - **The window** ([`window`]): the share of bad samples and the region
 //!   most often bad over the last ten minutes, by V1's thresholds. It is
-//!   forgotten whenever the gate closes, for any reason (the privacy, sleep
-//!   and not known included), and on `room/stood_up`, except while the gate
-//!   is paused on a misread on the same tracked face ([`crate::pause`]):
-//!   then it is held, unsaid, for at most 5 s. No frame and no
+//!   forgotten at once on `room/stood_up` and when the gate closes for the
+//!   privacy slide, sleep, the opt-in off or a forget, or on a stranger
+//!   ([`crate::keep::Hard`]). While the gate is paused on a misread on the
+//!   same tracked face ([`crate::pause`]) it is held, unsaid, for at most
+//!   5 s; on any other closing (the face lost, a reading gone stale) it is
+//!   held, unsaid, for at most [`crate::keep::KEEP_US`] (120 s), and goes on
+//!   if the gate opens again within it ([`Pose::hold`]). No frame and no
 //!   per-person history is kept.
+//! - **The journal** ([`Note`], drained by `serve` with [`Pose::notes`]):
+//!   each sample sent (its bytes) and its answer (scored or no body, the
+//!   time it took), at most one each 30 s. The RULA score, its risk, bad or
+//!   good and the region, and the said window's bad share and region, only
+//!   with the diagnostics switch [`crate::JOURNAL_LABELS`] `on`: a forget or
+//!   the opt-in off does not clear the journal ([`said_line`]).
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
 //!   samples: from the third sample of a sitting. The gate closed, nothing
@@ -60,7 +69,7 @@ use lamp_msgs::HumanPosture;
 use rand_core::RngCore;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use window::Window;
 use zeroize::Zeroizing;
 
@@ -110,6 +119,124 @@ struct Job {
     cancel: Arc<AtomicBool>,
     done: mpsc::Receiver<Outcome>,
     started_us: u64,
+    started: Instant,
+    /// The frame's width as sent, for the shoulders' share of it.
+    width: u32,
+}
+
+/// The most pose answers' shoulder shares kept for [`Pose::answers`]
+/// between two reads: the newest.
+pub const ANSWERS_MOST: usize = 8;
+
+/// One line for the journal about a posture sample ([`Note::line`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Note {
+    /// A frame handed to its socket, as sent (before Base64).
+    Sent { bytes: usize },
+    /// Answered with a score: the RULA score and risk level, whether the
+    /// sample is bad and its first high region (V1's rules,
+    /// [`window::judge`]), and whether it went into the window.
+    Answered {
+        score: i64,
+        risk_level: i64,
+        /// The server scored the upper body only (the hips hidden).
+        partial: bool,
+        bad: bool,
+        region: &'static str,
+        took: Duration,
+        kept: bool,
+    },
+    /// Answered, but no body found: no sample.
+    NoBody { took: Duration },
+    Busy {
+        took: Duration,
+        held_back_s: Option<u64>,
+    },
+    Failed {
+        failure: Failure,
+        took: Duration,
+        held_back_s: Option<u64>,
+    },
+    /// Stopped by the gate closing; its answer dropped.
+    Cancelled,
+}
+
+/// The journal's line when `humans/posture` is said, without the
+/// `lamp-seen: ` prefix: the window's length and its samples, and its bad
+/// share and region only with `labels` ([`crate::JOURNAL_LABELS`]).
+pub fn said_line(posture: &HumanPosture, samples: usize, labels: bool) -> String {
+    let said = format!(
+        "posture said: window {} s, {samples} samples",
+        posture.window_s
+    );
+    if labels {
+        format!(
+            "{said}, bad_share {:.2}, region {}",
+            posture.bad_share,
+            window::region_word(posture.region)
+        )
+    } else {
+        said
+    }
+}
+
+impl Note {
+    /// The journal's line, without the `lamp-seen: ` prefix; `labels`
+    /// ([`crate::JOURNAL_LABELS`]) names the score, off says only scored.
+    pub fn line(&self, labels: bool) -> String {
+        let held = |held_back_s: &Option<u64>| {
+            held_back_s
+                .map(|s| format!("; posture held back {s} s"))
+                .unwrap_or_default()
+        };
+        match self {
+            Note::Sent { bytes } => format!("posture sample sent: {bytes} bytes"),
+            Note::Answered { took, kept, .. } if !labels => format!(
+                "posture sample answered: scored, {} ms{}",
+                took.as_millis(),
+                if *kept { "" } else { "; not kept (no sitting)" }
+            ),
+            Note::Answered {
+                score,
+                risk_level,
+                partial,
+                bad,
+                region,
+                took,
+                kept,
+            } => format!(
+                "posture sample answered: score {score}, risk {risk_level}, {}{}, region {region}, {} ms{}",
+                if *partial { "partial, " } else { "" },
+                if *bad { "bad" } else { "good" },
+                took.as_millis(),
+                if *kept { "" } else { "; not kept (no sitting)" }
+            ),
+            Note::NoBody { took } => {
+                format!(
+                    "posture sample answered: no body found, {} ms",
+                    took.as_millis()
+                )
+            }
+            Note::Busy { took, held_back_s } => format!(
+                "posture sample busy: the server is busy, the frame dropped, {} ms{}",
+                took.as_millis(),
+                held(held_back_s)
+            ),
+            Note::Failed {
+                failure,
+                took,
+                held_back_s,
+            } => format!(
+                "posture sample failed ({}), {} ms{}",
+                failure.as_str(),
+                took.as_millis(),
+                held(held_back_s)
+            ),
+            Note::Cancelled => {
+                "posture sample cancelled: the gate closed, its answer dropped".to_owned()
+            }
+        }
+    }
 }
 
 /// A jitter draw from 0 to 1.
@@ -135,6 +262,13 @@ pub struct Pose {
     last_failure: Option<Failure>,
     counts: Counts,
     jitter: Jitter,
+    notes: Vec<Note>,
+    /// Each answer's shoulders as a share of the width
+    /// ([`crate::hold::share`]), until [`Pose::answers`] takes them.
+    answers: Vec<Option<f32>>,
+    /// The newest answer's share and when its frame went, for
+    /// [`Pose::recent_answer`].
+    recent: Option<(u64, Option<f32>)>,
 }
 
 impl Pose {
@@ -155,7 +289,44 @@ impl Pose {
             last_failure: None,
             counts: Counts::default(),
             jitter,
+            notes: Vec::new(),
+            answers: Vec::new(),
+            recent: None,
         }
+    }
+
+    /// The journal's notes since the last call, oldest first.
+    pub fn notes(&mut self) -> Vec<Note> {
+        std::mem::take(&mut self.notes)
+    }
+
+    /// Each answer's shoulders as a share of the frame's width since the
+    /// last call, oldest first, at most [`ANSWERS_MOST`]: none for an
+    /// answer without both shoulders confident. Read by the held sitting
+    /// ([`crate::hold`]); nothing else of the answer is kept.
+    pub fn answers(&mut self) -> Vec<Option<f32>> {
+        std::mem::take(&mut self.answers)
+    }
+
+    /// The newest answer's shoulders as a share of the width, when its
+    /// frame went under [`EVERY_US`] ago: what a held sitting beginning
+    /// now begins with ([`crate::hold`]), as the 30 s rate lets no new
+    /// frame go yet. Forgotten with the window.
+    pub fn recent_answer(&self, now_us: u64) -> Option<Option<f32>> {
+        self.recent
+            .filter(|(sent_us, _)| now_us.saturating_sub(*sent_us) < EVERY_US)
+            .map(|(_, share)| share)
+    }
+
+    /// Whether a sitting's window is being watched (begun and not
+    /// forgotten): something a closing gate may keep ([`crate::keep`]).
+    pub fn watching(&self) -> bool {
+        self.window.begun()
+    }
+
+    fn held_back_s(&self, now_us: u64) -> Option<u64> {
+        self.paused_until(now_us)
+            .map(|until| (until - now_us).div_ceil(1_000_000))
     }
 
     pub fn counts(&self) -> Counts {
@@ -205,31 +376,66 @@ impl Pose {
         };
         let cancelled = job.cancel.load(Ordering::Relaxed);
         let started_us = job.started_us;
+        let took = job.started.elapsed();
+        let width = job.width;
         self.job = None;
         if cancelled || matches!(outcome, Outcome::Cancelled { .. }) {
             self.counts.cancelled = self.counts.cancelled.saturating_add(1);
+            self.notes.push(Note::Cancelled);
             return;
         }
         let jitter = (self.jitter)();
         match outcome {
-            Outcome::Answered(ergo) => {
+            Outcome::Answered { ergo, shoulders } => {
                 self.counts.answered = self.counts.answered.saturating_add(1);
+                if self.answers.len() >= ANSWERS_MOST {
+                    self.answers.remove(0);
+                }
+                let share = crate::hold::share(shoulders.as_ref(), width);
+                self.answers.push(share);
+                self.recent = Some((started_us, share));
                 self.retreat.take(Ended::Answered, now_us, jitter);
                 self.last_failure = None;
                 match ergo {
-                    Some(ergo) if self.window.begun() => self.window.add(started_us, &ergo),
-                    Some(_) => {}
-                    None => self.counts.no_body = self.counts.no_body.saturating_add(1),
+                    Some(ergo) => {
+                        let (bad, high) = window::judge(&ergo);
+                        let kept = self.window.begun();
+                        if kept {
+                            self.window.add(started_us, &ergo);
+                        }
+                        self.notes.push(Note::Answered {
+                            score: ergo.score,
+                            risk_level: ergo.risk_level,
+                            partial: ergo.partial,
+                            bad,
+                            region: window::region_name(high),
+                            took,
+                            kept,
+                        });
+                    }
+                    None => {
+                        self.counts.no_body = self.counts.no_body.saturating_add(1);
+                        self.notes.push(Note::NoBody { took });
+                    }
                 }
             }
             Outcome::Busy => {
                 self.counts.busy = self.counts.busy.saturating_add(1);
                 self.retreat.take(Ended::Busy, now_us, jitter);
+                self.notes.push(Note::Busy {
+                    took,
+                    held_back_s: self.held_back_s(now_us),
+                });
             }
             Outcome::Failed(failure) => {
                 self.counts.failed = self.counts.failed.saturating_add(1);
                 self.last_failure = Some(failure);
                 self.retreat.take(Ended::Failed, now_us, jitter);
+                self.notes.push(Note::Failed {
+                    failure,
+                    took,
+                    held_back_s: self.held_back_s(now_us),
+                });
             }
             Outcome::Cancelled { .. } => {}
         }
@@ -246,9 +452,10 @@ impl Pose {
     ) -> Option<HumanPosture> {
         self.collect(now_us);
         self.open = gate.is_ok();
-        // Any closing forgets the window: nothing old is said under the
-        // privacy or while asleep. A pause on a misread holds it instead
-        // ([`Self::hold`], [`crate::pause`]).
+        // Any closing that reaches here forgets the window: nothing old is
+        // said under the privacy or while asleep. A pause on a misread, or
+        // a short closing `serve` keeps ([`crate::keep`]), holds it instead
+        // ([`Self::hold`]).
         if stood_up || gate.is_err() {
             self.forget();
         }
@@ -286,10 +493,13 @@ impl Pose {
         }
         self.window.reset();
         self.open_at_us = None;
+        self.recent = None;
     }
 
     /// One step at `now_us` while the gate is paused on a misread
-    /// ([`crate::pause`]): the window kept, in memory only; the running
+    /// ([`crate::pause`]) or closed for a while `serve` keeps
+    /// ([`crate::keep`]): the window kept, in memory only (its samples
+    /// still age out of its ten minutes when it is next read); the running
     /// request stopped and its answer dropped; no frame taken and nothing
     /// said.
     pub fn hold(&mut self, now_us: u64) {
@@ -334,6 +544,8 @@ impl Sink for Pose {
             self.counts.wrong_frame = self.counts.wrong_frame.saturating_add(1);
             return;
         };
+        let bytes = sent.len();
+        let width = crate::scale::sent_size(meta.width, meta.height).0;
         let frame_b64 = Zeroizing::new(STANDARD.encode(&*sent));
         drop(sent);
         let cancel = Arc::new(AtomicBool::new(false));
@@ -351,10 +563,13 @@ impl Sink for Pose {
         match spawned {
             Ok(_) => {
                 self.counts.sent = self.counts.sent.saturating_add(1);
+                self.notes.push(Note::Sent { bytes });
                 self.job = Some(Job {
                     cancel,
                     done,
                     started_us: now_us,
+                    started: Instant::now(),
+                    width,
                 });
             }
             Err(_) => self.counts.dropped = self.counts.dropped.saturating_add(1),

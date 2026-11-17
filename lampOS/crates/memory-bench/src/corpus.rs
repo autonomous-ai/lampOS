@@ -797,6 +797,8 @@ fn questions(persona: &Persona, events: &[Event], key: &[Evidence]) -> Result<Ve
 /// probes only reach back a week; these ask from the end of the month about
 /// "earlier this month", "last week" and a date more than a week back.
 /// Forgotten facts are skipped: their answer is an abstention, not a date.
+/// The "last week" probes are exact (registration 7): a one-day tolerance
+/// would accept the Monday of this week, which is not last week.
 fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>) -> Result<()> {
     let days = |f: &Fact| -> Vec<u32> {
         let mut d: Vec<u32> = key
@@ -819,6 +821,7 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
                day: u32,
                heard: String,
                on: u32,
+               tolerance_days: u32,
                f: &Fact| {
         used.insert(f.id.clone());
         let q = question(
@@ -829,7 +832,7 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
             heard,
             Rule::Date {
                 expected: persona.local_date(on)?.to_string(),
-                tolerance_days: 1,
+                tolerance_days,
             },
             sources(key, &f.id),
         )?;
@@ -854,6 +857,7 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
                 f.label
             ),
             first,
+            1,
             f,
         )?;
     }
@@ -879,6 +883,7 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
                     f.label
                 ),
                 d,
+                0,
                 f,
             )?;
             n += 1;
@@ -901,6 +906,7 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
                     f.label
                 ),
                 d,
+                1,
                 f,
             )?;
             n += 1;

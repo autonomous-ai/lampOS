@@ -16,16 +16,16 @@
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
-    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, HumanPosture, Level,
-    MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
+    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanDoingMore, HumanFamiliar,
+    HumanPosture, Level, MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
 };
 use lamp_seen::{
     BUS_NAME, ENVIRONMENT, HEALTH_NAME,
     activity::{self, Activity},
-    burst::{Outcome, Pace},
+    burst::Pace,
     endpoint::Endpoint,
     frames::{self, Sink, Taker},
-    gate, link,
+    gate, hold, keep, link,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
@@ -33,7 +33,7 @@ use lamp_seen::{
     pause::{self, Pause},
     pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
-    sitting::Sitting,
+    sitting::{BREAK_IS_STANDING, Sitting},
     switched_on,
     watch::Readings,
 };
@@ -426,6 +426,22 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         bus.publisher_declared(HumanDoing::TOPIC, &HumanDoing::declaration(), BUS_NAME)?;
     let mut seen_out =
         bus.publisher_declared(DoingSeen::TOPIC, &DoingSeen::declaration(), BUS_NAME)?;
+    // Tiredness, desk work and celebrating, on a topic of their own: off,
+    // it is not even declared.
+    let more_doings = lamp_seen::sitting::more(
+        std::env::var(lamp_seen::sitting::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    let mut doing_more_out = if more_doings {
+        Some(bus.publisher_declared(
+            HumanDoingMore::TOPIC,
+            &HumanDoingMore::declaration(),
+            BUS_NAME,
+        )?)
+    } else {
+        None
+    };
     let opt_in_file = opt_in::File::in_folder(&config.opt_in_folder);
     let record = opt_in::Record::in_folder(&config.state_folder);
     let mut kept = lamp_msgs::consent::Kept::default();
@@ -514,7 +530,35 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         )),
     };
     let mut sitting: Option<Sitting> = None;
+    // A break is a stand-up, not a stretch (#6543 step 2): with the switch
+    // on, `stood_up_us` keeps when the last room/stood_up came, so the
+    // sitting begun on their return counts its break from then.
+    let break_is_standing = switched_on(std::env::var(BREAK_IS_STANDING).ok().as_deref());
+    if break_is_standing {
+        eprintln!("lamp-seen: a break is a stand-up, not a stretch");
+    }
+    let mut stood_up_us: Option<u64> = None;
     let mut pause = Pause::default();
+    let mut keep = keep::Keep::default();
+    // The owner's recognised sitting held while a close person is seen
+    // (`hold.rs`); off, none, and every step is as without it.
+    let mut holds =
+        switched_on(std::env::var(hold::ENVIRONMENT).ok().as_deref()).then(hold::Hold::default);
+    if holds.is_some() {
+        eprintln!(
+            "lamp-seen: {}=on: the owner's recognised sitting is held while a close person is seen",
+            hold::ENVIRONMENT
+        );
+    }
+    // What the journal may name of what was seen: counts and outcomes only
+    // unless the diagnostics switch is on.
+    let labels = switched_on(std::env::var(lamp_seen::JOURNAL_LABELS).ok().as_deref());
+    if labels {
+        eprintln!(
+            "lamp-seen: {}=on: the journal names each label and score",
+            lamp_seen::JOURNAL_LABELS
+        );
+    }
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -559,15 +603,51 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             said_back::Step::Idle | said_back::Step::Waiting => {}
         }
         let now = monotonic_us();
+        if came.stood_up {
+            stood_up_us = Some(now);
+        }
         // No frame before the lamp has begun saying it will look.
         let said_on = said_back.said_on(&kept, &record);
         let now_inputs = readings.inputs(opted_in, said_on, now);
+        // Held, the presence and stranger rules are taken as holding while
+        // the newest pose answer sees a close person (`hold.rs`).
+        let answers = frames
+            .as_mut()
+            .and_then(|(_, marked)| marked.inner_mut().pose.as_mut())
+            .map(|pose| pose.answers())
+            .unwrap_or_default();
+        // A hold beginning now begins with the newest answer when its frame
+        // went under 30 s ago (the rate lets no new frame go yet).
+        let posture_now = frames
+            .as_ref()
+            .and_then(|(_, marked)| marked.inner().pose.as_deref());
+        let posture_frames = posture_now.is_some();
+        let recent_answer = posture_now.and_then(|pose| pose.recent_answer(now));
+        let seen = readings.on_track(now);
+        let (now_inputs, on_track) = hold::wire(
+            holds.as_mut(),
+            &answers,
+            &hold::Now {
+                now_us: now,
+                inputs: &now_inputs,
+                stood_up: came.stood_up,
+                forgot: came.forgot,
+                seen: &seen,
+                recent_answer,
+                posture: posture_frames,
+            },
+        );
+        if let Some(holds) = holds.as_mut() {
+            for note in holds.notes() {
+                eprintln!("lamp-seen: {}", note.line());
+            }
+        }
         let gate = gate::may_request(&now_inputs);
         // A stranger reading on the same tracked face pauses: the gate stays
         // closed, and the window and timers are kept unsaid, at most 5 s.
         let was_paused = pause.paused();
         let before = pause.counts();
-        let verdict = pause.step(now, &now_inputs, &readings.on_track(now));
+        let verdict = pause.step(now, &now_inputs, &on_track);
         let verdict = pause::after_stood_up(&mut pause, verdict, came.stood_up);
         if pause.counts().paused != before.paused {
             let counts = pause.counts();
@@ -576,20 +656,16 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 counts.paused, counts.misread_on_track
             );
         } else if was_paused && !verdict.paused {
+            // Ended by the face lost or a reading lapsing: the keep below
+            // says whether the sitting is kept or wiped.
             eprintln!(
                 "lamp-seen: the pause ended: {}",
-                if verdict.wipe { "wiped" } else { "kept" }
+                match (verdict.wipe, pause.lost()) {
+                    (false, _) => "kept",
+                    (true, false) => "wiped",
+                    (true, true) => "the face lost or a reading lapsed",
+                }
             );
-        }
-        if verdict.wipe {
-            if sitting.take().is_some() {
-                doing_said = None;
-            }
-            if let Some((_, marked)) = frames.as_mut()
-                && let Some(pose) = marked.inner_mut().pose.as_mut()
-            {
-                pose.forget();
-            }
         }
         if last_gate != Some(gate) {
             eprintln!(
@@ -609,59 +685,118 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             asleep: Some(false),
             ..now_inputs
         });
-        if pause::ends_sitting(verdict, came.stood_up, desk) && sitting.take().is_some() {
+        // Posture's own gate: closed `not_said_yet` until a line naming
+        // posture was said for this yes, whatever activity's says.
+        let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
+        let watching = frames
+            .as_ref()
+            .and_then(|(_, marked)| marked.inner().pose.as_deref())
+            .is_some_and(Pose::watching);
+        // What a closing wipes at once, and what it keeps unsaid for up to
+        // 120 s (`keep.rs`).
+        let plan = keep.step(&keep::Now {
+            now_us: now,
+            inputs: &now_inputs,
+            seen: &on_track,
+            verdict,
+            pause_lost: pause.lost(),
+            stood_up: came.stood_up,
+            forgot: came.forgot,
+            posture_gate,
+            desk,
+            watching,
+            sitting: sitting.is_some(),
+        });
+        let word =
+            |closed: Result<(), gate::Closed>| closed.map_or_else(|c| c.as_str(), |()| "open");
+        if let Some(line) = plan.posture.line("posture's window", word(posture_gate)) {
+            eprintln!("lamp-seen: {line}");
+        }
+        if let Some(line) = plan.sitting.line("the sitting's timers", word(desk)) {
+            eprintln!("lamp-seen: {line}");
+        }
+        if plan.sitting.wipes() && sitting.take().is_some() {
             doing_said = None;
         }
-        if desk.is_ok() && sitting.is_none() {
-            sitting = Some(Sitting::new(inputs.arrived_us(now)));
+        if plan.posture.wipes()
+            && let Some((_, marked)) = frames.as_mut()
+            && let Some(pose) = marked.inner_mut().pose.as_mut()
+        {
+            pose.forget();
         }
+        if desk.is_ok() && sitting.is_none() {
+            let begun = Sitting::with_more(inputs.arrived_us(now), more_doings);
+            sitting = Some(if break_is_standing {
+                begun.break_is_standing(now, stood_up_us)
+            } else {
+                begun
+            });
+        }
+        // Paused, or kept through a short closing: nothing said from it.
+        let sitting_held = verdict.paused || plan.sitting.holds();
         if let Some((taker, marked)) = frames.as_mut() {
-            // Posture's own gate: closed `not_said_yet` until a line naming
-            // posture was said for this yes, whatever activity's says.
-            let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
-            if verdict.paused
+            if (verdict.paused || plan.posture.holds())
                 && let Some(pose) = marked.inner_mut().pose.as_mut()
             {
                 pose.hold(now);
             } else if let (Some(pose), Some(posture_out)) =
                 (marked.inner_mut().pose.as_mut(), posture_out.as_mut())
                 && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
-                && let Err(error) = posture_out.publish_json(now, &posture)
             {
-                eprintln!("lamp-seen: humans/posture could not be said: {error}");
+                eprintln!(
+                    "lamp-seen: {}",
+                    pose::said_line(&posture, pose.samples(), labels)
+                );
+                if let Err(error) = posture_out.publish_json(now, &posture) {
+                    eprintln!("lamp-seen: humans/posture could not be said: {error}");
+                }
             }
             if let Some(activity) = marked.inner_mut().activity.as_mut()
                 && let Some(finished) = activity.poll(now)
             {
-                match finished.outcome {
-                    Outcome::Answered => {}
-                    Outcome::Busy => eprintln!("lamp-seen: the server is busy: the burst dropped"),
-                    Outcome::Failed(failure) => {
-                        eprintln!("lamp-seen: a burst failed ({})", failure.as_str())
-                    }
-                }
-                // Paused: the burst under way is aborted below, and what it
-                // saw is dropped, never said.
-                if let Some(sitting) = sitting.as_mut().filter(|_| !verdict.paused) {
+                // Paused or kept: the burst under way is aborted below, and
+                // what it saw is dropped, never said.
+                if let Some(sitting) = sitting.as_mut().filter(|_| !sitting_held) {
                     for newly in sitting.saw(&finished.seen, now) {
                         if newly.check().is_ok() {
                             let _ = seen_out.publish_json(now, &newly);
                         }
                     }
-                    if !finished.seen.is_empty() {
+                    // Its other timers wait for the next 30 s, so
+                    // humans/doing goes out as often as without them.
+                    sitting.saw_more(&finished.more, now);
+                    if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
                         // Said at once, not at the next 30 s.
                         doing_said = None;
                     }
                 }
             }
             taker.step(gate, now, marked);
+            // The journal: each burst and posture sample, and its answer.
+            let stopped = match gate {
+                Ok(()) => "the link lost or its grant changed".to_owned(),
+                Err(closed) => format!("gate {}", closed.as_str()),
+            };
+            if let Some(activity) = marked.inner_mut().activity.as_mut() {
+                for note in activity.notes() {
+                    eprintln!("lamp-seen: {}", note.line(&stopped, labels));
+                }
+            }
+            if let Some(pose) = marked.inner_mut().pose.as_mut() {
+                for note in pose.notes() {
+                    eprintln!("lamp-seen: {}", note.line(labels));
+                }
+            }
         }
-        if let Some(sitting) = sitting.as_ref().filter(|_| !verdict.paused)
+        if let Some(sitting) = sitting.as_ref().filter(|_| !sitting_held)
             && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
         {
             let doing = sitting.doing(now);
             if doing.check().is_ok() {
                 let _ = doing_out.publish_json(now, &doing);
+            }
+            if let (Some(out), Some(more)) = (doing_more_out.as_mut(), sitting.doing_more(now)) {
+                let _ = out.publish_json(now, &more);
             }
             doing_said = Some(Instant::now());
         }

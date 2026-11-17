@@ -258,7 +258,13 @@ and none of the skills' own (`crate::use_skill`):
   `lamp-skills`). The enum names as many skills as fit the link's 4 KB for
   parameters (`use_skill::offered`, about 67 with the longest names), so a
   lamp with more keeps the function; the setup line names the rest (`;
-  skills not given: … (past use_skill's bound)`).
+  skills not given: … (past use_skill's bound)`). With
+  `LAMP_SKILL_STATE_TOLD=on` it takes `about` too, a question about any
+  skill on the lamp, given alone, and `skill` is then not required
+  ([skills.md](skills.md), "Asked about by voice"); `about`'s description
+  comes off the same 4 KB, so a few fewer of the longest names fit (none
+  fewer for 40 skills of 18-byte names, more than a product lamp has:
+  `skill_about::tests::use_skill_takes_about_with_the_switch_alone`).
 - **What the session is told:** after the rest of its instruction, "Your
   skills": one line each, its name, its description, and its choice's name
   and words and its yes-or-no's name, each with what its parameter says.
@@ -559,11 +565,11 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 44 of the lamp's own
+unit sets it: a product lamp's chat request offers 45 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 26 with these two among them (and `set_role` and `end_role`
-since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov; `go_to_sleep` is
-PARKED (#7219) with `LAMP_SLEEP_ASKED` off in the product, 45 with it on), the actions part's
+voice's own 27 with these two among them (and `set_role` and `end_role`
+since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
+since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the

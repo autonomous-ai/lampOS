@@ -3156,7 +3156,14 @@ fn run_now_call(
         lamp_skills::task::asked_by_voice(&skill, now_ms);
     }
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
-    let _ = reply.send(json!({ "ran": skill }));
+    // Whether it speaks its own words (a made skill's exact text, the only
+    // say the voice takes of one): the voice then adds no line of its own
+    // when the heard words started it (`lamp_voice::made_run::speaks_itself`).
+    let says = run
+        .calls
+        .iter()
+        .any(|call| matches!(call, Call::Words(words) if words.exact));
+    let _ = reply.send(json!({ "ran": skill, "says": says }));
     for event in run.events {
         publish(out, event);
     }
@@ -4660,7 +4667,7 @@ fn perform(
         Some((what, asking)) => {
             let mut begun = Vec::new();
             let mut was_begun = false;
-            let outcome = say(&sockets.say, what, skill, asking, rest_permits, || {
+            let mut on_begun = || {
                 was_begun = true;
                 act(
                     &first,
@@ -4673,7 +4680,36 @@ fn perform(
                     &mut begun,
                 );
                 let _ = made.send(());
+            };
+            // News of work handed over is held while the voice refuses it
+            // because the lamp is muted or listening, and asked again until
+            // the lamp is free, at most `NEWS_HELD_MOST_MS`; with the lamp
+            // private it waits for the next reply, as before
+            // (`lamp_skills::say_held`). Any other say is asked once.
+            let news = calls.iter().find_map(|call| match call {
+                Call::SayFrom(lamp_skills::Source::Tasks, task) => Some(*task),
+                _ => None,
             });
+            let outcome = match news {
+                Some(task) => lamp_skills::say_held(
+                    task,
+                    || {
+                        say(
+                            &sockets.say,
+                            what,
+                            skill,
+                            asking.clone(),
+                            rest_permits,
+                            &mut on_begun,
+                        )
+                    },
+                    || lamp_skills::routine::private_for_news(bus),
+                    || clock::now_us() / 1_000,
+                    clock::sleep,
+                    |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+                ),
+                None => say(&sockets.say, what, skill, asking, rest_permits, on_begun),
+            };
             said.extend(begun);
             said.push(outcome);
             // Nothing after a say never begun, as nothing with it.
@@ -5642,7 +5678,11 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// carries it (a run granted a linked service's read,
 /// [`lamp_skills::task::told`]), is said to the owner in `room`, behind a
 /// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
-/// how many sentences.
+/// how many sentences. With `LAMP_SKILL_TASK_SURE` on
+/// ([`lamp_skills::task_sure`]), a run lamp-tasks says failed is told as
+/// one fixed line behind the same gate, and one refused `busy` waits its
+/// turn in the lamp's one line ([`lamp_skills::task_sure::LAMP`]), on this
+/// thread; off, as before.
 fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     // This run's own: a run now asked by voice, never a trigger's after it.
     let asked = lamp_skills::task::take_asked_by_voice(skill);
@@ -5666,43 +5706,80 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             "priority": lamp_voice::say::NORMAL_PRIORITY,
             "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
         });
-        let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
-        let mut found = None;
-        let said = lamp_skills::task::hand(
+        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        // With `LAMP_SKILL_TASK_SURE` on: a failed run's told line, and
+        // whether lamp-tasks said `busy`, so it waits its turn
+        // (`lamp_skills::task_sure`). Off, neither is ever set.
+        let sure = lamp_skills::task_sure::on();
+        let found = std::cell::Cell::new(None);
+        let tried = lamp_skills::task_sure::Tried::default();
+        let send = |socket: &Path, line: &str| {
+            let sent = hand_over(socket, line);
+            if sure {
+                tried.sent(&skill, &sent);
+            }
+            let answer = sent?;
+            // What lamp-tasks' answer carries of its agent's: its length
+            // only, never its words (#7180).
+            let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
+                .ok()
+                .and_then(|answer| answer["answer"].as_str().map(str::len));
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
+                carried.map_or_else(
+                    || "no agent's answer".to_owned(),
+                    |bytes| format!("{bytes} bytes of its agent's answer")
+                )
+            );
+            found.set(lamp_skills::task::told(&answer));
+            lamp_skills::service_write::agent_answered(&answer)
+        };
+        // Each try afresh: one that returns before `send` keeps nothing of
+        // the try before it.
+        let try_hand = || {
+            found.set(None);
+            tried.once(|| {
+                lamp_skills::task::hand(
+                    &skill,
+                    &step,
+                    &folder,
+                    &grants,
+                    place,
+                    unix_ms(),
+                    send,
+                    say_yes,
+                )
+            })
+        };
+        let said = lamp_skills::task_sure::hand_in_turn(
+            sure,
+            &lamp_skills::task_sure::LAMP,
             &skill,
-            &step,
-            &folder,
-            &grants,
-            place,
-            unix_ms(),
-            |socket, line| {
-                let answer = hand_over(socket, line)?;
-                // What lamp-tasks' answer carries of its agent's: its length
-                // only, never its words (#7180).
-                let carried = serde_json::from_str::<serde_json::Value>(answer.trim())
-                    .ok()
-                    .and_then(|answer| answer["answer"].as_str().map(str::len));
-                eprintln!(
-                    "lamp-skills: skill:{skill}: do.task: lamp-tasks' answer carries {}",
-                    carried.map_or_else(
-                        || "no agent's answer".to_owned(),
-                        |bytes| format!("{bytes} bytes of its agent's answer")
-                    )
-                );
-                found = lamp_skills::task::told(&answer);
-                lamp_skills::service_write::agent_answered(&answer)
-            },
-            say_yes,
-        );
+            || HANDING.load(std::sync::atomic::Ordering::SeqCst) == 0,
+            try_hand,
+            |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+        )
+        .unwrap_or_else(|dropped| {
+            if dropped.tells() {
+                tried.tell(lamp_skills::task_sure::dropped_line(&skill));
+            }
+            dropped.words()
+        });
         eprintln!("lamp-skills: skill:{skill}: {said}");
-        if let Some(lines) = found {
+        // What its agent found, or with the switch on, why it didn't run.
+        let told = match (found.take(), tried.failed()) {
+            (Some(lines), _) => Some((lines, "what its agent found")),
+            (None, Some(line)) => Some((vec![line], "what became of its run")),
+            (None, None) => None,
+        };
+        if let Some((lines, what)) = told {
             // Kept as waiting till its end, so a restart that drops it
             // unsaid leaves a line at the next start (#7180).
             let began = unix_ms();
             if let Some(state) = &state
                 && let Err(error) = lamp_skills::task::telling_begins(state, &skill, began)
             {
-                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
             // Asked by the owner's voice and ready within five minutes: the
             // quiet lifted for it, for five minutes more (#7180).
@@ -5713,21 +5790,21 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                     Some(until) => {
                         room.quiet_lifted = Some(until);
                         eprintln!(
-                            "lamp-skills: skill:{skill}: do.task: what its agent found: told in quiet hours too, its owner asked by voice {after} s before ({})",
+                            "lamp-skills: skill:{skill}: do.task: {what}: told in quiet hours too, its owner asked by voice {after} s before ({})",
                             lamp_voice::told_when_asked::ENVIRONMENT
                         );
                     }
                     None => eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: what its agent found: its quiet holds, ready {after} s after its owner's ask, past five minutes"
+                        "lamp-skills: skill:{skill}: do.task: {what}: its quiet holds, ready {after} s after its owner's ask, past five minutes"
                     ),
                 }
             }
             let told = lamp_skills::service_read::tell(&lines, &mut room);
-            eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {told}");
+            eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
             if let Some(state) = &state
                 && let Err(error) = lamp_skills::task::telling_ends(state, &skill, began)
             {
-                eprintln!("lamp-skills: skill:{skill}: do.task: what its agent found: {error}");
+                eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {error}");
             }
         }
     });
@@ -5757,6 +5834,10 @@ impl Handing {
 impl Drop for Handing {
     fn drop(&mut self) {
         HANDING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        // A task waiting its turn tries now (`LAMP_SKILL_TASK_SURE`).
+        if lamp_skills::task_sure::on() {
+            lamp_skills::task_sure::LAMP.ended();
+        }
     }
 }
 
@@ -5819,6 +5900,13 @@ fn write_service(
             hand_write_over,
             || send_write(skill, write),
             |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+            // The lamp's own line about its send (#7092), exact words: not
+            // the skill's say, so its permissions don't hold it back.
+            || {
+                let asking = json!({"text": service_write::NOT_SENT_LINE, "exact": true,
+                                    "priority": lamp_skills::SAY_PRIORITY});
+                say(&sockets.say, "say", skill, asking, &[], || {})
+            },
         );
     }
     send_write(skill, write)
@@ -6878,6 +6966,170 @@ mod tests {
             heard
         });
         Voice { stop, thread }
+    }
+
+    /// A say service that refuses the first `refusals` asks with "the lamp
+    /// is muted", then answers `begun` and `spoken` and stops; it gives the
+    /// asks it heard, also once a connection says nothing.
+    fn muted_voice(
+        listener: UnixListener,
+        refusals: usize,
+    ) -> std::thread::JoinHandle<Vec<serde_json::Value>> {
+        listener.set_nonblocking(true).unwrap();
+        std::thread::spawn(move || {
+            let mut heard = Vec::new();
+            let until = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < until {
+                let Ok((stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                // An empty connection: the test is done with it.
+                if line.trim().is_empty() {
+                    break;
+                }
+                heard.push(serde_json::from_str(&line).unwrap());
+                let mut stream = &stream;
+                if heard.len() <= refusals {
+                    writeln!(
+                        stream,
+                        "{}",
+                        json!({"outcome": "refused", "why": "the lamp is muted"})
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(stream, "{}", json!({"event": "begun"})).unwrap();
+                    writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
+                    break;
+                }
+            }
+            heard
+        })
+    }
+
+    /// Task news's run, its say asked of `dir`'s say socket.
+    fn tell_news(dir: &Path, bus: &Bus) -> String {
+        let sockets = nowhere(
+            dir,
+            Permissions {
+                speak: true,
+                ..Permissions::default()
+            },
+        );
+        let (made, _) = mpsc::channel();
+        perform(
+            "task-news",
+            (
+                &[Call::SayFrom(lamp_skills::Source::Tasks, Some(62))],
+                &[],
+                &[],
+            ),
+            &sockets,
+            bus,
+            None,
+            (None, false),
+            (made, None),
+        )
+    }
+
+    /// lamp-c0a4, 16 Nov 15:35: news refused while the voice restarted ("the
+    /// lamp is muted") is held, asked again, and told once the lamp is free.
+    #[test]
+    fn task_news_refused_while_muted_is_held_and_told_once_the_lamp_is_free() {
+        let dir = tempfile::Builder::new()
+            .prefix("nh")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let outcome = tell_news(dir.path(), &bus);
+        assert_eq!(outcome, "say: spoken");
+        let heard = voice.join().unwrap();
+        assert_eq!(heard.len(), 2, "asked again once, and told: {heard:?}");
+        assert!(
+            heard
+                .iter()
+                .all(|ask| ask["from"] == "tasks" && ask["task"] == 62),
+            "{heard:?}"
+        );
+    }
+
+    /// With the privacy switch closed, news refused is not held: asked once,
+    /// and it waits for the next reply, as before.
+    #[test]
+    fn task_news_refused_with_the_privacy_switch_closed_is_not_held() {
+        let dir = tempfile::Builder::new()
+            .prefix("np")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::MicrophonePrivacy::TOPIC,
+            &lamp_msgs::MicrophonePrivacy::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(clock::now_us(), &json!({"physical_muted": true}))
+        .unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let began = Instant::now();
+        let outcome = tell_news(dir.path(), &bus);
+        assert_eq!(outcome, "say: refused (the lamp is muted)");
+        assert!(began.elapsed() < Duration::from_millis(lamp_skills::NEWS_HELD_RETRY_MS));
+        drop(UnixStream::connect(dir.path().join("say.sock")));
+        let heard = voice.join().unwrap();
+        assert_eq!(heard.len(), 1, "{heard:?}");
+    }
+
+    /// Task news's run with `voice/mute` saying muted by `muted_by`.
+    fn tell_news_muted_by(prefix: &str, muted_by: lamp_msgs::MutedBy) -> (String, usize) {
+        let dir = tempfile::Builder::new()
+            .prefix(prefix)
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        bus.publisher_declared(
+            lamp_msgs::VoiceMute::TOPIC,
+            &lamp_msgs::VoiceMute::declaration(),
+            "voice",
+        )
+        .unwrap()
+        .publish_json(
+            clock::now_us(),
+            &lamp_msgs::VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(muted_by),
+                control: false,
+                hears_name: false,
+            },
+        )
+        .unwrap();
+        let voice = muted_voice(UnixListener::bind(dir.path().join("say.sock")).unwrap(), 1);
+        let outcome = tell_news(dir.path(), &bus);
+        drop(UnixStream::connect(dir.path().join("say.sock")));
+        (outcome, voice.join().unwrap().len())
+    }
+
+    /// lamp-c0a4, 16 Nov 15:35 and 12:59: the voice back from a fault,
+    /// muted by the restart guard, is not privacy: its news is held, asked
+    /// again, and told once.
+    #[test]
+    fn task_news_refused_under_the_restart_guards_mute_is_held_and_told_once() {
+        let (outcome, asked) = tell_news_muted_by("ng", lamp_msgs::MutedBy::RestartGuard);
+        assert_eq!(outcome, "say: spoken");
+        assert_eq!(asked, 2, "asked again once, and told");
+    }
+
+    /// Muted by the person's button, news refused is not held, as before.
+    #[test]
+    fn task_news_refused_muted_by_the_button_is_not_held() {
+        let (outcome, asked) = tell_news_muted_by("nb", lamp_msgs::MutedBy::Button);
+        assert_eq!(outcome, "say: refused (the lamp is muted)");
+        assert_eq!(asked, 1);
     }
 
     /// The say service [`voice`] runs.

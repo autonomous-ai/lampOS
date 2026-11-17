@@ -784,7 +784,12 @@ Only a plain yes on a later line within 30 s
 with their face seen saying it, or in the private room
 (`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
 exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
-never `forget_last`). The yes may say the forget too
+never `forget_last`). The held forget carries the subject's words
+(`about`); once the by-id forget is confirmed, that person's own exchanges
+about those words go too (`exchanges_forget`,
+`remember::agreed_forget_exchanges`), by the same match as a forget about
+and in their scope alone, never another's or the room's, so recall no longer
+tells the talk about it (C128; lamp-06c1, build 13523). The yes may say the forget too
 (`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
 forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
 said back alone, "Forget it." or "Quên đi.", which is only ever read as the
@@ -3618,7 +3623,8 @@ night away).
   --nightly` runs one pass for a made-up person on a made-up day (12 lines)
   through the relay. With `LAMP_NIGHTLY_MEMORY` naming a lamp-memory binary
   with the nightly ops, it starts that binary on a fresh folder of its own
-  (never the lamp's memory), writes the day and prints Days' accepted and
+  (never the lamp's memory), made 0700 whatever the umask (C108: lamp-memory
+  refuses a store folder others can enter), writes the day and prints Days' accepted and
   dropped counts per kind and the reasons; without it, the model's proposed
   counts per kind.
 - **Tests:** `nightly::tests` (the hours, quiet and slide; people and days;
@@ -4188,7 +4194,19 @@ then use that person's scope:
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
-    lamp, known.
+    lamp, known. With `LAMP_NAME_LEARN_FIX=on` (off unless set, second
+    route only, #7331), a `remember` whose text gives the speaker's own name
+    (`known_faces::gives_a_name`, or `named::own_name_in` for the model's
+    "The user's name is Ada.", never "Her name is Linh.", which is someone
+    else's) is told instead to ask them "Shall I
+    remember your face as Ada?" and to call `remember_my_face` with that
+    name only after their yes (a new face is kept only on that yes,
+    `known_faces::ASK_FACE_FIRST`), so the eyes take a fresh look and judge the face
+    (`needs_face::withheld`, journal `TO_FACE_SAVE`, no words): on
+    lamp-74ff the owner's "my name is ..." came back not kept while a
+    recognition flicker held their face as nobody's. Any other personal
+    line is still not kept. Set it only with `LAMP_NAMES=checked` and the
+    eyes' who socket, which give the model that function.
   - **The observation pass keeps only what rests on the person's words**
     (finding M on #3504): `OBSERVE_PROMPT` says `heard` is the person's and
     `said` the lamp's, never to propose what only the lamp said, and to keep

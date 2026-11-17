@@ -472,20 +472,64 @@ fn openclaw_seen(state: &str, ask: Value) -> Value {
     step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
 }
 
-/// #6499: OpenClaw's `show` on the lamp can read idle with no ask seconds
-/// after a `new` whose `--message` it did take (12139 on lamp-52e6, 9adf's
-/// runs on #6504). Idle with no ask counts as handed over: one `new`, and
-/// nothing closed, started again or replied.
-#[test]
-fn openclaw_idle_with_no_ask_after_new_is_taken_as_handed_over() {
+/// An OpenClaw `show` reading of `agent` with a tool used: proof it took
+/// its first prompt.
+fn openclaw_used(agent: &str) -> Value {
+    step(json!({"id":agent,"state":"idle","ask":null,"answer":"","truncated":false,"tools":1}))
+}
+
+/// An OpenClaw launch to the lamp's own engine with `launch_timeout`, and
+/// the Gateway's record (`OPENCLAW_STATE_DIR`) an agent database with
+/// OpenClaw 2026.11.2's tables that holds `rows` (SQL inserts, may be
+/// empty). With `rows` `None`, no record is there at all.
+fn openclaw_rig(launch_timeout: Duration, rows: Option<&str>) -> (Rig, Launch) {
     let mut request = launch();
     request.target.engine = EngineKind::Openclaw;
-    let rig = Rig::new();
+    let mut rig = Rig::new();
+    rig.config.launch_timeout = launch_timeout;
+    let state = rig.root.path().join("openclaw-state");
+    if let Some(rows) = rows {
+        let db = lamp_tasks::harness::openclaw_record_path(&state);
+        fs::create_dir_all(db.parent().unwrap()).unwrap();
+        let connection = rusqlite::Connection::open(&db).unwrap();
+        connection
+            .execute_batch(&format!(
+                "CREATE TABLE session_nodes (session_key TEXT NOT NULL PRIMARY KEY, current_session_id TEXT NOT NULL, status TEXT);\n\
+                 CREATE TABLE session_windows (session_id TEXT NOT NULL PRIMARY KEY, session_key TEXT NOT NULL);\n\
+                 CREATE TABLE transcript_events (session_id TEXT NOT NULL, seq INTEGER NOT NULL, message_role TEXT, PRIMARY KEY (session_id, seq));\n\
+                 {rows}"
+            ))
+            .unwrap();
+    }
+    rig.config
+        .environment
+        .insert("OPENCLAW_STATE_DIR".into(), state.into_os_string());
+    (rig, request)
+}
+
+/// The record's rows for a session of Harness's `agent` the Gateway took
+/// the first prompt in: its header and the user's message, no run status.
+fn openclaw_user_row(agent: &str) -> String {
+    format!(
+        "INSERT INTO session_nodes VALUES ('agent:main:harness-{agent}', 'w1', NULL);\n\
+         INSERT INTO session_windows VALUES ('w1', 'agent:main:harness-{agent}');\n\
+         INSERT INTO transcript_events VALUES ('w1', 0, NULL), ('w1', 1, 'user');"
+    )
+}
+
+/// #7277 (a): idle with no ask after `new` is no proof; a tool used within
+/// the bound is, and the launch is Created with one `new` and nothing
+/// closed, started again or replied. The #6499 case, a run that read idle
+/// with no ask and still wrote its file, is this one.
+#[test]
+fn openclaw_idle_with_no_ask_then_a_tool_within_the_bound_is_created() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
         "show":{"each":[
             openclaw_seen("starting", Value::Null),
-            openclaw_seen("idle", Value::Null)
+            openclaw_seen("idle", Value::Null),
+            openclaw_used(AGENT)
         ]},
         "reply":{"default":true}
     }));
@@ -495,9 +539,201 @@ fn openclaw_idle_with_no_ask_after_new_is_taken_as_handed_over() {
             agent_id: AGENT.into()
         }
     );
-    assert_eq!(openclaw_verbs(&rig), ["machines", "new", "show", "show"]);
+    assert_eq!(
+        openclaw_verbs(&rig),
+        ["machines", "new", "show", "show", "show"]
+    );
     let new = rig.calls()[1]["args"].as_array().unwrap().clone();
     assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
+}
+
+/// #7277 (b): idle with no ask through the bound, after `new` and after
+/// the one `new` more, with the Gateway's record holding nothing of
+/// either, is never taken as handed over: each harness is closed, and the
+/// task is not sent, `openclaw_not_taken`, all within one launch bound.
+#[test]
+fn openclaw_idle_with_no_ask_throughout_is_closed_started_once_more_and_not_sent() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(rig.cli().launch(&request), not_sent("openclaw_not_taken"));
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (2, 2, 0),
+        "{verbs:?}"
+    );
+    let first_close = verbs.iter().position(|v| v == "close").unwrap();
+    let second_new = verbs.iter().rposition(|v| v == "new").unwrap();
+    assert!(first_close < second_new, "{verbs:?}");
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
+/// #7277: no proof from the first harness and nothing of it in the
+/// Gateway's record, so it is closed; the one `new` more proves it (a tool
+/// used), and is the launch.
+#[test]
+fn openclaw_not_taken_then_taken_on_the_second_new_is_created_on_it() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
+    let second = step(
+        json!({"ok":true,"machineId":MACHINE,"agent":{"id":OTHER,"name":"lamp-task-001","engine":"openclaw"}}),
+    );
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"each":[{"default":true}, second]},
+        "close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)],"by_arg":{OTHER: openclaw_used(OTHER)}},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: OTHER.into()
+        }
+    );
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(
+        verbs.iter().filter(|v| *v == "close").count(),
+        1,
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last().map(String::as_str), Some("show"), "{verbs:?}");
+}
+
+/// #7277: a first harness with no proof and nothing in the record that
+/// can't be closed ends the launch uncertain, with nothing more started:
+/// one left running could still take its prompt beside a second.
+#[test]
+fn openclaw_not_taken_and_not_closed_is_uncertain_with_nothing_more_started() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":1},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(rig.cli().launch(&request), uncertain("openclaw_not_closed"));
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(verbs.iter().filter(|v| *v == "new").count(), 1, "{verbs:?}");
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
+/// #7287 follow-up (lamp-c0a4, 16:27): `show` never proves within the
+/// bound and the Gateway's record holds nothing yet (read a moment before
+/// it was written), but `harness close` is refused with exit 1 `WORKING`:
+/// the harness took its prompt after all. The launch is Created on it,
+/// with one `new` and no second.
+#[test]
+fn openclaw_close_refused_as_working_is_created_with_no_second_new() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(""));
+    let working = json!({
+        "stdout":format!("{}\n", json!({"error":"WORKING","detail":"…","code":"WORKING","next":[]})),
+        "exit":1
+    });
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":working,
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (1, 1, 0),
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last().map(String::as_str), Some("close"), "{verbs:?}");
+}
+
+/// #7287 (the Reviewer-lead's P2): `show` shows no proof, but the
+/// Gateway's own record holds the user's message for this harness's
+/// session: the send already reached it. Nothing is closed and `new` is
+/// never asked again (the ask would run twice); the harness is kept and
+/// looked at to the launch's bound, then the launch is uncertain,
+/// `openclaw_taken_unseen`.
+#[test]
+fn openclaw_taken_in_the_gateway_record_but_unseen_is_kept_never_started_twice() {
+    let rows = openclaw_user_row(AGENT);
+    let (rig, request) = openclaw_rig(Duration::from_secs(10), Some(&rows));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        uncertain("openclaw_taken_unseen")
+    );
+    let verbs = openclaw_verbs(&rig);
+    let count = |verb: &str| verbs.iter().filter(|v| *v == verb).count();
+    assert_eq!(
+        (count("new"), count("close"), count("reply")),
+        (1, 0, 0),
+        "{verbs:?}"
+    );
+}
+
+/// #7287: no record the lamp can read (no agent database there) is never
+/// taken as "nothing was sent": the harness is kept, never closed or
+/// started again, and the launch is uncertain, `openclaw_record_unread`.
+#[test]
+fn openclaw_with_no_readable_gateway_record_is_never_started_twice() {
+    let (rig, request) = openclaw_rig(Duration::from_secs(4), None);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        uncertain("openclaw_record_unread")
+    );
+    let verbs = openclaw_verbs(&rig);
+    assert_eq!(verbs.iter().filter(|v| *v == "new").count(), 1, "{verbs:?}");
+    assert_eq!(
+        verbs.iter().filter(|v| *v == "close").count(),
+        0,
+        "{verbs:?}"
+    );
+}
+
+/// #7287 (Heron's P2): the whole no-proof path, two proof waits, two
+/// closes and the one `new` more, ends within the launch's own bound
+/// (`launch_timeout` from its start), never a full bound per step: the
+/// tasks-harness lane serves every other task's reads and closes.
+#[test]
+fn openclaw_no_proof_path_ends_within_one_launch_bound() {
+    let bound = Duration::from_secs(4);
+    let (rig, request) = openclaw_rig(bound, Some(""));
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[openclaw_seen("idle", Value::Null)]},
+        "reply":{"default":true}
+    }));
+    let began = std::time::Instant::now();
+    let outcome = rig.cli().launch(&request);
+    let took = began.elapsed();
+    assert!(
+        matches!(
+            &outcome,
+            LaunchOutcome::NotSent { .. } | LaunchOutcome::Uncertain { .. }
+        ),
+        "{outcome:?}"
+    );
+    // The bound, and the one fixture call that may be under way at it.
+    assert!(took < bound + Duration::from_millis(1500), "{took:?}");
+    assert_eq!(
+        openclaw_verbs(&rig).iter().filter(|v| *v == "new").count(),
+        2
+    );
 }
 
 /// An OpenClaw read asked (`ask` set) after `new` is under way, as
@@ -2632,6 +2868,182 @@ fn a_missing_folder_after_new_is_not_sent_with_the_switch_and_never_retried() {
     rig.config.folder_missing = true;
     rig.new_step(json!({"stdout":"{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n"}));
     assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
+}
+
+/// No Harness daemon on this computer (build 13373, a product lamp signed
+/// out): `new` exits 1 with Harness CLI's `NOT_RUNNING` words on stderr.
+/// Nothing was started, so it is `not_sent` with `harness_not_running`,
+/// which the owner starts the daemon on and tries once more; `new` itself
+/// is asked once. Its journal line carries Harness's stderr whole, on one
+/// line. Any other failure stays `uncertain` with `new_failed`.
+#[test]
+fn a_new_harness_answers_not_running_here_is_not_sent_and_said_whole() {
+    const NOT_RUNNING: &str = "Harness is not running here. Start it with `harness start`.\n";
+    for (step, outcome) in [
+        (
+            json!({"exit": 1, "stderr": NOT_RUNNING}),
+            not_sent("harness_not_running"),
+        ),
+        (
+            json!({"exit": 1, "stdout": "{\"ok\":false,\"error\":\"NOT_RUNNING\"}\n", "stderr": NOT_RUNNING}),
+            not_sent("harness_not_running"),
+        ),
+        (
+            json!({"exit": 1, "stderr": "Harness is running here.\n"}),
+            uncertain("new_failed"),
+        ),
+        (
+            json!({"exit": 1, "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n"}),
+            uncertain("new_failed"),
+        ),
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(step.clone());
+        let (said, lines) = journal_of(&mut rig, &launch());
+        assert_eq!(said, outcome, "{step}");
+        assert_eq!(news(&rig), 1, "{step}");
+        if outcome == not_sent("harness_not_running") {
+            assert_eq!(lines.len(), 1, "{lines:?}");
+            assert!(
+                lines[0].starts_with(
+                    "tasks: lamp-task-001: dispatch not_sent harness_not_running (exit 1, "
+                ),
+                "{}",
+                lines[0]
+            );
+            assert!(
+                lines[0].ends_with(
+                    ", stderr: Harness is not running here. Start it with `harness start`.)"
+                ),
+                "{}",
+                lines[0]
+            );
+        }
+    }
+    // Only stderr's not-running line is said whole: any other line keeps
+    // `said_of_stderr`'s cut, with nothing of the person's words. The
+    // words on stdout only are no not-running answer.
+    let mut request = launch();
+    request.prompt = "Summarise Quarterly Payroll for Bob".into();
+    for (step, outcome, said) in [
+        (
+            json!({"exit": 1, "stderr": format!("{NOT_RUNNING}Summarise Quarterly Payroll for Bob\n")}),
+            not_sent("harness_not_running"),
+            ", stderr: Harness is not running here. Start it with `harness start`.)",
+        ),
+        (
+            json!({"exit": 1, "stdout": "Harness is not running here. Start it with `harness start`.\n", "stderr": "Summarise Quarterly Payroll for Bob\n"}),
+            uncertain("new_failed"),
+            "",
+        ),
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(step.clone());
+        let (said_outcome, lines) = journal_of(&mut rig, &request);
+        assert_eq!(said_outcome, outcome, "{step}");
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        if !said.is_empty() {
+            assert!(lines[0].ends_with(said), "{}", lines[0]);
+        }
+        assert_said_nothing_private(&lines[0], &request);
+    }
+}
+
+/// The first builder's P2 on #7282: the person's ask, "find out why the
+/// printer is not running here", echoed on the one stderr line of a `new`
+/// that failed another way. Only a line that is Harness's fixed sentence
+/// itself counts: this one is `uncertain` (`new_failed`), never sent again,
+/// and its journal line never holds the line whole, nor the ask's words.
+/// Harness's sentence beside other words on one line is not it either.
+#[test]
+fn a_new_whose_stderr_line_holds_not_running_words_among_others_is_not_that_answer() {
+    let mut request = launch();
+    request.prompt = "Find out why Bob's printer is not running here".into();
+    for stderr in [
+        "error: Find out why Bob's printer is not running here\n",
+        "Harness is not running here. Start it with `harness start`. Bob's printer\n",
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(json!({"exit": 1, "stderr": stderr}));
+        let (outcome, lines) = journal_of(&mut rig, &request);
+        assert_eq!(outcome, uncertain("new_failed"), "{stderr}");
+        assert_eq!(news(&rig), 1, "{stderr}");
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(!lines[0].contains(stderr.trim()), "{}", lines[0]);
+        assert!(!lines[0].contains("Bob"), "{}", lines[0]);
+        assert!(!lines[0].contains("printer"), "{}", lines[0]);
+        assert_said_nothing_private(&lines[0], &request);
+    }
+}
+
+/// The shared rule for any `harness new` caller ([`DaemonOnce::run`]): it
+/// waits for a daemon start already under way (lamp-tasks' first, at boot)
+/// and fires none itself; a not-running answer starts the daemon and asks
+/// `new` once more; twice not running is returned, never a third `new`.
+#[test]
+fn daemon_once_waits_for_a_start_under_way_and_tries_new_once_more() {
+    use lamp_tasks::harness::{DaemonGate, DaemonOnce};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let order = Arc::new(Mutex::new(Vec::<&str>::new()));
+    // A start under way: `new` waits for it, and no second start.
+    let gate = Arc::new(DaemonGate::default());
+    let mut marked = false;
+    gate.starting(&mut marked, true);
+    let (g, o) = (gate.clone(), order.clone());
+    let caller = std::thread::spawn(move || {
+        DaemonOnce::run(
+            &g,
+            "make-1",
+            || {
+                o.lock().unwrap().push("new");
+                "created"
+            },
+            |said| *said == "not running",
+            || {
+                o.lock().unwrap().push("daemon");
+                Ok(())
+            },
+        )
+    });
+    std::thread::sleep(Duration::from_millis(150));
+    assert!(order.lock().unwrap().is_empty());
+    order.lock().unwrap().push("first start done");
+    gate.starting(&mut marked, false);
+    assert_eq!(caller.join().unwrap(), "created");
+    assert_eq!(*order.lock().unwrap(), ["first start done", "new"]);
+    // Not running once: the daemon, then `new` once more.
+    for (answers, news, starts, last) in [(1, 2, 1, "created"), (5, 2, 1, "not running")] {
+        let gate = DaemonGate::default();
+        let (left, asked, started) = (
+            AtomicUsize::new(answers),
+            AtomicUsize::new(0),
+            AtomicUsize::new(0),
+        );
+        let said = DaemonOnce::run(
+            &gate,
+            "make-2",
+            || {
+                asked.fetch_add(1, Ordering::SeqCst);
+                if left
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                    .is_ok()
+                {
+                    "not running"
+                } else {
+                    "created"
+                }
+            },
+            |said| *said == "not running",
+            || {
+                started.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        );
+        assert_eq!(said, last);
+        assert_eq!(asked.load(Ordering::SeqCst), news);
+        assert_eq!(started.load(Ordering::SeqCst), starts);
+        assert!(!gate.busy());
+    }
 }
 
 /// `harness machines engines`' row for this computer and Codex
@@ -7020,6 +7432,7 @@ fn skill_runner_with(
         held_by: None,
         retry: Duration::from_millis(20),
         lost_look: Duration::from_millis(600),
+        answer_wait: Duration::from_millis(600),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
         no_harness: Default::default(),
@@ -7027,6 +7440,18 @@ fn skill_runner_with(
         agent_ns: None,
         login: None,
         starts: Default::default(),
+        one_session: None,
+        // Agent main's exec allow-list has the launcher.
+        skill_start_allowed: lamp_tasks::gateway::SkillStartAllowed::new(
+            Box::new(|| {
+                Ok(json!({"file":{"agents":{"main":{"allowlist":[
+                    {"pattern":lamp_tasks::skill_start::LAUNCHER}
+                ]}}}})
+                .to_string())
+            }),
+            Box::new(|| Some(1)),
+        ),
+        makes: false,
     }
 }
 
@@ -7046,10 +7471,19 @@ fn skill_run(deadline: Duration) -> SkillRun {
         ],
         deadline,
         started: Default::default(),
+        write: false,
+        not_made: Default::default(),
         start_in: None,
         env_file: None,
         answer: Default::default(),
     }
+}
+
+/// [`skill_run`] as a skill's fixed write's (#6879).
+fn write_run(deadline: Duration) -> SkillRun {
+    let mut run = skill_run(deadline);
+    run.write = true;
+    run
 }
 
 /// Nothing of the run is left: no `skill-*` folder, no token file.
@@ -7149,6 +7583,127 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     );
     assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
     nothing_left(&rig);
+}
+
+/// #7275: a made skill's run on the lamp's own target, with no Harness
+/// daemon here, got "Harness is not running here" from `new` and ended.
+/// Now `harness start` runs, and `new` once more ([`DaemonOnce::run`]); a
+/// second not-running answer ends the run with `harness_not_running`, and
+/// never a third `new`.
+#[test]
+fn a_skill_run_harness_answers_not_running_starts_its_daemon_and_goes_once_more() {
+    let not_running = json!({"exit": 1, "stderr": "Harness is not running here. Start it with `harness start`.\n"});
+    let verbs = |rig: &Rig| -> Vec<String> {
+        rig.calls()
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap().to_owned())
+            .filter(|verb| verb == "new" || verb == "start")
+            .collect()
+    };
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[not_running.clone(), {"default":true}]},
+        "start":{"exit":0},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert_eq!(verbs(&rig), ["new", "start", "new"]);
+    nothing_left(&rig);
+    // Still not running after the start: refused once, no third `new`.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":not_running,
+        "start":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(said.contains("harness_not_running"), "{said}");
+    assert_eq!(verbs(&rig), ["new", "start", "new"]);
+}
+
+/// #7171: a `new` that Harness answered naming the run's agent, which
+/// lamp-tasks then refused as `Uncertain` (a `machineId` not the lamp's,
+/// R5 on lamp-c0a4; an `existing` agent of the run's name), still closes
+/// that agent with `close --now` on the launch's machine, after the run's
+/// token is ended, and leaves nothing. A refusal whose reply names no
+/// agent, or another name's, closes nothing.
+#[test]
+fn issue_7171_a_skill_run_refused_as_uncertain_closes_the_agent_harness_named() {
+    let mismatched = json!({"ok":true,"machineId":"ffffffffffffffffffffffffffffffff",
+        "agent":{"id":AGENT,"name":"skill-task-1","engine":"hermes"}});
+    let existing = json!({"ok":true,"existing":true,"machineId":MACHINE,
+        "name":"skill-task-1","state":"running","agentId":AGENT});
+    for (reply, code) in [
+        (mismatched, "machine_mismatch"),
+        (existing, "existing_unbound"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":step(reply),
+            "close":{"exit":0},
+        }));
+        let ended_at = std::cell::Cell::new(None);
+        let end_token = || ended_at.set(Some(rig.calls().len()));
+        let why = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &end_token)
+            .unwrap_err();
+        assert!(why.contains(code), "{code}: {why}");
+        // The sign-in look the refusal's words come from aside.
+        let calls: Vec<Value> = rig
+            .calls()
+            .into_iter()
+            .filter(|call| call["args"][0] != "auth")
+            .collect();
+        let verbs: Vec<&str> = calls
+            .iter()
+            .map(|call| call["args"][0].as_str().unwrap())
+            .collect();
+        assert_eq!(verbs, ["machines", "new", "close"], "{code}");
+        assert_eq!(
+            calls[2]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"]),
+            "{code}"
+        );
+        // The token ended just before the close, as on every other end.
+        assert_eq!(
+            ended_at.get(),
+            Some(rig.calls().len() - 1),
+            "{code}: token ended before close"
+        );
+        nothing_left(&rig);
+    }
+    // No agent named, or one of another name: nothing to close.
+    for reply in [
+        json!({"ok":true,"machineId":MACHINE}),
+        json!({"ok":true,"machineId":"ffffffffffffffffffffffffffffffff",
+            "agent":{"id":AGENT,"name":"lamp-task-001","engine":"hermes"}}),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":step(reply.clone()),
+            "close":{"exit":0},
+        }));
+        skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(
+            rig.calls().iter().all(|call| call["args"][0] != "close"),
+            "{reply}"
+        );
+        nothing_left(&rig);
+    }
 }
 
 /// The real Hermes, as Harness lists it apart from the wrapper's agent.
@@ -8643,6 +9198,149 @@ fn a_skill_run_that_fails_leaves_nothing() {
     }
 }
 
+/// #7092: a fixed write's launch Harness didn't make (`new_failed`, its
+/// daemon not up yet just after a lamp-tasks restart) is asked once more,
+/// the same run in the same folder on the same token file, once Harness
+/// answers with nothing in the run's folder: one run, one send. A task's
+/// run is never asked twice.
+#[test]
+fn issue_7092_a_fixed_writes_unmade_launch_is_asked_once_more_once_harness_answers() {
+    use std::sync::atomic::Ordering;
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[{"exit":1},{"default":true}]},
+        // Harness's daemon unreachable at first, then up with nothing there.
+        "ps":{"each":[{"exit":1},step(json!({"ok":true,"harnesses":[]}))]},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let run = write_run(Duration::from_secs(20));
+    assert_eq!(
+        skill_runner(&rig, Some(EngineKind::Hermes)).run(&run, &|| {}),
+        Ok(0)
+    );
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    let news: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new")
+        .collect();
+    assert_eq!(news.len(), 2, "asked once more, never a third time");
+    assert_eq!(
+        news[0]["args"], news[1]["args"],
+        "the same run, the same folder"
+    );
+    let first_ps = calls.iter().position(|call| call["args"][0] == "ps");
+    let second_new = calls
+        .iter()
+        .rposition(|call| call["args"][0] == "new")
+        .unwrap();
+    assert!(
+        first_ps.is_some_and(|ps| ps < second_new),
+        "asked after Harness answers"
+    );
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "ps").count(),
+        2,
+        "until it answers"
+    );
+    nothing_left(&rig);
+    // A task's run is asked once, as before.
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"each":[{"exit":1},{"default":true}]}}));
+    let run = skill_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness didn't start the run (new_failed)");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    assert!(calls.iter().all(|call| call["args"][0] != "ps"));
+    nothing_left(&rig);
+}
+
+/// #7092: a fixed write's run that started and then failed is never asked
+/// again; nor is one whose unmade launch left an agent in the run's
+/// folder (Harness may have made it after all). Neither is `not_made`:
+/// it may have sent.
+#[test]
+fn issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again() {
+    use std::sync::atomic::Ordering;
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "failed");
+    let run = write_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert!(why.contains("failed"), "{why}");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    nothing_left(&rig);
+    let rig = Rig::new();
+    let folder = rig.root.path().join("project/skill-task-1");
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"each":[{"exit":1},{"default":true}]},
+        "ps":step(json!({"ok":true,"harnesses":[
+            {"id":AGENT,"state":"working","folder":folder.to_str().unwrap()},
+        ]})),
+        "close":{"exit":0},
+    }));
+    let run = write_run(Duration::from_secs(20));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&run, &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness didn't start the run (new_failed)");
+    assert!(!run.not_made.load(Ordering::Acquire));
+    assert!(run.started.load(Ordering::Acquire));
+    let calls = rig.calls();
+    assert_eq!(
+        calls.iter().filter(|call| call["args"][0] == "new").count(),
+        1
+    );
+    nothing_left(&rig);
+}
+
+/// #7092: a fixed write whose second launch Harness didn't make either, or
+/// whose Harness never answered within its wait, is `not_made`: nothing
+/// was made, so lamp-skills tells the owner its send didn't go. Never a
+/// third launch.
+#[test]
+fn issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made() {
+    use std::sync::atomic::Ordering;
+    for (ps, news) in [
+        (step(json!({"ok":true,"harnesses":[]})), 2),
+        (json!({"exit":1}), 1),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"machines":{"default":true},"new":{"exit":1},"ps":ps}));
+        let run = write_run(Duration::from_secs(20));
+        let why = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&run, &|| {})
+            .unwrap_err();
+        assert!(why.starts_with("Harness didn't start the run"), "{why}");
+        assert!(run.not_made.load(Ordering::Acquire), "{why}");
+        let calls = rig.calls();
+        assert_eq!(
+            calls.iter().filter(|call| call["args"][0] == "new").count(),
+            news,
+            "{why}"
+        );
+        assert!(calls.iter().all(|call| call["args"][0] != "close"));
+        nothing_left(&rig);
+    }
+}
+
 /// Hermes only: OpenClaw (or any other engine) as the lamp's, no lamp
 /// target, no Harness set up, or a wrapper that doesn't find a run by its
 /// folder, is refused in words, with nothing made or asked but, with no
@@ -8751,4 +9449,802 @@ fn issue_6691_named_reads_each_sessions_id_name_and_folder_from_one_ps() {
         rig.cli().named("not a machine"),
         Err("invalid_machine".into())
     );
+}
+
+/// The OpenClaw gateway default's runner with `LAMP_TASKS_ONE_SESSION` on
+/// (#7246): its one session's queue bounds short, its boot fixed.
+fn one_session_runner(rig: &Rig) -> HarnessRunner {
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = Some(Arc::new(
+        lamp_tasks::one_session::OneSession::new(
+            Duration::from_secs(5),
+            Duration::from_millis(20),
+            Duration::from_secs(5),
+        )
+        .with_state_file(rig.root.path().join("one-session.json"))
+        .with_session_delete(Box::new(|_| Ok(()))),
+    ));
+    runner
+}
+
+/// A pane whose turn for run `task-1` is idle, as `show` reads it.
+fn one_session_plan(rig: &Rig) {
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+}
+
+/// #7246: with `LAMP_TASKS_ONE_SESSION` on, an OpenClaw gateway default's
+/// skill runs share one Harness pane: one `new` (the pane's own, in its
+/// folder `one-session`, not the run's), each run typed into it with
+/// `reply` after its header line, and no `close` at a run's end; each
+/// run's folder, launcher claim and token stay its own and are gone after.
+/// Off (`an_openclaw_gateway_default_runs_through_harness_new_like_hermes`),
+/// every run is its own `new` and `close`.
+#[test]
+fn with_one_session_on_runs_share_one_pane_and_it_is_never_closed() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..3 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert_eq!(
+            run.answer.get().map(String::as_str),
+            Some("Took the photo.")
+        );
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "new").count(),
+        1,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "reply").count(),
+        3,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "close").count(),
+        0,
+        "{verbs:?}"
+    );
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "openclaw");
+    assert!(new.to_string().contains("one-session"), "{new}");
+    assert!(!new.to_string().contains("skill-task-1"), "{new}");
+    for reply in calls.iter().filter(|call| call["args"][0] == "reply") {
+        assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
+        let words = reply["args"][6].as_str().unwrap();
+        assert!(words.starts_with("New task task-1:\n"), "{words}");
+        assert!(
+            words.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "{words}"
+        );
+        assert!(!words.contains(RUN_SECRET));
+    }
+    assert!(rig.root.path().join("project/one-session").is_dir());
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-openclaw");
+    assert!(named, "the pane's fixed name: {new}");
+    // Opened as the person: Harness's 30-min close of an idle pane is for
+    // one an agent started.
+    assert!(new["environment"].get("AI_AGENT").is_none(), "{new}");
+}
+
+/// #7246: with Harness called as an agent (not `--harness-as-person`), no
+/// pane is shared, since Harness would close an idle one an agent started
+/// after 30 min: each run is its own `new` and `close`, as off.
+#[test]
+fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
+    let rig = Rig::new();
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+}
+
+/// #7246: only an OpenClaw default shares the one pane. A Hermes default
+/// whose wrapper is a gateway agent's (its run's token through the
+/// skill-start launcher, as OpenClaw's) keeps today's per-run path, even
+/// with the switch on and Harness called as the person: each run its own
+/// `new hermes` and `close`, nothing typed with `reply`.
+#[test]
+fn with_one_session_on_a_hermes_default_keeps_the_per_run_path() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = one_session_runner(&rig).one_session;
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(!new.to_string().contains("one-session"), "{new}");
+}
+
+/// #7246: a run past its deadline in the one pane ends its turn: the
+/// token ended, the pane closed `--now` (Harness has no interrupt verb),
+/// and the next run opens a new pane and goes on in it.
+#[test]
+fn with_one_session_on_a_deadline_closes_the_pane_and_the_next_run_reopens() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    // The pane opened; then a turn that never ends.
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":"{\"harnesses\":[]}","exit":124,"delay_ms":200},
+        "show":{"default":true},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let ended = std::cell::Cell::new(None);
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {
+            ended
+                .get()
+                .is_none()
+                .then(|| ended.set(Some(rig.calls().len())));
+        })
+        .unwrap_err();
+    assert_eq!(said, "the run was ended at its deadline, 2 s");
+    let calls = rig.calls();
+    let closed = calls
+        .iter()
+        .position(|call| call["args"][0] == "close")
+        .expect("the pane closed");
+    assert!(calls[closed].to_string().contains("--now"));
+    assert!(
+        ended.get().is_some_and(|at| at <= closed),
+        "the token first"
+    );
+    nothing_left(&rig);
+    // The next run: a new pane, typed into.
+    one_session_plan(&rig);
+    let before = rig.calls().len();
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "new").count(),
+        1,
+        "{after:?}"
+    );
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "close").count(),
+        0,
+        "{after:?}"
+    );
+}
+
+/// #7246 (the Reviewer-lead's #4): a pane that stays busy until a skill
+/// run's deadline fails the run in words; it never runs its own
+/// `harness new`, a second session.
+#[test]
+fn with_one_session_on_a_busy_pane_never_makes_a_second_session() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("working", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"working","ask":"Someone else's.",
+            "answer":"","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let before = rig.calls().len();
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("one session could not take the run"),
+        "{said}"
+    );
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert!(!after.iter().any(|verb| verb == "new"), "{after:?}");
+    nothing_left(&rig);
+}
+
+/// #7245: the lamp's make runner with an OpenClaw gateway default, its
+/// gateway's namespace showing lamp-control's socket: the one run path's
+/// runner with `makes` on, as `MakeGateway::lamp` makes it.
+fn make_gateway(
+    rig: &Rig,
+    default: EngineKind,
+    gateway: bool,
+) -> lamp_tasks::skill_make::MakeGateway {
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = if gateway {
+        openclaw_gateway_wrapper(&gateway_ns)
+    } else {
+        "#!/bin/sh\nexec openclaw-own \"$@\"\n".to_owned()
+    };
+    let mut runner = one_path_runner(rig, default, &[("openclaw", &wrapper)], Some("#!/bin/sh\n"));
+    // A make is on the one run path whatever lamp-tasks' own switch.
+    runner.default_agent = false;
+    runner.makes = true;
+    lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner))
+}
+
+/// A stand-in for the lamp's Hermes in its namespace (`MakeHermes`): it
+/// counts its runs and writes `HERMES` as the make's answer.
+#[derive(Default)]
+struct MakeHermesStandIn(std::sync::atomic::AtomicUsize);
+
+impl Runner for MakeHermesStandIn {
+    fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        self.0.fetch_add(1, Ordering::AcqRel);
+        fs::write(run.start_in.as_ref().unwrap().join("answer.md"), "HERMES").unwrap();
+        Ok(0)
+    }
+}
+
+/// A voice make's line (#7245), with `one_path` when given; its rules
+/// carry the guide's check line, which a gateway make never gets.
+fn make_line(one_path: Option<bool>, within_ms: u64) -> Vec<u8> {
+    let mut line = json!({
+        "op":"skill_make",
+        "rules":"RULES\n/opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME\n",
+        "within_ms":within_ms,
+        "guide":true,
+    });
+    if let Some(one_path) = one_path {
+        line["one_path"] = json!(one_path);
+    }
+    serde_json::to_vec(&line).unwrap()
+}
+
+/// The rig's make work folder, made empty.
+fn make_work(rig: &Rig) -> PathBuf {
+    let work = rig.root.path().join("work");
+    fs::create_dir(&work).unwrap();
+    work
+}
+
+/// Every Harness call of verb `verb`.
+fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
+    rig.calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == verb)
+        .collect()
+}
+
+/// #7245 (lamp-c0a4, 16 Nov 17:53: Harness's hand-over took 40 of 90 s): a
+/// gateway make's turn gets its whole deadline from the hand-over, so a slow
+/// `harness new` still leaves the agent its time to answer.
+#[test]
+fn a_gateway_make_with_a_slow_hand_over_still_gets_its_whole_time() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER","delay_ms":2500},
+        "wait":{"stdout":waited("stopped", AGENT),"delay_ms":2000},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 3_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+}
+
+/// #7245: a make line with `"one_path":true` on a lamp whose default agent
+/// is an OpenClaw gateway agent is exactly one `harness new openclaw` in a
+/// fresh make folder in the work folder, with no token, no token file and
+/// nothing made live; the answer is the agent's `answer.md`; then its
+/// session is closed `--now` and the folder is gone. The lamp's Hermes
+/// never runs.
+#[test]
+fn a_one_path_make_on_a_gateway_default_is_one_harness_new_then_closed_and_gone() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER"},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let mut told = 0;
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || told += 1,
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    assert_eq!(told, 1, "started told once");
+    assert_eq!(
+        hermes.0.load(Ordering::Acquire),
+        0,
+        "never the lamp's Hermes"
+    );
+    let news = calls_of_verb(&rig, "new");
+    assert_eq!(news.len(), 1, "exactly one harness new");
+    assert_eq!(news[0]["args"][1], "openclaw");
+    let folder = PathBuf::from(news[0]["args"][4].as_str().unwrap());
+    assert_eq!(folder.parent(), Some(work.as_path()), "in the work folder");
+    let name = folder.file_name().unwrap().to_str().unwrap();
+    assert!(name.starts_with("make-"), "{name}");
+    assert_eq!(news[0]["args"][6], name);
+    let task = news[0]["args"][9].as_str().unwrap();
+    assert!(
+        task.contains("rules.md") && task.contains("answer.md"),
+        "{task}"
+    );
+    assert!(
+        !task.contains("lamp-skills"),
+        "no check on a gateway: {task}"
+    );
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "closed once");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+    );
+    assert_eq!(
+        rig.calls().last().unwrap()["args"][0],
+        "close",
+        "closed last"
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+    assert!(!rig.root.path().join("runs").exists(), "no token file");
+    assert!(
+        !rig.root.path().join("project").exists(),
+        "no skill-* folder"
+    );
+    for call in rig.calls() {
+        assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+    }
+}
+
+/// #7245: a gateway make that ends in an error (Harness says `failed`) or
+/// at its deadline is refused, and still its session is closed `--now`
+/// once and its folder removed; an answer written before is never kept.
+#[test]
+fn a_one_path_gateway_make_ending_in_an_error_or_its_deadline_is_closed_and_gone() {
+    for timeout in [false, true] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true,"write_answer":"ANSWER"},
+            "wait": if timeout {
+                json!({"stdout":waited("idle", AGENT),"delay_ms":5000})
+            } else {
+                json!({"stdout":waited("failed", AGENT)})
+            },
+            "show":{"default":true},
+            "close":{"exit":0},
+        }));
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+        let hermes = MakeHermesStandIn::default();
+        let began = Instant::now();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(Some(true), if timeout { 1_000 } else { 20_000 }),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        assert_eq!(answered["ok"], false, "{timeout}: {answered}");
+        assert_eq!(answered["error"], "run_failed", "{answered}");
+        let why = answered["message"].as_str().unwrap();
+        if timeout {
+            assert!(why.contains("deadline"), "{why}");
+            assert!(
+                began.elapsed() < Duration::from_secs(4),
+                "{:?}",
+                began.elapsed()
+            );
+        } else {
+            assert!(why.contains("failed"), "{why}");
+        }
+        assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+        assert_eq!(calls_of_verb(&rig, "new").len(), 1);
+        let closes = calls_of_verb(&rig, "close");
+        assert_eq!(closes.len(), 1, "{timeout}: closed once");
+        assert_eq!(
+            closes[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+        );
+        assert_eq!(fs::read_dir(&work).unwrap().count(), 0, "{timeout}: gone");
+        // The turn itself: an answer the agent wrote before its run failed
+        // is never taken as the make's.
+        let folder = work.join("make-direct");
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("rules.md"), "R").unwrap();
+        let run = lamp_tasks::skill_make::gateway_run(
+            &folder,
+            Duration::from_millis(if timeout { 1_000 } else { 20_000 }),
+            false,
+        );
+        assert!(gateway.turn.make_turn(&run).is_err());
+        assert_eq!(run.answer.get(), None, "{timeout}: never kept");
+        assert!(!folder.exists(), "{timeout}: the turn removes its folder");
+    }
+}
+
+/// #7245: without the field, a make goes to the lamp's Hermes in its
+/// namespace as before, whatever the default agent, and Harness is never
+/// asked; with the field and the lamp's Hermes the default, the same.
+/// With the field and a default that is neither a gateway agent nor
+/// Hermes, it is refused in words and nothing runs.
+#[test]
+fn a_make_without_one_path_or_on_hermes_goes_to_the_lamps_hermes() {
+    for (one_path, default) in [
+        (None, EngineKind::Openclaw),
+        (Some(false), EngineKind::Openclaw),
+        (Some(true), EngineKind::Hermes),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let work = make_work(&rig);
+        let gateway = make_gateway(&rig, default, default == EngineKind::Openclaw);
+        let hermes = MakeHermesStandIn::default();
+        let answered = lamp_tasks::skill_make::answer_with(
+            &make_line(one_path, 20_000),
+            true,
+            &work,
+            &hermes,
+            Some(&gateway),
+            &mut || {},
+        );
+        assert_eq!(
+            answered,
+            json!({"ok": true, "answer": "HERMES"}),
+            "{one_path:?} {default:?}"
+        );
+        assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+        assert!(rig.calls().is_empty(), "{one_path:?}: Harness never asked");
+        assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+    }
+    // OpenClaw the default with no gateway data: refused, nothing runs.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, false);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["error"], "run_failed", "{answered}");
+    assert!(
+        answered["message"]
+            .as_str()
+            .unwrap()
+            .contains("(openclaw) is neither a gateway agent nor the lamp's Hermes"),
+        "{answered}"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+    assert!(rig.calls().is_empty());
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// #7245: Hermes lamps unchanged. With `one_path`, the lamp's Hermes the
+/// default and Harness not set up (no slot, so no default known), the make
+/// goes to the lamp's Hermes exactly as without the field: not refused,
+/// and Harness never asked.
+#[test]
+fn a_one_path_make_with_no_harness_set_up_goes_to_the_lamps_hermes() {
+    let rig = Rig::new();
+    let work = make_work(&rig);
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[], None);
+    runner.harness = SkillHarnessSlot::default();
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "HERMES"}));
+    assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+    assert!(rig.calls().is_empty(), "Harness never asked");
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// #7245 (Heron's P2): on an OpenClaw lamp whose Harness target isn't
+/// known yet, a one_path make is told "still getting ready" at once,
+/// never made as a Hermes make.
+#[test]
+fn a_one_path_make_on_openclaw_with_no_lamp_target_yet_is_not_ready() {
+    let rig = Rig::new();
+    let work = make_work(&rig);
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[], None);
+    runner.harness = SkillHarnessSlot::default();
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let mut line: serde_json::Value =
+        serde_json::from_slice(&make_line(Some(true), 20_000)).unwrap();
+    line["engine"] = json!("OpenClaw");
+    let answered = lamp_tasks::skill_make::answer_with(
+        &serde_json::to_vec(&line).unwrap(),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], json!(false));
+    assert_eq!(answered["error"], json!(lamp_tasks::skill_make::NOT_READY));
+    assert_eq!(
+        answered["message"],
+        json!(lamp_tasks::skill_make::NOT_READY_LINE)
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0, "never a Hermes make");
+    assert!(rig.calls().is_empty(), "Harness never asked");
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+}
+
+/// #7245: a make whose `harness new` is uncertain (a receipt Harness never
+/// gives) is refused, and at its end the agent Harness made late in the
+/// make's own folder is closed `--now`, then the folder removed: one
+/// `new`, never a second.
+#[test]
+fn an_uncertain_make_new_is_closed_in_its_folder_and_never_made_twice() {
+    let late = "33333333-3333-4333-8333-333333333333";
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"stdout":json!({"ok":true,"machineId":MACHINE,"agent":{
+            "id":AGENT,"name":"make","engine":"openclaw","permissionMode":"auto","bypassPermission":true}}).to_string()},
+        "ps":{"live_in_new_folder":late},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], false, "{answered}");
+    assert_eq!(calls_of_verb(&rig, "new").len(), 1, "never made twice");
+    assert_eq!(calls_of_verb(&rig, "ps").len(), 1);
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "{closes:?}");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, late, "--now", "--json"])
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+}
+
+/// #7245: a make whose `harness new` is uncertain, with nothing live in its
+/// folder at first, is looked for again: the session Harness makes there a
+/// little later is closed `--now`, then the folder removed.
+#[test]
+fn an_uncertain_make_new_made_after_the_first_look_is_still_closed() {
+    let late = "44444444-4444-4444-8444-444444444444";
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"stdout":json!({"ok":true,"machineId":MACHINE,"agent":{
+            "id":AGENT,"name":"make","engine":"openclaw","permissionMode":"auto","bypassPermission":true}}).to_string()},
+        "ps":{"each":[
+            {"stdout":json!({"harnesses":[]}).to_string()},
+            {"live_in_new_folder":late},
+        ]},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], false, "{answered}");
+    assert_eq!(calls_of_verb(&rig, "new").len(), 1, "never made twice");
+    assert_eq!(calls_of_verb(&rig, "ps").len(), 2, "looked again once");
+    let closes = calls_of_verb(&rig, "close");
+    assert_eq!(closes.len(), 1, "{closes:?}");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, late, "--now", "--json"])
+    );
+    assert_eq!(
+        fs::read_dir(&work).unwrap().count(),
+        0,
+        "the folder is gone"
+    );
+}
+
+/// #7245: a gateway make that can't start because the gateway isn't ready
+/// is told to the person at once, `not_ready` with the lamp's short words,
+/// never a silent failure: no `new`, and its folder gone.
+#[test]
+fn a_gateway_make_not_ready_is_said_at_once_in_short_words() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let work = make_work(&rig);
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    let (mut runner, _) = with_gateway(
+        &rig,
+        runner,
+        EngineKind::Openclaw,
+        None,
+        Duration::from_millis(200),
+    );
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(
+        answered,
+        json!({"ok": false, "error": "not_ready", "message": "I'm still getting ready. Give me a minute and ask me again."})
+    );
+    assert!(calls_of_verb(&rig, "new").is_empty());
+    assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0);
 }

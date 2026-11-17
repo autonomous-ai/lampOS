@@ -105,6 +105,11 @@ impl Copied {
             wiped,
         })
     }
+
+    /// Its size in bytes, as it is sent (before Base64), for the journal.
+    pub fn size(&self) -> usize {
+        self.bytes.len()
+    }
 }
 
 impl Drop for Copied {
@@ -165,8 +170,9 @@ pub enum Outcome {
 pub enum Event {
     /// The public key it fetched, to keep for the next bursts.
     PublicKey(Box<RsaPublicKey>),
-    /// One frame's answer.
-    Answer(ActionAnswer),
+    /// One frame's answer, and how long it took from the frame sent to
+    /// its answer read (for the journal).
+    Answer(ActionAnswer, Duration),
     /// The end; the socket is closed.
     Done(Outcome),
 }
@@ -455,12 +461,14 @@ async fn session_steps(
             tokio::time::sleep_until(at + pace.gap).await;
         }
         let message = frame_message(&crypto, frame)?;
-        last_sent = Some(Instant::now());
+        let sent_at = Instant::now();
+        last_sent = Some(sent_at);
         send(socket, message).await?;
         let raw = receive(socket, pace.answer_within).await?;
+        let took = sent_at.elapsed();
         match read_answer(&crypto, &raw)? {
             Ok(answer) => {
-                let _ = events.send(Event::Answer(answer));
+                let _ = events.send(Event::Answer(answer, took));
             }
             Err(ended) => return Ok(ended),
         }

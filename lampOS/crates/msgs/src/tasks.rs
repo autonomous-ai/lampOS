@@ -163,7 +163,7 @@ impl TaskSettled {
     }
 }
 
-fn engine_named(engine: &str) -> bool {
+pub(crate) fn engine_named(engine: &str) -> bool {
     !engine.is_empty()
         && engine.len() <= 32
         && engine
@@ -281,7 +281,91 @@ impl TaskStatus {
     }
 }
 
-/// The tasks part's optional topic, apart from the first topics.
+/// The most bytes of a step's tool name.
+pub const TASK_STEP_MOST_TOOL_BYTES: usize = 40;
+/// The most bytes of a step's result, cut on a whole character.
+pub const TASK_STEP_MOST_RESULT_BYTES: usize = 120;
+
+/// One step an agent took on a task handed over (`tasks/step`, #7267), from
+/// the engine's own session transcript: the tool it called and the start
+/// of its result. It carries the result's words, so its publisher is
+/// switched (off unless set) and peek shows it only in monitor mode.
+/// Published by `lamp-tasks` with `LAMP_TASKS_STEPS=on` (#7267, `docs/tasks.md`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskStep {
+    /// The task's number, as `tasks/status` and `voice/decision` give it.
+    pub task: u64,
+    /// Who has the work, as `tasks/status` names it.
+    pub engine: String,
+    /// The step's number in the task, from 1.
+    pub n: u32,
+    /// When the engine wrote it, in milliseconds since 1970 UTC.
+    pub at_unix_ms: u64,
+    /// A call, its reply, or an error.
+    pub kind: StepKind,
+    /// The tool called, at most [`TASK_STEP_MOST_TOOL_BYTES`]: required for
+    /// a call, empty allowed for a reply or an error.
+    pub tool: String,
+    /// The start of its arguments, at most [`TASK_STEP_MOST_RESULT_BYTES`],
+    /// cut on a whole character (`crate::cut_whole_chars`).
+    pub args: String,
+    /// The start of its result, at most [`TASK_STEP_MOST_RESULT_BYTES`],
+    /// cut on a whole character (`crate::cut_whole_chars`).
+    pub result: String,
+    /// Whether the call succeeded, when the transcript says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ok: Option<bool>,
+}
+
+/// What a [`TaskStep`] is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StepKind {
+    Call,
+    Reply,
+    Error,
+}
+
+impl TaskStep {
+    pub const TYPE: &str = "lamp_msgs/TaskStep";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "tasks/step";
+
+    /// One a step, as it is read: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        if self.task == 0 || self.n == 0 {
+            return Err(Invalid("a task's and a step's number are positive".into()));
+        }
+        if !engine_named(&self.engine) {
+            return Err(Invalid(
+                "an engine is 1..32 lowercase letters, digits or underscores".into(),
+            ));
+        }
+        if self.at_unix_ms > MOST_UNIX_MS {
+            return Err(Invalid("a time is within years 1970 through 9999".into()));
+        }
+        // A call names its tool; a reply or an error may not.
+        if (self.kind == StepKind::Call && self.tool.is_empty())
+            || self.tool.len() > TASK_STEP_MOST_TOOL_BYTES
+            || self.result.len() > TASK_STEP_MOST_RESULT_BYTES
+            || self.args.len() > TASK_STEP_MOST_RESULT_BYTES
+        {
+            return Err(Invalid(format!(
+                "a call's tool is 1..{TASK_STEP_MOST_TOOL_BYTES} bytes (a reply's or an error's at most that), its args and result at most {TASK_STEP_MOST_RESULT_BYTES}"
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// The tasks part's optional topics, apart from the first topics.
 pub fn tasks_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(TaskStatus::TOPIC, TaskStatus::declaration())]
+    vec![
+        (TaskStatus::TOPIC, TaskStatus::declaration()),
+        (TaskStep::TOPIC, TaskStep::declaration()),
+    ]
 }

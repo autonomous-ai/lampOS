@@ -4600,6 +4600,77 @@ fn nothing_in_scope() {
     NOTHING_IN_SCOPE.with(|nothing| nothing.set(true));
 }
 
+/// `exchanges_forget` in the memory at `socket`: a known person's own
+/// exchanges with every key word of a subject of `about` (what was said,
+/// never kept), in their scope alone, never the room's
+/// (`DaysClient::forget_exchanges_about`). How many went; `None` with no
+/// known person, no words, no time left or no answer.
+fn exchanges_forget_about(
+    socket: &Path,
+    about: &Value,
+    person: Option<&str>,
+    until: Instant,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<u64> {
+    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+        .into_iter()
+        .map(|(_, words)| words)
+        .collect();
+    if words.is_empty() {
+        return None;
+    }
+    let left = until
+        .checked_duration_since(Instant::now())
+        .filter(|left| !left.is_zero())?;
+    let answer = bounded_exchange_scoped(
+        socket,
+        &json!({"op":"exchanges_forget","person":person,"about":words}),
+        left,
+        lease,
+    )?;
+    let removed = answer["removed"]
+        .as_u64()
+        .filter(|_| answer["ok"] == true)?;
+    eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
+    Some(removed)
+}
+
+/// The one-face forget their yes agreed to (#5627), held with the words it
+/// was about (`about`), after its forget by id `told`: that person's own
+/// exchanges about those words go too, as a forget about takes them
+/// ([`exchanges_forget_about`], C128), so recall no longer tells the talk
+/// about it (lamp-06c1, build 13523). Only after a by-id forget the memory
+/// confirmed, only in `person`'s scope, never the room's. Some gone,
+/// nothing of this conversation is journalled after it.
+pub fn agreed_forget_exchanges(
+    socket: &Path,
+    told: (Value, bool),
+    about: &Value,
+    person: &str,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !told.1 || told.0["forgotten"] != true || !lease.is_current() {
+        return told;
+    }
+    let until = Instant::now() + deadline;
+    let removed = exchanges_forget_about(socket, about, Some(person), until, Some(lease));
+    if removed.is_some_and(|removed| removed > 0)
+        && let Some(client) = DAYS
+            .get()
+            .and_then(Option::as_ref)
+            .filter(|client| client.socket == socket)
+    {
+        let said = match client.context.try_lock() {
+            Ok(mut context) => client.forgotten(&mut context),
+            Err(_) => None,
+        };
+        say(said);
+    }
+    exchanges_forgotten(told, removed)
+}
+
 /// `theirs`, a forget in the one known face's scope, and then `room`, the
 /// room's, only when `theirs` answered and found nothing about it there
 /// ([`nothing_in_scope`]). The room's is told when it forgot, or when its
@@ -5324,7 +5395,12 @@ fn run_for_guarded(
     }
     // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
     // while nobody is known, on either memory client.
-    if let Some(told) = needs_face::withheld(call, person, needs_face::on()) {
+    if let Some(told) = needs_face::withheld(
+        call,
+        person,
+        needs_face::on(),
+        crate::known_faces::name_learn_fix_on(),
+    ) {
         return (told, true);
     }
     if DAYS_MODE.get() == Some(&true) {
@@ -10914,26 +10990,7 @@ impl DaysClient {
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<u64> {
-        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
-        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
-            .into_iter()
-            .map(|(_, words)| words)
-            .collect();
-        if words.is_empty() {
-            return None;
-        }
-        let left = until
-            .checked_duration_since(Instant::now())
-            .filter(|left| !left.is_zero())?;
-        let answer = bounded_exchange_scoped(
-            &self.socket,
-            &json!({"op":"exchanges_forget","person":person,"about":words}),
-            left,
-            lease,
-        )?;
-        let removed = answer["removed"]
-            .as_u64()
-            .filter(|_| answer["ok"] == true)?;
+        let removed = exchanges_forget_about(&self.socket, about, person, until, lease)?;
         if removed > 0 {
             let said = match self.context.try_lock() {
                 Ok(mut context) => self.forgotten(&mut context),
@@ -10941,7 +10998,6 @@ impl DaysClient {
             };
             say(said);
         }
-        eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
         Some(removed)
     }
 

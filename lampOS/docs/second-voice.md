@@ -817,6 +817,106 @@ order is kept. A written turn is the same from the chat on.
   send it, else `no usage given` (#1712, the first builder at 18:56: the
   request was 31 KB with 31 tools, and its first event came in 976 to
   1296 ms).
+- **With `LAMP_VOICE_DAY_TALLY=on` those counts are added up for the day**
+  (off unless set; #7347, `day_tally.rs`). On 16 November a lamp at home
+  used up its day's allowance before six in the evening and answered
+  nothing for over an hour; the journal's lines above were gone within
+  minutes (#7254), and nothing on the lamp said what the day had cost.
+  With the switch on, each chat answer that ends is counted by its model:
+  answers, prompt tokens, those the cache held, completion tokens, and
+  answers whose service gave no count; each turn the model declined as
+  not said to the lamp; the sound sent to be heard, in milliseconds; and
+  the lines sent to be spoken, with their characters. The day is a UTC
+  day, as the allowance is counted. Numbers only: no word, name or request
+  is kept.
+  - **Where it is kept:** `/var/lib/lampOS/voice/day-tally/tally.json`,
+    root's: `{"today": {"day", "models": {NAME: {"answers", "uncounted",
+    "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined",
+    "heard_ms", "heard_lines", "heard_no_words_lines",
+    "heard_no_words_ms", "heard_declined_ms", "spoken_lines",
+    "spoken_chars"}, "yesterday": …}`. `day` is days since 1970. At the
+    first write of a
+    new UTC day the day before becomes `yesterday`, whole, so a morning's
+    read shows what a day cost; a day older than that is let go. Only a
+    later day turns it over: a clock that has gone back across midnight
+    goes on counting into the day the file is on. A file that is there
+    and cannot be read as a tally is begun again, with one journal line
+    saying so. At most eight models are kept apart, the rest as `other`.
+  - **A turn never waits on it.** An answer is counted in memory where it
+    ends, and a line where it is sent to be spoken (`Tts::speak_in`,
+    `speak_fresh`, the Gemini speech's `speak`), under a short lock. Sound
+    is counted where each block goes onto the speech-to-text socket, a
+    hundred times a second, so that takes no lock: one flag read and one
+    add. Both ways of listening count it (`stt.rs`'s `run` and Flux's),
+    the stop words' lines with them, and so does the quiet Flux sends to
+    keep a line. A thread of its own adds the counts to the
+    file at most once a minute, under a file lock, written whole beside
+    it and moved over it. The voice and its second-route worker are two
+    processes and each adds its own.
+  - **The journal** has one line in each hour in which the process counted
+    something: `thinking today (UTC): N chat answers, P prompt tokens (H
+    from the cache), C completion tokens; D turns declined; S s of sound
+    sent to be heard, of N lines ended M had no words (W s) and X s was in
+    declined turns; L lines sent to be spoken (K characters)`, and by
+    model when there is more than one.
+  - **Why sound and lines are counted too:** by the relay's own count of
+    that lamp's day (Backend on #7347, 16 Nov), thinking was about 38% of
+    what the day cost, listening 30%, speaking 27% and the second model
+    4%. A lamp in a busy room spends its day on hearing, even when it
+    says little. The relay counts a token its cache held as far less than
+    a fresh one, which the two token counts here keep apart.
+  - **The lamp's clock is not always right, and the day must not be lost
+    to it.** Until the clock is set, which is when it reads 1 Nov 2026 or
+    later, nothing is written: the counts wait in memory, and the journal
+    says once that the tally waits for the clock. So a boot before the
+    clock is set neither loses the day nor moves it. A file more than a
+    day ahead of a set clock was written under a clock set ahead and since
+    put right: it is brought back to today with its counts, and the day
+    before it is let go unless it is the day before today.
+  - **What the listening came to** (#7347: which listening can be cut).
+    When a line ends with its words asked for (`SttStream::finish` for a
+    request, `finished` for a stop word), it is counted (`heard_lines`).
+    If no words came back it is counted as that too
+    (`heard_no_words_lines`), with the sound queued on it
+    (`heard_no_words_ms`). When the model declines a
+    turn as not said to the lamp, the sound queued on that request's
+    lines is counted (`heard_declined_ms`); the newest 32 requests are
+    remembered for that, in memory only. So of a day's sound, three parts
+    can be told apart: sound that held no words, words not said to the
+    lamp, and the rest, which is what was answered, failed or given up.
+    The parts are the sound as queued on a line, and `heard_ms` is the
+    sound as sent, so they are close and not equal; a line given up
+    before its end is in `heard_ms` only, and a line nothing was queued
+    on is not counted at all.
+  - **Only the second route's listening and speaking are counted.** The
+    voice and its second-route worker both count, but only the second
+    route's speech-to-text and speech call these. On a lamp whose Live
+    route carries the day, the tally's sound and lines show only the
+    second route's share.
+  - **These are the lamp's own counts, not the bill.** Seconds of sound
+    and characters of speech are what the lamp sent. What each costs is
+    the relay's to say, and the relay's count of the day stays the true
+    figure. A line taken from the cache of fixed lines is not sent, so it
+    is not counted; a piece asked again after it failed to start is
+    counted again.
+  - **Not counted:** an answer cut before it ends (the service still
+    counts its prompt). Counts made in the last minute before 00:00 UTC
+    may be written into the new day, and those of the last minute before
+    the voice or its worker stops are lost.
+  - **Not yet:** the lamp does not read how much of its day the relay says
+    is used, warn, or shed anything near the limit. Those are #7347's
+    next parts. A reset does not wipe the file yet.
+  - Tests: `day_tally::tests` (an answer's usage is read in both services'
+    forms, nothing is counted until counting begins, two writers add up
+    by model, a new UTC day keeps the day before and begins again, a clock
+    gone back keeps today's counts, a file from a clock set ahead is
+    brought back with its counts, until the clock is set nothing is
+    written, a line's sound is told by what it came to, sound and spoken
+    lines add up and are told with the part of a millisecond carried, a
+    bad file begins again and many models are bounded, names are bounded
+    and an answer without usage is still counted), and the workers' census
+    (`process::switch_census_tests`), which fails if the switch does not
+    reach the second worker.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
   what stays** (off unless set; #1712, the first builder at 18:56). The
   system message keeps only the character and the skills. The memory note,
@@ -3498,7 +3598,8 @@ after a take-over, but now for every turn:
     on 30 Oct a follow-up begun 9 s after the lamp's words and spoken for
     13 s was held, judged 22 s after them (Migrate's launch finding 2 on
     #3997). A busy room's 15 s after the words is still counted to the
-    judging. The journal's "no conversation going on" line says how long
+    judging, unless `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332, below), which
+    measures them to the line's start too. The journal's "no conversation going on" line says how long
     the line ran ("the line ran N s"), when the lamp was "last heard
     saying words, to their end," and adds ", in a busy room, where it goes
     on 15 s".
@@ -3953,6 +4054,25 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+  **A light act told as under way** (`LAMP_ACTION_CLAIM_DOING=on`, off by
+  default, only beside `LAMP_ACTION_CLAIM_CHECKED`; #7285: lamp-52e6 core w2
+  on 13333, 13417 and 13495, "Hold on, hey Lamp, make the light a little
+  warmer." answered in three words with `calls=none`): the phrase runs
+  read only what was done or promised, and `LAMP_ACTION_CLAIM_WORDED` is
+  off in the product. With this switch a reply whose first sentence past
+  lead words opens with a verb acting on the light in "-ing"
+  (`action_claim::LIGHT_VERBS`: warm, cool, dim, brighten, switch, turn,
+  change, make, set, each held by a test to the light functions' text; not
+  "Thinking about blue whales.") (bare or after "I'm"), has at
+  most six words, names one of the light's acts as `lamp_actions::catalog`
+  declares them (a step function's name past `light_`, or a colour
+  `light_colour` takes), and has no '?', "not" or "n't" is a light claim
+  (`action_claim::doing_claim`: "Warming that up.", "Switching to
+  blue."), held and asked again as above. Only the reply is read, never
+  the person's line: "A red fox lived alone." and "Cool, glad you like
+  it." are said as they came. A reply whose first word is no "-ing" verb
+  is decided at that word, so it is not held. The journal adds
+  `, an act told as under way: LAMP_ACTION_CLAIM_DOING`.
   **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
   unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
   "I'm preparing to fold — please wait …", "Still preparing …",
@@ -3987,8 +4107,12 @@ after a take-over, but now for every turn:
   "I've kept the light on until ten.", and nothing held the light, so
   claimed-not-done stayed at 1). `action_claim::claim_as` reads, beside the
   strict lines above, a short run of words at the reply's start, bare or
-  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,"),
-  each tied to one family with a call behind it (`action_claim::WORDED`):
+  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,",
+  and for these runs alone a greeting, `action_claim::GREETINGS`: "Hello.",
+  "Hi,", "Hey,", "Morning!", "Good morning.", "Noted." and the like; GO-159
+  on a lamp, 14 Nov, 12958: "Hello. The light will stay on until ten." and
+  "Good morning. I'll keep it on until ten." beside only a `keep_rule`
+  were said as they were), each tied to one family with a call behind it (`action_claim::WORDED`):
   a timer, reminder or alarm set ("Timer set for one minute.", "I've set a
   timer for …", "Reminder set …", "I'll remind you in …", "Your
   one-minute timer is set.", the last also standing beside
@@ -4007,7 +4131,10 @@ after a take-over, but now for every turn:
   light stays on until …", "I'll keep my light on until …", with no "the",
   "my" or "your" too when a clock follows ("Light stays on until 10 pm.",
   "Light's on until ten.", #5215 claim #1; "Light stays on until you say
-  otherwise." is none), or "for" with
+  otherwise." is none), the hold said as never going out before its hour
+  ("The light will stay on and won't go out by itself before ten.", "It'll
+  stay on and won't go out before ten.", closing at the clock; GO-159, 14
+  Nov; "… won't go out by itself." is none), or "for" with
   a time after it: digits, a number word, "the night" or "tonight", so
   "I'll keep my light on for ten minutes." is one and "I left a light on
   for you." is not. State replies with "for" close at the duration and
@@ -4122,7 +4249,8 @@ after a take-over, but now for every turn:
   `a_limit_after_the_first_sentence_is_judged_only_in_its_piece`,
   `a_kept_lights_clock_beside_a_rule_and_a_timer_is_held`,
   `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held`,
-  `a_kept_lights_claim_is_held_beside_any_call` and
+  `a_kept_lights_claim_is_held_beside_any_call`,
+  `a_kept_lights_claim_after_a_greeting_beside_a_kept_rule_is_held` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
@@ -4203,6 +4331,72 @@ after a take-over, but now for every turn:
   lamp." and "Not for me either.", and 160 ms for "Not for me to say, but
   it's lovely." and "Not for me to answer, but I think it's lovely.", each
   held to the word that decides it.
+- **Inside a live back-and-forth the doubt goes to the person, with
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`** (off unless set, #7332; Sixth's trace
+  and design, with the first builder's 19:54 conditions). On the owner's
+  lamp-74ff on 16 Nov (13500), in a busy room, the owner spoke three times
+  in 26 s and got no answer: r43 called the lamp, r44 followed it up, the
+  model called `not_for_me` on both, so neither of the busy room's clocks
+  moved (`said_until_us` moves only on words said, `called_at` only on a
+  call); r45, judged 16 s after the call, was held ("a busy room, and
+  nothing shows it was called"), and r46 was held as "a reply to a
+  question the lamp left unanswered" (`AFTER_QUESTION`), the owner's own
+  r45. With the switch, five things change, in a room of any kind but
+  mattering in a busy one:
+  - a line let out only as the conversation going on and spoken by the
+    caller (the caller's face alone seen speaking it,
+    `spoken_by_the_caller_alone`) renews the call (`Heeding::call_renewed_at`),
+    whatever the model makes of it; with `LAMP_DECLINE_SILENT` too, its
+    decline keeps that renewal. The renewed call carries only the caller's
+    own lines (`Heeding::call_for`, the same face check): a colleague's
+    line 20 s after the call is judged by the call alone, as off, and held
+    (the Reviewer-lead's P2 on #7349, #7297's half). A line in the
+    conversation's voice alone, with no face, renews nothing: the prints
+    come after the windows are read, and are for the services alone in the
+    product. Another face, or two, renew nothing, nor does a line untied to the lamp
+    (`LAMP_UNTIED_GOING_ON`) or whose words open nothing. Journal: `the caller's own
+    follow-up: it renews the call, and the model is told it is theirs
+    (LAMP_BUSY_FOLLOW_UP_RENEWS)`;
+  - such a line is told `worker::FOLLOW_UP_NOTE` in the place of
+    `CONVERSATION_ALONE`: it is the person the lamp was talking with,
+    speaking again, to be answered unless plainly said to someone else.
+    The first builder's point 1: the old note primed the model to decline
+    exactly the lines a conversation is made of. `LAMP_NOT_FOR_ME_WORDS`
+    and `LAMP_DECLINE_SILENT` treat it as they treat `CONVERSATION_ALONE`;
+  - the busy room's 15 s (`BUSY_GOING_ON_FOR` after the words,
+    `CALL_CARRIES_FOR` after the call, `went_on_told`) are measured to the
+    line's start with `LAMP_WINDOW_FROM_START`, as the conversation's own
+    check already was: a line begun 12 s after the call and judged 17 s
+    after it goes on;
+  - a question held just before a line, said by the same speaker (one face,
+    the same; or both in the conversation's voice), is no question to
+    someone else that the line answers (`Attention::after_a_question`,
+    `carried_past_a_question`). Journal: `the question held just before it
+    was the same speaker's: no reply to someone else`;
+  - with the wait sound, any tool a heard line calls makes it past
+    `cue_after` (1.5 s), not only a connected service's, and the chat round
+    after a call is timed for it too; one sound a round (a tool's sound
+    stands for the round after it, a round's own sound for its tools;
+    only a sound that played counts), none
+    once a newer line began, so never over the person's own words, and none
+    for a held line's calls (`attention::DONE_THOUGH_HELD`), whose line the
+    lamp won't answer. Journal: `made a sound while chat
+    round N had not begun in 1500 ms (LAMP_BUSY_FOLLOW_UP_RENEWS)`.
+  Latency: nothing waits for it. The renewal, the note and the question
+  check are bookkeeping at the verdict; the sound is raced against work
+  already in flight (a tool, a round's first event), never awaited before
+  it, and a round that begins before 1.5 s makes none. On the test clock a
+  3 s tool turn's first audio comes at 1.5 s with the switch, at 3 s
+  without (`tool_round_past_cue_after_makes_one_sound`). Tests (each fails
+  with the switch off): `busy_follow_up_declined_still_renews_the_call`
+  (lamp-74ff's r43 to r46, all let out; off, r45 and r46 held; a
+  colleague's line renews nothing), `busy_follow_up_is_told_it_is_the_callers`,
+  `busy_window_is_measured_to_the_line_start`,
+  `own_held_question_is_no_reply_to_another` (the owner's line let out, a
+  colleague's still held), `a_silent_decline_keeps_the_callers_renewal`,
+  `the_renewed_call_carries_only_the_caller`. Not yet shown on a lamp: the first builder's
+  row (the person's follow-ups answered three of three, the colleague
+  track's lines answered none, first audio on tool turns before and after).
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay
@@ -7121,7 +7315,10 @@ from the Tiers night, #5000) once a run for a made-up person on a made-up
 day of 12 lines, through the second route's relay (`deepseek_base_url`,
 the relay's own credential), with the night's own bounds. With
 `LAMP_NIGHTLY_MEMORY` set to a lamp-memory binary that has the nightly ops,
-it runs that binary on a fresh folder of its own and prints Days' accepted
+it runs that binary on a fresh folder of its own, made 0700 whatever the
+umask (lamp-memory refuses a store folder others can enter; C108 on
+lamp-06c1, 10 Nov: under the default umask the folder was 755 and the probe
+ran only with `umask 077`), and prints Days' accepted
 and dropped counts per kind and the drop reasons; without it, what the
 model proposed per kind. `LAMP_MEMORY_NIGHTLY_PATTERNS` and
 `LAMP_MEMORY_NIGHTLY_FEELINGS` are read as the voice reads them. Counts

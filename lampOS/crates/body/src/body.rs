@@ -451,6 +451,17 @@ pub fn strain_guard_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// `LAMP_BODY_SEAT_COOLS=on` (#7281), under the strain guard: a lamp seated
+/// for heat stands again by itself once the joint that seated it has read
+/// under [`StrainGuard::COOL`] for [`StrainGuard::COOL_FOR`], once an hour
+/// (`StrainGuard::cools`). Off: a hot seat waits for a person, as before.
+pub const SEAT_COOLS: &str = "LAMP_BODY_SEAT_COOLS";
+
+/// Whether a value of [`SEAT_COOLS`] turns it on.
+pub fn seat_cools_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
 /// One step of the pose follower: the joint's new velocity, critically
 /// damped toward a goal `gap` counts away, its acceleration at most
 /// `limits.acceleration` and its speed at most `limits.speed`. Under
@@ -492,6 +503,9 @@ const JERK: f32 = 6.0;
 pub struct StrainGuard {
     pub load: u16,
     pub seconds: u16,
+    /// [`SEAT_COOLS`] (#7281): a hot seat stands again by itself once cool.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cools: bool,
 }
 
 impl StrainGuard {
@@ -509,7 +523,37 @@ impl StrainGuard {
     pub const CLIMB: u8 = 8;
     pub const CLIMB_WINDOW: Duration = Duration::from_secs(5 * 60);
     pub const CLIMB_EVERY: Duration = Duration::from_secs(10);
+    /// Under [`Self::cools`] (#7281): the joint that seated the lamp hot
+    /// reads under this, 12 under the 62 it sat down at and over a healthy
+    /// standing elbow's 46 to 49 (lamp-4ace, lamp-52e6), for
+    /// [`Self::COOL_FOR`] back to back, and the lamp stands again by
+    /// itself. A held or missing read starts the count again.
+    pub const COOL: u8 = crate::bus_out::WARM - 5;
+    pub const COOL_FOR: Duration = Self::CLIMB_WINDOW;
 }
+
+/// The stand ease (#7289): an arm joint fully stood up, asked its stand goal
+/// and nothing else, held more than [`STAND_EASE_SHORT`] counts short of it
+/// at a load over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`], has that goal
+/// eased to where it holds plus [`STAND_EASE_MARGIN`] for the rest of the
+/// run. lamp-74ff's elbow held 41 to 47 short at 176 to 200 and heated to
+/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24.
+/// ponytail: tuned on two lamps; retune from journals of more arms.
+pub const STAND_EASE_SHORT: u16 = 20;
+/// Over this a joint is pushing at its goal, not just carrying the lamp:
+/// 74ff's elbow read 176 to 200, 52e6's 24. ponytail: unmeasured on others.
+pub const STAND_EASE_LOAD: u16 = 150;
+/// Sixty seconds of steps short and loaded: well past a rise settling and
+/// a gesture easing back, long before 74ff's 30 to 40 min to heat.
+/// ponytail: unmeasured; time counts only while it is asked its stand goal.
+pub const STAND_EASE_STEPS: u32 = 3_000;
+/// Left this far toward the goal from where it holds, so it still presses
+/// the lamp up a little. ponytail: unmeasured.
+pub const STAND_EASE_MARGIN: u16 = 5;
+/// Never eased more than this under its measured stand: farther short is a
+/// hand pushing it down, not the arm's own reach, and is said once instead.
+/// 74ff's worst was 47. ponytail: unmeasured.
+pub const STAND_EASE_FLOOR: u16 = 80;
 
 /// Each joint's temperature every [`StrainGuard::CLIMB_EVERY`] over the last
 /// [`StrainGuard::CLIMB_WINDOW`] (#4501): a joint warming fast is said
@@ -716,6 +760,18 @@ const CALLED_EVERY: Duration = Duration::from_secs(10);
 /// morning, or gone quiet, holds the lamp folded no longer than this.
 pub const NIGHT_LAPSE: Duration = Duration::from_secs(120);
 
+/// Under `LAMP_BODY_PRESENCE` (#7301): someone at the lamp keeps a
+/// standing lamp up only this long after the last talk or arrival. After
+/// it the lamp folds calmly at the end of its window, the person still
+/// there, and stands again when spoken to: a sway for hours at the edge of
+/// someone's sight is a reason to turn it off (the first builder, 15:42).
+/// lamp-74ff's elbow took 30 to 40 minutes to heat standing (#7289).
+pub const QUIET_STAND: Duration = Duration::from_secs(15 * 60);
+/// Under `LAMP_BODY_PRESENCE`: for this long after an arrival or the end
+/// of talk the shifts at rest come at two energy levels above the owner's,
+/// for this long again at one above, then at the owner's own.
+pub const LIVELY_FOR: Duration = Duration::from_secs(2 * 60);
+
 /// A gesture asked on the mood socket, not one the body makes of itself:
 /// a shift at rest (`crate::idle`, `IDLE` among them) or the turn to a call.
 fn from_outside(clip: &Clip) -> bool {
@@ -825,6 +881,10 @@ pub struct Asked {
     /// 1 for today. Only with `LAMP_BODY_ENERGY=on`; taken only once the
     /// lamp is settled (no gesture, the pose and the arm still).
     pub energy: u8,
+    /// Someone is at the lamp, or was within `presence_in::GRACE_S`
+    /// (`room/presence`, `crate::presence_in`, #7301). Only with
+    /// `LAMP_BODY_PRESENCE=on`; taken only under [`Limits::presence`].
+    pub present: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -867,6 +927,7 @@ impl Asked {
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -898,6 +959,7 @@ impl Asked {
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
 }
 
@@ -1238,6 +1300,13 @@ pub struct Limits {
     /// switch, [`crate::energy_in::enabled`], as the level is.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub energy: bool,
+    /// `LAMP_BODY_PRESENCE=on` (#7301): someone at the lamp keeps a standing
+    /// lamp up for a bounded time, its shifts at rest come every 20 to 60 s
+    /// and sag its arm, livelier for a few minutes after an arrival or
+    /// talk. Off: as before. Read by the one reader of the switch,
+    /// [`crate::presence_in::enabled`], as presence is.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub presence: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -1429,6 +1498,7 @@ impl Limits {
         app_reach: false,
         strain_guard: None,
         energy: false,
+        presence: false,
     };
 }
 
@@ -1547,6 +1617,8 @@ pub struct Glimpse {
     /// runs.
     pub bad_reads: [u16; 5],
     pub retreats: u16,
+    /// Of `retreats`, those for heat (#7281), for the fold line.
+    pub hot_retreats: u16,
     /// Seconds left of the long rest after three strains inside
     /// `Standing::RETREAT_WINDOW`; 0 when it is not resting so. Said on its
     /// health, so a body sat down for half an hour is seen, not only felt
@@ -1567,6 +1639,10 @@ pub struct Glimpse {
     pub strained: Option<(&'static str, u16)>,
     pub warming: Option<(&'static str, u8, u8)>,
     pub seated: Option<(&'static str, &'static str)>,
+    /// Under `StrainGuard::cools` (#7281): the seat ends by itself once its
+    /// joint is cool (a hot seat, the first self-stand within the hour).
+    /// `false` while it waits for a person or a health check.
+    pub seat_rests: bool,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -5180,6 +5256,7 @@ pub(crate) fn run_looking(
         replace: false,
         lively: false,
         energy: 0,
+        present: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -6660,10 +6737,25 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // inside `StrainGuard::SEAT_WINDOW`; what `Glimpse` says of them; and
     // each joint's temperatures, for a fast warming.
     let mut strain_since: [Option<Duration>; 2] = [None; 2];
+    // #7289: the stand as measured, the steps each arm joint has been held
+    // short of its stand goal under load, and whether one too far short to
+    // ease has been said.
+    let stand_measured = standing.map(|up| [up.pose[3], up.pose[4]]);
+    let mut stand_short_steps = [0u32; 2];
+    let mut too_short_said = [false; 2];
     let mut seat_retreats: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
     let mut unlifted_said: Option<&'static str> = None;
     let mut strained_by: Option<(&'static str, u16)> = None;
     let mut seated: Option<(&'static str, &'static str)> = None;
+    // #7281, under `StrainGuard::cools`: the joint (servo order) of a seat
+    // that ends by itself once cool; since when that joint has read cool,
+    // back to back; that it has, for the next step to stand; and when it
+    // last stood by itself, so that it does at most once an hour.
+    let mut seat_rests: Option<usize> = None;
+    let mut cool_since: Option<Duration> = None;
+    let mut seat_cooled = false;
+    let mut self_stood_at: Option<Duration> = None;
+    let mut hot_retreats = 0u16;
     let mut climb = Climb::default();
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
@@ -6732,6 +6824,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // and how.
     let mut idle_due: Option<Duration> = None;
     let mut idler = idle::Idler::new(standing.map_or(0, |up| up.idle_seed));
+    idler.alive = limits.presence;
+    // Under `Limits::presence` (#7301): when the lamp was last talked with
+    // or someone last arrived, whether someone was there the step before,
+    // and how much a shift's arm offsets are scaled (`energy::idle_size`).
+    let mut stirred_at: Option<Duration> = None;
+    let mut was_present = false;
+    // The window presence last renewed, if it still is the lamp's (#7313).
+    let mut presence_until: Option<Duration> = None;
+    let mut idle_size = 1.0f32;
     // The energy level taken (`crate::energy`, #6893): 1 is the limits and
     // the stand's pace this body was given, exactly.
     let base = limits;
@@ -6998,10 +7099,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         {
             seat_retreats.clear();
             unlifted_said = None;
+            self_stood_at = None;
             eprintln!(
                 "lamp-body: step {}: seated for its {joint} ({why}) until now: let stand again",
                 report.steps
             );
+        } else if seat_cooled && let Some((joint, _)) = seated.take() {
+            // #7281: cool, it stands again by itself. The hour's sit-downs
+            // are kept, so the next hot one seats it again.
+            self_stood_at = Some(now);
+            eprintln!(
+                "lamp-body: step {}: {joint} read under {} for {} min: stands again by itself",
+                report.steps,
+                StrainGuard::COOL,
+                StrainGuard::COOL_FOR.as_secs() / 60
+            );
+        }
+        if seated.is_none() {
+            (seat_rests, cool_since, seat_cooled) = (None, None, false);
         }
         // Only lamp-control's asks (a paired computer's) replace what
         // plays; any other asker's mark is taken as absent.
@@ -7169,6 +7284,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             _ => mood,
         };
+        // Talk, a call, or someone arriving (#7301): the lively minutes and
+        // the quiet ones count from the last of them.
+        let present = limits.presence && asked_now.present;
+        if mood != Mood::Resting || (present && !was_present) {
+            stirred_at = Some(now);
+        }
+        was_present = present;
         let Pose { pitch, roll, yaw } =
             gestures.target(mood, level, now.as_micros().try_into().unwrap_or(u64::MAX));
         let mut goals = written;
@@ -7319,6 +7441,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut window_before_ask = awake_until;
         // A lamp that is folded, or folding, looks at nobody.
         let mut awake_now = leaving.is_none() && !slumped;
+        // Folded for a reason of its own whatever its window says: resting
+        // after a load, heat or tracking retreat, unplugged, unable to lift
+        // or seated. Presence never stands such a lamp (#7313).
+        let tired = tired_until.is_some_and(|until| now < until);
+        let kept_down = tired || unplug_latched || cannot_lift.is_some() || seated.is_some();
         if let Some(up) = standing.filter(|_| !slumped) {
             // Spoken to, or with somebody sitting in front of it: awake.
             // It does not fold away from a person who is still there.
@@ -7350,6 +7477,33 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // stays up while a program moves it; a folded one is not
                 // stood up by a hold alone.
                 awake_until = Some(now + up.awake);
+            } else if present
+                && stand > 0.0
+                && !kept_down
+                && !asked_now.night
+                && stirred_at.is_some_and(|at| now.saturating_sub(at) < QUIET_STAND)
+                && report.last.is_none_or(|last| {
+                    ARM.iter()
+                        .all(|joint| last[joint.index()].temperature < crate::bus_out::WARM)
+                })
+                && awake_until.is_some_and(|until| now < until)
+            {
+                // Someone at the lamp (#7301): a lamp that is up stays up
+                // for them, as with the lease never standing a folded one,
+                // for no more than `QUIET_STAND` after the last talk or
+                // arrival, never in its night rest and never once an arm
+                // joint is warm: it folds calmly at the window's end,
+                // before the strain guard's hot sit-down.
+                awake_until = Some(now + up.awake);
+                presence_until = awake_until;
+            }
+            // Kept down by a retreat, the plug, a failed lift or its seat
+            // while the window is presence's (Sixth's P1 on #7313): that
+            // window ends, so the lamp is not stood again once the reason
+            // passes. A window from talk, a gesture or company is kept.
+            if kept_down && presence_until.is_some() && awake_until == presence_until {
+                awake_until = None;
+                presence_until = None;
             }
             // Paused after a gesture was taken: one still waiting is
             // dropped, and the window it opened is given back (keeper.md: a
@@ -7389,15 +7543,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 awake_until = Some(now + up.awake);
                 woke_for_gesture = true;
             }
-            let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted = if leaving.is_none()
-                && awake
-                && !tired
-                && !unplug_latched
-                && cannot_lift.is_none()
-                && seated.is_none()
-            {
+            let wanted = if leaving.is_none() && awake && !kept_down {
                 asked_now
                     .stand_share
                     .map_or(up.share, |asked| asked.min(up.share))
@@ -7540,6 +7687,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             (None, _) => rest_average = None,
         }
         let settled = drifted_at.is_none_or(|at| now.saturating_sub(at) >= SHIFT_QUIET);
+        // Under `Limits::presence` (#7301): livelier for a while after talk
+        // or an arrival, two energy levels above the owner's and then one,
+        // in the waits and the arm's sag only, never the speed or the stand.
+        // With `LAMP_BODY_ENERGY` off the owner's level is 1, and these
+        // minutes still come.
+        if limits.presence {
+            let since = stirred_at.map_or(Duration::MAX, |at| now.saturating_sub(at));
+            let boost = if since < LIVELY_FOR {
+                2
+            } else if since < LIVELY_FOR * 2 {
+                1
+            } else {
+                0
+            };
+            let lively = crate::energy::of((energy + boost).min(5));
+            idler.share = lively.idle_share;
+            idle_size = lively.idle_size;
+        }
         let idling = playing.is_some_and(|(clip, _)| idle::is_move(clip));
         let quiet = upright
             && mood == Mood::Resting
@@ -7548,7 +7713,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && !asked_now.still
             && easing == [0; 3]
             && in_hand == [0; 3]
-            && !test_held;
+            && !test_held
+            && !(limits.presence && asked_now.held);
         if !quiet {
             idle_due = None;
             if idling {
@@ -7863,6 +8029,23 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // already taken up from where the hold carried it.
                 (None, Some(offsets)) if upright => {
                     gesture_wanted = offsets;
+                    // Under `Limits::presence` (#7301) a shift's arm only
+                    // sags toward its fold, by the level's size, and stays
+                    // on its way between the fold and the stand.
+                    if limits.presence
+                        && idle::is_move(clip)
+                        && let Some(up) = standing
+                    {
+                        for index in 0..2 {
+                            gesture_wanted[3 + index] = idle::sag(
+                                offsets[3 + index],
+                                idle_size,
+                                f32::from(arm_goals[index]),
+                                f32::from(up.folded[index]),
+                                f32::from(up.pose[3 + index]),
+                            );
+                        }
+                    }
                     if let Some((at, held)) = resumed {
                         let t = now.saturating_sub(at).as_secs_f32() / EASE_OUT.as_secs_f32();
                         if t < 1.0 {
@@ -8790,6 +8973,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             None => unsent = 0,
         }
+        // #7281: a seat that rests counts its joint's cool reads, back to
+        // back; a held or missing read starts the count again.
+        if let Some(index) = seat_rests {
+            let read = samples[index].temperature;
+            if bus.temperature_held[index] || read == 0 || read >= StrainGuard::COOL {
+                cool_since = None;
+            } else if now.saturating_sub(*cool_since.get_or_insert(now)) >= StrainGuard::COOL_FOR {
+                seat_cooled = true;
+            }
+        }
         let mut glimpse = Glimpse {
             unplug_safe: false,
             unplug_unsafe: None,
@@ -8864,6 +9057,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
+            hot_retreats,
             resting_s: match tired_until {
                 Some(until)
                     if until > now
@@ -8884,6 +9078,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 .strain_guard
                 .and_then(|_| climb.observe(now, samples.map(|sample| sample.temperature))),
             seated,
+            seat_rests: seat_rests.is_some(),
             waiting: None,
             home: Some(home),
         };
@@ -8975,6 +9170,50 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.arm_peak_load[index] = report.arm_peak_load[index].max(is.load);
                 report.arm_peak_temperature[index] =
                     report.arm_peak_temperature[index].max(is.temperature);
+                // #7289: fully stood and asked its stand goal and nothing
+                // else (a gesture, a lean, a hold or the anti-tip cut writes
+                // another goal, and pauses the count), held short of it
+                // under load: that goal is eased to where it holds. The
+                // strain guard below still judges every step as before.
+                let goal = up.pose[3 + index];
+                if stand >= 1.0 && arm_written[index] == goal {
+                    let rising = goal > up.folded[index];
+                    let short = if rising {
+                        goal.saturating_sub(is.position)
+                    } else {
+                        is.position.saturating_sub(goal)
+                    };
+                    stand_short_steps[index] =
+                        if short > STAND_EASE_SHORT && is.load > STAND_EASE_LOAD {
+                            stand_short_steps[index] + 1
+                        } else {
+                            0
+                        };
+                    if stand_short_steps[index] >= STAND_EASE_STEPS {
+                        stand_short_steps[index] = 0;
+                        let measured = stand_measured.map_or(goal, |stood| stood[index]);
+                        let eased = if rising {
+                            is.position + STAND_EASE_MARGIN
+                        } else {
+                            is.position.saturating_sub(STAND_EASE_MARGIN)
+                        };
+                        if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                            if let Some(up) = standing.as_mut() {
+                                up.pose[3 + index] = eased;
+                            }
+                            eprintln!(
+                                "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                report.steps, is.position, is.load
+                            );
+                        } else if !too_short_said[index] {
+                            too_short_said[index] = true;
+                            eprintln!(
+                                "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
+                                report.steps, is.load
+                            );
+                        }
+                    }
+                }
                 arm_over[index] = if is.load > up.load[index] {
                     arm_over[index].saturating_add(1)
                 } else {
@@ -9067,15 +9306,39 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         if seat_retreats.len() >= StrainGuard::SEAT_AFTER && seated.is_none() {
                             seated = Some((joint.name(), kind));
                             release_due = true;
+                            // #7281: a hot seat ends by itself once cool,
+                            // unless it already stood by itself this hour.
+                            seat_rests = (kind == "hot"
+                                && limits.strain_guard.is_some_and(|guard| guard.cools)
+                                && self_stood_at.is_none_or(|at| {
+                                    now.saturating_sub(at) >= StrainGuard::SEAT_WINDOW
+                                }))
+                            .then_some(joint.index());
+                            cool_since = None;
+                            let cools = if seat_rests.is_some() {
+                                format!(
+                                    "until it reads under {} for {} min, or ",
+                                    StrainGuard::COOL,
+                                    StrainGuard::COOL_FOR.as_secs() / 60
+                                )
+                            } else {
+                                String::new()
+                            };
                             eprintln!(
-                                "lamp-body: step {}: {joint} sat down {kind} for the second time in an hour: seated, its arm let go, until a person holds its head a second, a health check starts or it is started again",
+                                "lamp-body: step {}: {joint} sat down {kind} for the second time in an hour: seated, its arm let go, {cools}until a person holds its head a second, a health check starts or it is started again",
                                 report.steps
                             );
                         }
                     }
                 }
                 if !tired && stand > 0.0 {
+                    // #7281: every sit-down says why as it happens, not only
+                    // in the exit report.
+                    eprintln!("lamp-body: step {}: sat down: {why}", report.steps);
                     retreats = retreats.saturating_add(1);
+                    if hot {
+                        hot_retreats = hot_retreats.saturating_add(1);
+                    }
                     retreated_at.retain(|at| now.saturating_sub(*at) < Standing::RETREAT_WINDOW);
                     retreated_at.push_back(now);
                     if report.retreats.len() < 16 {

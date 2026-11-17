@@ -184,7 +184,7 @@ timeline through both. The product's lamp-controls turns it on (29 Oct,
 Controls'. Tests:
 `crates/controls/tests/it/head_pet.rs`.
 
-**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on; on in the product by #6853, PARKED (#7219) off there since: it broke a fresh lamp's onboarding walk; uncomment its line in `deploy/product/lamp-voice.service` to turn it on).** "Lamp, go
+**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on; on in the product since #6853).** "Lamp, go
 to sleep" is the voice's own function `go_to_sleep`, on both routes. The
 model is told to say only "Going to sleep. Tap my head to wake me.". Once
 that turn ends heard whole (as a say's `spoken`), the voice asks the same
@@ -1826,6 +1826,17 @@ taken unsaved, checked from the look through the save as a release is; a
 press that comes meanwhile puts the guard back. Tests:
 `a_clean_stop_ends_a_mute_the_restart_guard_restored` and
 `a_clean_stop_keeps_a_chosen_mute_and_a_guard_with_a_press_in_flight`.
+A stop that keeps the guard's mute says which gate kept it, in one journal
+line (#7368): "lamp-voice: the mute the restart guard restored is kept at this
+stop: <why>", where why is "the run did not end clean", "no stop was asked
+for", "the mute record could not be saved earlier", "a control was in
+flight" or "a control was taken and not yet saved"
+(`HandControls::kept_on_stop_why`, looked at before the release), or
+"a press came as it was saved" when nothing kept it at that look but a press
+during the release's save put the guard back
+(`HandControls::kept_after_release`).
+It is said only for the guard's mute, never a person's, and changes nothing
+the stop does. Test: `a_kept_guard_mute_names_its_gate`.
 **A head tap wakes such a mute, as it wakes sleep** (`Receiver::request_wake_after_fault`):
 on lamp-4ace on 2026-10-16 a crash at 12:20 brought the voice up muted, and
 with no main button and the base strip off nothing at the lamp could open it.

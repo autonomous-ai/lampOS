@@ -2037,6 +2037,66 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
     assert_eq!((lamp.servos[1].goal, lamp.servos[2].goal), (2_050, 2_047));
 }
 
+/// A lamp standing for 75 s, its elbow reading `load` throughout and
+/// otherwise as `set` makes it: the arm goals and positions of the last
+/// step it was fully stood up.
+fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(75));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, load)];
+    set(&mut lamp);
+    // Listened to throughout: awake, and at energy level 1 no lean moves
+    // the arm off its stand goal.
+    let news = || Some((Mood::Listening, 100));
+    let mut last = None;
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 600)),
+        news,
+        |glimpse| {
+            if glimpse.stand == 1.0 {
+                last = Some((glimpse.arm_goals, glimpse.arm_positions));
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.stood && report.retreats.is_empty(), "{report:?}");
+    last.unwrap()
+}
+
+/// lamp-74ff on 13373 (#7289): standing, its elbow held 41 to 47 counts
+/// short of its stand goal (2,600 here) at a load of 176 to 200 and heated
+/// until the lamp sat down. Held 45 short at 190 past `STAND_EASE_STEPS`,
+/// its stand goal is eased to where it holds plus `STAND_EASE_MARGIN`.
+#[test]
+fn a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased() {
+    let (goals, at) = elbow_standing(190, |lamp| lamp.short = Some((2, 45.0)));
+    assert_eq!(at[1], 2_555);
+    assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-52e6 on the same build: 3 short at a load of 24. Nothing changes.
+#[test]
+fn a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal() {
+    let (goals, _) = elbow_standing(24, |lamp| lamp.short = Some((2, 3.0)));
+    assert_eq!(goals, [2_650, 2_600]);
+}
+
+/// A hand pushing the stood elbow 120 down, past `STAND_EASE_FLOOR`: not
+/// where the arm can hold. It is not eased.
+#[test]
+fn a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased() {
+    let (goals, at) = elbow_standing(190, |lamp| {
+        lamp.hand = Some((Duration::from_secs(8), Duration::from_secs(75), 2, 2_480.0));
+    });
+    assert_eq!(at[1], 2_480);
+    assert_eq!(goals, [2_650, 2_600]);
+}
+
 /// lamp-4ace, 20 to 24 Oct: three strains of the elbow in half an hour sat
 /// the lamp down for the rest of a five-day run, and it never stood again
 /// until restarted. Three inside `Standing::RETREAT_WINDOW` rest it
@@ -2351,6 +2411,7 @@ fn a_long_strain_twice_in_an_hour_seats_the_lamp_until_a_person_lets_it_stand() 
     let guard = StrainGuard {
         load: 450,
         seconds: 10,
+        cools: false,
     };
     let unseat_at = Duration::from_secs(200);
     let (report, seen) = strained_twice(Some(guard), unseat_at, Duration::from_secs(280));
@@ -2452,6 +2513,7 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
             strain_guard: Some(StrainGuard {
                 load: StrainGuard::LOAD,
                 seconds: StrainGuard::SECONDS,
+                cools: false,
             }),
             ..Limits::FOLDED
         },
@@ -2490,6 +2552,454 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
     // Each sit-down let the folded arm go, and it rests pushing at nothing.
     assert_eq!(report.arm_releases, 2);
     assert_eq!(lamp.servos[2].load, 20);
+}
+
+/// What each step of [`hot_elbow`] said: when, how far it stood, the seat
+/// and whether it ends by itself.
+type SeatSeen = Vec<(Duration, f32, Option<(&'static str, &'static str)>, bool)>;
+
+/// The elbow warmed from 45 to 63 a degree each 0.1 s from `from`.
+fn warms(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
+    (46..=63u8)
+        .zip(0u64..)
+        .map(move |(to, n)| (from + Duration::from_millis(100 * n), 2, to))
+}
+
+/// The elbow cooled from 62 to 45 a degree each second from `from`: under
+/// [`StrainGuard::COOL`] (50) from 13 s on, when it reads 49.
+fn cools(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
+    (45..=62u8)
+        .rev()
+        .zip(0u64..)
+        .map(move |(to, n)| (from + Duration::from_secs(n), 2, to))
+}
+
+/// Under the strain guard (#7281), standing with the elbow at 63 from 6 s:
+/// it sits down hot, cools from 12 s and stands again after its minute,
+/// and hot again from 80 s, the second sit-down seats it at about 83 s.
+/// `heats` follow; it is never touched.
+fn hot_elbow(
+    seat_cools: bool,
+    heats: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen) {
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    lamp.heats = warms(Duration::from_secs(6))
+        .chain(cools(Duration::from_secs(12)))
+        .chain(warms(Duration::from_secs(80)))
+        .chain(heats)
+        .collect();
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: seat_cools,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        news,
+        Asked::default,
+        |glimpse| {
+            seen.push((
+                time.get(),
+                glimpse.stand,
+                glimpse.seated,
+                glimpse.seat_rests,
+            ))
+        },
+    );
+    (report, seen)
+}
+
+/// When it was first seated, and when it first stood fully once down.
+fn seated_then_stood(seen: &SeatSeen) -> (Duration, Option<Duration>) {
+    let seated_at = seen
+        .iter()
+        .find(|(_, _, seated, _)| seated.is_some())
+        .expect("seated")
+        .0;
+    let down = seen
+        .iter()
+        .find(|(at, stand, ..)| *at > seated_at && *stand == 0.0)
+        .map_or(Duration::MAX, |(at, ..)| *at);
+    let stood = seen
+        .iter()
+        .find(|(at, stand, ..)| *at > down && *stand > 0.99)
+        .map(|(at, ..)| *at);
+    (seated_at, stood)
+}
+
+/// #7281: a lamp seated hot stands again by itself once the elbow has read
+/// under 50 for five minutes, and says that it will from the seat on. Off,
+/// the same lamp waits for a person.
+#[test]
+fn a_hot_seat_stands_again_after_five_cool_minutes() {
+    let ends = Duration::from_secs(480);
+    let heats: Vec<_> = cools(Duration::from_secs(100)).collect();
+    let (report, seen) = hot_elbow(true, heats.clone(), ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch at 63 degrees")),
+        "{:?}",
+        report.retreats
+    );
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert!(
+        (Duration::from_secs(80)..Duration::from_secs(90)).contains(&seated_at),
+        "{seated_at:?}"
+    );
+    // Under 50 from 113 s: five minutes on, at 413 s, it stands again.
+    let cool_from = Duration::from_secs(113);
+    let stood = stood.expect("stood again");
+    assert!(
+        (cool_from + StrainGuard::COOL_FOR
+            ..cool_from + StrainGuard::COOL_FOR + Duration::from_secs(10))
+            .contains(&stood),
+        "{stood:?}"
+    );
+    // Seated hot and saying it will rest, down, until then.
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10)
+                && *at < cool_from + StrainGuard::COOL_FOR)
+            .all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && *rests),
+    );
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at >= stood)
+            .all(|(_, _, seated, _)| seated.is_none())
+    );
+    // Off, it waits for a person, and never says it will rest.
+    let (_, seen) = hot_elbow(false, heats, ends);
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert_eq!(stood, None);
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at)
+            .all(|(_, _, seated, rests)| seated.is_some() && !rests)
+    );
+}
+
+/// #7281: cool for a second under its five minutes, it stays seated.
+#[test]
+fn a_hot_seat_cool_for_under_five_minutes_stays_seated() {
+    // Under 50 from 113 s; it ends a second short of 413 s.
+    let ends = Duration::from_secs(412);
+    let (_, seen) = hot_elbow(true, cools(Duration::from_secs(100)).collect(), ends);
+    let (seated_at, stood) = seated_then_stood(&seen);
+    assert_eq!(stood, None);
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10))
+            .all(|(_, stand, seated, _)| *stand == 0.0 && seated.is_some())
+    );
+}
+
+/// lamp-74ff's arm warmth on 16 Nov (its journal, `warmth [shoulder, elbow]`
+/// on the step lines), from step 95122 (16:13:18, standing, the elbow at
+/// 61) to step 159640 (16:34:49, the journal's last): standing at 61 to 62,
+/// it sat down hot at 16:15:23, stood again at 16:16:32, and was seated hot
+/// at step 122133 (16:22:19, offset 27011, "elbow_pitch sat down hot for
+/// the second time in an hour"), then cooled to 51 by the file's end. Each
+/// entry is a change: steps after 95122, shoulder, elbow.
+const LAMP_74FF_WARMTH: &[(u64, u8, u8)] = &[
+    (0, 52, 61),
+    (3500, 52, 62),
+    (5000, 52, 61),
+    (5066, 52, 62),
+    (5141, 52, 61),
+    (5166, 52, 62),
+    (6318, 52, 61),
+    (6343, 52, 62),
+    (7696, 52, 61),
+    (7721, 52, 62),
+    (7769, 52, 61),
+    (7844, 52, 62),
+    (7870, 52, 61),
+    (8007, 52, 62),
+    (8032, 52, 61),
+    (8170, 52, 62),
+    (8419, 52, 61),
+    (9933, 52, 62),
+    (9958, 52, 61),
+    (10216, 51, 61),
+    (10241, 52, 61),
+    (10527, 51, 61),
+    (10552, 52, 61),
+    (10602, 51, 61),
+    (10614, 52, 61),
+    (10664, 51, 61),
+    (10788, 51, 63),
+    (10810, 52, 61),
+    (11118, 51, 61),
+    (11143, 52, 61),
+    (11219, 51, 61),
+    (11719, 52, 61),
+    (12219, 51, 61),
+    (12595, 52, 61),
+    (12620, 52, 60),
+    (13120, 52, 61),
+    (13620, 51, 61),
+    (13819, 52, 61),
+    (18025, 50, 61),
+    (18050, 52, 61),
+    (26542, 52, 62),
+    (29878, 52, 61),
+    (31692, 51, 61),
+    (33192, 51, 60),
+    (35912, 50, 60),
+    (37412, 50, 59),
+    (38912, 50, 58),
+    (41561, 50, 57),
+    (44561, 49, 56),
+    (49061, 49, 55),
+    (52908, 49, 54),
+    (53193, 48, 54),
+    (53218, 49, 54),
+    (53644, 48, 54),
+    (53658, 49, 54),
+    (53758, 48, 54),
+    (53772, 49, 54),
+    (53922, 48, 54),
+    (53947, 49, 54),
+    (54237, 48, 54),
+    (54262, 49, 54),
+    (54374, 48, 54),
+    (54399, 49, 54),
+    (54458, 48, 54),
+    (54483, 49, 54),
+    (54508, 48, 54),
+    (54553, 49, 54),
+    (54654, 49, 53),
+    (54679, 48, 54),
+    (54692, 49, 54),
+    (54717, 48, 54),
+    (54742, 48, 53),
+    (54767, 48, 54),
+    (54792, 49, 54),
+    (54817, 49, 53),
+    (54842, 49, 54),
+    (54867, 48, 54),
+    (54892, 49, 53),
+    (54942, 49, 54),
+    (54992, 48, 53),
+    (55067, 49, 53),
+    (55092, 49, 54),
+    (55095, 49, 53),
+    (55311, 48, 53),
+    (55336, 49, 53),
+    (55386, 48, 54),
+    (55411, 48, 53),
+    (55461, 49, 53),
+    (55745, 48, 53),
+    (55889, 49, 53),
+    (57389, 48, 53),
+    (58998, 48, 52),
+    (59016, 48, 53),
+    (59509, 48, 52),
+    (59522, 48, 53),
+    (59885, 48, 52),
+    (59910, 48, 53),
+    (59935, 48, 52),
+    (59985, 48, 54),
+    (61485, 48, 52),
+    (63394, 49, 52),
+    (63419, 48, 52),
+    (64386, 47, 52),
+    (64411, 48, 52),
+    (64461, 48, 51),
+    (64468, 48, 52),
+    (64518, 48, 51),
+];
+
+/// [`LAMP_74FF_WARMTH`] played from `from` (a step is 20 ms), shoulder and
+/// elbow. Its last read, 51, never gets under [`StrainGuard::COOL`] (50):
+/// SYNTHETIC from there, the elbow cools a degree a minute as 74ff's did
+/// (62 to 51 in 12 min), 50 one minute on and 49 two minutes on, then 48.
+/// The heats, and when the elbow first reads under 50.
+fn lamp_74ff_replay(from: Duration) -> (Vec<(Duration, usize, u8)>, Duration) {
+    let mut heats: Vec<_> = LAMP_74FF_WARMTH
+        .iter()
+        .flat_map(|(step, shoulder, elbow)| {
+            let at = from + TICK * *step as u32;
+            [(at, 1, *shoulder), (at, 2, *elbow)]
+        })
+        .collect();
+    let last = from + TICK * LAMP_74FF_WARMTH.last().unwrap().0 as u32;
+    // Synthetic cooling tail, past the journal's end.
+    for (minutes, to) in [(1, 50), (2, 49), (3, 48)] {
+        heats.push((last + Duration::from_secs(60 * minutes), 2, to));
+    }
+    (heats, last + Duration::from_secs(120))
+}
+
+/// lamp-74ff's elbow standing as it did on 16 Nov (`LAMP_74FF_WARMTH` from
+/// 6 s on, and `then`), under the strain guard with `LAMP_BODY_SEAT_COOLS`:
+/// what each step said, and each line its seat would say (`SeatSay`, out
+/// of the quiet hours).
+fn lamp_74ff(
+    then: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen, Vec<&'static str>) {
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2);
+    (lamp.servos[1].temperature, lamp.servos[2].temperature) = (first, second);
+    lamp.heats = lamp_74ff_replay(Duration::from_secs(6))
+        .0
+        .into_iter()
+        .chain(then)
+        .collect();
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let mut say = crate::seat_say::SeatSay::default();
+    let mut lines = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: true,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        news,
+        Asked::default,
+        |glimpse| {
+            seen.push((
+                time.get(),
+                glimpse.stand,
+                glimpse.seated,
+                glimpse.seat_rests,
+            ));
+            lines.extend(say.step(glimpse.seated.is_some(), glimpse.seat_rests, || false));
+        },
+    );
+    (report, seen, lines)
+}
+
+/// #7281, lamp-74ff's seat at 16:22:19 replayed: seated hot, it says it
+/// will rest, once, stays down through the journal's whole cooling (62 to
+/// 51 in 12 min), and stands again by itself five minutes after the elbow
+/// reads under 50 (the synthetic tail). Before #7281 it stayed seated.
+#[test]
+fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
+    let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
+    let ends = under + StrainGuard::COOL_FOR + Duration::from_secs(30);
+    let (report, seen, lines) = lamp_74ff(Vec::new(), ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        report
+            .retreats
+            .iter()
+            .all(|why| why.contains("elbow_pitch at 62 degrees")),
+        "{:?}",
+        report.retreats
+    );
+    let (seated_at, stood) = seated_then_stood(&seen);
+    // Seated hot, saying it rests, and down until five cool minutes are up.
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(10)
+                && *at < under + StrainGuard::COOL_FOR)
+            .all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && *rests)
+    );
+    let stood = stood.expect("stood again by itself");
+    assert!(
+        (under + StrainGuard::COOL_FOR..under + StrainGuard::COOL_FOR + Duration::from_secs(10))
+            .contains(&stood),
+        "{stood:?}, under 50 from {under:?}"
+    );
+    assert_eq!(lines, [crate::seat_say::RESTS]);
+}
+
+/// #7281, 74ff's numbers: stood by itself after its seat, its elbow warms
+/// back to 74ff's standing 61 to 62 (a degree each 10 s from 48, then the
+/// journal again), and the hot seat that follows within the hour waits for
+/// a person through the same cooling and five minutes more; its line says
+/// so, once.
+#[test]
+fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
+    let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
+    let stands = under + StrainGuard::COOL_FOR;
+    let warm: Vec<_> = (49..=61u8)
+        .zip(1u32..)
+        .map(|(to, n)| (stands + Duration::from_secs(10) * n, 2, to))
+        .collect();
+    let again_from = stands + Duration::from_secs(140);
+    let (replay, under_again) = lamp_74ff_replay(again_from);
+    let ends = under_again + StrainGuard::COOL_FOR + Duration::from_secs(30);
+    let (report, seen, lines) = lamp_74ff(warm.into_iter().chain(replay).collect(), ends);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let (_, stood) = seated_then_stood(&seen);
+    let stood = stood.expect("stood by itself");
+    let again = seen
+        .iter()
+        .find(|(at, _, seated, _)| *at > stood && seated.is_some())
+        .expect("seated again")
+        .0;
+    assert!(again < stood + Duration::from_secs(60 * 60), "{again:?}");
+    let after: Vec<_> = seen
+        .iter()
+        .filter(|(at, ..)| *at > again + Duration::from_secs(10))
+        .collect();
+    assert!(
+        !after.is_empty()
+            && after.iter().all(|(_, stand, seated, rests)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "hot"))
+                && !rests),
+        "{:?}",
+        after.last()
+    );
+    assert_eq!(lines, [crate::seat_say::RESTS, crate::seat_say::WAITS]);
+}
+
+/// #7281: a seat for a strain never stands by itself, cool as it is.
+#[test]
+fn a_strained_seat_stays_seated_however_cool() {
+    let guard = StrainGuard {
+        load: 450,
+        seconds: 10,
+        cools: true,
+    };
+    let (report, seen) = strained_twice(Some(guard), Duration::MAX, Duration::from_secs(480));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let seated_at = seen
+        .iter()
+        .find(|(.., seated)| seated.is_some())
+        .expect("seated")
+        .0;
+    assert!(
+        seen.iter()
+            .filter(|(at, ..)| *at > seated_at + Duration::from_secs(20))
+            .all(|(_, stand, _, seated)| *stand == 0.0
+                && *seated == Some(("elbow_pitch", "strained")))
+    );
 }
 
 /// #4501: a joint rising 8 degrees within five minutes, while under 55, is
@@ -3378,6 +3888,7 @@ fn gesture_run_full(
                 replace: false,
                 lively: false,
                 energy: 0,
+                present: false,
             }
         },
         |glimpse| {
@@ -3511,6 +4022,7 @@ fn expression_run_with(
             replace: false,
             lively: false,
             energy: 0,
+            present: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -3685,6 +4197,7 @@ fn speaking_run_with(
             replace: false,
             lively: false,
             energy: 0,
+            present: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -4402,6 +4915,7 @@ fn rest_glances_watched(
             replace: false,
             lively: false,
             energy: 0,
+            present: false,
         },
         |glimpse| {
             let at = seen_at.get();
@@ -5482,6 +5996,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             replace: false,
             lively: false,
             energy: 0,
+            present: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -5557,6 +6072,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             replace: false,
             lively: false,
             energy: 0,
+            present: false,
         },
         |_| {},
     );
@@ -5650,6 +6166,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 replace: false,
                 lively: false,
                 energy: 0,
+                present: false,
             }
         },
         |glimpse| {
@@ -5856,6 +6373,353 @@ fn it_does_not_shift_while_talked_to_folded_or_held() {
     let (report, _) = shifts_at_rest(true, 10, Mood::Resting, 100, Some(30), None);
     assert!(report.eased[1] >= 15, "{report:?}");
     assert_eq!(report.idles, 0, "{report:?}");
+}
+
+/// Under `LAMP_BODY_PRESENCE` (`presence`, #7301) or not: spoken to for two
+/// seconds, then left at rest for `minutes`, asked `asked` at each time,
+/// its awake window the product unit's 90 s and its energy switch as
+/// given; a servo's temperature from a time if given. Its shifts, when it
+/// first began to fold after standing, and each arm goal's lowest and
+/// highest while a shift played.
+#[allow(clippy::type_complexity)]
+fn at_rest_with(
+    presence: bool,
+    energy: bool,
+    minutes: u64,
+    asked: fn(Duration) -> Asked,
+    heat: Option<(Duration, usize, u8)>,
+    strain: Option<(Duration, Duration, usize, u16)>,
+) -> (
+    BodyReport,
+    Vec<Shift>,
+    Option<Duration>,
+    [(u16, u16); 2],
+    Option<Duration>,
+) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(minutes * 60));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    lamp.heats.extend(heat);
+    lamp.strains.extend(strain);
+    let limits = Limits {
+        presence,
+        energy,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let time = clock.time.clone();
+    let watched = clock.time.clone();
+    let heard = clock.time.clone();
+    let mut shifts: Vec<Shift> = Vec::new();
+    let mut playing: Option<(Duration, &'static str)> = None;
+    let mut stood = false;
+    let mut folding: Option<Duration> = None;
+    let mut down = false;
+    let mut rose_again: Option<Duration> = None;
+    let mut arm = [(u16::MAX, 0u16); 2];
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 90).idling(true).seeded(5)),
+        None,
+        move || {
+            Some(if time.get() < Duration::from_secs(2) {
+                (Mood::Listening, 100)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        move || asked(heard.get()),
+        |glimpse| {
+            stood |= glimpse.stand >= 1.0;
+            // Not the fold at the run's own end.
+            if stood
+                && glimpse.stand < 1.0
+                && folding.is_none()
+                && watched.get() < Duration::from_secs(minutes * 60)
+            {
+                folding = Some(watched.get());
+            }
+            // Folded all the way after standing, then rising again.
+            down |= folding.is_some() && glimpse.stand <= 0.0;
+            if down && glimpse.stand > 0.0 && rose_again.is_none() {
+                rose_again = Some(watched.get());
+            }
+            let shift = glimpse
+                .gesture
+                .filter(|name| idle::MOVES.iter().any(|shift| shift.name == *name));
+            if shift.is_some() {
+                for (index, (low, high)) in arm.iter_mut().enumerate() {
+                    *low = (*low).min(glimpse.arm_goals[index]);
+                    *high = (*high).max(glimpse.arm_goals[index]);
+                }
+            }
+            match (playing, shift) {
+                (None, Some(name)) => playing = Some((watched.get(), name)),
+                (Some((from, name)), now) if now != Some(name) => {
+                    shifts.push((from, watched.get(), name));
+                    playing = now.map(|name| (watched.get(), name));
+                }
+                _ => {}
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    (report, shifts, folding, arm, rose_again)
+}
+
+fn someone_there(_: Duration) -> Asked {
+    Asked {
+        present: true,
+        ..Asked::default()
+    }
+}
+
+/// The waits between shifts that began in `from..to`.
+fn waits_in(shifts: &[Shift], from: Duration, to: Duration) -> Vec<Duration> {
+    shifts
+        .windows(2)
+        .filter(|pair| (from..to).contains(&pair[1].0))
+        .map(|pair| pair[1].0 - pair[0].1)
+        .collect()
+}
+
+/// Someone at the desk keeps a standing lamp up past its 90 s: still up at
+/// nine minutes, and folding calmly once 15 minutes have passed with no
+/// talk and no arrival, the person still there. Off, or with nobody there,
+/// it folds 90 s after the talk, as today.
+#[test]
+fn someone_there_keeps_it_standing_for_fifteen_quiet_minutes() {
+    let (report, _, folding, _, _) = at_rest_with(true, false, 20, someone_there, None, None);
+    let folding = folding.expect("it never folded");
+    assert!(
+        folding >= Duration::from_secs(2) + QUIET_STAND,
+        "{folding:?} {report:?}"
+    );
+    assert!(
+        folding <= Duration::from_secs(2 + 90 + 1) + QUIET_STAND,
+        "{folding:?}"
+    );
+    for (presence, asked) in [
+        (false, someone_there as fn(Duration) -> Asked),
+        (true, |_| Asked::default()),
+    ] {
+        let (_, _, folding, _, _) = at_rest_with(presence, false, 3, asked, None, None);
+        let folding = folding.expect("it never folded");
+        assert!(
+            (Duration::from_secs(91)..=Duration::from_secs(93)).contains(&folding),
+            "{presence}: {folding:?}"
+        );
+    }
+}
+
+/// Someone who leaves: it folds 90 s after the last step they were there
+/// (the eyes' own two minutes of grace come before, `presence_in`).
+#[test]
+fn someone_who_leaves_is_folded_for_ninety_seconds_later() {
+    let (_, _, folding, _, _) = at_rest_with(
+        true,
+        false,
+        8,
+        |at| Asked {
+            present: at < Duration::from_secs(4 * 60),
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    let folding = folding.expect("it never folded");
+    assert!(
+        (Duration::from_secs(4 * 60)..=Duration::from_secs(4 * 60 + 91)).contains(&folding),
+        "{folding:?}"
+    );
+}
+
+/// An arm joint as warm as `bus_out::WARM` keeps it up no longer: it folds
+/// calmly at the end of its window, before the strain guard's hot sit-down.
+#[test]
+fn a_warm_arm_is_not_kept_standing_for_someone() {
+    let (_, _, folding, _, _) = at_rest_with(
+        true,
+        false,
+        8,
+        someone_there,
+        Some((Duration::from_secs(3 * 60), 1, crate::bus_out::WARM)),
+        None,
+    );
+    let folding = folding.expect("it never folded");
+    assert!(
+        (Duration::from_secs(3 * 60)..=Duration::from_secs(3 * 60 + 92)).contains(&folding),
+        "{folding:?}"
+    );
+}
+
+/// Sixth's P1 on #7313: presence never stands a lamp folded for its load.
+/// Spoken to, then the shoulder loaded at 990 at 60 s, so its tired rest
+/// outlasts the talk's 90 s: it folds and stays folded, someone there or not.
+#[test]
+fn someone_there_does_not_stand_a_lamp_folded_for_its_load() {
+    for presence in [false, true] {
+        let (report, _, folding, _, rose_again) = at_rest_with(
+            presence,
+            false,
+            4,
+            someone_there,
+            None,
+            Some((Duration::from_secs(60), Duration::from_secs(61), 1, 990)),
+        );
+        let folding = folding.expect("it never folded");
+        assert!(folding < Duration::from_secs(62), "{presence}: {folding:?}");
+        assert!(!report.retreats.is_empty(), "{presence}: {report:?}");
+        assert_eq!(rose_again, None, "{presence}: {report:?}");
+    }
+}
+
+/// Presence never keeps a lamp up in its night rest: Expression saying
+/// asleep from 30 s, a standing lamp is kept up no longer and folds at the
+/// end of the window it had then, 90 s later.
+#[test]
+fn at_night_someone_there_does_not_keep_it_standing() {
+    let (_, _, folding, _, _) = at_rest_with(
+        true,
+        false,
+        4,
+        |at| Asked {
+            present: true,
+            night: at >= Duration::from_secs(30),
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    let folding = folding.expect("it never folded");
+    assert!(
+        (Duration::from_secs(119)..=Duration::from_secs(121)).contains(&folding),
+        "{folding:?}"
+    );
+}
+
+/// With someone there for ten minutes at the product's level 1 (the energy
+/// switch off): a shift at least every minute, livelier in the four after
+/// the talk, from 20 s apart after; half the moves or so sag the arm, only
+/// toward the fold and never past it, by enough to be seen at 1 m.
+#[test]
+fn someone_there_sees_a_shift_every_twenty_to_sixty_seconds() {
+    let (report, shifts, folding, arm, _) =
+        at_rest_with(true, false, 10, someone_there, None, None);
+    assert_eq!(folding, None);
+    assert_eq!(report.idles as usize, shifts.len());
+    assert!(shifts.len() >= 10, "{shifts:?}");
+    assert!(
+        shifts[0].0 <= Duration::from_secs(2 + 6 + 42) + TICK,
+        "{shifts:?}"
+    );
+    let all = waits_in(&shifts, Duration::ZERO, Duration::from_secs(600));
+    assert!(
+        all.iter()
+            .all(|wait| (Duration::from_secs(14)..=Duration::from_secs(60) + TICK).contains(wait)),
+        "{shifts:?}"
+    );
+    // Lively after the talk: level 3's waits in its first two minutes.
+    let lively = waits_in(&shifts, Duration::ZERO, Duration::from_secs(2 + 120));
+    assert!(!lively.is_empty(), "{shifts:?}");
+    assert!(
+        lively
+            .iter()
+            .all(|wait| *wait <= Duration::from_secs(42) + TICK),
+        "{shifts:?}"
+    );
+    // Settled at its own level 1 after four.
+    let settled = waits_in(
+        &shifts,
+        Duration::from_secs(2 + 240 + 60),
+        Duration::from_secs(600),
+    );
+    assert!(!settled.is_empty(), "{shifts:?}");
+    assert!(
+        settled.iter().all(|wait| *wait >= Duration::from_secs(20)),
+        "{shifts:?}"
+    );
+    assert!(
+        shifts.iter().any(|shift| shift.2 == clips::SETTLE.name),
+        "{shifts:?}"
+    );
+    // The stand is 2,650 and 2,600 from a fold of 2,050 and 2,047.
+    assert!(arm[0].1 <= 2_650 && arm[1].1 <= 2_600, "{arm:?}");
+    assert!(arm[0].0 >= 2_050 && arm[1].0 >= 2_047, "{arm:?}");
+    assert!(2_650 - arm[0].0 >= 45 && 2_600 - arm[1].0 >= 30, "{arm:?}");
+    assert!(report.retreats.is_empty(), "{report:?}");
+}
+
+/// At energy level 5, waits of 10 s to 30 s.
+#[test]
+fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
+    let (_, shifts, folding, _, _) = at_rest_with(
+        true,
+        true,
+        8,
+        |_| Asked {
+            present: true,
+            energy: 5,
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    assert_eq!(folding, None);
+    let waits = waits_in(&shifts, Duration::ZERO, Duration::from_secs(480));
+    assert!(waits.len() >= 10, "{shifts:?}");
+    assert!(
+        waits
+            .iter()
+            .all(|wait| (Duration::from_secs(10)..=Duration::from_secs(30) + TICK).contains(wait)),
+        "{shifts:?}"
+    );
+}
+
+/// Held by lamp-control's lease: under `LAMP_BODY_PRESENCE` no shift at
+/// rest, even with nothing else asked of it (usage: "While held, no shift
+/// at rest"). With the switch off (`run_at_rest`'s `Limits` leave
+/// `presence` false) it shifts while held as before #7301, exactly as an
+/// unheld run does (switches.md, "Off:").
+#[test]
+fn held_by_a_lease_it_does_not_shift_only_with_presence_on() {
+    let held = |_| Asked {
+        held: true,
+        ..Asked::default()
+    };
+    let (held_off, held_shifts) = shifts_at_rest(true, 10, Mood::Resting, 100, None, Some(held));
+    let (unheld, unheld_shifts) = shifts_at_rest(
+        true,
+        10,
+        Mood::Resting,
+        100,
+        None,
+        Some(|_| Asked::default()),
+    );
+    assert!(held_off.idles > 0, "{held_off:?}");
+    assert_eq!(held_shifts, unheld_shifts);
+    assert_eq!(held_off.idles, unheld.idles);
+    let (report, shifts, _, _, _) = at_rest_with(
+        true,
+        false,
+        10,
+        |_| Asked {
+            held: true,
+            present: true,
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    assert_eq!((report.idles, shifts.len()), (0, 0), "{shifts:?}");
 }
 
 /// Expression's rest stream, renewed every step under `--rest-glance`
@@ -6082,6 +6946,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     replace: false,
                     lively: false,
                     energy: 0,
+                    present: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6170,6 +7035,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 replace: false,
                 lively: false,
                 energy: 0,
+                present: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6263,6 +7129,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 replace: false,
                 lively: false,
                 energy: 0,
+                present: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -9268,6 +10135,7 @@ fn called_run(
                 replace: false,
                 lively: false,
                 energy: 0,
+                present: false,
             }
         },
         |glimpse| {
@@ -19692,7 +20560,7 @@ fn energy_level_one_is_the_unit_exactly() {
     let lively = unit.at(5);
     assert_eq!((lively.speed, lively.acceleration), (800.0, 4_800.0));
     assert_eq!(lively.stand_roll, 200.0);
-    assert_eq!(unit.at(3).stand_roll, 120.0);
+    assert_eq!(unit.at(3).stand_roll, 106.0);
     assert_eq!(unit.at(2).stand_roll, unit.stand_roll);
     // Only the speed, its acceleration and the roll standing change.
     assert_eq!(
@@ -20058,6 +20926,127 @@ fn at_level_five_the_heads_roll_swaps_sides_no_faster_than_level_one() {
         assert_eq!(five.speed, f32::from(speed).max(ROLL_SPEED));
         assert_eq!(base.at(5).speed, 800.0);
     }
+}
+
+/// When a standing lamp at an energy `level`, idle shifts on, spoken to from
+/// one second to seven and then left alone with `--awake-seconds 20`, starts
+/// to fold: the first step after its last talk that its stand goes under 1.
+fn folds_at(level: u8) -> Duration {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(45));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let news = spoken_to(&clock.time);
+    let seen_at = clock.time.clone();
+    let mut fold = None;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 20).idling(true).seeded(5)),
+        None,
+        news,
+        move || Asked {
+            energy: level,
+            ..Asked::default()
+        },
+        |glimpse| {
+            let at = seen_at.get();
+            if fold.is_none() && at > Duration::from_secs(8) && glimpse.stand < 1.0 {
+                fold = Some(at);
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    fold.expect("it folded")
+}
+
+/// #7314, row-7153L2 on lamp-52e6: a livelier character never sits down
+/// sooner. At every level the lamp stays up for the whole of
+/// `--awake-seconds` after its last talk, as level 1 does.
+#[test]
+fn at_every_level_the_lamp_folds_no_sooner_than_at_level_one() {
+    let today = folds_at(1);
+    assert!(today >= Duration::from_millis(26_900), "{today:?}");
+    for level in 2..=5 {
+        let lively = folds_at(level);
+        assert!(
+            lively >= today,
+            "level {level}: {lively:?} against {today:?}"
+        );
+    }
+}
+
+/// #7314, lamp-52e6 at 16:37:43: the fold was `--awake-seconds 90` after
+/// the last Speaking step. At level 5, with `--awake-seconds 90`, spoken to
+/// until 7 s and then only at rest, a shift at rest plays inside the window
+/// and does not renew it: the lamp stays up until 90 s after its last talk
+/// and starts to fold then, not sooner and not 90 s after the shift.
+#[test]
+fn an_idle_shift_does_not_renew_the_awake_window() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(110));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let news = spoken_to(&clock.time);
+    let seen_at = clock.time.clone();
+    let mut seen: Vec<(Duration, f32, bool)> = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 90).idling(true).seeded(5)),
+        None,
+        news,
+        || Asked {
+            energy: 5,
+            ..Asked::default()
+        },
+        |glimpse| {
+            let shifting = glimpse.gesture.is_some_and(idle::is_move_name);
+            seen.push((seen_at.get(), glimpse.stand, shifting));
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let last_talk = Duration::from_secs(7);
+    let window_ends = last_talk + Duration::from_secs(90);
+    // A shift at rest played inside the window, after the talk.
+    let shift = seen
+        .iter()
+        .find(|step| step.2 && step.0 > last_talk)
+        .map(|step| step.0)
+        .expect("a shift at rest");
+    assert!(shift < window_ends - Duration::from_secs(10), "{shift:?}");
+    // Up through the window, folding from its end.
+    for step in seen
+        .iter()
+        .filter(|step| step.0 >= Duration::from_secs(12) && step.0 < window_ends - TICK)
+    {
+        assert_eq!(step.1, 1.0, "{step:?}");
+    }
+    let fold = seen
+        .iter()
+        .find(|step| step.0 > last_talk && step.1 < 1.0)
+        .map(|step| step.0)
+        .expect("it folded");
+    assert!(
+        fold >= window_ends - TICK && fold <= window_ends + TICK,
+        "{fold:?}, shift at {shift:?}"
+    );
 }
 
 /// What each mood leans toward: speaking and reading `LEAN` at every

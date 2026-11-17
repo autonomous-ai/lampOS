@@ -304,7 +304,7 @@ pub struct Use {
 }
 
 /// What a skill may use, by machine name, in the order the page shows it.
-pub const USES: [Use; 22] = [
+pub const USES: [Use; 23] = [
     use_of("speak", "speaks, or plays a short sound", false),
     use_of("light", "changes the light", false),
     use_of("body", "moves the lamp", false),
@@ -359,6 +359,15 @@ pub const USES: [Use; 22] = [
         "knows when you were last seen drinking, eating or stretching, and how you sat, from pictures sent to be labelled",
         true,
     ),
+    // Tiredness, desk work and celebrating (#6543, `humans/doing_more`): a
+    // use of its own, so a skill given `seen` never has these, and the
+    // owner agrees to them only when a skill names the topic. Desk work
+    // says most about a person (the first builder on #6543).
+    use_of(
+        "seen_more",
+        "knows when you last looked tired, worked at the desk and at what, or celebrated, from pictures sent to be labelled",
+        true,
+    ),
     use_of("hearing", "hears what is said to it", true),
     use_of("room_sound", "hears how loud the room is", true),
     use_of("touch", "feels a touch on the lamp", false),
@@ -392,6 +401,7 @@ fn topic_use(topic: &str) -> &'static str {
         "humans/faces/tracked" => "faces",
         "room/presence" | "room/activity" => "presence",
         "humans/doing" | "humans/doing_seen" | "humans/posture" => "seen",
+        "humans/doing_more" => "seen_more",
         "voice/heard" | "name/heard" => "hearing",
         "ears/level" | "ears/sudden" => "room_sound",
         // A pet on the head (#3997) is a touch, as the head's others are.
@@ -1540,6 +1550,27 @@ pub mod tests {
                 "{topic}"
             );
         }
+        // Tiredness, desk work and celebrating are a use of their own: a
+        // skill given `seen` does not have them, and naming them shows
+        // `seen_more`, private, apart from `seen`.
+        let more = may_use(&Permissions {
+            topics: vec!["humans/doing_more".into()],
+            ..Permissions::default()
+        });
+        assert_eq!(
+            more.iter()
+                .map(|used| (used.name, used.privacy))
+                .collect::<Vec<_>>(),
+            [("seen_more", Some(PRIVACY))]
+        );
+        let both = may_use(&Permissions {
+            topics: vec!["humans/doing".into(), "humans/doing_more".into()],
+            ..Permissions::default()
+        });
+        assert_eq!(
+            both.iter().map(|used| used.name).collect::<Vec<_>>(),
+            ["seen", "seen_more"]
+        );
         // An add-on: each act it may propose, in the page's order, and its
         // say grant the same row as proposing `say`.
         let addon = Permissions {

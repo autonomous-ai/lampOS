@@ -280,6 +280,24 @@ fn left_off_or_never_asked_is_a_failure() {
     let uploads = uploads(&dir, "http://127.0.0.1:9", &socket);
     let kept = json!({"sha256": "a".repeat(64)});
     assert_eq!(uploads.settle(kept.clone()), Err(LEFT_OFF.to_owned()));
+    // Left off and why, as lamp-voice says it (the audit's B2, 16 Nov):
+    // told to the app whole, the journal's words fixed.
+    let (socket, _seen) = voice(
+        "left-why",
+        vec![
+            json!({"state": "left_off", "why": "the lamp's check didn't let it on: its skill.toml asks for the camera"}),
+        ],
+    );
+    let told = self::uploads(&dir, "http://127.0.0.1:9", &socket)
+        .settle(kept.clone())
+        .unwrap_err();
+    assert_eq!(
+        told,
+        format!(
+            "{LEFT_OFF}: the lamp's check didn't let it on: its skill.toml asks for the camera"
+        )
+    );
+    assert_eq!(journaled(&told), LEFT_OFF);
     let mut waits = Uploads::new(
         "http://127.0.0.1:9",
         "k",
@@ -811,4 +829,33 @@ fn an_agent_skills_file_is_taken_to_64_kib_only_with_its_switch() {
     let long = format!("{card}{}", "x".repeat(MOST_AGENT_BYTES));
     let (past, _) = run("agent-past", &long, true, vec![]);
     assert_eq!(past.unwrap_err(), AGENT_TOO_LONG);
+}
+
+/// LAMP_MADE_SKILL_ASKS: the trigger phrases lamp-voice left out of an
+/// upload's asks reach the app's answer as lamp-voice said them; with none
+/// said (or not a list), the answer holds no such field.
+#[test]
+fn the_phrases_left_out_reach_the_apps_answer_only_when_said() {
+    let run = |name: &str, answer: Value| {
+        let dir = folder(name);
+        let upload_id = id(CARD.as_bytes());
+        let (base, _) = backend(
+            &format!("{KIND_PREFIX}{upload_id}"),
+            data(CARD.as_bytes(), "skill_md"),
+        );
+        let (socket, _seen) = voice(name, vec![answer]);
+        let uploads = uploads(&dir, &base, &socket);
+        uploads.run(&upload_id).0.unwrap()
+    };
+    let left = json!([{"phrase": "thank you", "why": "too short"}]);
+    let mut answer = kept();
+    answer["kept"]["asks_left_out"] = left.clone();
+    let told = run("asks-left-out", answer);
+    assert_eq!(told["asks_left_out"], left);
+    let told = run("asks-none", kept());
+    assert!(told.get("asks_left_out").is_none(), "{told}");
+    let mut answer = kept();
+    answer["kept"]["asks_left_out"] = json!("thank you");
+    let told = run("asks-not-list", answer);
+    assert!(told.get("asks_left_out").is_none(), "{told}");
 }

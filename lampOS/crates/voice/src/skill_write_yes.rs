@@ -104,6 +104,9 @@ pub struct Waiting {
     /// The person's answer to it was read as unclear once ([`answered`]):
     /// a second unclear keeps nothing and ends the wait.
     pub unclear: bool,
+    /// How many heard turns past [`YES_WITHIN`] have been guarded against
+    /// saying it is on (#7270, [`late_guarded`]).
+    pub late_guarded: u8,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -186,6 +189,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             said: VecDeque::new(),
             noted,
             unclear: false,
+            late_guarded: 0,
         });
     });
     if remove {
@@ -445,6 +449,46 @@ pub fn code_yes_awaited(sha256: &str, now: Instant) -> bool {
                 && waiting.asks.sha256 == sha256
                 && now.saturating_duration_since(waiting.at) <= YES_WITHIN
         })
+    })
+}
+
+/// The made skill with code of its own that is not on and whose yes was
+/// asked before `request` (#7270, `crate::made_not_on`): its name, and
+/// whether its yes is past [`YES_WITHIN`] at `now`, so no yes takes it any
+/// more. Only within `within` of its wait's start; never a remove's, a
+/// skill's task's or a write's wait (a skill that writes is on already),
+/// and none once the wait is answered, dropped or taken by its yes.
+pub fn code_not_on(request: u64, now: Instant, within: Duration) -> Option<(String, bool)> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref().filter(|waiting| {
+            waiting.asks.code
+                && !waiting.asks.remove
+                && request > waiting.request
+                && now.saturating_duration_since(waiting.at) <= within
+        })?;
+        Some((
+            waiting.asks.skill.clone(),
+            now.saturating_duration_since(waiting.at) > YES_WITHIN,
+        ))
+    })
+}
+
+/// The made skill with code of its own that [`code_not_on`] names, past
+/// its [`YES_WITHIN`], for the heard turn `request` at `now`: its name, for
+/// the first `most` such turns only, each counted once (#7270,
+/// `crate::made_not_on::Guard`). None within its wait, or past `most`.
+pub fn late_guarded(request: u64, now: Instant, within: Duration, most: u8) -> Option<String> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_mut().filter(|waiting| {
+            waiting.asks.code
+                && !waiting.asks.remove
+                && request > waiting.request
+                && now.saturating_duration_since(waiting.at) > YES_WITHIN
+                && now.saturating_duration_since(waiting.at) <= within
+                && waiting.late_guarded < most
+        })?;
+        waiting.late_guarded += 1;
+        Some(waiting.asks.skill.clone())
     })
 }
 

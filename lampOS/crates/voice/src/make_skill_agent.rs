@@ -1,7 +1,8 @@
 //! A voice make the lamp's own model couldn't make, handed to the lamp's
 //! own agent (a proposal on #6059, the owner's OK and the first builder's
 //! yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on` ([`ENVIRONMENT`], off
-//! unless set; off in the product's lamp-voice, #7014).
+//! unless set; on in the product's lamp-voice again since 15 Nov, after
+//! #7014 had it off, a code make by the agent passing 3 of 3 on lamp-9adf).
 //!
 //! The order: DeepSeek writes first ([`crate::make_skill_local`]). With
 //! Hermes as the lamp's agent (the tasks part's `lamp` target; only Hermes
@@ -12,7 +13,8 @@
 //! and request, to the agent, which writes the blocks again and gets the
 //! repairs. Its answers go through the very same checks. With no agent on
 //! the lamp DeepSeek keeps its repairs, as today; with no answer from the
-//! agent within [`WRITE_WITHIN`], DeepSeek's failure stands.
+//! agent within [`WRITE_WITHIN`], or its run busy or failed, DeepSeek's
+//! failure stands, said as the agent's ([`not_made_try`]).
 //!
 //! The agent writes in a skill run's namespace (#6643, the first builder's
 //! guard, 12 Nov 18:15): the make goes to lamp-tasks' make socket
@@ -42,12 +44,29 @@
 //! words at most [`GUIDED_MOST_REPAIRS`] more times, within the agent's
 //! [`MAKE_WITHIN`]. Off, the line is today's, byte for byte.
 //!
-//! With the guide, the line also carries this worker's values of the
+//! With the guide, the line also carries this process's values of the
 //! switches `lamp-skills` reads as it packs a skill ([`CHECK_SWITCHES`],
 //! `"switches"`, Heron's P2 on #6768): lamp-tasks starts the make with a
 //! cleared environment, so without them the guide's check would refuse a
 //! `write` step or a `do.task`'s service grant the voice's own check
 //! accepts, and Hermes would take the asked-for step out.
+//!
+//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, off
+//! unless set; #7245), a make goes to the lamp's agent when it is one the
+//! one run path takes ([`ONE_PATH_ENGINES`]: Hermes or OpenClaw), and its
+//! line carries `"one_path":true` so lamp-tasks' make socket picks its
+//! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a
+//! gateway agent). Off, the line and the hand-over are today's, byte for
+//! byte. A `cannot:` answer is passed on verbatim, as before (#7234). It is
+//! the voice's make's alone ([`Agent::for_voice`]): the app's MAKE IT below
+//! hands over to Hermes only, as before.
+//!
+//! The app's MAKE IT (`crate::app_make`, the owner's ask, 13 Nov) makes the
+//! same way: its typed words go through the same order and this same
+//! hand-over ([`Agent::for_app`]), read from the coordinator's own
+//! environment, where the app's makes run (its `LAMP_TASKS_DIR`, the
+//! directory the second route's worker is given). No waiting line is said
+//! for it: the app shows the ask as making until it is on or not kept.
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
@@ -102,9 +121,18 @@ const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// `no_namespace`: the wrapper or the namespace script has no make-home
 /// line yet (an older lamp-update round).
 const NOT_HELD_OFF_CODES: [&str; 3] = ["off", "not_held_off", "no_namespace"];
+/// lamp-tasks' refusal of a make that can't start because Harness or the
+/// gateway isn't ready yet (#7245, `lamp_tasks::skill_make::NOT_READY`).
+const NOT_READY_CODE: &str = "not_ready";
 /// The one engine a make is handed to: only Hermes has a namespace runner
 /// for a make today (lamp-tasks' `MakeHermes`, #6643's 19:14 ruling).
 pub const MAKE_ENGINE: &str = "Hermes";
+/// The one run path's switch for a make (#7245): `on`, and nothing else;
+/// off unless set.
+pub const ONE_PATH_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_ONE_PATH";
+/// With [`ONE_PATH_ENVIRONMENT`] on, the engines a make is handed to:
+/// lamp-tasks takes each through the one run path (#7133).
+pub const ONE_PATH_ENGINES: [&str; 2] = [MAKE_ENGINE, "OpenClaw"];
 
 /// Whether the switch is on.
 pub fn on() -> bool {
@@ -191,13 +219,19 @@ pub fn guide_on() -> bool {
     on_with(std::env::var(GUIDE_ENVIRONMENT).ok().as_deref())
 }
 
+/// Whether the one run path's switch is on ([`ONE_PATH_ENVIRONMENT`]).
+pub fn one_path_on() -> bool {
+    on_with(std::env::var(ONE_PATH_ENVIRONMENT).ok().as_deref())
+}
+
 /// The switches `lamp-skills pack` reads as it loads a skill, so that change
 /// what it refuses: a `do.task`'s linked service grants and a `write` step
 /// or permission (`lamp_tasks::skill_make::CHECK_SWITCHES`, the only names
-/// lamp-tasks takes). The voice's check runs with this worker's own
-/// environment, which has each as `on` exactly or not at all
-/// (`process::agent_services_worker_environment`,
-/// `skill_writes_worker_environment`).
+/// lamp-tasks takes). The voice's check runs with the environment of the
+/// process that makes: the second route's worker, which has each as `on`
+/// exactly or not at all (`process::agent_services_worker_environment`,
+/// `skill_writes_worker_environment`), or the coordinator for the app's
+/// MAKE IT, with lamp-voice's own unit's.
 pub const CHECK_SWITCHES: [&str; 2] = [
     crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
     crate::made_skill::WRITES_ENVIRONMENT,
@@ -244,6 +278,14 @@ pub struct Agent {
     /// Whether each make asks for the lamp's skill-creator guide
     /// ([`GUIDE_ENVIRONMENT`]).
     pub guide: bool,
+    /// Whether a make goes to the lamp's agent on the one run path, its
+    /// line carrying `"one_path":true` ([`ONE_PATH_ENVIRONMENT`]).
+    pub one_path: bool,
+    /// Whether DeepSeek gets its repairs when the agent doesn't take the
+    /// make (no make run, `busy`, or no first answer): the app's MAKE IT,
+    /// with no turn waiting ([`Agent::for_app`], Heron's P2 on #6788); a
+    /// voice make's one answer stands, as before.
+    pub repairs_if_untaken: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -272,6 +314,33 @@ impl std::fmt::Display for NotWritten {
     }
 }
 
+/// What the person hears when the agent made nothing for a reason of its
+/// own side (`why`, a [`NotWritten`] as [`Agent::write`] says it): lamp-tasks
+/// makes one at a time (`busy`), [`crate::made_skill::AGENT_BUSY_TRY`]; no
+/// answer within [`WRITE_WITHIN`], [`crate::made_skill::AGENT_LATE_TRY`];
+/// no agent after all ([`NotWritten::NoAgent`]),
+/// [`crate::made_skill::AGENT_MISSING`], what is missing and never "try
+/// again"; any other (`run_failed`, `no_answer`, an answer cut or unread),
+/// [`crate::made_skill::AGENT_FAILED_TRY`]. Never the tip to ask for one
+/// thing: the ask was not at fault.
+pub fn not_made_try(why: &str) -> &'static str {
+    if why == NotWritten::NoAgent.to_string() {
+        crate::made_skill::AGENT_MISSING
+    } else if why == NotWritten::Timeout.to_string() {
+        crate::made_skill::AGENT_LATE_TRY
+    } else if why
+        == NotWritten::Failed(format!("lamp-tasks didn't make it ({BUSY_CODE})")).to_string()
+    {
+        crate::made_skill::AGENT_BUSY_TRY
+    } else {
+        crate::made_skill::AGENT_FAILED_TRY
+    }
+}
+
+/// lamp-tasks' code for a make while another is made
+/// (`lamp_tasks::skill_make`, one at a time).
+const BUSY_CODE: &str = "busy";
+
 impl Agent {
     /// The agent for a voice make, with the switch on and a tasks part;
     /// none otherwise.
@@ -280,10 +349,60 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
-        let guide = guide_on();
         Some(Self {
+            one_path: one_path_on(),
+            ..Self::made_with(
+                tasks,
+                Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
+                guide_on(),
+            )
+        })
+    }
+
+    /// The agent for a make typed in the app's MAKE IT
+    /// (`crate::app_make`), with the switch on and a tasks part: the
+    /// coordinator's own environment, where the app's makes run, its
+    /// `LAMP_TASKS_DIR` the directory the second route's worker is given
+    /// as `--tasks-dir`; none otherwise. The guide as [`Agent::for_voice`]
+    /// has it. No waiting line: the app shows the ask as making.
+    pub fn for_app() -> Option<Self> {
+        let var = |name: &str| std::env::var(name).ok();
+        Self::for_app_with(
+            var(ENVIRONMENT).as_deref(),
+            var(GUIDE_ENVIRONMENT).as_deref(),
+            var(agent_tasks::ENVIRONMENT).as_deref(),
+        )
+    }
+
+    /// [`Agent::for_app`] from the switch's value `switch`, the guide's
+    /// `guide` and the tasks part's directory `tasks`, absolute only.
+    pub fn for_app_with(
+        switch: Option<&str>,
+        guide: Option<&str>,
+        tasks: Option<&str>,
+    ) -> Option<Self> {
+        if !on_with(switch) {
+            return None;
+        }
+        let tasks = PathBuf::from(tasks?);
+        if !tasks.is_absolute() {
+            return None;
+        }
+        // No turn waits on the app's make: DeepSeek keeps its repairs when
+        // the agent doesn't take it.
+        Some(Self {
+            repairs_if_untaken: true,
+            ..Self::made_with(tasks, None, on_with(guide))
+        })
+    }
+
+    /// One make's agent through the tasks part at `tasks`, its waiting line
+    /// said at `say`, each answer given [`GUIDED_WRITE_WITHIN`] with the
+    /// guide and [`WRITE_WITHIN`] without, within [`MAKE_WITHIN`].
+    fn made_with(tasks: PathBuf, say: Option<PathBuf>, guide: bool) -> Self {
+        Self {
             tasks,
-            say: Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
+            say,
             within: if guide {
                 GUIDED_WRITE_WITHIN
             } else {
@@ -291,7 +410,11 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
-        })
+            // The one run path is the voice's (#7245): `for_voice` sets it
+            // from its switch.
+            one_path: false,
+            repairs_if_untaken: false,
+        }
     }
 
     /// The most times an answer the voice's check refused goes back to the
@@ -319,10 +442,27 @@ impl Agent {
     /// The lamp's agent when it is Hermes, the one engine a make is handed
     /// to ([`MAKE_ENGINE`]); any other (OpenClaw has no namespace runner for
     /// a make) is journaled with its name and not handed over, so
-    /// DeepSeek's answer stands.
+    /// DeepSeek's answer stands. With [`Agent::one_path`], the lamp's agent
+    /// when the one run path takes it ([`ONE_PATH_ENGINES`]).
+    /// How long the make's answer is waited for: [`Agent::within`] and a
+    /// grace; with the one run path, the hand-over's own [`Agent::within`]
+    /// too, as lamp-tasks counts a gateway make's deadline from it (#7245).
+    pub fn read_within(&self, grace: Duration) -> Duration {
+        match self.one_path {
+            true => self.within * 2 + grace,
+            false => self.within + grace,
+        }
+    }
+
     pub fn hermes(&self) -> Option<&'static str> {
         let engine = self.engine()?;
         if engine == MAKE_ENGINE {
+            return Some(engine);
+        }
+        if self.one_path && ONE_PATH_ENGINES.contains(&engine) {
+            eprintln!(
+                "lamp-voice: a skill made here: the lamp's agent is {engine}: handed over on the one run path"
+            );
             return Some(engine);
         }
         eprintln!(
@@ -369,9 +509,19 @@ impl Agent {
             line["guide"] = json!(true);
             line["switches"] = check_switches();
         }
+        // The one run path asked for only with its switch: off, the line
+        // is as above, byte for byte.
+        if self.one_path {
+            line["one_path"] = json!(true);
+            // The lamp's agent as seen here, so lamp-tasks never makes an
+            // OpenClaw lamp's skill as a Hermes make (#7245).
+            if let Some(engine) = self.engine() {
+                line["engine"] = json!(engine);
+            }
+        }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
-            .and_then(|()| stream.set_read_timeout(Some(self.within + grace)))
+            .and_then(|()| stream.set_read_timeout(Some(self.read_within(grace))))
             .and_then(|()| writeln!(stream, "{line}"))
             .map_err(|error| NotWritten::Failed(format!("the make was not sent: {error}")))?;
         let mut lines = BufReader::new(std::io::Read::take(stream, 2 * MOST_ANSWER_BYTES as u64));
@@ -410,6 +560,11 @@ impl Agent {
         let code = code(&answer);
         if NOT_HELD_OFF_CODES.contains(&code.as_str()) {
             return Err(NotWritten::NoMakeRun);
+        }
+        // Harness or the gateway not ready yet (#7245): the lamp's own
+        // short line, said to the person at once.
+        if code == NOT_READY_CODE {
+            return Err(NotWritten::Failed(crate::made_skill::NOT_READY_LINE.into()));
         }
         Err(NotWritten::Failed(format!(
             "lamp-tasks didn't make it ({code})"
@@ -505,6 +660,29 @@ pub fn service_asked(
         .map(|(code, _)| *code)
 }
 
+/// The service `words` may mean, linked or not, by [`SERVICE_WORDS`] or
+/// [`LINKED_WORDS`]: only a hint for the lamp's own model, which decides
+/// by naming the grant (`LAMP_MAKE_NO_CANNOT`; the lead's rule, the first
+/// builder on #7261: the bare word decides nothing). None names none.
+pub fn service_hint(words: &str) -> Option<&'static str> {
+    let words: Vec<String> = words
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let said = |phrase: &[&str]| {
+        words
+            .windows(phrase.len())
+            .any(|run| run.iter().zip(phrase).all(|(word, wanted)| word == wanted))
+    };
+    let all = || SERVICE_WORDS.iter().chain(LINKED_WORDS);
+    // A service's own name first ("Linear" over "issues"), then any word.
+    all()
+        .find(|(code, phrase)| code.starts_with(phrase[0]) && said(phrase))
+        .or_else(|| all().find(|(_, phrase)| said(phrase)))
+        .map(|(code, _)| *code)
+}
+
 /// lamp-tasks' code only, never the run's words.
 fn code(answer: &Value) -> String {
     answer
@@ -526,7 +704,8 @@ pub(crate) mod tests {
     /// A stub tasks part in a folder of its own: its `lamp` target runs
     /// `engine` (none for no target; "old" for a build with no make
     /// socket; "not_held_off" for one whose run can't be held off;
-    /// "no_namespace" for one whose wrapper has no make-home line), and
+    /// "no_namespace" for one whose wrapper has no make-home line; "busy"
+    /// for one making another; "run_failed" for a run that failed), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
@@ -558,6 +737,8 @@ pub(crate) mod tests {
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
                 guide: false,
+                one_path: false,
+                repairs_if_untaken: false,
             }
         }
 
@@ -612,14 +793,26 @@ pub(crate) mod tests {
                         "targets" => match engine {
                             Some(engine) => {
                                 let engine = match engine {
-                                    "old" | "not_held_off" | "no_namespace" => "hermes",
+                                    "old" | "not_held_off" | "no_namespace" | "busy"
+                                    | "run_failed" | "not_ready" => "hermes",
                                     engine => engine,
                                 };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
                             }
                             None => json!({"ok":true,"targets":[]}),
                         },
-                        "skill_make" if matches!(engine, Some("not_held_off" | "no_namespace")) => {
+                        "skill_make"
+                            if matches!(
+                                engine,
+                                Some(
+                                    "not_held_off"
+                                        | "no_namespace"
+                                        | "busy"
+                                        | "run_failed"
+                                        | "not_ready"
+                                )
+                            ) =>
+                        {
                             json!({"ok":false,"error":engine.unwrap(),"message":"no"})
                         }
                         "skill_make" => {
@@ -777,6 +970,47 @@ pub(crate) mod tests {
         assert!(began.elapsed() < Duration::from_secs(4));
     }
 
+    /// The audit's A3 (16 Nov): the agent busy, its run failed or no answer
+    /// in time is the agent's side, and each is said as such, never as the
+    /// tip to ask for one thing.
+    #[test]
+    fn the_agents_own_failures_are_each_said_as_the_agents() {
+        use crate::made_skill::{
+            AGENT_BUSY_TRY, AGENT_FAILED_TRY, AGENT_LATE_TRY, AGENT_MISSING, NOT_MADE_TRY,
+        };
+        let busy = stub(Some("busy"), Arc::new(|_: &str| Some("x".into())));
+        let why = busy.agent().write("S", "B", false).unwrap_err().to_string();
+        assert_eq!(not_made_try(&why), AGENT_BUSY_TRY, "{why}");
+        let failed = stub(Some("run_failed"), Arc::new(|_: &str| Some("x".into())));
+        let why = failed
+            .agent()
+            .write("S", "B", false)
+            .unwrap_err()
+            .to_string();
+        assert_eq!(not_made_try(&why), AGENT_FAILED_TRY, "{why}");
+        assert_eq!(
+            not_made_try(&NotWritten::Timeout.to_string()),
+            AGENT_LATE_TRY
+        );
+        // No agent after all: what is missing, never "try again" (El's P3
+        // on #7243).
+        assert_eq!(
+            not_made_try(&NotWritten::NoAgent.to_string()),
+            AGENT_MISSING
+        );
+        assert!(!AGENT_MISSING.contains("try again"), "{AGENT_MISSING}");
+        for line in [
+            AGENT_BUSY_TRY,
+            AGENT_LATE_TRY,
+            AGENT_FAILED_TRY,
+            AGENT_MISSING,
+        ] {
+            assert_eq!(crate::made_skill::plain_reason(line), line);
+            assert_eq!(crate::made_skill::not_made_line(line), line);
+            assert_ne!(line, NOT_MADE_TRY);
+        }
+    }
+
     /// The owner's ask, 13 Nov: a make naming mail, a calendar, Drive or
     /// GitHub asks for a linked service, as whole words; a word that is an
     /// everyday one too counts only for a service told linked; a make
@@ -836,6 +1070,27 @@ pub(crate) mod tests {
             }),
             Some("gmail")
         );
+    }
+
+    /// The first builder on #7261 (the lead's rule): the bare word never
+    /// routes a make to the agent for a service not linked, with
+    /// `LAMP_MAKE_NO_CANNOT` on or off; it is only a hint for the lamp's own
+    /// model ([`service_hint`]), linked or not.
+    #[test]
+    fn a_service_word_unlinked_routes_nothing_and_is_only_a_hint() {
+        let issues = "when I sit down at my desk, tell me how many open issues I have on Linear";
+        let timer = "make a linear timer that dims the light over ten minutes";
+        let none = || Some(Vec::new());
+        for on in [false, true] {
+            crate::make_no_cannot::set_on_here(Some(on));
+            assert_eq!(service_asked(issues, none), None);
+            assert_eq!(service_asked(timer, none), None);
+        }
+        crate::make_no_cannot::set_on_here(None);
+        assert_eq!(service_hint(issues), Some("linear"));
+        assert_eq!(service_hint("say my new issues at nine"), Some("github"));
+        assert_eq!(service_hint(timer), Some("linear"));
+        assert_eq!(service_hint("glow green at nine"), None);
     }
 
     /// `LAMP_MAKE_AGENT_GUIDE`: with it each make's line asks lamp-tasks
@@ -912,6 +1167,100 @@ pub(crate) mod tests {
                 ("LAMP_SKILL_WRITES", "on".to_owned())
             ]
         );
+    }
+
+    /// #7245, lamp-c0a4 (13333, OpenClaw, 11:46): with
+    /// `LAMP_MAKE_AGENT_ONE_PATH` on, a make on an OpenClaw lamp is handed
+    /// to OpenClaw, never "DeepSeek makes it alone", and its line asks
+    /// lamp-tasks for the one run path.
+    #[test]
+    fn with_the_one_path_on_a_make_on_openclaw_is_handed_over_on_it() {
+        let tasks = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        assert_eq!(agent.hermes(), Some("OpenClaw"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+        let mut keys = make.as_object().unwrap().keys().collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(keys, ["engine", "one_path", "op", "rules", "within_ms"]);
+        assert_eq!(make["engine"], json!("OpenClaw"));
+    }
+
+    /// #7245: the switch off, an OpenClaw lamp is as today: not handed
+    /// over, and a line sent anyway has no `one_path`.
+    #[test]
+    fn with_the_one_path_off_a_make_on_openclaw_is_as_today() {
+        let tasks = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = tasks.agent();
+        assert!(!agent.one_path);
+        assert_eq!(agent.engine(), Some("OpenClaw"));
+        assert_eq!(agent.hermes(), None);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(
+            make.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
+        );
+    }
+
+    /// #7245: with the switch on, a Hermes lamp's make is handed over as
+    /// before, its line carrying `one_path` too.
+    #[test]
+    fn with_the_one_path_on_a_make_on_hermes_carries_it() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        assert_eq!(agent.hermes(), Some("Hermes"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+    }
+
+    #[test]
+    fn the_one_path_switch_is_on_only_when_set_on() {
+        assert_eq!(ONE_PATH_ENVIRONMENT, "LAMP_MAKE_AGENT_ONE_PATH");
+        assert_eq!(ONE_PATH_ENGINES, ["Hermes", "OpenClaw"]);
+    }
+
+    /// The app's MAKE IT (the owner's ask, 13 Nov): its makes go to the
+    /// agent only with the switch on and an absolute tasks part, the guide
+    /// only with its own switch, as the voice's; no waiting line is said.
+    #[test]
+    fn the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part() {
+        let tasks = Some("/run/lampos-tasks");
+        let agent = Agent::for_app_with(Some("on"), None, tasks).unwrap();
+        assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
+        assert_eq!(agent.say, None);
+        assert!(!agent.guide);
+        assert!(agent.repairs_if_untaken);
+        assert_eq!(agent.within, WRITE_WITHIN);
+        assert_eq!(agent.make_within, MAKE_WITHIN);
+        let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
+        assert!(guided.guide);
+        assert_eq!(guided.within, GUIDED_WRITE_WITHIN);
+        assert_eq!(guided.most_repairs(), GUIDED_MOST_REPAIRS);
+        for (switch, folder) in [
+            (None, tasks),
+            (Some("off"), tasks),
+            (Some("ON"), tasks),
+            (Some("on"), None),
+            (Some("on"), Some("run/lampos-tasks")),
+        ] {
+            assert!(
+                Agent::for_app_with(switch, Some("on"), folder).is_none(),
+                "{switch:?} {folder:?}"
+            );
+        }
     }
 
     #[test]

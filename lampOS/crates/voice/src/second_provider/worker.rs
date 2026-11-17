@@ -24,6 +24,7 @@ use crate::{
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};
 use std::{
+    cell::Cell,
     io,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -68,6 +69,9 @@ struct Gate {
     rides_stall: bool,
     /// Since when it holds closed, the last authority's install.
     held_since: Option<u64>,
+    /// The last retired request whose dropped input was journalled
+    /// ([`Gate::admits`]): one line per request, not one per audio frame.
+    retired_logged: Cell<u64>,
 }
 
 enum Drain {
@@ -87,6 +91,7 @@ impl Gate {
             skipped_expired: 0,
             rides_stall: false,
             held_since: None,
+            retired_logged: Cell::new(0),
         }
     }
 
@@ -289,16 +294,28 @@ impl Gate {
             .guard
             .state()
             .ok_or_else(|| invalid("second route has no authority"))?;
-        if request == 0
-            || !state.listening_ready(MonoTime::from_micros(now_us))
+        if request == 0 {
+            return Err(invalid(
+                "second route input lost privacy or retention authority",
+            ));
+        }
+        // Input of a retired turn is dropped unread before any authority
+        // check (#7224): after a stall of the whole board the gap snapshot
+        // that retired it can come before a line queued for it, and that
+        // line must not end the route. A live request keeps every check.
+        if request <= self.retired_through {
+            if self.retired_logged.get() != request {
+                self.retired_logged.set(request);
+                eprintln!("lamp-voice second: input of retired turn {request} dropped unread");
+            }
+            return Ok(false);
+        }
+        if !state.listening_ready(MonoTime::from_micros(now_us))
             || privacy != state.microphone_generation()
         {
             return Err(invalid(
                 "second route input lost privacy or retention authority",
             ));
-        }
-        if request <= self.retired_through {
-            return Ok(false);
         }
         if state.owner().map(|owner| owner.turn()) != Some(request) {
             return Err(invalid("second route input has no matching admitted owner"));
@@ -2449,6 +2466,9 @@ pub fn serve(
     crate::second_provider::net::key_terms::start_from_environment(files.tools.tasks.is_some());
     // The owner's place's names too, with LAMP_OWNER_PLACE=on (#4333).
     crate::owner_place::start_terms();
+    // Each chat answer's tokens and each declined turn counted for the day,
+    // with LAMP_VOICE_DAY_TALLY=on (`day_tally`, #7347): numbers only.
+    crate::day_tally::start_from_environment();
     let checked = checks_sounds(&files);
     let tools = files.tools;
     start_tasks(&tools);
@@ -2817,6 +2837,9 @@ pub fn serve(
     let scoped_settings = tools.clone();
     let skill_settings = tools.clone();
     let days = crate::remember::days_from_environment();
+    // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
+    // recall runs here, so this worker reads the switch itself.
+    crate::nightly::chapters_from_environment();
     // For what memory holds that fits a turn's words (#2176 row 5c).
     let (hits_socket, hits_who) = (socket.clone(), who.clone());
     // For a reply's don't-know, the person's own kept things
@@ -4017,6 +4040,15 @@ pub fn serve(
                 crate::known_faces::RENAME_YES_ENVIRONMENT
             );
             engine = engine.holding_renames_for_yes(true);
+            // A rename question cut before its name was heard is asked
+            // again, once (`LAMP_NAME_LEARN_FIX`, #7331).
+            if crate::known_faces::name_learn_fix_on() {
+                eprintln!(
+                    "lamp-voice second: a face rename whose question was cut before its name was heard is asked again ({})",
+                    crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
+                );
+                engine = engine.learning_names(true);
+            }
         } else {
             eprintln!(
                 "lamp-voice second: {} is on but names are not checked or the eyes' socket is not known: renames are as before",
@@ -4281,6 +4313,29 @@ pub fn serve(
         );
     }
     engine = engine.checking_worded_claims(action_claims && worded_claims);
+    // A made skill with code not on after its say-back is never said to be
+    // on (`LAMP_MADE_NOT_ON_TOLD=on`, #7270).
+    let made_not_on = crate::made_not_on::on();
+    if made_not_on {
+        eprintln!(
+            "lamp-voice second: while a made skill with code is not on after its say-back, the model is told so and a reply saying it is on is said not on yet (LAMP_MADE_NOT_ON_TOLD)"
+        );
+    }
+    engine = engine.telling_made_not_on(made_not_on);
+    // The same for a light act told as under way ("Warming that up.";
+    // `LAMP_ACTION_CLAIM_DOING=on`, #7285), only beside the check above.
+    let doing_claims = crate::action_claim::doing_on();
+    if doing_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply telling a light act as under way with no call is held the same way (LAMP_ACTION_CLAIM_DOING)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_DOING does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_doing_claims(action_claims && doing_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
@@ -4604,6 +4659,19 @@ pub fn serve(
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.measuring_windows_from_start();
             }
+        }
+        // Inside a live back-and-forth the doubt goes to the person
+        // (`LAMP_BUSY_FOLLOW_UP_RENEWS=on`, #7332).
+        if std::env::var(crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: in a busy room the caller's own follow-up renews the call and is told it is theirs, the busy room's 15 s are measured to a line's start, a held question of the same speaker's is no one else's, and a slow tool or the round after it makes one wait sound (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.renewing_busy_follow_ups();
+            }
+            engine = engine.cueing_every_tool();
         }
         // At a desk, a face turned to the lamp is no sign, and a
         // conversation goes on only shortly after its words
@@ -5258,6 +5326,27 @@ pub fn serve(
     // and a line held as a remark about the lamp for Expression's glance
     // (`voice/remarked`, #4175, with `LAMP_REMARK_ABOUT_IT=on` only).
     if let Some(root) = files.bus_root.as_deref() {
+        // Each turn's decision (`voice/decision`, #7267): answered with its
+        // tools, a hand-over's steps, and held back as `voice/turn` says.
+        let decisions = match crate::bus_out::DecisionOut::on(root) {
+            Ok(out) => {
+                let out = Arc::new(Mutex::new(out));
+                let told: crate::second_provider::Decisions = Arc::new(move |decision| {
+                    if let Ok(mut out) = out.lock() {
+                        out.tell(&decision, lamp_ipc::monotonic_us());
+                    }
+                });
+                engine = engine.telling_decisions(told.clone());
+                crate::agent_tasks::telling_decisions(told.clone());
+                Some(told)
+            }
+            Err(error) => {
+                eprintln!(
+                    "lamp-voice second: turns' decisions are not published on the bus: {error}"
+                );
+                None
+            }
+        };
         match crate::bus_out::TurnOut::on(root) {
             Ok(out) => {
                 let out = Mutex::new(out);
@@ -5277,6 +5366,11 @@ pub fn serve(
                     let now_us = lamp_ipc::monotonic_us();
                     if let Ok(mut out) = out.lock() {
                         out.tell(request, verdict, now_us);
+                    }
+                    if verdict == lamp_msgs::TurnVerdict::HeldBack
+                        && let Some(decided) = decisions.as_ref()
+                    {
+                        decided(lamp_msgs::VoiceDecision::held_back(request));
                     }
                     let remarked = verdict == lamp_msgs::TurnVerdict::HeldBack
                         && heeding.as_ref().is_some_and(|heeding| {
@@ -7162,6 +7256,18 @@ pub(crate) struct Heeding {
     name_stays: bool,
     /// `LAMP_WINDOW_FROM_START=on` ([`Self::measuring_windows_from_start`]).
     from_start: bool,
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` ([`Self::renewing_busy_follow_ups`]).
+    follow_up_renews: bool,
+    /// With it, the request let out as the caller's own follow-up
+    /// ([`FOLLOW_UP_NOTE`]).
+    follow_up_line: Option<u64>,
+    /// With it, when the caller's own follow-up was last let out: the call
+    /// renewed, for the caller's lines alone ([`Self::call_for`]).
+    call_renewed_at: Option<Instant>,
+    /// With it, the speakers seen in the line judged last and whether it
+    /// was in the conversation's voice: a held question of the same
+    /// speaker's is no question to someone else.
+    last_speakers: Option<(crate::speaking_faces::Speakers, bool)>,
     said_lately: std::collections::VecDeque<(u64, (u64, u64), bool, u64)>,
     /// The requests of [`Self::said_lately`] the rule let out, newest last:
     /// a let-out line the lamp didn't answer (`not_for_me`) holds nothing
@@ -7905,6 +8011,12 @@ pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right 
 /// a big saving."), where Live answered it once (#1712).
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
+/// With `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, told in the place of
+/// [`CONVERSATION_ALONE`] beside a line let out only as the conversation
+/// going on and spoken by the one the lamp was talking with (#7332): told
+/// the other note, the owner's follow-ups on lamp-74ff got `not_for_me`.
+pub(crate) const FOLLOW_UP_NOTE: &str = "(For you to know, not to answer: nobody said your name this time, but this is the person you were just talking with, speaking again. Take it as a follow-up to your conversation and answer it. Only if it is plainly said to someone else, call not_for_me and say nothing.)";
+
 /// How the rule saw a line when it judged it, kept for a verdict given
 /// once the Policy decides ([`Heeding::policy_now`]).
 struct Seen {
@@ -8225,6 +8337,10 @@ impl Heeding {
             faces_held: None,
             name_stays: false,
             from_start: false,
+            follow_up_renews: false,
+            follow_up_line: None,
+            call_renewed_at: None,
+            last_speakers: None,
             said_lately: std::collections::VecDeque::new(),
             let_out_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
@@ -8781,6 +8897,36 @@ impl Heeding {
     /// (`LAMP_WINDOW_FROM_START=on`).
     pub(crate) fn measuring_windows_from_start(&mut self) {
         self.from_start = true;
+    }
+
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332): inside a live back-and-forth
+    /// the doubt goes to the person.
+    pub(crate) fn renewing_busy_follow_ups(&mut self) {
+        self.follow_up_renews = true;
+    }
+
+    /// The call a line said in `window` goes on from: the person's last
+    /// call let out, or with `LAMP_BUSY_FOLLOW_UP_RENEWS` the caller's
+    /// follow-up since (`call_renewed_at`), for a line the caller's face alone
+    /// was seen speaking. Anyone else's line is judged by the call alone, as
+    /// without the switch (the Reviewer-lead's P2 on #7349: a colleague's
+    /// line 20 s after the call was let out by the owner's renewal, #7297).
+    fn call_for(&self, request: u64, (began, ended): (u64, u64)) -> Option<Instant> {
+        let Some(renewed) = self
+            .call_renewed_at
+            .filter(|at| self.called_at.is_none_or(|called| *at > called))
+        else {
+            return self.called_at;
+        };
+        let (speakers, _) = speakers_between(self.eyes.as_ref(), began, ended);
+        if spoken_by_the_caller_alone(&speakers, &self.caller_faces) {
+            Some(renewed)
+        } else {
+            eprintln!(
+                "lamp-voice second: request {request}: not the caller's face alone: the call renewed by the caller's follow-up carries it not (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+            );
+            self.called_at
+        }
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -10021,6 +10167,9 @@ impl Heeding {
                     eprintln!(
                         "lamp-voice second: request {request}: declined by the model: no conversation going on from it (LAMP_DECLINE_SILENT)"
                     );
+                    // The caller's renewed call (`call_renewed_at`,
+                    // `LAMP_BUSY_FOLLOW_UP_RENEWS`) is not rolled back: their
+                    // own follow-up, declined, still renews it (#7332).
                     self.called_at = before.called_at;
                     self.caller_faces = before.caller_faces;
                     self.caller_faces_from_call = before.caller_faces_from_call;
@@ -10475,8 +10624,8 @@ impl Heeding {
         // let out (#1712: on lamp-4ace on 19 Oct the owner's next lines came
         // before the lamp's answers were said, and were held as no
         // conversation).
-        let called_ago =
-            carried_call(self.called_at, closed_at).map(|at| now.saturating_duration_since(at));
+        let called_ago = carried_call(self.call_for(request, (began, ended)), closed_at)
+            .map(|at| now.saturating_duration_since(at));
         // From the end of what the lamp said, not from when its answer began,
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
@@ -10560,6 +10709,7 @@ impl Heeding {
             signs.going_on &= !talked_past;
         }
         let switch = self.name_or_follow_up;
+        let follow_up_renews = self.follow_up_renews;
         // `LAMP_SAME_SPEAKER_CARRIES`: in a busy room the one the lamp
         // answered goes on for `SAME_SPEAKER_CARRIES_FOR` after the end of
         // its words, or once from a held colleague line's audio end,
@@ -10641,6 +10791,14 @@ impl Heeding {
                 }
                 return signs;
             }
+            // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): the busy room's 15 s
+            // are measured as the conversation's are (`at_start`): a line
+            // begun inside them and judged after them goes on.
+            let (said_ago, called_ago) = if follow_up_renews {
+                (at_start(said_ago), at_start(called_ago))
+            } else {
+                (said_ago, called_ago)
+            };
             went_on_told(
                 request,
                 signs,
@@ -10945,6 +11103,27 @@ impl Heeding {
         }
         let (mut going_on, mut other_voice, same_voice, likeness) = voice;
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+        // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a question held just before
+        // this line, said by the same speaker (one face, the same; or both
+        // in the conversation's voice), is no question to someone else that
+        // this line answers (`attention::AFTER_QUESTION`): on lamp-74ff the
+        // owner's held "…?" made the owner's next line held as its reply.
+        if self.follow_up_renews {
+            if self.attention.after_a_question()
+                && self
+                    .last_speakers
+                    .as_ref()
+                    .is_some_and(|(before, before_same)| {
+                        spoken_by_the_caller_alone(before, &speakers) || *before_same && same_voice
+                    })
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: the question held just before it was the same speaker's: no reply to someone else (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+                );
+                self.attention.carried_past_a_question();
+            }
+            self.last_speakers = Some((speakers.clone(), same_voice));
+        }
         // Whether a carry still stands for the caller after this line.
         let mut carry_stands = false;
         // `LAMP_SAME_SPEAKER_CARRIES`: someone else's line held while the
@@ -11662,6 +11841,33 @@ impl Heeding {
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name =
             (played && (attention.called_for_itself() || seen.named_faced)).then_some(request);
+        // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a line let out only as the
+        // conversation going on, spoken by the caller (their face alone, or
+        // the conversation's voice), renews the call as a call does, whatever
+        // the model makes of it: on lamp-74ff the owner's follow-up got
+        // `not_for_me`, neither clock moved, and the next lines were held.
+        // Its note says it is the caller's follow-up ([`FOLLOW_UP_NOTE`]).
+        // A line untied to the lamp (`LAMP_UNTIED_GOING_ON`), or whose
+        // words open nothing, renews nothing (Sixth's P2 2 on #7349).
+        let callers_follow_up = self.follow_up_renews
+            && played
+            && alone
+            && !untied
+            && !opens_nothing
+            && !called
+            && !someone_else
+            && spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces);
+        if callers_follow_up {
+            eprintln!(
+                "lamp-voice second: request {request}: the caller's own follow-up: it renews the call for the caller's lines, and the model is told it is theirs (LAMP_BUSY_FOLLOW_UP_RENEWS)"
+            );
+            self.call_renewed_at = Some(Instant::now());
+            self.follow_up_line = Some(request);
+        }
+        if called {
+            // A new call is the call; the renewal is the old caller's.
+            self.call_renewed_at = None;
+        }
         // A call let out: the conversation goes on from it, with the face
         // seen speaking it.
         if called {
@@ -11797,7 +12003,8 @@ impl Heeding {
     }
 
     /// The note for `request` if the rule let it out only as the
-    /// conversation going on ([`CONVERSATION_ALONE`]): not for a line whose
+    /// conversation going on ([`CONVERSATION_ALONE`], or with
+    /// `LAMP_BUSY_FOLLOW_UP_RENEWS` the caller's [`FOLLOW_UP_NOTE`]): not for a line whose
     /// words ask for the lamp's own work ([`Self::asks_its_work`]), which is
     /// said to the lamp. On lamp-4ace on 20 Oct, told the note, "Remember
     /// that my favourite colour is green." got `not_for_me` and nothing was
@@ -11817,7 +12024,11 @@ impl Heeding {
         (self.alone == Some(request)
             && (self.began_over != Some(request) || self.untied_line == Some(request))
             && !self.asks_its_work(request))
-        .then_some(CONVERSATION_ALONE)
+        .then_some(if self.follow_up_line == Some(request) {
+            FOLLOW_UP_NOTE
+        } else {
+            CONVERSATION_ALONE
+        })
     }
 
     /// Whether `request` was let out only as the conversation going on,
@@ -22308,6 +22519,136 @@ mod tests {
         }
     }
 
+    /// #7224, lamp-c0a4 16 Nov 12:59:12: "second worker exited abnormally"
+    /// after a stall under memory pressure. A 600 ms silence of the
+    /// controller during an active second-route turn, with a line queued for
+    /// it before the stall and its output pending: with the switch on the
+    /// route is held (the queued line dropped unread), and the coordinator's
+    /// gap snapshot (the turn revoked by its lapse, capture held) lets it go
+    /// on. The loop's own order: drain, holds, fresh, input, output.
+    #[tokio::test]
+    async fn a_600_ms_controller_stall_in_a_second_route_turn_is_held_and_goes_on() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, true);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        // A tick in the silence: held, the queued line dropped unread.
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(gate.holds(monotonic_us(), &mut engine));
+        for _ in 0..INPUT_SLICE {
+            if worker.data.receive::<ProviderInput>().unwrap().is_none() {
+                break;
+            }
+        }
+        // The coordinator wakes: its gap snapshot, capture held.
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        assert!(snapshot.owner().is_none());
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        assert!(worker.data.receive::<ProviderInput>().unwrap().is_none());
+        // The stalled turn's output is retired, dropped unsent.
+        assert!(turn <= gate.retired_through);
+    }
+
+    /// The same 600 ms stall of the whole board (#7224): the second worker
+    /// stalled with the controller, so when it wakes the coordinator's gap
+    /// snapshot is already queued and the line sent just before the stall
+    /// is still unread. The route must drop the line, not end.
+    #[tokio::test]
+    async fn a_600_ms_board_stall_in_a_second_route_turn_drops_the_retired_line_unread() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, true);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        // The worker's first tick after waking, as `run` does it.
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        let retained = worker.data.receive::<ProviderInput>().unwrap().unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        let admitted = gate.admits(monotonic_us(), &retained);
+        assert!(
+            matches!(admitted, Ok(false)),
+            "the queued line ended the route: {admitted:?}"
+        );
+    }
+
+    /// The same whole-board stall with `LAMP_PRIVACY_RIDES_STALL` off
+    /// (#7224): the retired turn's queued line is dropped unread and the
+    /// route goes on (it ended the worker before), while a live request's
+    /// input without listening still ends it as before.
+    #[tokio::test]
+    async fn off_a_retired_turns_queued_line_is_dropped_unread_and_a_live_one_still_errs() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(600_000, false);
+        let generation = gate.guard.state().unwrap().microphone_generation();
+        parent.data.send(line_start(turn, generation)).unwrap();
+        let at = MonoTime::from_micros(monotonic_us());
+        owner.set_capture(at, CaptureState::Unavailable).unwrap();
+        let snapshot = owner.snapshot(at).unwrap();
+        parent
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        assert!(turn <= gate.retired_through);
+        let retained = worker.data.receive::<ProviderInput>().unwrap().unwrap();
+        let now_us = monotonic_us();
+        assert!(
+            !gate
+                .guard
+                .state()
+                .unwrap()
+                .listening_ready(MonoTime::from_micros(now_us))
+        );
+        assert!(matches!(gate.admits(now_us, &retained), Ok(false)));
+        // Again for the same request: still dropped, journalled once.
+        assert!(matches!(gate.admits(now_us, &retained), Ok(false)));
+        assert_eq!(gate.retired_logged.get(), turn);
+        // Request 0 is never a turn.
+        assert!(gate.admits(now_us, &line_start(0, generation)).is_err());
+        // A live (not retired) request without listening errs as before.
+        let live = gate.retired_through + 1;
+        assert_eq!(
+            gate.admits(now_us, &line_start(live, generation))
+                .unwrap_err()
+                .to_string(),
+            "second route input lost privacy or retention authority"
+        );
+    }
+
     /// #2305's review: a camera close and a mute, as the worker installs
     /// them, tell the engine's privacy hook (the caller's face ids go,
     /// `Heeding::privacy_changed`); a renewed authority with neither does not.
@@ -31910,3 +32251,7 @@ mod kept_name_callback;
 #[cfg(test)]
 #[path = "worker/held_keeps_caller_tests.rs"]
 mod held_keeps_caller;
+
+#[cfg(test)]
+#[path = "worker/busy_follow_up_tests.rs"]
+mod busy_follow_up;

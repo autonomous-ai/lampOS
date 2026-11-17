@@ -167,7 +167,9 @@ impl ActionAnswer {
 
 /// Pose's RULA score for the frame (`ergo`). Each side's detail is kept as
 /// sent; V1 read `score` and `risk_level`, and each side's `score` and
-/// `body_scores`.
+/// `body_scores`. `partial` is true when the hips were hidden and only the
+/// upper body was scored (trunk and legs fixed at 1, `risk_level` capped
+/// low); an older server sends no field, read as a full answer.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Ergo {
     #[serde(default)]
@@ -178,6 +180,8 @@ pub struct Ergo {
     pub left: Option<Value>,
     #[serde(default)]
     pub right: Option<Value>,
+    #[serde(default)]
+    pub partial: bool,
 }
 
 /// Pose's answer to a frame: the points and the score, or an error.
@@ -191,6 +195,45 @@ pub struct PoseAnswer {
     pub ergo: Option<Ergo>,
     #[serde(default)]
     pub error: Option<String>,
+}
+
+/// COCO-17's left and right shoulder in `pose_2d.joints` (RTMPose's graph,
+/// `PS/core/perception/pose/graph/coco.py`).
+pub const SHOULDERS: [usize; 2] = [5, 6];
+
+/// One 2D point of `pose_2d`: where it is in the frame as sent, in pixels
+/// (RTMPose decodes to the frame it was given), and its confidence.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Joint {
+    pub x: f32,
+    pub y: f32,
+    pub conf: f32,
+}
+
+impl PoseAnswer {
+    /// The two shoulders of `pose_2d` ([`SHOULDERS`]), when it is COCO's
+    /// graph (or names none) and both are there as numbers; else none.
+    pub fn shoulders(&self) -> Option<[Joint; 2]> {
+        let pose = self.pose_2d.as_ref()?;
+        if pose
+            .get("graph_type")
+            .is_some_and(|graph| graph.as_str() != Some("coco"))
+        {
+            return None;
+        }
+        let joints = pose.get("joints")?.as_array()?;
+        let confs = pose.get("confs")?.as_array()?;
+        let joint = |index: usize| -> Option<Joint> {
+            let point = joints.get(index)?.as_array()?;
+            let number = |value: Option<&Value>| value?.as_f64().filter(|n| n.is_finite());
+            Some(Joint {
+                x: number(point.first())? as f32,
+                y: number(point.get(1))? as f32,
+                conf: number(confs.get(index))? as f32,
+            })
+        };
+        Some([joint(SHOULDERS[0])?, joint(SHOULDERS[1])?])
+    }
 }
 
 /// A label's group, as V1's `ACTIVITY_GROUP` (`motion.py`) has it, for the
@@ -268,11 +311,43 @@ mod tests {
         .unwrap();
         let ergo = pose.ergo.unwrap();
         assert_eq!((ergo.score, ergo.risk_level), (5, 3));
+        assert!(!ergo.partial, "no field: a full answer");
         assert_eq!(ergo.right.unwrap()["score"], 4);
         assert!(pose.error.is_none());
+        let partial: PoseAnswer =
+            serde_json::from_str(r#"{"ergo": {"score": 3, "risk_level": 1, "partial": true}}"#)
+                .unwrap();
+        assert!(partial.ergo.unwrap().partial);
         let failed: PoseAnswer = serde_json::from_str(r#"{"error": "no person"}"#).unwrap();
         assert_eq!(failed.error.as_deref(), Some("no person"));
         assert!(failed.ergo.is_none());
+    }
+
+    #[test]
+    fn the_shoulders_are_read_from_pose_2d() {
+        let joints: Vec<Value> = (0..17)
+            .map(|i| serde_json::json!([10.0 * i as f64, 2.0 * i as f64]))
+            .collect();
+        let confs: Vec<f64> = (0..17).map(|i| 0.01 * i as f64).collect();
+        let answer: PoseAnswer = serde_json::from_value(serde_json::json!({
+            "pose_2d": {"graph_type": "coco", "joints": joints, "confs": confs},
+            "ergo": null
+        }))
+        .unwrap();
+        let [left, right] = answer.shoulders().unwrap();
+        assert_eq!((left.x, left.y), (50.0, 10.0));
+        assert_eq!((right.x, right.y), (60.0, 12.0));
+        assert!((left.conf - 0.05).abs() < 1e-6 && (right.conf - 0.06).abs() < 1e-6);
+        // Another graph, too few joints, or no pose: none.
+        for bad in [
+            serde_json::json!({"pose_2d": {"graph_type": "h36m", "joints": joints, "confs": confs}}),
+            serde_json::json!({"pose_2d": {"graph_type": "coco", "joints": [[1, 2]], "confs": [0.9]}}),
+            serde_json::json!({"pose_2d": {"joints": joints, "confs": [0.9]}}),
+            serde_json::json!({"error": "no person"}),
+        ] {
+            let answer: PoseAnswer = serde_json::from_value(bad.clone()).unwrap();
+            assert_eq!(answer.shoulders(), None, "{bad}");
+        }
     }
 
     #[test]

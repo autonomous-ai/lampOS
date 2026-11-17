@@ -429,6 +429,26 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
         ],
     ),
+    // What it says in place of a reply claiming a made skill not on is on
+    // (`LAMP_MADE_NOT_ON_TOLD`, #7270), its yes still taken, then too late.
+    (
+        crate::made_not_on::NOT_ON_YET,
+        [
+            "Kỹ năng đó chưa bật đâu: bạn ở cạnh đèn và nói đồng ý với mình, mình sẽ bật nó lên.",
+            "まだオンになっていないよ。ランプのそばで「はい」って言ってくれたら、オンにするね。",
+            "它还没有打开：你在台灯旁边对我说“好”，我就把它打开。",
+            "아직 켜지지 않았어요. 램프 앞에서 저에게 좋다고 말해 주시면 켤게요.",
+        ],
+    ),
+    (
+        crate::made_not_on::NOT_ON_LATE,
+        [
+            "Kỹ năng đó chưa bật đâu: lời đồng ý của bạn đến muộn quá, nên bạn nhờ mình làm lại nhé.",
+            "まだオンになっていないよ。返事が間に合わなかったから、もう一度作ってって頼んでね。",
+            "它还没有打开：你的回答来得太晚了，请再让我做一次。",
+            "아직 켜지지 않았어요. 대답이 너무 늦게 와서, 다시 만들어 달라고 해 주세요.",
+        ],
+    ),
     // What the second route says when every sentence of a reply was an
     // offer to keep left out (`LAMP_KEEP_QUIETLY`, Thirteen's P2 on #5053).
     (
@@ -470,6 +490,25 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "よし、いくよ。",
             "好，我开始啦。",
             "좋아요, 시작할게요.",
+        ],
+    ),
+    // A seated lamp's one line, sent by lamp-body as exact words (#7281).
+    (
+        lamp_body::seat_say::RESTS,
+        [
+            "Mình hơi nóng, nên mình nghỉ một lúc nhé.",
+            "ちょっと熱くなっちゃった。少し休むね。",
+            "我有点热，先休息一会儿。",
+            "조금 뜨거워져서 잠시 쉴게요.",
+        ],
+    ),
+    (
+        lamp_body::seat_say::WAITS,
+        [
+            "Mình cần nghỉ một chút. Khi nào muốn mình dậy, giữ đầu mình một giây nhé.",
+            "ちょっと休ませてね。起きてほしいときは、頭を1秒おさえてね。",
+            "我需要休息一下。想让我起来的时候，按住我的头一秒钟。",
+            "잠깐 쉬어야 해요. 제가 일어나길 원하면 제 머리를 1초만 잡아 주세요.",
         ],
     ),
     // The prepare-unplug skill's lines, sent as exact words (#5777's P3):
@@ -1008,6 +1047,9 @@ mod tests {
             "The air reads like smoke. If something's burning, please check it."
         ));
         assert!(is_fixed("Hehe, that tickles."));
+        // A seated lamp's lines (#7281).
+        assert!(is_fixed(lamp_body::seat_say::RESTS));
+        assert!(is_fixed(lamp_body::seat_say::WAITS));
         assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
         assert!(!is_fixed("Two new mails, from the bakery."));
     }
@@ -1016,7 +1058,9 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 46);
+        // Each English key once: a second entry for a key is never said.
+        let keys: std::collections::HashSet<_> = FIXED_LINES.iter().map(|(e, _)| e).collect();
+        assert_eq!(keys.len(), FIXED_LINES.len());
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

@@ -1,8 +1,9 @@
 //! `tasks/status`: how the work handed over is going, as typed state.
 use lamp_bus::Kind;
 use lamp_msgs::{
-    AgentState, Decision, Sign, TASK_STATUS_MOST_TASKS, TaskProgress, TaskSettled, TaskStatus,
-    declaration_of, first_topics, tasks_topics,
+    AgentState, Decision, Sign, StepKind, TASK_STATUS_MOST_TASKS, TASK_STEP_MOST_RESULT_BYTES,
+    TaskProgress, TaskSettled, TaskStatus, TaskStep, cut_whole_chars, declaration_of, first_topics,
+    tasks_topics,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -221,7 +222,7 @@ fn the_topic_is_kept_latest_apart_from_the_first_topics() {
     let declared = TaskStatus::declaration();
     assert_eq!(declared.type_name, "lamp_msgs/TaskStatus");
     assert_eq!((declared.kind, declared.period()), (Kind::Latest, None));
-    assert_eq!(tasks_topics(), vec![(TaskStatus::TOPIC, declared.clone())]);
+    assert_eq!(tasks_topics()[0], (TaskStatus::TOPIC, declared.clone()));
     assert_eq!(declaration_of("tasks/status"), Some(declared));
     assert!(
         first_topics()
@@ -283,4 +284,63 @@ fn a_progress_decision_names_its_work_and_an_attention_one_is_written_as_before(
         };
         assert!(wrong.check().unwrap_err().0.contains("task"), "{task:?}");
     }
+}
+
+/// #7267: one step an agent took, declared ahead of its publisher.
+#[test]
+fn a_step_names_its_task_tool_and_a_short_result() {
+    let step = TaskStep {
+        task: 2,
+        engine: "openclaw".into(),
+        n: 1,
+        at_unix_ms: 1_791_964_812_345,
+        kind: StepKind::Reply,
+        tool: "web_search".into(),
+        args: "{\"q\":\"lamps\"}".into(),
+        // 70 two-byte characters cut to 120 bytes: 60, none split.
+        result: cut_whole_chars(&"\u{e9}".repeat(70), TASK_STEP_MOST_RESULT_BYTES).into(),
+        ok: Some(true),
+    };
+    assert!(
+        serde_json::to_string(&step)
+            .unwrap()
+            .contains("\"kind\":\"reply\"")
+    );
+    assert_eq!(step.result.chars().count(), 60);
+    assert_eq!(cut_whole_chars("a\u{e9}", 2), "a");
+    step.check().unwrap();
+    let text = serde_json::to_string(&step).unwrap();
+    assert_eq!(serde_json::from_str::<TaskStep>(&text).unwrap(), step);
+    let refused = |change: &dyn Fn(&mut TaskStep)| {
+        let mut wrong = step.clone();
+        change(&mut wrong);
+        wrong.check().is_err()
+    };
+    assert!(refused(&|s| s.tool = "x".repeat(41)));
+    assert!(refused(&|s| s.result = "x".repeat(121)));
+    assert!(refused(&|s| s.args = "x".repeat(121)));
+    assert!(refused(&|s| s.n = 0));
+    assert!(refused(&|s| s.engine = "Open Claw".into()));
+    // Each kind: a call names its tool; a reply and an error may not.
+    let of = |kind, tool: &str| TaskStep {
+        kind,
+        tool: tool.into(),
+        ..step.clone()
+    };
+    of(StepKind::Call, "web_search").check().unwrap();
+    assert!(of(StepKind::Call, "").check().is_err());
+    of(StepKind::Reply, "").check().unwrap();
+    of(StepKind::Error, "").check().unwrap();
+    for (kind, word) in [
+        (StepKind::Call, "call"),
+        (StepKind::Reply, "reply"),
+        (StepKind::Error, "error"),
+    ] {
+        assert_eq!(serde_json::to_value(kind).unwrap(), word);
+    }
+    let declared = TaskStep::declaration();
+    assert_eq!(declared.type_name, "lamp_msgs/TaskStep");
+    assert_eq!(declared.kind, Kind::Event);
+    assert!(tasks_topics().contains(&(TaskStep::TOPIC, declared.clone())));
+    assert_eq!(declaration_of("tasks/step"), Some(declared));
 }

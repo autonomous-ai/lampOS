@@ -104,9 +104,29 @@ pub const APPROVALS_ENV: [(&str, &str); 4] = [
     ("PATH", "/var/lib/lampos-openclaw/node/bin:/usr/bin:/bin"),
     ("SHELL", "/bin/sh"),
 ];
+/// Agent `main`'s exec allow-list entry for the launcher, put back once
+/// per Gateway start (#7280): lamp-update's own add
+/// (`lamp_update::openclaw_install::exec_allowlist_args`, agent `RUN_AGENT`,
+/// path `SKILL_START`), through the same wrapper, as `lampos` with
+/// [`APPROVALS_ENV`]. OpenClaw takes an entry already there without
+/// writing, so a start that keeps it writes nothing.
+pub const ALLOWLIST_ADD: [&str; 8] = [
+    "/usr/local/bin/openclaw",
+    "approvals",
+    "allowlist",
+    "add",
+    "--gateway",
+    "--agent",
+    "main",
+    crate::skill_start::LAUNCHER,
+];
 /// One approvals read's bound: OpenClaw's CLI is Node, slow to start on a
 /// lamp; past it the read is killed and counts as not served yet.
 const READ_WITHIN: Duration = Duration::from_secs(20);
+/// One allow-list add's bound (#7280): a just-restarted Gateway answered
+/// lamp-c0a4's approvals RPCs in up to 12 s each (16 Nov) and an add ran
+/// past 20 s, so the add has its own, longer bound.
+const ADD_WITHIN: Duration = Duration::from_secs(60);
 /// What the read asks the Gateway to answer within (`{ms}`).
 const READ_RPC_MS: u64 = 10_000;
 /// Between two approvals reads, at least: each starts a Node process, so
@@ -121,9 +141,15 @@ const READ_EVERY: Duration = Duration::from_secs(3);
 /// that succeeded is kept against the inode of the socket listening on
 /// [`PORT`] ([`listener_inode`]); a restarted Gateway listens on a new
 /// socket, so it is read again. With no inode found, every look reads.
+/// Right after a read that qualifies a start, the launcher's allow-list
+/// entry is added again ([`ALLOWLIST_ADD`], #7280): a restarted Gateway
+/// may have lost it, and lamp-update's round may be far off.
 pub struct Serving {
     port: Box<dyn Probe>,
     read: Box<dyn Probe>,
+    /// The allow-list add run once per qualifying read: none, in tests
+    /// that do not ask for one.
+    add: Option<Box<dyn Probe>>,
     /// Whether the last look found the port answering.
     port_answered: bool,
     /// The listening socket's inode now ([`listener_inode`]).
@@ -179,6 +205,12 @@ impl Serving {
                 .get_or_init(|| std::sync::Arc::new(std::sync::Mutex::new(None)))
                 .clone(),
         )
+        .with_add(Box::new(ApprovalsRead::new(
+            ALLOWLIST_ADD.map(str::to_owned).to_vec(),
+            ADD_WITHIN,
+            // No spacing: a failed add is tried once more at once.
+            Duration::ZERO,
+        )))
     }
 
     /// With no listener known: every look reads.
@@ -186,6 +218,7 @@ impl Serving {
         Self {
             port,
             read,
+            add: None,
             port_answered: false,
             listener: Box::new(|| None),
             served: std::sync::Arc::new(std::sync::Mutex::new(None)),
@@ -201,6 +234,12 @@ impl Serving {
     ) -> Self {
         self.listener = listener;
         self.served = served;
+        self
+    }
+
+    /// With `add` run after each read that qualifies a start (#7280).
+    pub fn with_add(mut self, add: Box<dyn Probe>) -> Self {
+        self.add = Some(add);
         self
     }
 }
@@ -224,7 +263,42 @@ impl Probe for Serving {
         // A read from the old process does not qualify its replacement.
         let same_listener = listener == (self.listener)();
         let read = read && same_listener && !cancelled() && Instant::now() < until;
+        // A failed add is tried once more at once; failing again, it does
+        // not hold the run (the entry may be there): the start is just not
+        // kept, so the next run reads and adds again.
+        let added = !read
+            || self.add.as_mut().is_none_or(|add| {
+                // Each add says its outcome and how long it took, so a slow
+                // gateway's wait is in the journal (the first builder, #7307).
+                let began = Instant::now();
+                if add.ready_until(until, cancelled) {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded in {} ms",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis()
+                    );
+                    return true;
+                }
+                let first = add.not_ready();
+                let added = add.ready_until(until, cancelled);
+                if added {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} succeeded on its second try in {} ms (the first: {first})",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis()
+                    );
+                } else {
+                    eprintln!(
+                        "tasks: the OpenClaw Gateway's allow-list add for {} did not succeed in {} ms (the first: {first}, the second: {}); the next run tries again",
+                        crate::skill_start::LAUNCHER,
+                        began.elapsed().as_millis(),
+                        add.not_ready()
+                    );
+                }
+                added
+            });
         if read
+            && added
             && listener.is_some()
             && let Ok(mut served) = self.served.lock()
         {
@@ -246,12 +320,15 @@ impl Probe for Serving {
 
 /// The Gateway's approvals read ([`APPROVALS_READ`]) run as lamp-tasks'
 /// own user, each bounded by `within`, at most once every `every`: ready
-/// when one exits 0. Only a read: nothing is set.
+/// when one exits 0. Only a read: nothing is set. The same runner carries
+/// [`ALLOWLIST_ADD`], OpenClaw's own add of one entry (#7280).
 pub struct ApprovalsRead {
     argv: Vec<String>,
     within: Duration,
     every: Duration,
     last: Option<Instant>,
+    /// How the last run ended, in words: its exit, or why it was stopped.
+    outcome: String,
 }
 
 impl ApprovalsRead {
@@ -261,15 +338,17 @@ impl ApprovalsRead {
             within,
             every,
             last: None,
+            outcome: "not run".into(),
         }
     }
 
     /// One read, killed with its process group past `within`.
-    fn read(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+    fn read(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
         if cancelled() || Instant::now() >= until {
+            self.outcome = "past the run's bound".into();
             return false;
         }
         let ms = READ_RPC_MS.to_string();
@@ -287,6 +366,7 @@ impl ApprovalsRead {
             .process_group(0)
             .spawn()
         else {
+            self.outcome = "not started".into();
             return false;
         };
         let pid = Pid::from_child(&child);
@@ -311,6 +391,13 @@ impl ApprovalsRead {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = child.kill();
         let _ = child.wait();
+        self.outcome = match code {
+            Some(code) => format!("exit {code}"),
+            None if began.elapsed() >= self.within => {
+                format!("killed at its {} s bound", self.within.as_secs())
+            }
+            None => "stopped".into(),
+        };
         code == Some(0) && !cancelled() && Instant::now() < until
     }
 }
@@ -326,6 +413,10 @@ impl Probe for ApprovalsRead {
         }
         self.last = Some(Instant::now());
         self.read(until, cancelled)
+    }
+
+    fn not_ready(&self) -> String {
+        self.outcome.clone()
     }
 }
 
@@ -644,6 +735,153 @@ pub fn start_ran(claimed: bool, started: bool) -> Result<(), String> {
     }
 }
 
+/// Why a skill run is not typed into the one session while agent `main`'s
+/// exec allow-list lacks the launcher ([`SkillStartAllowed`]).
+pub const SKILL_START_NOT_ALLOWED: &str = "skill-start is not on agent main's exec allow-list yet (lamp-update re-adds it after a gateway start)";
+/// Its refusal code, for a run that is not a fixed write's.
+pub const SKILL_START_NOT_ALLOWED_CODE: &str = "skill_start_not_allowed";
+
+/// Whether an approvals read's JSON ([`APPROVALS_READ`]: `{"file":
+/// {"agents": {...}}}`) lets agent `main` exec the skill-start launcher:
+/// an entry whose `pattern` is [`crate::skill_start::LAUNCHER`] in
+/// `main`'s or the wildcard `*`'s allow-list (OpenClaw joins both). None
+/// when the text is not such a read.
+pub fn allows_skill_start(json: &str) -> Option<bool> {
+    let read: Value = serde_json::from_str(json).ok()?;
+    let agents = read.get("file")?.as_object()?.get("agents");
+    let Some(agents) = agents.and_then(Value::as_object) else {
+        return Some(false);
+    };
+    Some(["main", "*"].iter().any(|agent| {
+        agents
+            .get(*agent)
+            .and_then(|agent| agent.get("allowlist"))
+            .and_then(Value::as_array)
+            .is_some_and(|entries| {
+                entries.iter().any(|entry| {
+                    entry.get("pattern").and_then(Value::as_str).map(str::trim)
+                        == Some(crate::skill_start::LAUNCHER)
+                })
+            })
+    }))
+}
+
+/// Agent `main`'s exec allow-list checked for the skill-start launcher
+/// before a skill run is typed into the one session (#7246): right after
+/// a Gateway start the entry is missing until lamp-update's round re-adds
+/// it, and the agent's `exec` of the launcher is denied headless, so the
+/// run would end as [`NEVER_STARTED`]. A read takes about 10 s, so a
+/// positive one is kept per Gateway start (its listening socket's inode,
+/// as [`Serving`]); a read that fails or can't be parsed never blocks.
+pub struct SkillStartAllowed {
+    read: Box<dyn Fn() -> Result<String, String> + Send + Sync>,
+    listener: Box<dyn Fn() -> Option<u64> + Send + Sync>,
+    allowed_at: std::sync::Mutex<Option<u64>>,
+}
+
+impl SkillStartAllowed {
+    /// The lamp's: [`APPROVALS_READ`]'s output, kept per [`PORT`]'s
+    /// listening socket.
+    pub fn lamp() -> Self {
+        Self::new(Box::new(approvals_json), Box::new(listener_here))
+    }
+
+    pub fn new(
+        read: Box<dyn Fn() -> Result<String, String> + Send + Sync>,
+        listener: Box<dyn Fn() -> Option<u64> + Send + Sync>,
+    ) -> Self {
+        Self {
+            read,
+            listener,
+            allowed_at: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// [`SKILL_START_NOT_ALLOWED`] only when a read was answered and has
+    /// no entry; else fine.
+    pub fn check(&self) -> Result<(), &'static str> {
+        let listener = (self.listener)();
+        let kept = self.allowed_at.lock().map(|at| *at).unwrap_or(None);
+        if listener.is_some() && listener == kept {
+            return Ok(());
+        }
+        let read = match (self.read)() {
+            Ok(read) => read,
+            Err(why) => {
+                eprintln!("tasks: agent main's exec allow-list not read ({why}); the run is typed");
+                return Ok(());
+            }
+        };
+        match allows_skill_start(&read) {
+            Some(false) => Err(SKILL_START_NOT_ALLOWED),
+            Some(true) => {
+                if listener.is_some()
+                    && listener == (self.listener)()
+                    && let Ok(mut at) = self.allowed_at.lock()
+                {
+                    *at = listener;
+                }
+                Ok(())
+            }
+            None => {
+                eprintln!("tasks: agent main's exec allow-list read is not JSON; the run is typed");
+                Ok(())
+            }
+        }
+    }
+}
+
+/// [`APPROVALS_READ`]'s output, run as [`ApprovalsRead`] runs it, killed
+/// with its process group past [`READ_WITHIN`].
+fn approvals_json() -> Result<String, String> {
+    use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+    let ms = READ_RPC_MS.to_string();
+    let mut words = APPROVALS_READ.iter().map(|word| word.replace("{ms}", &ms));
+    let program = words.next().ok_or("no program")?;
+    let mut child = Command::new(program)
+        .args(words)
+        .envs(APPROVALS_ENV)
+        .current_dir("/")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|error| format!("openclaw not started: {error}"))?;
+    let pid = Pid::from_child(&child);
+    let mut out = child.stdout.take().ok_or("no output")?;
+    let reader = thread::spawn(move || {
+        let mut text = String::new();
+        out.read_to_string(&mut text).map(|_| text)
+    });
+    let until = Instant::now() + READ_WITHIN;
+    let code = loop {
+        // NOWAIT keeps the pid, so the group signal below never reaches
+        // another process given it.
+        match waitid(
+            WaitId::Pid(pid),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        ) {
+            Ok(Some(status)) => break Some(status.exit_status()),
+            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(50)),
+            Ok(None) => break None,
+            Err(error) if error == rustix::io::Errno::INTR => {}
+            Err(_) => break None,
+        }
+    };
+    let _ = kill_process_group(pid, Signal::KILL);
+    let _ = child.kill();
+    let _ = child.wait();
+    let text = reader.join().map_err(|_| "its output not read")?;
+    match code {
+        Some(Some(0)) => text.map_err(|error| error.to_string()),
+        Some(code) => Err(format!("openclaw ended {code:?}")),
+        None => Err("openclaw gave no answer in time".into()),
+    }
+}
+
 /// The `PATH` the skill's script is run with ([`FENCE_TEXT`]), and the
 /// launcher's fence: nothing of the gateway's.
 pub const SCRIPT_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
@@ -767,6 +1005,72 @@ pub fn prompt(launcher: &Path, run: &SkillRun) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7246: the approvals read's JSON allows the launcher only with an
+    /// exact `pattern` in main's or `*`'s allow-list.
+    #[test]
+    fn skill_start_is_allowed_only_with_its_entry() {
+        let with = |agent: &str, pattern: &str| {
+            serde_json::json!({"file": {"agents": {agent: {"allowlist": [{"pattern": pattern}]}}}})
+                .to_string()
+        };
+        let launcher = crate::skill_start::LAUNCHER;
+        assert_eq!(allows_skill_start(&with("main", launcher)), Some(true));
+        assert_eq!(allows_skill_start(&with("*", launcher)), Some(true));
+        assert_eq!(allows_skill_start(&with("other", launcher)), Some(false));
+        assert_eq!(
+            allows_skill_start(&with("main", "/usr/bin/true")),
+            Some(false)
+        );
+        assert_eq!(
+            allows_skill_start(&with("main", "/usr/local/lib/lampos/skill-start*")),
+            Some(false)
+        );
+        assert_eq!(
+            allows_skill_start(r#"{"file": {"version": 1}}"#),
+            Some(false)
+        );
+        assert_eq!(allows_skill_start("not json"), None);
+        assert_eq!(allows_skill_start(r#"{"path": "/x"}"#), None);
+    }
+
+    /// Missing: refused, read again each time. Present: kept per listener,
+    /// read again after a new one. A failed read never refuses.
+    #[test]
+    fn skill_start_allowed_is_kept_per_gateway_start() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+        let reads = Arc::new(AtomicUsize::new(0));
+        let present = Arc::new(AtomicBool::new(false));
+        let listener = Arc::new(AtomicU64::new(1));
+        let (r, p, l) = (reads.clone(), present.clone(), listener.clone());
+        let allowed = SkillStartAllowed::new(
+            Box::new(move || {
+                r.fetch_add(1, Ordering::SeqCst);
+                let pattern = if p.load(Ordering::SeqCst) {
+                    crate::skill_start::LAUNCHER
+                } else {
+                    "/usr/bin/true"
+                };
+                Ok(serde_json::json!({"file": {"agents": {"main": {"allowlist": [{"pattern": pattern}]}}}}).to_string())
+            }),
+            Box::new(move || Some(l.load(Ordering::SeqCst))),
+        );
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(reads.load(Ordering::SeqCst), 2);
+        present.store(true, Ordering::SeqCst);
+        assert_eq!(allowed.check(), Ok(()));
+        assert_eq!(allowed.check(), Ok(()));
+        assert_eq!(reads.load(Ordering::SeqCst), 3, "kept for the same Gateway");
+        // A restarted Gateway: read again, and now missing.
+        present.store(false, Ordering::SeqCst);
+        listener.store(2, Ordering::SeqCst);
+        assert_eq!(allowed.check(), Err(SKILL_START_NOT_ALLOWED));
+        assert_eq!(reads.load(Ordering::SeqCst), 4);
+        let failed = SkillStartAllowed::new(Box::new(|| Err("no".into())), Box::new(|| Some(1)));
+        assert_eq!(failed.check(), Ok(()));
+    }
     use crate::harness::Target;
     use crate::skill_task::RUN_PATH;
     use std::net::TcpListener;
@@ -914,7 +1218,9 @@ mod tests {
     }
 
     fn runs(at: &Path) -> u32 {
-        std::fs::read_to_string(at).map_or(0, |text| text.trim().parse().unwrap())
+        // Read while a run's `echo $n > runs` has emptied the file but not
+        // yet written it: that run is not counted yet.
+        std::fs::read_to_string(at).map_or(0, |text| text.trim().parse().unwrap_or(0))
     }
 
     fn serving(argv: Vec<String>, port: &Fake, within: Duration) -> Gateway {
@@ -1076,6 +1382,166 @@ mod tests {
             4,
             "no socket found, yet not read"
         );
+    }
+
+    /// An allow-list add standing in for [`ALLOWLIST_ADD`] (#7280): a
+    /// script over a list file that, as OpenClaw's add, writes its last
+    /// word only when the list lacks it. Each run is counted in `runs`,
+    /// each write in `writes`; it exits `code`.
+    fn add_script(dir: &Path, code: u8) -> (ApprovalsRead, PathBuf) {
+        let list = dir.join("list");
+        let script = dir.join("add");
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\necho run >> {d}/runs\neval last=\\${{$#}}\ngrep -qxF \"$last\" {list} 2>/dev/null || {{ echo \"$last\" >> {list}; echo write >> {d}/writes; }}\nexit {code}\n",
+                d = dir.display(),
+                list = list.display()
+            ),
+        )
+        .unwrap();
+        let mut argv = ALLOWLIST_ADD.map(str::to_owned).to_vec();
+        argv[0] = script.display().to_string();
+        argv.insert(0, "/bin/sh".into());
+        let add = ApprovalsRead::new(argv, Duration::from_secs(5), Duration::from_millis(1));
+        (add, list)
+    }
+
+    fn lines(at: &Path) -> usize {
+        std::fs::read_to_string(at).map_or(0, |text| text.lines().count())
+    }
+
+    /// A look at the Gateway on listening socket `socket`, with `add`.
+    fn look_with_add(
+        socket: u64,
+        served: &Arc<Mutex<Option<u64>>>,
+        add: ApprovalsRead,
+    ) -> (bool, Option<u64>) {
+        struct Reads;
+        impl Probe for Reads {
+            fn ready(&mut self) -> bool {
+                true
+            }
+        }
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut serving = Serving::new(Box::new(port), Box::new(Reads))
+            .with_listener(Box::new(move || Some(socket)), served.clone())
+            .with_add(Box::new(add));
+        let ready = serving.ready();
+        (ready, *served.lock().unwrap())
+    }
+
+    /// #7280: a Gateway start whose allow-list lacks the launcher's entry
+    /// gets it at the first run's look, before the hand-over; a later run
+    /// on the same start adds nothing.
+    #[test]
+    fn a_gateway_start_whose_list_lacks_the_entry_gets_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (add, list) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            std::fs::read_to_string(&list).unwrap(),
+            format!("{}\n", crate::skill_start::LAUNCHER)
+        );
+        assert_eq!(lines(&dir.path().join("writes")), 1);
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            lines(&dir.path().join("runs")),
+            1,
+            "added again, same start"
+        );
+    }
+
+    /// #7280: a restarted Gateway (a new socket) whose list has the entry
+    /// is asked once and nothing is written.
+    #[test]
+    fn a_gateway_start_whose_list_has_the_entry_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let list = dir.path().join("list");
+        std::fs::write(&list, format!("{}\n", crate::skill_start::LAUNCHER)).unwrap();
+        let served = Arc::new(Mutex::new(Some(7)));
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(8, &served, add), (true, Some(8)));
+        assert_eq!(lines(&dir.path().join("runs")), 1, "a new start not asked");
+        assert_eq!(lines(&dir.path().join("writes")), 0, "written though there");
+        assert_eq!(
+            std::fs::read_to_string(&list).unwrap(),
+            format!("{}\n", crate::skill_start::LAUNCHER)
+        );
+    }
+
+    /// #7280: an add that fails both its tries does not hold the run, but
+    /// the start is not kept, so the next run adds again.
+    #[test]
+    fn a_failed_add_is_tried_again_by_the_next_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (add, _) = add_script(dir.path(), 1);
+        assert_eq!(look_with_add(7, &served, add), (true, None));
+        assert_eq!(lines(&dir.path().join("runs")), 2, "not tried twice");
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(lines(&dir.path().join("runs")), 3);
+    }
+
+    /// #7280, lamp-c0a4 16 Nov: a just-restarted Gateway let an add run
+    /// past its bound. A first add that fails is tried once more on the
+    /// same start; once that succeeds, the start is kept and the next run
+    /// on it adds nothing.
+    #[test]
+    fn a_first_add_that_fails_is_tried_once_more_on_the_same_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (mut add, _) = add_script(dir.path(), 0);
+        // Fails on its first call only: exits 1 while `runs` has one line.
+        add.argv[1] = {
+            let script = dir.path().join("first-fails");
+            std::fs::write(
+                &script,
+                format!(
+                    "#!/bin/sh\n/bin/sh {add} \"$@\"\n[ \"$(wc -l < {d}/runs)\" -ge 2 ]\n",
+                    add = add.argv[1],
+                    d = dir.path().display()
+                ),
+            )
+            .unwrap();
+            script.display().to_string()
+        };
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(lines(&dir.path().join("runs")), 2, "not tried twice");
+        let (add, _) = add_script(dir.path(), 0);
+        assert_eq!(look_with_add(7, &served, add), (true, Some(7)));
+        assert_eq!(
+            lines(&dir.path().join("runs")),
+            2,
+            "added again, same start"
+        );
+    }
+
+    /// The add is lamp-update's own `exec_allowlist_args` add, word for
+    /// word: its wrapper, agent and launcher.
+    #[test]
+    fn the_allowlist_add_is_lamp_updates() {
+        let source = include_str!("../../update/src/openclaw_install.rs");
+        for (name, value) in [
+            ("WRAPPER", ALLOWLIST_ADD[0]),
+            ("RUN_AGENT", ALLOWLIST_ADD[6]),
+            ("SKILL_START", ALLOWLIST_ADD[7]),
+        ] {
+            assert!(
+                source.contains(&format!("pub const {name}: &str = \"{value}\";")),
+                "{name}"
+            );
+        }
+        assert!(source.contains(
+            "\"approvals\",\n            \"allowlist\",\n            op,\n            \"--gateway\",\n            \"--agent\","
+        ));
+        assert!(source.contains("edit(\"add\", RUN_AGENT, SKILL_START)"));
     }
 
     /// #7170: a read that hangs is killed at its bound and counts as not
@@ -1287,6 +1753,8 @@ mod tests {
             start_in: None,
             env_file: None,
             answer: std::sync::OnceLock::new(),
+            write: false,
+            not_made: Default::default(),
         }
     }
 

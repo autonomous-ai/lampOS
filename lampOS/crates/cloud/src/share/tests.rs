@@ -67,6 +67,7 @@ fn previewed(places: &crate::skills::Places, name: &str, at: &str) -> String {
         places,
         &json!({"name": name, "preview": true}),
         &scratch(at),
+        "en",
     )
     .unwrap()["preview"]["sha256"]
         .as_str()
@@ -190,17 +191,17 @@ fn the_package_is_the_skills_own_files_and_not_made_here_on_another_lamp() {
 
 #[test]
 fn the_multipart_body_carries_the_file_and_the_author_when_given() {
-    let (boundary, body) = multipart("water-1.0.0.tar", b"TAR", Some("Lan"), None);
+    let (boundary, body) = multipart("water-1.0.0.tar", b"TAR", Some("Lan"), None, None);
     let text = String::from_utf8(body).unwrap();
     assert!(text.starts_with(&format!("--{boundary}\r\n")));
     assert!(text.contains("name=\"file\"; filename=\"water-1.0.0.tar\"\r\nContent-Type: application/x-tar\r\n\r\nTAR\r\n"));
     assert!(text.contains("name=\"author\"\r\n\r\nLan\r\n"));
     assert!(text.ends_with(&format!("--{boundary}--\r\n")));
-    let (_, body) = multipart("w.tar", b"TAR", None, None);
+    let (_, body) = multipart("w.tar", b"TAR", None, None, None);
     let text = String::from_utf8(body).unwrap();
     assert!(!text.contains("author") && !text.contains("made_with"));
     // A pushed skill says it was made with the SDK, beside the author.
-    let (boundary, body) = multipart("w.tar", b"TAR", Some("Lan"), Some("sdk"));
+    let (boundary, body) = multipart("w.tar", b"TAR", Some("Lan"), Some("sdk"), None);
     let text = String::from_utf8(body).unwrap();
     assert!(text.contains("name=\"made_with\"\r\n\r\nsdk\r\n"));
     assert!(text.contains("name=\"author\"\r\n\r\nLan\r\n"));
@@ -220,6 +221,7 @@ fn share_uploads_the_package_with_the_lamps_key_and_reads_back_pending() {
         &places,
         &json!({"name": "water", "author": "Lan", "sha256": previewed(&places, "water", "up-seen")}),
         &scratch("up"),
+        "en",
     )
     .unwrap();
     assert_eq!(
@@ -279,7 +281,8 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
             &taken,
             &places,
             &json!({"name": "water", "sha256": previewed(&places, "water", "no-seen")}),
-            &scratch("no")
+            &scratch("no"),
+            "en"
         ),
         Err("the Skills Store said: skill_name_taken".into())
     );
@@ -293,7 +296,8 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
             &full,
             &places,
             &json!({"name": "water", "sha256": previewed(&places, "water", "no2-seen")}),
-            &scratch("no2")
+            &scratch("no2"),
+            "en"
         ),
         Err("the Skills Store said: 3 are waiting already".into())
     );
@@ -359,6 +363,7 @@ fn a_preview_shows_the_text_that_would_leave_and_sends_nothing() {
         &places,
         &json!({"name": "water", "preview": true}),
         &scratch("preview"),
+        "en",
     )
     .unwrap();
     let files = answer["preview"]["files"].as_array().unwrap();
@@ -395,7 +400,8 @@ fn a_share_sends_only_the_package_its_preview_showed() {
             &store,
             &places,
             &json!({"name": "water"}),
-            &scratch("seen-none")
+            &scratch("seen-none"),
+            "en"
         ),
         Err(NOT_SEEN.into())
     );
@@ -408,7 +414,8 @@ fn a_share_sends_only_the_package_its_preview_showed() {
             &store,
             &places,
             &json!({"name": "water", "sha256": first}),
-            &scratch("seen-stale")
+            &scratch("seen-stale"),
+            "en"
         ),
         Err(CHANGED.into())
     );
@@ -419,7 +426,8 @@ fn a_share_sends_only_the_package_its_preview_showed() {
             &store,
             &places,
             &json!({"name": "water", "sha256": now}),
-            &scratch("seen-ok")
+            &scratch("seen-ok"),
+            "en"
         )
         .unwrap()
         .get("sent")
@@ -460,7 +468,8 @@ fn a_preview_shows_and_hashes_one_copy_even_when_the_skill_changes_meanwhile() {
             &store,
             &places,
             &json!({"name": "water", "sha256": sha256}),
-            &scratch("snapshot-send")
+            &scratch("snapshot-send"),
+            "en"
         ),
         Err(CHANGED.into())
     );
@@ -477,7 +486,8 @@ fn a_sent_answer_with_no_id_is_unread_not_sent() {
             &store,
             &places,
             &json!({"name": "water", "sha256": previewed(&places, "water", "unread-seen")}),
-            &scratch("unread")
+            &scratch("unread"),
+            "en"
         ),
         Err(UNREAD.into())
     );
@@ -581,6 +591,7 @@ fn a_pushed_skill_goes_with_made_with_sdk_and_a_made_one_does_not() {
             &places,
             &json!({"name": name, "sha256": previewed(&places, name, "mw-seen")}),
             &scratch("mw"),
+            "en",
         )
         .unwrap();
         let (_, body) = seen.recv().unwrap();
@@ -593,4 +604,289 @@ fn a_pushed_skill_goes_with_made_with_sdk_and_a_made_one_does_not() {
         // Whatever the skill's folder holds as dot files never travels.
         assert!(!body.contains(".pushed.json") && !body.contains(".yes.json"));
     }
+}
+
+// ---- who can see a shared skill (#5209) ----
+
+/// [`store`] under a name a test's own `store` variable can't hide.
+fn stored(status: u16, body: &'static str) -> (Store, mpsc::Receiver<(String, Vec<u8>)>) {
+    store(status, body)
+}
+
+/// A Store nothing is ever sent to: a request that reached it would fail as
+/// unreachable, so a test that gets a different answer proves nothing left.
+fn nowhere() -> Store {
+    Store {
+        base: "http://127.0.0.1:9".into(),
+        key: "k-secret".into(),
+    }
+}
+
+#[test]
+fn a_mode_is_one_of_the_three_exactly_or_none_or_refused() {
+    assert_eq!(visibility(&json!({})), Ok(None));
+    assert_eq!(visibility(&json!({"visibility": null})), Ok(None));
+    for mode in ["public", "unlisted", "private"] {
+        assert_eq!(visibility(&json!({"visibility": mode})), Ok(Some(mode)));
+    }
+    for bad in [
+        json!("Private"),
+        json!("PUBLIC"),
+        json!(" private"),
+        json!("secret"),
+        json!(""),
+        json!(1),
+        json!(true),
+        json!(["private"]),
+    ] {
+        assert_eq!(
+            visibility(&json!({"visibility": bad})),
+            Err(BAD_VISIBILITY.into()),
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn the_multipart_body_carries_a_mode_only_when_one_is_named() {
+    let (boundary, body) = multipart("w.tar", b"TAR", None, None, Some("private"));
+    let text = String::from_utf8(body).unwrap();
+    assert!(text.contains("name=\"visibility\"\r\n\r\nprivate\r\n"));
+    assert!(text.ends_with(&format!("--{boundary}--\r\n")));
+    for none in [
+        multipart("w.tar", b"TAR", None, None, None).1,
+        multipart("w.tar", b"TAR", Some("Lan"), Some("sdk"), None).1,
+    ] {
+        assert!(!String::from_utf8(none).unwrap().contains("visibility"));
+    }
+}
+
+#[test]
+fn a_preview_says_the_mode_and_the_lamps_line_for_it_and_sends_nothing() {
+    let places = places("share-vis-preview");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    // No mode named: none said, none picked for the owner.
+    let preview = share(
+        &nowhere(),
+        &places,
+        &json!({"name": "water", "preview": true}),
+        &scratch("vis-none"),
+        "ko",
+    )
+    .unwrap();
+    assert_eq!(preview["preview"]["visibility"], Value::Null);
+    assert!(preview["preview"].get("visibility_note").is_none());
+    // Each mode named: the mode, and the line in the owner's language.
+    for (mode, language) in [("private", "en"), ("unlisted", "vi"), ("public", "ja")] {
+        let preview = share(
+            &nowhere(),
+            &places,
+            &json!({"name": "water", "preview": true, "visibility": mode}),
+            &scratch("vis-named"),
+            language,
+        )
+        .unwrap();
+        assert_eq!(preview["preview"]["visibility"], mode);
+        assert_eq!(
+            preview["preview"]["visibility_note"],
+            visibility_note(mode, language)
+        );
+        assert!(preview["preview"]["sha256"].as_str().unwrap().len() == 64);
+    }
+    // A mode that is none of the three is refused on a preview too.
+    assert_eq!(
+        share(
+            &nowhere(),
+            &places,
+            &json!({"name": "water", "preview": true, "visibility": "secret"}),
+            &scratch("vis-bad-preview"),
+            "en",
+        ),
+        Err(BAD_VISIBILITY.into())
+    );
+}
+
+#[test]
+fn every_mode_has_a_line_in_every_language_and_english_for_any_other() {
+    let mut seen = std::collections::HashSet::new();
+    for language in ["en", "vi", "ja", "zh", "ko"] {
+        for mode in VISIBILITIES {
+            let line = visibility_note(mode, language);
+            assert!(!line.trim().is_empty(), "{language} {mode}");
+            assert!(seen.insert(line), "{language} {mode} repeats a line");
+            if language != "en" {
+                assert_ne!(line, visibility_note(mode, "en"), "{language} {mode}");
+            }
+        }
+    }
+    assert_eq!(seen.len(), 15);
+    for other in ["", "fr", "EN", "ja_JP", "en_GB"] {
+        for mode in VISIBILITIES {
+            assert_eq!(visibility_note(mode, other), visibility_note(mode, "en"));
+        }
+    }
+    // Where the skill goes, that it is checked and who can see it, in
+    // English; private never says it stays on the lamp.
+    let private = visibility_note("private", "en");
+    assert!(private.contains("goes to the Store") && private.contains("checked"));
+    assert!(private.contains("only you"));
+    assert!(visibility_note("unlisted", "en").contains("anyone with its link"));
+    assert!(visibility_note("public", "en").contains("everyone"));
+}
+
+#[test]
+fn a_send_names_the_mode_only_when_one_was_named_and_passes_the_stores_words_on() {
+    let places = places("share-vis-send");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    let seen_sha = previewed(&places, "water", "vis-send-seen");
+
+    // A mode named: it is uploaded, and the Store's line comes back with it
+    // (beside the skill, as `data` carries it).
+    let (store, seen) = stored(
+        201,
+        r#"{"status":1,"data":{"skill":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending"},"visibility":"private","visibility_note":"Private: it goes to the Store."}}"#,
+    );
+    let sent = share(
+        &store,
+        &places,
+        &json!({"name": "water", "sha256": seen_sha, "visibility": "private"}),
+        &scratch("vis-send"),
+        "en",
+    )
+    .unwrap();
+    assert_eq!(sent["sent"]["visibility"], "private");
+    assert_eq!(
+        sent["sent"]["visibility_note"],
+        "Private: it goes to the Store."
+    );
+    let (_, body) = seen.recv().unwrap();
+    assert!(String::from_utf8_lossy(&body).contains("name=\"visibility\"\r\n\r\nprivate\r\n"));
+
+    // The Store's words inside the skill are taken the same way.
+    let (store, _) = stored(
+        201,
+        r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending","visibility":"unlisted","visibility_note":"Unlisted: by link."}}"#,
+    );
+    let sent = share(
+        &store,
+        &places,
+        &json!({"name": "water", "sha256": previewed(&places, "water", "vis-send-seen2"), "visibility": "unlisted"}),
+        &scratch("vis-send2"),
+        "en",
+    )
+    .unwrap();
+    assert_eq!(sent["sent"]["visibility"], "unlisted");
+    assert_eq!(sent["sent"]["visibility_note"], "Unlisted: by link.");
+
+    // No mode named: no field goes, so a new version keeps the owner's mode
+    // at the Store, and nothing is said that the Store did not say.
+    let (store, seen) = stored(
+        201,
+        r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.1","review_status":"pending"}}"#,
+    );
+    let sent = share(
+        &store,
+        &places,
+        &json!({"name": "water", "sha256": previewed(&places, "water", "vis-send-seen3")}),
+        &scratch("vis-send3"),
+        "en",
+    )
+    .unwrap();
+    assert!(sent["sent"].get("visibility").is_none());
+    assert!(sent["sent"].get("visibility_note").is_none());
+    let (_, body) = seen.recv().unwrap();
+    assert!(!String::from_utf8_lossy(&body).contains("visibility"));
+
+    // A mode that is none of the three never reaches the Store.
+    assert_eq!(
+        share(
+            &nowhere(),
+            &places,
+            &json!({"name": "water", "sha256": previewed(&places, "water", "vis-send-seen4"), "visibility": "Private"}),
+            &scratch("vis-send4"),
+            "en",
+        ),
+        Err(BAD_VISIBILITY.into())
+    );
+}
+
+#[test]
+fn a_mode_is_changed_later_with_a_put_and_the_stores_refusals_are_told() {
+    let (store, seen) = stored(
+        200,
+        r#"{"status":1,"data":{"id":"s1","visibility":"private","visibility_note":"Private: only you."}}"#,
+    );
+    assert_eq!(
+        set_visibility(&store, &json!({"id": "s1", "visibility": "private"})),
+        Ok(
+            json!({"visibility": {"id": "s1", "visibility": "private", "visibility_note": "Private: only you."}})
+        )
+    );
+    let (head, body) = seen.recv().unwrap();
+    assert!(
+        head.starts_with("PUT /api/v1/skills/s1/visibility HTTP/1.1"),
+        "{head}"
+    );
+    let head = head.to_lowercase();
+    assert!(head.contains("authorization: bearer k-secret"), "{head}");
+    assert!(head.contains("content-type: application/json"), "{head}");
+    assert_eq!(
+        serde_json::from_slice::<Value>(&body).unwrap(),
+        json!({"visibility": "private"})
+    );
+
+    // The Store says nothing of the mode: the one asked for is told.
+    let (store, _) = stored(200, r#"{"status":1,"data":null}"#);
+    assert_eq!(
+        set_visibility(&store, &json!({"id": "s-1_a", "visibility": "unlisted"})),
+        Ok(json!({"visibility": {"id": "s-1_a", "visibility": "unlisted"}}))
+    );
+
+    // Someone else's skill, or none: the Store's word, plainly.
+    let (store, _) = stored(
+        404,
+        r#"{"status":0,"message":"Request failed","error_code":"skill_not_found"}"#,
+    );
+    assert_eq!(
+        set_visibility(&store, &json!({"id": "gone", "visibility": "public"})),
+        Err("the Skills Store said: skill_not_found".into())
+    );
+
+    // A bad id, no mode or a bad one: refused before anything is sent.
+    for (bad, why) in [
+        (json!({"visibility": "private"}), BAD_ID),
+        (json!({"id": "../x", "visibility": "private"}), BAD_ID),
+        (json!({"id": "s1"}), NO_VISIBILITY),
+        (json!({"id": "s1", "visibility": null}), NO_VISIBILITY),
+        (json!({"id": "s1", "visibility": "secret"}), BAD_VISIBILITY),
+    ] {
+        assert_eq!(set_visibility(&nowhere(), &bad), Err(why.into()), "{bad}");
+    }
+}
+
+#[test]
+fn shared_keeps_the_stores_mode_and_line_when_it_says_them_and_drops_none() {
+    let (store, _) = stored(
+        200,
+        r#"{"status":1,"data":{"data":[{"id":"s2","name":"a","version":"1.0.0","review_status":"approved","visibility":"private","visibility_note":"Private: only you.","owner_id":"o"},{"id":"s1","name":"b","review_status":"approved"}],"total":2}}"#,
+    );
+    let shares = shared(&store).unwrap();
+    assert_eq!(shares["shares"][0]["visibility"], "private");
+    assert_eq!(shares["shares"][0]["visibility_note"], "Private: only you.");
+    assert!(shares["shares"][0].get("owner_id").is_none());
+    assert!(shares["shares"][1].get("visibility").is_none());
+    assert!(shares["shares"][1].get("visibility_note").is_none());
+}
+
+#[test]
+fn the_share_kinds_are_the_four_and_visibility_is_the_one_that_says_the_field_is_taken() {
+    assert_eq!(
+        KINDS,
+        [
+            "skills.share",
+            "skills.shared",
+            "skills.unshare",
+            "skills.visibility"
+        ]
+    );
 }

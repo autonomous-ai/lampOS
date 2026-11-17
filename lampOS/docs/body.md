@@ -1010,6 +1010,9 @@ the shoulder (servo 2) and the elbow (servo 3):
   for less than that, somebody walking past, wakes nothing. Not yet seen on
   a lamp: whether a folded lamp-4ace's camera sees a person at the desk at
   all.
+- With `LAMP_BODY_PRESENCE=on` (#7301, "Someone at the lamp" below) a
+  standing lamp also stays up while `room/presence` says someone is there,
+  for at most 15 quiet minutes. It never stands a folded lamp for them.
 - Asleep for the night with `LAMP_NIGHT_STAYS_FOLDED=on` (#5156, "On the
   bus" below), a folded lamp is not raised by the voice listening or
   thinking alone, nor by a bare name hit Expression refused; a tap, a
@@ -1116,6 +1119,39 @@ started again, and the arm may need looking at" (`Glimpse::cannot_lift`).
 The voice doesn't say this line; it shows on the lamp's health. A sit-down
 of an arm that did lift is as before: nothing let go, no count.
 
+### A stand the arm can't reach is eased (#7289)
+
+Always on. Fully stood up (`stand` 1.0) and asked its stand goal and nothing
+else, a shoulder or elbow held more than 20 counts short of that goal
+(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s
+(`STAND_EASE_STEPS`, 3,000 steps) has its stand goal eased to where it
+holds plus 5 counts toward the goal (`STAND_EASE_MARGIN`), for the rest of
+the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
+(13373) the elbow held 41 to 47 short of its measured 2,562 at loads of
+176 to 200, reached 62 °C in about 40 min and sat down hot; lamp-52e6's
+elbow holds 3 short at 24 and is left as it is.
+
+- A gesture, a lean, a hold, a cut by the anti-tip rule or a sit-down
+  writes another goal; while it does, the count pauses. It resets only
+  when the joint is at its goal or unloaded.
+- Never above the measured stand (the eased goal lies between where the
+  joint holds and the goal), and never more than 80 counts under it
+  (`STAND_EASE_FLOOR`): a joint held farther short is a hand pushing it
+  down, not the arm's reach. It is not eased, and the journal says so once
+  per joint: `elbow_pitch held 120 short of its stand goal 2600, load 190:
+  past 80, not eased`.
+- An ease is one journal line: `elbow_pitch held short of its stand: goal
+  2600 eased to 2560, held at 2555, load 190`. A start begins from the
+  measured stand again.
+- The strain guard, the load bound and the heat bound below judge every
+  step as before: a real strain still sits it down.
+
+The numbers are from two lamps (`ponytail:` in the code); retune them from
+more arms' journals. Shown by tests only
+(`a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased`,
+`a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal`,
+`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`); not yet on a lamp.
+
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
 On in the product unit (`lampOS/deploy/product/lamp-body.service`, #4899,
@@ -1153,7 +1189,36 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   (`lamp/selftest`'s `started`), or a restart lets it stand again
   (`src/unseat_in.rs`). This takes the place of the three-in-half-an-hour
   long rest and of the two long rests' give-up, which do not happen with
-  the guard on.
+  the guard on. A seated lamp is said seated on its health before any warm
+  joint (#7281).
+- **A hot seat stands again once cool** (`LAMP_BODY_SEAT_COOLS=on`, #7281,
+  off in the product until its row on lamp-52e6; `StrainGuard::cools`). A seat for heat ends by
+  itself once the joint that seated it has read under 50 °C
+  (`StrainGuard::COOL`, `bus_out::WARM` less 5: 12 under the 62 it sat
+  down at, over a healthy standing elbow's 46 to 49 on lamp-4ace and
+  lamp-52e6) for 5 min back to back (`StrainGuard::COOL_FOR`, the
+  `CLIMB_WINDOW`); a held or missing read starts the count again. The
+  journal says `elbow_pitch read under 50 for 5 min: stands again by
+  itself`, and the hour's sit-downs are kept. Only once an hour: a hot seat
+  within `SEAT_WINDOW` of standing by itself, and any strained seat, wait
+  for a person or a health check as above, so a servo is never cycled hot.
+  A touch still lifts any seat at once. While a seat will end by itself its
+  health says `seated: the elbow sat down hot twice in an hour; it stands
+  again by itself once it reads under 50 for 5 min, or when its head is
+  held a second` (`Glimpse::seat_rests`).
+- **A seat says one line** (`LAMP_BODY_SEAT_COOLS=on`, `src/seat_say.rs`).
+  As a seat begins, lamp-body asks the voice's say service
+  (`/run/lampos-say/say.sock`, `"exact": true`, the first stand's way) for
+  one fixed line, said in the owner's language (`language::FIXED_LINES`):
+  "I'm a bit warm, so I'll rest a little while." only when it will stand by
+  itself, and "I need a rest. Hold my head a second when you'd like me
+  up." otherwise. Never in the quiet hours (`lamp_local_time::quiet_hours`),
+  where the seated pose says it; the say service refuses it while muted or
+  paused. Asked on a thread of its own, so the body's step never waits;
+  the outcome goes to the journal. Nothing more is said until it stands.
+- **Each sit-down says why** (#7281). The journal says `sat down: {why}`
+  (e.g. `elbow_pitch at 62 degrees`) as it happens, not only in the exit
+  report, and the fold line says `it sat down hot` when one was for heat.
 - **The day's peaks are kept.** Each joint's highest load and temperature
   in each local day go to `/var/lib/lampos-body/peaks/YYYY-MM-DD.json`
   (`{"day":…,"joints":{"elbow":{"load":…,"temperature":…},…}}`,
@@ -1176,6 +1241,70 @@ shoulder at 2,658 and the elbow at 2,650, so it has stood there; nothing
 else about the pose has been checked on this unit, and the old runtime
 reached it by moving all five joints together over five seconds.
 
+### Someone at the lamp: it stays up for them, and stays alive (`LAMP_BODY_PRESENCE=on`, #7301)
+
+Without it a lamp folds 90 s after the last talk and then only breathes,
+which reads as switched off with a person still at the desk. With
+`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; off in the product until its lamp-52e6 row)
+the body reads `room/presence` ([presence.md](presence.md)) at most once a
+second (`presence_in.rs`):
+
+- **Someone there.** A fresh value (said within its 3 s) that says
+  someone, or nobody for under 120 s (`presence_in::GRACE_S`, someone
+  reading face down). Anything else is nobody: an old value, the camera
+  closed (nothing is said), a pause or a hand's sleep (`Asked::PAUSED`,
+  `Asked::ASLEEP`). Off: nobody, always.
+- **It stays up for them.** A lamp that is up keeps its `--awake-seconds`
+  window open while someone is there, as the lease does. It never stands a
+  folded lamp: an arrival alone raises nothing. Bounded:
+  - by time: no more than 15 minutes (`QUIET_STAND`) after the last talk,
+    call or arrival. Then it folds calmly at the window's end with the
+    person still there, and stands again when spoken to or called;
+  - by heat: not once the shoulder or the elbow reads 55 (`bus_out::WARM`),
+    so it folds before the strain guard's hot sit-down at 62;
+  - never in its night rest (`Asked::night`);
+  - never through a fold of its own: a lamp resting after a load, heat or
+    tracking retreat, unplugged, unable to lift or seated (#4501) is not
+    kept up, and the window presence last gave it ends then, so it does not
+    stand again when that rest is over (Sixth's P1 on #7313). A window from
+    talk, a call or a gesture is kept as without the switch.
+
+  Someone who leaves: folded about 120 s + 90 s after the last face or
+  voice.
+- **Alive while it stands.** Shifts at rest come every 20 to 60 s (`idle::
+  ALIVE_GAP_LEAST`, `ALIVE_GAP_MOST`) instead of 40 s to 3 min, and a sixth
+  move joins them: `settle`, the arm sagging toward its fold (table in
+  "Shifts at rest" below). In every shift the arm only sags: each offset
+  is taken toward the fold whatever its sign, scaled by the level's
+  `idle_size`, and cut into the way between the fold and the stand, as a
+  holder's pose is (`idle::sag`). The head's offsets are unchanged.
+- **Livelier after talk or an arrival.** For 2 minutes after either
+  (`LIVELY_FOR`) the shifts' waits and size are those of the owner's
+  energy level + 2, for the next 2 of level + 1, then the owner's own (at
+  most 5). Only the waits and the sag; never the speed or the stand. These
+  minutes are this switch's, not `LAMP_BODY_ENERGY`'s: with that one off
+  the owner's level is 1, and they still come.
+
+At the product's level 1, after a talk:
+
+| minutes after | as level | wait between shifts | arm sag x |
+|---|---|---|---|
+| 0 to 2 | 3 | 14 to 42 s | 1.1 |
+| 2 to 4 | 2 | 17 to 51 s | 1.05 |
+| after 4 | 1 | 20 to 60 s | 1.0 |
+
+At level 5 the waits are 10 to 30 s and the sag 1.2 times. The settle
+moves the head about 15 to 20 mm (estimated from lamp-4ace's link lengths,
+not measured on lamp-52e6): about 1 degree of view at 1 m, against the
+breath's 3 mm. It moves at most about 35 counts a second at level 1
+(about 39 at level 5's 1.2 times), against the pose's 300, to stay quiet.
+
+Rule 8: posture, as a breath let out. The base never turns and nothing
+sweeps; the timing is irregular and the same move seldom comes twice.
+
+Tests on the host only (`body/tests.rs`, `idle.rs`, `presence_in.rs`); the
+ROW on lamp-52e6 is to come (#7301).
+
 ### How lively it moves: the energy level (`LAMP_BODY_ENERGY=on`, #6893)
 
 With `LAMP_BODY_ENERGY=on` (off unless exactly `on`, set in no unit) the body reads the character's
@@ -1186,13 +1315,21 @@ the limits and the stand pace the unit gives (`Limits::at(1)` returns them uncha
 against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
 under what the unit gives:
 
-| level | pose speed, counts/s (acceleration 6x) | stand and fold, s | idle wait x |
-|---|---|---|---|
-| 1 | the unit's (300) | the unit's (6) | 1.0 (40 to 180 s) |
-| 2 | 425 | 5.5 | 0.85 |
-| 3 | 550 | 5 | 0.7 |
-| 4 | 675 | 4.5 | 0.6 |
-| 5 | 800 | 4 | 0.5 (20 to 90 s) |
+| level | pose speed, counts/s (acceleration 6x) | stand and fold, s | idle wait x | idle size x |
+|---|---|---|---|---|
+| 1 | the unit's (300) | the unit's (6) | 1.0 (40 to 180 s; 20 to 60 s under `LAMP_BODY_PRESENCE`) | 1.0 |
+| 2 | 425 | 5.5 | 0.85 | 1.05 |
+| 3 | 550 | 5 | 0.7 | 1.1 |
+| 4 | 675 | 4.5 | 0.6 | 1.15 |
+| 5 | 800 | 4 | 0.5 (20 to 90 s; 10 to 30 s) | 1.2 |
+
+The idle size scales a shift's arm sag, and only under `LAMP_BODY_PRESENCE`
+("Someone at the lamp" above), which also makes the waits livelier for a
+few minutes after talk or an arrival.
+
+The idle wait is only the wait between shifts at rest (`Idler::share`). The awake time, the fold
+`--awake-seconds` after the last mood, face or gesture, is the unit's at every level: a livelier lamp
+never sits down sooner (#7314, `at_every_level_the_lamp_folds_no_sooner_than_at_level_one`).
 
 A new level is taken only once the lamp is settled: no gesture playing or waiting, the pose's filter
 still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
@@ -1205,8 +1342,8 @@ while it speaks (`energy.rs` `TABLE`):
 |---|---|---|---|
 | 1 | the unit's (`--stand-roll`, none in the product) | none | 1.0 |
 | 2 | the unit's | none | 1.1 |
-| 3 | 120 | -10/-15 | 1.2 |
-| 4 | 160 | -20/-25 | 1.3 |
+| 3 | 106 | -10/-15 | 1.2 |
+| 4 | 153 | -20/-25 | 1.3 |
 | 5 | 200 | -25/-30 | 1.4 |
 
 - **Roll.** `Limits::at` raises `stand_roll` to the level's, never under the unit's. It is the head's
@@ -1220,6 +1357,11 @@ while it speaks (`energy.rs` `TABLE`):
   tilt that swapped sides (about 340 counts) left the servo about 95 counts behind at a load of about
   210, and the head met resistance on its roll 1 and 3 times in two level-5 windows against 0 at level 1
   (lamp-52e6, row-6893g, 15 Nov).
+  Levels 1, 3 and 5 are evenly spaced in the standing head's swing: listening tilts 0.85 of the
+  roll reach to alternating sides, 2 x 0.85 x `stand_roll` peak to peak, so at 120 counts level 3 swung
+  204 counts, 17.9 degrees, against 7.7 at level 1 and 23.9 at level 5 (lamp-52e6, row-7153L2, 16 Nov).
+  Level 3 is 106 counts, about 15.8 degrees, the midpoint; level 4 is 153, midway between 3 and 5
+  (#7314, `level_three_swings_midway_between_one_and_five`).
 - **Nod.** Speaking, what Expression asks of the head (its nods as speech pauses) is scaled by the
   level's share before `EXPRESSION_REACH` cuts it, so a nod never goes past that reach (60 counts of
   pitch): on the host Expression's 30 counts nod 30 at level 1 and 42 at level 5.
@@ -1998,12 +2140,13 @@ What the body does with the request:
 With `--idle on` a lamp standing at rest shifts a little by itself now and
 then: anything alive that stands with nothing to do does. Not on a clock
 (until 2026-10-16 it was every 18 s, `idle` after `idle` all afternoon on
-lamp-4ace, #705): each wait is drawn at random from 40 s to 3 min. A lamp
+lamp-4ace, #705): each wait is drawn at random from 40 s to 3 min (20 s
+to 60 s under `LAMP_BODY_PRESENCE`, "Someone at the lamp" above). A lamp
 left alone folds `--awake-seconds` after the last mood or face, and folded
 it never shifts: that is how it is still with nobody near. Each shift is
-one of five small moves (`crate::idle`), the one made last a third as
-likely as each other: not ruled out, as with only two to choose from that
-would be strict turns, a pattern of its own.
+one of five small moves (`crate::idle`), six under `LAMP_BODY_PRESENCE`,
+the one made last a third as likely as each other: not ruled out, as with
+only two to choose from that would be strict turns, a pattern of its own.
 
 | Move | Lasts | Mostly |
 | --- | --- | --- |
@@ -2011,6 +2154,11 @@ would be strict turns, a pattern of its own.
 | `tilt_left`, `tilt_right` | 3.2 s | head roll 25 to one side, the head lifting 10; only on a head that tilts standing (`--stand-roll` past `--reach`'s roll), as elsewhere the roll is left out and both are the same lift under a degree. No deployed unit gives `--stand-roll`, so there the moves are `idle`, `look_up` and `dip` |
 | `look_up` | 3.2 s | the head lifts 50 |
 | `dip` | 3.2 s | the head lowers 40, a breath let out |
+| `settle` | 6.0 s | only under `LAMP_BODY_PRESENCE`: the shoulder 45 and the elbow 30 toward the fold, the head lifting 20 so the light stays on the desk; eased out 2 s, held 1.5 s, back 2.5 s; not while a hand holds the arm. On a lamp with no `--stand-roll` the moves are then `idle`, `settle`, `look_up` and `dip`, half of them the arm's |
+
+Under `LAMP_BODY_PRESENCE` the arm only sags in every shift, `idle`'s
+sway too: each arm offset goes toward the fold, scaled by the level's
+idle size, and stays between the fold and the stand (`idle::sag`).
 
 The four head moves stay inside the reach of a glance at rest
 (`REST_GLANCE_REACH`) and move neither the base nor the arm; they pass
@@ -2019,8 +2167,11 @@ may not take their names. No shift
 while it is folded, rising or folding, while a mood other than rest is
 heard (someone talking to it, a call taken as listening), while a call or
 another gesture plays or waits, while the head or the base has given way to
-a hand or is in one, or while stillness is asked (Expression's `hold` for
-someone working under the light, or a pause); any of these lets a shift
+a hand or is in one, while stillness is asked (Expression's `hold` for
+someone working under the light, or a pause), or under
+`LAMP_BODY_PRESENCE` while lamp-control's lease holds the body
+(`Asked::held`, #7301; with the switch off a held lamp shifts as before);
+any of these lets a shift
 under way go and starts the wait again, so no shift comes right after it.
 
 A shift and Expression's rest layer under `--rest-glance` (its breath and
@@ -2886,8 +3037,9 @@ The report is `ok` with no message, or a warning:
 
 | Level | Message | When |
 | --- | --- | --- |
+| `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard"). Said before a warm joint (#7281) |
+| `warn` | `seated: the elbow sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second` | With `LAMP_BODY_SEAT_COOLS=on`, a hot seat that will end by itself (#7281) |
 | `warn` | `shoulder is warm: it reads 55, and the body stops at 62` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at 62 |
-| `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard") |
 | `warn` | `its elbow pushed as hard as it may and did not move, in two long rests' tries: …` | Without the strain guard, after two long rests begun by a stand that never lifted (#4390) |
 | `warn` | `the elbow strained: it read a load of 500 too long while standing, and the lamp sat down to rest` | With the strain guard, while it rests from a long strain |
 | `warn` | `the elbow pushed as hard as it may and didn't move` | With the strain guard, from a stand that never lifted until it is let stand again |

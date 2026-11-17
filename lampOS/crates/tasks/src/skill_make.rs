@@ -134,6 +134,18 @@ pub struct MakeLine {
     /// only beside `"guide":true`; `null` is not one.
     #[serde(default, deserialize_with = "given")]
     pub switches: Option<CheckSwitches>,
+    /// #7245: lamp-voice's `LAMP_MAKE_AGENT_ONE_PATH` on, so the make goes
+    /// to the lamp's default agent as its data says ([`MakeGateway`]):
+    /// only when the line says `true`. Without it, the lamp's Hermes in
+    /// its namespace ([`MakeHermes`]) as before, byte for byte.
+    #[serde(default)]
+    pub one_path: bool,
+    /// #7245: the lamp's agent as the voice saw it (`"Hermes"`,
+    /// `"OpenClaw"`), sent beside `"one_path":true`. A make that would
+    /// fall back to Hermes on a lamp whose agent isn't Hermes is told
+    /// [`NOT_READY_LINE`] instead (Harness hasn't looked yet).
+    #[serde(default)]
+    pub engine: Option<String>,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -285,6 +297,63 @@ pub fn guided_prompt(folder: &Path) -> String {
     )
 }
 
+/// #7245: the guide as a gateway agent's make is given it ([`GUIDE`]
+/// without its check, section 3): a gateway agent's exec allow-list
+/// (OpenClaw's) holds only the skill-start launcher, so the guide's
+/// `lamp-skills pack` ([`CHECK_PROGRAM`]) can't run there. The voice's
+/// own checks and repairs of the answer still apply.
+pub fn gateway_guide() -> String {
+    match (GUIDE.find("## 3. "), GUIDE.find("## 4. ")) {
+        (Some(check), Some(answer)) if check < answer => format!(
+            "{}{}",
+            &GUIDE[..check],
+            GUIDE[answer..].replacen("## 4. ", "## 3. ", 1)
+        ),
+        _ => without_check(GUIDE),
+    }
+}
+
+/// `text` without any line naming the lamp's own check ([`CHECK_PROGRAM`]
+/// or `lamp-skills pack`), which a gateway agent's make can't run
+/// (#7245): the rules as a gateway make is given them, the rest byte for
+/// byte.
+pub fn without_check(text: &str) -> String {
+    text.split_inclusive('\n')
+        .filter(|line| !line.contains(CHECK_PROGRAM) && !line.contains("lamp-skills pack"))
+        .collect()
+}
+
+/// #7245: a gateway agent's make's words, with the guide when `guide`
+/// ([`gateway_guide`]): as [`prompt`] and [`guided_prompt`], but no check
+/// is run and no command at all.
+pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
+    if !guide {
+        return prompt(folder);
+    }
+    format!(
+        "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
+         lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
+         then {rules}, and follow both; {rules} wins where they differ. Draft the skill in \
+         {folder}/draft/NAME. Then write the answer exactly as {rules} says (the fenced blocks, \
+         or its one line when the skill can't be made), and nothing else, to the file {answer} \
+         in this folder. Write no file outside this folder, install nothing and run no command.",
+        guide = GUIDE_FILE,
+        rules = RULES_FILE,
+        answer = ANSWER_FILE,
+        folder = folder.display(),
+    )
+}
+
+/// #7245: a gateway agent's make in `folder` ([`gateway_prompt`]), at
+/// most `within`, started in its folder: no home, no switches, no token,
+/// no script (nothing for the skill-start launcher to claim).
+pub fn gateway_run(folder: &Path, within: Duration, guide: bool) -> SkillRun {
+    let mut run = make_run(folder, within);
+    run.prompt = gateway_prompt(folder, guide);
+    run.env = Vec::new();
+    run
+}
+
 /// The run of a make in `folder`: its words, at most `within`, started in
 /// its folder, with its own fresh home ([`HOME_FOLDER`]) as `HOME`,
 /// `HERMES_HOME` under it and [`HOME_ENV`] naming it, and nothing else of
@@ -324,6 +393,8 @@ pub fn make_run_with(
         env: home_env(folder).into_iter().chain(switches.env()).collect(),
         deadline: within,
         started: Default::default(),
+        write: false,
+        not_made: Default::default(),
         start_in: Some(folder.to_path_buf()),
         env_file: None,
         answer: Default::default(),
@@ -478,6 +549,19 @@ fn put_with(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder
     Ok(made)
 }
 
+/// #7245: a gateway agent's make's folder in `work`, `make-<run id>`,
+/// 0700, with the rules ([`without_check`]) and, when `guide`, the
+/// gateway's guide ([`gateway_guide`]), each 0600: no home, as the gateway
+/// agent runs in its own.
+fn put_for_gateway(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder> {
+    let made = fresh_folder(work, FOLDER_HEAD)?;
+    file_in(&made.fd, RULES_FILE, &without_check(rules))?;
+    if guide {
+        file_in(&made.fd, GUIDE_FILE, &gateway_guide())?;
+    }
+    Ok(made)
+}
+
 /// A run's own folder in `work`, `make-<run id>`, and its fresh home in it
 /// ([`HOME_FOLDER`], [`HERMES_FOLDER`]) with only the provider config
 /// ([`make_config`]): a make's, and an agent skill's run's or a `net`
@@ -571,6 +655,14 @@ fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
     (!text.trim().is_empty() && text.len() as u64 <= MOST_ANSWER_BYTES).then_some(text)
 }
 
+/// [`answer_read`] of the make's folder at `folder`, opened never through
+/// a link: the one run path's read of a gateway make's answer before its
+/// guard removes the folder (#7245).
+pub(crate) fn answer_in(folder: &Path) -> Option<String> {
+    let fd = rustix::fs::open(folder, DIR_FLAGS, rustix::fs::Mode::empty()).ok()?;
+    answer_read(&fd)
+}
+
 /// Make folders an earlier lamp-tasks left in `work` (stopped while a make
 /// ran), removed as it starts: only folders named `make-*`, never a link.
 pub fn sweep(work: &Path) {
@@ -611,6 +703,23 @@ pub fn answer(
     runner: &dyn Runner,
     started: &mut dyn FnMut(),
 ) -> Value {
+    answer_with(line, on, work, runner, None, started)
+}
+
+/// [`answer`], a line with `"one_path":true` ([`MakeLine::one_path`]) going
+/// to the lamp's default agent as `gateway` picks it by its data
+/// ([`MakeGateway::pick`]): a gateway agent's make through `gateway`'s one
+/// turn ([`MakeTurn::make_turn`]), the lamp's Hermes's through `hermes` as
+/// before, any other refused in words. Without the field, or with no
+/// `gateway`, `hermes` as [`answer`] has it.
+pub fn answer_with(
+    line: &[u8],
+    on: bool,
+    work: &Path,
+    hermes: &dyn Runner,
+    gateway: Option<&MakeGateway>,
+    started: &mut dyn FnMut(),
+) -> Value {
     if !on {
         return refusal(
             "off",
@@ -620,6 +729,21 @@ pub fn answer(
     let make = match MakeLine::parse(line) {
         Ok(make) => make,
         Err((code, why)) => return refusal(code, &why),
+    };
+    let runner = match gateway {
+        Some(gateway) if make.one_path => match (gateway.pick)() {
+            // The lamp's agent isn't Hermes, but its Harness target isn't
+            // known yet (right after boot): said at once, never a Hermes make.
+            Ok(MakeAgent::Hermes) if make.engine.as_deref().is_some_and(|e| e != "Hermes") => {
+                return refusal(NOT_READY, NOT_READY_LINE);
+            }
+            Ok(MakeAgent::Hermes) => hermes,
+            Ok(MakeAgent::Gateway(_)) => {
+                return answer_on_gateway(&make, work, gateway, started);
+            }
+            Err(why) => return refusal("run_failed", &why),
+        },
+        _ => hermes,
     };
     if let Err(why) = runner.ready() {
         return refusal(not_started(&why), &why);
@@ -646,6 +770,170 @@ pub fn answer(
             Some(text) => json!({"ok": true, "answer": text}),
             None => refusal("no_answer", NO_ANSWER),
         },
+    }
+}
+
+/// #7245: a make on a gateway agent ([`MakeGateway`]): its folder with the
+/// rules made in `work`, `started` told, the one make turn sent and its
+/// answer taken ([`MakeTurn::make_turn`], `answer.md` read before the
+/// session and folder go), the folder removed here too however it ends.
+fn answer_on_gateway(
+    make: &MakeLine,
+    work: &Path,
+    gateway: &MakeGateway,
+    started: &mut dyn FnMut(),
+) -> Value {
+    if let Err(why) = gateway.ready() {
+        return refusal(not_started(&why), &why);
+    }
+    let folder = match put_for_gateway(work, &make.rules, make.guide) {
+        Ok(folder) => folder,
+        Err(error) => {
+            return refusal(
+                "run_failed",
+                &format!("the make's folder was not made: {error}"),
+            );
+        }
+    };
+    started();
+    let run = gateway_run(&folder.path, make.within(), make.guide);
+    let ran = gateway.run(&run, &|| {});
+    drop(folder);
+    match ran {
+        // Harness or the gateway not ready yet: said to the person at
+        // once in the lamp's short words, never a silent failure; the
+        // reason is journaled.
+        Err(why) if not_ready(&why) => {
+            eprintln!("[lamp-tasks] skill make: not ready: {why}");
+            refusal(NOT_READY, NOT_READY_LINE)
+        }
+        Err(why) => refusal(not_started(&why), &why),
+        Ok(_) => match run
+            .answer
+            .get()
+            .filter(|text| !text.trim().is_empty() && text.len() as u64 <= MOST_ANSWER_BYTES)
+        {
+            Some(text) => json!({"ok": true, "answer": text}),
+            None => refusal("no_answer", NO_GATEWAY_ANSWER),
+        },
+    }
+}
+
+/// The refusal's code of a gateway make that couldn't start because
+/// Harness or the gateway isn't ready yet (#7245): lamp-voice says
+/// [`NOT_READY_LINE`] for it.
+pub const NOT_READY: &str = "not_ready";
+/// What the person is told, at once, for [`NOT_READY`].
+pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and ask me again.";
+
+/// Whether a gateway make's run was refused because Harness or the gateway
+/// isn't ready yet: Harness not set up or with no lamp target, or the
+/// gateway not answering ([`crate::gateway::NOT_READY`]).
+fn not_ready(why: &str) -> bool {
+    why.contains(crate::gateway::NOT_READY)
+        || why.starts_with("Harness isn't set up")
+        || why.starts_with("the lamp has no Harness target")
+}
+
+/// Said when a gateway agent's make ended with no answer to read (#7245).
+pub const NO_GATEWAY_ANSWER: &str = "the lamp's default agent wrote no answer";
+
+/// Which agent a make with `"one_path":true` goes to (#7245), by the lamp's
+/// default agent's data ([`crate::skill_task::HarnessRunner::make_agent`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MakeAgent {
+    /// The lamp's Hermes, in its own namespace ([`MakeHermes`]).
+    Hermes,
+    /// A gateway agent (OpenClaw), through [`MakeGateway`].
+    Gateway(crate::harness::EngineKind),
+}
+
+/// THE SEAM (#7245): the one step "send this one make turn to the agent
+/// and get its answer". A gateway make reaches its agent only through
+/// [`MakeTurn::make_turn`]. Today's only implementation is a fresh
+/// `harness new <engine>` per make in the make's folder, through the one
+/// run path's runner ([`crate::skill_task::HarnessRunner`] with `makes`),
+/// its session closed `--now` and its folder removed however it ends.
+/// When #7258's one session (`LAMP_TASKS_ONE_SESSION`) is on, it takes
+/// this step over by sending the make as a message into the shared pane
+/// instead of a session per make: implement this trait there and hand it
+/// to [`MakeGateway::turn`]; nothing else of the make changes.
+pub trait MakeTurn {
+    /// Sends `run` (its words, its folder [`SkillRun::start_in`] holding
+    /// [`RULES_FILE`], its deadline) as one turn to the agent and waits
+    /// for its end, at most `run.deadline`: the agent's `answer.md`, when
+    /// it wrote one, in [`SkillRun::answer`]. Nothing is left of the turn
+    /// once this returns.
+    fn make_turn(&self, run: &SkillRun) -> Result<u64, String>;
+    /// lamp-tasks' stop, as [`Runner::stop_on`]: a turn that outlives
+    /// lamp-tasks ends when this is set.
+    fn stop_on(&self, _stop: Arc<AtomicBool>) {}
+}
+
+impl MakeTurn for crate::skill_task::HarnessRunner {
+    fn make_turn(&self, run: &SkillRun) -> Result<u64, String> {
+        if !self.makes {
+            return Err("this runner takes a skill's runs, not a make".into());
+        }
+        // A make has no token to end.
+        Runner::run(self, run, &|| {})
+    }
+
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        Runner::stop_on(self, stop);
+    }
+}
+
+/// A voice make on the lamp's default agent when it is a gateway agent
+/// (OpenClaw, #7245): `pick` reads the agent's data at each make, and the
+/// make is one turn through [`MakeTurn`], never a second runner. No token
+/// and no skill-start claim: a make has no grants and no script.
+pub struct MakeGateway {
+    /// Which agent a make with `"one_path":true` goes to now.
+    pub pick: Box<dyn Fn() -> Result<MakeAgent, String> + Send + Sync>,
+    /// The make's one turn ([`MakeTurn`], the seam).
+    pub turn: Arc<dyn MakeTurn + Send + Sync>,
+}
+
+impl MakeGateway {
+    /// The lamp's: the one run path's runner ([`crate::skill_task::HarnessRunner::lamp`]
+    /// with `makes`) on lamp-tasks' Harness `harness`, its default agent a
+    /// gateway agent by [`crate::skill_task::HarnessRunner::make_agent`], the lamp's Hermes
+    /// as its own, any other refused in words.
+    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
+        let mut runner = crate::skill_task::HarnessRunner::lamp(home, harness);
+        runner.makes = true;
+        Self::of(Arc::new(runner))
+    }
+
+    /// With `runner` (its `makes` on) as both the pick and the turn.
+    pub fn of(runner: Arc<crate::skill_task::HarnessRunner>) -> Self {
+        let looks = runner.clone();
+        Self {
+            pick: Box::new(move || match looks.make_agent()? {
+                Some((engine, true)) => Ok(MakeAgent::Gateway(engine)),
+                // Hermes lamps unchanged (#7245's done-when): the lamp's
+                // Hermes, and with Harness not set up (no gateway agent
+                // can be reached), as without the field, with no Harness
+                // check.
+                Some((crate::harness::EngineKind::Hermes, false)) | None => Ok(MakeAgent::Hermes),
+                Some((engine, false)) => Err(format!(
+                    "the lamp's default agent ({}) is neither a gateway agent nor the lamp's Hermes, so a make is not handed to it and nothing was started",
+                    engine.argument()
+                )),
+            }),
+            turn: runner,
+        }
+    }
+}
+
+impl Runner for MakeGateway {
+    fn run(&self, run: &SkillRun, _end_token: &dyn Fn()) -> Result<u64, String> {
+        self.turn.make_turn(run)
+    }
+
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        self.turn.stop_on(stop);
     }
 }
 
@@ -753,6 +1041,9 @@ pub struct MakeHandOvers {
     /// The lamp's work folder, where each make's folder is made.
     pub work: PathBuf,
     pub runner: Arc<dyn Runner + Send + Sync>,
+    /// #7245: where a line with `"one_path":true` goes ([`answer_with`]);
+    /// `None`, every make to [`Self::runner`].
+    pub one_path: Option<Arc<MakeGateway>>,
     pub caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
 }
 
@@ -760,10 +1051,10 @@ impl MakeHandOvers {
     /// The lamp's: [`MAKE_SOCKET`], the lamp's Hermes in its namespace
     /// ([`lamp_runner`], the network as [`NET_SWITCH`] says) and its work
     /// folder, lamp-voice alone as caller.
-    pub fn lamp(home: &Path) -> Self {
+    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
         let held = held(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
-            "[lamp-tasks] skill make: a make's run {}",
+            "[lamp-tasks] skill make: a make's run on the lamp's Hermes (its namespace path only; a gateway agent's make on the one run path is its gateway's own turn) {}",
             if held {
                 "is held off the network (LAMP_MAKE_AGENT_NET=held)"
             } else {
@@ -775,6 +1066,7 @@ impl MakeHandOvers {
             socket: PathBuf::from(MAKE_SOCKET),
             work: runner.hermes.folder.clone(),
             runner: Arc::new(runner),
+            one_path: Some(Arc::new(MakeGateway::lamp(home, harness))),
             caller: caller_may,
         }
     }
@@ -791,6 +1083,11 @@ impl MakeHandOvers {
         }
         // What a lamp-tasks stopped mid-make left, before any make of its own.
         sweep(&self.work);
+        // A gateway make's session lives in Harness's daemon: ended as
+        // lamp-tasks stops (#7245).
+        if let Some(gateway) = &self.one_path {
+            gateway.stop_on(stop.clone());
+        }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         let served = std::thread::Builder::new()
             .name("tasks-skill-make".into())
@@ -866,9 +1163,16 @@ impl MakeHandOvers {
             return;
         }
         let place = Place(running);
-        let answered = answer(&line, true, &self.work, &*self.runner, &mut || {
-            write_answer(stream, &json!({"ok": true, "started": true}));
-        });
+        let answered = answer_with(
+            &line,
+            true,
+            &self.work,
+            &*self.runner,
+            self.one_path.as_deref(),
+            &mut || {
+                write_answer(stream, &json!({"ok": true, "started": true}));
+            },
+        );
         drop(place);
         eprintln!("{}", journal_line(&answered));
         write_answer(stream, &answered);
@@ -1436,7 +1740,7 @@ mod tests {
     #[test]
     fn a_make_is_started_through_the_marked_namespace_held_or_not() {
         let dir = tempfile::tempdir().unwrap();
-        let lamp = MakeHandOvers::lamp(Path::new("/var/lib/lampos-tasks"));
+        let lamp = MakeHandOvers::lamp(Path::new("/var/lib/lampos-tasks"), Default::default());
         assert_eq!(
             lamp.work,
             Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp")
@@ -1743,6 +2047,7 @@ mod tests {
             socket: dir.path().join("skill-make.sock"),
             work: work.clone(),
             runner: Arc::new(writing(None)),
+            one_path: None,
             caller: |_| true,
         }
         .start(true, stop.clone())
@@ -1784,6 +2089,7 @@ mod tests {
             socket: socket.clone(),
             work,
             runner: Arc::new(writing(Some("A"))),
+            one_path: None,
             caller: |_| true,
         }
         .start(true, stop.clone())
@@ -1807,6 +2113,7 @@ mod tests {
             socket: socket.clone(),
             work: dir.path().into(),
             runner: Arc::new(writing(None)),
+            one_path: None,
             caller: |_| true,
         }
         .start(false, Arc::default())
@@ -1872,5 +2179,45 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// #7245: a gateway agent's make never gets the guide's check, which
+    /// its exec allow-list can't run: the guide without its section 3, the
+    /// rules without a line naming the check, and words that run nothing;
+    /// the line's `one_path` is a bool, false when not given.
+    #[test]
+    fn a_gateway_make_is_given_no_check_and_one_path_is_read() {
+        let guide = gateway_guide();
+        assert!(!guide.contains(CHECK_PROGRAM) && !guide.contains("lamp-skills"));
+        assert!(!guide.contains("## 4. ") && guide.contains("## 3. Answer"));
+        assert!(guide.starts_with(&GUIDE[..GUIDE.find("## 3. ").unwrap()]));
+        assert!(GUIDE.contains(CHECK_PROGRAM), "the guide itself keeps it");
+        let rules = format!("a\n  {CHECK_PROGRAM} pack --out x draft/A\nb\n");
+        assert_eq!(without_check(&rules), "a\nb\n");
+        assert_eq!(without_check("a\nb"), "a\nb");
+        let folder = Path::new("/w/make-1");
+        for guided in [false, true] {
+            let words = gateway_prompt(folder, guided);
+            assert!(
+                !words.contains(CHECK_PROGRAM) && !words.contains(" pack "),
+                "{words}"
+            );
+            let run = gateway_run(folder, Duration::from_secs(5), guided);
+            assert_eq!(run.prompt, words);
+            assert!(run.env.is_empty() && run.script.as_os_str().is_empty());
+            assert_eq!(run.start_in.as_deref(), Some(folder));
+            assert_eq!(run.run, "1");
+        }
+        assert_eq!(gateway_prompt(folder, false), prompt(folder));
+        let parsed = |extra: &str| {
+            MakeLine::parse(
+                format!(r#"{{"op":"skill_make","rules":"R","within_ms":2000{extra}}}"#).as_bytes(),
+            )
+            .map(|make| make.one_path)
+        };
+        assert_eq!(parsed(""), Ok(false));
+        assert_eq!(parsed(r#","one_path":false"#), Ok(false));
+        assert_eq!(parsed(r#","one_path":true"#), Ok(true));
+        assert!(parsed(r#","one_path":"yes""#).is_err());
     }
 }

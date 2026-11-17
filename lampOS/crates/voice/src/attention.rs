@@ -3228,6 +3228,12 @@ impl Attention {
         self.after_question = false;
     }
 
+    /// Whether the request in hand follows a question the lamp left
+    /// unanswered ([`AFTER_QUESTION`]), however the room is.
+    pub fn after_a_question(&self) -> bool {
+        self.after_question
+    }
+
     pub fn narrow_the_call(&mut self, narrowed: bool) {
         self.call_narrowed = narrowed;
     }

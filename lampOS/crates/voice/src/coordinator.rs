@@ -3035,6 +3035,8 @@ pub fn run_fixture(
     output: &Path,
     options: FixtureOptions,
 ) -> Result<()> {
+    // Off Linux: no host sound, refused by name before the signal handler or any worker.
+    options.refuse_host_sound_off_linux()?;
     let termination = Termination::install()?;
     if !options.directed.diagnostics {
         return Err(io::Error::other("fixture experiments require explicit --diagnostics").into());
@@ -3058,7 +3060,7 @@ pub fn run_fixture(
         None,
         None,
         Some(info),
-        &ControlsOptions::default(),
+        &options.controls,
         cues,
         &termination,
     )
@@ -5182,10 +5184,25 @@ fn released_restored_on_stop(
     trace: &mut SessionState,
     controls: &mut Option<HandControls>,
 ) -> io::Result<()> {
-    let (true, Some(signal), Some(controls)) = (clean, signal, controls.as_mut()) else {
+    let Some(controls) = controls.as_mut() else {
         return Ok(());
     };
-    if controls.release_restored_on_stop()? {
+    let signal = match (clean, signal) {
+        (true, Some(signal)) => signal,
+        // Kept, and the journal says which gate (#7368).
+        (false, _) => {
+            guard_mute_kept(controls, "the run did not end clean");
+            return Ok(());
+        }
+        (true, None) => {
+            guard_mute_kept(controls, "no stop was asked for");
+            return Ok(());
+        }
+    };
+    let restored = controls.restored_after_fault();
+    let why = controls.kept_on_stop_why();
+    let released = controls.release_restored_on_stop()?;
+    if released {
         eprintln!(
             "lamp-voice: {signal} ended the mute the restart guard restored; the next start listens"
         );
@@ -5194,8 +5211,24 @@ fn released_restored_on_stop(
             trace,
             json!({"kind":"guard_mute_ended_on_stop","at_us":monotonic_us(),"signal":signal}),
         );
+    } else if let Some(why) = HandControls::kept_after_release(restored, why, released) {
+        eprintln!("{}", guard_mute_kept_line(why));
     }
     Ok(())
+}
+
+/// The one journal line for a stop that keeps a mute the restart guard
+/// restored (#7368): which gate kept it, so a lamp left deaf after a clean
+/// restart says why. Said only for the guard's mute, never a person's.
+fn guard_mute_kept(controls: &HandControls, why: &str) {
+    if controls.restored_after_fault() {
+        eprintln!("{}", guard_mute_kept_line(why));
+    }
+}
+
+/// [`guard_mute_kept`]'s words.
+fn guard_mute_kept_line(why: &str) -> String {
+    format!("lamp-voice: the mute the restart guard restored is kept at this stop: {why}")
 }
 
 /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
@@ -6831,6 +6864,9 @@ fn conversation_with_gate_inner(
         // The memory's night through the relay, with LAMP_MEMORY_TIERS
         // (`tiers_night`): idle, at night, with the slide open; never said.
         crate::tiers_night::start_from_environment();
+        // What those two cost is counted for the day, with
+        // LAMP_VOICE_DAY_TALLY=on (`day_tally`, #7347): numbers only.
+        crate::day_tally::start_from_environment();
     }
     leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;

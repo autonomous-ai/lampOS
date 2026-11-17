@@ -27,7 +27,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, ChildStderr, ChildStdout, Command, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -129,9 +129,12 @@ pub enum EngineKind {
     /// handed to them and none is a target.
     Hermes,
     /// OpenClaw (#6226), which Harness launches as `openclaw tui --session
-    /// harness-<agentId> --message "<prompt>"` through OpenClaw's own
-    /// Gateway, with a first prompt and no permission modes (Harness CLI
-    /// 0.6.11 and up). Like Hermes, a target only on the lamp itself.
+    /// harness-<agentId>` through OpenClaw's own Gateway, with no permission
+    /// modes. Harness 0.6.52 starts it with no `--message` and types the
+    /// first prompt in once the pane is ready, waiting up to 30 s for the
+    /// Gateway to write it as the user's message (`sessionInput.ts`); before
+    /// 0.6.52 it was `--message "<prompt>"` (Harness CLI 0.6.11 and up).
+    /// Like Hermes, a target only on the lamp itself.
     Openclaw,
 }
 
@@ -413,6 +416,42 @@ fn session_seen(
     }
 }
 
+/// `show` of the lamp's one standing pane (#7246, [`Cli::observe_pane`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PaneSeen {
+    pub seen: Observation,
+    /// The last words typed were taken: `show` has no `told`, or its
+    /// `told.taken` is true. Words typed while earlier ones are untaken
+    /// are queued by Harness behind them, which mixes two tasks' answers.
+    pub taken: bool,
+}
+
+/// Whether `show`'s answer says the last words typed were taken
+/// ([`PaneSeen::taken`]).
+fn told_taken(bytes: &[u8]) -> bool {
+    let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
+    match reply.get("told") {
+        None | Some(Value::Null) => true,
+        Some(told) => told["taken"] == true,
+    }
+}
+
+/// How typing into the lamp's one standing pane went ([`Cli::reply_to`],
+/// `LAMP_TASKS_ONE_SESSION`, #7246).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Typed {
+    /// Harness took the words for that pane.
+    Typed,
+    /// The pane is busy with a turn (`NOT_IDLE`): nothing typed.
+    NotIdle,
+    /// Harness says the pane was closed or stopped (`NOT_RUNNING`).
+    NotRunning,
+    /// Nothing typed, with why.
+    NotSent(String),
+    /// The words may have been typed: never typed again.
+    Uncertain(String),
+}
+
 /// How closing one harness this lamp started went (#1390).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -585,6 +624,75 @@ pub const MOST_SESSION_BYTES: usize = 128;
 /// How often a Devin just started is looked at until it is idle, for its
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
+/// How long after `new` the lamp's OpenClaw is given to prove it took its
+/// first prompt (#7277): asked, a tool used, an answer, or `working`.
+/// Idle with no ask is no proof: on c0a4 (build 13373, Harness 0.6.52)
+/// such a read was taken as handed over at 14:20:02, and the Gateway's
+/// first chat send then logged a 17.5 s startup (`slow chat send 17467ms
+/// stage=startup`, 14:20:15), its model call at 14:20:36 and tools at
+/// 14:20:43. Harness types the prompt in only once the pane is ready, and
+/// waits up to 30 s for the Gateway to write it (`sessionInput.ts`). 45 s
+/// from `new` covers that wait, the slow first send and the preparation
+/// after it. A send later still is caught by the Gateway's own record
+/// ([`openclaw_record`], #7287) before any close or second `new`, so the
+/// prompt is never run twice.
+pub const OPENCLAW_PROOF_WITHIN: Duration = Duration::from_secs(45);
+
+/// Where the Gateway keeps agent `main`'s sessions under its state folder
+/// `state` (`OPENCLAW_STATE_DIR`, `/var/lib/lampos-openclaw/state` on the
+/// lamp): OpenClaw 2026.11.2's agent database, schema 27, as Harness reads
+/// it (openharness `engines/openclaw/contract.ts`, `openclawAgentDb`;
+/// lamp-c0a4's own file list on #6343). lamp-tasks runs as `lampos`, the
+/// Gateway's own user, and the Gateway's namespace shows this folder at
+/// the same path, so it is read here directly: no OpenClaw CLI call (a
+/// Node start of about 10 s on the lamp) is made.
+pub fn openclaw_record_path(state: &Path) -> PathBuf {
+    state.join("agents/main/agent/openclaw-agent.sqlite")
+}
+
+/// Whether the Gateway's record at `db` holds anything of the session of
+/// Harness's `agent_id` (`agent:main:harness-<agentId>`, matched by the
+/// key's first 8 characters of the id, so a shortened key is found too):
+/// a transcript row with a role (the user's message, an answer, a tool
+/// result) in any of its windows, or a run status (`running`, `done`, ...).
+/// Read only, never written; `Err` with why when it can't be read (no
+/// file, another schema, busy past one second), which a caller takes as
+/// "may be under way" (#7287).
+pub fn openclaw_record(db: &Path, agent_id: &str) -> Result<bool, String> {
+    use rusqlite::{Connection, OpenFlags};
+    let id8: String = agent_id.chars().take(8).collect();
+    if id8.len() < 8 {
+        return Err("agent id too short".into());
+    }
+    let prefix = format!("agent:main:harness-{id8}");
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM session_nodes n WHERE substr(n.session_key, 1, ?2) = ?1 AND n.status IS NOT NULL) \
+             OR EXISTS(SELECT 1 FROM transcript_events t WHERE t.message_role IS NOT NULL AND t.session_id IN \
+               (SELECT w.session_id FROM session_windows w WHERE substr(w.session_key, 1, ?2) = ?1 \
+                UNION SELECT n.current_session_id FROM session_nodes n WHERE substr(n.session_key, 1, ?2) = ?1))",
+            rusqlite::params![prefix, prefix.len() as i64],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// A short name for a record read's error, never its message (which can
+/// quote a path or a row).
+fn error_kind(error: &rusqlite::Error) -> String {
+    match error {
+        rusqlite::Error::SqliteFailure(code, _) => format!("{:?}", code.code),
+        _ => "other".into(),
+    }
+}
 
 /// What `show` read of a harness just started ([`Cli::look_until_idle`]).
 enum Looked {
@@ -1134,6 +1242,15 @@ impl Cli {
     /// Hand `launch` over, and say how it went in one journal line
     /// ([`dispatch_line`]), whatever the outcome.
     pub fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        self.launch_naming(launch).0
+    }
+
+    /// [`Cli::launch`], and with an [`LaunchOutcome::Uncertain`] the agent
+    /// the `new` reply still named by the launch's own name, if any
+    /// ([`named_agent`]): Harness may have made it, so a caller that owns
+    /// the launch can close it (a skill's run, #7171). `None` for any other
+    /// outcome, or a reply naming no agent of that name.
+    pub fn launch_naming(&self, launch: &Launch) -> (LaunchOutcome, Option<String>) {
         let began = Instant::now();
         let mut seen = Seen::default();
         let outcome = self.launch_seen(launch, &mut seen);
@@ -1143,7 +1260,11 @@ impl Cli {
         if let Some(journal) = &self.config.journal {
             journal.lock().unwrap_or_else(|e| e.into_inner()).push(line);
         }
-        outcome
+        let named = seen
+            .named
+            .take()
+            .filter(|_| matches!(outcome, LaunchOutcome::Uncertain { .. }));
+        (outcome, named)
     }
 
     fn launch_seen(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
@@ -1361,27 +1482,55 @@ impl Cli {
             reply = self.run(&args, left);
             seen.took(&reply);
         }
+        // The agent a successful `new` names for this launch, kept in case
+        // the reply is then refused as uncertain (#7171).
+        if let Ok(answered) = &reply
+            && answered.success
+        {
+            seen.named = named_agent(&answered.stdout, launch);
+        }
         match reply {
             Ok(reply) if reply.success && launch.target.engine.typed_after() => {
                 let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
                 self.first_message(launch, outcome, until, seen)
             }
-            // OpenClaw's first prompt is its TUI's `--message` (#6226). On
-            // the lamp, `show` may read it idle with no `ask` (and no tool)
-            // seconds after a `new` that it did take: 12139 on lamp-52e6 and
-            // 9adf's runs on #6504 both wrote their file. So idle with no ask
-            // counts as handed over: no close, no second `new`, no `reply`
-            // (#6499). A truly lost prompt ("initial message not sent") is
-            // Harness's to type in: fixed in Harness 0.6.23 (openharness#4172).
+            // OpenClaw's first prompt is typed in by Harness once its pane
+            // is ready (#6226, Harness 0.6.52). Idle with no `ask` is no
+            // proof it was taken: on c0a4 (#7277) it was the TUI before its
+            // first send, and on other runs the send never came. So the launch counts only once `show`
+            // proves the prompt taken ([`Cli::openclaw_taken`]); with no
+            // proof the harness is closed and `new` asked once more
+            // (`harness reply` is off on product lamps).
             Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
                 let outcome = parse_launch(&reply.stdout, launch, self.daemon_here().as_deref());
-                self.openclaw_first_prompt(launch, outcome, until, seen)
+                // A `new` that made its folder (`--new <name>`) is asked
+                // again in that folder: `--new` again is refused, the
+                // project being there (Thirteen's P3 on #6504).
+                let mut again = args.clone();
+                if let Some(at) = again.iter().position(|arg| arg == "--new") {
+                    let plain = folder.as_ref().map_or_else(
+                        || launch.target.project.clone(),
+                        |folder| folder.sent.clone(),
+                    );
+                    again.splice(at..at + 2, [plain.into()]);
+                }
+                self.openclaw_first_prompt(launch, &again, outcome, until, seen)
             }
             Ok(reply) if reply.success => {
                 parse_launch(&reply.stdout, launch, self.daemon_here().as_deref())
             }
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
+            }
+            // No Harness daemon on this computer (`NOT_RUNNING`, "Harness
+            // is not running here. Start it with `harness start`."): `new`
+            // reached nothing that could start an agent, so the task surely
+            // did not start (build 13373, a product lamp signed out, whose
+            // install starts no daemon at boot). The owner starts the
+            // daemon and hands the task over once more
+            // ([`HARNESS_NOT_RUNNING`]).
+            Ok(reply) if not_running_here(&reply.stdout, &reply.stderr) => {
+                not_sent(HARNESS_NOT_RUNNING)
             }
             Ok(_) => uncertain("new_failed"),
             Err(error) if error.spawned => uncertain(error.code),
@@ -1820,6 +1969,54 @@ impl Cli {
                 Err(error) if error.spawned => uncertain("reply_uncertain"),
                 Err(error) => not_sent(&format!("reply_{}", error.code)),
             };
+        }
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): `words` typed into the lamp's one
+    /// standing pane, `agent_id` on `machine`, with `harness reply`, the
+    /// verb [`Cli::reply_named`] types with, but by the pane's own id:
+    /// lamp-tasks opened that pane, so nothing is looked up by name. One
+    /// try under the operation lock; never typed twice here. Harness has
+    /// no steer and no turn id, so a busy pane is `NotIdle` (its
+    /// `NOT_IDLE`, retryable) and the caller waits for idle first.
+    pub fn reply_to(&self, machine: &str, agent_id: &str, words: &str) -> Typed {
+        if !machine_id(machine) || !self::agent_id(agent_id) {
+            return Typed::NotSent("invalid_agent".into());
+        }
+        if words.trim().is_empty()
+            || words.len() > MAX_PROMPT_BYTES
+            || words.starts_with("--")
+            || words.contains('\0')
+        {
+            return Typed::NotSent("invalid_prompt".into());
+        }
+        let Ok(_guard) = self.operation.try_lock() else {
+            return Typed::NotSent("busy".into());
+        };
+        let reply = self.run(
+            &[
+                "reply".into(),
+                "--machine".into(),
+                machine.into(),
+                agent_id.into(),
+                "--json".into(),
+                "--".into(),
+                words.into(),
+            ],
+            self.config.launch_timeout,
+        );
+        match reply {
+            Ok(reply) if reply.success && replied(&reply.stdout, agent_id) => Typed::Typed,
+            // Taken, with an answer that can't say for this pane: the words
+            // may be there.
+            Ok(reply) if reply.success => Typed::Uncertain("reply_uncertain".into()),
+            Ok(reply) => match reply_refusal(&reply.stdout) {
+                "reply_not_idle" => Typed::NotIdle,
+                "reply_not_running" => Typed::NotRunning,
+                refused => Typed::NotSent(refused.into()),
+            },
+            Err(error) if error.spawned => Typed::Uncertain("reply_uncertain".into()),
+            Err(error) => Typed::NotSent(format!("reply_{}", error.code)),
         }
     }
 
@@ -2423,32 +2620,269 @@ impl Cli {
         self.type_first_message(launch, agent_id, until, seen)
     }
 
-    /// OpenClaw's launch once `new` answered (#6499): `show` read until it
-    /// is asked or idle, within `until`, and either way it is as Harness
-    /// answered it. Idle with no ask is journaled once and still counts as
-    /// handed over: on the lamp that reading came after a `--message` the
-    /// TUI did take (12139, 9adf), and closing or typing it in again told
-    /// the person a done task was uncertain. Nothing is closed, started
-    /// again or replied.
+    /// OpenClaw's launch once `new` answered (#7277): Created only once
+    /// `show` proves its first prompt taken ([`Cli::openclaw_taken`]). The
+    /// whole of it, every proof wait, close and the one `new` more, runs
+    /// within the launch's own `until` (`began + launch_timeout`), so the
+    /// tasks-harness lane is never held longer than one launch (Heron's P2
+    /// on #7287); the owner's stop ends it `cancelled` at the next call.
+    /// With no proof, the Gateway's own record of that harness's session is
+    /// read first ([`openclaw_record`]): a user message or a run there, or a
+    /// record that can't be read, means the prompt may already be under
+    /// way, so nothing is closed or started again (the Reviewer-lead's P2 on
+    /// #7287): the first harness is kept and looked at until `until`, and
+    /// with still no proof the launch is uncertain, `openclaw_taken_unseen`
+    /// or `openclaw_record_unread`. Only a record read that holds nothing
+    /// of it has the harness closed and `new` asked once more, proved the
+    /// same way; still none, its record is read too, and only with nothing
+    /// there is it closed and the task not sent, `openclaw_not_taken`, so
+    /// the person hears it failed. A close refused as `WORKING` proves the
+    /// prompt taken after all, and that harness is the launch. A harness
+    /// that can't be closed otherwise ends it uncertain, with nothing more
+    /// started: one left running could still
+    /// take its prompt beside a second (Heron's P2 on #6504). Nothing is
+    /// ever started a third time or replied.
     fn openclaw_first_prompt(
         &self,
         launch: &Launch,
+        again: &[OsString],
         outcome: LaunchOutcome,
         until: Instant,
         seen: &mut Seen,
     ) -> LaunchOutcome {
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let LaunchOutcome::Created { agent_id } = outcome else {
             return self.first_message_unless_asked(launch, outcome, until, seen, true);
         };
-        match self.look_until_idle(launch, &agent_id, until, seen, true) {
-            Ok(Looked::Asked) => {}
-            Ok(Looked::Idle) => eprintln!(
-                "tasks: {}: OpenClaw's harness reads idle with no ask yet; its --message is taken as handed over, as Harness answered the new",
-                launch.name
-            ),
-            Err(code) => return LaunchOutcome::Uncertain { code: code.into() },
+        // Looks and the second `new` end an eighth of `launch_timeout`
+        // before `until` (7.5 s of 60 s), so a close after them still fits.
+        let looks_until = until
+            .checked_sub(self.config.launch_timeout / 8)
+            .unwrap_or(until);
+        match self.openclaw_taken(launch, &agent_id, looks_until, seen) {
+            Ok(true) => return LaunchOutcome::Created { agent_id },
+            Ok(false) => {}
+            Err(code) => return uncertain(code),
         }
-        LaunchOutcome::Created { agent_id }
+        if let Some(code) = self.openclaw_maybe_taken(launch, &agent_id) {
+            // Kept: no close, no second `new`. Looked at until `until`.
+            return match self.openclaw_taken(launch, &agent_id, until, seen) {
+                Ok(true) => LaunchOutcome::Created { agent_id },
+                Ok(false) => {
+                    eprintln!(
+                        "tasks: {}: OpenClaw's harness still shows no sign by the launch's bound: uncertain ({code}), never started again",
+                        launch.name
+                    );
+                    uncertain(code)
+                }
+                Err(code) => uncertain(code),
+            };
+        }
+        if self.cancelled(None) {
+            return uncertain("cancelled");
+        }
+        match self.openclaw_closed(launch, &agent_id, until, seen) {
+            OpenclawClosed::Closed => {}
+            OpenclawClosed::Working => return LaunchOutcome::Created { agent_id },
+            OpenclawClosed::Not => return uncertain("openclaw_not_closed"),
+        }
+        eprintln!(
+            "tasks: {}: OpenClaw showed no sign it took its prompt within {} s of new, and its Gateway's record holds none: the harness is closed, and it is started once more",
+            launch.name,
+            self.openclaw_proof_within().as_secs()
+        );
+        if self.cancelled(None) {
+            return uncertain("cancelled");
+        }
+        let left = looks_until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            // The first is closed and no time is left for a second: nothing
+            // runs this task.
+            return uncertain("openclaw_new_again_failed");
+        }
+        let reply = self.run(again, left);
+        seen.took(&reply);
+        let agent_id = match reply {
+            Ok(reply) if reply.success => {
+                match parse_launch(&reply.stdout, launch, self.daemon_here().as_deref()) {
+                    LaunchOutcome::Created { agent_id } => agent_id,
+                    other => return other,
+                }
+            }
+            // The first is closed and the second wasn't made: nothing runs
+            // this task.
+            Ok(_) => return uncertain("openclaw_new_again_failed"),
+            Err(error) => return uncertain(error.code),
+        };
+        match self.openclaw_taken(launch, &agent_id, looks_until, seen) {
+            Ok(true) => return LaunchOutcome::Created { agent_id },
+            Ok(false) => {}
+            Err(code) => return uncertain(code),
+        }
+        if let Some(code) = self.openclaw_maybe_taken(launch, &agent_id) {
+            eprintln!(
+                "tasks: {}: OpenClaw's second harness shows no sign by the launch's bound: uncertain ({code}), kept, never closed or started again",
+                launch.name
+            );
+            return uncertain(code);
+        }
+        eprintln!(
+            "tasks: {}: OpenClaw took no prompt on its second new either: not sent (openclaw_not_taken)",
+            launch.name
+        );
+        match self.openclaw_closed(launch, &agent_id, until, seen) {
+            OpenclawClosed::Closed => {}
+            OpenclawClosed::Working => return LaunchOutcome::Created { agent_id },
+            OpenclawClosed::Not => return uncertain("openclaw_not_taken"),
+        }
+        LaunchOutcome::NotSent {
+            code: "openclaw_not_taken".into(),
+        }
+    }
+
+    /// Whether the Gateway's own record says the prompt of `agent_id`'s
+    /// harness may be under way ([`openclaw_record`], read where
+    /// `OPENCLAW_STATE_DIR` in Harness's environment says): `Some` with
+    /// the uncertain code the launch ends with if nothing more proves it,
+    /// journaled once; `None` only for a record read that holds nothing of
+    /// it.
+    fn openclaw_maybe_taken(&self, launch: &Launch, agent_id: &str) -> Option<&'static str> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)
+            .map(PathBuf::from);
+        let read = match &state {
+            Some(state) => openclaw_record(&openclaw_record_path(state), agent_id),
+            None => Err(format!("no {}", crate::hold::OPENCLAW_STATE_DIR)),
+        };
+        match read {
+            Ok(false) => None,
+            Ok(true) => {
+                eprintln!(
+                    "tasks: {}: OpenClaw's Gateway record holds a user message or run for this harness though show shows none: it is kept, never closed or started again",
+                    launch.name
+                );
+                Some("openclaw_taken_unseen")
+            }
+            Err(why) => {
+                eprintln!(
+                    "tasks: {}: OpenClaw's Gateway record could not be read ({why}): the harness is kept, never closed or started again",
+                    launch.name
+                );
+                Some("openclaw_record_unread")
+            }
+        }
+    }
+
+    /// How long after its `new` OpenClaw is given to prove its prompt
+    /// taken: [`OPENCLAW_PROOF_WITHIN`], never more than three quarters of
+    /// one `launch_timeout` (45 s of the lamp's 60 s), so a close and one
+    /// `new` more still fit in the launch's own bound.
+    fn openclaw_proof_within(&self) -> Duration {
+        OPENCLAW_PROOF_WITHIN.min(self.config.launch_timeout * 3 / 4)
+    }
+
+    /// `show` read from just after `new` until it proves OpenClaw took its
+    /// prompt (`Ok(true)`): asked (`ask` set), a tool used, an answer, or
+    /// `working`. Idle with none of them is no proof. `Ok(false)`: no proof
+    /// within [`Cli::openclaw_proof_within`] or by the launch's `until`,
+    /// whichever is first. `Err` is the uncertain code it ends with: a
+    /// stopped harness, the owner's stop (`cancelled`), or a `show` that
+    /// failed to run.
+    fn openclaw_taken(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> Result<bool, &'static str> {
+        let until = until.min(Instant::now() + self.openclaw_proof_within());
+        let show: Vec<OsString> = vec![
+            "show".into(),
+            "--machine".into(),
+            launch.target.machine_id.clone().into(),
+            agent_id.into(),
+            "--json".into(),
+        ];
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Ok(false);
+            }
+            let shown = self.run(&show, left.min(self.config.read_timeout));
+            seen.took(&shown);
+            let observation = match &shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, agent_id).ok(),
+                // A read cut short by the bound itself is no proof.
+                Err(_) if Instant::now() >= until => return Ok(false),
+                Err(error) => return Err(error.code),
+                _ => None,
+            };
+            if let Some(observation) = &observation {
+                if !fresh(observation) || observation.state == "working" {
+                    return Ok(true);
+                }
+                if matches!(observation.state.as_str(), "stopped" | "failed" | "offline") {
+                    return Err("stopped_before_message");
+                }
+            }
+            let left = until.saturating_duration_since(Instant::now());
+            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
+        }
+    }
+
+    /// `harness close` of an OpenClaw harness that took no prompt, by the
+    /// launch's `until`: whether it is closed (or gone), refused as
+    /// `WORKING` (proof it took its prompt after all: a slow Gateway's
+    /// first turn just past the proof bound, lamp-c0a4 #7287), or not
+    /// closed. Each but closed is journaled with why.
+    fn openclaw_closed(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> OpenclawClosed {
+        let left = until.saturating_duration_since(Instant::now());
+        let closed = (!left.is_zero()).then(|| {
+            self.run(
+                &[
+                    "close".into(),
+                    "--machine".into(),
+                    launch.target.machine_id.clone().into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                left,
+            )
+        });
+        if let Some(closed) = &closed {
+            seen.took(closed);
+        }
+        if let Some(Ok(reply)) = &closed
+            && close_refused_working(reply.code, &reply.stdout)
+        {
+            eprintln!(
+                "tasks: {}: OpenClaw's harness was working when it was to be closed: its prompt is taken, kept",
+                launch.name
+            );
+            return OpenclawClosed::Working;
+        }
+        let why = match &closed {
+            None => "no_time_left".to_owned(),
+            Some(Ok(reply)) => match self::closed(reply.code) {
+                Ok(Closed::Closed | Closed::Gone) => return OpenclawClosed::Closed,
+                Ok(Closed::Refused | Closed::Left) => "refused".to_owned(),
+                Err(code) => code,
+            },
+            Some(Err(error)) => error.code.to_owned(),
+        };
+        eprintln!(
+            "tasks: {}: OpenClaw's harness took no prompt and wasn't closed ({why}), so nothing more is started",
+            launch.name
+        );
+        OpenclawClosed::Not
     }
 
     /// `show` read until the harness just started is idle (or, with
@@ -2746,6 +3180,74 @@ impl Cli {
         agent_id: &str,
         timeout: Duration,
     ) -> Result<Vec<u8>, String> {
+        let reply = self.show_reply(machine, agent_id, timeout)?;
+        if !reply.success {
+            return Err("observe_failed".into());
+        }
+        Ok(reply.stdout)
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): [`Cli::observe`] of the lamp's one
+    /// standing pane, with a pane Harness no longer has (`UNKNOWN_HARNESS`
+    /// or `GONE`, as after a user-manager restart killed every pane) told
+    /// apart as `gone`, so it is reopened and not waited on, and whether
+    /// the last words typed were taken ([`PaneSeen::taken`]).
+    pub fn observe_pane(&self, machine: &str, agent_id: &str) -> Result<PaneSeen, String> {
+        let reply = self.show_reply(machine, agent_id, self.config.read_timeout)?;
+        if !reply.success {
+            return Err(if gone(&reply.stdout) {
+                "gone".into()
+            } else {
+                "observe_failed".into()
+            });
+        }
+        let seen = parse_reading(&reply.stdout, agent_id).map_err(str::to_string)?;
+        Ok(PaneSeen {
+            taken: told_taken(&reply.stdout),
+            seen,
+        })
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): `harness resume --machine <id>
+    /// <agent> --json` of the lamp's one standing pane, stopped or gone,
+    /// once: its state after, or why not. A Harness with no `resume` is
+    /// `session_closed`, and a fresh `new` follows.
+    pub fn resume_pane(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        if !machine_id(machine) || !self::agent_id(agent_id) {
+            return Err("invalid_agent".into());
+        }
+        let mut seen = Seen::default();
+        if !self.has_resume(self.config.read_timeout, &mut seen) {
+            return Err("session_closed".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &[
+                    "resume".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.launch_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err(resume_refusal(&reply.stdout).into());
+        }
+        parse_resume(&reply.stdout, agent_id)
+            .map(|(_, state)| state)
+            .ok_or_else(|| "session_closed".into())
+    }
+
+    /// `harness show --json` of one agent, as Harness answered it.
+    fn show_reply(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        timeout: Duration,
+    ) -> Result<Reply, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -2753,24 +3255,19 @@ impl Cli {
             return Err("invalid_agent_id".into());
         }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
-        let reply = self
-            .run(
-                &[
-                    "show".into(),
-                    "--machine".into(),
-                    machine.into(),
-                    agent_id.into(),
-                    "--chars".into(),
-                    "4000".into(),
-                    "--json".into(),
-                ],
-                timeout,
-            )
-            .map_err(|error| error.code.to_string())?;
-        if !reply.success {
-            return Err("observe_failed".into());
-        }
-        Ok(reply.stdout)
+        self.run(
+            &[
+                "show".into(),
+                "--machine".into(),
+                machine.into(),
+                agent_id.into(),
+                "--chars".into(),
+                "4000".into(),
+                "--json".into(),
+            ],
+            timeout,
+        )
+        .map_err(|error| error.code.to_string())
     }
 
     /// Close a harness this lamp started, once its result has been told
@@ -2796,7 +3293,7 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
-        self.close_with(machine, agent_id, within, false)
+        self.close_with(machine, agent_id, within, false, false)
     }
 
     /// Stop a skill run lamp-tasks itself started, at its deadline or its
@@ -2814,7 +3311,22 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
-        self.close_with(machine, agent_id, within, true)
+        self.close_with(machine, agent_id, within, true, false)
+    }
+
+    /// `LAMP_TASKS_ONE_SESSION` (#7246): [`Cli::close_now`] of the lamp's
+    /// one standing pane, with a close Harness refuses because it no longer
+    /// has the pane (`UNKNOWN_HARNESS` or `GONE`, read as
+    /// [`Cli::observe_pane`] reads them) told apart as
+    /// [`CLOSE_UNKNOWN_HARNESS`], so the pane is let go and not closed
+    /// again forever. Every other failure is as [`Cli::close_now`]'s.
+    pub fn close_pane_now(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, true, true)
     }
 
     /// The agent `harness show <id> --json` names for one harness of this
@@ -2875,13 +3387,16 @@ impl Cli {
         Ok((agent, answer))
     }
 
-    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
+    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]),
+    /// and a pane Harness no longer has told apart only when asked
+    /// ([`Cli::close_pane_now`]).
     fn close_with(
         &self,
         machine: &str,
         agent_id: &str,
         within: Duration,
         now: bool,
+        tell_gone: bool,
     ) -> Result<Closed, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
@@ -2918,6 +3433,9 @@ impl Cli {
         // (#5689).
         if !now && !reply.success && background_refusal(&reply.stdout, &reply.stderr) {
             return Err(CLOSE_BACKGROUND_COMMANDS.into());
+        }
+        if tell_gone && !reply.success && gone(&reply.stdout) {
+            return Err(CLOSE_UNKNOWN_HARNESS.into());
         }
         closed(reply.code)
     }
@@ -4065,6 +4583,176 @@ pub fn parse_engines(bytes: &[u8], machine: &str) -> Result<Vec<EngineRow>, &'st
     Ok(rows)
 }
 
+/// A hand-over `new` refused as no Harness daemon runs on this computer
+/// (Harness's `NOT_RUNNING`): `not_sent`, nothing started. lamp-tasks starts
+/// the daemon and hands the task over once more on it ([`DaemonOnce`]).
+pub const HARNESS_NOT_RUNNING: &str = "harness_not_running";
+
+/// "Not running here → start Harness's daemon → try once more", shared by
+/// every `harness new` caller in lamp-tasks. The product install starts
+/// no daemon at boot (`update/src/harness_install.rs`), and one that died
+/// is never started again otherwise, so lamp-tasks is the only starter
+/// (build 13373, a product lamp signed out).
+///
+/// - The spoken hand-over (`Cli::launch`, `runtime.rs`' owner loop) asks
+///   [`DaemonOnce::again`] with the task's id on a `harness_not_running`
+///   outcome: `true` once a task, and the owner then schedules the daemon's
+///   start and queues the task again, first, behind its daemon gate.
+///   [`DaemonOnce::done`] forgets the task once its outcome is final.
+/// - A caller that runs `new` itself and can wait on the daemon there (a
+///   pane opened on one session, #7258; a make runner, #7245) uses
+///   [`DaemonOnce::run`] with [`DaemonGate::shared`]: it waits for a start
+///   lamp-tasks' owner has due or under way (the one at boot, say, for a
+///   make seconds after it) and never fires a second; then its own `new`,
+///   and on a not-running answer the daemon's start (or the wait for one
+///   already starting) and that `new` once more; a second not-running
+///   answer is returned as it is. Classify raw output with
+///   [`not_running_here`].
+///
+/// Each says [`DaemonOnce::line`] in the journal when it tries again.
+#[derive(Debug, Default)]
+pub struct DaemonOnce {
+    tried: BTreeSet<u64>,
+}
+impl DaemonOnce {
+    /// Whether this outcome of `key`'s `new` is to be tried once more after
+    /// Harness's daemon is started: a `harness_not_running` one, the first
+    /// for that key. Any other outcome, or a second one, is final.
+    pub fn again(&mut self, key: u64, outcome: &LaunchOutcome) -> bool {
+        matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
+            && self.tried.insert(key)
+    }
+    /// `key`'s outcome kept as final: forgotten, so the set stays small.
+    pub fn done(&mut self, key: u64) {
+        self.tried.remove(&key);
+    }
+    /// The journal's line when `label`'s `new` is tried once more.
+    pub fn line(label: &str) -> String {
+        format!(
+            "tasks: {label}: Harness answered not running here; \
+             its daemon is started and the hand-over tried once more"
+        )
+    }
+    /// One synchronous `new` with this rule. First a daemon start `gate`
+    /// has due or under way is waited for, at most [`DAEMON_GATE_WAIT`];
+    /// then `new()`, and when `not_running` says its answer is Harness's
+    /// `NOT_RUNNING`, the daemon is started through `gate`
+    /// ([`DaemonGate::start_or_wait`]: `start_daemon()`, or the wait for a
+    /// start already under way) and `new()` once more, whatever the start
+    /// said (a failed start leaves the second answer not running, returned
+    /// as it is). Never a third.
+    pub fn run<T>(
+        gate: &DaemonGate,
+        label: &str,
+        mut new: impl FnMut() -> T,
+        not_running: impl Fn(&T) -> bool,
+        start_daemon: impl FnOnce() -> Result<(), String>,
+    ) -> T {
+        gate.wait(DAEMON_GATE_WAIT);
+        let first = new();
+        if !not_running(&first) {
+            return first;
+        }
+        eprintln!("{}", Self::line(label));
+        if let Err(code) = gate.start_or_wait(start_daemon, DAEMON_GATE_WAIT) {
+            eprintln!("tasks: {label}: Harness's daemon not started: {code}");
+        }
+        new()
+    }
+}
+
+/// The longest [`DaemonOnce::run`] waits on a daemon start under way: a
+/// `harness start` that hangs never holds a caller longer.
+pub const DAEMON_GATE_WAIT: Duration = Duration::from_secs(30);
+
+/// Whether a start of Harness's daemon is due or under way in this
+/// process, so a `harness new` caller waits for it and fires no second one
+/// ([`DaemonOnce::run`]). lamp-tasks' owner loop marks its own starts
+/// (`runtime.rs`: due, or its job in flight) with [`DaemonGate::starting`];
+/// counted per starter, so services in one process (tests) keep apart.
+#[derive(Debug, Default)]
+pub struct DaemonGate {
+    starting: Mutex<usize>,
+    settled: Condvar,
+}
+impl DaemonGate {
+    /// The process's one gate, which every `harness new` caller shares.
+    pub fn shared() -> &'static DaemonGate {
+        static SHARED: std::sync::OnceLock<DaemonGate> = std::sync::OnceLock::new();
+        SHARED.get_or_init(DaemonGate::default)
+    }
+    /// A starter's start begins (`true`) or ends (`false`); `was` is what
+    /// that starter last said, so each counts once.
+    pub fn starting(&self, was: &mut bool, now: bool) {
+        if *was == now {
+            return;
+        }
+        *was = now;
+        let mut starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+        if now {
+            *starting += 1;
+        } else {
+            *starting = starting.saturating_sub(1);
+            if *starting == 0 {
+                self.settled.notify_all();
+            }
+        }
+    }
+    /// Whether a start is due or under way now.
+    pub fn busy(&self) -> bool {
+        *self.starting.lock().unwrap_or_else(|e| e.into_inner()) > 0
+    }
+    /// Waits, at most `at_most`, until no start is due or under way.
+    /// Whether none is.
+    pub fn wait(&self, at_most: Duration) -> bool {
+        let starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+        let (starting, _) = self
+            .settled
+            .wait_timeout_while(starting, at_most, |n| *n > 0)
+            .unwrap_or_else(|e| e.into_inner());
+        *starting == 0
+    }
+    /// `start()` when no start is due or under way, marked as one while it
+    /// runs; else the wait for that one, at most `at_most`, and no second.
+    pub fn start_or_wait(
+        &self,
+        start: impl FnOnce() -> Result<(), String>,
+        at_most: Duration,
+    ) -> Result<(), String> {
+        {
+            let mut starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+            if *starting > 0 {
+                drop(starting);
+                return if self.wait(at_most) {
+                    Ok(())
+                } else {
+                    Err("daemon_start_waited".into())
+                };
+            }
+            *starting += 1;
+        }
+        let started = start();
+        let mut mine = true;
+        self.starting(&mut mine, false);
+        started
+    }
+}
+
+/// Harness CLI's fixed answer when no daemon runs on this computer
+/// (`NOT_RUNNING`), a whole stderr line.
+pub const NOT_RUNNING_SAID: &str = "Harness is not running here. Start it with `harness start`.";
+
+/// Whether a failed `new` says no Harness daemon runs on this computer: a
+/// stderr line that, trimmed, is [`NOT_RUNNING_SAID`] itself. A line that
+/// only holds those words (a person's ask echoed back, "why the printer is
+/// not running here") is not it, nor is stdout (the first builder's and the
+/// reviewer-lead's reads of #7282).
+pub fn not_running_here(_stdout: &[u8], stderr: &[u8]) -> bool {
+    String::from_utf8_lossy(stderr)
+        .lines()
+        .any(|line| line.trim() == NOT_RUNNING_SAID)
+}
+
 /// Whether a failed `new` says the target's folder isn't on the computer
 /// (#2840). Harness refuses that before it makes anything (`CWD_NOT_FOUND`,
 /// openharness `core/agents/create.ts`; `INVALID_CWD` in its own words), so
@@ -4093,6 +4781,9 @@ struct Seen {
     /// Every word of the machines the preflight listed (names, hostnames,
     /// ids), lowercased: never said ([`said_of_stderr`]).
     machines: BTreeSet<String>,
+    /// The agent a successful `new` reply named by the launch's own name
+    /// ([`named_agent`]), whether or not the reply was then taken.
+    named: Option<String>,
 }
 impl Seen {
     fn took(&mut self, result: &Result<Reply, RunError>) {
@@ -4191,11 +4882,27 @@ fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Du
         launch.name,
         took.as_secs_f64()
     );
-    if let Some(said) = said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines) {
+    // Harness's own words that no daemon runs here are said whole, so the
+    // lamp's journal shows them as Harness gave them: the fixed answer's
+    // constant, never stderr's own line, which may hold the person's
+    // words. Any other stderr goes through `said_of_stderr`'s cut.
+    let whole = matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING)
+        .then(|| not_running_lines(&seen.stderr))
+        .flatten();
+    if let Some(said) =
+        whole.or_else(|| said_of_stderr(&seen.stderr, &launch.prompt, &seen.machines))
+    {
         line.push_str(&format!(", stderr: {said}"));
     }
     line.push(')');
     line
+}
+
+/// [`NOT_RUNNING_SAID`] when stderr says it ([`not_running_here`]): the
+/// constant, never stderr's own line. Nothing when no line is it: the rest
+/// of stderr is never said whole.
+fn not_running_lines(stderr: &[u8]) -> Option<String> {
+    not_running_here(&[], stderr).then(|| NOT_RUNNING_SAID.to_owned())
 }
 
 /// Stderr's last line that has words, with only what can't be the person's
@@ -5502,6 +6209,21 @@ fn reply_refusal(bytes: &[u8]) -> &'static str {
     }
 }
 
+/// The agent id a `new` reply names under the launch's own name, read
+/// loosely so a reply [`parse_launch`] refuses still gives it (#7171): a
+/// created agent's `agent.id` and `agent.name`, or an `existing` one's
+/// top-level `agentId` and `name`. `None` when it names none, names
+/// another name, or the id isn't one.
+fn named_agent(bytes: &[u8], launch: &Launch) -> Option<String> {
+    let reply = serde_json::from_slice::<Value>(bytes).ok()?;
+    let (id, name) = match reply.get("agent") {
+        Some(agent) => (agent.get("id"), agent.get("name")),
+        None => (reply.get("agentId"), reply.get("name")),
+    };
+    let id = id?.as_str()?;
+    (name?.as_str()? == launch.name && agent_id(id)).then(|| id.to_owned())
+}
+
 /// `daemon`: the id Harness's daemon here starts work under
 /// ([`parse_daemon_here`]). A `new` for the lamp's own target is sent with
 /// no `--machine`, so it is always started here, and its reply names the
@@ -5712,6 +6434,9 @@ pub const BACKGROUND_COMMANDS: &str = "background_commands";
 /// Harness refused the close itself for background commands still running
 /// (#5689).
 pub const CLOSE_BACKGROUND_COMMANDS: &str = "close_background_commands";
+/// Harness refused the one standing pane's close because it no longer has
+/// that pane (`UNKNOWN_HARNESS` or `GONE`, #7246): already gone.
+pub const CLOSE_UNKNOWN_HARNESS: &str = "UNKNOWN_HARNESS";
 
 /// Whether a refused `close` says background commands still run: Harness
 /// 0.6.52's `N background commands running; --now closes anyway`, in its
@@ -5724,6 +6449,29 @@ pub fn background_refusal(stdout: &[u8], stderr: &[u8]) -> bool {
             .windows(SAID.len())
             .any(|window| window == SAID)
     })
+}
+
+/// Whether a `harness close` was refused because the harness is working
+/// or waiting for the person: exit 1 with `WORKING` as its `--json`
+/// reply's `error` (or `code`), nothing else. `AGENT_CHANGED`, a gone
+/// harness or any other refusal is not.
+fn close_refused_working(code: Option<i32>, stdout: &[u8]) -> bool {
+    code == Some(1)
+        && serde_json::from_slice::<Value>(stdout).is_ok_and(|reply| {
+            reply["error"].as_str() == Some("WORKING") || reply["code"].as_str() == Some("WORKING")
+        })
+}
+
+/// What closing an OpenClaw harness with no proof came to
+/// ([`Cli::openclaw_closed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpenclawClosed {
+    /// Closed or gone: a `new` more may be asked.
+    Closed,
+    /// Refused as `WORKING`: it took its prompt, and is the launch.
+    Working,
+    /// Not closed, for any other reason: nothing more is started.
+    Not,
 }
 
 /// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused

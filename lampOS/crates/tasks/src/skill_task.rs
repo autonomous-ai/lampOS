@@ -770,6 +770,15 @@ pub struct SkillRun {
     /// is refused [`NOT_STARTED`], so lamp-skills may send it itself, and
     /// never after (the first builder's ruling on #6823).
     pub started: std::sync::atomic::AtomicBool,
+    /// A skill's fixed write's run (#6879), set by [`run_on_token`]: a
+    /// launch Harness didn't make is asked once more ([`HarnessRunner`],
+    /// #7092).
+    pub write: bool,
+    /// Set by the runner when a fixed write's run was never made: Harness
+    /// didn't make its launch, asked twice, or didn't answer to be asked
+    /// again (#7092). Refused [`NOT_MADE`], so lamp-skills tells the owner
+    /// its send didn't go.
+    pub not_made: std::sync::atomic::AtomicBool,
     /// The folder the run starts in, when not the runner's own work
     /// folder: a make's folder (`crate::skill_make`). None for a skill's.
     pub start_in: Option<PathBuf>,
@@ -791,6 +800,12 @@ pub const TELL_LINE: &str = "Your last answer is said aloud to the owner by the 
 /// The code of a fixed write's run refused before its agent began
 /// ([`SkillRun::started`]): nothing of it can have been sent.
 pub const NOT_STARTED: &str = "not_started";
+
+/// The code of a fixed write's run Harness never made, though asked
+/// ([`SkillRun::not_made`], #7092): not sent straight, as its first launch
+/// may have reached Harness, and never tried again; lamp-skills tells the
+/// owner its send didn't go.
+pub const NOT_MADE: &str = "not_made";
 
 impl std::fmt::Debug for SkillRun {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -852,6 +867,8 @@ impl SkillRun {
             ],
             deadline: RUN_LIFETIME,
             started: std::sync::atomic::AtomicBool::new(false),
+            write: false,
+            not_made: std::sync::atomic::AtomicBool::new(false),
             start_in: None,
             env_file: None,
             answer: std::sync::OnceLock::new(),
@@ -1321,7 +1338,8 @@ pub fn answer_for(
 /// starts in, removed when it ends; or the refusal) and waited for, the
 /// token ended however it ends; the answer, or the refusal. A fixed
 /// write's (`write`) that fails before its agent began is [`NOT_STARTED`],
-/// else `run_failed` as a task's. A run that `tells` ([`tells_answer`])
+/// one Harness never made though asked is [`NOT_MADE`] (#7092), else
+/// `run_failed` as a task's. A run that `tells` ([`tells_answer`])
 /// and ended well with an answer has it in its answer ([`told_answer`]).
 fn run_on_token(
     skill: &str,
@@ -1353,10 +1371,11 @@ fn run_on_token(
              the owner says yes again in the app",
         );
     }
-    let (run, fresh) = match made(&run_id, &minted.token) {
+    let (mut run, fresh) = match made(&run_id, &minted.token) {
         Ok(made) => made,
         Err(refused) => return refused,
     };
+    run.write = write;
     let ran = runner.run(&run, &|| ending.end());
     let began = run.started.load(Ordering::Acquire);
     let found = run
@@ -1377,6 +1396,7 @@ fn run_on_token(
             }
         );
     }
+    let not_made = run.not_made.load(Ordering::Acquire);
     // Its keys' file, whatever the runner did with it, then its folder.
     if let Some(file) = &run.env_file {
         let _ = std::fs::remove_file(file);
@@ -1390,7 +1410,14 @@ fn run_on_token(
             Some(answer) => json!({"ok": true, "id": id, "answer": answer}),
             None => json!({"ok": true, "id": id}),
         },
+        // The one session's queue full (#7246): `busy`, as a second run
+        // is, so lamp-skills' retry (#7239) still applies.
+        Err(why) if !began && why == crate::one_session::BUSY => refusal("busy", &why),
         Err(why) if write && !began => refusal(NOT_STARTED, &why),
+        Err(why) if write && not_made => refusal(NOT_MADE, &why),
+        Err(why) if !began && why == crate::gateway::SKILL_START_NOT_ALLOWED => {
+            refusal(crate::gateway::SKILL_START_NOT_ALLOWED_CODE, &why)
+        }
         Err(why) => refusal("run_failed", &why),
     }
 }
@@ -1611,6 +1638,11 @@ pub const WAIT_RETRY: Duration = Duration::from_secs(1);
 /// looked past, for the live one in the run's folder, before the run ends
 /// as lost (#6432); and how often in that time it is looked for.
 pub const LOST_START_LOOK: Duration = Duration::from_secs(5);
+/// How long a fixed write's launch Harness didn't make waits for Harness
+/// to answer before it is asked once more (#7092): its daemon, started
+/// again with lamp-tasks, answered within seconds on lamp-9adf. Within the
+/// run's own deadline, under lamp-skills' wait for the answer.
+pub const ANSWER_WAIT: Duration = Duration::from_secs(60);
 const LOST_START_EVERY: Duration = Duration::from_millis(500);
 
 /// The Harness a skill's run is started through, as lamp-tasks has set it
@@ -2157,7 +2189,12 @@ pub fn harness_sign_in_read(sign_in: Option<crate::harness::SignIn>) {
         HarnessHere::SignedOut => 2,
         HarnessHere::Unknown | HarnessHere::Absent => 0,
     };
-    HARNESS_SIGN_IN.store(value, Ordering::Release);
+    let before = HARNESS_SIGN_IN.swap(value, Ordering::AcqRel);
+    // Signed in, now signed out (#7246's privacy rules): the one session's
+    // pane is removed, its conversation with it.
+    if before == 1 && value == 2 {
+        crate::one_session::signed_out();
+    }
 }
 
 /// Harness's sign-in as last read ([`harness_sign_in_read`]): no call, no
@@ -2286,6 +2323,9 @@ pub struct HarnessRunner {
     /// How long a `stopped` with no session bound is looked past
     /// ([`LOST_START_LOOK`] on a lamp, #6432).
     pub lost_look: Duration,
+    /// How long a fixed write's unmade launch waits for Harness to answer
+    /// before it is asked once more ([`ANSWER_WAIT`] on a lamp, #7092).
+    pub answer_wait: Duration,
     /// [`DEFAULT_AGENT_SWITCH`] on: a run goes to the lamp's default agent
     /// by the one run path, or is refused ([`default_agent_takes_runs`]).
     pub default_agent: bool,
@@ -2313,6 +2353,31 @@ pub struct HarnessRunner {
     /// A gateway agent's runs live for the launcher
     /// ([`crate::skill_start::Server`] serves the same, #7133).
     pub starts: crate::skill_start::Starts,
+    /// `LAMP_TASKS_ONE_SESSION` on (#7246): the lamp's one standing pane a
+    /// gateway agent's run is typed into ([`crate::one_session`]); `None`
+    /// (off), every run is its own `harness new` as before.
+    pub one_session: Option<std::sync::Arc<crate::one_session::OneSession>>,
+    /// Agent `main`'s exec allow-list checked for the launcher before a
+    /// run is typed into the one session ([`crate::gateway::SkillStartAllowed`]).
+    pub skill_start_allowed: crate::gateway::SkillStartAllowed,
+    /// #7245: this runner takes a voice make's one turn
+    /// ([`crate::skill_make::MakeTurn`]), not a skill's run: always on the
+    /// one run path, to a gateway agent only, in the make's own folder
+    /// ([`SkillRun::start_in`], made by the make), with no token, no token
+    /// file and no skill-start claim. The make's `answer.md` is read into
+    /// [`SkillRun::answer`] before its guard closes the session (`close
+    /// --now`) and removes the folder, however the make ends. Off for every
+    /// skill's run.
+    pub makes: bool,
+}
+
+/// lamp-tasks' Harness project in `home`, `~/harnesses/lamp-tasks`
+/// (`runtime::MACHINES_PROJECT`), where each run's folder is made.
+pub fn lamp_project(home: &Path) -> PathBuf {
+    let project = crate::runtime::MACHINES_PROJECT
+        .strip_prefix("~/")
+        .unwrap_or(crate::runtime::MACHINES_PROJECT);
+    home.join(project)
 }
 
 impl HarnessRunner {
@@ -2320,16 +2385,14 @@ impl HarnessRunner {
     /// (`runtime::MACHINES_PROJECT`), token files in
     /// [`crate::run_token_file::RUNS_DIR`], held by [`HERMES`].
     pub fn lamp(home: &Path, harness: SkillHarnessSlot) -> Self {
-        let project = crate::runtime::MACHINES_PROJECT
-            .strip_prefix("~/")
-            .unwrap_or(crate::runtime::MACHINES_PROJECT);
         Self {
-            project: home.join(project),
+            project: lamp_project(home),
             runs: PathBuf::from(crate::run_token_file::RUNS_DIR),
             harness,
             held_by: Some(PathBuf::from(HERMES)),
             retry: WAIT_RETRY,
             lost_look: LOST_START_LOOK,
+            answer_wait: ANSWER_WAIT,
             default_agent: std::env::var(DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
             wrappers: Some(PathBuf::from(AGENT_WRAPPERS)),
             agent_ns: Some(PathBuf::from(AGENT_NS)),
@@ -2337,7 +2400,58 @@ impl HarnessRunner {
             stopping: std::sync::OnceLock::new(),
             no_harness: NoHarnessSlot::default(),
             starts: Default::default(),
+            one_session: None,
+            skill_start_allowed: crate::gateway::SkillStartAllowed::lamp(),
+            makes: false,
         }
+    }
+
+    /// The lamp's default agent's wrapper text and, when that wrapper is a
+    /// gateway agent's, its data (#7133): read from the agents' wrappers
+    /// for `engine`, the same for a skill's run and a make (#7245).
+    fn default_agent_data(
+        &self,
+        engine: crate::harness::EngineKind,
+    ) -> (Option<String>, Option<crate::gateway::GatewayAgent>) {
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        let wrapper = self
+            .wrappers
+            .as_ref()
+            .and_then(|wrappers| read(&wrappers.join(engine.argument())));
+        // A gateway agent, by its wrapper's own data (no engine's name):
+        // its tools run in its gateway, so its run's token goes through
+        // the skill-start launcher, never a file (#7133).
+        let gateway_agent = self.wrappers.as_ref().and_then(|_| {
+            wrapper
+                .as_deref()
+                .and_then(crate::gateway::GatewayAgent::of)
+                .and_then(Result::ok)
+        });
+        (wrapper, gateway_agent)
+    }
+
+    /// #7245: the lamp's default agent for a voice make on the one run
+    /// path, by its own data, nothing started: its engine, and whether it
+    /// is a gateway agent that takes a run ([`default_agent_takes_runs`]
+    /// with its gateway's namespace). A per-run agent is `false` here; a
+    /// gateway agent that can't take a run is refused in words. `None`
+    /// while Harness isn't set up or has no lamp target: no gateway agent
+    /// can be reached then, so the make goes as without the field.
+    pub fn make_agent(&self) -> Result<Option<(crate::harness::EngineKind, bool)>, String> {
+        let Some(harness) = self.harness.get() else {
+            return Ok(None);
+        };
+        let Some(lamp) = (harness.lamp)() else {
+            return Ok(None);
+        };
+        let engine = (harness.default_engine)().unwrap_or(lamp.engine);
+        let (wrapper, gateway) = self.default_agent_data(engine);
+        let Some(gateway) = gateway else {
+            return Ok(Some((engine, false)));
+        };
+        let script = std::fs::read_to_string(&gateway.ns).ok();
+        default_agent_takes_runs(engine, wrapper.as_deref(), script.as_deref())
+            .map(|()| Some((engine, true)))
     }
 
     /// Whether the lamp's default agent takes a skill's run with no
@@ -2544,6 +2658,12 @@ impl Drop for LocalRun<'_> {
     }
 }
 
+/// How long a make's pending or uncertain `harness new` is looked for in
+/// its folder at its end, to be closed if Harness made it late (#7245).
+const LATE_NEW_WINDOW: Duration = Duration::from_secs(10);
+/// How often that folder is looked in: never more than ten `ps` calls.
+const LATE_NEW_STEP: Duration = Duration::from_secs(1);
+
 /// A run started through Harness, undone however the run ends: its
 /// session closed (`close --now`), then its folder removed, then its token
 /// file deleted (when the wrapper hasn't already).
@@ -2557,6 +2677,17 @@ struct Started<'a> {
     /// A gateway agent's run live for its launcher (#7133): no longer live
     /// once its token is ended, so a later claim is refused.
     live: Option<crate::skill_start::Live>,
+    /// A make's engine (#7245): its end is journaled once its session is
+    /// closed and its folder removed.
+    make: Option<crate::harness::EngineKind>,
+    /// Whether a `close --now` of its session failed.
+    not_closed: bool,
+    /// Whether Harness made it a session (a make's end is journaled only
+    /// then).
+    opened: bool,
+    /// A make whose `harness new` was uncertain or pending: what is live in
+    /// its folder is closed before the folder goes (#7245).
+    uncertain: bool,
 }
 
 impl Started<'_> {
@@ -2574,6 +2705,7 @@ impl Started<'_> {
             // TODO(#6510): the SIGKILL backstop to the namespace's `unshare`
             // pid goes here once lamp-tasks has a sure way to that pid.
             eprintln!("[lamp-tasks] skill task: the run's session was not closed: {why}");
+            self.not_closed = true;
         }
         Some(closed)
     }
@@ -2582,15 +2714,77 @@ impl Started<'_> {
 impl Drop for Started<'_> {
     fn drop(&mut self) {
         self.close();
-        if let Err(error) = std::fs::remove_dir_all(&self.folder)
-            && error.kind() != std::io::ErrorKind::NotFound
+        if self.uncertain
+            && let Some(folder) = self.folder.to_str()
         {
-            eprintln!(
-                "[lamp-tasks] skill task: the run's folder {} was not removed: {error}",
-                self.folder.display()
-            );
+            // A pending `new` Harness may still make a few seconds on: its
+            // folder is looked in again each LATE_NEW_STEP, until a session
+            // there is closed or LATE_NEW_WINDOW runs out.
+            let until = std::time::Instant::now() + LATE_NEW_WINDOW;
+            loop {
+                let found = match self.cli.live_in(&self.machine, folder) {
+                    Ok(live) => {
+                        let found = !live.is_empty();
+                        for agent in live {
+                            let closed = self.cli.close_now(
+                                &self.machine,
+                                &agent,
+                                crate::harness::CLOSE_BUDGET,
+                            );
+                            match closed {
+                                Ok(_) => {
+                                    eprintln!(
+                                        "tasks: make: closed {agent} an uncertain new made late"
+                                    )
+                                }
+                                Err(why) => {
+                                    self.not_closed = true;
+                                    eprintln!(
+                                        "tasks: make: {agent} an uncertain new made was not closed: {why}"
+                                    );
+                                }
+                            }
+                        }
+                        found
+                    }
+                    Err(code) => {
+                        eprintln!("tasks: make: harness ps after an uncertain new: {code}");
+                        false
+                    }
+                };
+                if found || std::time::Instant::now() + LATE_NEW_STEP > until {
+                    break;
+                }
+                std::thread::sleep(LATE_NEW_STEP);
+            }
         }
+        let removed = match std::fs::remove_dir_all(&self.folder) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                eprintln!(
+                    "[lamp-tasks] skill task: the run's folder {} was not removed: {error}",
+                    self.folder.display()
+                );
+                false
+            }
+            _ => true,
+        };
         drop(self.token.take());
+        if let Some(engine) = self.make.filter(|_| self.opened) {
+            let engine = engine.argument();
+            if removed && !self.not_closed {
+                eprintln!("tasks: make: {engine} session closed, folder removed");
+            } else {
+                eprintln!(
+                    "tasks: make: {engine} session {}, folder {}",
+                    if self.not_closed {
+                        "NOT closed"
+                    } else {
+                        "closed"
+                    },
+                    if removed { "removed" } else { "NOT removed" }
+                );
+            }
+        }
     }
 }
 
@@ -2668,20 +2862,62 @@ fn after_stop(
     }
 }
 
+/// Whether Harness didn't make a launch it was asked for: `new` refused
+/// or failed (`new_failed`, #7092).
+fn unmade(outcome: &crate::harness::LaunchOutcome) -> bool {
+    matches!(outcome, crate::harness::LaunchOutcome::Uncertain { code } if code == "new_failed")
+}
+
+impl HarnessRunner {
+    /// #7092: `ps` of `machine` asked every [`Self::retry`] until Harness
+    /// answers, `until` or lamp-tasks' stop: whether nothing is live in
+    /// `folder` then, or `None` when it never answered.
+    fn answers_empty(
+        &self,
+        cli: &crate::harness::Cli,
+        machine: &str,
+        folder: &str,
+        until: std::time::Instant,
+    ) -> Option<bool> {
+        let stopped = || {
+            self.stopping
+                .get()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
+        loop {
+            if let Ok(live) = cli.live_in(machine, folder) {
+                return Some(live.is_empty());
+            }
+            let next = std::time::Instant::now() + self.retry;
+            if next >= until || stopped() {
+                return None;
+            }
+            while std::time::Instant::now() < next && !stopped() {
+                std::thread::sleep(RUN_TICK.min(self.retry));
+            }
+        }
+    }
+}
+
 impl Runner for HarnessRunner {
     fn stop_on(&self, stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {
         let _ = self.stopping.set(stop);
     }
 
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
-        use crate::harness::{Cli, Closed, EngineKind, Launch, LaunchOutcome, Target};
+        use crate::harness::{
+            Cli, Closed, DaemonGate, DaemonOnce, EngineKind, HARNESS_NOT_RUNNING, Launch,
+            LaunchOutcome, Target,
+        };
         use std::os::unix::fs::DirBuilderExt;
         use std::sync::atomic::AtomicBool;
         let began = std::time::Instant::now();
         // With the switch on and no Harness account (or no Harness), the
         // lamp's own agent with no Harness (#6685 PR 3), read as last
         // known: nothing is asked here.
-        if let Some(local) = self.no_harness.get() {
+        if !self.makes
+            && let Some(local) = self.no_harness.get()
+        {
             let here = (local.here)();
             if starts_without_harness(self.default_agent, here, self.harness.get().is_some()) {
                 match self.takes_without_harness(local) {
@@ -2717,22 +2953,11 @@ impl Runner for HarnessRunner {
         // Off, the lamp's own Hermes on the lamp's machine (V2's (b), #1711
         // 21:34). The person's own spoken tasks still go to the chosen or
         // named engine (#6506).
-        let one_path = if self.default_agent {
+        // A make (#7245) is always on the one run path.
+        let one_path = if self.default_agent || self.makes {
             let engine = (harness.default_engine)().unwrap_or(lamp.engine);
             let read = |path: &Path| std::fs::read_to_string(path).ok();
-            let wrapper = self
-                .wrappers
-                .as_ref()
-                .and_then(|wrappers| read(&wrappers.join(engine.argument())));
-            // A gateway agent, by its wrapper's own data (no engine's name):
-            // its tools run in its gateway, so its run's token goes through
-            // the skill-start launcher, never a file (#7133).
-            let gateway_agent = self.wrappers.as_ref().and_then(|_| {
-                wrapper
-                    .as_deref()
-                    .and_then(crate::gateway::GatewayAgent::of)
-                    .and_then(Result::ok)
-            });
+            let (wrapper, gateway_agent) = self.default_agent_data(engine);
             let checked = match &self.wrappers {
                 Some(wrappers) => {
                     // The namespace the agent runs in, by its own data: a
@@ -2767,7 +2992,9 @@ impl Runner for HarnessRunner {
                 // The lamp's Hermes the default, its wrapper not yet
                 // rewritten (an older updater's round, #6898): the run goes
                 // the switch-off way below, as before (#6914).
-                Err(why) if hermes_waits_for_its_round(engine, wrapper.as_deref()) => {
+                Err(why)
+                    if !self.makes && hermes_waits_for_its_round(engine, wrapper.as_deref()) =>
+                {
                     eprintln!(
                         "[lamp-tasks] skill task {}: {why}; run through the lamp's Hermes as with {DEFAULT_AGENT_SWITCH} off until lamp-update rewrites its wrapper",
                         run.run
@@ -2783,7 +3010,18 @@ impl Runner for HarnessRunner {
             None
         };
         let (engine, agent, by_start) = match one_path {
+            // A make goes only to a gateway agent here: the lamp's Hermes
+            // takes its makes in its own namespace (`MakeHermes`).
+            Some((engine, false)) if self.makes => {
+                return Err(format!(
+                    "the lamp's default agent ({}) is not a gateway agent, so a make is not handed to it on the one run path and nothing was started",
+                    engine.argument()
+                ));
+            }
             Some((engine, by_start)) => (engine, "the lamp's default agent", by_start),
+            None if self.makes => {
+                return Err("a make goes only on the one run path, so nothing was started".into());
+            }
             None => {
                 if let Some(wrapper) = &self.held_by
                     && !std::fs::read_to_string(wrapper)
@@ -2794,28 +3032,44 @@ impl Runner for HarnessRunner {
                 (EngineKind::Hermes, "the lamp's Hermes", false)
             }
         };
-        let token = run
-            .env
-            .iter()
-            .find(|(name, _)| *name == TOKEN_ENV)
-            .map(|(_, secret)| RunToken::new(secret.clone()))
-            .ok_or("the run has no token, so nothing was started")?;
+        // A make has no token (#7245): it has no grants.
+        let token = if self.makes {
+            None
+        } else {
+            Some(
+                run.env
+                    .iter()
+                    .find(|(name, _)| *name == TOKEN_ENV)
+                    .map(|(_, secret)| RunToken::new(secret.clone()))
+                    .ok_or("the run has no token, so nothing was started")?,
+            )
+        };
         let cli = Cli::new(harness.config.clone(), harness.session.clone())
             .map_err(|error| format!("Harness can't be asked: {error}"))?;
-        // The project as Harness's own folder for the lamp is made (0700,
-        // `lampos`'s); the run's folder in it is new, never one there.
-        if !self.project.is_dir() {
+        let folder = if self.makes {
+            // The make's own folder, made by the make with its rules.
+            run.start_in
+                .clone()
+                .filter(|folder| folder.is_dir())
+                .ok_or("the make's folder is not there, so nothing was started")?
+        } else {
+            // The project as Harness's own folder for the lamp is made
+            // (0700, `lampos`'s); the run's folder in it is new, never one
+            // there.
+            if !self.project.is_dir() {
+                std::fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(&self.project)
+                    .map_err(|error| format!("lamp-tasks' Harness project not made: {error}"))?;
+            }
+            let folder = self.project.join(format!("{RUN_FOLDER_PREFIX}{}", run.run));
             std::fs::DirBuilder::new()
-                .recursive(true)
                 .mode(0o700)
-                .create(&self.project)
-                .map_err(|error| format!("lamp-tasks' Harness project not made: {error}"))?;
-        }
-        let folder = self.project.join(format!("{RUN_FOLDER_PREFIX}{}", run.run));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&folder)
-            .map_err(|error| format!("the run's folder not made: {error}"))?;
+                .create(&folder)
+                .map_err(|error| format!("the run's folder not made: {error}"))?;
+            folder
+        };
         let mut started = Started {
             cli: &cli,
             end_token,
@@ -2824,6 +3078,10 @@ impl Runner for HarnessRunner {
             folder,
             token: None,
             live: None,
+            make: self.makes.then_some(engine),
+            not_closed: false,
+            opened: false,
+            uncertain: false,
         };
         // Always before the launch. A per-run agent's wrapper reads it at
         // its start; a gateway agent's tools never see that wrapper, and
@@ -2831,22 +3089,33 @@ impl Runner for HarnessRunner {
         // reads and writes: so nothing is written there, the run is made
         // live for the launcher to claim once, and the task asks the agent
         // to run the launcher with the run's id (#7133).
-        let prompt = if by_start {
-            let (live, prompt) =
-                crate::gateway::open_start(&self.starts, &started.folder, run, token.secret())?;
-            started.live = Some(live);
-            prompt
-        } else {
-            started.token = Some(crate::run_token_file::RunTokenFile::write(
-                &self.runs, &run.run, &token,
-            )?);
-            run.prompt.clone()
+        // A make's one turn is its own words alone (#7245): nothing made
+        // live, no token file.
+        let prompt = match &token {
+            None => run.prompt.clone(),
+            Some(token) if by_start => {
+                let (live, prompt) =
+                    crate::gateway::open_start(&self.starts, &started.folder, run, token.secret())?;
+                started.live = Some(live);
+                prompt
+            }
+            Some(token) => {
+                started.token = Some(crate::run_token_file::RunTokenFile::write(
+                    &self.runs, &run.run, token,
+                )?);
+                run.prompt.clone()
+            }
         };
         let Some(project) = started.folder.to_str().map(str::to_owned) else {
             return Err("the run's folder is not a plain path".into());
         };
+        let head = if self.makes {
+            crate::skill_make::FOLDER_HEAD
+        } else {
+            RUN_FOLDER_PREFIX
+        };
         let launch = Launch {
-            name: format!("{RUN_FOLDER_PREFIX}{}", run.run),
+            name: format!("{head}{}", run.run),
             prompt,
             target: Target {
                 machine_id: lamp.machine_id.clone(),
@@ -2879,17 +3148,95 @@ impl Runner for HarnessRunner {
         if stopped() || std::time::Instant::now() >= until {
             return Err("the skill run ended before hand-over".into());
         }
-        let outcome = cli.launch(&launch);
+        // `LAMP_TASKS_ONE_SESSION` on (#7246): a gateway agent's run is
+        // typed into the lamp's one standing pane, its folder, launcher
+        // claim and token still its own; one the pane can't take goes on
+        // below, the per-run way.
+        // Only with Harness called as the person, as the product's
+        // lamp-tasks is: Harness closes an idle pane an agent started after
+        // 30 min, so as an agent each run keeps its own.
+        // OpenClaw's only: a Hermes default keeps the per-run path.
+        if by_start
+            && harness.config.as_person
+            && crate::one_session::shares(engine)
+            && let Some(one) = &self.one_session
+            && let Some(ended) = self.run_in_one_session(
+                one,
+                &cli,
+                &lamp.machine_id,
+                engine,
+                run,
+                &mut started,
+                &launch.prompt,
+                began,
+                until,
+                &stopped,
+            )
+        {
+            return ended;
+        }
+        // No Harness daemon here (`harness_not_running`, #7275): started,
+        // after any start lamp-tasks already has under way, and the run
+        // handed over once more; never a third `new` ([`DaemonOnce`]).
+        let (mut outcome, mut named) = DaemonOnce::run(
+            DaemonGate::shared(),
+            &launch.name,
+            || cli.launch_naming(&launch),
+            |(outcome, _)| matches!(outcome, LaunchOutcome::NotSent { code } if code == HARNESS_NOT_RUNNING),
+            || cli.start_daemon(),
+        );
         // Asked of Harness: from here the agent may have begun, unless
         // Harness never sent the creation.
         if !matches!(outcome, LaunchOutcome::NotSent { .. }) {
             run.started.store(true, Ordering::Release);
+        }
+        // #7092: a fixed write's launch Harness didn't make (`new_failed`:
+        // its daemon not up yet, as just after a lamp-tasks restart) is
+        // asked once more, the same run in the same folder on the same
+        // token, once Harness answers with nothing in the run's folder.
+        // lamp-services sends a run's write once, so even a first launch
+        // Harness made after all sends nothing twice. Never a task's run,
+        // never a third launch, and never once something is in the folder.
+        if run.write && unmade(&outcome) {
+            let until = std::time::Instant::now() + self.answer_wait;
+            let until = until.min(began + run.deadline);
+            match self.answers_empty(&cli, &lamp.machine_id, &launch.target.project, until) {
+                Some(true) => {
+                    eprintln!(
+                        "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed); it answers now with nothing in the run's folder, so it is asked once more",
+                        run.run
+                    );
+                    (outcome, named) = cli.launch_naming(&launch);
+                    if unmade(&outcome) || matches!(outcome, LaunchOutcome::NotSent { .. }) {
+                        run.not_made.store(true, Ordering::Release);
+                    }
+                }
+                Some(false) => eprintln!(
+                    "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed), but an agent is in the run's folder, so it isn't asked again: it may have begun",
+                    run.run
+                ),
+                None => {
+                    eprintln!(
+                        "[lamp-tasks] skill task {}: Harness didn't make the fixed write's run (new_failed) and didn't answer within {} s, so it isn't asked again",
+                        run.run,
+                        self.answer_wait.as_secs()
+                    );
+                    run.not_made.store(true, Ordering::Release);
+                }
+            }
         }
         let launched = match outcome {
             LaunchOutcome::Created { agent_id } => agent_id,
             // Never asked for: no route, no named session.
             LaunchOutcome::Joined { .. } | LaunchOutcome::JoinedOn { .. } => {
                 return Err("Harness handed the run to a session already there".into());
+            }
+            // A make has no token for a wrapper to refuse (#7245): what
+            // Harness may still have made is looked for in the make's own
+            // folder and closed by the guard, before the folder goes.
+            LaunchOutcome::Pending { .. } | LaunchOutcome::Uncertain { .. } if self.makes => {
+                started.uncertain = true;
+                return Err("Harness didn't start the make for sure, so it was given up".into());
             }
             // A creation Harness may still finish: the folder and the token
             // file go with this guard, so it starts with no token, and its
@@ -2898,15 +3245,35 @@ impl Runner for HarnessRunner {
                 return Err("Harness didn't start the run at once, so it was given up".into());
             }
             LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
+                // #7171: an uncertain `new` whose reply still named the
+                // run's agent (a `machineId` not the lamp's, an `existing`
+                // one) may have started it, so the guard closes it as on
+                // every other end: the token ended, then `close --now`.
+                started.agent = named;
                 return Err(format!("Harness didn't start the run ({code})"));
             }
         };
         started.agent = Some(launched.clone());
+        started.opened = true;
         drop(token);
+        if self.makes {
+            eprintln!(
+                "tasks: make: handed to {} on the one run path in {} ms",
+                engine.argument(),
+                began.elapsed().as_millis()
+            );
+        }
         let mut agents = vec![launched];
         let mut seen = agents.clone();
         let cancel = AtomicBool::new(false);
-        let deadline = run.deadline.saturating_sub(began.elapsed());
+        // A voice make's turn gets its whole deadline from the hand-over
+        // (#7245, lamp-c0a4 17:53: Harness's hand-over took 40 of 90 s and
+        // OpenClaw had no time left to write). A skill's run is unchanged.
+        let deadline = if self.makes {
+            run.deadline
+        } else {
+            run.deadline.saturating_sub(began.elapsed())
+        };
         let stopping = self.stopping.get().cloned();
         let stopped = || {
             stopping
@@ -3046,10 +3413,19 @@ impl Runner for HarnessRunner {
                     });
                 }
                 let ended = ended_as(&state, agent);
-                // Failing closed: a gateway agent's run whose launcher never
-                // claimed its start, or whose fence never said it started
-                // the script, never ran the skill's script.
-                let ended = if by_start && ended.is_ok() {
+                // A make's answer is its folder's `answer.md`, read before
+                // its guard removes the folder (#7245). Failing closed: a
+                // gateway agent's run whose launcher never claimed its
+                // start, or whose fence never said it started the script,
+                // never ran the skill's script.
+                let ended = if self.makes {
+                    if ended.is_ok()
+                        && let Some(text) = crate::skill_make::answer_in(&started.folder)
+                    {
+                        let _ = run.answer.set(text);
+                    }
+                    ended
+                } else if by_start && ended.is_ok() {
                     started
                         .live
                         .as_ref()
@@ -3074,8 +3450,10 @@ impl Runner for HarnessRunner {
                     }
                 );
                 // Kept for the hand-over's answer; told only by a run that
-                // tells it ([`tells_answer`]).
+                // tells it ([`tells_answer`]). Never a make's: its answer is
+                // its file's alone.
                 if ended.is_ok()
+                    && !self.makes
                     && let Some(answer) = answer
                 {
                     let _ = run.answer.set(answer);
@@ -3104,6 +3482,154 @@ impl Runner for HarnessRunner {
                 }
             }
         }
+    }
+}
+
+impl HarnessRunner {
+    /// A gateway agent's run in the lamp's one standing pane (#7246,
+    /// [`crate::one_session`]): the pane taken in the queue's order (full:
+    /// [`crate::one_session::BUSY`]), the run's words typed after its
+    /// header line, then its turn waited for, as a run's own agent is, to
+    /// the deadline or lamp-tasks' stop. The pane is never closed at the
+    /// run's end; `started` keeps no agent, so its guard only ends the
+    /// run's token and launcher claim and removes its folder. `None`: the
+    /// pane could not take it, so the run goes the per-run way.
+    #[allow(clippy::too_many_arguments)]
+    fn run_in_one_session(
+        &self,
+        one: &crate::one_session::OneSession,
+        cli: &crate::harness::Cli,
+        machine: &str,
+        engine: crate::harness::EngineKind,
+        run: &SkillRun,
+        started: &mut Started<'_>,
+        words: &str,
+        began: std::time::Instant,
+        until: std::time::Instant,
+        stopped: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Result<u64, String>> {
+        use crate::one_session::{Ended, Kind, Place, Refused, Sent};
+        use std::os::unix::fs::DirBuilderExt;
+        // Never typed while agent main may not exec the launcher: its exec
+        // would be denied headless and the run end as never started.
+        if let Err(why) = self.skill_start_allowed.check() {
+            eprintln!("tasks: {}: not typed into the one session: {why}", run.run);
+            return Some(Err(why.into()));
+        }
+        let folder = self.project.join(crate::one_session::FOLDER);
+        let Some(folder_text) = folder.to_str().map(str::to_owned) else {
+            return Some(Err("the one session's folder is not a plain path".into()));
+        };
+        if let Err(error) = std::fs::DirBuilder::new().mode(0o700).create(&folder)
+            && error.kind() != std::io::ErrorKind::AlreadyExists
+        {
+            return Some(Err(format!("the one session's folder not made: {error}")));
+        }
+        let place = Place {
+            machine: machine.to_owned(),
+            engine,
+            folder: folder_text,
+        };
+        let turn = match one.enter(&run.run, Kind::Skill, until, stopped) {
+            Ok(turn) => turn,
+            Err(Refused::Busy) => return Some(Err(crate::one_session::BUSY.into())),
+            Err(Refused::Ended) => {
+                return Some(Err("the skill run ended before hand-over".into()));
+            }
+        };
+        match turn.send(cli, &place, words, until, stopped) {
+            Sent::Typed(turns) => {
+                run.started.store(true, Ordering::Release);
+                if let Some(agent) = one.agent() {
+                    one.wait_taken(cli, machine, &agent, &run.run);
+                }
+                eprintln!(
+                    "tasks: {}: turn accepted in {} ms ({})",
+                    run.run,
+                    began.elapsed().as_millis(),
+                    crate::one_session::nth(turns)
+                );
+            }
+            // Never a second session: the run fails, in words.
+            Sent::NotTyped(why) => {
+                return Some(Err(format!(
+                    "the lamp's one session could not take the run: {why}"
+                )));
+            }
+            Sent::Uncertain(code) => {
+                run.started.store(true, Ordering::Release);
+                return Some(Err(format!("Harness didn't start the run ({code})")));
+            }
+        }
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let ended = std::thread::scope(|scope| {
+            let (done, wakes) = std::sync::mpsc::channel::<()>();
+            let cancel = &cancel;
+            // The deadline, or lamp-tasks' stop, whichever comes first,
+            // cancels the wait, as for a run's own agent.
+            scope.spawn(move || {
+                loop {
+                    if stopped() || std::time::Instant::now() >= until {
+                        cancel.store(true, Ordering::Release);
+                        return;
+                    }
+                    let left = until.saturating_duration_since(std::time::Instant::now());
+                    match wakes.recv_timeout(left.min(RUN_TICK)) {
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                        _ => return,
+                    }
+                }
+            });
+            let end_token = started.end_token;
+            let ended = turn.wait_end(cli, machine, cancel, &|| end_token());
+            drop(done);
+            ended
+        });
+        drop(turn);
+        let took = began.elapsed().as_secs();
+        let agent = "the lamp's default agent";
+        Some(match ended {
+            Ended::Answered(answer) => {
+                eprintln!(
+                    "{}",
+                    run_line(&run.run, "idle", took, &AgentSeen::Started(agent.into()))
+                );
+                // Failing closed, as the per-run way: a launcher that never
+                // claimed its start, or a fence that never said it started
+                // the script, never ran the skill's script.
+                let ended = started.live.as_ref().map_or_else(
+                    || crate::gateway::start_ran(false, false),
+                    crate::skill_start::Live::ran,
+                );
+                let answer = Some(answer).filter(|answer| !answer.trim().is_empty());
+                eprintln!(
+                    "[lamp-tasks] skill task {}: its agent's answer: {}",
+                    run.run,
+                    match (&answer, ended.is_ok()) {
+                        (Some(answer), true) => format!("{} bytes kept", answer.len()),
+                        (Some(_), false) => "not kept, its run didn't end well".to_owned(),
+                        (None, _) => "none in its end's show".to_owned(),
+                    }
+                );
+                if ended.is_ok()
+                    && let Some(answer) = answer
+                {
+                    let _ = run.answer.set(answer);
+                }
+                ended.map(|()| 0)
+            }
+            Ended::Failed(why) => Err(why),
+            Ended::Cancelled => {
+                if began.elapsed() >= run.deadline {
+                    Err(format!(
+                        "the run was ended at its deadline, {} s",
+                        run.deadline.as_secs()
+                    ))
+                } else {
+                    Err("the run was ended as lamp-tasks stops".into())
+                }
+            }
+        })
     }
 }
 
@@ -3220,6 +3746,7 @@ impl HandOvers {
         harness: SkillHarnessSlot,
         no_harness: NoHarnessSlot,
         starts: crate::skill_start::Starts,
+        one_session: Option<std::sync::Arc<crate::one_session::OneSession>>,
     ) -> Self {
         let net = net_on(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
@@ -3233,6 +3760,7 @@ impl HandOvers {
         let mut runner = HarnessRunner::lamp(home, harness);
         runner.no_harness = no_harness;
         runner.starts = starts;
+        runner.one_session = one_session;
         let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
         if keys {
             eprintln!(
@@ -3716,12 +4244,17 @@ mod tests {
         seen: RefCell<Vec<Seen>>,
         /// Whether its agent begins before its result ([`SkillRun::started`]).
         starts: bool,
+        /// Whether a fixed write's run is never made ([`SkillRun::not_made`]).
+        not_made: bool,
     }
 
     impl Runner for FakeRunner<'_> {
         fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             if self.starts {
                 run.started.store(true, Ordering::Release);
+            }
+            if self.not_made && run.write {
+                run.not_made.store(true, Ordering::Release);
             }
             let token = run
                 .env
@@ -3804,6 +4337,7 @@ mod tests {
             result,
             seen: RefCell::default(),
             starts: true,
+            not_made: false,
         }
     }
 
@@ -3832,6 +4366,24 @@ mod tests {
         assert_eq!(tokens.minted.borrow().len(), 1);
         assert_eq!(tokens.ended.borrow().len(), 1);
         assert!(tokens.live.borrow().is_empty());
+    }
+
+    /// #7246: a run refused by the one session's full queue, before it
+    /// began, is `busy`, as a second run is, so lamp-skills' retry (#7239)
+    /// still applies; nothing else of a run is `busy`.
+    #[test]
+    fn a_full_one_session_queue_is_busy() {
+        let tokens = FakeTokens::default();
+        let mut ran = runner(&tokens, Err(crate::one_session::BUSY.to_owned()));
+        // Refused in the queue: its agent never began.
+        ran.starts = false;
+        let said = answer(&line(|_| {}), true, skills(), &tokens, &ran);
+        assert_eq!(said["ok"], false);
+        assert_eq!(said["error"], "busy", "{said}");
+        assert_eq!(tokens.ended.borrow().len(), 1);
+        let ran = runner(&tokens, Err("the pane is busy".to_owned()));
+        let said = answer(&line(|_| {}), true, skills(), &tokens, &ran);
+        assert_eq!(said["error"], "run_failed", "{said}");
     }
 
     /// #6835 gap 1: what `harness show` names says whether the agent
@@ -3978,6 +4530,24 @@ mod tests {
             assert_eq!(refused, refusal(code, harness), "{refused}");
             assert_eq!(fresh.ended.borrow().len(), 1, "its token ended");
         }
+        // #7092: one Harness never made, asked twice, is `not_made`, so
+        // lamp-skills tells the owner; never sent straight.
+        let fresh = FakeTokens {
+            yes: Some(vec!["gmail-write".into()]),
+            ..FakeTokens::default()
+        };
+        let unmade = "Harness didn't start the run (new_failed)";
+        let mut failing = super::tests::runner(&fresh, Err(unmade.into()));
+        failing.not_made = true;
+        let refused = answer_with(&write_line(|_| {}), true, true, skills(), &fresh, &failing);
+        assert_eq!(refused, refusal(NOT_MADE, unmade), "{refused}");
+        assert_eq!(fresh.ended.borrow().len(), 1, "its token ended");
+        // A task's run is never a fixed write's: `run_failed`, as before.
+        let fresh = FakeTokens::default();
+        let mut failing = super::tests::runner(&fresh, Err(unmade.into()));
+        failing.not_made = true;
+        let task = answer_with(&line(|_| {}), true, true, skills(), &fresh, &failing);
+        assert_eq!(task["error"], "run_failed");
         // A task's run failing before it began is still `run_failed`.
         let fresh = FakeTokens::default();
         let mut failing = super::tests::runner(&fresh, Err(harness.into()));
@@ -5494,7 +6064,7 @@ mod tests {
             .and_then(|(_, rest)| rest.split_once("\n}\n"))
             .unwrap()
             .0;
-        assert!(run.contains("cli.launch(&launch)"));
+        assert!(run.contains("cli.launch_naming(&launch)"));
         for named in [
             "GatewayRunner",
             "gateway_run",
@@ -5697,6 +6267,7 @@ mod tests {
             held_by: None,
             retry: Duration::from_millis(20),
             lost_look: LOST_START_LOOK,
+            answer_wait: Duration::from_millis(200),
             default_agent,
             wrappers: Some(bin),
             agent_ns: Some(ns),
@@ -5706,7 +6277,119 @@ mod tests {
             stopping: std::sync::OnceLock::new(),
             no_harness,
             starts: Default::default(),
+            one_session: None,
+            skill_start_allowed: allowed_read(true),
+            makes: false,
         }
+    }
+
+    /// An approvals read standing in for the gateway's: agent main's
+    /// allow-list with the launcher when `present`, its listener the same.
+    fn allowed_read(present: bool) -> crate::gateway::SkillStartAllowed {
+        let entry = if present {
+            crate::skill_start::LAUNCHER
+        } else {
+            "/usr/bin/true"
+        };
+        let read = serde_json::json!({
+            "path": "/x", "exists": true, "hash": "h",
+            "file": {"version": 1, "agents": {"main": {"allowlist": [{"pattern": entry}]}}},
+        })
+        .to_string();
+        crate::gateway::SkillStartAllowed::new(
+            Box::new(move || Ok(read.clone())),
+            Box::new(|| Some(7)),
+        )
+    }
+
+    /// #7246: right after a gateway start agent main's exec allow-list has
+    /// no skill-start until lamp-update re-adds it, and the agent's exec is
+    /// denied headless. Such a run is never typed into the one session: it
+    /// fails at once with the clear reason, nothing queued or made. With
+    /// the entry there, the run goes on to the pane.
+    #[test]
+    fn a_skill_run_is_not_typed_while_main_may_not_exec_skill_start() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join("harness");
+        std::fs::write(&bin, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let cli = crate::harness::Cli::new(crate::harness::CliConfig::new(bin), "session".into())
+            .unwrap();
+        for present in [false, true] {
+            let mut runner = local_runner(dir.path(), HarnessHere::SignedOut, true, None);
+            runner.skill_start_allowed = allowed_read(present);
+            std::fs::create_dir_all(&runner.project).unwrap();
+            let one = crate::one_session::OneSession::new(
+                Duration::from_millis(50),
+                Duration::from_millis(10),
+                Duration::from_millis(50),
+            );
+            let run = skill_run("tok", Duration::from_secs(1));
+            let end_token = || {};
+            let mut started = Started {
+                cli: &cli,
+                end_token: &end_token,
+                machine: "m".into(),
+                agent: None,
+                folder: dir.path().join("run"),
+                token: None,
+                live: None,
+                make: None,
+                not_closed: false,
+                opened: false,
+                uncertain: false,
+            };
+            let began = std::time::Instant::now();
+            let ended = runner.run_in_one_session(
+                &one,
+                &cli,
+                "m",
+                crate::harness::EngineKind::Openclaw,
+                &run,
+                &mut started,
+                "words",
+                began,
+                began + Duration::from_millis(500),
+                &|| false,
+            );
+            let folder = runner.project.join(crate::one_session::FOLDER);
+            if present {
+                assert_ne!(
+                    ended,
+                    Some(Err(crate::gateway::SKILL_START_NOT_ALLOWED.into()))
+                );
+                assert!(folder.exists(), "went on to the pane");
+            } else {
+                assert_eq!(
+                    ended,
+                    Some(Err(crate::gateway::SKILL_START_NOT_ALLOWED.into()))
+                );
+                assert!(!folder.exists(), "nothing made");
+                assert_eq!(one.turns(), 0);
+                assert_eq!(one.waiting(), 0);
+                assert!(!run.started.load(Ordering::Acquire));
+            }
+        }
+    }
+
+    /// Its refusal names its own code, unless a fixed write's (which
+    /// lamp-skills may still send itself, `not_started`).
+    #[test]
+    fn a_run_refused_for_skill_start_not_allowed_says_its_code() {
+        let tokens = FakeTokens::default();
+        let mut ran = runner(
+            &tokens,
+            Err(crate::gateway::SKILL_START_NOT_ALLOWED.to_owned()),
+        );
+        ran.starts = false;
+        let said = answer(&line(|_| {}), true, skills(), &tokens, &ran);
+        assert_eq!(said["ok"], false);
+        assert_eq!(
+            said["error"],
+            crate::gateway::SKILL_START_NOT_ALLOWED_CODE,
+            "{said}"
+        );
     }
 
     /// Nothing of run `task-1` is left in `dir`: no folder, no token file.
@@ -6209,6 +6892,7 @@ mod tests {
             std::sync::Arc::default(),
             std::sync::Arc::default(),
             Default::default(),
+            None,
         );
         assert_eq!(lamp.work.as_deref(), Some(Path::new(MAKE_WORK)));
         assert!(lamp.held.is_some());

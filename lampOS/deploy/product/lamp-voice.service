@@ -338,10 +338,7 @@ Environment=LAMP_HEAD_TOUCH=on
 Environment=LAMP_SLEEP_LINE=on
 # "Lamp, go to sleep" asks the same sleep the 3 s hold asks, with the same kept line (#3748, controls.md): played on
 # lamp-52e6 on 2 Nov 09:18-09:24, PASS, and the one-breath fix 4/4 there (#4886). On in the product for #6853.
-# PARKED (#7219): off in the product; on, a fresh lamp's onboarding walk lost its voice about 20 s in ("provider
-# input lost its owner", P0). To turn it on, once #7219's fix lands, uncomment the next line and drop
-# crates/update/tests/functions.rs's the_asked_sleep_is_parked_in_the_product_voice (PRODUCT_FUNCTIONS back to 45).
-#Environment=LAMP_SLEEP_ASKED=on
+Environment=LAMP_SLEEP_ASKED=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.

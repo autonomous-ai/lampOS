@@ -2245,6 +2245,114 @@ impl<P: Persistence> Engine<P> {
         })
     }
 
+    /// The queued tasks' launches, the next first (#7246's one session).
+    pub fn queued_launches(&self) -> Vec<&Launch> {
+        self.state
+            .tasks
+            .iter()
+            .filter(|task| task.dispatch.state == DispatchState::Queued)
+            .map(|task| &task.launch)
+            .collect()
+    }
+
+    /// Whether the task launched as `name` is done with its session: spent
+    /// (its answer read), not accepted, or no longer kept (#7246).
+    pub fn launch_answer(&self, name: &str) -> Option<&str> {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)?
+            .observations
+            .last()
+            .map(|seen| seen.data.answer.as_str())
+    }
+
+    /// Whether the launch `name` ended with its answer: its agent's last
+    /// read idle with words (#7246: else the lamp's pane is closed).
+    pub fn launch_answered(&self, name: &str) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .and_then(|task| task.observations.last())
+            .is_some_and(|seen| seen.data.state == "idle" && !seen.data.answer.trim().is_empty())
+    }
+
+    /// Whether the spoken task launched as `name` may give the lamp's one
+    /// pane (#7246) to the next turn: [`Engine::launch_done`], and its
+    /// answer told by the voice, or kept [`UNTOLD_CLOSE_MS`] ago (or in an
+    /// earlier boot) and still untold. #7258's P1-a: the next turn joined
+    /// to the pane takes over its agent id, and the store keeps one task an
+    /// agent, so a pane given on as soon as the answer was read lost that
+    /// answer before it was told.
+    pub fn launch_told(&self, name: &str, now: &Clock) -> bool {
+        let Some(task) = self
+            .state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+        else {
+            return true;
+        };
+        if !matches!(
+            task.dispatch.state,
+            DispatchState::Attempting | DispatchState::Accepted
+        ) {
+            return true;
+        }
+        if !spent(task) {
+            return false;
+        }
+        task.observations.last().is_none_or(|newest| {
+            newest.observed.boot_id != now.boot_id
+                || now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    >= UNTOLD_CLOSE_MS
+                || match &newest.speech {
+                    // A playout under way is not told yet.
+                    Some(speech) => speech.state != SpeechState::Claimed,
+                    None => newest.told.is_some(),
+                }
+        })
+    }
+
+    /// Whether the spoken task launched as `name` asks something (its
+    /// newest read `needs-input`) since at least [`UNTOLD_CLOSE_MS`] ago,
+    /// or since an earlier boot: it would hold the lamp's one pane for
+    /// good, since an accepted task is never cancelled and a question is
+    /// never spent (Heron's P1 on #7258).
+    pub fn launch_asking_past(&self, name: &str, now: &Clock) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .filter(|task| task.dispatch.state == DispatchState::Accepted)
+            .and_then(|task| task.observations.last())
+            .is_some_and(|newest| {
+                newest.data.state == "needs-input"
+                    && (newest.observed.boot_id != now.boot_id
+                        || now
+                            .monotonic_ms
+                            .saturating_sub(newest.observed.monotonic_ms)
+                            >= UNTOLD_CLOSE_MS)
+            })
+    }
+
+    pub fn launch_done(&self, name: &str) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .is_none_or(|task| {
+                spent(task)
+                    || !matches!(
+                        task.dispatch.state,
+                        DispatchState::Attempting | DispatchState::Accepted
+                    )
+            })
+    }
+
     /// The returned job is permission for one invocation only. A caller that
     /// loses the return must reopen as uncertain, never obtain the job again.
     pub fn begin_launch(&mut self, now: &Clock) -> Result<Option<LaunchJob>, Error> {
@@ -2272,6 +2380,37 @@ impl<P: Persistence> Engine<P> {
         };
         self.save(next)?;
         Ok(Some(job))
+    }
+
+    /// The launch under way back in the queue, where `begin_launch` takes
+    /// it next, as its `new` was refused before anything started: no
+    /// Harness daemon on this computer (`harness_not_running`). The owner
+    /// starts the daemon first, and asks this at most once a task; any
+    /// other outcome is final ([`Self::finish_launch`]).
+    pub fn launch_again(&mut self, task_id: u64, now: &Clock) -> Result<(), Error> {
+        self.clock(now)?;
+        let index = find(&self.state, task_id)?;
+        if self.state.tasks[index].dispatch.state != DispatchState::Attempting {
+            return Err(err(
+                "stale_job",
+                "The launch is not the current committed attempt.",
+            ));
+        }
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        task.dispatch.state = DispatchState::Queued;
+        task.dispatch.attempted = None;
+        task.updated = at;
+        self.save(next)
+    }
+
+    /// The launch `task_id` put back in the queue, in its place, with
+    /// nothing sent (#7246): a spoken task the lamp's one pane could not
+    /// take within its short wait on the worker, tried again later. The
+    /// same move as [`Self::launch_again`].
+    pub fn put_back_launch(&mut self, task_id: u64, now: &Clock) -> Result<(), Error> {
+        self.launch_again(task_id, now)
     }
 
     pub fn finish_launch(
@@ -2975,8 +3114,18 @@ fn identity(mut body: Value, store_id: &str, revision: u64) -> Value {
     body
 }
 fn task_metadata(task: &Task) -> Value {
-    json!({"id":task.id,"target_alias":task.target_alias,"prepare_request_id":task.prepare_request_id,"dispatch":task.dispatch,
-        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"close":task.close,"completion":"unverified"})
+    let mut metadata = json!({"id":task.id,"target_alias":task.target_alias,"prepare_request_id":task.prepare_request_id,"dispatch":task.dispatch,
+        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"close":task.close,"completion":"unverified"});
+    // Waiting for the lamp's one session (#7246): its place, 1 the next,
+    // so the voice can say the earlier task is being finished.
+    if task.dispatch.state == DispatchState::Queued
+        && let Some(position) = crate::one_session::LAMP
+            .get()
+            .and_then(|one| one.queued_place(&task.launch.name))
+    {
+        metadata["queued"] = json!({"position": position});
+    }
+    metadata
 }
 fn observation_metadata(observed: &Observed) -> Value {
     json!({"id":observed.id,"digest":observed.digest,"state":observed.data.state,"observed":observed.observed,
@@ -4073,6 +4222,79 @@ mod tests {
     /// session over once it is spent, so the follow-up watches and tells
     /// it, and is never closed. One the store still sees working (the router
     /// saw it idle) keeps it, and the follow-up is uncertain.
+    /// #7258's P1-a: a spoken task holds the lamp's one pane until its
+    /// answer is told, not only read: the next turn joined to the pane
+    /// would take its place in the store before it was told. Untold, it
+    /// gives the pane on after [`UNTOLD_CLOSE_MS`] (or a restart).
+    /// Heron's P1 on #7258: a spoken task whose agent asks something is
+    /// never spent, so it lets the lamp's pane go once its newest read has
+    /// asked for [`UNTOLD_CLOSE_MS`] (or since an earlier boot).
+    #[test]
+    fn a_pane_turn_asking_past_the_bound_lets_the_pane_go() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let name = engine.state.tasks[0].launch.name.clone();
+        assert!(!engine.launch_asking_past(&name, &clock(5)), "no read");
+        let job = request_read(&mut engine, id, 10);
+        let mut asking = data("");
+        asking.state = "needs-input".into();
+        asking.ask = Some("Allow the command?".into());
+        engine.finish_observation(&job, asking, &clock(10)).unwrap();
+        assert!(!engine.launch_told(&name, &clock(10 + UNTOLD_CLOSE_MS)));
+        assert!(!engine.launch_asking_past(&name, &clock(11)), "just asked");
+        assert!(engine.launch_asking_past(&name, &clock(10 + UNTOLD_CLOSE_MS)));
+        let mut other_boot = clock(11);
+        other_boot.boot_id = "another-boot".into();
+        assert!(engine.launch_asking_past(&name, &other_boot), "a restart");
+    }
+
+    #[test]
+    fn a_pane_turn_is_held_until_its_answer_is_told() {
+        let (mut engine, _) = opened();
+        let id = queued(&mut engine, 0);
+        let name = engine.state.tasks[0].launch.name.clone();
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert!(!engine.launch_told(&name, &clock(5)), "working");
+        let job = request_read(&mut engine, id, 10);
+        engine
+            .finish_observation(&job, data("It is 21 degrees outside."), &clock(10))
+            .unwrap();
+        assert!(engine.launch_done(&name));
+        assert!(!engine.launch_told(&name, &clock(11)), "read, not told");
+        assert!(
+            engine.launch_told(&name, &clock(10 + UNTOLD_CLOSE_MS)),
+            "bounded"
+        );
+        let mut other_boot = clock(11);
+        other_boot.boot_id = "another-boot".into();
+        assert!(engine.launch_told(&name, &other_boot), "a restart");
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, id, observation), &clock(12), true)
+            .unwrap();
+        assert!(!engine.launch_told(&name, &clock(13)), "being spoken");
+        engine
+            .handle(&acknowledgement(&engine, id, observation), &clock(14), true)
+            .unwrap();
+        assert!(engine.launch_told(&name, &clock(15)), "told");
+        assert!(engine.launch_told("gone", &clock(15)), "no longer kept");
+    }
+
     #[test]
     fn a_follow_up_takes_over_a_spent_tasks_session_and_never_a_working_one() {
         let join = |engine: &mut Engine<Memory>, at: u64| {
@@ -7203,6 +7425,28 @@ mod tests {
                  close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes openclaw"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
+        );
+    }
+
+    /// #7246: a launch put back is queued again in its place, with nothing
+    /// sent: it is the next launch again, before a later task, and a launch
+    /// not attempted can't be put back.
+    #[test]
+    fn a_launch_put_back_is_queued_again_first_with_nothing_sent() {
+        let (mut engine, _) = opened();
+        let first = queued(&mut engine, 1);
+        let second = queued(&mut engine, 2);
+        let job = engine.begin_launch(&clock(3)).unwrap().unwrap();
+        assert_eq!(job.task_id, first);
+        assert_eq!(engine.queued_launches().len(), 1);
+        engine.put_back_launch(first, &clock(4)).unwrap();
+        assert_eq!(engine.queued_launches().len(), 2);
+        let again = engine.begin_launch(&clock(5)).unwrap().unwrap();
+        assert_eq!(again.task_id, first);
+        assert_eq!(again.launch, job.launch);
+        assert_eq!(
+            engine.put_back_launch(second, &clock(6)).unwrap_err().code,
+            "stale_job"
         );
     }
 }
