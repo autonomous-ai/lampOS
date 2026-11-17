@@ -265,24 +265,35 @@ pub fn plan(
 /// The settings a lamp's own copy of is merged by key, not kept whole
 /// (#5984): Controls' two files, which the factory step, a V1 move
 /// (lamp-keeper) and install itself (`install::own_pins_follow_build`)
-/// write the lamp's own values into. Every other setting the lamp changed
-/// is kept whole and said.
-pub const MERGED: &[&str] = &[
-    "/etc/lampOS/controls/controls.json",
-    "/etc/lampOS/controls/controls-pins.json",
+/// write the lamp's own values into. Each names the build's top-level keys
+/// a merge may add: none means every key. The pins add only `privacy`, the
+/// one section install adds to a lamp's own pins: a build's other pin
+/// sections, `reset` (a factory-reset line) among them, name lines of the
+/// product's wiring, which a board whose pins were set by hand may not
+/// share (#7123). Every key of `controls.json` is either one a lamp's own
+/// file must already have to be read or an optional one, so a key a build
+/// adds there names no line. Every other setting the lamp changed is kept
+/// whole and said.
+pub const MERGED: &[(&str, Option<&[&str]>)] = &[
+    ("/etc/lampOS/controls/controls.json", None),
+    (
+        "/etc/lampOS/controls/controls-pins.json",
+        Some(&["privacy"]),
+    ),
 ];
 
 /// Each [`MERGED`] setting kept as the lamp's own, merged by key: the
-/// lamp's JSON object with every top-level key of the build's it lacks
-/// added, its own values kept. One with nothing to add, or either side not
-/// a JSON object, stays kept. Run on [`plan`]'s steps by the round and by
-/// `lamp-update-apply` alike, so both write the same bytes.
+/// lamp's JSON object with each top-level key of the build's it lacks, of
+/// those its [`MERGED`] entry names, added, its own values kept. One with
+/// nothing to add, or either side not a JSON object, stays kept. Run on
+/// [`plan`]'s steps by the round and by `lamp-update-apply` alike, so both
+/// write the same bytes.
 pub fn merge_own(root: &Path, steps: &mut [Step]) -> io::Result<()> {
     for step in steps.iter_mut() {
-        if !MERGED.contains(&step.setting.path.as_str())
-            || step.act != Act::Keep("this lamp's own".into())
-            || step.setting.removed
-        {
+        let Some(&(_, keys)) = MERGED.iter().find(|(path, _)| *path == step.setting.path) else {
+            continue;
+        };
+        if step.act != Act::Keep("this lamp's own".into()) || step.setting.removed {
             continue;
         }
         let Some(Ok(serde_json::Value::Object(build))) = step
@@ -309,7 +320,7 @@ pub fn merge_own(root: &Path, steps: &mut [Step]) -> io::Result<()> {
         };
         let mut added = Vec::new();
         for (key, value) in build {
-            if !own.contains_key(&key) {
+            if keys.is_none_or(|keys| keys.contains(&key.as_str())) && !own.contains_key(&key) {
                 own.insert(key.clone(), value);
                 added.push(key);
             }
@@ -1492,6 +1503,75 @@ mod tests {
         assert_eq!(lamp.read(EXPRESSION).as_deref(), Some("expression 1"));
         assert_eq!(lamp.read(CONTROLS).as_deref(), Some("controls 1"));
         assert_eq!(lamp.state(), before);
+    }
+
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+
+    /// #7123: a lamp's own pins gain only the build's `privacy`, never its
+    /// `reset` line; a put-back restores the lamp's own bytes.
+    #[test]
+    fn own_pins_gain_only_privacy_and_a_put_back_restores_them() {
+        let mut lamp = Lamp::new();
+        lamp.installed(&[(PINS, "{\"chip\": \"a\"}\n")]);
+        let own = "{\"chip\": \"b\", \"every_ms\": 5}\n";
+        lamp.write(PINS, own);
+        let build = r#"{"chip":"a","reset":{"line":100},"privacy":{"line":7}}"#;
+        let envelope = lamp.envelope(2, vec![Setting::new(PINS, build)]);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        let merged: serde_json::Value = serde_json::from_str(&lamp.read(PINS).unwrap()).unwrap();
+        assert_eq!(
+            merged,
+            serde_json::json!({"chip": "b", "every_ms": 5, "privacy": {"line": 7}})
+        );
+        assert!(
+            lamp.said.contains(&merged_line(PINS, "privacy")),
+            "{:?}",
+            lamp.said
+        );
+        lamp.run(Op::Back, 2, None).unwrap();
+        assert_eq!(lamp.read(PINS).as_deref(), Some(own));
+    }
+
+    /// Controls' own `controls.json` gains every key of the build's it lacks.
+    #[test]
+    fn own_controls_gain_every_new_key_of_the_builds() {
+        let mut lamp = Lamp::new();
+        lamp.installed(&[(CONTROLS, "{\"enabled\": false}\n")]);
+        lamp.write(CONTROLS, "{\"enabled\": true}\n");
+        let build = r#"{"enabled":false,"base_selected_mask":null}"#;
+        let envelope = lamp.envelope(2, vec![Setting::new(CONTROLS, build)]);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        let merged: serde_json::Value =
+            serde_json::from_str(&lamp.read(CONTROLS).unwrap()).unwrap();
+        assert_eq!(
+            merged,
+            serde_json::json!({"enabled": true, "base_selected_mask": null})
+        );
+    }
+
+    /// An own file that is not a JSON object, and a setting the build
+    /// removed, are kept as they are: no merge, and no error.
+    #[test]
+    fn an_own_file_not_an_object_and_a_removed_setting_are_not_merged() {
+        let lamp = Lamp::new();
+        lamp.write(PINS, "[1]\n");
+        lamp.write(CONTROLS, "{\"enabled\": true}\n");
+        let keep = Act::Keep("this lamp's own".into());
+        let mut removed = Setting::new(CONTROLS, r#"{"base_selected_mask":null}"#);
+        removed.removed = true;
+        let mut steps = vec![
+            Step {
+                setting: Setting::new(PINS, r#"{"privacy":{"line":7}}"#),
+                act: keep.clone(),
+            },
+            Step {
+                setting: removed,
+                act: keep.clone(),
+            },
+        ];
+        merge_own(&lamp.root, &mut steps).unwrap();
+        assert!(steps.iter().all(|step| step.act == keep), "{steps:?}");
+        assert_eq!(lamp.read(PINS).as_deref(), Some("[1]\n"));
     }
 
     #[test]
