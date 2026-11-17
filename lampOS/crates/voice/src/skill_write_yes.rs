@@ -637,9 +637,17 @@ fn answer_forced(waiting: &Waiting) -> bool {
 /// answer was the newest, so the yes was never forced. The wait's own
 /// request cut with nothing kept still stands: a say-back cut off before its
 /// first word (#7072).
+///
+/// Nor does the lamp's answer to a later line that was only its name
+/// ([`line_heard`]): it answered a call, not the say-back, so the line
+/// after it is still the say-back's answer, forced and awaited, as a
+/// call's answer is no other request of a waiting write's
+/// (`services::answered_in_place`). Else "Yes? I'm here." after "Hey
+/// Lamp" stood between, and the person's "Yes." after it was neither
+/// forced nor awaited.
 fn stands_between(waiting: &Waiting, kept: &(u64, String, bool)) -> bool {
     let (id, said, cut) = kept;
-    !(*id > waiting.request && *cut && said.is_empty())
+    !(*id > waiting.request && ((*cut && said.is_empty()) || name_only_line(waiting, *id)))
 }
 
 /// Whether the line of `request` was only the lamp's name, or no words at
