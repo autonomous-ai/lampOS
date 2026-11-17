@@ -37,6 +37,18 @@ const MAX_REFERENCE_AGE_US: u64 = 40_000;
 const MAX_PARTIAL_US: u64 = 50_000;
 const MAX_AHEAD_BLOCKS: u64 = 8;
 const MAX_CAPTURE_BEFORE_START_NOTICE: usize = PRIME_FRAMES / RENDER_SAMPLES;
+/// How many of the speaker's first queue looks are kept for the line a `ReferenceLate` fault says
+/// (a diagnostic only: nothing decides on them). 32 looks are 32 accepted render blocks, 320 ms.
+const QUEUE_LOOKS: usize = 32;
+
+/// One accepted reference packet's queue look: when it was accepted, when the speaker looked at
+/// its queue, and how many frames it held then (all host monotonic microseconds).
+#[derive(Clone, Copy, Default)]
+struct QueueLook {
+    accepted_at_us: u64,
+    observed_at_us: u64,
+    queued_frames: usize,
+}
 /// Capture-clocked only: the ring starts with this much of the silence that
 /// preceded the stream ahead of the speaker's prime, so that it starts at its
 /// target. Before its first accepted frame the speaker put out nothing; the
@@ -87,6 +99,9 @@ pub struct ReferenceAssembly {
     /// reported reseed; no other counter changes.
     margin_rebase: i64,
     recovery: Option<Box<recovery::State>>,
+    /// The first [`QUEUE_LOOKS`] queue looks, kept for [`Self::late`]'s line; never read otherwise.
+    queue_looks: [QueueLook; QUEUE_LOOKS],
+    queue_looks_len: usize,
 }
 
 impl Default for ReferenceAssembly {
@@ -106,6 +121,8 @@ impl Default for ReferenceAssembly {
             ring_origin: 0,
             margin_rebase: 0,
             recovery: None,
+            queue_looks: [QueueLook::default(); QUEUE_LOOKS],
+            queue_looks_len: 0,
         }
     }
 }
@@ -166,6 +183,52 @@ impl ReferenceAssembly {
             }),
             ..self.timing
         }
+    }
+
+    fn note_queue_look(&mut self) {
+        if self.queue_looks_len < QUEUE_LOOKS {
+            self.queue_looks[self.queue_looks_len] = QueueLook {
+                accepted_at_us: self.timing.accepted_at_us,
+                observed_at_us: self.timing.queue_observed_at_us,
+                queued_frames: self.timing.queued_frames,
+            };
+            self.queue_looks_len += 1;
+        }
+    }
+
+    /// The speaker's first queue looks as one line, in ms from the first accept: `accepted/observed/queued`
+    /// for each. What a `ReferenceLate` on a Mac needs read (the queue ran out: how deep did it sit?).
+    fn queue_looks_line(&self) -> Option<String> {
+        let first = self
+            .queue_looks
+            .first()
+            .filter(|_| self.queue_looks_len > 0)?
+            .accepted_at_us;
+        let looks: Vec<String> = self.queue_looks[..self.queue_looks_len]
+            .iter()
+            .map(|look| {
+                format!(
+                    "{:.1}/{:.1}/{}",
+                    look.accepted_at_us.saturating_sub(first) as f64 / 1000.0,
+                    look.observed_at_us.saturating_sub(first) as f64 / 1000.0,
+                    look.queued_frames
+                )
+            })
+            .collect();
+        Some(format!(
+            "lamp-voice: reference queue looks (ms from the first accept, accepted/observed/queued frames; the first {}): {}",
+            self.queue_looks_len,
+            looks.join(" ")
+        ))
+    }
+
+    /// A `ReferenceLate` fault, and on stderr the queue looks that led to it: a diagnostic, no
+    /// decision depends on them.
+    fn late(&self, now: u64) -> ReferenceFault {
+        if let Some(line) = self.queue_looks_line() {
+            eprintln!("{line}");
+        }
+        self.fault(Kind::ReferenceLate, now)
     }
 
     pub fn fault(&self, reason: Kind, now: u64) -> ReferenceFault {
@@ -246,6 +309,8 @@ impl ReferenceAssembly {
         self.prime_observed_at_us = prime.queue_observed_at_us;
         self.captures_before_start_notice.fill(0);
         self.captures_before_start_notice_len = 0;
+        // The looks are of this epoch's start, as the sequence is.
+        self.queue_looks_len = 0;
         self.clear_partial();
         if self.recovery.is_some() {
             self.primed_recovering(previous_epoch, now)?;
@@ -373,6 +438,7 @@ impl ReferenceAssembly {
             self.timing.accepted_at_us = reference.accepted_at_us;
             self.timing.queue_observed_at_us = reference.queue_observed_at_us;
             self.timing.queued_frames = reference.queued_frames;
+            self.note_queue_look();
             return Ok(true);
         }
         let full_blocks = accepted / RENDER_SAMPLES as u64;
@@ -407,6 +473,7 @@ impl ReferenceAssembly {
         self.timing.accepted_at_us = reference.accepted_at_us;
         self.timing.queue_observed_at_us = reference.queue_observed_at_us;
         self.timing.queued_frames = reference.queued_frames;
+        self.note_queue_look();
         Ok(true)
     }
 
@@ -430,7 +497,7 @@ impl ReferenceAssembly {
             || (self.timing.clock_started_at_us.is_none()
                 && self.captures_before_start_notice_len == MAX_CAPTURE_BEFORE_START_NOTICE)
         {
-            return Err(self.fault(Kind::ReferenceLate, now).into());
+            return Err(self.late(now).into());
         }
         if self.len > 0 && now.saturating_sub(self.partial_since) >= MAX_PARTIAL_US {
             return Err(self.fault(Kind::PartialExpired, now).into());
@@ -451,7 +518,7 @@ impl ReferenceAssembly {
         if self.timing.clock_started_at_us.is_some() && render_frames == 0 {
             // An origin offset is not credit for an exhausted observed queue.
             // Fail on nominal starvation; never manufacture a silence block.
-            return Err(self.fault(Kind::ReferenceLate, now).into());
+            return Err(self.late(now).into());
         }
         // Capture-clocked, the block about to be rendered was accepted a
         // ring's length ago and is that much nearer to being heard.
@@ -474,7 +541,7 @@ impl ReferenceAssembly {
         };
         let mut block = [0; RENDER_SAMPLES];
         if clock.resampler.take(&mut block).is_err() {
-            return Err(self.fault(Kind::ReferenceLate, now).into());
+            return Err(self.late(now).into());
         }
         echo.render(&block)?;
         // Frames the speaker has accepted since its last packet, at the
@@ -511,7 +578,7 @@ impl ReferenceAssembly {
             .ok_or_else(|| self.fault(Kind::CaptureTiming, now))?;
         if self.timing.clock_started_at_us.is_none() {
             if self.captures_before_start_notice_len == MAX_CAPTURE_BEFORE_START_NOTICE {
-                return Err(self.fault(Kind::ReferenceLate, now).into());
+                return Err(self.late(now).into());
             }
             self.captures_before_start_notice[self.captures_before_start_notice_len] =
                 read_completed_at_us;
@@ -547,6 +614,27 @@ fn fresh(at: u64, now: u64, maximum: u64) -> bool {
 mod tests {
     use super::*;
     use lamp_audio::ownership::QueuedRange;
+
+    /// The diagnostic line a `ReferenceLate` says: the first 32 looks only, in ms from the first
+    /// accept, and nothing at all before the first look. It decides nothing.
+    #[test]
+    fn the_queue_looks_line_holds_the_first_looks_in_ms_from_the_first_accept() {
+        let mut state = ReferenceAssembly::default();
+        assert!(state.queue_looks_line().is_none());
+        for look in 0..40u64 {
+            state.timing.accepted_at_us = 5_000_000 + look * 10_000;
+            state.timing.queue_observed_at_us = 5_000_000 + look * 10_000 + 2_500;
+            state.timing.queued_frames = 240 + look as usize;
+            state.note_queue_look();
+        }
+        let line = state.queue_looks_line().unwrap();
+        assert!(line.contains("the first 32)"), "{line}");
+        let looks: Vec<&str> = line.rsplit(": ").next().unwrap().split(' ').collect();
+        assert_eq!(looks.len(), 32);
+        assert_eq!(looks[0], "0.0/2.5/240");
+        assert_eq!(looks[31], "310.0/312.5/271");
+    }
+
     #[test]
     fn a_write_discarded_during_its_post_write_check_is_never_new_epoch_reference() {
         use lamp_audio::ownership::PlaybackCursor;
@@ -723,6 +811,35 @@ mod tests {
     fn capture(state: &mut ReferenceAssembly, read_at: u64) {
         state.before_capture(0, read_at).unwrap();
         state.captured(read_at, read_at + 1).unwrap();
+    }
+
+    /// The looks are of the epoch's start: a new prime (a reference restart) clears them, so a late
+    /// fault hours into a run says the looks of the epoch it ends, never of the first one.
+    #[test]
+    fn a_new_epochs_prime_clears_the_queue_looks() {
+        let mut state = ReferenceAssembly::default();
+        let mut echo = EchoProcessor::new(false);
+        state.prime(prime(1, None), 10_002, 2, &mut echo).unwrap();
+        let mut packet = reference(1, 480, 240);
+        packet.playback_epoch = 1;
+        packet.accepted_at_us = 10_010;
+        packet.queue_observed_at_us = 10_011;
+        packet.queued_frames = 337;
+        state.accept(packet, 10_012, 2, &mut echo).unwrap();
+        assert_eq!(state.queue_looks_len, 1);
+        let mut reset = prime(
+            2,
+            Some(QueuedRange {
+                epoch: 1,
+                retired_through: 100,
+                accepted_through: 720,
+            }),
+        );
+        reset.accepted_at_us = 10_020;
+        reset.queue_observed_at_us = 10_021;
+        state.prime(reset, 10_022, 2, &mut echo).unwrap();
+        assert_eq!(state.queue_looks_len, 0);
+        assert!(state.queue_looks_line().is_none());
     }
 
     #[test]
