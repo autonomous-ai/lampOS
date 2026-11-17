@@ -3972,10 +3972,19 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lượt đọc duy nhất của đèn) và được nói một lần, lần tới chủ đèn được thấy
   trong vòng 30 phút (`NEWS_WAIT`), nếu không thì bỏ (`skipped: <why>`);
   vào giờ yên lặng thì bỏ ngay (`skipped: quiet hours`), không bao giờ giữ
-  qua giờ yên lặng. Khi `LAMP_TOLD_WHEN_ASKED` bật, lần chạy được yêu cầu
-  bằng giọng nói và sẵn sàng trong năm phút được bỏ giờ yên lặng ngay trong
-  lần nhìn của cổng (`LampRoom::seen`, `told_when_asked::quiet_holds`), nên
-  những phút đó không phải giờ yên lặng ở đó và câu không bị bỏ vì chúng. Trước đây câu chờ tới một giờ để có đúng
+  qua giờ yên lặng. Lần chạy ngay được yêu cầu bằng giọng nói mà câu trả
+  lời của nó, điều agent tìm thấy hay lần thất bại, sẵn sàng trong năm phút
+  sau lời yêu cầu thì được bỏ giờ yên lặng thêm năm phút, khi
+  `LAMP_TOLD_WHEN_ASKED` hoặc công tắc này bật (`quiet_ask`, `lift_quiet`):
+  việc bỏ nằm ngay trong lần nhìn của cổng (`LampRoom::seen`,
+  `told_when_asked::quiet_holds`), nên những phút đó không phải giờ yên
+  lặng ở đó, và cả câu trả lời tìm thấy lẫn tin tức đều không bị giữ hay
+  bỏ vì chúng. Sản phẩm đặt công tắc này mà không đặt
+  `LAMP_TOLD_WHEN_ASKED`: trên lamp-9adf (18/11, 00:11) "Lamp, use my
+  bitcoin price skill." có câu trả lời của agent được giữ rồi bị giờ yên
+  lặng giữ lại không nói. Câu trả lời trong cuộc trò chuyện đã yêu cầu
+  (`answers`) chỉ dành cho câu thất bại; điều agent tìm thấy vẫn đi sau
+  cổng của lần đọc, với giờ yên lặng được bỏ. Trước đây câu chờ tới một giờ để có đúng
   một khuôn mặt và không có giọng nói, và trên lamp-9adf (17/11, 21:11) sau
   "Fig facts is running now." không có gì nữa. Các câu: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được

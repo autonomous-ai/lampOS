@@ -4692,6 +4692,12 @@ mod tests {
         let ran = Instant::now();
         crate::made_run::ran_now(skill, ran);
         assert!(says.exact_answers());
+        // Keyed by the skill run: another skill's line is no answer of it
+        // (Heron's mutation on #7363).
+        assert!(!crate::made_run::answers_now("another-skill-7363", ran));
+        let (other, _other_answered) =
+            Says::answers_exact_for_test("another-skill-7363", vec![0; 16]);
+        assert!(!other.exact_answers(), "another skill's line waits");
         let within = crate::made_run::ANSWERS_WITHIN;
         assert!(crate::made_run::answers_now(skill, ran + within));
         let past = ran + within + Duration::from_millis(1);
