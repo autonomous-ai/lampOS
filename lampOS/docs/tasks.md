@@ -2887,7 +2887,10 @@ for each run, and is answered once the run ends
   running: one runs at a time). With `LAMP_SKILL_TASK_SURE=on` in
   lamp-skills (off unless set, on in the product; docs/skills.md, "A
   skill's task"), lamp-skills says a refusal or a failed run to the owner
-  as one fixed line behind a told answer's gate, never the task's words
+  as one fixed line (in the conversation that asked for a run now by
+  voice, at once as its answer; otherwise as news, behind a told answer's
+  gate, the next time the owner is seen within 30 minutes, dropped at quiet
+  hours; #7363), never the task's words
   nor this message, and a run refused `busy` waits its turn in lamp-skills'
   one line (at most 4 in it, one being handed over among them, first in
   first out, each at most 15 minutes from when it began to wait) and is handed over again when the run going ends, so two

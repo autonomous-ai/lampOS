@@ -557,6 +557,12 @@ pub struct Request {
     /// A note let go, unsaid, once its moment has passed (#6543,
     /// [`Says::end_unsaid`]).
     pub may_end_unsaid: bool,
+    /// An exact line that answers the conversation that ran its skill now
+    /// by the owner's voice (lamp-skills' failed task line under
+    /// `LAMP_SKILL_TASK_SURE`, #7363): a conversation going on doesn't hold
+    /// it, as the unplug's lines ([`Says::exact_answers`]), only while
+    /// `crate::made_run::answers_now` says that run was this one's.
+    pub answers: bool,
     /// For `voice/line` (#4209): who asked, and what it was once rendered.
     pub line: LineMeta,
 }
@@ -643,6 +649,10 @@ struct Wire {
     /// a say at its priority waits for ([`may_play_exact_after`]).
     #[serde(default)]
     quiet: bool,
+    /// With `exact`: a made skill's line asked as the answer to the
+    /// conversation that ran it now ([`Request::answers`]).
+    #[serde(default)]
+    answers: bool,
     #[serde(default)]
     unplug_request: Option<String>,
     #[serde(default)]
@@ -828,6 +838,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             question: false,
             line: Default::default(),
             quiet: false,
+            answers: false,
         });
     }
     let words = if let Some(clip) = wire.clip {
@@ -978,6 +989,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         }
         Some(voice) => lamp_msgs::chosen_voice::fit_voice(voice)?,
     };
+    if wire.answers && !matches!(words, Words::Exact(_)) {
+        return Err("answers goes only with exact".into());
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -1003,6 +1017,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             voice,
         },
         quiet: wire.quiet,
+        answers: wire.answers,
     })
 }
 
@@ -1023,6 +1038,7 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         || wire.exact
         || wire.made
         || wire.quiet
+        || wire.answers
         || wire.unplug_request.is_some()
         || wire.by.is_some()
         || wire.who
@@ -1051,6 +1067,7 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1139,6 +1156,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1165,6 +1183,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1198,6 +1217,7 @@ fn parse_stream(skill: String, stream: StreamWire, wire: &Wire) -> Result<Reques
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1870,6 +1890,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -1904,6 +1925,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: 0,
@@ -2012,6 +2034,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: 0,
@@ -2360,9 +2383,18 @@ impl Says {
     /// dropped). Held for the conversation, the update line
     /// after "Yes." waited out its 30 s and was never said (row-5747n D,
     /// lamp-52e6, build 12200).
+    /// Also a made skill's line asked as its run's answer
+    /// ([`Request::answers`]) while that run now by the owner's voice is
+    /// within [`crate::made_run::ANSWERS_WITHIN`] (#7363: "Fig facts is
+    /// running now.", then its failure held for the conversation and lost).
     pub fn exact_answers(&self) -> bool {
         self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))
-            .is_some_and(|index| self.waiting[index].request.skill == "prepare-unplug")
+            .is_some_and(|index| {
+                let request = &self.waiting[index].request;
+                request.skill == "prepare-unplug"
+                    || (request.answers
+                        && crate::made_run::answers_now(&request.skill, Instant::now()))
+            })
     }
 
     /// The quiet the next exact line needs since the last turn: none
@@ -4557,6 +4589,7 @@ mod tests {
                     question: false,
                     line: Default::default(),
                     quiet: false,
+                    answers: false,
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -4632,6 +4665,39 @@ mod tests {
         assert_eq!(stay.unplug_request, None);
     }
 
+    /// #7363 (the first builder's 21:25): a made skill's exact line asked
+    /// as the answer to the conversation that ran it now is let through
+    /// that conversation, as the unplug's lines are, only while the voice's
+    /// own record says the owner ran that skill by voice within
+    /// [`crate::made_run::ANSWERS_WITHIN`]; asked by no run, or not asked
+    /// as an answer, it waits as any exact line. Only with exact text.
+    #[test]
+    fn a_made_skills_answer_goes_through_only_the_conversation_that_ran_it() {
+        let skill = "fig-facts-answers-7363";
+        let (mut says, _answered) = Says::exact_for_test(skill, vec![0; 16]);
+        says.waiting[0].request.answers = true;
+        assert!(!says.exact_answers(), "no run now by voice: it waits");
+        let ran = Instant::now();
+        crate::made_run::ran_now(skill, ran);
+        assert!(says.exact_answers());
+        let within = crate::made_run::ANSWERS_WITHIN;
+        assert!(crate::made_run::answers_now(skill, ran + within));
+        let past = ran + within + Duration::from_millis(1);
+        assert!(!crate::made_run::answers_now(skill, past));
+        says.waiting[0].request.answers = false;
+        assert!(!says.exact_answers(), "not asked as the answer");
+        let line = "Fig facts couldn't run this time.";
+        let exact = json!({"skill": skill, "text": line, "exact": true, "answers": true,
+                           "expires_in_ms": 30_000});
+        assert!(parse(&exact.to_string()).unwrap().answers);
+        let note = json!({"skill": skill, "note": "say it", "answers": true,
+                          "expires_in_ms": 30_000});
+        assert_eq!(
+            parse(&note.to_string()).unwrap_err(),
+            "answers goes only with exact"
+        );
+    }
+
     #[test]
     fn a_request_is_read_and_checked_and_a_refusal_names_the_field() {
         let reminder = parse(
@@ -4654,6 +4720,7 @@ mod tests {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             }
         );
         let text =
@@ -5020,6 +5087,7 @@ mod tests {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             }
         );
         assert_eq!(

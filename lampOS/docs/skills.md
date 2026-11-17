@@ -1986,16 +1986,37 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, on
   in the product; `task_sure`), two more things. **A failed run is told**
   (`task_sure::failed_line`): when lamp-tasks answers `ok:false`, or no
-  answer comes, one short fixed line is said to the owner behind a told
-  answer's gate (below: the owner alone, quiet hours, the lamp's one read
-  turn; `LAMP_TOLD_WHEN_ASKED` lifts the quiet as for a told answer), never
-  the task's words nor lamp-tasks' message: `missing_secret` "<Skill>
+  answer comes, one short fixed line is said to the owner, never the
+  task's words nor lamp-tasks' message (`service_read::tell_failed`, the
+  first builder's 21:25 on #7363). **In the conversation that asked for
+  the run** (a run now the owner asked for by voice, the line ready within
+  45 s of the ask, `task_sure::in_asking_conversation`), it is said then,
+  as that conversation's answer, the way "<skill> is running now" was:
+  exact words to the say service with `"answers": true`, and no read's
+  gate (no face, no minute of quiet). The voice lets such a line through
+  a conversation going on, as the unplug's lines (`Says::exact_answers`),
+  only while its own record says the owner ran that skill now by voice
+  within 45 s (`made_run::answers_now`, `ANSWERS_WITHIN`, the thread's
+  `GOING_ON_FOR`); otherwise it waits as any exact line; `answers` goes
+  only with exact text. The journal says `do.task: what became of its
+  run: said in the asking conversation`. **Otherwise it is news**
+  (`service_read::tell_news`): a trigger's run, a line ready later, or one
+  the voice didn't say as the answer (`not said in the asking conversation
+  (<why>), so as news: …`) waits behind a told answer's gate (below: the
+  owner alone, the lamp's one read turn) and is said once, the next time
+  the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
+  (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
+  quiet hours`), never held through them (`LAMP_TOLD_WHEN_ASKED` still
+  lifts the quiet for a run asked by voice). Before, the line waited up to
+  an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
+  "Fig facts is running now." was followed by nothing. Lines:
+  `missing_secret` "<Skill>
   couldn't run: it needs a key added
   in the app, on its page."; any other refusal before its agent began, or
   lamp-tasks not reached, "<Skill> couldn't run this time."; `run_failed`,
-  no answer or anything else "<Skill> didn't finish this time.". The
-  journal says `do.task: what became of its run: told 1` (or the gate's
-  outcome). Before, only the journal had it, even after the voice said
+  no answer or anything else "<Skill> didn't finish this time.". As news,
+  the journal says `do.task: what became of its run: told 1` (or the
+  gate's outcome). Before the switch, only the journal had it, even after the voice said
   "<skill> is running now". **A run refused `busy` waits its turn**
   (`task_sure::Line`, `task_sure::LAMP`): lamp-tasks runs one skill's task
   at a time, so of two due at one minute (a morning's mail and its
@@ -5054,7 +5075,7 @@ only how many were said (`do.task: what its agent found: told N`), and
 before it how much of the agent's answer lamp-tasks' answer carried, its
 length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
-begins, a read's or a told answer's, is said once with its reason
+begins, a read's or a told answer's, is said with its reason
 (`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
 answer held in quiet hours leaves a line (#7180); each change of that reason
 while it waits is said once more, at most one a second
