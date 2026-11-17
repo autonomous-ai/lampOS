@@ -3686,6 +3686,14 @@ gone ([switches.md](switches.md)). What happens:
      `lamp.gesture(name)` and `lamp.close()`, and `asyncio.run(main())`;
      there is no other lamp module (on lamp-9adf, 13 Nov, the model wrote
      `from lamp import light` and `light.set_light(…, for="59s")`).
+     With `LAMP_MADE_NOTES=on` (#7245) it also names
+     `lamp.notes.set(key, value)` and `lamp.notes.get(key)` (grant `notes`,
+     `made_skill::SCRIPT_NOTES_SDK`): a small note kept in lamp-control's
+     notes store under the skill's own client (`runs::skill_notes_client`),
+     which its next run reads back; never a file the person opens. A say
+     that claims a file or a note with no `lamp.notes.set` in its code is
+     refused for a repair (`made_skill::CLAIMS_A_FILE`). Off, byte for byte
+     as before.
    - **Offered to the voice** (#6749 B): with the switch on, the
      `make_skill` function's description (`make_skill_local::CODE_TOLD`)
      says a made skill may carry its own Python script, run by its task

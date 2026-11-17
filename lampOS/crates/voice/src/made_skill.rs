@@ -4670,6 +4670,90 @@ pub const SCRIPT_SDK: &str = "import asyncio; from lampos import Lamp; async def
      light step's colour, level 1-5, for_ms in ms; light), await lamp.say(text) (speak), await \
      lamp.gesture(name) (body), await lamp.close(); last, asyncio.run(main())";
 
+/// The switch for a made skill's notes (#7245): `on` exactly, off unless
+/// set. On, the making model is told the lamp's notes calls
+/// ([`SCRIPT_NOTES_SDK`], grant `notes`): a small note the skill keeps in
+/// lamp-control's notes store and its next run reads back, never a file the
+/// person opens; and a say that claims a file or a note with no
+/// `lamp.notes.set` in its code is refused ([`claims_a_file`]). Off, the
+/// prompt and the check are as before, byte for byte.
+pub const NOTES_ENVIRONMENT: &str = "LAMP_MADE_NOTES";
+
+#[cfg(test)]
+thread_local! {
+    /// [`NOTES_ENVIRONMENT`] as a test of this thread sets it.
+    static NOTES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may keep notes in this process ([`NOTES_ENVIRONMENT`]).
+pub fn notes_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = NOTES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(NOTES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`notes_on`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_notes_here(on: Option<bool>) {
+    NOTES_HERE.with(|here| here.set(on));
+}
+
+/// The notes calls added to [`SCRIPT_SDK`] with [`NOTES_ENVIRONMENT`] on:
+/// lamp-control's notes store as it bounds it (control/src/notes.rs).
+pub const SCRIPT_NOTES_SDK: &str = "await lamp.notes.set(key, value) (keeps a small note on the \
+     lamp, not a file the person opens: key 1-64 of A-Z a-z 0-9 . _ : -, value any JSON at most \
+     16 KiB, at most 256 notes; notes), await lamp.notes.get(key) (the note kept, or None; \
+     notes), ";
+
+/// How a made skill's code reaches the lamp ([`SCRIPT_SDK`]), with its
+/// notes calls when [`notes_on`]; off, [`SCRIPT_SDK`] exactly.
+pub fn script_sdk() -> String {
+    if !notes_on() {
+        return SCRIPT_SDK.to_owned();
+    }
+    let close = "await lamp.close()";
+    let at = SCRIPT_SDK.find(close).expect("SCRIPT_SDK closes the lamp");
+    format!(
+        "{}{SCRIPT_NOTES_SDK}{}",
+        &SCRIPT_SDK[..at],
+        &SCRIPT_SDK[at..]
+    )
+}
+
+/// Why a made skill is refused when a say claims a file or a note its code
+/// never keeps (#7245: on c0a4, 17 Nov, "Writing three facts about apples
+/// into a file." with no step that wrote one).
+pub const CLAIMS_A_FILE: &str = "its say claims a file no step writes";
+
+/// The words a say claims a kept file or note with.
+const FILE_WORDS: [&str; 6] = ["file", "files", "note", "notes", "saved", "saving"];
+
+/// The first say of `toml` that claims a file or a note ([`FILE_WORDS`])
+/// when none of `scripts`' `.py` files calls `lamp.notes.set`: what it
+/// says, for its refusal ([`CLAIMS_A_FILE`]). None when no say claims one,
+/// or the code does keep a note.
+pub fn claims_a_file(toml: &str, scripts: &[(String, String)]) -> Option<String> {
+    let keeps = scripts
+        .iter()
+        .any(|(path, text)| path.ends_with(RUNNABLE_ENDING) && text.contains("notes.set("));
+    if keeps {
+        return None;
+    }
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    table
+        .get("do")?
+        .as_array()?
+        .iter()
+        .filter_map(|step| say_text(step.get("say")?))
+        .find(|text| {
+            words_of(text)
+                .iter()
+                .any(|word| FILE_WORDS.contains(&word.as_str()))
+        })
+}
+
 #[cfg(test)]
 thread_local! {
     /// [`PYTHON`] as a test of this thread sets it.
@@ -4828,7 +4912,8 @@ fn scripts_parse(scripts: &[(String, String)]) -> Result<(), Refused> {
                     SCRIPT_DOESNT_PARSE.into(),
                     Some(format!(
                         "The lamp refused its code: {path} isn't Python that parses{at}, \
-                         {error}{shown}. Reach the lamp only so: {SCRIPT_SDK}."
+                         {error}{shown}. Reach the lamp only so: {}.",
+                        script_sdk()
                     )),
                 ));
             }
@@ -8242,6 +8327,21 @@ pub fn keep_asked(
     // Each .py it wrote Python that parses, before its check and its
     // say-back (#6749 E): one that doesn't goes to a repair.
     scripts_parse(&files.scripts)?;
+    // A say that claims a file or a note its code never keeps (#7245),
+    // with the notes switch alone: off, the check is as before.
+    if notes_on()
+        && let Some(text) = claims_a_file(&files.toml, &files.scripts)
+    {
+        eprintln!("lamp-voice: a made skill was not kept: its say claims a file no step writes");
+        return Err(Refused(
+            CLAIMS_A_FILE.into(),
+            Some(format!(
+                "say \"{text}\" claims a file or a note, but no code keeps one: keep it with \
+                 await lamp.notes.set(key, value) in a task step's code (grant notes), or answer \
+                 one line, {CANNOT} and one short sentence"
+            )),
+        ));
+    }
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
     if !uses.writes.is_empty() {
@@ -10309,6 +10409,30 @@ mod tests {
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
     /// 18:10) is caught; a reminder the person asked to be told, or words
     /// they gave to say, is not.
+    // #7245: c0a4, 17 Nov, a say-only skill claimed a file it never wrote.
+    #[test]
+    fn a_say_claiming_a_file_with_no_notes_call_is_caught() {
+        let toml = "[[do]]\nsay = { text = \"Writing three facts about apples into a file.\" }\n";
+        assert_eq!(
+            claims_a_file(toml, &[]).as_deref(),
+            Some("Writing three facts about apples into a file.")
+        );
+        let keeps = vec![(
+            "scripts/main.py".to_owned(),
+            "await lamp.notes.set(\"apples\", [\"a\", \"b\", \"c\"])".to_owned(),
+        )];
+        assert_eq!(claims_a_file(toml, &keeps), None);
+        // A notes call in a text file is no step.
+        let in_text = vec![("scripts/README.md".to_owned(), keeps[0].1.clone())];
+        assert!(claims_a_file(toml, &in_text).is_some());
+        // A say naming no file is not held to it.
+        let plain = "[[do]]\nsay = { text = \"Three facts about apples.\" }\n";
+        assert_eq!(claims_a_file(plain, &[]), None);
+        // "profile" is no "file".
+        let profile = "[[do]]\nsay = { text = \"Your profile looks good.\" }\n";
+        assert_eq!(claims_a_file(profile, &[]), None);
+    }
+
     #[test]
     fn a_say_handing_the_ask_back_is_caught_and_a_reminder_is_not() {
         let with = |say: &str| {

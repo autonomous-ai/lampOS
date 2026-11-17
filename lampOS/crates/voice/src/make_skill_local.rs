@@ -365,14 +365,29 @@ fn code_rules() -> String {
          the lamp's own SDK, with only those grants, and has no other network: {sdk}. There \
          is no other lamp module, and each call takes only the arguments named. Its other \
          steps run at once; what the code finds comes back as the lamp's task news. The lamp \
-         says back what it uses and waits for the person's yes before it runs any code.",
-        sdk = made_skill::SCRIPT_SDK,
+         says back what it uses and waits for the person's yes before it runs any code.{notes}",
+        sdk = made_skill::script_sdk(),
+        notes = if made_skill::notes_on() {
+            NOTES_RULES
+        } else {
+            ""
+        },
         most = made_skill::MOST_SCRIPTS,
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
         all = made_skill::MOST_SCRIPTS_BYTES / 1024,
         grants = grants.join(", "),
     )
 }
+
+/// What the making model is told of a made skill's notes (#7245), with
+/// [`made_skill::NOTES_ENVIRONMENT`] on: a note is what the skill keeps and
+/// its next run reads back, never a file the person opens; and a say never
+/// claims one the code doesn't keep.
+const NOTES_RULES: &str = " To keep something for later (\"write it down\", \"keep a list\", \
+     \"save it to a file\"), its code keeps a note with lamp.notes.set, grant notes; its next \
+     run reads it back with lamp.notes.get. A note is no file the person opens: a say calls it \
+     a note the lamp keeps, and never says it wrote, saved or keeps a file or a note unless its \
+     code calls lamp.notes.set.";
 
 /// The request [`AGENT_SERVICES_EXAMPLE`] is made for.
 const AGENT_SERVICES_ASKED: &str = "every morning at eight, read me my new mail";
@@ -3622,6 +3637,34 @@ pub(crate) mod tests {
     /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
     /// only. A visitor's "yes" approves nothing and drops the wait; the
     /// owner's approves; an id that isn't waiting is left to `approve`.
+    // #7245: the notes switch off leaves the prompt byte for byte; on, the
+    // model hears the notes calls and that a note is no file.
+    #[test]
+    fn notes_off_is_byte_for_byte_and_on_tells_the_notes_calls() {
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_notes_here(None);
+        let before = system_for(false, false);
+        made_skill::set_notes_here(Some(false));
+        assert_eq!(system_for(false, false), before);
+        assert_eq!(made_skill::script_sdk(), made_skill::SCRIPT_SDK);
+        assert!(!before.contains("lamp.notes"), "{before}");
+        made_skill::set_notes_here(Some(true));
+        let on = system_for(false, false);
+        for part in [
+            "await lamp.notes.set(key, value)",
+            "await lamp.notes.get(key)",
+            "A note is no file the person opens",
+            "unless its code calls lamp.notes.set",
+        ] {
+            assert!(on.contains(part), "{part}: {on}");
+        }
+        assert!(
+            made_skill::script_sdk().ends_with("await lamp.close(); last, asyncio.run(main())")
+        );
+        made_skill::set_notes_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
     #[test]
     fn a_voice_made_writes_yes_is_the_owners_only() {
         use crate::skill_write_yes as yes;

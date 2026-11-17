@@ -697,6 +697,14 @@ sau:
      `asyncio.run(main())`; không có module nào khác của đèn (trên
      lamp-9adf, 13/11, mô hình đã viết `from lamp import light` và
      `light.set_light(…, for="59s")`).
+     Khi `LAMP_MADE_NOTES=on` (#7245) nó còn nêu
+     `lamp.notes.set(key, value)` và `lamp.notes.get(key)` (quyền `notes`,
+     `made_skill::SCRIPT_NOTES_SDK`): một ghi chú nhỏ giữ trong kho notes
+     của lamp-control dưới client riêng của kỹ năng
+     (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
+     là một tệp người dùng mở được. Một câu nói tự nhận đã ghi tệp hay ghi
+     chú mà mã không gọi `lamp.notes.set` bị từ chối để sửa lại
+     (`made_skill::CLAIMS_A_FILE`). Khi tắt, giữ nguyên từng byte như trước.
    - **Được mời cho giọng nói** (#6749 B): khi bật công tắc, mô tả của
      hàm `make_skill` (`make_skill_local::CODE_TOLD`) nói rằng một kỹ năng
      tự tạo có thể mang script Python riêng, chạy bởi task của nó khi người

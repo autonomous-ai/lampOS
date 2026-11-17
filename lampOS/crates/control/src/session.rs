@@ -1233,20 +1233,33 @@ impl Door {
                     return reply_refused(Some(re), error);
                 }
                 let notes = self.notes.as_ref().expect("notes on");
+                // A made skill's run, with its switch (#7245): its notes are
+                // its skill's, so its next run reads them back. Off, or no
+                // live run, the run's own client as before.
+                // The session's own client still takes the rate and the reply.
+                let kept_as = if crate::runs::skill_notes_on() && session.run_socket {
+                    self.runs
+                        .of_client(&client, now_us)
+                        .map_or(client.clone(), |run| {
+                            crate::runs::skill_notes_client(&run.skill)
+                        })
+                } else {
+                    client.clone()
+                };
                 // A write is kept off the door's lock (two fsyncs took 11 to
                 // 15 ms on lamp-75c9, 10 Nov), its answer coming when it is;
                 // a read is from memory.
                 let answered = match &op {
-                    Op::NotesSet { key, value } => notes.set(&client, key, value),
-                    Op::NotesDelete { key } => notes.delete(&client, key),
-                    Op::NotesGet { key } => notes.get(&client, key).map(|found| {
+                    Op::NotesSet { key, value } => notes.set(&kept_as, key, value),
+                    Op::NotesDelete { key } => notes.delete(&kept_as, key),
+                    Op::NotesGet { key } => notes.get(&kept_as, key).map(|found| {
                         crate::notes::Step::Now(match found {
                             Some(value) => json!({"key": key, "found": true, "value": value}),
                             None => json!({"key": key, "found": false}),
                         })
                     }),
                     Op::NotesList { prefix } => {
-                        notes.list(&client, prefix).map(crate::notes::Step::Now)
+                        notes.list(&kept_as, prefix).map(crate::notes::Step::Now)
                     }
                     _ => unreachable!("a notes op"),
                 };
