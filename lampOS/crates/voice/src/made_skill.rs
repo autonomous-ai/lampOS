@@ -4769,7 +4769,8 @@ pub fn promises_a_file_to_open(toml: &str) -> Option<String> {
     steps
         .iter()
         .filter_map(|step| {
-            say_text(step.get("say")?)
+            step.get("say")
+                .and_then(say_text)
                 .or_else(|| Some(step.get("task")?.get("task")?.as_str()?.to_owned()))
         })
         .find(|text| {
