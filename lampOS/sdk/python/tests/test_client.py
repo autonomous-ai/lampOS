@@ -117,6 +117,18 @@ def test_the_lamps_language_comes_from_hello_and_is_english_when_it_says_none(tm
     run(go())
 
 
+def test_the_lamps_build_comes_from_hello_and_is_none_when_it_says_none(tmp_path):
+    async def go():
+        for said in ("143+ab12cd34ef56", None):
+            async with FakeLamp(build=said) as fake:
+                ring = await paired(fake, tmp_path / f"{said}")
+                async with await Lamp.connect(keyring=ring) as lamp:
+                    assert lamp.build == said
+                    assert lamp.info.get("build") == said
+
+    run(go())
+
+
 def test_a_wrong_code_is_refused_and_nothing_is_kept(tmp_path):
     async def go():
         async with FakeLamp() as fake:

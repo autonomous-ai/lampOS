@@ -105,6 +105,9 @@ yours names your lamp and lists the grants the owner ticked:
 lamp-fake: grants body, light, speak, look, hear, sound, skills, air, device, camera, microphone, speaker, notes, speech
 ```
 
+A lamp on a build that says its own build adds `build <number>` after the colon
+(the same text the app shows): quote it in a bug report. The fake lamp has none.
+
 Then a first program (it needs the `speak` grant):
 
 ```python
