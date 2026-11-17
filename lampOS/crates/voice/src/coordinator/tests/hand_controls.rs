@@ -4543,3 +4543,31 @@ fn a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted() {
     assert!(!controls.borrow().as_ref().unwrap().control_held());
     let _ = fs::remove_dir_all(&directory);
 }
+
+/// #7224, lamp-c0a4 on 13309: lamp-voice exited 1 twice within about a
+/// minute of every boot, before it had heard anything. The selected-route
+/// wait itself retries a new Controls publisher (`unreadable_retried`); the
+/// exit is the first session after the wait, whose coordinator stalls past
+/// the 250 ms granting lease under boot load (page faults), so the privacy
+/// reading lapses ("privacy controller lease expired" on the lamp; in this
+/// harness "privacy freshness lost") and the voice ends. With the product unit as shipped, a 275 ms stall 100 ms into
+/// that session must be ridden closed, not an exit.
+#[test]
+fn a_boot_session_stall_under_the_product_unit_is_ridden_not_an_exit() {
+    let unit = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../deploy/product/lamp-voice.service"),
+    )
+    .unwrap();
+    let product_on = unit
+        .lines()
+        .any(|line| line.trim() == "Environment=LAMP_PRIVACY_RIDES_STALL=on");
+    let (ran, began) = stall_run(product_on, 100_000, 275_000, None);
+    assert!(
+        ran.ended_us >= began + 1_500_000,
+        "the voice ended {} ms into its first session on a 275 ms stall (product unit rides stall: {product_on}): {}",
+        ran.ended_us.saturating_sub(began) / 1_000,
+        ran.error
+    );
+    assert_eq!(gap_marks(&ran, "began").len(), 1, "{}", ran.error);
+}
