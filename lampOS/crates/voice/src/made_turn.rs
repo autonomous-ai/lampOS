@@ -23,12 +23,16 @@
 //!   manage helper's own `{"off": NAME}` or `{"on": NAME}`, as the app's
 //!   switch asks it (`lamp-cloud`'s `skills.off` and `skills.on`): kept in
 //!   lamp-skills' `off` file, which a round and a restart keep. No yes:
-//!   nothing is lost, and "turn it back on" undoes it.
+//!   nothing is lost, and "turn it back on" undoes it. A remove of that
+//!   very skill still waiting for its yes is dropped
+//!   (`skill_write_yes::drop_remove_of`): "no, just turn it off" never
+//!   leaves it for a later yes to take.
 //!
 //! No extra round trip: the match reads two local folders, then one line
 //! to the manage helper over its local socket.
 use crate::made_remove::{self, Found};
 use crate::made_skill::{self, Keeping};
+use crate::skill_write_yes;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::time::Duration;
@@ -90,7 +94,8 @@ fn not_turned(spoken: &str, off: bool, why: &str) -> Value {
 /// [`made_remove::found`] by the name, on the lamp as the very package
 /// made, is turned off or on by `turn` (the manage helper's own, as the
 /// app's switch asks it: its name and whether off, or why not). Never a
-/// remove, and nothing waits. What the model is told.
+/// remove, and nothing waits: a remove of it waiting is dropped. What the
+/// model is told.
 pub fn asked(
     ask: Ask<'_>,
     keeping: &Keeping,
@@ -175,6 +180,14 @@ pub fn asked(
             });
         }
     };
+    // A remove of this very skill waiting for its yes is dropped, whether
+    // it turns or not ("Remove coffee time?", "no, just turn it off"): a
+    // later yes never takes it (Twelve's P2 on #7453).
+    if skill_write_yes::drop_remove_of(&made) {
+        eprintln!(
+            "lamp-voice: request {request}: a remove waiting for the same made skill was dropped"
+        );
+    }
     let spoken = made_skill::spoken_name(&made);
     let Some(kept) = made_skill::kept_on_named(&keeping.directory, &made) else {
         eprintln!(
@@ -654,5 +667,89 @@ mod tests {
         yes::clear_for_test();
         made_skill::set_off_said_here(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The remove of `name` asked in `request` at `now`: its wait's id.
+    fn remove_waits(keeping: &Keeping, name: &str, request: u64, now: Instant) -> String {
+        let told = made_remove::asked(
+            made_remove::Ask {
+                name,
+                request,
+                heard: true,
+                sends_here: true,
+            },
+            keeping,
+            owner,
+            now,
+        );
+        let id = told[yes::APPROVE_ID].as_str().unwrap().to_owned();
+        assert!(yes::waits(&id), "{told}");
+        id
+    }
+
+    /// Twelve's P2 on #7453: the lamp asks "Remove coffee time?" and the
+    /// person says "no, just turn it off". The turn drops that remove's
+    /// wait, turned off or back on alike: no waiting note names it, and a
+    /// later yes finds nothing to take. A remove of another skill stays.
+    #[test]
+    fn a_turn_drops_a_remove_of_the_same_skill() {
+        for off in [true, false] {
+            let (root, keeping) = nines_lamp("turn-drops-remove");
+            let now = Instant::now();
+            let id = remove_waits(&keeping, "coffee time", 81, now);
+            let told = asked(ask("coffee time", off), &keeping, owner, |_, _| Ok(()));
+            assert_eq!(told["off"], off, "{told}");
+            assert!(!yes::waits(&id), "{told}");
+            assert!(!yes::awaited(now));
+            assert!(yes::waiting_note(83, now).is_none());
+            assert_eq!(names(&keeping), ["coffee-time", "moon-fact"]);
+            let id = remove_waits(&keeping, "moon fact", 83, now);
+            asked(ask("coffee time", off), &keeping, owner, |_, _| Ok(()));
+            assert!(yes::waits(&id));
+            yes::clear_for_test();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// `make_skill`'s call `args` answered as the voice answers it, in a
+    /// turn nobody spoke: what each path says then is its own, so which
+    /// path took the call shows, and nothing on the lamp is read.
+    fn answered_unheard(args: Value) -> Value {
+        let call = lamp_gemini::ToolCall {
+            id: "1".into(),
+            name: made_skill::MAKE.into(),
+            args,
+        };
+        crate::make_skill_local::answer(&call, 84, false, None, None)
+    }
+
+    /// Switch on: a `turn_off` or `turn_on` call is taken by `answer` as a
+    /// turn, never as no request.
+    #[test]
+    fn switch_on_a_turn_call_is_routed_as_a_turn() {
+        made_skill::set_off_said_here(Some(true));
+        for key in [TURN_OFF, TURN_ON] {
+            let told = answered_unheard(json!({ key: "coffee time" }));
+            assert_eq!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(None);
+    }
+
+    /// Switch on: one call that carries both a turn-off and a remove is
+    /// read as the turn-off, before the remove, and never asks a remove.
+    #[test]
+    fn switch_on_a_turn_off_with_a_remove_is_a_turn_off() {
+        made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        let now = Instant::now();
+        let told = answered_unheard(json!({
+            TURN_OFF: "coffee time",
+            made_remove::REMOVE: "coffee time",
+        }));
+        assert_eq!(told["error"], NOT_ASKED_ALOUD, "{told}");
+        assert_ne!(told["error"], made_remove::NOT_ASKED_ALOUD, "{told}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        assert!(!yes::awaited(now));
+        made_skill::set_off_said_here(None);
     }
 }

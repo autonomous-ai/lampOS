@@ -4472,8 +4472,8 @@ remove's. Which one a line asks is the model's judgment, never a list of
 words: the function's last sentence becomes "To turn off, pause or stop one
 they made: turn_off alone, never remove; back on: turn_on; delete: remove;
 run now: run; list: made; say nothing first."
-(`make_skill_local::TURN_OFF_TOLD`, as many bytes as the sentence it
-replaces, so every switch on still fits the link's 1,024), `turn_off`'s
+(`make_skill_local::TURN_OFF_TOLD`, 151 bytes to the 149 of the sentence
+it replaces, so every switch on still fits the link's 1,024), `turn_off`'s
 parameter says "turn off, pause or stop a skill they made, which keeps it
 to turn back on ... Never remove for this", and `remove`'s says "delete or
 remove a skill for good, never to turn one off, pause or stop it". A call
@@ -4499,7 +4499,10 @@ becomes a remove. Then, in code (`made_turn::asked`):
   removed; or that NAME is on again. A refusal is said as not turned, and
   why.
 - **A remove still asks first.** "Remove coffee time?" and the owner's yes,
-  as above (#6960).
+  as above (#6960). A turn of that very skill drops its remove still
+  waiting (`skill_write_yes::drop_remove_of`), turned or not: "Remove
+  coffee time?", "no, just turn it off" leaves no waiting note naming it,
+  and a later yes takes nothing. A remove of another skill stays.
 - **No extra round trip.** The match reads two local folders, then one line
   to the manage helper over its local socket, at most 8 s.
 
@@ -4512,7 +4515,10 @@ Tests: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
 `only_their_own_made_skill_on_the_lamp_is_turned`,
 `a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
 `switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
-`remove_still_waits_for_its_yes`; and lamp-skills'
+`remove_still_waits_for_its_yes`, `a_turn_drops_a_remove_of_the_same_skill`,
+`switch_on_a_turn_call_is_routed_as_a_turn` and
+`switch_on_a_turn_off_with_a_remove_is_a_turn_off` (through
+`make_skill_local::answer`); and lamp-skills'
 `made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch`,
 through the real manage helper.
 
