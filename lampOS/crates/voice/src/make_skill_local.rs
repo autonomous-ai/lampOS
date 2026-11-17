@@ -9240,7 +9240,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{description}"
         );
         let uses = crate::skill_task_yes::uses_said(&grants);
-        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(uses.contains("reaches the public internet"), "{uses}");
         assert!(
             description.ends_with(&format!(
                 "The lamp's agent does it, and {uses}. It runs only once you agree."
