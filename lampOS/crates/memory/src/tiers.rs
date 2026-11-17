@@ -703,8 +703,29 @@ fn empty_tiers(root: &Path, log: &(dyn Fn(&str) + Send + Sync)) -> bool {
 /// A start with the switch off (or unknown): a tiered copy an earlier
 /// `shadow` or `on` left under `dir` is removed, since no forget made while
 /// off would reach it. The log line has counts only. `None` when there was
-/// none.
-pub fn clear_left(dir: &Path) -> Option<String> {
+/// none. A copy that can't be removed is also counted in `health`.
+pub fn clear_left(dir: &Path, health: Option<&crate::health::State>) -> Option<String> {
+    clear_left_by(dir, health, remove_left)
+}
+
+/// A left copy removed, a link or a file alike.
+fn remove_left(root: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(root) {
+        Ok(meta) if meta.is_dir() => fs::remove_dir_all(root),
+        Ok(_) => fs::remove_file(root),
+        Err(error) => Err(error),
+    }
+}
+
+/// [`clear_left`] with its removal given. The removal can't be made to fail
+/// on every host through the file system alone: root removes a read-only
+/// folder, and a file where a folder was is removed as a file. So the test
+/// gives a failing removal (#4988's read, on #7627).
+pub(crate) fn clear_left_by(
+    dir: &Path,
+    health: Option<&crate::health::State>,
+    remove: impl FnOnce(&Path) -> io::Result<()>,
+) -> Option<String> {
     let root = dir.join(DIR);
     if fs::symlink_metadata(&root).is_err() {
         return None;
@@ -720,16 +741,16 @@ pub fn clear_left(dir: &Path) -> Option<String> {
             }
         }
     }
-    let removed = match fs::symlink_metadata(&root) {
-        Ok(meta) if meta.is_dir() => fs::remove_dir_all(&root),
-        Ok(_) => fs::remove_file(&root),
-        Err(error) => Err(error),
-    };
-    Some(match removed {
+    Some(match remove(&root) {
         Ok(()) => format!("tiers off: a left tiered copy removed stores={stores} files={files}"),
-        Err(_) => format!(
-            "tiers off: a left tiered copy could not be removed stores={stores} files={files}"
-        ),
+        Err(_) => {
+            if let Some(health) = health {
+                health.tiers_left_kept();
+            }
+            format!(
+                "tiers off: a left tiered copy could not be removed stores={stores} files={files}"
+            )
+        }
     })
 }
 

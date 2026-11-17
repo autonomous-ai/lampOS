@@ -323,7 +323,7 @@ fn serve(arguments: &Arguments, server: Server, health: Option<&State>) -> io::R
             Err(tiers::UnknownMode) => log("LAMP_MEMORY_TIERS is not off, shadow or on; the tiers stay off"),
         }
         // Off: a forget can't reach a tiered copy an earlier run left.
-        if let Some(line) = tiers::clear_left(&arguments.dir) {
+        if let Some(line) = tiers::clear_left(&arguments.dir, health) {
             log(&line);
         }
         return server.run_reporting(&mut store, &mut now_unix_ms, &mut log, health);
