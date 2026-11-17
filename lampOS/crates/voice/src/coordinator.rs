@@ -12944,6 +12944,19 @@ fn conversation_with_gate_inner(
         };
         if let Some(says) = says.as_mut() {
             says.poll(say_now_us);
+            // A note that may end unsaid (#6543) is let go, never begun,
+            // once someone was heard or the face left since it was asked.
+            for (skill, why) in says.end_unsaid(|asked_us| {
+                crate::say::moment_passed(
+                    asked_us,
+                    last_speech_us,
+                    presence
+                        .as_ref()
+                        .is_some_and(|presence| presence.left_since(asked_us, clock)),
+                )
+            }) {
+                eprintln!("lamp-voice: the skill {skill}'s note ends unsaid: {why}");
+            }
         }
         // The shutdown's last words (#3697) wait for none of it: the lamp's
         // own speech is cut for them. A muted lamp stays silent.
