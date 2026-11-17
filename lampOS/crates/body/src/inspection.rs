@@ -310,6 +310,9 @@ pub(crate) trait Runtime {
     fn recovery_inhibited(&self) -> bool {
         false
     }
+    /// Before READY=1, a move about to take `by` asks systemd to wait that
+    /// much longer for it (`EXTEND_TIMEOUT_USEC`, #5693). Nothing by default.
+    fn extend_start(&mut self, _by: Duration) {}
 }
 
 fn micros(time: Duration) -> u64 {
