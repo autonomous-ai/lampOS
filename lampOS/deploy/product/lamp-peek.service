@@ -48,7 +48,10 @@ ReadWritePaths=/run/lampos-bus
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK: glibc's getifaddrs reads the interface list over a netlink socket, and the monitor's gate
+# reads the subnet of the interface a request came to from it (#7208). Without it getifaddrs fails, no
+# prefix is found, and a peer on the lamp's own subnet outside RFC1918 is refused (#7456).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
