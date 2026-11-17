@@ -328,6 +328,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     (
+        crate::second_provider::DOWN_LINE_LIMIT,
+        [
+            "Mình hết hạn mức rồi.",
+            "利用上限に達しちゃった。",
+            "我的额度用完了。",
+            "사용 한도를 다 썼어요.",
+        ],
+    ),
+    (
         crate::second_provider::COULD_NOT_LOOK,
         [
             "Mình không nhìn rõ được.",

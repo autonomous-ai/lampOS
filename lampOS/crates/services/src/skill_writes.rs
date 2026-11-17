@@ -100,12 +100,22 @@ pub const APPROVED_FILE: &str = "skill-writes-approved.json";
 pub const LEDGER_FILE: &str = "skill-writes.json";
 /// In the store folder: the owner's sent-log.
 pub const SENT_FILE: &str = "skill-writes-sent.json";
-/// The most sends a skill makes in any 24 hours.
-pub const PER_SKILL: usize = 10;
-/// The most sends every skill together makes in any 24 hours.
-pub const ALL_SKILLS: usize = 30;
+/// The most sends a skill makes in any 24 hours: 10 until the owner's ask
+/// of 15 Nov raised it with the skills' runs (`lamp-skills`' `task.rs`).
+/// The read-back and the spoken yes on each write's SHA-256 stay the safety.
+pub const PER_SKILL: usize = 50;
+/// The most sends every skill together makes in any 24 hours: 30 until
+/// 15 Nov, raised with [`PER_SKILL`].
+pub const ALL_SKILLS: usize = 200;
 /// The window the bounds count in, seconds.
 pub const DAY_S: i64 = 86_400;
+/// The most sends a skill makes in any hour (15 Nov, the first builder's
+/// brake beside the day's [`PER_SKILL`]): a presence trigger that flaps
+/// sends at most this many to the same person before an hour passes, never
+/// the day's 50 in minutes.
+pub const PER_SKILL_HOUR: usize = 5;
+/// The window [`PER_SKILL_HOUR`] counts in, seconds.
+pub const HOUR_S: i64 = 3_600;
 /// The most writes approved on the lamp, every skill's together.
 pub const APPROVED_MOST: usize = 50;
 /// The most writes one skill has approved.
@@ -514,8 +524,9 @@ impl Ledger {
         }
     }
 
-    /// One send for `skill` at `now` taken, when both bounds allow it: the
-    /// skill's sends and every skill's in the last day, after it. Kept
+    /// One send for `skill` at `now` taken, when the bounds allow it: the
+    /// skill's sends and every skill's in the last day, and the skill's in
+    /// the last hour, after it. Kept
     /// before the send (the caller holds one lock across it), so two at
     /// once never pass a bound together; a send that then fails still
     /// counts. Refused when the ledger can't be kept.
@@ -543,6 +554,15 @@ impl Ledger {
         if mine >= PER_SKILL {
             return Err(format!(
                 "a skill sends at most {PER_SKILL} times a day, and this one has"
+            ));
+        }
+        let this_hour = sent
+            .iter()
+            .filter(|one| one.skill == skill && one.at > now - HOUR_S)
+            .count();
+        if this_hour >= PER_SKILL_HOUR {
+            return Err(format!(
+                "a skill sends at most {PER_SKILL_HOUR} times an hour, and this one has"
             ));
         }
         if sent.len() >= ALL_SKILLS {
@@ -765,33 +785,54 @@ mod tests {
     fn the_ledger_holds_each_skill_and_every_skill_to_its_bound() {
         let dir = tempfile::tempdir().unwrap();
         let ledger = Ledger::new(dir.path());
-        for n in 1..=PER_SKILL {
-            assert_eq!(ledger.take("a", 1_000).unwrap().0, n);
+        // The skill's day: PER_SKILL_HOUR an hour, up to PER_SKILL.
+        let hour_of = |n: usize| (n / PER_SKILL_HOUR) as i64 * HOUR_S;
+        for n in 0..PER_SKILL {
+            assert_eq!(ledger.take("a", hour_of(n)).unwrap().0, n + 1);
         }
+        let next = hour_of(PER_SKILL - 1) + HOUR_S;
         assert!(
             ledger
-                .take("a", 1_000)
+                .take("a", next)
                 .unwrap_err()
-                .contains(&format!("at most {PER_SKILL} times"))
+                .contains(&format!("at most {PER_SKILL} times a day"))
         );
-        // A day later it may again.
-        assert!(ledger.take("a", 1_000 + DAY_S).is_ok());
-        // Other skills fill the window to every skill's bound, each within
-        // its own.
-        let mut left = ALL_SKILLS - 1;
-        for skill in ["b", "c", "d", "e", "f"] {
-            for _ in 0..PER_SKILL.min(left) {
-                ledger.take(skill, 2_000 + DAY_S).unwrap();
-            }
-            left -= PER_SKILL.min(left);
+        // A day after its first hour's sends, it may again.
+        assert!(ledger.take("a", DAY_S + 1).is_ok());
+        // Every skill's bound, each skill within its own hour.
+        let all = tempfile::tempdir().unwrap();
+        let ledger = Ledger::new(all.path());
+        for n in 0..ALL_SKILLS {
+            ledger
+                .take(&format!("s{}", n / PER_SKILL_HOUR), 1_000)
+                .unwrap();
         }
-        assert_eq!(left, 0);
         assert!(
             ledger
-                .take("g", 2_000 + DAY_S)
+                .take("another", 1_000)
                 .unwrap_err()
                 .contains(&format!("at most {ALL_SKILLS} times"))
         );
+    }
+
+    /// A trigger that flaps (15 Nov): one skill's sends stop at
+    /// [`PER_SKILL_HOUR`] within an hour, then go again in the next.
+    #[test]
+    fn a_skill_sends_at_most_five_in_an_hour() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger = Ledger::new(dir.path());
+        for n in 1..=PER_SKILL_HOUR {
+            assert_eq!(ledger.take("arrive-mail", 1_000).unwrap().0, n);
+        }
+        assert!(
+            ledger
+                .take("arrive-mail", 1_000 + HOUR_S - 1)
+                .unwrap_err()
+                .contains(&format!("at most {PER_SKILL_HOUR} times an hour"))
+        );
+        // Another skill is not held by it.
+        assert!(ledger.take("other", 1_000).is_ok());
+        assert!(ledger.take("arrive-mail", 1_000 + HOUR_S).is_ok());
     }
 
     #[test]

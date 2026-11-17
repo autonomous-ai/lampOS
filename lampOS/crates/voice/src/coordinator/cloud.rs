@@ -583,6 +583,7 @@ mod tests {
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,
+            make_waiting: false,
             owner: turn,
             cloud: CloudRequest::new(1).unwrap(),
             local_input_ended: false,

@@ -84,6 +84,13 @@ Environment=LAMP_BUS=on
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
 # Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
 Environment=LAMP_PRIVACY_CONTROLS=on
+# A stall of the voice itself under about 1.44 s is ridden closed, not an exit (#5611, privacy-switch.md): the privacy
+# worker rides its granting lease's lapse publishing nothing, the second worker holds closed, and the loop rides the
+# gap with the answer cut and the microphones and camera given nothing until a fresh steady reading. lamp-06c1, 12 Nov
+# 14:32:11 on 12226: a 274 ms coordinator stall as the first session after a muted wait began ended both workers with
+# exit 1 and the voice on "privacy.c.p: Connection refused; verified cleanup failed" (#5224). A longer stall ends all
+# as before.
+Environment=LAMP_PRIVACY_RIDES_STALL=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
@@ -309,6 +316,10 @@ Environment=LAMP_NAMES=checked
 # only a face already known, and the new name is said back. Both need LAMP_NAMES=checked and the eyes' who socket.
 Environment=LAMP_NAMES_RENAME_ASKED=on
 Environment=LAMP_NAMES_RENAME_YES=on
+# The owner can teach the lamp their name (#7331, docs/eyes.md): a rename question cut before its name is asked again,
+# a name given with nobody known asks before a face is kept, a spelled name is said back and one line corrects it.
+# Second route only; needs LAMP_NAMES=checked and the eyes' who socket. row-7331b and the fresh-lamp walk on lamp-52e6.
+Environment=LAMP_NAME_LEARN_FIX=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
@@ -359,6 +370,9 @@ Environment=LAMP_NAME_IN_PASSING=ignored
 # about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
 # starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
 Environment=LAMP_SPOKEN_TO=on
+# Inside a live back-and-forth a follow-up the model lets pass still renews the call for the caller's next line, and the
+# next line is told it is theirs (#7332: lamp-74ff, 16 Nov, three of the owner's lines in 26 s held). Caller's face only.
+Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
 # "Lamp," that Deepgram writes "One," calls the lamp, "Wang," and "Lung," too with one person in a conversation,
 # and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov). On after the
 # tester's check on lamp-3e83 (3 Nov, 9680: "One, …" and its retry answered, held on 2 Nov) and lamp-06c1's played

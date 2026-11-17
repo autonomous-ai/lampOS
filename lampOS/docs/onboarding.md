@@ -650,6 +650,28 @@ off until a yes, spoken or in the app.
 - **The ask still runs**: an app yes doesn't end the walk's step. With the
   ask on, the walk still asks once; a yes keeps the voice's record, a no
   takes the app's back.
+- **Seen activity too**, a third key, where lamp-seen looks (next section).
+
+## Seen activity (#6543)
+
+The owner's yes to lamp-seen looking now and then at what they do at the
+desk (eating, drinking, slouching), kept beside the two above and in their
+shape, but given at any time, never asked at onboarding. Only with
+`LAMP_SEEN_ACTIVITY=on`, lamp-seen's own switch (off unless set); off, no
+function is declared and the app has no such key.
+
+| | Room sounds | Seen activity |
+|---|---|---|
+| Key, file | `room_sounds`, `room-sounds.json` | `seen_activity`, `seen-activity.json` |
+| Asked | once, at onboarding, on a no-slide lamp | when the person asks the lamp to notice what they do at the desk ("keep an eye on whether I eat"): the model's `offer_desk_noticing` gives it the disclosure to say word for word (`SEEN_DISCLOSURE`, the PM's wording on #6543: "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you're at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?"; with `LAMP_SEEN_POSTURE=on`, ", and how you're sitting" after "take a break"), and keeps the offer pending when it was said aloud. The offer counts only when the lamp played the disclosure whole: every word of it, in order, in the lamp's words as played for that turn (`thread`'s `lamp_for`), and the answer not cut, interrupted or barged in (`heard_only`), as a write's read-back is checked (`services::read_back_said`). **Owed before the switch goes on:** "deleted once they're checked" waits on the backend's written retention confirmation (#6912). An ordinary look ("look at my desk, where are my keys?") is never an offer |
+| Spoken yes taken | the model's `setup_step` `done` after a clear yes | the model's `look_at_my_desk` (`seen_yes.rs`), only in the very next turn after the offer played whole (the offer goes at the next turn either way, and with no offer pending the call is refused), and only for the owner's own spoken line: seen saying it, or in their voice (`services::owners_yes_now`); in the private room (`LAMP_PRIVACY_ROOM`), their voice by the judge (`services::owners_voice_now`), so a television's line is none. A guest's, a typed or a later yes is refused and nothing is written |
+| Written by | the onboarding storage worker | the same writer (`storage::keep_yes`), from the voice's provider worker: whole, temporary file, mode set, group set, synced, renamed; 0640 root:lampos (0600 with no `lampos` group), `{"version":1,"seen_activity":"yes","at_unix_s":N,"by":"voice"}`. A yes already kept is left as it is |
+| Said back | the walk's or the model's words | by lamp-seen alone, on and off (its said-back record); the model is told to add nothing |
+| Taken back by voice | a "no" or a redo | anyone's "stop looking" (`stop_looking_at_my_desk`) removes the file, the safe side; never declined with its request, as reports' stop |
+| Forget | a forget of everything | any forget (`forget` and `forget_everything`, `remember.rs`), whoever asked, before the memory is asked; a journal line names the file only when one was there |
+| App | `consent.set` with `LAMP_APP_CONSENT=on`, only on a no-slide lamp | the same, only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` |
+| Reset | the reset plan wipes it | the same |
+| Read by | lamp-ears, at its start | lamp-seen, every 2 s; it never writes the folder |
 
 ## Face expressions (#2872)
 

@@ -285,6 +285,26 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
                 )
             },
         )
+    } else if let Some((joint, cooling)) = glimpse.rest_waits {
+        // #7344: a rest that ends folded says so at once, and what brings it up,
+        // before a hot joint's warmth: that is why it lies there.
+        let cool = if cooling {
+            format!(
+                "it reads under {} for {} min, and then ",
+                crate::body::StrainGuard::COOL,
+                crate::body::StrainGuard::COOL_FOR.as_secs() / 60
+            )
+        } else {
+            String::new()
+        };
+        (
+            Level::Warn,
+            format!(
+                "resting: the {} sat down{}; it stays folded until {cool}someone speaks to it, holds its head a second or runs a health check",
+                said_as(joint),
+                if cooling { " hot" } else { " for a strain" }
+            ),
+        )
     } else if reading >= WARM {
         (
             Level::Warn,
@@ -1100,6 +1120,7 @@ mod tests {
             warming: None,
             seated: None,
             seat_rests: false,
+            rest_waits: None,
             home: None,
             waiting: None,
             stand_ask: None,
@@ -1486,6 +1507,20 @@ mod tests {
         assert_eq!(
             said(&seated),
             "seated: the shoulder sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second"
+        );
+        // #7344: a rest that ends folded is said before a warm joint.
+        // A seat is said before it (#7281); this one never seated.
+        let mut rest = seated;
+        rest.seated = None;
+        rest.rest_waits = Some(("elbow_pitch", true));
+        assert_eq!(
+            said(&rest),
+            "resting: the elbow sat down hot; it stays folded until it reads under 50 for 5 min, and then someone speaks to it, holds its head a second or runs a health check"
+        );
+        rest.rest_waits = Some(("base_pitch", false));
+        assert_eq!(
+            said(&rest),
+            "resting: the shoulder sat down for a strain; it stays folded until someone speaks to it, holds its head a second or runs a health check"
         );
     }
 

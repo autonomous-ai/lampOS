@@ -535,6 +535,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
+            ProviderOutput::MakeWaiting { request } => (format!("make_waiting:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -883,6 +884,176 @@ async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
         ]
     );
     assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
+}
+
+/// lamp-c0a4, 16 Nov (#7371): a make on the one run path waited about 63 s
+/// after its waiting line in silence. With the one run path the waiting
+/// line says how long, and a make still with no answer past its wait says
+/// one long-wait line, once; a make that answers first says none.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more() {
+    let said = |after: Duration| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_on_one_path(Some(after));
+        engine.submit(written(
+            7_371_000 + after.as_millis() as u64 % 1_000,
+            "Make me x.",
+        ));
+        turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>()
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    assert_eq!(
+        said(Duration::from_millis(30)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting.clone(),
+            long,
+            "said:Made.".into()
+        ]
+    );
+    assert_eq!(
+        said(Duration::from_secs(60)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting,
+            "said:Made.".into()
+        ]
+    );
+}
+
+/// lamp-c0a4, 16 Nov (#7371): after the one run path's waiting line the
+/// turn stays open for the make, about 80 s, and its generation never
+/// completed, so the lamp's playback never ended and it showed speaking
+/// all along. On the one path the line's generation completes once its
+/// last audio is sent, then `MakeWaiting`, before anything more; the
+/// long-wait line's too. With the switch off, no generation completes
+/// before the answer's, as before.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_completes_its_generation_after_its_audio() {
+    let labels = |after: Option<Duration>, request: u64| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        );
+        if after.is_some() {
+            engine = engine.waiting_on_one_path(after);
+        }
+        engine.submit(written(request, "Make me x."));
+        let mut labels: Vec<String> = Vec::new();
+        for label in turn(&mut engine).await {
+            let label = if label.starts_with("audio:") {
+                "audio".to_owned()
+            } else {
+                label.replacen("said: ", "said:", 1)
+            };
+            if labels.last() != Some(&label) {
+                labels.push(label);
+            }
+        }
+        // From the waiting line on.
+        let from = labels
+            .iter()
+            .position(|label| {
+                label.ends_with(crate::make_skill_agent::waiting_line(after.is_some()))
+            })
+            .unwrap();
+        labels.split_off(from)
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    let answer = ["said:Made.", "audio", "generated", "complete"];
+    let waited = |request: u64| {
+        [
+            "audio".to_owned(),
+            "generated".into(),
+            format!("make_waiting:{request}"),
+        ]
+    };
+    let mut expected = vec![waiting.clone()];
+    expected.extend(waited(7_372_001));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_secs(60)), 7_372_001).await,
+        expected
+    );
+    let mut expected = vec![waiting];
+    expected.extend(waited(7_372_002));
+    expected.push(long);
+    expected.extend(waited(7_372_002));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_millis(30)), 7_372_002).await,
+        expected
+    );
+    let mut expected = vec![
+        format!("said:{}", crate::make_skill_agent::WAITING_LINE),
+        "audio".into(),
+    ];
+    expected.extend(answer.map(String::from));
+    assert_eq!(labels(None, 7_372_003).await, expected);
 }
 
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
@@ -6702,6 +6873,336 @@ async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one(
             .all(|turn| !turn.contains(&line) && !turn.contains(&again) && !turn.contains(&cannot)),
         "{off:?}"
     );
+}
+
+/// #7346 (lamp-74ff, 16 Nov 18:00-19:07): the relay out of its usage limit
+/// answered 429 for over an hour and the lamp kept promising "a moment".
+/// 429s with no answer between, spanning [`LIMIT_AFTER`], say
+/// [`DOWN_LINE_LIMIT`] instead of the slow line: once a run of 429s,
+/// then nothing; an answered turn ends the
+/// streak; 503s that last as long keep the slow line; a written turn never
+/// says it; with the down line off, nothing.
+#[tokio::test(start_paused = true)]
+async fn a_429_that_lasts_says_the_usage_limit_line_not_the_slow_one() {
+    async fn turns(on: bool, status: u16) -> Vec<Vec<String>> {
+        let refused = || vec![Err(net::Error::Status(status))];
+        let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                    .take(9)
+                    .collect(),
+            ),
+            chats: Mutex::new(
+                [
+                    answered(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    answered(),
+                    refused(),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        let mut heard = Vec::new();
+        // One chat each, the written turn's too.
+        for (request, wait, spoken) in [
+            (1, 0, true),
+            (2, 1, true),
+            (3, 1, true),
+            (4, 130, true),
+            (5, 1, true),
+            (6, 1, false),
+            (7, 61, true),
+            (8, 1, true),
+            (9, 1, true),
+        ] {
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            if spoken {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+            } else {
+                engine.submit(written(request, "Say hello."));
+            }
+            heard.push(sent(&mut engine).await);
+        }
+        heard
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let slow = |turn: &Vec<String>| turn.contains(&line) || turn.contains(&again);
+    let on = turns(true, 429).await;
+    assert!(
+        on[1].contains(&line) && !on[1].contains(&limit),
+        "a first 429: {on:?}"
+    );
+    assert!(on[2].contains(&again) && !on[2].contains(&limit), "{on:?}");
+    assert!(
+        on[3].contains(&limit) && !slow(&on[3]),
+        "429s past the bound: {on:?}"
+    );
+    assert!(
+        on[3].iter().any(|event| event == "failed"),
+        "still a failed turn: {on:?}"
+    );
+    assert!(
+        !on[4].contains(&limit) && !slow(&on[4]),
+        "never twice in a run, nor the slow line: {on:?}"
+    );
+    assert!(
+        !on[5].contains(&limit) && !slow(&on[5]),
+        "a written turn: {on:?}"
+    );
+    assert!(
+        !on[6].contains(&limit) && !slow(&on[6]),
+        "once a run, past the minute too: {on:?}"
+    );
+    assert!(!on[7].contains(&limit), "answered: {on:?}");
+    assert!(
+        on[8].contains(&line) && !on[8].contains(&limit),
+        "an answer ends the streak: {on:?}"
+    );
+    let busy = turns(true, 503).await;
+    assert!(
+        busy.iter().all(|turn| !turn.contains(&limit)),
+        "a 5xx keeps the slow line: {busy:?}"
+    );
+    assert!(slow(&busy[3]) && slow(&busy[6]), "{busy:?}");
+    let off = turns(false, 429).await;
+    assert!(off.iter().all(|turn| !turn.contains(&limit)), "{off:?}");
+}
+
+/// #7346's row on lamp-52e6 (23:21, then 23:24): the limit line came again
+/// 3.5 min later with no answer between. V2's ruling: it is said once a
+/// run of 429s, however long the run; only an answered round ends the run,
+/// and a later run says it once again.
+#[tokio::test(start_paused = true)]
+async fn the_usage_limit_line_is_said_once_a_run_until_an_answer() {
+    let refused = || vec![Err(net::Error::Status(429))];
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    // Two runs of 429s, each spanning more than LIMIT_AFTER and two
+    // DOWN_LINE_EVERY, an answer between them.
+    let run = [1, 1, 130, 61, 61];
+    let chats: Vec<_> = std::iter::once(answered())
+        .chain(run.iter().map(|_| refused()))
+        .chain(std::iter::once(answered()))
+        .chain(run.iter().map(|_| refused()))
+        .collect();
+    let waits: Vec<u64> = std::iter::once(0)
+        .chain(run)
+        .chain(std::iter::once(1))
+        .chain(run)
+        .collect();
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(waits.len())
+                .collect(),
+        ),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for (request, wait) in (1..).zip(waits) {
+        tokio::time::sleep(Duration::from_secs(wait)).await;
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        heard.push(sent(&mut engine).await);
+    }
+    assert!(LIMIT_AFTER + 2 * DOWN_LINE_EVERY < Duration::from_secs(run.iter().skip(1).sum()));
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let said = |turns: &[Vec<String>]| turns.iter().filter(|t| t.contains(&limit)).count();
+    assert_eq!(said(&heard[1..6]), 1, "once in the first run: {heard:?}");
+    assert!(heard[3].contains(&limit), "{heard:?}");
+    assert_eq!(said(&heard[6..7]), 0, "answered: {heard:?}");
+    assert_eq!(
+        said(&heard[7..]),
+        1,
+        "once again after an answer: {heard:?}"
+    );
+    assert!(heard[9].contains(&limit), "{heard:?}");
+}
+
+/// One spoken turn's audio, `down` for its `DownLineSaid`, and how it ended.
+async fn sent_with_down(engine: &mut Engine, request: u64) -> Vec<String> {
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let mut sent = Vec::new();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Audio { samples, .. } => sent.push(format!("audio:{}", samples[0])),
+            ProviderOutput::DownLineSaid { request: of } if of == request => {
+                sent.push("down".into());
+            }
+            ProviderOutput::TurnFailed { .. } => {
+                sent.push("failed".into());
+                return sent;
+            }
+            ProviderOutput::TurnComplete { .. } => {
+                sent.push("complete".into());
+                return sent;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// #7346, Backend's relay (#1711): a 429 whose body names `usage_limit`
+/// is a usage limit at once, by the relay's own word, not after 2 min; the
+/// line says when it comes back, in the lamp's local time, rendered then.
+/// Without a time it is the plain line. Later asks in the same run hear
+/// nothing, and still send `DownLineSaid`, so the coordinator says no
+/// `turn_lost` over them (the Reviewer-lead's question on #7362).
+#[tokio::test(start_paused = true)]
+async fn a_usage_limit_in_the_relays_word_says_the_line_at_once_with_the_time() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let reset = now + 3 * 3_600;
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = |reset| vec![Err(net::Error::UsageLimit(reset))];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(3)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(Some(reset)), limited(Some(reset))].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let first = sent_with_down(&mut engine, 1).await;
+    assert!(first.contains(&"complete".to_owned()), "{first:?}");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let timed = crate::local_time::offset_here()
+        .and_then(|offset| usage_limit::line_at(None, reset, now, offset))
+        .unwrap_or_else(|| DOWN_LINE_LIMIT.to_owned());
+    let said = sent_with_down(&mut engine, 2).await;
+    assert!(
+        said.contains(&format!("audio:{}", timed.len()))
+            && said.ends_with(&["down".to_owned(), "failed".to_owned()])
+            && !said.contains(&format!("audio:{}", DOWN_LINE.len())),
+        "at once, with the time ({timed}): {said:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let again = sent_with_down(&mut engine, 3).await;
+    assert_eq!(
+        again,
+        ["down", "failed"],
+        "quiet, and no turn_lost: {again:?}"
+    );
+
+    // No time in the refusal: the plain line, at once.
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(None)].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    sent_with_down(&mut engine, 1).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let plain = sent_with_down(&mut engine, 2).await;
+    assert!(
+        plain.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "{plain:?}"
+    );
+}
+
+/// The first builder's ruling on #7362 (23:56): after the first limit line
+/// of a run, only a line that names the lamp hears it again, at most once
+/// in [`LIMIT_AGAIN_NAMED`]; every other line hears no words at all, and
+/// still tells the coordinator, so no other line takes its place. A round
+/// that begins ends the run, and the next run's first line hears it.
+#[tokio::test(start_paused = true)]
+async fn after_the_first_limit_line_only_a_line_naming_the_lamp_hears_it_again() {
+    const NAMED: &str = "Lamp, what time is it?";
+    const UNNAMED: &str = "What time is it?";
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = || vec![Err(net::Error::UsageLimit(None))];
+    // (words, wait before it in s, its chat)
+    let turns = [
+        (UNNAMED, 0, answered()),
+        (UNNAMED, 1, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 301, limited()),
+        (NAMED, 60, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 300, limited()),
+        (NAMED, 1, answered()),
+        (NAMED, 1, limited()),
+    ];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            turns
+                .iter()
+                .map(|(words, _, _)| Ok((*words).to_owned()))
+                .collect(),
+        ),
+        chats: Mutex::new(turns.iter().map(|(_, _, chat)| chat.clone()).collect()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for ((_, wait, _), request) in turns.iter().zip(1..) {
+        tokio::time::sleep(Duration::from_secs(*wait)).await;
+        heard.push(sent_with_down(&mut engine, request).await);
+    }
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let quiet = ["down".to_owned(), "failed".to_owned()];
+    assert!(heard[1].contains(&limit), "the run's first line: {heard:?}");
+    assert_eq!(heard[2], quiet, "unnamed: {heard:?}");
+    assert!(heard[3].contains(&limit), "named, 5 min on: {heard:?}");
+    assert_eq!(heard[4], quiet, "named again within 5 min: {heard:?}");
+    assert_eq!(heard[5], quiet, "unnamed: {heard:?}");
+    assert!(
+        heard[6].contains(&limit),
+        "named, 5 min on again: {heard:?}"
+    );
+    assert!(heard[7].contains(&"complete".to_owned()), "{heard:?}");
+    assert!(
+        heard[8].contains(&limit),
+        "a new run's first line: {heard:?}"
+    );
+}
+
+/// #7346: the usage-limit line is said in each of the owner's languages,
+/// as the other down lines are.
+#[test]
+fn the_usage_limit_line_has_each_language() {
+    use crate::language::{Language, fixed_in};
+    for language in [
+        Language::Vietnamese,
+        Language::Japanese,
+        Language::Chinese,
+        Language::Korean,
+    ] {
+        assert_ne!(
+            fixed_in(Some(language), DOWN_LINE_LIMIT),
+            DOWN_LINE_LIMIT,
+            "{language:?}"
+        );
+    }
 }
 
 /// #4332 (lamp-e82d): a 503 that says the slow line tells the coordinator

@@ -270,8 +270,8 @@ must not leave a step silently undone)*.
 | `do.requested_audio` | no | A fixed relative `.wav` path, only in a tool-only skill with `permissions.speak = true`: exactly one short plain `say` confirmation, then one `requested_audio` step with `after = "say"`. No other actions, triggers (including daily clock triggers), conditions, choice/flag arguments, output limits, history, search, watch, stop, quiet hours or nudge limits (`most_a_day`, `active`, `budget`, `rest`). The ordinary `again` guard and `still` note remain available and confer no audio authority. Voice plays at most 60 seconds of checked 24 kHz mono PCM16 under the same spoken owner after confirmed confirmation retirement. Advertisement and execution require exact `LAMP_REQUESTED_AUDIO=on`; pack/install may validate while off. See [requested audio](requested-audio.md) for private context, leases, revocation and asset bounds |
 | `do.remind` | no | A timer or reminder set in the lamp's schedule (#6066): `{ at = "HH:MM", words = "..." }` through the actions part's `set_reminder` (the next local `HH:MM` from the run), or `{ in = D, words = "..." }` through its `set_timer` (D from the run, `1m` to `24h`, whole seconds), the same calls the voice makes when a person asks, with `LAMP_SCHEDULE_TOOLS=on` in `lamp-actions`. It needs that function in `[permissions] actions` (`set_reminder` or `set_timer`), checked at load and again at the call. `words` are the skill's own fixed text, never the model's, with a made skill's say limits (`remind::plain_words`): at most 120 characters, one or two sentences, no web address, no quotes, braces or backticks, no control or format character; anything else refuses the skill at load. Only in a skill a trigger starts, never one with a `tool` (a person asking for a reminder asks the voice, which says its time back), and not in a step for some choices. Manners: a skill sets at most 3 in any 24 hours (`remind::MOST_A_DAY`, counted when the set is asked, kept while the program runs as `most_a_day` is), and never stacks one: before a set it reads the schedule's `list_reminders`, and words already set and not yet said (case and spacing aside) mean nothing new; a list it can't read whole sets nothing. The read-back is the schedule's: the run's journal says `set, due HH:MM` only for a `committed` answer, with its `clock`, and never the words. The call names no caller, so the reminder is the room's: said to whoever is at the lamp when it comes due. It reads no memory and writes nothing beyond the schedule's entry. Tests: `tests/it/remind.rs` and `a_remind_step_is_made_through_the_actions_part` |
 | `do.read` | no | A read of one of the owner's linked services (proposal #5288, `LAMP_SKILL_READS=on` in `lamp-skills` and `lamp-services`, on in the product units): `{ service, what, ... }`, any service with a fixed read (not the send-only `gmail-app`, the MCP services or Ahrefs), any of its fixed reads, never one that gives a whole text or a free-form one (a GraphQL `query`, `get` on any path, an MCP `call`; `lamp_services::spoken::skill_read_refused`, held again by `lamp-services` at its door), a calendar's `events` with `day = "today"` or `"tomorrow"` (`service_read::ReadFile`). The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "read" }` and `speak = true`. `lamp-skills` reads it itself through `lamp-services`' tools socket, once a local day, when the owner's known face is alone in view and steady 5 s, no voice was heard in the last minute and the lamp is not private, paused or in quiet hours (waiting up to 60 minutes, then skipping the day unsaid), and says the count and then each item's short line as exact text, judging the gate again before each; someone coming stops it with "I'll tell you the rest later." The journal keeps counts and the gate's outcome only ([services.md](services.md), "A made skill's read"). A read refused because the service isn't linked says nothing, unless `LAMP_SKILL_LINK_NOTE=on` (with `--state-dir`; off): then it says `lamp-services`' "<Service> isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." once, behind the same gate, kept per skill in the state folder's `link-noted` until a read succeeds again ([services.md](services.md), "Not linked at the run") |
-| `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 10 times a skill and 30 across every skill in any 24 hours. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
-| `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 3 a skill and 10 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
+| `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 50 times a skill and 200 across every skill in any 24 hours, and 5 a skill in any hour. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
+| `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 20 a skill and 100 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
 
@@ -1891,8 +1891,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   asks again"); either way the lamp asks for the yes aloud (below), and the
   journal adds what became of that ask. lamp-control off or not reached
   hands nothing over and asks nothing ("lamp-control, which keeps the
-  owner's yes, can't be asked"). Then one at a time a skill, and at most 3 a skill
-  and 10 across every skill in any 24 hours (`task-runs.json` in
+  owner's yes, can't be asked"). Then one at a time a skill, and at most 20 a skill
+  and 100 across every skill in any 24 hours (`task-runs.json` in
   `--state-dir`; an unreadable ledger or one with a run after now counts as
   full). A run is counted as it is handed over, and taken back off the
   ledger when lamp-tasks refused it before its agent began (the fixed
@@ -1948,7 +1948,7 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   A run that is only `do.task`s is checked first, read only
   (its folder known, then `task::would_refuse`: the switch, `--state-dir`,
   its last under way, the bounds): refused, nothing is handed over, the run's `Done` says "not
-  made: " and why (say "not made: the skills' 10 runs in 24 hours are
+  made: " and why (say "not made: the skills' 100 runs in 24 hours are
   spent"), and a model's call is answered with an error that nothing is
   running and why (`TASK_NOT_RUN`), never "Done." (lamp-9adf, 15 Nov). A
   run with other steps makes them at once, its task still refused on its
@@ -4531,17 +4531,87 @@ no network:
   one in its description, each weighed by how few skills have it) in full,
   with what it does (its description, cut at 400 bytes), when it last ran
   by itself when that is kept, and, for a skill whose `[[do]]` hands a task
-  over, whether that task waits for the owner's yes (asked of lamp-control
-  through the manage helper once, for the first such skill, with
-  `LAMP_SKILL_TASKS` on); and to answer from these alone, never guess, say
+  over, whether that task waits for the owner's yes (asked of the manage
+  helper and lamp-control once, for the first such skill, with
+  `LAMP_SKILL_TASKS` on, both within 1.5 s together,
+  `skill_about::YES_CHECK_MOST`, so first audio isn't held; a yes itself
+  still waits 8 s for each. Either not there or not answering in time is
+  never a wait: `waits_for_yes` is left out and `waits_for_yes_unchecked`
+  says "the lamp can't check right now whether its task waits for the
+  owner's yes", `skill_about::task_waits`); and to answer from these alone, never guess, say
   what isn't given isn't kept, and say no skill on the lamp is that one when
-  none is (a reminder they set is not a skill). Which skill they mean is the
-  model's. The answer is about 3 to 5 KB with 65 skills on the lamp.
+  none is (a reminder they set is not a skill), and only to answer:
+  "offer to change, turn on or turn off nothing" (on lamp-9adf "is my plant
+  watering skill on?" was answered none, then "say so and I'll turn it
+  off"). Which skill they mean is the model's. The answer is about 3 to 5
+  KB with 65 skills on the lamp, and never past what the link carries
+  (`tools::sendable`, the provider's 4,096 bytes less 16; past it Live gets
+  no answer at all): skills' lines are left out from the end, then the
+  nearest, and how many is said in `skills_left_out`
+  (`skill_about::fit`); one that still doesn't fit is told the lamp can't
+  check its skills right now.
+- **A reminder may be a skill.** On lamp-9adf (#7335's row) "Lamp, is my
+  water reminder on or off?" called `list_reminders`, not `use_skill`, and
+  with no reminder set the lamp said "No water reminder is set", while Sip
+  of water and Drink water reminder were on. With the switch, every
+  `list_reminders` answer through the schedule (`tools::run_call_with_scope`,
+  which both routes' calls reach; `skill_about::with_reminders`) carries,
+  beside the schedule's own words, `skills_on_the_lamp`: every skill's line
+  as above, and `skills_note`: "A reminder they ask about may be one of the
+  lamp's own skills, each listed in skills_on_the_lamp with its state from
+  the lamp's records. When one fits what they asked, answer from its line
+  too, in a few words; never say a skill is off or missing unless its line
+  says so. Only answer: offer to change, turn on or turn off nothing."
+  Whether a skill fits is the model's; nothing in code reads the words. A
+  record there and unreadable gives only `skills_note`: "The lamp can't
+  check its skills right now: if they may mean one of the lamp's skills, say
+  you can't check that right now, and guess nothing."; the names and a turn
+  nobody spoke are as below (nothing is added to that turn's answer). An
+  answer that isn't an object is kept under `result`. A failed answer (not
+  answered, unavailable, or the schedule's uncertain `error`) is kept as it
+  is. The lines fit what the link carries as above, the schedule's own
+  words whole: lines left out from the end and counted in
+  `skills_left_out`, and with no room even for the note, nothing is added.
+  The schedule's route has no settings, so the voice's skills folder is
+  noted as its worker reads `--skills-dir` (`skill_about::note_tools_dir`)
+  for `holds.json`. Off, or any other schedule call, the answer is the
+  schedule's, byte for byte.
+- **A skill asked about may not be one they made.** On lamp-9adf (#7335's
+  row) "Lamp, do I have a skill that reads my calendar when I sit down?
+  Did it last run?" called `make_skill` for the list of the skills they
+  made, and the lamp said it saw no such skill, while
+  read-calendar-when-sitting, added from a file, was on. With the switch,
+  a `make_skill` answer that tells the person about their skills without
+  making or asking anything (`skill_about::tells_their_skills`) carries
+  `skills_on_the_lamp` and `skills_note` the same way, through
+  `make_skill`'s route (`tools::run_call_with_scope`): the list of those
+  they made (`made`), whatever it says, and a run, a remove or a read-back
+  (`run`, `remove`, `read_back`) answered with an `error` (none found by
+  that name, more than one, not theirs, not here) and no `approve_id`
+  awaited. The note: "A skill they ask about may be any skill on the lamp,
+  not only one they made: each is listed in skills_on_the_lamp with its
+  state from the lamp's records, whether made here, added from a file,
+  from the Store or the lamp's own. When one fits what they asked, answer
+  from its line too, in a few words, though the words above name only
+  those they made; never say they have none like it, or that it is off,
+  unless its line says so. Only answer: offer to change, turn on or turn
+  off nothing." With a record unreadable: "The lamp can't check its other
+  skills right now: if they may mean a skill they didn't make, say you
+  can't check that right now, and guess nothing." A make, a clash's
+  choice, a yes, a read-back or remove that waits for a yes, and a turn
+  nobody spoke are untouched, and so is an unavailable `make_skill`; the
+  lines fit what the link carries as for reminders; off, every
+  `make_skill` answer is as before, byte for byte.
 - **Never a guess.** A record there and unreadable (the skills folder, the
   `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
   model only that the lamp can't check its skills right now. A missing
-  `off`, `holds.json` or pushed folder is nothing turned off, held or
-  pushed.
+  `off` or pushed folder is nothing turned off or pushed. A missing
+  `holds.json` is unknown, not nothing: lamp-skills writes it at its first
+  turn whenever it runs (an empty one too) and removes it when a write
+  fails, so with none a skill on by its files is told "on, its snooze
+  can't be checked right now" in its line and "on, but whether it is
+  snoozed or resting, and when it last ran, can't be checked right now" in
+  full, never plain "on".
 - **Names to the owner.** A skill made here (`made: here`) is named only
   when the owner hears (`services::owner_hears`, asked only when there is
   one), as a list's names are; to anyone else it is left out and counted
@@ -4559,7 +4629,9 @@ call naming no skill. Tests: `skill_about::tests` (on, off, snoozed, resting,
 `[present]`, a skill named by what it does, one not on the lamp, records
 that can't be read, the owner's names, the bounds, `use_skill`'s parameters with the switch and without),
 `tools::tests::a_question_about_a_skill_adds_no_function`,
-`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`, and
+`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`,
+`tools::tests::a_reminders_answer_carries_the_skills_only_with_the_switch`,
+`tools::tests::a_made_skills_list_carries_the_skills_only_with_the_switch`, and
 `process::tests::the_memory_switches_alone_reach_the_started_routes`.
 
 **Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread
@@ -4614,8 +4686,8 @@ first."). Then, in code (`made_run::asked`):
   lamp-9adf at 21:40 a run now was said to be running while another
   skill's write held lamp-tasks, which then refused it as busy); or a task
   that `task::would_refuse` says the
-  hand-over would refuse (its `PER_SKILL` = 3 runs in 24 hours spent, every
-  skill's `ALL_SKILLS` = 10 spent, its last task still under way, tasks
+  hand-over would refuse (its `PER_SKILL` = 20 runs in 24 hours spent, every
+  skill's `ALL_SKILLS` = 100 spent, its last task still under way, tasks
   off); a read whose switch is off, or that ran on this local day already
   (a read is once a day, as `read_service` holds it); a write whose switch
   is off or whose writes are stopped. What passes starts as a trigger's
@@ -5243,6 +5315,30 @@ the same code for both writers.
   second after the lamp's last turn (`app_make::say_waiting_at`, once, not
   begun after 15 s). Never when the hand-over failed at once, nor when the
   turn was cut already. The made line is the same either way.
+- **With `LAMP_MAKE_AGENT_ONE_PATH` on (#7371).** An agent's make takes
+  about a minute (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
+  result), so the waiting line says how long: "This takes about a minute.
+  I'm on it." (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
+  through the say service alike). In the turn, a make still with no answer
+  85 s after its waiting line (`make_skill_agent::LONG_WAIT_AFTER`, about
+  90 s from the ask) says "It's taking a bit longer, but I'm still on it."
+  (`make_skill_agent::LONG_WAIT_LINE`) once, never again; the journal says
+  "the make has no answer 85 s after its waiting line: its one long-wait
+  line is said". No line repeats. Through the say service (no voice turn
+  waiting on the make) only the waiting line is said, never the long-wait
+  line: with no turn there is no thinking look to hold. A make that runs
+  out its time (`make_skill_agent::MAKE_WITHIN`, 120 s) says the long-wait
+  line at about 90 s and its failure line at about 120 s: two lines about
+  30 s apart, as meant, not a fault. The lamp shows thinking between the
+  waiting line and the result: once each waiting line's audio is sent its
+  generation completes (`GenerationComplete`, then `MakeWaiting`), so its
+  playback ends and ring and body show the thinking look
+  (`ring_wire::RingPhase::Waiting`) until the next audio; the answer then
+  plays under a new playback to its end and the turn settles. Off: today's line,
+  and no second. Tests: `the_one_path_waiting_line_says_how_long`,
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
+  `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
+  and `a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer`.
 - **The journal.** "made by DeepSeek", "it asks for a linked service
   (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
   service's code, never the person's words), "the agent (Hermes) made none
@@ -5488,8 +5584,8 @@ today's checks.
    (lamp-voice).
 
 Unchanged with it on: a write's read-back and the spoken yes on its
-content's SHA-256; the sends, at most 10 a skill and 30 across all skills
-a day (`lamp-services`, which doesn't read the switch); the privacy
+content's SHA-256; the sends, at most 50 a skill and 200 across all skills
+a day, 5 a skill an hour (`lamp-services`, which doesn't read the switch); the privacy
 refusals; #6071's code grants and yes.
 
 Tests: `made_skill::tests::loosened_*` (the four, on and off,

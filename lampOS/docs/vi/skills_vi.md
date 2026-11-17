@@ -955,8 +955,9 @@ sau:
    nơi chỉ gửi nếu chủ đèn đã đồng ý đúng nội dung đó cho kỹ năng đó như đã cài (gói của nó: kỹ năng được cập nhật hay bị gỡ thì chờ lời đồng ý mới) dưới
    cùng liên kết (chỉ do đường đồng ý của giọng nói, không bao giờ do cài đặt, và không
    bao giờ trong ứng dụng, nơi không có lời đồng ý nào cho nó: "not sent: waiting for the owner's yes"), không đã đăng xuất,
-   tối đa 10 lần mỗi kỹ năng và
-   30 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào. Liên kết mất hoặc thuộc
+   tối đa 50 lần mỗi kỹ năng và
+   200 lần cho mọi kỹ năng trong bất kỳ 24 giờ nào, và 5 lần mỗi kỹ năng
+   trong bất kỳ một giờ nào. Liên kết mất hoặc thuộc
    tài khoản khác thì dừng các lần ghi của kỹ năng cho đến khi `lamp-skills`
    khởi động lại. **Một lần ghi đang chờ lời đồng ý không tiêu gì**
    (lamp-9adf, 12/11: một thư chưa được đồng ý của nhóm `wellbeing` đã
@@ -1783,7 +1784,7 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   lúc 21:40 một lần chạy ngay được nói là đang chạy trong khi write của
   kỹ năng khác giữ lamp-tasks, rồi lamp-tasks từ chối nó vì bận); hay task
   mà `task::would_refuse` nói việc giao sẽ từ chối (hết
-  `PER_SKILL` = 3 lần chạy trong 24 giờ của nó, hết `ALL_SKILLS` = 10 của
+  `PER_SKILL` = 20 lần chạy trong 24 giờ của nó, hết `ALL_SKILLS` = 100 của
   mọi kỹ năng, task trước của nó vẫn đang chạy, task tắt); read có công
   tắc tắt, hay đã chạy trong ngày địa phương này (read mỗi ngày một lần,
   như `read_service` giữ); write có công tắc tắt hay đã bị dừng. Cái qua
@@ -2357,6 +2358,31 @@ cả hai người viết.
   giây sau lượt cuối của đèn (`app_make::say_waiting_at`, một lần, không
   bắt đầu sau 15 giây). Không bao giờ khi lần giao thất bại ngay, hay khi
   lượt đã bị cắt. Câu báo đã tạo không đổi.
+- **Khi bật `LAMP_MAKE_AGENT_ONE_PATH` (#7371).** Một lần tạo của agent mất
+  khoảng một phút (lamp-c0a4, 16/11: 63 giây từ câu chờ tới kết quả), nên
+  câu chờ nói luôn là bao lâu: "This takes about a minute. I'm on it."
+  (`make_skill_agent::ONE_PATH_WAITING_LINE`, trong lượt cũng như qua dịch
+  vụ nói). Trong lượt, một lần tạo vẫn chưa có câu trả lời 85 giây sau câu
+  chờ (`make_skill_agent::LONG_WAIT_AFTER`, khoảng 90 giây từ lúc hỏi) nói
+  "It's taking a bit longer, but I'm still on it."
+  (`make_skill_agent::LONG_WAIT_LINE`) một lần, không bao giờ lặp lại; nhật
+  ký ghi "the make has no answer 85 s after its waiting line: its one
+  long-wait line is said". Không câu nào lặp lại. Qua dịch vụ nói (không có
+  lượt giọng nói nào chờ lần tạo) chỉ nói câu chờ, không bao giờ nói câu chờ
+  lâu: không có lượt thì không có dáng suy nghĩ để giữ. Một lần tạo hết giờ
+  (`make_skill_agent::MAKE_WITHIN`, 120 giây) nói câu chờ lâu ở khoảng 90
+  giây và câu báo thất bại ở khoảng 120 giây: hai câu cách nhau khoảng 30
+  giây, đúng như thiết kế, không phải lỗi. Từ lúc nói xong câu chờ
+  tới khi có kết quả, đèn hiện dáng suy nghĩ: âm thanh của mỗi câu chờ gửi
+  xong là lượt sinh của nó kết thúc (`GenerationComplete`, rồi
+  `MakeWaiting`), nên phần phát dừng lại, vòng đèn và thân đèn chuyển sang
+  dáng suy nghĩ (`ring_wire::RingPhase::Waiting`) cho tới khi có âm thanh
+  tiếp theo; sau đó câu trả lời phát hết dưới một lần phát mới và lượt kết
+  thúc. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
+  `the_one_path_waiting_line_says_how_long`,
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
+  `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
+  và `a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer`.
 - **Nhật ký.** "made by DeepSeek", "it asks for a linked service (gmail):
   straight to the agent (Hermes), DeepSeek not asked" (mã của dịch vụ,
   không bao giờ là lời của người dùng), "the agent (Hermes) made none
@@ -2598,8 +2624,8 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    (lamp-voice).
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
-SHA-256 nội dung của nó; việc gửi, tối đa 10 mỗi kỹ năng và 30 cho mọi kỹ năng
-một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
+SHA-256 nội dung của nó; việc gửi, tối đa 50 mỗi kỹ năng và 200 cho mọi kỹ năng
+một ngày, 5 mỗi kỹ năng một giờ (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
 quyền mã và lời đồng ý của #6071.
 
 Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt,
@@ -3714,7 +3740,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lamp-control; không có "có" thì chờ, "có" cho byte hay grant khác thì hỏi
   lại (cả hai trường hợp đèn tự hỏi thành tiếng, xem dưới), không hỏi được
   lamp-control thì không giao gì và không hỏi gì; một tác vụ một lúc mỗi
-  kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ. Một lần
+  kỹ năng, tối đa 20 mỗi kỹ năng và 100 cho mọi kỹ năng trong 24 giờ. Một lần
   chạy được đếm khi giao đi, và được gỡ khỏi sổ khi lamp-tasks từ chối nó
   trước khi agent bắt đầu (`NOT_TAKEN` của lần ghi cố định: `busy` vì đang
   chạy tác vụ của kỹ năng khác, `not_started`, tắt, dòng sai hay thiếu
@@ -3766,7 +3792,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   Lần chạy chỉ gồm `do.task` được kiểm tra trước, chỉ đọc
   (biết thư mục của nó, rồi `task::would_refuse`: công tắc, `--state-dir`,
   lần trước còn chạy, giới hạn): bị từ chối thì không giao gì, `Done` của lần chạy ghi "not made: "
-  kèm lý do (ví dụ "not made: the skills' 10 runs in 24 hours are spent"),
+  kèm lý do (ví dụ "not made: the skills' 100 runs in 24 hours are spent"),
   và lời gọi của model được trả lỗi rằng không có gì đang chạy và vì sao
   (`TASK_NOT_RUN`), không bao giờ "Done." (lamp-9adf, 15/11). Lần chạy có
   bước khác vẫn làm các bước đó ngay, tác vụ vẫn bị từ chối trên luồng của

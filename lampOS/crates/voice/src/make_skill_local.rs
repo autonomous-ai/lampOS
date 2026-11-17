@@ -806,7 +806,8 @@ pub fn again(error: &net::Error) -> bool {
         // stopped at its cap on tokens, or one with no fenced block at
         // all, is not whole either.
         net::Error::Protocol(what) => [CUT, AT_LENGTH, NO_BLOCK].contains(what),
-        net::Error::Url => false,
+        // A usage limit doesn't pass in a moment (#7346).
+        net::Error::Url | net::Error::UsageLimit(_) => false,
     }
 }
 

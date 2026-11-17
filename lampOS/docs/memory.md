@@ -4194,7 +4194,7 @@ then use that person's scope:
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
-    lamp, known. With `LAMP_NAME_LEARN_FIX=on` (off unless set, second
+    lamp, known. With `LAMP_NAME_LEARN_FIX=on` (on in the product unit, second
     route only, #7331), a `remember` whose text gives the speaker's own name
     (`known_faces::gives_a_name`, or `named::own_name_in` for the model's
     "The user's name is Ada.", never "Her name is Linh.", which is someone

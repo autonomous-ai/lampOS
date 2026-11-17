@@ -351,8 +351,8 @@ async fn racing(
 /// connection, as it decides what the lamp says; else the first's.
 fn which_error(first: Option<net::Error>, second: Option<net::Error>) -> Option<net::Error> {
     match (first, second) {
-        (Some(first @ net::Error::Status(_)), _) => Some(first),
-        (_, Some(second @ net::Error::Status(_))) => Some(second),
+        (Some(first @ (net::Error::Status(_) | net::Error::UsageLimit(_))), _) => Some(first),
+        (_, Some(second @ (net::Error::Status(_) | net::Error::UsageLimit(_)))) => Some(second),
         (first, second) => first.or(second),
     }
 }

@@ -71,6 +71,7 @@ pub mod probe;
 mod second_try;
 mod services;
 pub mod speech_tags;
+mod usage_limit;
 pub mod wordless_call;
 pub mod worker;
 
@@ -320,9 +321,27 @@ pub const DOWN_LINE_AGAIN: &str = "Still slow, sorry.";
 /// on #3771). At most once in [`DOWN_LINE_EVERY`]; asking again changes
 /// nothing, so it isn't repeated.
 pub const DOWN_LINE_CANNOT: &str = "Sorry, I can't answer just now.";
+/// What it says when the chat has refused with 429 for [`LIMIT_AFTER`],
+/// with no answer between: a usage limit, not a burst, so no promise of a
+/// moment (#7346: lamp-74ff's relay answered 429 for over an hour on
+/// 16 Nov and the lamp kept saying its thoughts were slow). V1's
+/// `PhraseLLMLimit`. Once a run of 429s: said again only after a chat round
+/// begins or another status ends the run (V2's ruling on #7362's row).
+pub const DOWN_LINE_LIMIT: &str = "I've hit my usage limit.";
+/// How long 429s must keep coming, with no answer between, before they are
+/// taken for a usage limit: a rate burst's per-minute window passes in one.
+pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
+/// After a run's first [`DOWN_LINE_LIMIT`], how long before a line that
+/// names the lamp hears it again (the first builder's ruling on #7362).
+pub const LIMIT_AGAIN_NAMED: Duration = Duration::from_secs(300);
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
-pub(crate) const DOWN_LINES: [&str; 3] = [DOWN_LINE, DOWN_LINE_AGAIN, DOWN_LINE_CANNOT];
+pub(crate) const DOWN_LINES: [&str; 4] = [
+    DOWN_LINE,
+    DOWN_LINE_AGAIN,
+    DOWN_LINE_CANNOT,
+    DOWN_LINE_LIMIT,
+];
 
 /// Whether a refusal before any word is passing (429, a 5xx), which the slow
 /// line suits, or one asking again won't mend.
@@ -1733,6 +1752,11 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// With the make's one run path ([`Engine::waiting_on_one_path`],
+    /// #7371): how long after its waiting line a make with no answer yet
+    /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
+    /// off, today's line and no second.
+    one_path_wait: Option<Duration>,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -3498,6 +3522,12 @@ struct DownLine {
     again: Mutex<Option<Vec<i16>>>,
     cannot: Mutex<Option<Vec<i16>>>,
     cannot_at: Mutex<Option<tokio::time::Instant>>,
+    /// [`DOWN_LINE_LIMIT`].
+    limit: Mutex<Option<Vec<i16>>>,
+    /// When the first of the 429s before any word came, with no chat round
+    /// begun and no other refusal since, and when this run last said
+    /// [`DOWN_LINE_LIMIT`] (#7346).
+    refused_since: Mutex<Option<(tokio::time::Instant, Option<tokio::time::Instant>)>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3521,7 +3551,7 @@ impl DownLine {
             // the ones kept are not rendered again (Third's P2 on #3771).
             let missing =
                 |slot: &Mutex<Option<Vec<i16>>>| slot.lock().is_ok_and(|kept| kept.is_none());
-            for (slot, text) in [&line.clip, &line.again, &line.cannot]
+            for (slot, text) in [&line.clip, &line.again, &line.cannot, &line.limit]
                 .into_iter()
                 .zip(DOWN_LINES)
             {
@@ -3545,7 +3575,7 @@ impl DownLine {
                     *kept = Some(clip);
                 }
             }
-            if [&line.clip, &line.again, &line.cannot]
+            if [&line.clip, &line.again, &line.cannot, &line.limit]
                 .into_iter()
                 .any(missing)
             {
@@ -3587,6 +3617,55 @@ impl DownLine {
 
     fn cannot_said(&self) {
         if let Ok(mut at) = self.cannot_at.lock() {
+            *at = Some(tokio::time::Instant::now());
+        }
+    }
+
+    /// A refusal before any word with `status`: how long the 429s have
+    /// come, once that is [`LIMIT_AFTER`] or more, or at once when the
+    /// service named it its usage limit (`word`, #7346). Another status
+    /// ends the run of them.
+    // ponytail: a burst, hours of no turn, then another burst reads as one
+    // run; an answered round in between (the usual case) ends it.
+    fn refused(&self, status: u16, word: bool) -> Option<Duration> {
+        let mut since = self.refused_since.lock().ok()?;
+        if status != 429 {
+            *since = None;
+            return None;
+        }
+        let now = tokio::time::Instant::now();
+        let lasted = now.duration_since(since.get_or_insert((now, None)).0);
+        (word || lasted >= LIMIT_AFTER).then_some(lasted)
+    }
+
+    /// A chat round began: the 429s, if any, have passed.
+    fn answered(&self) {
+        if let Ok(mut since) = self.refused_since.lock() {
+            *since = None;
+        }
+    }
+
+    /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
+    /// then, as before); else its clip for the run's first line, and after
+    /// that only for a line that names the lamp (`named`), at most once in
+    /// [`LIMIT_AGAIN_NAMED`]; `Some(None)`, no words, for every other (the
+    /// first builder's ruling on #7362, 23:56).
+    fn limit_due(&self, named: bool) -> Option<Option<Vec<i16>>> {
+        let clip = self.limit.lock().ok()?.clone()?;
+        let said_at = self.refused_since.lock().ok()?.and_then(|(_, at)| at);
+        let due = match said_at {
+            None => true,
+            Some(at) => {
+                named && tokio::time::Instant::now().duration_since(at) >= LIMIT_AGAIN_NAMED
+            }
+        };
+        Some(due.then_some(clip))
+    }
+
+    fn limit_said(&self) {
+        if let Ok(mut since) = self.refused_since.lock()
+            && let Some((_, at)) = since.as_mut()
+        {
             *at = Some(tokio::time::Instant::now());
         }
     }
@@ -4629,6 +4708,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                one_path_wait: None,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -5933,6 +6013,19 @@ impl Engine {
         self
     }
 
+    /// `LAMP_MAKE_AGENT_ONE_PATH=on` ([`crate::make_skill_agent::ONE_PATH_ENVIRONMENT`],
+    /// #7371), with `after` ([`crate::make_skill_agent::LONG_WAIT_AFTER`]):
+    /// a voice make's waiting line says how long
+    /// ([`crate::make_skill_agent::ONE_PATH_WAITING_LINE`]), and a make with
+    /// no answer `after` it says [`crate::make_skill_agent::LONG_WAIT_LINE`]
+    /// once. None: today's. Before any turn only.
+    pub fn waiting_on_one_path(mut self, after: Option<Duration>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.one_path_wait = after;
+        }
+        self
+    }
+
     /// `LAMP_NO_WORDS_AGAIN=on` ([`NO_WORDS_AGAIN_ENVIRONMENT`], #3704): a
     /// spoken line that begins with the lamp's name, whose round gives no
     /// words and calls nothing, with nothing said or called earlier in the
@@ -6880,6 +6973,9 @@ impl Engine {
                     .voice_confirms
                     .as_ref()
                     .map(|confirms| confirms.owner.generation());
+                // An offer of seen activity is answered only in the line
+                // right after it (#6543).
+                crate::seen_yes::turn_began(request);
                 if self.shared.wordless_resumes
                     && let Ok(mut kept) = self.shared.heard_of_cut.lock()
                 {
@@ -8115,7 +8211,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
-        | ProviderOutput::DownLineSaid { request } => Some(*request),
+        | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -8168,6 +8265,87 @@ async fn say_cannot(shared: &Shared, request: u64, heard: bool) -> Result<(), St
     Ok(())
 }
 
+/// How long the usage-limit line with its time may take to render before
+/// the plain one, rendered ahead, is said instead.
+const LIMIT_RENDER_WITHIN: Duration = Duration::from_secs(3);
+
+/// [`DOWN_LINE_LIMIT`] for 429s that have lasted `lasted`, to someone who
+/// spoke only, once a run of 429s. With the service's `reset`, it says
+/// when it comes back ([`usage_limit::line_at`], in the lamp's local time
+/// and the owner's language), rendered now since the time can't be known
+/// ahead; one that can't be rendered in [`LIMIT_RENDER_WITHIN`] (the voice
+/// may be at the same limit) says the plain line rendered ahead. The slow
+/// line ([`say_down`]) while the plain one isn't rendered. Tells the
+/// coordinator as [`say_down`] does, so no `turn_lost` follows it. After
+/// the run's first, only a line that names the lamp (`named`) hears it
+/// again, once in [`LIMIT_AGAIN_NAMED`]; every other ask hears nothing and
+/// tells the coordinator too, so no `turn_lost` or other line is said over
+/// it (the Reviewer-lead's question and the first builder's ruling on
+/// #7362).
+async fn say_limit(
+    shared: &Shared,
+    (request, heard, named): (u64, bool, bool),
+    lasted: Duration,
+    reset: Option<i64>,
+) -> Result<(), Stop> {
+    let Some(down) = shared.down.as_ref().filter(|_| heard) else {
+        return Ok(());
+    };
+    let Some(due) = down.limit_due(named) else {
+        return say_down(shared, request, heard).await;
+    };
+    if let Some(plain) = due {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64);
+        let timed = reset.and_then(|reset| {
+            usage_limit::line_at(
+                shared.language,
+                reset,
+                now,
+                crate::local_time::offset_here()?,
+            )
+        });
+        let clip = match &timed {
+            Some(text) => {
+                tokio::time::timeout(LIMIT_RENDER_WITHIN, render_line(&shared.services, text))
+                    .await
+                    .unwrap_or_default()
+            }
+            None => Vec::new(),
+        };
+        let (clip, with_time) = if clip.is_empty() {
+            (plain, false)
+        } else {
+            (clip, true)
+        };
+        cue(shared, request, clip).await?;
+        down.limit_said();
+        eprintln!(
+            "lamp-voice second: request {request} said it has hit its usage limit (429s for {} s{})",
+            lasted.as_secs(),
+            if with_time {
+                ", with when it comes back"
+            } else {
+                ""
+            }
+        );
+    } else {
+        eprintln!(
+            "lamp-voice second: request {request} heard nothing: its usage limit was said earlier in this run ({})",
+            if named {
+                "named within 5 min of it"
+            } else {
+                "not named"
+            }
+        );
+    }
+    if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+        return Err(Stop::Gone);
+    }
+    Ok(())
+}
+
 /// How often a lost line's wait asks whether the link is back.
 const LINK_BACK_EVERY: Duration = Duration::from_millis(250);
 
@@ -8214,7 +8392,7 @@ pub fn fault(error: &net::Error) -> Fault {
         net::Error::Timeout(_) => Fault::ResponseTimeout,
         net::Error::Status(401 | 403) => Fault::Authentication,
         net::Error::Status(402) => Fault::QuotaExceeded,
-        net::Error::Status(429) => Fault::RateLimited,
+        net::Error::Status(429) | net::Error::UsageLimit(_) => Fault::RateLimited,
         net::Error::Status(500..) => Fault::ServerUnavailable,
         net::Error::Status(_) => Fault::ServerRejected,
         net::Error::Protocol(_) => Fault::Protocol,
@@ -15172,11 +15350,31 @@ async fn said_while_made<T>(
         answer = &mut answering => return Ok(answer),
         Ok(()) = &mut in_turn.due => {}
     }
-    let line = queue.shared.fixed(crate::make_skill_agent::WAITING_LINE);
+    let wait = queue.shared.one_path_wait;
+    let line = queue
+        .shared
+        .fixed(crate::make_skill_agent::waiting_line(wait.is_some()));
     eprintln!(
         "lamp-voice second: request {request}: the make's agent began: its waiting line is said in this turn"
     );
-    queue.push(line.to_owned()).await?;
+    // On the one run path its generation completes once it is played, so
+    // the lamp thinks while the make goes on; else as before.
+    queue.push_ending(line.to_owned(), wait.is_some()).await?;
+    // With the one run path (#7371): one more line, once, only if the make
+    // runs long; the ring and body show thinking meanwhile.
+    let Some(after) = wait else {
+        return Ok(answering.await);
+    };
+    tokio::select! {
+        answer = &mut answering => return Ok(answer),
+        () = tokio::time::sleep(after) => {}
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: the make has no answer {} s after its waiting line: its one long-wait line is said",
+        after.as_secs()
+    );
+    let line = queue.shared.fixed(crate::make_skill_agent::LONG_WAIT_LINE);
+    queue.push_ending(line.to_owned(), true).await?;
     Ok(answering.await)
 }
 
@@ -15518,6 +15716,15 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    // Whether the line names the lamp, known without the model: the name
+    // in its words, its name detector's note, or a wake by name before it
+    // (#7346: after the first usage-limit line, only such a line hears it).
+    let named = heard
+        && (crate::attention::called_by_name_on(&said, true)
+            || notes.iter().any(|note| {
+                [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
+            })
+            || crate::attention::marked_woken_by_name(request).is_some());
     // Each round's prompt journaled for a cut-in (`LAMP_CUT_IN_PROMPT_LOG`).
     let logs_prompt = heard && shared.logs_prompt_of(request);
     let looking = matches!(asked, Asker::Written { looking: true, .. });
@@ -16899,12 +17106,26 @@ async fn answer(
                         // silence (#1844's B). The slow line only for one
                         // that passes (429, a 5xx); a key, credit or request
                         // refused says it can't answer, with no promise
-                        // (the Reviewer-lead's P3 on #3771).
+                        // (the Reviewer-lead's P3 on #3771). A usage limit,
+                        // in the service's word or by 429s that last, says
+                        // so (#7346).
+                        let refusal = match error {
+                            net::Error::Status(status) => Some((status, None)),
+                            net::Error::UsageLimit(reset) => Some((429, Some(reset))),
+                            _ => None,
+                        };
                         if first
                             && round == 1
-                            && let net::Error::Status(status) = error
+                            && let Some((status, word)) = refusal
                         {
-                            if passing(status) {
+                            let limited = shared
+                                .down
+                                .as_ref()
+                                .and_then(|down| down.refused(status, word.is_some()));
+                            if let Some(lasted) = limited {
+                                say_limit(shared, (request, heard, named), lasted, word.flatten())
+                                    .await?;
+                            } else if passing(status) {
                                 say_down(shared, request, heard).await?;
                             } else {
                                 say_cannot(shared, request, heard).await?;
@@ -16917,6 +17138,9 @@ async fn answer(
                     first = false;
                     if round == 1 {
                         reached(&writing_times, |times| &mut times.chat);
+                    }
+                    if let Some(down) = &shared.down {
+                        down.answered();
                     }
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round} first event in {} ms",
@@ -19053,7 +19277,7 @@ async fn answer(
         // #4338): said with the next piece, as one, so no sentence of the
         // answer is silently dropped.
         let mut carried: Option<String> = None;
-        while let Some((text, packets)) = queued.recv().await {
+        while let Some((text, packets, ends)) = queued.recv().await {
             // Nothing of it goes out while its pause's grace keeps it back
             // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
             // short unheard, and it says nothing more.
@@ -19218,6 +19442,19 @@ async fn answer(
                         did(Did::Said(request, until));
                     }
                 }
+            }
+            // A make's waiting line on the one run path (#7371), played
+            // whole: its generation is over, after its last audio, so the
+            // lamp's playback ends and it thinks until the make's answer.
+            // One carried unsaid ends nothing: it is said with the next.
+            if ends
+                && played
+                && (!shared
+                    .emit(ProviderOutput::GenerationComplete { request })
+                    .await
+                    || !shared.emit(ProviderOutput::MakeWaiting { request }).await)
+            {
+                return Err(Stop::Gone);
             }
         }
         // The answer's last piece could not be started twice: nothing came
@@ -19490,7 +19727,9 @@ struct Queue<'a> {
     speech: &'a mut JoinSet<()>,
     /// Said before the first sentence of the answer, if due.
     announcement: Option<Packets>,
-    sentences: mpsc::Sender<(String, Packets)>,
+    /// Each piece with whether its generation completes once it is played
+    /// (the make's waiting lines on the one run path, #7371).
+    sentences: mpsc::Sender<(String, Packets, bool)>,
     /// Some of the answer itself is on its way.
     started: bool,
     /// How many pieces of it went to the voice: whether a round said any.
@@ -19528,12 +19767,20 @@ impl Drop for Queue<'_> {
 impl Queue<'_> {
     async fn announce(&mut self) -> Result<(), Stop> {
         match self.announcement.take() {
-            Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets).await,
+            Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets, false).await,
             None => Ok(()),
         }
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        self.push_ending(text, false).await
+    }
+
+    /// [`Self::push`], and with `ends` its generation completes once it is
+    /// played whole: `GenerationComplete` and then
+    /// [`ProviderOutput::MakeWaiting`] go just after its last audio, in
+    /// order, from the saying half (#7371).
+    async fn push_ending(&mut self, text: String, ends: bool) -> Result<(), Stop> {
         // `LAMP_MADE_NOT_ON_TOLD` (#7270): a claim that a made skill not on
         // is on, and the rest of its round, wait for the round's end.
         if let Some(guard) = self.made_not_on.as_mut()
@@ -19591,7 +19838,7 @@ impl Queue<'_> {
             heard_at: self.heard_at,
         };
         let packets = start_speech(self.shared, self.speech, spoken, turn);
-        self.send(text, packets).await
+        self.send(text, packets, ends).await
     }
 
     /// A fixed line (`line`) said from its clip rendered ahead, as the
@@ -19623,13 +19870,13 @@ impl Queue<'_> {
                 }
             }
         });
-        self.send(line.to_owned(), queued).await
+        self.send(line.to_owned(), queued, false).await
     }
 
-    async fn send(&mut self, text: String, packets: Packets) -> Result<(), Stop> {
+    async fn send(&mut self, text: String, packets: Packets, ends: bool) -> Result<(), Stop> {
         // Closed only when the saying half stopped; its error is the one kept.
         self.sentences
-            .send((text, packets))
+            .send((text, packets, ends))
             .await
             .map_err(|_| Stop::Gone)
     }

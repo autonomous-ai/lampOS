@@ -67,6 +67,11 @@ pub enum Error {
     Timeout(&'static str),
     /// The service answered with this HTTP status.
     Status(u16),
+    /// The service answered 429 and named it its usage limit in its own
+    /// word (`error.code` `usage_limit`, #7346), with when it comes back
+    /// (seconds since 1970 UTC: its `reset_at`, else `retry-after` from
+    /// now), if it said.
+    UsageLimit(Option<i64>),
     /// The service said something this client does not read.
     Protocol(&'static str),
 }
@@ -78,6 +83,7 @@ impl fmt::Display for Error {
             Error::Transport(step) => write!(f, "{step} failed"),
             Error::Timeout(step) => write!(f, "{step} timed out"),
             Error::Status(code) => write!(f, "service answered HTTP {code}"),
+            Error::UsageLimit(_) => f.write_str("service answered HTTP 429 (usage limit)"),
             Error::Protocol(what) => write!(f, "unexpected {what}"),
         }
     }
@@ -236,7 +242,13 @@ async fn post(
         // Why it refused, as the service's codes alone (#1712: Gemini's chat
         // answered HTTP 400 ten times out of ten on 21 Oct, and nothing said
         // whether for the key, the model or the request).
-        let codes = refusal_codes(&refusal_head(response).await);
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
+        let head = refusal_head(response).await;
+        let codes = refusal_codes(&head);
         if codes.is_empty() {
             eprintln!("lamp-voice second: a service answered HTTP {status}, naming no code");
         } else {
@@ -245,9 +257,106 @@ async fn post(
                 codes.join(", ")
             );
         }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64);
+        if let Some(reset) = usage_limit(status, &head, retry_after, now) {
+            match reset {
+                Some(reset) => eprintln!(
+                    "lamp-voice second: the service's usage limit (HTTP {status}, usage_limit) resets at {reset} (in {} s)",
+                    reset - now
+                ),
+                None => eprintln!(
+                    "lamp-voice second: the service's usage limit (HTTP {status}, usage_limit), no reset said"
+                ),
+            }
+            return Err(Error::UsageLimit(reset));
+        }
         return Err(Error::Status(status));
     }
     Ok(response)
+}
+
+/// An RFC 3339 time (`2026-11-17T00:00:00Z`, `…+07:00`, with or without
+/// fractions of a second) as seconds since 1970 UTC; nothing for anything
+/// else.
+pub(crate) fn unix_of(text: &str) -> Option<i64> {
+    let days = crate::local_time::day_of(text.get(..10)?)?;
+    let rest = text.get(10..)?.strip_prefix(['T', 't'])?;
+    let bytes = rest.as_bytes();
+    if bytes.len() < 9 || bytes[2] != b':' || bytes[5] != b':' {
+        return None;
+    }
+    let part = |range: std::ops::Range<usize>| -> Option<i64> {
+        let digits = rest.get(range)?;
+        digits
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+            .then(|| digits.parse().ok())?
+    };
+    let (hour, minute, second) = (part(0..2)?, part(3..5)?, part(6..8)?);
+    if hour > 23 || minute > 59 || second > 60 {
+        return None;
+    }
+    let mut zone = &rest[8..];
+    if let Some(fraction) = zone.strip_prefix('.') {
+        zone = fraction.trim_start_matches(|c: char| c.is_ascii_digit());
+    }
+    let east = match zone {
+        "Z" | "z" => 0,
+        _ => {
+            let sign = match zone.as_bytes().first()? {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let zone_part = |range: std::ops::Range<usize>| -> Option<i64> {
+                let digits = zone.get(range)?;
+                digits
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit())
+                    .then(|| digits.parse().ok())?
+            };
+            if zone.len() != 6 || zone.as_bytes()[3] != b':' {
+                return None;
+            }
+            sign * (zone_part(1..3)? * 3_600 + zone_part(4..6)? * 60)
+        }
+    };
+    Some(days * 86_400 + hour * 3_600 + minute * 60 + second - east)
+}
+
+/// The longest `retry-after` taken as a reset: past it, no time is said.
+const MOST_RETRY_AFTER: u64 = 30 * 86_400;
+
+/// Whether a refusal is the relay's usage limit (#7346): a 429 whose body
+/// names `usage_limit`, and when it comes back (`reset_at`, else
+/// `retry_after` seconds from `now`), if it said. `None` for any other.
+/// The body is [`refusal_head`]'s, at most [`REFUSAL_BYTES`]; one cut
+/// there, or not the relay's, is no usage limit by its word.
+fn usage_limit(
+    status: u16,
+    head: &[u8],
+    retry_after: Option<u64>,
+    now: i64,
+) -> Option<Option<i64>> {
+    if status != 429 {
+        return None;
+    }
+    let value = serde_json::from_slice::<serde_json::Value>(head).ok()?;
+    let error = match &value {
+        serde_json::Value::Array(items) => &items.first()?["error"],
+        _ => &value["error"],
+    };
+    if error["code"].as_str() != Some("usage_limit") {
+        return None;
+    }
+    let reset = error["reset_at"].as_str().and_then(unix_of).or_else(|| {
+        retry_after
+            .filter(|seconds| *seconds <= MOST_RETRY_AFTER)
+            .map(|seconds| now + seconds as i64)
+    });
+    Some(reset)
 }
 
 /// The most of a refusal's body [`refusal_head`] reads, and how long it waits.
@@ -492,6 +601,58 @@ mod tests {
         // Not JSON, or JSON without an error.
         assert!(refusal_codes(b"<html>Bad Gateway</html>").is_empty());
         assert!(refusal_codes(br#"{"status":0,"message":"no"}"#).is_empty());
+    }
+
+    /// #7346: the relay's usage-limit 429 (Backend, #1711), its reset read
+    /// from `reset_at`, else `retry-after` from now; any other refusal,
+    /// or a body that isn't the relay's, is no usage limit.
+    #[test]
+    fn a_429_naming_usage_limit_is_a_usage_limit_with_its_reset() {
+        let relay = br#"{"error":{"code":"usage_limit","message":"Usage limit reached.","reset_at":"2026-11-17T00:00:00Z","type":"service_error"}}"#;
+        let now = 1_794_800_000;
+        assert_eq!(
+            usage_limit(429, relay, None, now),
+            Some(Some(1_794_873_600))
+        );
+        assert_eq!(
+            usage_limit(429, relay, Some(60), now),
+            Some(Some(1_794_873_600)),
+            "reset_at first"
+        );
+        let no_reset = br#"{"error":{"code":"usage_limit","type":"service_error"}}"#;
+        assert_eq!(
+            usage_limit(429, no_reset, Some(3_600), now),
+            Some(Some(now + 3_600))
+        );
+        assert_eq!(usage_limit(429, no_reset, None, now), Some(None));
+        let bad_reset = br#"{"error":{"code":"usage_limit","reset_at":"tomorrow"}}"#;
+        assert_eq!(usage_limit(429, bad_reset, None, now), Some(None));
+        assert_eq!(usage_limit(503, relay, None, now), None);
+        assert_eq!(usage_limit(429, b"", Some(60), now), None);
+        assert_eq!(usage_limit(429, b"<html>Too Many</html>", None, now), None);
+        let burst = br#"{"error":{"code":"rate_limit_exceeded"}}"#;
+        assert_eq!(usage_limit(429, burst, Some(1), now), None);
+    }
+
+    #[test]
+    fn rfc_3339_times_are_read_and_anything_else_is_not() {
+        for text in [
+            "2026-11-17T00:00:00Z",
+            "2026-11-17T00:00:00.123Z",
+            "2026-11-17T07:00:00+07:00",
+            "2026-11-16T19:00:00-05:00",
+        ] {
+            assert_eq!(unix_of(text), Some(1_794_873_600), "{text}");
+        }
+        for text in [
+            "",
+            "tomorrow",
+            "2026-11-17",
+            "2026-11-17T25:00:00Z",
+            "2026-11-17T00:00:00",
+        ] {
+            assert_eq!(unix_of(text), None, "{text}");
+        }
     }
 
     #[test]
