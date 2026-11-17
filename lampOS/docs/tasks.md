@@ -4254,7 +4254,8 @@ exactly, the default when unset), every task and run is its own
   Otherwise work for the pane never falls back to its own `new`.
 - **Held while the lamp's place is not known.** A spoken task that may be
   for the pane while the lamp's place is not known yet (just after a
-  start, or with Harness's daemon down; signed in or out alike) is not
+  start, or with Harness's daemon down; signed in only: signed out it
+  goes the per-task way, below) is not
   sent the per-run way. It is held in the queue until the place is known,
   at most 15 min (`QUEUE_WAIT`), then fails `busy` with no `harness new`.
 - **Found again by its kept id.** The pane's agent id from its `new` is
@@ -4311,9 +4312,19 @@ exactly, the default when unset), every task and run is its own
   it starts again (`OneSession::takes_reply`): every later task goes the
   per-task way at once, with no reply tried and no wait for the pane, and
   the first time is journaled `tasks: one session: Harness takes no reply
-  here (reply_off); each task gets its own pane`. The pane itself stays
-  open. Any other refused reply (`reply_failed`, a busy, gone or not
+  here (reply_off); each task gets its own pane`. The pane, unused from
+  then on, is removed as at a sign-out: once nothing holds it, the
+  `one-session` thread closes it `--now`, deletes its OpenClaw session
+  and its kept id (`dropped <id> (Harness takes no reply here
+  (reply_off))`), and opens no pane again until lamp-tasks starts again.
+  Any other refused reply (`reply_failed`, a busy, gone or not
   ready pane) is as before: no second session.
+- **Signed out: no pane.** Signed out there is no person, so Harness
+  takes no reply. While the `one-session` thread's last look (every 2 s)
+  read the lamp signed out, no pane is opened or adopted, nothing waits
+  for the lamp's place, and every task goes the per-task way at once,
+  with no reply tried. This is read again at each look and not
+  remembered: the first look that reads a sign-in opens the pane.
 - **A spoken task's turn.** The store watches the pane as a session the
   person already had (`Joined`) and never closes it. The store reads the
   pane for the task only once its words were seen taken. Not seen taken
@@ -4460,8 +4471,10 @@ When it is removed:
   whether the lamp was signed in when the pane was made (written then
   only). At a start that reads the lamp signed out, a kept pane made
   signed in is removed the same way; a file without the field counts as
-  signed in. A kept pane made signed out is adopted while the lamp is
-  still signed out (the ship lamp runs signed out, #6407).
+  signed in. A kept pane made signed out is kept while the lamp is still
+  signed out (the ship lamp runs signed out, #6407), neither adopted nor
+  replaced then (signed out, no pane is opened), and adopted once a
+  sign-in is read.
 
 #### What a skill run's pass bounds in the one session
 
