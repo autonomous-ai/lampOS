@@ -1797,12 +1797,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         let asked = match args.get("what").and_then(Value::as_str).map(str::trim) {
             Some("tools") => None,
             Some("call") => Some((mcp::tool_name(args)?.to_owned(), mcp::arguments(args)?)),
-            _ => {
-                return Err(format!(
-                    "{} reads: tools, call {{tool, arguments}}",
-                    service.code
-                ));
-            }
+            _ => return Err(reads::no_such_kind(service.code)),
         };
         let endpoint = Endpoint::new(service, entry)?;
         let name = service.name;
@@ -1876,10 +1871,12 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let (service, entry) = self.linked(args).await.map_err(|why| (Stage::Link, why))?;
         if service.mcp.is_some() {
-            return self
-                .mcp_read(service, &entry, args)
-                .await
-                .map_err(|why| (Stage::Service, why));
+            return self.mcp_read(service, &entry, args).await.map_err(|why| {
+                match reads::is_no_such_kind(&why) {
+                    true => (Stage::Asked, why),
+                    false => (Stage::Service, why),
+                }
+            });
         }
         let plan = reads::plan(service.code, args, &entry, crate::now_secs())
             .map_err(|why| (Stage::Asked, why))?;
@@ -2407,18 +2404,38 @@ enum Stage {
     Service,
 }
 
-/// A `what` as the journal names it: a word of the read lists, else
-/// "another": never the model's own text.
-fn what_said(args: &Value) -> &str {
-    args.get("what")
+/// A `what` as the journal names it: one of the service's kinds of read
+/// ([`reads::kinds`]; with the service unknown, any service's), else its
+/// shape alone (#7498): its length, and whether it is another service's
+/// kind. Never the model's own text.
+fn what_said(code: Option<&str>, args: &Value) -> String {
+    let what = args
+        .get("what")
         .and_then(Value::as_str)
         .map(str::trim)
-        .filter(|what| {
-            !what.is_empty()
-                && what.len() <= 24
-                && what.chars().all(|c| c.is_ascii_lowercase() || c == '_')
-        })
-        .unwrap_or("another")
+        .unwrap_or("");
+    if what.is_empty() {
+        return "no what".into();
+    }
+    let any_kind = catalog::SERVICES
+        .iter()
+        .any(|service| reads::kinds(service.code).contains(&what));
+    let its_kind = match code {
+        Some(code) => reads::kinds(code).contains(&what),
+        None => any_kind,
+    };
+    if its_kind {
+        return what.to_owned();
+    }
+    format!(
+        "a what of {} characters, {}",
+        what.chars().count(),
+        if any_kind {
+            "another service's kind"
+        } else {
+            "no service's kind"
+        }
+    )
 }
 
 /// Why a read was refused, in a few fixed words ([`Stage::Link`] and
@@ -2439,7 +2456,7 @@ fn why_said(stage: Stage, why: &str) -> &'static str {
         Stage::Asked if has("is the one a list gave") || has("is not an id") => {
             "refused: an id no list gave"
         }
-        Stage::Asked if has(" reads: ") => "refused: a what it doesn't read",
+        Stage::Asked if reads::is_no_such_kind(why) => "refused: a what it doesn't read",
         Stage::Asked => "refused: its arguments",
         Stage::Service if has("has no such item") => "none: no such item",
         Stage::Service if has("didn't answer in time") => "error: not answered in time",
@@ -2483,7 +2500,7 @@ fn read_said(
             Asker::Skill => "a skill's",
         },
         code.unwrap_or("an unknown service"),
-        what_said(args),
+        what_said(code, args),
     )
 }
 
@@ -5345,9 +5362,65 @@ mod tests {
         );
         let (_, said) = read(json!({"service":"gmail","what":"Tell me $$"}));
         assert!(
-            said.contains("gmail another: refused: a what it doesn't read"),
+            said.ends_with(
+                "gmail a what of 10 characters, no service's kind: refused: a what it doesn't read"
+            ),
             "{said}"
         );
+    }
+
+    /// #7498: on lamp-a63e on 17 Nov the second route's model read Gmail
+    /// with a `what` none of Gmail's kinds, four times; each was refused,
+    /// and only its retry with `search` answered. The refusal names each
+    /// kind Gmail reads, so the next call is right, and the journal says
+    /// the refused `what`'s shape alone: its length, and whether it is
+    /// another service's kind, never its words. An MCP service's is
+    /// refused as asked, before its server is.
+    #[test]
+    fn a_what_gmail_doesnt_read_is_told_gmails_kinds_and_journalled_by_its_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = Services::new(
+            Store(dir.path().join("s")),
+            FakeHttp::default(),
+            FakeMail::default(),
+            None,
+            false,
+        );
+        run(services.admin(&app_password_gmail("me@home.test")));
+        let read = |args: Value| {
+            let args = services.gmail_args(&args);
+            let read = run(services.read_staged(&args, Asker::Owner));
+            let said = read_said(Asker::Owner, Some("gmail"), &args, &read);
+            (read.unwrap_err(), said)
+        };
+        for (what, shape) in [
+            ("unread", "a what of 6 characters, no service's kind"),
+            (
+                "my latest emails",
+                "a what of 16 characters, no service's kind",
+            ),
+            ("events", "a what of 6 characters, another service's kind"),
+        ] {
+            let ((stage, why), said) = read(json!({"service":"gmail","what":what}));
+            assert_eq!(stage, Stage::Asked, "{what}");
+            assert!(
+                why.starts_with(
+                    "what is one of gmail's kinds of read, the word alone: recent, search, drafts, message, attachment."
+                ),
+                "{why}"
+            );
+            assert_eq!(
+                said,
+                format!(
+                    "the voice's service_read of gmail {shape}: refused: a what it doesn't read"
+                )
+            );
+            assert!(!said.contains(what), "{said}");
+        }
+        assert!(services.mail.asked.lock().unwrap().is_empty());
+        let ((_, why), said) = read(json!({"service":"gmail"}));
+        assert_eq!(why, "what to read is needed");
+        assert!(said.ends_with("gmail no what: refused: no what"), "{said}");
     }
 
     /// A read that found nothing says so in its journal line.

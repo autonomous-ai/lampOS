@@ -3085,6 +3085,73 @@ mod tests {
         );
     }
 
+    /// #7498: on lamp-a63e on 17 Nov the second route's model read Gmail
+    /// with a `what` none of its kinds, and only each retry answered. The
+    /// offered `service_read`'s `what` names each service's kinds of read,
+    /// the words a refusal names ([`lamp_services::reads::kinds`]), on the
+    /// field itself, so no cut of the description loses them; the
+    /// description and the parameters keep within the link's most.
+    #[test]
+    fn the_offered_reads_what_names_each_services_kinds() {
+        let dir = std::env::temp_dir().join(format!("lamp-services-kinds-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write(&dir).unwrap();
+        let offered = tools(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let read = offered.iter().find(|tool| tool.name == READ).unwrap();
+        let parameters = read.parameters.as_ref().unwrap();
+        let what = &parameters["properties"]["what"];
+        let said = what["description"].as_str().unwrap();
+        assert!(
+            said.contains("gmail: recent, search, drafts, message, attachment;"),
+            "{said}"
+        );
+        let services = parameters["properties"]["service"]["enum"]
+            .as_array()
+            .unwrap();
+        let (_, by_service) = said
+            .split_once(lamp_services::tools::KINDS_OPEN)
+            .unwrap_or_else(|| panic!("{said}"));
+        let by_service = by_service.split(". ").next().unwrap();
+        for code in services.iter().filter_map(Value::as_str) {
+            let kinds = lamp_services::reads::kinds(code);
+            if kinds.is_empty() {
+                continue;
+            }
+            let listed = by_service
+                .split("; ")
+                .find(|group| {
+                    group
+                        .split(": ")
+                        .next()
+                        .is_some_and(|codes| codes.split(", ").any(|named| named == code))
+                })
+                .unwrap_or_else(|| panic!("{code}: {said}"));
+            assert!(
+                listed
+                    .trim_end_matches('.')
+                    .ends_with(&format!(": {}", kinds.join(", "))),
+                "{code}: {listed}"
+            );
+            for kind in kinds {
+                assert!(
+                    what["enum"]
+                        .as_array()
+                        .is_some_and(|all| all.contains(&json!(kind))),
+                    "{kind}: {what}"
+                );
+            }
+        }
+        // What each kind needs is still told, here or in the description.
+        assert!(
+            said.contains("search {query}") || read.description.contains("search {query}"),
+            "{said}"
+        );
+        assert!(read.description.len() <= MOST_DESCRIPTION_BYTES);
+        assert!(parameters.to_string().len() <= MOST_PARAMETERS_BYTES);
+    }
+
     /// The few words the model is told to say before a service call never
     /// ask for the lamp's eyes (lamp-9adf, 4 Nov 21:45).
     #[test]
