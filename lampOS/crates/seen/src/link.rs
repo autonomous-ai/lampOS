@@ -19,9 +19,11 @@
 //! `lamp-eyes.service` passes `--frame-link SOCKET --frame-link-boots FILE`
 //! and the eyes read the boots from it themselves (#6645): never an
 //! `EnvironmentFile=`, so the boots are on no command line and in no
-//! environment. The second line is the eyes' `--visits`, for the gate's
-//! stranger check only: `humans/familiar`, a level with no name, face or
-//! picture (the first builder's yes on #6543). The eyes don't read it from
+//! environment. The second line is the eyes' `--visits`:
+//! `humans/familiar`, a level with no name, face or picture (the first
+//! builder's yes on #6543), kept for the gate's stranger check; the gate
+//! has none since the owner's word on #6543, and the line is kept as it
+//! was. The eyes don't read it from
 //! this file; it is also kept alone in [`VISITS_FILE`] beside it, which the
 //! unit loads as an `EnvironmentFile=` and puts `$LAMP_EYES_VISITS` on its
 //! command line. `lamp-seen serve` reads the link file
@@ -50,7 +52,7 @@ pub const VARIABLE: &str = "LAMP_EYES_FRAME_LINK";
 pub const VISITS_FILE: &str = "eyes-visits.env";
 
 /// The file's second line: the eyes' familiarity levels on
-/// `humans/familiar`, which the gate's stranger check reads.
+/// `humans/familiar` (once read by the gate's stranger check, now gone).
 pub const VISITS_LINE: &str = "LAMP_EYES_VISITS=--visits on";
 
 /// The file is read up to this many bytes.

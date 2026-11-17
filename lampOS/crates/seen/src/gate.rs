@@ -12,13 +12,11 @@
 //!    comes ([`crate::frames`]);
 //! 3. someone is at the desk: a fresh `room/presence` saying someone, and a
 //!    face in view now on `humans/faces/tracked` (a voice alone shows
-//!    nobody at the desk to see);
-//! 4. no stranger is in view: exactly one face, and `humans/familiar`
-//!    fresh with a level (someone who asked the lamp to remember them),
-//!    said after that face, by its passing id, came into view alone
-//!    ([`crate::watch`]): a level names no face, so one said before the
-//!    face now in view came is someone else's;
-//! 5. the lamp is awake: a fresh `expression/state` that does not say
+//!    nobody at the desk to see). Whose face it is, and how many, is not
+//!    asked: there is no stranger check (the owner's word on #6543, "just
+//!    remove it completely"), so anyone at the desk is seen once the owner
+//!    opted in;
+//! 4. the lamp is awake: a fresh `expression/state` that does not say
 //!    asleep.
 //!
 //! Whatever is not known is closed: a reading gone stale, never said, or
@@ -39,10 +37,6 @@ pub struct Inputs {
     pub someone: Option<bool>,
     /// `humans/faces/tracked`: how many faces are in view now.
     pub faces: Option<usize>,
-    /// `humans/familiar`: the one at the lamp is remembered (a level, said
-    /// after the one face now in view came into view alone), or not (none,
-    /// or a level said before that face came).
-    pub familiar: Option<bool>,
     /// `expression/state`: asleep or falling asleep.
     pub asleep: Option<bool>,
 }
@@ -62,8 +56,6 @@ pub enum Closed {
     Nobody,
     /// Presence or faces not known.
     PresenceUnknown,
-    /// More than one face, or the one face not someone remembered.
-    Stranger,
     /// The lamp is asleep or falling asleep.
     Asleep,
     /// Whether the lamp is asleep is not known.
@@ -80,7 +72,6 @@ impl Closed {
             Closed::PrivacyUnknown => "privacy_unknown",
             Closed::Nobody => "nobody",
             Closed::PresenceUnknown => "presence_unknown",
-            Closed::Stranger => "stranger",
             Closed::Asleep => "asleep",
             Closed::SleepUnknown => "sleep_unknown",
         }
@@ -106,10 +97,6 @@ pub fn may_request(inputs: &Inputs) -> Result<(), Closed> {
         (None, _) | (_, None) => return Err(Closed::PresenceUnknown),
         (Some(true), Some(_)) => {}
     }
-    // One face, and that face someone remembered. A second face is anyone's.
-    if inputs.faces != Some(1) || inputs.familiar != Some(true) {
-        return Err(Closed::Stranger);
-    }
     match inputs.asleep {
         Some(false) => Ok(()),
         Some(true) => Err(Closed::Asleep),
@@ -128,7 +115,6 @@ mod tests {
             privacy_open: Some(true),
             someone: Some(true),
             faces: Some(1),
-            familiar: Some(true),
             asleep: Some(false),
         }
     }
@@ -177,7 +163,6 @@ mod tests {
             Closed::PrivacyUnknown,
             Closed::Nobody,
             Closed::PresenceUnknown,
-            Closed::Stranger,
             Closed::Asleep,
             Closed::SleepUnknown,
         ];
@@ -239,24 +224,20 @@ mod tests {
     }
 
     #[test]
-    fn a_stranger_in_view_no_frame() {
-        // The one face not remembered, or not known to be.
-        for familiar in [Some(false), None] {
-            let inputs = Inputs {
-                familiar,
-                ..clear()
-            };
-            assert_eq!(may_request(&inputs), Err(Closed::Stranger), "{familiar:?}");
-        }
+    fn a_stranger_in_view_still_sends() {
+        // No stranger check: whose face it is is never asked.
+        assert_eq!(may_request(&clear()), Ok(()));
     }
 
     #[test]
-    fn a_second_face_is_a_stranger_even_beside_a_remembered_one() {
-        let inputs = Inputs {
-            faces: Some(2),
-            ..clear()
-        };
-        assert_eq!(may_request(&inputs), Err(Closed::Stranger));
+    fn a_second_face_still_sends() {
+        for faces in [2, 3] {
+            let inputs = Inputs {
+                faces: Some(faces),
+                ..clear()
+            };
+            assert_eq!(may_request(&inputs), Ok(()), "{faces}");
+        }
     }
 
     #[test]

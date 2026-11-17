@@ -34,11 +34,10 @@
 //! - **The window** ([`window`]): the share of bad samples and the region
 //!   most often bad over the last ten minutes, by V1's thresholds. It is
 //!   forgotten at once on `room/stood_up` and when the gate closes for the
-//!   privacy slide, sleep, the opt-in off or a forget, or on a stranger
-//!   ([`crate::keep::Hard`]). While the gate is paused on a misread on the
-//!   same tracked face ([`crate::pause`]) it is held, unsaid, for at most
-//!   5 s; on any other closing (the face lost, a reading gone stale) it is
-//!   held, unsaid, for at most [`crate::keep::KEEP_US`] (120 s), and goes on
+//!   privacy slide, sleep, the opt-in off or a forget
+//!   ([`crate::keep::Hard`]); a stranger, a second face or a misread
+//!   closes nothing (there is no stranger check). On any other closing
+//!   (the face lost, a reading gone stale) it is held, unsaid, for at most [`crate::keep::KEEP_US`] (120 s), and goes on
 //!   if the gate opens again within it ([`Pose::hold`]). No frame and no
 //!   per-person history is kept.
 //! - **The journal** ([`Note`], drained by `serve` with [`Pose::notes`]):
@@ -453,8 +452,8 @@ impl Pose {
         self.collect(now_us);
         self.open = gate.is_ok();
         // Any closing that reaches here forgets the window: nothing old is
-        // said under the privacy or while asleep. A pause on a misread, or
-        // a short closing `serve` keeps ([`crate::keep`]), holds it instead
+        // said under the privacy or while asleep. A short closing `serve`
+        // keeps ([`crate::keep`]) holds it instead
         // ([`Self::hold`]).
         if stood_up || gate.is_err() {
             self.forget();
@@ -496,8 +495,7 @@ impl Pose {
         self.recent = None;
     }
 
-    /// One step at `now_us` while the gate is paused on a misread
-    /// ([`crate::pause`]) or closed for a while `serve` keeps
+    /// One step at `now_us` while the gate is closed for a while `serve` keeps
     /// ([`crate::keep`]): the window kept, in memory only (its samples
     /// still age out of its ten minutes when it is next read); the running
     /// request stopped and its answer dropped; no frame taken and nothing

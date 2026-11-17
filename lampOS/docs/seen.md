@@ -29,8 +29,11 @@ lamp also says once when the opt-in is turned off.
 1. **The opt-in is off by default.** It is the owner's yes on that lamp,
    given in the app or spoken.
 2. **The ring shows its mark whenever a frame is going out.**
-3. **No frames** while the privacy slide is on, a stranger is in view,
-   nobody is at the desk, or the lamp is asleep.
+3. **No frames** while the privacy slide is on, nobody is at the desk, or
+   the lamp is asleep. Phase 0 also closed on a stranger in view; the
+   owner removed that check on #6543 (17 Nov: "just remove it completely,
+   no stranger check needed"), so anyone at the desk is seen once the
+   owner opted in ([No stranger check](#no-stranger-check)).
 4. **Nothing is kept.** A frame is sent, labelled and dropped, on both
    ends.
 5. **Forget everything turns the opt-in off.**
@@ -55,7 +58,6 @@ lamp also says once when the opt-in is turned off.
   | The opt-in said back | the said-back record (below) | the on line for the kept yes has not begun (`not_said_yet`), so the ring's first camera mark never comes before the lamp said it would look |
   | The privacy is open | `voice/privacy` (`MicrophonePrivacy`) | the lease is invalid, is not permitted, or is older than 50 ms. The camera looks exactly while the microphone may listen ([eyes.md](eyes.md#when-the-camera-is-open)) |
   | Someone is at the desk | `room/presence` (`someone`) and `humans/faces/tracked` | nobody, no face in view, or either value stale |
-  | No stranger | `humans/faces/tracked` (count, passing `id`) and `humans/familiar` (`level`) | more than one face, the one face has no familiarity level, or the level was said before that face came into view |
   | Awake | `expression/state` (`says_asleep()`, valid and enabled) | asleep, falling asleep, disabled or stale |
 
   Presence is `room/presence`, the one signal every reader uses, rather than
@@ -63,13 +65,9 @@ lamp also says once when the opt-in is turned off.
   voice puts nobody at the desk to see. So a face in view on
   `humans/faces/tracked` is also needed.
 
-  `humans/familiar` names no face, and a level stays fresh for 5 s. So a
-  level counts only if it was said at or after the moment the one face now
-  in view, by its passing `id`, came into view as the only face. A new id,
-  a second face, no face, or an invalid list since then closes the gate
-  until the eyes say a level again. When the owner leaves and a guest sits
-  down a second later, the owner's level is not the guest's. A new id that
-  `follows` an old one counts as a new face.
+  Whose face it is, and how many, is not asked: there is no stranger
+  check ([No stranger check](#no-stranger-check)), and `lamp-seen` does not
+  read `humans/familiar`.
 
 - **The frames** (`frames.rs`). These follow the frame link's rules
   (`crates/camera/src/frames.rs`, the `perception` role):
@@ -365,22 +363,20 @@ that one too, aborts a burst under way.
   kind counts only when one answer is at least 0.5 sure of it, or at least
   2 of the burst's last 4 answers have it at all (the server sends only
   what clears 0.3).
-- **The sitting and its timers.** A sitting begins when one remembered face
-  is at the desk (the gate's presence and stranger lines, whatever the
+- **The sitting and its timers.** A sitting begins when someone is at the
+  desk with a face in view (the gate's presence line, whatever the
   opt-in, its said-back line, the privacy or sleep say), from `room/activity`'s `sitting_s`
   when it said one lately, else from now. It ends at once on
-  `room/stood_up`, a forget, or a stranger (a second face, or a fresh
-  "nobody remembered" reading on the one face in view outside a pause). When
-  the gate's lines say nobody, or a face not yet recognised, it is kept,
-  unsaid, for up to 120 s and goes on if the owner is recognised again
+  `room/stood_up` or a forget; a stranger, a second face or a misread ends
+  nothing (no stranger check). When the gate's presence line says nobody,
+  it is kept, unsaid, for up to 120 s and goes on if the face is back
   within them on the same passing id (another id starts afresh); past
-  them it ends (below, "The pause on a misread" and "A
-  short closing keeps the sitting"). Its timers count from the desk arrival
+  them it ends (below, "A short closing keeps the sitting"). Its timers count from the desk arrival
   until something is seen, and from the last sighting after.
 - **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
   - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
     `break_s_ago` (always present), `last` and `confidence`, every 30 s
-    while a sitting lasts (not while it is paused or kept through a short
+    while a sitting lasts (not while it is kept through a short
     closing), and at once after a burst that saw something.
     It goes out whether or not frames do (the opt-in off, the server busy,
     the slide shut, no account given), so a skill's `[[while]] above` on a
@@ -438,8 +434,7 @@ break is a stand-up:
   that does not say `humans/doing` at once (`Sitting::takes`). Drinking and
   eating are unchanged.
 - **The break counts from their return.** `room/stood_up` already ends the
-  sitting, so its timers begin again when one remembered face is back at
-  the desk. That new sitting counts from `room/activity`'s `sitting_s`, and
+  sitting, so its timers begin again when someone is back at the desk. That new sitting counts from `room/activity`'s `sitting_s`, and
   the eyes keep a sitting through a gap under two minutes, so after a short
   stand-up the arrival can still be the first one. With the switch on, a
   sitting begun after a `room/stood_up` that came at or after its arrival
@@ -473,10 +468,9 @@ Tests: `sitting.rs`, `switch_off_a_stretch_is_a_break`,
   `--frame-link-file`), `lamp-seen` runs the gate and says it on
   `diagnostics`, and asks for no frame. In the product the eyes serve the
   link ([The product unit](#the-product-unit)).
-- `humans/familiar` is said only with `lamp-eyes --visits`. Without it the
-  gate reads every face as a stranger and stays closed. The product unit
-  gives it with the switch on, for the stranger check only
-  ([The product unit](#the-product-unit)).
+- `lamp-seen` no longer reads `humans/familiar` (no stranger check). The
+  product unit still gives the eyes `--visits` with the switch on, as it
+  did ([The product unit](#the-product-unit)).
 
 ## Phase 3: posture
 
@@ -573,10 +567,10 @@ either's). One frame and one blink can serve both.
   An answer with no body found counts no sample. A sample is its time, one
   flag and four bits: nothing of the frame or the answer is kept. The
   window is forgotten at once on `room/stood_up` and when posture's gate
-  closes for the privacy, sleep, the opt-in off, a forget or a stranger.
-  A pause on a misread (below) holds it unsaid for at most 5 s, and any
-  other closing (nobody in view, the face lost, a reading gone stale) for
-  at most 120 s (below, "A short closing keeps the sitting"); it goes on
+  closes for the privacy, sleep, the opt-in off or a forget; a stranger,
+  a second face or a misread closes nothing. Any other closing (nobody in
+  view, the face lost, a reading gone stale) holds it unsaid for at most
+  120 s (below, "A short closing keeps the sitting"); it goes on
   if the gate opens again within them, and is forgotten after.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
@@ -586,7 +580,7 @@ either's). One frame and one blink can serve both.
   on. **Under 3 samples, nothing is said either** (#6839's and #6660's
   reviews): frames not going out (the opt-in off, the slide shut), the
   server busy or failing, no body found, the sitting just begun, or the
-  window just wiped (the privacy, sleep, a stranger, `room/stood_up`, or
+  window just wiped (the privacy, sleep, `room/stood_up`, or
   a closing longer than 120 s).
   The topic runs out, so a skill holding on it with
   `unknown = "holds_stale"` (Sit back) runs as it did, rather than reading
@@ -614,66 +608,64 @@ an estimated 80–130 ms on a lamp.
 
 **Not done in phase 3:** the posture line's wording awaits the PM.
 
-## The pause on a misread
+## No stranger check
 
-On a live person, `humans/familiar` flips between known and stranger
-whenever the owner looks down: the recogniser's threshold on a tilted face
-(lamp-06c1, run 2: slouching gave 64 open samples to 54 stranger, upright
-31 to 88). Each flip closed the gate, which forgot the posture window and
-ended the sitting, so `bad_share` stayed 0.0 and a drink seen at 0.91
-never reached `humans/doing`. So a stranger reading on the same tracked
-face **pauses** the gate instead (`pause.rs`, under the Reviewer-lead's
-conditions on #6543):
+The owner's word on #6543 (17 Nov, after lamp-06c1's run 6): "no stranger
+interrupt this activity and posture flow", then "just remove it
+completely, no stranger check needed". In run 6, with the lamp angled to
+the side, the eyes read the owner as a stranger three times (11:38:32,
+11:46:43, 11:48:07); each wiped posture's window and the sitting's timers
+at once (`gate stranger`), one ended the held sitting as another person
+alone in the seat, and a drink seen was lost.
 
-- **What pauses.** The gate was open on one face at the last step and now
-  closes only because a fresh `humans/familiar` says nobody remembered,
-  said after that face came into view alone. That same passing id is the
-  only face in view, its box has not moved by more than the face's own
-  width, and every other rule of the gate holds.
-- **A pause sends nothing.** The gate stays closed while paused, so no
-  frame is asked of the camera, no mark is asked of the ring, and a burst
-  or pose request under way is aborted, its answer dropped. Nothing kept
-  is published: no `humans/posture`, `humans/doing` or
-  `humans/doing_seen`.
-- **What ends it.** Only a new known reading on that same passing id,
-  said after the stranger one, opens the gate again: time alone never
-  does. The kept window and timers carry on only when the box is then
-  near where it paused (the centre within the face's own width).
-  Otherwise they are wiped and the sitting starts fresh.
-- **What a pause keeps.** The posture window and the doing timers, in
-  memory only. They are wiped after 5 s paused, and at once on a box jump
-  between samples larger than the face's own width, a new id, a second
-  face, no face, the privacy, sleep, the opt-in withdrawn,
-  `room/stood_up`, or anything the gate no longer knows.
-- **The familiar yes is never carried to a new id** (#6602's P2): a new id
-  wipes, and the gate still wants a level said after that face came.
-- **After a pause.** A pause's own wipes above (5 s, a box jump, a new
-  id, a resume far from where it paused), a second face, the privacy,
-  sleep, the opt-in and `room/stood_up` still wipe at once. A pause ended
-  by no face in view or a reading of the gate gone stale is taken as a
-  short closing instead: kept, unsaid, for up to 120 s (next section).
-- **The journal** says `gate paused on a misread (paused N,
-  misread_on_track M)` and `the pause ended: kept`, `wiped`, or `the face
-  lost or a reading lapsed` (then the next section's lines say which).
-  `diagnostics` adds the counts `paused` and `misread_on_track`. No id and
-  no box is written, and `humans/familiar` is unchanged.
+So `lamp-seen` has no stranger rule anywhere, with or without a switch:
 
-**Why the passing id alone is not enough, and why the pause stands
-without more.** The eyes follow a face by its box alone (`lamp-eyes`
-`bus_out::Ids`: the same id for a box overlapping one seen within 1.5 s by
-at least 0.2 of their union), with no face print. So an id can pass to
-another person who takes the same place within 1.5 s, or swap when two
-faces cross. `humans/familiar` says only a level, not whose. The pause
-does not rely on the id meaning one person. It sends nothing, and only
-the recogniser's own known reading ends it, which is what opens the gate
-anyway. Two faces wipe at once, before a swap through a crossing can
-matter. What is left is the owner's window and timers, unpublished, for at
-most 5 s, and dropped if the box moved. No face is kept, since #6543's
-run 3, for up to 120 s as a short closing (next section): nothing is sent
-or said meanwhile, and it goes on only once the recogniser says a level
-for the face then in view, which is what opens the gate anyway. A face
-print check from the eyes may come later, as its own read, if either
-bound ever needs to grow.
+- **The gate** (`gate.rs`) asks only the opt-in, its said-back line, the
+  privacy, someone at the desk with a face in view, and that the lamp is
+  awake. A guest, a face nobody remembers, a misread of the owner and a
+  second face beside them all leave it open. There is no `stranger` word
+  on `diagnostics` or in the journal any more.
+- **The keep** (`keep.rs`) wipes at once only on `room/stood_up`, a forget,
+  the opt-in off, the privacy and sleep.
+- **The pause on a misread** (once `pause.rs`) is gone: with no stranger
+  reading there is nothing to pause on, and `diagnostics` no longer says
+  `paused` or `misread_on_track`.
+- **The held sitting** (`hold.rs`) no longer ends on another person alone
+  in the seat.
+- **`humans/familiar`** is not read by `lamp-seen`.
+
+What this agrees to: once the owner has opted in and been told, pictures
+go whenever someone is at the desk with a face in view, whoever they are,
+under the same mark, rates, privacy slide and sleep rules. The keep still
+starts afresh when a face comes back under another passing id after a
+short closing, so a window and timers kept for one face are not taken on
+by the next.
+
+**Whose sitting it is (the bound).** With no stranger check, the window
+and timers are the seat's, not a person's, and they can be carried from
+the owner onto someone who takes the seat:
+
+- With two faces in view no id is matched (`watch::Readings::on_track`
+  is none), so the keep goes on holding the id it had before the second
+  face came (`keep::Away`). While the gate stays open, nothing compares
+  ids, so the owner leaving with a guest still in view carries the
+  owner's posture window, timers and drink seen on under the guest.
+- The eyes' tracker may also hand the owner's passing id to whoever sits
+  down within about 1.5 s of them leaving, and that is the same id to the
+  keep.
+- **The bounds:** `room/stood_up` or a forget wipes both at once; nobody
+  at the desk for 120 s wipes both (`keep::KEEP_US`); posture's samples
+  age out of its ten-minute window, so after 10 minutes it holds only the
+  one sitting now. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
+  sitting ends at the 10-minute re-check since the gate was last open on
+  a face (`hold::MOST_US`) at the latest. The keep then holds the id it
+  had, so the guest's own face opening the gate wipes both as another face
+  (`Why::OtherFace`), as the test
+  `the_owner_leaving_and_a_guest_sitting_within_1_5_s_ends_at_the_10_min_re_check`
+  shows.
+- **The effect** is a wrong count or timing, never a name: nothing is said
+  or kept with a name, and the voice's `doing_told` still speaks only to
+  a known person alone.
 
 ## A short closing keeps the sitting
 
@@ -682,35 +674,29 @@ on brief misreads and the face lost for a moment, and each closing forgot
 the posture window. With 3 samples wanted and one each 30 s, posture was
 almost never said. So a closing that is not one of those that wipe at
 once keeps the posture window and the doing timers, in memory only, for
-up to 120 s (`keep.rs`, `KEEP_US`), around the 5 s pause:
+up to 120 s (`keep.rs`, `KEEP_US`):
 
 - **Wiped at once:** `room/stood_up`; a forget (`memory/forgot`); the
   opt-in off; the privacy closed (the slide, or capture muted); the lamp
-  asleep; a stranger (a second face in view, or a fresh "nobody
-  remembered" reading on the one face in view, said after it came, outside
-  a pause); and a pause's own wipes. The doing timers keep their rule for
-  the privacy, sleep and the opt-in: a sitting never ended on those alone,
-  except when a pause wiped for them, and still does not.
+  asleep. The doing timers keep their rule for the privacy, sleep and the
+  opt-in: a sitting never ends on those alone. A stranger, a second face
+  or a misread wipes nothing ([No stranger check](#no-stranger-check)).
 - **Kept, for up to 120 s:** any other closing. Nobody in view, the face
-  lost, a face (back) under a new passing id and not yet recognised, a
-  reading gone stale (presence, the privacy lease, sleep not known), and a
-  pause ended by the face going out of view or a reading lapsing.
+  lost, and a reading gone stale (presence, the privacy lease, sleep not
+  known).
 - **Nothing is sent or said while kept.** The gate is unchanged: no frame
   is asked of the camera, a burst or pose request under way is stopped and
   its answer dropped, and nothing kept is said (no `humans/posture`,
   `humans/doing` or `humans/doing_seen`).
-- **Goes on** when the gate opens again within the 120 s, which wants the
-  recogniser's own fresh level for the face then in view, and only on the
+- **Goes on** when the gate opens again within the 120 s, and only on the
   face it was kept for. The keep holds, in memory only and never said, the
   passing id of the one face in view the last step it was open
   (`keep::Away`); the gate opening on any other id, or with no id known
-  when it was kept, wipes both (`Why::OtherFace`), so a second remembered
-  person within the 120 s never takes on the first one's window or timers
-  (the Reviewer-lead's P2 on #7251). `humans/familiar` is only a level for
-  whoever the eyes recognise now, with no person id or name, so it cannot
-  tell that a new id is the same remembered person: a face back under a new
-  id (as the eyes give one coming back into view, `follows` included)
-  starts a fresh window and fresh timers. Past 120 s both are wiped, as any
+  when it was kept, wipes both (`Why::OtherFace`), so a second person
+  within the 120 s never takes on the first one's window or timers (the
+  Reviewer-lead's P2 on #7251). A face back under a new id (as the eyes
+  give one coming back into view, `follows` included) starts a fresh
+  window and fresh timers. Past 120 s both are wiped, as any
   closing wiped them before. The posture window's
   samples older than its ten minutes still age out.
 - **The journal** says, once each: `posture's window kept unsaid for up to
@@ -730,22 +716,21 @@ The owner's rule (#6543, c6908160252), behind its own switch,
 `LAMP_SEEN_HOLDS_SITTING` (`on` exactly, off unless set; [switches.md](switches.md)),
 and waiting for the lead's ruling and a lamp row. In run 3 the face left
 view while the owner slumped, so posture was said once in seven and a half
-minutes. Held, the owner's sitting goes on without the face while the pose
+minutes. Held, the sitting goes on without the face while the pose
 model sees a close person (`hold.rs`):
 
 - **Begins** only when the gate opens as it always does: the opt-in on and
-  said, the privacy open, the lamp awake, and the owner's face, the one
-  face in view, recognised.
-- **Goes on without the face:** while held, nobody in view, the face lost
-  or misread, a new face not yet recognised, a stranger reading or a
-  second face do not close the gate, as long as the newest pose answer
+  said, the privacy open, the lamp awake, and someone at the desk with a
+  face in view (no stranger check, above).
+- **Goes on without the face:** while held, nobody in view or the face
+  lost do not close the gate, as long as the newest pose answer
   shows a close person: both shoulders (COCO-17's 5 and 6 in the answer's
   `pose_2d`, pixels of the frame as sent) at or above the model's own
   confidence threshold, 0.3 (`hold::CONFIDENCE`, as the lamp configures
   it), and at least 15% of the frame's width apart (`hold::CLOSE_SHARE`, to
   be tuned on a lamp). Posture keeps its frame every 30 s and activity its
-  bursts, each behind the ring's mark; the pause and the short-closing keep
-  see the gate open meanwhile. The opt-in, its line, the privacy and sleep
+  bursts, each behind the ring's mark; the short-closing keep sees the gate
+  open meanwhile. The opt-in, its line, the privacy and sleep
   still hold every step: a privacy lease or a state not known closes that
   step, and the hold stays.
 - **Ends**, the gate closed as it would be, then the short-closing keep
@@ -753,9 +738,10 @@ model sees a close person (`hold.rs`):
   so at most about a minute of frames with none); the face lost and no close
   person's answer within 45 s of the hold's beginning, below;
   `room/stood_up`; the privacy slide or capture muted; sleep; the opt-in off
-  or its line withdrawn; a forget; 10 minutes since the owner's face was
-  last recognised (`hold::MOST_US`, the gate last open on it); or another
-  person alone in the seat, below.
+  or its line withdrawn; a forget; or 10 minutes since the gate was last
+  open on a face (`hold::MOST_US`). Another person alone in the seat no
+  longer ends it (#7256's stop, removed at the owner's word; [No stranger
+  check](#no-stranger-check)).
 - **The first answer** (lamp-06c1, run 4: the face lost seconds after
   every beginning, while the first answer was ~30 s away): a hold begins
   with the newest pose answer when its frame went under 30 s ago
@@ -765,45 +751,25 @@ model sees a close person (`hold.rs`):
   lost face keeps the hold for at most 45 s since it began
   (`hold::FIRST_ANSWER_US`), with no frames beyond posture's and activity's
   own rates; with none by then (no answer, or only a far one), it ends.
-- **Another person alone in the seat** (the first builder's change, which
-  the owner accepted): one face alone in view, close, on a passing id that
-  is not the owner's (the id of the face the gate was last open on), and
-  read as not the owner on every reading for 10 s
-  (`hold::STRANGER_ALONE_US`) ends the hold at once, and the gate closes as
-  a stranger's, so the short-closing keep wipes. Close is the hold's own
-  nearness: the newest pose answer shows a close person (`hold::close`, the
-  15% above). The eyes say only remembered or not (`humans/familiar` is a
-  level and names no one), so not the owner is a stranger reading on that
-  face, said after it came into view alone; someone else the lamp remembers
-  reads as the owner. An owner reading, the face gone or a new id, a second
-  face, or no close person starts the 10 s again, so a 1 to 3 s misread of
-  the owner does not end it. A second face beside the seated person never
-  ends the hold. A stranger reading on the owner's own id (the owner slumped
-  or turned; in lamp-06c1's run 4 it ended the hold and wiped posture at
-  once) is a misread: it counts nothing toward the 10 s, and while held the
-  pause and the short-closing keep never see it, so it wipes nothing at
-  once.
 - **Nothing kept:** an answer's two shoulders are read as a share of the
   width and dropped; no frame, point or id is kept, and the rates are
   unchanged.
-- **What it agrees to:** for up to 10 minutes after the owner was last
-  recognised, pictures may go while no face is visible, as long as someone
-  is close to the lamp. That includes someone else taking the seat without
-  showing their face, and a second person nearby (the owner's call). Shown,
-  another person's face ends it within 10 s; hidden, it ends at the
+- **What it agrees to:** for up to 10 minutes after the gate was last open
+  on a face, pictures may go while no face is visible, as long as someone
+  is close to the lamp. That includes someone else taking the seat, shown
+  or not, and a second person nearby (the owner's call); it ends at the
   10-minute re-check at the latest.
 - **Without posture** (`LAMP_SEEN_POSTURE` off) no pose answer ever comes,
   so a hold ends as soon as the face is lost, with no 45 s wait: nothing
   changes.
-- **The journal:** `held sitting began: the gate open on the owner's face`;
+- **The journal:** `held sitting began: the gate open on a face`;
   `held sitting goes on (close person, shoulders 23% of width)` when it
   first holds the gate open and with each close answer then; `held sitting
   goes on (no close person in 1 answer of 2, shoulders 8% of width)`; `held
   sitting ended (no close person in 2 answers in a row)`, or `(stood_up)`,
   `(privacy_closed)`, `(asleep)`, `(no_opt_in)`, `(not_said_yet)`,
   `(forgot)`, `(the face lost and no close posture answer within 45 s)`,
-  `(10 min since the owner's face was recognised)`, `(another person alone
-  in the seat for 10 s)`.
+  `(10 min since the gate was open on a face)`.
 
 Off, `serve` is as without it: the shoulders are read from each answer and
 dropped, and nothing else changes.
@@ -907,15 +873,16 @@ product is unchanged.
   next start (the lamp's restart, or the target's). Until then, after
   turning it off, they keep their `--visits` counts and serve the link,
   but no frame leaves: only lamp-seen may connect, and off it idles.
-- **The stranger check.** The same file's second line,
+- **The eyes' visits.** The same file's second line,
   `LAMP_EYES_VISITS=--visits on`, kept alone beside it as
   `/run/lampos-seen/eyes-visits.env` (the one file the eyes' unit loads,
   `EnvironmentFile=-`, and removed with the switch off), starts the eyes
   with `--visits` (they
   already run with `LAMP_BUS=on`), so `humans/familiar` says the level of
-  the one at the lamp, with no name, face or picture. It is for the gate's
-  stranger check only (the first builder's yes on #6543); off, the eyes
-  run without it, as before.
+  the one at the lamp, with no name, face or picture. It was for the gate's
+  stranger check (the first builder's yes on #6543), which is gone; the
+  line is kept as it was, and `lamp-seen` no longer reads the level. Off,
+  the eyes run without it, as before.
 - **Not in `lamp/health`'s expected parts**: off, it says nothing on
   `diagnostics`, so expecting it would mark every lamp stale. It goes in
   with the switch.
@@ -933,7 +900,7 @@ product is unchanged.
 | `lamp/health`'s expected parts | `--expect seen` in `lamp-health.service` once the switch is on in the product (off, it says nothing) | with the switch |
 
 V1 faults not ported: activity's per-face mode sent double events (one
-burst here, for the one remembered face), its heartbeat waited with no
+burst here, for the one face), its heartbeat waited with no
 timeout (`motion.py:208`; no heartbeat here, and every answer is bounded at
 V1's 15 s, `wire::ANSWER_WITHIN_S`), and it reconnected every 2 s with no
 backoff (here, the retreat).
