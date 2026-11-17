@@ -28,10 +28,12 @@ pub const ENVIRONMENT: &str = "LAMP_SAID_TO_ME";
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
 
-/// The head's pitch, in degrees (up positive), inside which a face is
-/// facing the lamp: a head down to a phone or a desk is not. A guess, set
-/// on the row (#7442's design).
-pub const PITCH_DEG: std::ops::RangeInclusive<f32> = -25.0..=20.0;
+/// The head's pitch, in degrees, down positive as `lamp_msgs::Face::pitch`
+/// (radians) has it, inside which a face is facing the lamp: a head down to a
+/// phone or a desk is not. The eyes' own window, copied (the voice does not
+/// depend on the eyes): `lamp-eyes` `facing::MAX_PITCH_UP_DEG` (20) up and
+/// `facing::MAX_PITCH_DOWN_DEG` (25) down. A guess, set on the row (#7442).
+pub const PITCH_DEG: std::ops::RangeInclusive<f32> = -20.0..=25.0;
 
 /// Whether the switch is on in this process's environment.
 pub fn on() -> bool {
@@ -75,8 +77,8 @@ pub struct Line<'a> {
     pub going_on: bool,
     /// A face turned to the lamp through it (the eyes' `facing`, yaw).
     pub turned: bool,
-    /// That face's pitch, in degrees, when the eyes give one.
-    pub pitch_deg: Option<f32>,
+    /// That face's pitch, in radians, down positive (`lamp_msgs::Face::pitch`), when the eyes give one.
+    pub pitch: Option<f32>,
     /// Whether that face looks at the lamp, when the eyes give it.
     pub looking: Option<bool>,
     /// A face seen speaking it: some face read `yes` in a look of it
@@ -117,8 +119,8 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     if line
-        .pitch_deg
-        .is_some_and(|pitch| !PITCH_DEG.contains(&pitch))
+        .pitch
+        .is_some_and(|pitch| !PITCH_DEG.contains(&pitch.to_degrees()))
     {
         Said::Held(Held::NotFacingPitch)
     } else if line.looking == Some(false) {
@@ -153,7 +155,7 @@ mod tests {
     fn a_line_is_said_to_the_lamp_by_name_conversation_or_face_and_words() {
         // Named: answered, head down or not, seen speaking or not.
         let named = Line {
-            pitch_deg: Some(-50.0),
+            pitch: Some(50f32.to_radians()),
             ..facing("Lamp, hi.", false)
         };
         assert_eq!(judge(named), Said::Stands);
@@ -174,7 +176,7 @@ mod tests {
         );
         // Head down to a phone, or looking away: held; unknown blocks nothing.
         let down = Line {
-            pitch_deg: Some(-40.0),
+            pitch: Some(40f32.to_radians()),
             ..facing("Can you call Ada back?", true)
         };
         assert_eq!(judge(down), Said::Held(Held::NotFacingPitch));
@@ -184,7 +186,7 @@ mod tests {
         };
         assert_eq!(judge(away), Said::Held(Held::LookingAway));
         let level = Line {
-            pitch_deg: Some(5.0),
+            pitch: Some(5f32.to_radians()),
             looking: Some(true),
             ..facing("Can you call Ada back?", true)
         };

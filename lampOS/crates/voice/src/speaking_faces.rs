@@ -247,6 +247,10 @@ struct Look {
     /// The faces turned to the lamp whose mouth was not read (`unknown`, or
     /// not judged at all) in this look.
     turned_unread: Vec<String>,
+    /// Of the faces turned to the lamp, the first whose head pitch or gaze
+    /// the eyes gave: its `pitch` (radians, down positive) and `looking`
+    /// (`LAMP_EYES_PITCH_GAZE`, [`SpeakingFaces::turned_pose_between`]).
+    turned_pose: (Option<f32>, Option<bool>),
     /// The eyes' word in this look on which lost id each face follows
     /// (`follows`, #4885): (old, new), bare ids.
     follows: Vec<(String, String)>,
@@ -439,6 +443,10 @@ impl SpeakingFaces {
             .filter(|face| !matches!(state(face), Some(SpeakingState::Yes | SpeakingState::No)))
             .map(|face| face.id.clone())
             .collect();
+        let turned_pose = turned_faces
+            .iter()
+            .find(|face| face.pitch.is_some() || face.looking.is_some())
+            .map_or((None, None), |face| (face.pitch, face.looking));
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
@@ -479,6 +487,7 @@ impl SpeakingFaces {
             turned,
             turned_silent,
             turned_unread,
+            turned_pose,
             follows,
         });
     }
@@ -960,6 +969,26 @@ impl SpeakingFaces {
                     && look.at <= to
                     && !if turned { &look.turned } else { &look.speaking }.is_empty()
             })
+        })
+    }
+
+    /// The head pitch (radians, down positive) and gaze the eyes last gave
+    /// for a face turned to the lamp from `from` to `to`, each from the
+    /// newest look that gave it; `None` when none did, which is unknown
+    /// (`LAMP_SAID_TO_ME`, #7442).
+    pub fn turned_pose_between(&self, from: Instant, to: Instant) -> (Option<f32>, Option<bool>) {
+        self.looks.lock().map_or((None, None), |looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .rev()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            (
+                during().find_map(|look| look.turned_pose.0),
+                during().find_map(|look| look.turned_pose.1),
+            )
         })
     }
 
@@ -2610,6 +2639,28 @@ mod tests {
             &[("f1", Yes), ("f2", Unknown)],
         ]);
         assert_eq!(eyes.speakers_reading(from, to, true), ["f1", "f2"]);
+    }
+
+    /// #7442: the turned face's newest pitch and gaze through the line, each
+    /// from the newest look that gave it; a face not turned to the lamp, or
+    /// none given, is unknown.
+    #[test]
+    fn the_turned_faces_pose_is_its_newest_through_the_line() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        let look = |index: u32, facing: bool, pitch: Option<f32>, looking: Option<bool>| {
+            let mut seen = faces(&[("f1", Yes)]);
+            seen.faces[0].facing = Some(facing);
+            seen.faces[0].pitch = pitch;
+            seen.faces[0].looking = looking;
+            eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
+        };
+        look(0, true, Some(0.1), Some(true));
+        look(1, true, Some(0.6), None);
+        look(2, false, Some(-0.9), Some(false));
+        let to = from + EVERY * 3;
+        assert_eq!(eyes.turned_pose_between(from, to), (Some(0.6), Some(true)));
+        assert_eq!(eyes.turned_pose_between(to, to), (None, None));
     }
 
     /// #7442: one `yes` in one or two looks is a face seen speaking; a mouth

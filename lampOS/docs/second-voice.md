@@ -5711,8 +5711,10 @@ after a take-over, but now for every turn:
   the line is said to the lamp when its name is heard or written in it;
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking; or when a face turned to the lamp is facing it
-  (pitch inside -25..+20 degrees and not looking away, when the eyes give
-  them; unknown blocks nothing, and the eyes give neither yet) and is seen
+  (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
+  as the eyes' `facing` window, and not looking away: the eyes' newest
+  `pitch` and `looking` through the line with `LAMP_EYES_PITCH_GAZE`,
+  `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
   speaking it (one `yes` in a look of the line,
   `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
   speaking), with 3 words or more, a question or an ask. Otherwise the face
