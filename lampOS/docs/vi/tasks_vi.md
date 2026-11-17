@@ -1375,9 +1375,11 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     giao của lamp-tasks (`HandOver::check`, `bad_request`, không tạo token).
     Kỹ năng cần cả hai thì là hai kỹ năng.
   - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
-    thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó trong thư
-    mục riêng của lần chạy, `make-<run id>/skill-folder`
-    (`egress::OWN_SKILL_FILE`), và script namespace chỉ đưa thư mục đó vào
+    thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó cạnh socket
+    lối ra của lần chạy, trong thư mục riêng 0700 của nó,
+    `/run/lampos-tasks/egress/<egress name>.folder` (0600, tạo mới cùng
+    socket bởi `Grant::open_for`, xoá cùng socket), nơi không lần chạy nào
+    thấy hay ghi được (P3 của Heron tại `2533a4f02b`; `egress::OWN_SKILL_FILE`), và script namespace chỉ đưa thư mục đó vào
     trong `/var/lib/lampOS/skills` và `skills-dev`
     (`hermes_install::OWN_SKILL_LINES`); script không có dòng đó
     (`egress::NS_OWN_SKILL_LINE`) thì không nhận lần chạy `net` (`no_net`).

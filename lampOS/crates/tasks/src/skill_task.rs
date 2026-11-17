@@ -1383,22 +1383,6 @@ pub fn answer_for(
         if let Some(folder) = &fresh {
             made.env.extend(crate::skill_make::home_env(&folder.path));
             made.start_in = Some(folder.path.clone());
-            // A run granted `net` sees only its own skill's folder: named
-            // here, found by the namespace script by the run's id
-            // (Heron's P3 on #7590).
-            if keeps_net {
-                folder
-                    .write(
-                        crate::egress::OWN_SKILL_FILE,
-                        &format!("{}\n", hand.folder.display()),
-                    )
-                    .map_err(|error| {
-                        refusal(
-                            "run_failed",
-                            &format!("the run's own skill folder was not named: {}", error.kind()),
-                        )
-                    })?;
-            }
         }
         if !values.is_empty() {
             let file = made
@@ -2705,7 +2689,7 @@ impl HarnessRunner {
         }
         let socket = format!("{RUN_FOLDER_PREFIX}{}", run.run);
         let served = grant
-            .open(&socket, until)
+            .open_for(&socket, until, &run.folder)
             .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
         eprintln!(
             "[lamp-tasks] skill task {}: granted net: its egress socket {socket}.sock made for the lamp's default agent ({name})",
@@ -7601,7 +7585,8 @@ mod tests {
         let ns_with = |line: &str| std::fs::write(&ns, format!("{NS_HOME_LINE}{line}\n")).unwrap();
         let script = format!(
             "env > {seen}.env; if [ -S \"{egress}/$LAMP_NS_EGRESS.sock\" ]; then echo there > {seen}.sock; fi; \
-             cat \"${{HOME%/home}}/{own}\" > {seen}.own 2>/dev/null || rm -f {seen}.own",
+             cat \"{egress}/$LAMP_NS_EGRESS{own}\" > {seen}.own 2>/dev/null || rm -f {seen}.own; \
+             ls -A \"${{HOME%/home}}\" > {seen}.ls 2>/dev/null",
             seen = seen.display(),
             egress = egress.display(),
             own = crate::egress::OWN_SKILL_FILE,
@@ -7669,11 +7654,17 @@ mod tests {
             .expect("named its egress");
         assert!(crate::egress::plain_name(name), "{name}");
         assert!(seen.with_extension("sock").exists(), "there while it ran");
-        // Its own skill's folder named in its run's folder while it ran
-        // (Heron's P3 on #7590): the namespace shows that one alone.
+        // Its own skill's folder named beside its socket while it ran,
+        // in lamp-tasks' private folder (Heron's P3 on #7590 and at
+        // 2533a4f02b): the namespace shows that one alone. Never in the
+        // run's own folder under the work folder, which other runs see.
         assert_eq!(
             std::fs::read_to_string(seen.with_extension("own")).unwrap(),
             format!("{SKILLS}/photo-booth\n")
+        );
+        assert_eq!(
+            std::fs::read_to_string(seen.with_extension("ls")).unwrap(),
+            "home\n"
         );
         assert_eq!(sockets(), 0, "gone after");
         assert_eq!(std::fs::read_dir(&work).unwrap().count(), 0);

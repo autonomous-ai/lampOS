@@ -41,7 +41,7 @@
 use crate::net_bridge::{Bounds, Counted, Say, pipe};
 use std::io::{self, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, UdpSocket};
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -63,17 +63,22 @@ pub const NS_LINE: &str = "V=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.sock";
 /// ([`crate::skill_task::RUN_FOLDER_PREFIX`]): without it such a run is
 /// refused ([`crate::skill_task::NET_NO_WAY_OUT`]).
 pub const NS_SKILL_LINE: &str = "case $LAMP_NS_EGRESS in make-?*|skill-?*) ;;";
-/// The file lamp-tasks writes in a run granted `net`'s own folder
-/// (`make-<run id>`, beside its fresh home): its skill's folder as the
-/// hand-over names it, one line. The namespace script finds it by the
-/// run's id and shows that folder alone of the lamp's skills and those
-/// pushed (Heron's P3 on #7590, made required by the first builder).
-pub const OWN_SKILL_FILE: &str = "skill-folder";
+/// The end of the file lamp-tasks writes beside a run granted `net`'s
+/// egress socket, in its private folder ([`EGRESS_DIR`]`/<name>.folder`,
+/// [`Grant::open_for`]): its skill's folder as the hand-over names it, one
+/// line, 0600, made new (never one there, never through a link) when the
+/// socket is made and removed with it. The namespace script finds it by
+/// the run's egress name and shows that folder alone of the lamp's skills
+/// and those pushed (Heron's P3 on #7590, made required by the first
+/// builder). No run can see or write that folder, so no other run can
+/// point a waiting net run at another skill's folder (Heron's P3 at
+/// `2533a4f02b`).
+pub const OWN_SKILL_FILE: &str = ".folder";
 /// The line lamp-update's namespace script carries when it shows a run
 /// granted `net` only its own skill's folder ([`OWN_SKILL_FILE`],
 /// `lamp_update::hermes_install::OWN_SKILL_LINES`): without it such a run
 /// is refused, as it would see every skill's folder.
-pub const NS_OWN_SKILL_LINE: &str = "O=$W/lamp/make-${LAMP_NS_EGRESS#*-}/skill-folder N=";
+pub const NS_OWN_SKILL_LINE: &str = "O=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.folder N=";
 /// Said when the namespace script has no [`NS_LINE`]: nothing is started.
 pub const NO_EGRESS: &str = "the lamp's agent can't be given the internet yet (its namespace script has no egress line: lamp-update's round hasn't run), so nothing was started";
 /// The ports a run granted `net` reaches (Heron's answer 1): the web.
@@ -933,6 +938,37 @@ impl Grant {
         self.dir.join(format!("{name}.sock"))
     }
 
+    /// `name`'s skill-folder file beside its socket ([`OWN_SKILL_FILE`]).
+    pub fn folder_file(&self, name: &str) -> PathBuf {
+        self.dir.join(format!("{name}{OWN_SKILL_FILE}"))
+    }
+
+    /// [`Grant::open`], and `skill_folder` written beside the socket
+    /// ([`Grant::folder_file`], 0600, made new, never through a link) for
+    /// the namespace script, removed with the socket. Not written: the
+    /// socket is removed and nothing is served.
+    pub fn open_for(&self, name: &str, until: Instant, skill_folder: &Path) -> io::Result<Served> {
+        let mut served = self.open(name, until)?;
+        let path = self.folder_file(name);
+        let line = format!("{}\n", skill_folder.display());
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
+            .open(&path)
+            .and_then(|mut file| {
+                use std::io::Write;
+                file.write_all(line.as_bytes())
+            });
+        if let Err(error) = written {
+            let _ = std::fs::remove_file(&path);
+            return Err(error);
+        }
+        served.folder = Some(path);
+        Ok(served)
+    }
+
     /// `name`'s socket made (its folder 0700 and ours, the socket 0600;
     /// any other run's socket left there swept: one runs at a time) and
     /// served on a thread of its own until the [`Served`] is dropped or
@@ -978,6 +1014,7 @@ impl Grant {
             ino,
             stop,
             thread: Some(thread),
+            folder: None,
         })
     }
 }
@@ -986,7 +1023,14 @@ impl Grant {
 fn sweep(dir: &Path) {
     use std::os::unix::fs::FileTypeExt;
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-        if entry.file_type().is_ok_and(|kind| kind.is_socket()) {
+        let left_folder = entry
+            .file_name()
+            .to_string_lossy()
+            .ends_with(OWN_SKILL_FILE);
+        if entry
+            .file_type()
+            .is_ok_and(|kind| kind.is_socket() || (left_folder && !kind.is_dir()))
+        {
             let _ = std::fs::remove_file(entry.path());
         }
     }
@@ -1038,6 +1082,8 @@ pub struct Served {
     ino: u64,
     stop: Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
+    /// Its skill-folder file ([`Grant::open_for`]), removed with it.
+    folder: Option<PathBuf>,
 }
 
 impl Served {
@@ -1053,6 +1099,9 @@ impl Drop for Served {
             let _ = thread.join();
         }
         remove_socket(&self.path, self.dev, self.ino);
+        if let Some(folder) = self.folder.take() {
+            let _ = std::fs::remove_file(folder);
+        }
     }
 }
 
