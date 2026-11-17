@@ -173,6 +173,7 @@ impl SharedMetadata {
                             "fixture_at_ms",
                             "head_wake_cue",
                             "look_note",
+                            "update_give_way",
                         ],
                     )
                 })
@@ -224,6 +225,7 @@ impl SharedMetadata {
                             "not_speech",
                             "playback_discarded",
                             "speaker_lapsed",
+                            "update_give_way",
                             "cancelled",
                         ],
                     )
