@@ -19227,12 +19227,14 @@ mod tests {
             // The speaker takes what it is given; a final block retires.
             let current = reply.as_mut().unwrap();
             let mut sequence = 40;
+            let mut waiting_token = None;
             while let Some((_, last)) = current.next_speaker_chunk() {
                 sequence += 1;
                 if last {
                     current.final_chunk = Some(sequence);
                     let token = current.retire_playback(sequence, 240).unwrap();
                     owner.playback_ended(now(), token).unwrap();
+                    waiting_token = Some(token);
                 }
             }
             // The quiet while the make goes on.
@@ -19251,6 +19253,50 @@ mod tests {
                 .unwrap()
                 .append_provider_packet(vec![22; 480], monotonic_us(), true);
             seen.push(shown(&mut owner, &reply, &mut body, &socket, 4_000_000));
+            // The answer is its own generation: it plays to its end under a
+            // new playback, and then the turn settles (Thirteen on #7395).
+            for event in [
+                ProviderOutput::GenerationComplete {
+                    request: turn.turn(),
+                },
+                ProviderOutput::TurnComplete {
+                    request: turn.turn(),
+                    idle: true,
+                },
+            ] {
+                observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+            }
+            let current = reply.as_mut().unwrap();
+            // Off the one path the waiting line never retired: the answer
+            // continues its playback.
+            let answer_token = match current.playback {
+                Some(token) => token,
+                None => {
+                    let permit = owner.issue_output(now(), current.plan, 100_000).unwrap();
+                    owner.playback_started(now(), permit).unwrap()
+                }
+            };
+            current.playback = Some(answer_token);
+            assert_eq!(waiting_token.is_some(), one_path);
+            assert_ne!(Some(answer_token), waiting_token);
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 5_000_000));
+            let current = reply.as_mut().unwrap();
+            let mut played = 0;
+            while let Some((samples, last)) = current.next_speaker_chunk() {
+                played += samples.len();
+                sequence += 1;
+                if last {
+                    current.final_chunk = Some(sequence);
+                    let token = current.retire_playback(sequence, 240).unwrap();
+                    assert_eq!(token, answer_token);
+                    owner.playback_ended(now(), token).unwrap();
+                }
+            }
+            assert!(played >= 480, "the whole answer was handed to the speaker");
+            assert!(
+                reply.as_ref().unwrap().settled(&None),
+                "the turn settles after its answer"
+            );
             seen
         };
         let phases = |seen: Vec<(Option<crate::ring_wire::RingPhase>, String)>| {
@@ -19266,12 +19312,13 @@ mod tests {
                 speaking(),
                 thinking(),
                 thinking(),
-                (Waiting, "speaking".into())
+                (Waiting, "speaking".into()),
+                speaking()
             ]
         );
         assert_eq!(
             phases(run(false)),
-            [speaking(), speaking(), speaking(), speaking()]
+            [speaking(), speaking(), speaking(), speaking(), speaking()]
         );
     }
 
