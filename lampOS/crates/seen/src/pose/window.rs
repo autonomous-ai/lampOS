@@ -21,7 +21,8 @@
 //! Nothing of the frame or the answer is kept: a sample is its time, one
 //! flag and four bits, and the window lives in memory only for one sitting
 //! (reset when they stand up or stay away past [`crate::keep::KEEP_US`], a
-//! stranger comes, the privacy or sleep, or the opt-in goes off).
+//! forget, the privacy or sleep, or the opt-in goes off; whose face is in
+//! view is never asked).
 use crate::wire::Ergo;
 use lamp_msgs::{HumanPosture, PostureRegion};
 use std::collections::VecDeque;
