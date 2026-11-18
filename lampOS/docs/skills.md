@@ -5223,82 +5223,52 @@ becomes a remove. Then, in code (`made_turn::asked`):
   which one is the model's to judge. Such an answer is not given the
   lamp's skills' lines (`skill_about::tells_their_skills`). With none to
   offer, the answer is as before, and also never calls it the lamp's own.
-- **Back on only by the call** (#7562's row on lamp-9adf, 18 Nov 03:2x:
+- **Back on by the call** (#7562's row on lamp-9adf, 18 Nov 03:2x:
   after btc price was turned off, "turn my bitcoin price skill back on"
   made no call and was answered "Bitcoin price is back on" while it stayed
   off). While any skill they made or added is in lamp-skills' `off` file,
   each heard turn on the second route gives the model one note
-  (`made_turn::off_note`): how many are turned off, never which, and
-  that a line asking to use or run one runs nothing, so it is told it is
-  off and didn't run and that they can ask to turn it back on, never
-  turned on for that, and `made_turn::BACK_ON_BY_CALL` ("A skill turned
-  off is turned back on only by calling make_skill with turn_on and its
-  name, when their line asks to turn it on; never say it is on or back on
-  unless that call's answer says so."). A turn-off's answer carries the
-  same line as `later`. A structural guard: no words matched, whether a
-  line asks to turn one back on stays the model's to judge. Two small
-  local files read a turn; nothing told when none is off, unheard, or with
-  the switch off.
-- **A use is told off, never turned on** (#7562's row on lamp-9adf, 18 Nov
-  10:53: "Lamp, use my btc price skill." with btc price turned off was
-  answered with a `turn_on` and "Bitcoin price is back on.", and never
-  ran). The function of a turned-off skill answers
-  `made_turn::FUNCTION_OFF`, which lamp-skills' `TOOL_TURNED_OFF` is
-  ("That skill is turned off, so it did nothing. Say so in a few words: it
-  is off and didn't run, and they can ask to turn it back on. Never turn it
-  on for this ..."). On the second route a `make_skill` `turn_on`
-  (`made_turn::turns_on`) runs only when the person's heard line asks it
-  on, in any order of the turn's calls (#7562 point 2, the first builder's
-  ranking, 18 Nov; `made_turn::on_refused`), as #7683's strict yes holds a
-  remove: it is the turn's only `make_skill` call, and the line asks
-  something on (`made_turn::asks_on`: "turn on", "back on", "switch on",
-  "enable", "put back on", "resume", "unpause" or Vietnamese "bật",
-  the short fixed set of the first builder's 12:51 ruling on #7683, or
-  "turn"/"switch" with "on" the line's last word, "turn btc price on"). A
-  plain yes never lets the model's own `turn_on` through, whatever the
-  lamp asked last (Thirteen's P2, 18 Nov): only the lamp's own offer,
-  below, takes a yes, read in code, for its own skill and within its wait.
-  Otherwise it is not run, before or
-  after the skill's function or alone: the model is told
-  `made_turn::not_asked_on` (`NOT_ASKED_ON`, "a skill turned off is turned
-  back on only when the person asks to turn it on, never to use it", and
-  to say it is off and didn't run). "Use my bitcoin skill", "run btc
-  price", "play btc price" and a question about it never turn it on; a
-  line the set misses costs the person saying "turn it on". "Turn on btc
-  price and run it" turns it on in either order; a run called after the
-  turn on in the same turn goes to the skill, and one that still answers
-  off (lamp-skills reads its `off` file again within 2 s) is told
-  `made_turn::just_on` (`JUST_ON`, "it was turned on just now and runs
-  from their next ask"), so the lamp says it is on and can be run now,
-  never that it is off. Such a run is tried again first, at most
-  `made_turn::RERUNS` (2) times, `RERUN_AFTER` (1.2 s) apart, so it is
-  answered once lamp-skills has read `off` again.
-- **Offered back on, and a yes runs it once** (#7684, the first builder's
-  11:05 ruling on #7562). On the second route, a turned-off skill's
-  function asked on a heard line, with nothing turned on in the turn, is
-  answered `made_turn::offer_told` in place of `FUNCTION_OFF`: the model
-  says only "X is turned off. Want me to turn it back on and check?", and
-  the call is kept as the offer (`made_turn::Offer`, `Shared::off_offer`).
-  The next heard line takes it, whatever it says. Only a plain yes, read in
-  code (`made_turn::offer_yes`: at most six words, no question, only "yes",
-  "yeah", "yep", "yup", "sure", "ok", "okay", "go ahead", "do it", "turn it
-  on", "vâng", "ừ", "có", "được", "bật lại" or "bật lên" beside "please",
-  "lamp", "hey", "đi" or "nhé"; a TODO shares #7683's helper once it
-  lands), within `OFFER_FOR` (60 s), turns it on and runs it once: round 1
-  calls, in code and asked of no chat, `make_skill` with `turn_on` and its
-  said name, then the very call the use asked, and round 2 is told
-  `made_turn::yes_note` and says what it found; it stays on. The round's
-  two calls are the lamp's own, known by the round the lamp made in code
-  (`offer_round`), never by a call id, so its `turn_on` is never refused
-  as above; a model's call of the same function after it is given that
-  run's answer (`made_turn::ran_already`), never run again, and its own
-  `turn_on` of any skill in that turn is refused as above. A yes past the
-  60 s, or one that names another skill ("Yes, moon fact."), turns nothing
-  on. "No.", silence, a new ask ("What time is
-  it?"), or more than a plain yes ("Yes, and play some music.") lets the
-  offer go: nothing is turned on or run, and the line is answered as
-  itself; a yes a line later is no yes to it. A turn that turned the
-  skill on drops any offer.
+  (`made_turn::off_note`): how many are turned off, never which; that a
+  line asking to use or run one calls its function as for any skill, the
+  lamp turning it on for the owner's ask (below); and
+  `made_turn::BACK_ON_BY_CALL` ("A skill turned off is turned back on by
+  calling make_skill with turn_on and its name, when their line asks to
+  turn it on, or by the lamp when the owner asks to use it; never say it is
+  on or back on unless a call's answer says so."). A turn-off's answer
+  carries the same line as `later`. A structural guard: no words matched,
+  whether a line asks to turn one back on stays the model's to judge. Two
+  small local files read a turn; nothing told when none is off, unheard, or
+  with the switch off.
+- **A use turns it on, never offered** (turned on, never offered: the
+  first builder 18:41, 18 Nov, from the product owner: nothing is asked of
+  the person; an offer becomes the action and one line with an undo; an
+  unsure line is not acted on). The function of a turned-off skill
+  answers `made_turn::FUNCTION_OFF`, which lamp-skills' `TOOL_TURNED_OFF`
+  is. On the second route, on a heard line with nothing turned on in the
+  turn, the lamp then calls `make_skill` itself with `turn_on` and the
+  skill's said name (`made_turn::on_for_ask`, id `ON_FOR_ASK_ID`), through
+  the same runner as the model's own call, so `made_turn::asked` holds it:
+  heard, the owner's alone (`services::owner_hears`), the name matched to
+  theirs. Turned on, the function is run again in that turn, asked of no
+  chat between: at most `made_turn::RERUNS` (2) times, `RERUN_AFTER`
+  (1.2 s) apart, as lamp-skills reads its `off` file again within 2 s. The
+  model is told `made_turn::turned_on_for_ask`: what the run found, and to
+  say first, in the conversation's language, "<X> was off, so I turned it
+  on. Say 'turn it off' to undo.", then what it found; if it still
+  answered off, what it found is `made_turn::just_on` (`JUST_ON`, "it was
+  turned on just now and runs from their next ask"), never that it is off.
+  A model's call of the same function after it in the turn is given that
+  answer (`made_turn::ran_already`), never run again. A guest's ask is
+  refused by `make_skill` (`made_turn::NOT_OWNER`) and turns nothing on: the model
+  is told `made_turn::not_turned_on`, to say plainly that it is off, didn't
+  run and why, naming no skill, never that it is on; so is any other
+  refusal, or no such skill of theirs. No words of the line are read: the
+  model's call of the skill is the ask, and a `make_skill` `turn_on` the
+  model calls itself runs as any call (no list of words, no plain-yes
+  reading). "Turn on btc price and run it" turns it on in either order;
+  a run called after the turn on in the same turn goes to the skill and
+  is tried again as above. Off, or unheard, the function's answer is told
+  as it is.
 - **Said off or back on only after its turn** (#7562's row on lamp-9adf,
   18 Nov 10:57: "Lamp, turn off my bitcoin price skill." found nothing
   near btc price and offered theirs, and the model, with no second call,
@@ -5361,7 +5331,7 @@ Tests: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
 `a_turn_on_by_another_name_offers_theirs_turned_off_to_call_again`,
 `at_most_eight_of_theirs_are_offered`,
 `while_one_of_theirs_is_off_back_on_is_told_as_a_turn_on_call`,
-`a_turned_off_skill_asked_for_use_is_told_off_never_turned_on`,
+`a_turned_off_skill_asked_for_use_is_turned_on_with_an_undo_line`,
 `a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
 `switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
 `remove_still_waits_for_its_yes`, `a_turn_drops_a_remove_of_the_same_skill`,
@@ -5372,12 +5342,19 @@ Tests: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
 through the real manage helper, and
 `package::a_skill_turned_off_runs_nothing_through_its_function`; on the
 second route, `second_provider::tests::made_turn_said`'s
-`a_turned_off_skill_asked_for_use_is_never_turned_on`,
 `a_turn_on_asked_is_run_as_before`,
+`the_models_own_turn_on_runs_on_its_judgment`,
+`turn_on_and_run_it_turns_it_on_in_either_order`,
 `already_off_with_no_turn_off_is_not_said_and_the_candidates_are_asked_again`,
 `back_on_with_no_turn_on_is_not_said_and_the_candidates_are_asked_again`,
-`none_of_the_candidates_is_said_after_one_ask_again` and
-`a_turn_off_found_by_its_name_is_said_as_before`, `a_turn_on_called_before_the_function_for_a_use_is_refused`, `a_turn_on_alone_for_a_use_or_a_run_is_refused`, `a_line_that_asks_it_on_turns_it_on`, `turn_on_and_run_it_turns_it_on_in_either_order`, `a_yes_to_the_models_own_turn_it_back_on_question_turns_nothing_on`, `a_turn_on_beside_another_skill_change_is_refused`, `a_run_just_after_its_turn_on_is_tried_again_and_never_said_off`, `a_use_while_off_offers_to_turn_it_back_on_and_turns_nothing_on`, `a_plain_yes_to_the_offer_turns_it_on_and_runs_it_once`, `a_no_to_the_offer_leaves_it_off`, `a_new_ask_in_place_of_the_yes_leaves_it_off_and_is_answered`, `a_yes_after_the_offers_wait_turns_nothing_on`, `a_yes_naming_another_skill_turns_nothing_on`, `the_offers_run_is_never_run_again_by_the_model`; `made_turn::tests::the_offer_is_taken_only_by_a_plain_yes_on_the_next_line`; and `made_turn::tests::a_turn_on_stands_only_on_a_line_that_asks_it_on`.
+`none_of_the_candidates_is_said_after_one_ask_again`,
+`a_turn_off_found_by_its_name_is_said_as_before`,
+`a_run_just_after_its_turn_on_is_tried_again_and_never_said_off`,
+`asked_to_run_an_off_skill_it_is_turned_on_and_run_in_one_turn_with_the_undo_line`,
+`a_run_turned_on_for_the_ask_is_tried_again_while_still_off`,
+`a_guests_ask_of_an_off_skill_is_refused_and_turns_nothing_on`,
+`the_skill_turned_on_and_run_for_the_ask_is_never_run_again` and
+`switch_off_a_use_of_an_off_skill_changes_nothing`.
 
 **Listed by voice** (lamp-9adf, 15 Nov, build 13162: "which skills have you
 made for me?" called nothing and was answered from the last few turns, two
