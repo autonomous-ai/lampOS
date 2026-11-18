@@ -535,12 +535,16 @@ pub const FORM_RULE: &str = "Never write asks under [permissions] or any other t
 /// apples on my own", "writing notes and reading them back"), while the
 /// same rules.md sent to the same model alone made the skill 10 of 10. So
 /// the words say first that the skill can be made, what a made skill can
-/// do, and that `cannot` is only for a limit rules.md names.
+/// do, and that `cannot` is only for a limit rules.md names. And its
+/// bounds (the owner, 18 Nov, on #7737: the kept session keeps V1's full
+/// grants, so the make's own words name them): only its folder, and no
+/// command but the pack check.
 pub const GATEWAY_CAN: &str = "You are making a skill for this lamp, and it can be made. Read \
      guide.md when it is here, then format.md for every step a skill can do, sdk.md for its code, examples/ \
      (whole skills the check takes), then follow rules.md. Words you know now need no lookup. \
      Answer cannot only for a limit rules.md names; if unsure, make it. Each make is new: \
-     read these files again, format.md before any cannot, and write no tool key.";
+     read these files again, format.md before any cannot, and write no tool key. Use only this \
+     make's folder below; run nothing but the check it names.";
 
 pub fn gateway_form() -> String {
     format!(
@@ -2603,7 +2607,7 @@ mod tests {
         for bad in [
             line("", 2_000),
             line("R", 10),
-            line("R", MOST_WITHIN.as_millis() as u64 + 1),
+            line("R", 600_001),
             line(&"x".repeat(MOST_RULES_BYTES + 1), 2_000),
             br#"{"op":"skill_make","rules":"R","within_ms":2000,"net":"host"}"#.to_vec(),
             br#"{"op":"skill_task","rules":"R","within_ms":2000}"#.to_vec(),
@@ -3558,7 +3562,12 @@ mod tests {
             skill_writes: Switch::On,
         };
         let words = gateway_checked_prompt(folder, &switches);
-        assert!(words.len() <= 2_000, "{} bytes", words.len());
+        // With lamp-tasks' LAMP_MADE_SKILL_ASKS on (the product's unit),
+        // its prefix too (Twelve's P3 on #7737).
+        let asks = format!("{ASKS_ENVIRONMENT}=on ");
+        assert!(words.len() + asks.len() <= 2_000, "{} bytes", words.len());
+        assert!(words.contains("Use only this make's folder below"));
+        assert!(words.contains("run nothing but the check it names"));
     }
 
     #[test]
@@ -3614,6 +3623,6 @@ mod tests {
                 words
             );
         }
-        assert!(GATEWAY_CAN.len() <= 420, "{}", GATEWAY_CAN.len());
+        assert!(GATEWAY_CAN.len() <= 540, "{}", GATEWAY_CAN.len());
     }
 }
