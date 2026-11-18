@@ -20,6 +20,7 @@ use std::{
 };
 
 pub mod addon;
+pub mod app_package;
 pub mod clock;
 pub mod daily;
 pub mod glow;

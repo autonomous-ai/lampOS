@@ -2,6 +2,7 @@
 //! the crate is linked once for them, not once a file (#1806).
 mod addon;
 mod air_traces;
+mod app_package;
 mod asks;
 mod call_wait;
 mod daily_engine;
