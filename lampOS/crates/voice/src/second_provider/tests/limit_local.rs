@@ -1,7 +1,9 @@
 //! `LAMP_LIMIT_LOCAL_ASKS` (#7346, done-when 4): at the usage limit, a
 //! plain light or volume ask is done with no model and answered with the
-//! acting part's own line; anything else is the limit as before.
+//! acting part's own line, and "what time is it?" is said from the lamp's
+//! clock (#7642); anything else is the limit as before.
 use super::*;
+use crate::second_provider::limit_local as pieces;
 
 /// A line at the limit that is no plain ask is journaled by its word count
 /// alone: none of its words reach the journal.
@@ -82,6 +84,8 @@ async fn engine_going_on(
             .then_some(worker::CONVERSATION_ALONE)
     }));
     engine.render_lines();
+    // The time's pieces are rendered last ([`pieces::time_pieces`]).
+    let last_piece = pieces::time_pieces().last().unwrap();
     tokio::time::timeout(Duration::from_secs(5), async {
         while engine
             .shared
@@ -93,6 +97,7 @@ async fn engine_going_on(
             .unwrap()
             .is_none()
             || (on && engine.shared.fixed_clips.kept("Brighter.").is_none())
+            || (on && engine.shared.fixed_clips.kept(last_piece).is_none())
         {
             tokio::task::yield_now().await;
         }
@@ -132,7 +137,7 @@ async fn at_the_limit_a_plain_ask_is_done_without_the_model() {
             "What time is it?",
             "Make it brighter.",
             "Quieter, please.",
-            "What time is it?",
+            "Tell me a joke.",
             "Lamp, a bit cooler.",
             "Lamp, what's the weather?",
             "Make it brighter.",
@@ -349,4 +354,95 @@ async fn plain_429s_that_last_do_not_key_the_local_asks() {
     assert!(next.contains(&"complete".to_owned()), "{next:?}");
     assert!(names(&ran).is_empty(), "the model's: {next:?}");
     assert_eq!(script.asked.lock().unwrap().len(), 4, "its chat was asked");
+}
+
+/// The audio a request's turn played, whole, and how it ended.
+async fn played(engine: &mut Engine, request: u64) -> (Vec<i16>, Vec<String>) {
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let (mut samples, mut events) = (Vec::new(), Vec::new());
+    loop {
+        match engine.next().await {
+            ProviderOutput::Audio { samples: part, .. } => samples.extend(part),
+            ProviderOutput::DownLineSaid { request: of } if of == request => {
+                events.push("down".to_owned());
+            }
+            ProviderOutput::TurnFailed { .. } => {
+                events.push("failed".to_owned());
+                return (samples, events);
+            }
+            ProviderOutput::TurnComplete { .. } => {
+                events.push("complete".to_owned());
+                return (samples, events);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The clip the time `(hour, minute)` is said in, from its pieces as the
+/// fake voice renders them (1,500 samples of each piece's length).
+fn time_clip((hour, minute): (i64, i64)) -> Vec<i16> {
+    pieces::time_said(hour, minute)
+        .into_iter()
+        .flat_map(|piece| vec![piece.len() as i16; 1_500])
+        .collect()
+}
+
+/// #7642: at the usage limit, "what time is it?" is answered from the
+/// lamp's own clock, said from pieces rendered at start (the relay renders
+/// no new speech at the limit, #7412), with no chat asked and no function
+/// run; the run's first refused ask too, in place of the limit line.
+#[tokio::test]
+async fn at_the_limit_the_time_is_said_from_its_pieces() {
+    let (mut engine, script, ran) = engine(
+        true,
+        &[
+            "Make it brighter.",
+            "What time is it?",
+            "Lamp, what's the time?",
+        ],
+        vec![answered(), limited()],
+        Duration::ZERO,
+    )
+    .await;
+    sent_with_down(&mut engine, 1).await;
+    for request in [2, 3] {
+        let before = crate::local_time::clock_here().expect("the host has a clock");
+        let (samples, events) = played(&mut engine, request).await;
+        let after = crate::local_time::clock_here().unwrap();
+        assert_eq!(events, ["down", "failed"], "request {request}");
+        assert!(
+            samples == time_clip(before) || samples == time_clip(after),
+            "request {request}: {} samples, not the time",
+            samples.len()
+        );
+    }
+    assert!(names(&ran).is_empty(), "no function for the time");
+    assert_eq!(script.asked.lock().unwrap().len(), 2, "no chat at the limit");
+}
+
+/// The time's pieces: the hour with its lead, the minutes as a clock is
+/// read, and a.m. or p.m.; every one of them rendered at start.
+#[test]
+fn the_time_is_said_from_pieces_rendered_at_start() {
+    let cases: &[((i64, i64), &[&str])] = &[
+        ((0, 0), &["It's twelve", "a.m."]),
+        ((7, 5), &["It's seven", "oh", "five", "a.m."]),
+        ((12, 15), &["It's twelve", "fifteen", "p.m."]),
+        ((19, 52), &["It's seven", "fifty", "two", "p.m."]),
+        ((23, 40), &["It's eleven", "forty", "p.m."]),
+    ];
+    for ((hour, minute), want) in cases {
+        assert_eq!(&pieces::time_said(*hour, *minute), want);
+    }
+    let rendered: Vec<&str> = pieces::time_pieces().collect();
+    for hour in 0..24 {
+        for minute in 0..60 {
+            for piece in pieces::time_said(hour, minute) {
+                assert!(rendered.contains(&piece), "{hour}:{minute}: {piece}");
+            }
+        }
+    }
 }

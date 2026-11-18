@@ -668,12 +668,23 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   #7642): 429s that last `LIMIT_AFTER` without it still say the limit
   line, but a plain ask is then the model's, its chat asked as before. With `LAMP_SECOND_REFUSED_HOLD`, a spoken line held only for
   429s is sent all the same (`model_refusing::only_rate_limited`), so the
-  route can match it; any other refusal still holds it. A timer and the
-  time are not done yet: their lines carry a time and can't be rendered
-  at the limit. The journal: `at the usage limit <function> was done
-  without the model, its own line said in N ms (LAMP_LIMIT_LOCAL_ASKS)`,
-  and for a line said to the lamp that is no plain ask, `limit_local: no
-  plain ask matched (N words)`, its word count only, never its words. The journal: `said its thoughts are slow`,
+  route can match it; any other refusal still holds it. **The time
+  (#7642):** a line that plainly asks the lamp's time and nothing more
+  (`limit_local::asks_the_time`: "what time is it", "what's the time",
+  "tell me the time"; not "what time is it in London" or "what time does
+  it close") is answered, by the same rules, from the lamp's own clock
+  (`local_time::clock_here`), said from word pieces rendered with the fixed
+  answers at start (`limit_local::time_pieces`, 38 clips: "It's one" to
+  "It's twelve", "oh", one to nineteen, twenty to fifty, "a.m.", "p.m."),
+  joined end to end: "It's seven" "fifty" "two" "p.m.". With the clock not
+  set or a piece not kept, the limit's own way. A timer is not done yet: a
+  due timer is said through a chat (`Asker::Reminder`), which the limit
+  refuses too, so one set at the limit would not ring. The journal: `at the
+  usage limit <function> was done without the model, its own line said in
+  N ms (LAMP_LIMIT_LOCAL_ASKS)`, `at the usage limit the time was said
+  without the model`, and for a line said to the lamp that is no plain
+  ask, `limit_local: no plain ask matched (N words)`, its word count only,
+  never its words. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
   one) or the usage-limit line has been handed over, or a quiet ask in a
   limit run has ended, the route sends `DownLineSaid` for the request,
