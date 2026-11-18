@@ -838,3 +838,17 @@ The request survives service restarts until reboot or a matching kept
 500 ms and carries the matching request identifier. [unplug.md](unplug.md)
 defines the payloads, ownership and proof. No readiness reader treats ordinary
 `body/joint_states`, pause or successful publication alone as safe completion.
+
+## `lamp/did`: what the lamp did, and why (#7757)
+
+An event for each outward action (spoke, moved, lit, started a task): who decided
+(the part, and the skill or rule), a short fact in plain words as the reason (at
+most 120 characters, what the lamp measured or decided, never a word a person
+said), when and how it went (done, refused, cut). lamp-skills tells each run it
+makes with `LAMP_DID_PUBLISH=on`; the voice keeps the last hour (200 at most) in
+memory with `LAMP_DID_KEEP=on` for the conversation's look-up; nothing survives a
+restart and nothing else reads it. A run is told when it ends, so how it went
+is known (done, cut, or refused at once); a skill made on the lamp is told as
+"a made skill", never by a name that may carry a person's words; and the voice
+keeps only dids published by lamp-skills. The other parts (the voice, the body, the ring)
+tell their own actions in small PRs of their own.

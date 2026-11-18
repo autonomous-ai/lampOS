@@ -4197,6 +4197,24 @@ pub fn serve(
             },
         ));
     }
+    // The last hour of what the lamp did, and why (#7757, LAMP_DID_KEEP, off):
+    // kept in memory for the look-up; nothing is read or kept off.
+    if crate::did_history::on() {
+        let kept = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+            .and_then(|bus| crate::did_history::watch(&bus));
+        eprintln!(
+            "lamp-voice second: {} ({})",
+            if kept.is_some() {
+                "the last hour of what the lamp did is kept in memory, up to 200 actions"
+            } else {
+                "there is no bus to read what the lamp did from, so none is kept"
+            },
+            crate::did_history::ENVIRONMENT
+        );
+    }
     if let Some(place) = named_agent {
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {
             crate::agent_tasks::named_for_work(&place, words)
