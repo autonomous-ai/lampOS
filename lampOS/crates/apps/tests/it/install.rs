@@ -656,15 +656,23 @@ fn remove_still_works_on_what_install_laid() {
     );
 }
 
-/// Another caller's whole install of `name`, run on the rig's folders while
-/// the first one has let the apps lock go to place its skills.
-fn other_install(layout: Layout, pkg: AppPackage, tag: &'static str) -> Box<dyn FnMut()> {
+/// Another caller's whole install of `name`, tried on the rig's folders while
+/// the first one has let the apps lock go to place its skills: what it was
+/// told, and how often its yes was asked.
+type Told = std::rc::Rc<std::cell::RefCell<Option<(Result<(), String>, usize)>>>;
+
+fn other_install(
+    layout: Layout,
+    pkg: AppPackage,
+    tag: &'static str,
+    told: Told,
+) -> Box<dyn FnMut()> {
     Box::new(move || {
         let bytes = bytes_of(tag);
         let mut fx = FakeEffects::default();
         let mut skills = FakeCompanions::default();
         let mut yes = FakeYes::granting(vec![key(Op::Install, &pkg, &bytes, &["speak"])]);
-        install(
+        let result = install(
             &layout,
             &mut fx,
             &mut skills,
@@ -673,32 +681,28 @@ fn other_install(layout: Layout, pkg: AppPackage, tag: &'static str) -> Box<dyn 
             &bytes,
             Some(200),
         )
-        .unwrap();
+        .map(|_| ());
+        *told.borrow_mut() = Some((result, yes.asked));
     })
 }
 
 #[test]
-fn a_failed_fresh_install_never_removes_another_install_of_the_same_name() {
+fn a_second_install_of_the_same_name_in_the_gap_is_refused_before_its_yes_and_the_first_stands() {
     let mut rig = rig();
     let pkg = package("x", "1.0.0", &["speak"], false);
-    // B starts fresh; A (a repackaged 1.0.0) finishes in the gap; B then
-    // fails its re-check.
+    let told: Told = Default::default();
     let other = package("x", "1.0.0", &["speak"], false);
-    rig.skills.on_place = Some(other_install(rig.layout.clone(), other, "a"));
-    let error = put(&mut rig, &pkg, "b", Op::Install, &["speak"]).unwrap_err();
-    assert!(error.contains(ALREADY), "{error}");
+    rig.skills.on_place = Some(other_install(rig.layout.clone(), other, "a", told.clone()));
+    put(&mut rig, &pkg, "b", Op::Install, &["speak"]).unwrap();
+    let (result, asked) = told.borrow_mut().take().expect("the other install ran");
+    assert!(result.unwrap_err().contains("being changed"));
+    assert_eq!(asked, 0, "its yes was spent");
     let app = rig.layout.code.join("x");
     assert_eq!(
         fs::read_link(app.join("current")).unwrap().to_str(),
         Some("1.0.0")
     );
-    assert!(app.join("1.0.0/src/app/main.py").is_file());
-    assert_eq!(installed_record(&rig.layout, "x").unwrap().version, "1.0.0");
-    assert!(
-        rig.skills.removed.is_empty(),
-        "A's companions were taken: {:?}",
-        rig.skills.removed
-    );
+    assert!(rig.skills.removed.is_empty());
     assert!(!has(&rig.layout.state, "x", Mark::Installing));
 }
 
@@ -802,4 +806,28 @@ fn logs_are_asked_like_net() {
     );
     assert!(put(&mut rig, &pkg, "a", Op::Install, &["speak"]).is_ok());
     assert!(installed_record(&rig.layout, "x").unwrap().logs);
+}
+
+#[test]
+fn an_app_being_installed_or_removed_is_refused_before_the_yes_is_spent() {
+    for mark in [Mark::Installing, Mark::Removing] {
+        let mut rig = rig();
+        let pkg = package("x", "1.0.0", &["speak"], false);
+        set(&rig.layout.state, "x", mark).unwrap();
+        let bytes = bytes_of("a");
+        let mut yes = FakeYes::granting(vec![key(Op::Install, &pkg, &bytes, &["speak"])]);
+        let error = install(
+            &rig.layout,
+            &mut rig.fx,
+            &mut rig.skills,
+            &mut yes,
+            &StubReader::new(pkg.clone()),
+            &bytes,
+            Some(200),
+        )
+        .unwrap_err();
+        assert!(error.contains("being changed"), "{error}");
+        assert_eq!(yes.asked, 0, "{mark:?}: the yes was spent");
+        assert!(!rig.layout.code.join("x").exists());
+    }
 }

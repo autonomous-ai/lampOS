@@ -1988,10 +1988,16 @@ dependencies = [
 name = "lamp-apps"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "lamp-skills",
+ "lamp-update",
  "libc",
+ "ring",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
+ "tar",
  "tempfile",
 ]
 
