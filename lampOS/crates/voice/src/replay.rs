@@ -2,7 +2,9 @@
 //! without a lamp (#7772). Each case in `tests/replay/*.json` is one line a
 //! row kit saw on a lamp: its word count and timing, the signs the worker
 //! read for it, and the eyes' looks through it as the kit sampled them
-//! (`S` lines). No words and no names: a line is `words` placeholder words.
+//! (`S` lines). No words and no names: a line is `words` placeholder words,
+//! or, with `yes_no`, `words` times "yes" (a bare yes or no, as the journal
+//! or its reader recorded it, #7698).
 //!
 //! The case is fed the way `second_provider::worker::Heeding::not_said_to_me`
 //! feeds it: the looks into a [`SpeakingFaces`], [`Line::with_eyes`] over
@@ -48,6 +50,10 @@ struct Case {
     /// #7726): the lone face's pose then gives none.
     #[serde(default)]
     another_voice: bool,
+    /// The line was a bare yes or no (`said_to_me`'s out-of-window answer
+    /// to the lamp's question, #7698): its words are "yes".
+    #[serde(default)]
+    yes_no: bool,
     /// The kit's eyes sample lines through the line:
     /// `S <s> <faces> <area> <yaw deg> <pitch deg> <facing> <looking> <speaking> <voice state>`.
     #[serde(default)]
@@ -119,7 +125,8 @@ fn verdict(case: &Case) -> String {
         let (seconds, frame) = faces(sample);
         eyes.look(at(seconds), Some((("replay", seq as u64), &frame)));
     }
-    let heard = vec!["word"; case.words].join(" ") + if case.question { "?" } else { "" };
+    let word = if case.yes_no { "yes" } else { "word" };
+    let heard = vec![word; case.words].join(" ") + if case.question { "?" } else { "" };
     let (line, _, _) = Line {
         heard: &heard,
         name_heard: case.named,
