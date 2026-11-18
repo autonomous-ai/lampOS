@@ -262,26 +262,57 @@ fn the_region_comes_from_the_set_time_zone_unless_set_or_in_china() {
     ] {
         assert_eq!(country_of_zone(zone), region, "{zone}");
     }
-    let us = region_from(None, Some(""), Some("America/Chicago"));
+    let us = region_from(None, Some(""), Some("America/Chicago"), "en");
     assert_eq!(us.as_deref(), Some("US"));
     assert!(lines.line(us.as_deref(), "en").contains("988"));
-    let vn = region_from(None, None, Some("Asia/Ho_Chi_Minh"));
+    let vn = region_from(None, None, Some("Asia/Ho_Chi_Minh"), "vi");
     assert!(lines.line(vn.as_deref(), "vi").contains("115"));
     assert_eq!(
-        region_from(None, Some("CN\n"), Some("America/Chicago")).as_deref(),
+        region_from(None, Some("CN\n"), Some("America/Chicago"), "en").as_deref(),
         Some("CN"),
         "lamp-cloud's placement says China"
     );
     assert_eq!(
-        region_from(Some("vn"), Some("CN"), Some("America/Chicago")).as_deref(),
+        region_from(Some("vn"), Some("CN"), Some("America/Chicago"), "en").as_deref(),
         Some("VN"),
         "set by hand first"
     );
-    assert_eq!(region_from(Some("nowhere"), None, None), None);
+    assert_eq!(region_from(Some("nowhere"), None, None, "en"), None);
     assert_eq!(
-        region_from(None, Some("US"), None),
+        region_from(None, Some("US"), None, "en"),
         None,
         "placement is CN or nothing"
+    );
+}
+
+/// The images' own zone, maybe never set: 988 only for an owner who
+/// speaks English; any other gets the default, never a wrong number (the
+/// safety read's P2 on #7752). Old US zone names count, and an installed
+/// copy missing a shipped region is not used.
+#[test]
+fn the_images_zone_counts_only_in_english_and_a_partial_copy_is_not_used() {
+    assert_eq!(
+        region_from(None, None, Some(IMAGE_ZONE), "en").as_deref(),
+        Some("US")
+    );
+    assert_eq!(region_from(None, None, Some(IMAGE_ZONE), "vi"), None);
+    assert_eq!(
+        region_from(None, None, Some("America/Los_Angeles"), "vi").as_deref(),
+        Some("US"),
+        "a zone set by hand counts in any language"
+    );
+    for zone in [
+        "America/Indianapolis",
+        "America/Louisville",
+        "America/Puerto_Rico",
+    ] {
+        assert_eq!(country_of_zone(zone), Some("US"), "{zone}");
+    }
+    let missing = r#"{"regions":{"CN":{"lines":{"en":"x"}}},"default":{"lines":{"en":"y"}}}"#;
+    assert!(
+        CareLines::or_shipped_whole(Some(missing))
+            .line(Some("US"), "en")
+            .contains("988")
     );
 }
 
