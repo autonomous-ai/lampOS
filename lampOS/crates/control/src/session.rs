@@ -1391,11 +1391,12 @@ impl Door {
                     return reply_refused(Some(re), error);
                 }
                 let notes = self.notes.as_ref().expect("notes on");
-                // A made skill's run, with its switch (#7245): its notes are
-                // its skill's, so its next run reads them back. Off, or no
-                // live run, the run's own client as before.
+                // A skill's run (#7245, #7775): its notes are its skill's,
+                // shared by every run of it (a run's client is new each
+                // run), so its next run reads them back. A paired computer,
+                // or no live run, keeps its own client.
                 // The session's own client still takes the rate and the reply.
-                let kept_as = if crate::runs::skill_notes_on() && session.run_socket {
+                let kept_as = if session.run_socket {
                     self.runs
                         .of_client(&client, now_us)
                         .map_or(client.clone(), |run| {
@@ -4475,6 +4476,78 @@ mod tests {
             "{outcome:?}"
         );
         assert!(outcome.later.is_none() && fake.did.is_empty());
+    }
+
+    /// #7775: a skill run's notes are its skill's, with no switch. Each run
+    /// has a new client, yet a run reads what the skill's last run wrote;
+    /// another skill reads none of it; ten runs keep one file, the skill's
+    /// notes client's (#7245's `n_`), none named by a run's client; and a
+    /// paired computer's notes stay its own.
+    #[test]
+    fn a_skills_runs_share_its_notes_and_leave_one_file() {
+        let folder = std::env::temp_dir().join(format!(
+            "lamp-control-door-skill-notes-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&folder);
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None)
+            .with_notes_folder(folder.clone());
+        let mut fake = Fake::default();
+        // Run `run` of `skill` says `frame`: its answer, a write run here,
+        // and the run ended as lamp-tasks ends it.
+        let mut run_says = |door: &mut Door, skill: &str, run: &str, frame: &str| {
+            let token = "T".repeat(43);
+            door.mint_run(&token, run, skill, [Grant::Notes].into(), None, 0)
+                .unwrap();
+            let (mut session, _) = door.open_run();
+            let hello = json!({"id": 1, "op": "hello", "client": crate::runs::HELLO_CLIENT,
+                "sig": crate::runs::hello_sig(), "token": token})
+            .to_string();
+            let outcome = door.handle(&mut session, &hello, &mut fake, S, 1);
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+            let mut outcome = door.handle(&mut session, frame, &mut fake, S, 1);
+            let answer = match outcome.later.take() {
+                Some(later) => later.reply(),
+                None => reply(&outcome).clone(),
+            };
+            door.closed(&session, S);
+            door.end_run(run, None);
+            answer
+        };
+        let get = r#"{"id":2,"op":"notes.get","key":"runs"}"#;
+        for n in 1..=10_u64 {
+            let read = run_says(&mut door, "lamp-checkup", &format!("task-{n}a"), get);
+            let last = read["value"].as_u64().unwrap_or(0);
+            assert_eq!(last, n - 1, "run {n} reads the last run's count: {read}");
+            let set = json!({"id": 3, "op": "notes.set", "key": "runs", "value": last + 1});
+            let kept = run_says(
+                &mut door,
+                "lamp-checkup",
+                &format!("task-{n}b"),
+                &set.to_string(),
+            );
+            assert_eq!(kept["key"], "runs", "{kept}");
+        }
+        // Another skill reads none of lamp-checkup's.
+        let other = run_says(&mut door, "mail-count", "task-x", get);
+        assert_eq!(other["found"], false, "{other}");
+        // One file, the skill's; none in the notes folder named by a run.
+        let names: Vec<String> = std::fs::read_dir(&folder)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let checkup = crate::runs::skill_notes_client("lamp-checkup");
+        assert_eq!(names, [format!("{checkup}.json")]);
+        // A paired computer's notes are its own, not a skill's.
+        let computer = Computer::new(1);
+        let (paired_door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
+        let mut paired_door = paired_door.with_notes_folder(folder.clone());
+        let outcome = paired_door.handle(&mut session, get, &mut fake, 2 * S, 1);
+        assert_eq!(reply(&outcome)["found"], false, "{outcome:?}");
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     #[test]

@@ -118,18 +118,6 @@ pub fn run_client(run: &str) -> String {
     format!("c_{hex}")
 }
 
-/// The switch for a made skill's notes (#7245, lamp-voice's
-/// `LAMP_MADE_NOTES`): `on` exactly, off unless set. On, a run's notes are
-/// kept under its skill's notes client ([`skill_notes_client`]), so the
-/// next run of the same skill reads them back; off, under the run's own
-/// client ([`run_client`]) as before.
-pub const SKILL_NOTES_ENVIRONMENT: &str = "LAMP_MADE_NOTES";
-
-/// Whether a run's notes are its skill's ([`SKILL_NOTES_ENVIRONMENT`]).
-pub fn skill_notes_on() -> bool {
-    std::env::var(SKILL_NOTES_ENVIRONMENT).ok().as_deref() == Some("on")
-}
-
 /// The notes client of a skill's runs: `n_` and 16 hex of its name's
 /// digest, one for every run of that skill and never a paired computer's
 /// or a run's own (`c_`).
