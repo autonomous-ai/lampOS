@@ -270,14 +270,15 @@ fn net_not_agent_task_told() -> String {
 }
 
 /// [`AGENT_SERVICES_EXAMPLE`]'s script: it only says the task is the
-/// lamp's agent's.
+/// lamp's agent's. Tests only: the lib reads the example whole.
+#[cfg(test)]
 const AGENT_SERVICES_SCRIPT: &str =
     "print(\"The lamp's agent does this task with its lamp-services tools.\")";
 
 /// Whether DeepSeek's `answer` is a skill for the web made as a task for
 /// the lamp's agent, with no linked service's `-read` or `-write` grant:
 /// its one script only prints a line handing the task to the agent (the
-/// lamp's own [`crate::make_no_cannot::SCRIPT`], [`AGENT_SERVICES_SCRIPT`]
+/// lamp's own [`crate::make_no_cannot::SCRIPT`], `AGENT_SERVICES_SCRIPT`
 /// or its like), or its code holds the `internet:` line
 /// ([`crate::make_no_cannot::says_needs_net`]; lamp-c0a4, 18 Nov 20:18:
 /// `print("internet: the current gold price")`). On a lamp whose agent
