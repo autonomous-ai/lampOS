@@ -3220,7 +3220,17 @@ cả hai người viết.
   - **Theo trigger**: đèn tự viết thành một việc agent được tạo
     (`make_no_cannot::skill_text`): `grants`, topics trong `[permissions]` và
     `[trigger]` của model, `[ask]` là nudge, và một `do.task` có `run` là
-    `scripts/agent.py` của chính đèn, chỉ báo agent rằng việc đó là của nó.
+    `scripts/agent.py` của chính đèn, là lời dặn agent đọc ở mỗi lần chạy
+    (`make_no_cannot::script`, người xây dựng đầu tiên lúc 02:09 trên
+    #7819): "A skill the person made has fired (when someone comes to the
+    desk). When they made it, they said: «…». Do now what it is for, …,
+    never making, changing or removing a skill; …", nêu điều đã kích hoạt
+    bằng lời thường của trigger và trích nguyên lời của task, là một chuỗi
+    Python thuần. Nó chỉ được coi là của đèn khi đúng dạng đó, hoặc đúng
+    từng byte script cố định trước đây (`made_skill::agent_script_only`,
+    `make_no_cannot::is_script`). Task chỉ chạy khi được gọi có cùng khung
+    trong hướng dẫn ("A skill the lamp's owner made has been asked for
+    now. When they made it, they said the line below. …").
     Nó qua cùng các phép kiểm tra, lưu và đóng gói như mọi kỹ năng được tạo
     có code (cần `LAMP_MADE_SCRIPTS` và `LAMP_SKILL_TASKS`), và được đọc lại
     ngay, không bao giờ nói là đã tạo: "I can have the lamp's agent do that,
@@ -3489,12 +3499,20 @@ cả hai người viết.
   không bao giờ được giữ. Cả hai trường hợp đều theo dạng giữa: đèn tự viết
   skill thành một task cho agent (`make_no_cannot::made`): trigger do mô
   hình của đèn chọn trong một lần gọi nữa (giờ cũng là trigger), hoặc lời
-  gọi nó, và một `do.task` có lời là chính lời của người dùng, câu nghe
-  được cho lần tạo (`thread.heard_for`, P2 của Twelve trên #7819), không
-  bao giờ là câu diễn đạt lại của mô hình giọng nói trong `request` của
-  `make_skill`, chỉ dùng khi không nghe được gì (tạo từ app hoặc câu gõ);
-  lần đánh giá và lần gọi thêm cũng hỏi theo chính lời đó; chạy
-  bằng `scripts/agent.py`, để agent làm toàn bộ việc khi nó chạy; không
+  gọi nó, và một `do.task` có lời là nguyên câu tạo của chính người dùng
+  (người xây dựng đầu tiên lúc 02:09 trên #7819, P2 của Twelve): chỉ câu
+  của chính họ (`thread.heard_in_own_line`), không bao giờ là lời nghe
+  được mới nhất (một câu sau, hay câu của người khác) hay câu diễn đạt lại
+  của mô hình giọng nói trong `request` của `make_skill`, chỉ dùng khi
+  không nghe được câu nào của họ (tạo từ app hoặc câu gõ); lần đánh giá và
+  lần gọi thêm cũng hỏi theo chính lời đó. Câu dài hơn sức chứa của task
+  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) bị từ chối,
+  nói rõ, không bao giờ bị cắt. Nó chạy bằng `scripts/agent.py`, lời dặn
+  nêu điều đã kích hoạt và trích nguyên câu ("A skill the person made has
+  fired (when someone comes back to the desk after it was empty for 5
+  minutes). When they made it, they said: «Lamp, make a skill that tells
+  me the news when I come back to my desk». Do now what it is for, …"), để
+  agent làm toàn bộ việc khi nó chạy; không
   `say`, không bước nào khác, không hẹn giờ hay `[[while]]` do mô hình
   viết. Trên trigger, nhưng không bao giờ trên đồng hồ của đèn
   (`clock/local`: "cho tôi biết giá BTC lúc 9 giờ" vẫn chạy lúc 9 giờ khi
@@ -4849,9 +4867,15 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   lần tạo code của người khác được giữ nhưng không bật, và nói rõ lý do. Giới
   hạn, bước kiểm tra gói, các quyền, `LAMP_TASK_NET` và namespace chạy không
   đổi. MAKE IT trong app cũng vậy, yêu cầu từ app là của chủ đèn. Kỹ năng có
-  gửi đi (một lần ghi, hoặc code nhắn tin tới điện thoại) vẫn đọc lại và chờ
-  đồng ý, vì `lamp-services` gửi theo lời đồng ý đó. Một task cho agent của
-  đèn trên trigger (dạng giữa, hoặc của `LAMP_MAKE_NO_CANNOT`) cũng được bật
+  gửi đi (`make_no_asks::sends`: một lần ghi, một tin nhắn tới điện thoại dù
+  có code riêng hay không, hoặc một task được cấp quyền ghi của dịch vụ liên
+  kết như `slack-write`) vẫn đọc lại và chờ đồng ý, vì `lamp-services` gửi
+  theo lời đồng ý đó (người xây dựng đầu tiên lúc 02:09 trên #7819: nơi duy
+  nhất lời của người dùng được gửi đi dưới tên họ); `keeps_no_yes` và câu
+  đọc lại của kỹ năng tự tạo hiểu giống nhau, nên task có gửi được nói kèm
+  "It runs only once you agree" và chờ. Quyền đọc (`gmail-read`) hay `net`
+  không phải gửi. Một task cho agent của đèn trên trigger (dạng giữa, hoặc
+  của `LAMP_MAKE_NO_CANNOT`) không gửi gì cũng được bật
   ngay theo cách đó, lời đồng ý cho task được ghi cho đúng các quyền của
   nó, và được nói bằng cùng một câu kèm cách hoàn tác, không bao giờ "It
   runs only once you agree" và không chờ lời đồng ý nào

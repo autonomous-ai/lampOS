@@ -1410,9 +1410,11 @@ pub fn make_in(
             .unwrap_or_default()
     });
     // The person's own line alone, for the judge of a made skill with no
-    // word of the ask (#7621): never the newest words heard, another
-    // utterance's, since a false refusal is worse than no check (#6537).
-    let _own = (made_in != 0 && made_skill::unrelated_on()).then(|| {
+    // word of the ask (#7621), and the words of a task for the lamp's agent
+    // (the first builder, 02:09 on #7819): never the newest words heard,
+    // another utterance's, since a false refusal is worse than no check
+    // (#6537), and a task is the maker's own line.
+    let _own = (made_in != 0).then(|| {
         OwnLine::set(
             crate::thread::THREAD
                 .lock()
@@ -3667,13 +3669,17 @@ fn made_and_journaled_by(
     // the internet's line or what can't be read keeps its own route. With
     // no agent on the lamp (`missing`), told so; an agent not known, no
     // judgement: DeepSeek's as before.
-    // The judge and the middle form's task take the person's own words, the
-    // line heard (the 19:50 ruling; Twelve's P2 on #7819), never the voice
-    // model's paraphrase in `request`; the request's words only when
-    // nothing was heard: a make from the app or a typed line.
-    let own_words = heard
+    // The judge and the middle form's task take the person's own make line
+    // whole (the first builder, 19:50 and 02:09 on #7819): their own line
+    // alone (`own_line`, the thread's `heard_in_own_line`), never the newest
+    // words heard nor the voice model's paraphrase in `request`; the
+    // request's words only when no line of theirs was heard: a make from
+    // the app or a typed line. The agent reads it inside the run-time
+    // brief ([`crate::make_no_cannot::script`]).
+    let own_words = own_line
+        .as_deref()
         .map(str::trim)
-        .filter(|heard| heard.chars().any(char::is_alphanumeric))
+        .filter(|line| line.chars().any(char::is_alphanumeric))
         .unwrap_or(request);
     let routed = made_skill::reactions_on() && (engine.is_some() || missing);
     let judged_none = routed && reaction_judged(Arc::clone(&chat), own_words) != Some(true);
@@ -3710,13 +3716,20 @@ fn made_and_journaled_by(
                 "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
                  one task of the request; no DeepSeek draft kept"
             );
-            let made = agent_task(
-                own_words,
-                &chat,
-                began,
-                &agent_kept,
-                (from, keeping, asked.named),
-            );
+            // A line longer than a task holds is refused, said plainly,
+            // never cut unheard (the first builder, 02:09 on #7819).
+            let made = if crate::make_no_cannot::task_cut(own_words) {
+                eprintln!("lamp-voice: a skill made here: the line is longer than a task holds");
+                Err(crate::make_no_cannot::too_long())
+            } else {
+                agent_task(
+                    own_words,
+                    &chat,
+                    began,
+                    &agent_kept,
+                    (from, keeping, asked.named),
+                )
+            };
             let line = kept_line(&made, false, began.elapsed().as_millis());
             return (plain_unless_cannot(made, false), line);
         }
@@ -11172,10 +11185,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                      rearm = \"ends\"\nduring = { from = \"08:00\", to = \"08:01\" }";
         let grants = ["light".to_owned(), "speak".to_owned()];
         let ours = crate::make_no_cannot::skill_text("plant-check", &grants, block, PLANT);
-        let theirs = ours.replace(
-            crate::make_no_cannot::SCRIPT,
-            "import os\nprint(os.getcwd())\n",
-        );
+        let brief = crate::make_no_cannot::script("every day at 08:00", PLANT);
+        assert!(ours.contains(&brief), "{ours}");
+        let theirs = ours.replace(&brief, "import os\nprint(os.getcwd())\n");
         assert_ne!(ours, theirs);
         for (answer, agents) in [(theirs, false), (ours, true)] {
             let (root, keeping) = keeping(&format!("no-cannot-own-code-{agents}"));
@@ -12084,8 +12096,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             &keeping.program,
             format!(
                 "#!/bin/sh\nname=$(basename \"$4\")\ncp \"$4/skill.toml\" \"{}\"\n\
+                 [ -f \"$4/scripts/agent.py\" ] && cp \"$4/scripts/agent.py\" \"{}\"\n\
                  printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
-                copy.display()
+                copy.display(),
+                root.join("last-agent.py").display()
             ),
         )
         .unwrap();
@@ -12347,30 +12361,45 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Twelve's P2 on #7819, the first builder's 19:50 ruling: the middle
-    /// form's task holds the person's own words, the line heard, never the
-    /// voice model's paraphrase in `request`; the judge and the one more
-    /// call are asked of the heard line too. With nothing heard (a make
-    /// from the app or a typed line), the request's words.
+    /// The first builder, 02:09 on #7819 (Twelve's P2): the middle form's
+    /// task is the person's own make line whole, their own line alone
+    /// (`heard_in_own_line`, [`OwnLine`]), never the voice model's
+    /// paraphrase in `request` nor the newest words heard (a later line, or
+    /// another person's); the agent reads it at each run inside the lamp's
+    /// brief, which names what fired it and quotes the line. With no line of
+    /// theirs, the request's words. One longer than a task holds is refused,
+    /// never cut.
     #[test]
-    fn with_the_switch_the_middle_forms_task_holds_the_heard_words() {
+    fn with_the_switch_the_middle_forms_task_is_the_own_make_line_in_a_run_brief() {
         made_skill::set_reactions_here(Some(true));
         net_make_here(Some(true));
         let (root, keeping, copy) = keeping_copied("reactions-heard");
-        const HEARD: &str = "when I've been sitting here ages, tell me to roll my shoulders";
-        const PARAPHRASE: &str = "remind the user to do shoulder rolls after a long sitting";
-        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
-        for (at, heard, words) in [
-            (0, Some(HEARD), HEARD),
-            (1, Some(" \n "), PARAPHRASE),
-            (2, None, PARAPHRASE),
+        let script = root.join("last-agent.py");
+        const BACK: &str = "Lamp, make a skill that tells me the news when I come back to my desk.";
+        const LATER: &str = "and turn the music down, it's too loud";
+        const PARAPHRASE: &str = "tell the user the news when they return to the desk";
+        let back = "field = \"someone\"\nequals = true\nwhen = \"appears\"\nabsent_for = \"5m\"\n";
+        let words_back = crate::make_no_cannot::task_words(BACK);
+        assert_eq!(
+            words_back,
+            "Lamp, make a skill that tells me the news when I come back to my desk"
+        );
+        // (own line held, heard_for's newest words, the task's words)
+        for (at, own, heard, words) in [
+            (0, Some(Some(BACK)), Some(LATER), words_back.as_str()),
+            (1, Some(None), Some(LATER), PARAPHRASE),
+            (2, None, None, PARAPHRASE),
         ] {
             let tasks = agent_answering(vec![]);
-            let name = format!("shoulder-roll-{at}");
+            let name = format!("desk-news-{at}");
             let (url, served) = service_sent(vec![
                 judgement(false),
-                (200, trigger_answer(&name, "speak", "room/presence", sat)),
+                (
+                    200,
+                    trigger_answer(&name, "net, speak", "room/presence", back),
+                ),
             ]);
+            let _own = own.map(|own: Option<&str>| OwnLine::set(own.map(str::to_owned)));
             let told = make_with_by(
                 0,
                 heard,
@@ -12384,21 +12413,58 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             let sent = served.join().unwrap();
             assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
             assert!(is_judgement(&sent[0], words), "{}", sent[0]);
-            assert!(
-                sent[1].contains(&format!("Request: {words}")),
-                "{}",
-                sent[1]
-            );
             assert_eq!(told["made"], name.as_str(), "{told}");
-            one_task_of(
-                &copy,
-                &crate::make_no_cannot::task_words(words),
-                crate::make_no_cannot::RUN,
+            let kept = std::fs::read_to_string(&copy).unwrap();
+            let table: toml::Table = toml::from_str(&kept).unwrap();
+            assert_eq!(
+                table["do"][0]["task"]["task"].as_str(),
+                Some(words),
+                "{kept}"
             );
-            if words == HEARD {
-                assert!(!std::fs::read_to_string(&copy).unwrap().contains(PARAPHRASE));
+            assert!(!kept.contains(LATER), "{kept}");
+            if words != PARAPHRASE {
+                assert!(!kept.contains(PARAPHRASE), "{kept}");
             }
+            // The run's brief: what fired it, and the line quoted whole.
+            let brief = std::fs::read_to_string(&script).unwrap();
+            assert_eq!(
+                brief,
+                crate::make_no_cannot::script(
+                    "when someone comes back to the desk after it was empty for 5 minutes",
+                    words
+                )
+            );
+            assert!(
+                brief.contains(&format!("they said: «{words}». Do now what it is for")),
+                "{brief}"
+            );
+            assert!(brief.contains("has fired (when someone comes back to the desk"));
+            assert!(made_skill::agent_script_only(&[(
+                crate::make_no_cannot::RUN.to_owned(),
+                brief
+            )]));
         }
+        // Longer than a task holds: refused plainly, nothing kept, no
+        // second call.
+        let long = format!("{BACK} {}", "And then tell me the weather too. ".repeat(4));
+        assert!(crate::make_no_cannot::task_cut(&long));
+        let entries = made_skill::entries(&keeping.directory).len();
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![judgement(false)]);
+        let _own = OwnLine::set(Some(long.clone()));
+        let told = make_with_by(
+            0,
+            Some(&long),
+            PARAPHRASE,
+            &keeping,
+            chat_at(url),
+            NOW + 9,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!(served.join().unwrap().len(), 1, "{told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), entries);
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
@@ -12450,8 +12516,20 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(told.get(none).is_none(), "{none}: {told}");
         }
         assert!(!crate::skill_write_yes::awaited(std::time::Instant::now()));
-        assert!(!told.to_string().contains("once you agree"), "{told}");
+        // The old ask is gone from the answer, its description and the
+        // say-back recorded (Twelve's P3 on #7819): each fails without it.
+        let agreed = made_skill::RUNS_ONCE_AGREED.trim();
+        assert!(!told.to_string().contains(agreed), "{told}");
+        let description = told["description"].as_str().unwrap();
+        assert!(
+            description.ends_with(&format!(
+                "The lamp's agent does it, and {}.",
+                crate::skill_task_yes::uses_said(&["speak".to_owned()])
+            )),
+            "{description}"
+        );
         let next = told["next"].as_str().unwrap();
+        assert!(!next.contains(agreed), "{next}");
         assert!(next.contains("Ask nothing and add no question"), "{next}");
         assert!(
             next.ends_with("\"Made sit hi. Say 'remove it' to undo.\""),
@@ -12467,6 +12545,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             panic!("{recorded:?}")
         };
         assert_eq!(recorded.grants.as_deref(), Some(&["speak".to_owned()][..]));
+        assert!(!recorded.say_back.contains(agreed), "{}", recorded.say_back);
         let entries = made_skill::entries(&keeping.directory);
         assert_eq!(entries[0]["on"], true, "{entries:?}");
         assert_eq!(entries[0]["uses"]["agent_task"], true, "{entries:?}");
@@ -12491,6 +12570,69 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         set_tasks_here(None);
         set_owner_here(None);
         crate::make_no_asks::set_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's question on #7819, the first builder's 02:09: a
+    /// middle-form task that sends (granted a linked service's write) keeps
+    /// its read-back and yes with `LAMP_MAKE_NO_ASKS` on, said and recorded
+    /// as one that waits, never put on; the same make granted only a read
+    /// would go on at once (`make_no_asks::keeps_no_yes`).
+    #[test]
+    fn with_no_asks_a_sending_middle_form_task_still_waits_for_the_yes() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        made_skill::set_agent_services_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        set_owner_here(Some(true));
+        const TEAM: &str = "when I sit down, tell my team I'm in";
+        let (root, keeping, copy) = keeping_copied("no-asks-sends");
+        let tasks = agent_answering(vec![]);
+        let sat = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (
+                200,
+                trigger_answer("team-in", "speak, slack-write", "room/presence", sat),
+            ),
+        ]);
+        let told = make_with_by(
+            7,
+            Some(TEAM),
+            TEAM,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        assert!(kept.contains("\"slack-write\""), "{kept}");
+        assert_eq!(told["made"], "team-in", "{told}");
+        assert_eq!(told["on"], false, "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        let description = told["description"].as_str().unwrap();
+        assert!(
+            description.ends_with(made_skill::RUNS_ONCE_AGREED.trim()),
+            "{description}"
+        );
+        assert!(
+            !told["next"]
+                .as_str()
+                .unwrap()
+                .contains("Say 'remove it' to undo"),
+            "{told}"
+        );
+        let entries = made_skill::entries(&keeping.directory);
+        assert_ne!(entries[0]["on"], true, "{entries:?}");
+        let _ = take_said_line();
+        set_owner_here(None);
+        crate::make_no_asks::set_here(None);
+        made_skill::set_agent_services_here(None);
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);

@@ -6613,10 +6613,19 @@ the same code for both writers.
   - **On a trigger**: written by the lamp as a made agent task
     (`make_no_cannot::skill_text`): `grants`, the model's `[permissions]`
     topics and `[trigger]`, `[ask]` a nudge, and one `do.task` whose `run`
-    is the lamp's own `scripts/agent.py`, which only tells the agent the task
-    is its to do, only while that file is the lamp's own script byte for
-    byte (`made_skill::agent_script_only`; model-written code at that path
-    is said and kept as the model's code). It goes through the same checks, keeping and packing as
+    is the lamp's own `scripts/agent.py`, the run-time brief the agent reads
+    at each run (`make_no_cannot::script`, the first builder's 02:09 on
+    #7819): "A skill the person made has fired (when someone comes to the
+    desk). When they made it, they said: «…». Do now what it is for, …,
+    never making, changing or removing a skill; …", what fired it in the
+    trigger's plain words and the task's words quoted whole, one plain
+    Python string. It counts as the lamp's own only in that exact form, or
+    as the earlier fixed script byte for byte
+    (`made_skill::agent_script_only`, `make_no_cannot::is_script`;
+    model-written code at that path is said and kept as the model's code).
+    A task only asked for carries the same frame in its instructions ("A
+    skill the lamp's owner made has been asked for now. When they made it,
+    they said the line below. …"). It goes through the same checks, keeping and packing as
     any made skill with code (`LAMP_MADE_SCRIPTS` and `LAMP_SKILL_TASKS`
     needed), and is said back at once, never as made: "I can have the
     lamp's agent do that, as plant check: every day at 08:00, it hands one
@@ -6868,12 +6877,20 @@ the same code for both writers.
   the middle form: the lamp writes the skill itself as one task for its
   agent (`make_no_cannot::made`): the trigger its own model picks in one
   more call (a time is a trigger), or the words that ask for it, and one
-  `do.task` whose words are the person's own, the line heard for the make
-  (`thread.heard_for`, Twelve's P2 on #7819), never the voice model's
-  paraphrase in `make_skill`'s `request`, which is taken only when nothing
-  was heard (a make from the app or a typed line); the judgement and the
-  one more call are asked of the same words; run by
-  `scripts/agent.py`, so the agent does all the work when it fires; no
+  `do.task` whose words are the person's own make line whole (the first
+  builder's 02:09 on #7819, Twelve's P2): their own line alone
+  (`thread.heard_in_own_line`), never the newest words heard (a later
+  line, or another person's) nor the voice model's paraphrase in
+  `make_skill`'s `request`, which is taken only when no line of theirs was
+  heard (a make from the app or a typed line); the judgement and the one
+  more call are asked of the same words. A line longer than a task holds
+  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) is refused,
+  said plainly, never cut. It is run by `scripts/agent.py`, whose brief
+  names what fired it and quotes the line whole ("A skill the person made
+  has fired (when someone comes back to the desk after it was empty for 5
+  minutes). When they made it, they said: «Lamp, make a skill that tells
+  me the news when I come back to my desk». Do now what it is for, …"), so
+  the agent does all the work when it fires; no
   `say`, no other step and no timer or `[[while]]` a model wrote. On a
   trigger, but never on the lamp's clock (`clock/local`: "tell me the BTC
   price at 9" with the owner head down at 9 still runs at 9,
@@ -8543,10 +8560,17 @@ reset still ask. On (`crate::make_no_asks`):
   ask, held as its spoken yes was (`services::owners_yes_of`); anyone
   else's code make is kept and not on, said so with why. The cap, the pack
   check, the grants, `LAMP_TASK_NET` and the run namespace are unchanged.
-  The app's MAKE IT alike, the app's ask the owner's. A skill that sends (a
-  write, or code that messages the phone) keeps its read-back and yes, as
-  that yes is what `lamp-services` sends by. A task for the lamp's agent on
-  a trigger (the middle form, or `LAMP_MAKE_NO_CANNOT`'s) goes on at once
+  The app's MAKE IT alike, the app's ask the owner's. A skill that sends
+  (`make_no_asks::sends`: a write, a message to the phone with code of its
+  own or not, or a task granted a linked service's write such as
+  `slack-write`) keeps its read-back and yes, as that yes is what
+  `lamp-services` sends by (the first builder, 02:09 on #7819: the one
+  place the person's words go out in their name); `keeps_no_yes` and the
+  made skill's say-back read it the same way, so a sending task is said
+  with "It runs only once you agree" and waits. A read grant
+  (`gmail-read`) or `net` does not send. A task for the lamp's agent on
+  a trigger (the middle form, or `LAMP_MAKE_NO_CANNOT`'s) that sends
+  nothing goes on at once
   the same way, its task's yes recorded for exactly its grants, and is said
   in the same one line with its undo, never "It runs only once you agree"
   and no spoken yes awaited (`made_skill::agent_said_as`; the first
