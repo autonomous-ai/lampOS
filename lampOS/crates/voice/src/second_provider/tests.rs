@@ -9,6 +9,7 @@ mod checking_line;
 mod clash_note;
 mod code_yes_name_only;
 mod cut_to_a_person;
+mod day_shed_held;
 mod decline_silent;
 mod dont_know;
 mod held_consent;

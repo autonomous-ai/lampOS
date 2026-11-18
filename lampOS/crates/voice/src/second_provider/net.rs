@@ -239,6 +239,15 @@ async fn post(
                 Error::Transport("request")
             }
         })?;
+    // The share of the lamp's day used, on every answer, with
+    // `LAMP_VOICE_DAY_SHED` (#7664): absent on a 2xx answer, not limited.
+    crate::day_shed::heard(
+        response
+            .headers()
+            .get(crate::day_shed::HEADER)
+            .and_then(|value| value.to_str().ok()),
+        response.status().is_success(),
+    );
     if !response.status().is_success() {
         let status = response.status().as_u16();
         // Why it refused, as the service's codes alone (#1712: Gemini's chat
