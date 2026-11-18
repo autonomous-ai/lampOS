@@ -369,6 +369,20 @@ pub const FORM_RULE: &str = "Never write asks under [permissions] or any other t
 /// words, so OpenClaw has it even if it never opens the rules: the order
 /// ([`FORM_ORDER`]), the rule ([`FORM_RULE`]) and one minimal skill.toml
 /// ([`FORM_TOML`]), at most [`MOST_FORM_BYTES`].
+/// #7245: the gateway make's first words, before what to read: the lamp's
+/// own OpenClaw answered `cannot:` on 4 of 5 makes on lamp-c0a4 (18 Nov,
+/// deepseek-flash), each with a reason of its own ("knowing facts about
+/// apples on my own", "writing notes and reading them back"), while the
+/// same rules.md sent to the same model alone made the skill 10 of 10. So
+/// the words say first that the skill can be made, what a made skill can
+/// do, and that `cannot` is only for a limit rules.md names.
+pub const GATEWAY_CAN: &str = "You are making a skill for this lamp, and it can be made. A made \
+     skill can run its own code (a script), keep a note and read it back (lamp.notes.set and \
+     lamp.notes.get, when rules.md grants notes), say words you write now (facts, a joke, a list \
+     you know: no lookup), and start when the person says its words (asks, when rules.md offers \
+     them). Make it. Answer cannot only for a limit rules.md names (a web lookup, a camera \
+     elsewhere, a send it isn't granted); if unsure, make it.";
+
 pub fn gateway_form() -> String {
     format!(
         "{FORM_ORDER} {FORM_RULE} A minimal skill.toml the lamp's check takes, the form only \
@@ -388,7 +402,7 @@ pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
     } else {
         prompt(folder)
     };
-    format!("{words}\n\n{}", gateway_form())
+    format!("{GATEWAY_CAN}\n\n{words}\n\n{}", gateway_form())
 }
 
 /// [`gateway_prompt`]'s words with the guide, before the form.
@@ -3056,8 +3070,16 @@ mod tests {
         }
         assert_eq!(
             gateway_prompt(folder, false),
-            format!("{}\n\n{}", prompt(folder), gateway_form())
+            format!("{GATEWAY_CAN}\n\n{}\n\n{}", prompt(folder), gateway_form())
         );
+        // lamp-c0a4, 18 Nov: the words say first that the skill can be
+        // made, and that cannot is only for a limit rules.md names.
+        for guided in [false, true] {
+            let words = gateway_prompt(folder, guided);
+            assert!(words.starts_with("You are making a skill for this lamp, and it can be made."));
+            assert!(words.contains("if unsure, make it"), "{words}");
+            assert!(words.contains("no lookup"), "{words}");
+        }
         let parsed = |extra: &str| {
             MakeLine::parse(
                 format!(r#"{{"op":"skill_make","rules":"R","within_ms":2000{extra}}}"#).as_bytes(),
