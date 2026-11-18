@@ -190,29 +190,59 @@ fn a_settings_event_says_what_changed_and_the_whole_map() {
 fn phrases_set_is_the_doors_subscribe_and_only_the_reply_is_the_apps() {
     let set =
         json!({"id": 4, "op": "phrases.set", "phrases": ["start the lesson", "begin the lesson"]});
-    let (door, count) = phrases_set_as_subscribe(&set.to_string());
-    assert_eq!(count, Some(2));
+    let PhrasesSet::Door(door, count) = phrases_set_as_subscribe(&set.to_string()) else {
+        panic!("a phrases.set");
+    };
+    assert_eq!(count, 2);
     let door: Value = serde_json::from_str(&door).unwrap();
     assert_eq!(door["op"], "subscribe");
     assert_eq!(door["events"], json!(["phrase.heard"]));
     assert_eq!(door["id"], 4);
     assert_eq!(door["phrases"].as_array().unwrap().len(), 2);
-    let (door, count) =
-        phrases_set_as_subscribe(&json!({"id": 5, "op": "phrases.set", "phrases": []}).to_string());
-    assert_eq!(count, Some(0));
+    let PhrasesSet::Door(door, count) =
+        phrases_set_as_subscribe(&json!({"id": 5, "op": "phrases.set", "phrases": []}).to_string())
+    else {
+        panic!("an empty phrases.set");
+    };
+    assert_eq!(count, 0);
     assert!(door.contains("\"unsubscribe\""));
-    // Anything else goes to the door as it came: another op, an extra field, a non-text phrase.
+    // Another op, no id, or no JSON: the door's own to parse.
     for text in [
         json!({"id": 1, "op": "gesture", "name": "nod"}).to_string(),
-        json!({"id": 1, "op": "phrases.set", "phrases": ["a"], "x": 1}).to_string(),
-        json!({"id": 1, "op": "phrases.set", "phrases": [1]}).to_string(),
+        json!({"op": "phrases.set", "phrases": []}).to_string(),
         "not json".to_owned(),
     ] {
         assert_eq!(
             phrases_set_as_subscribe(&text),
-            (text.clone(), None),
+            PhrasesSet::NotOurs,
             "{text}"
         );
+    }
+    // Refused here, in its own words, never the door's parser's.
+    for (text, why) in [
+        (
+            json!({"id": 1, "op": "phrases.set", "phrases": ["a"], "x": 1}),
+            "phrases.set takes only phrases",
+        ),
+        (
+            json!({"id": 1, "op": "phrases.set", "phrases": [1]}),
+            "phrases: a list of text",
+        ),
+        (
+            json!({"id": 1, "op": "phrases.set"}),
+            "phrases: a list of text",
+        ),
+        (
+            json!({"id": 1, "op": "phrases.set", "phrases": ["lesson time", "lesson time"]}),
+            "phrases: no phrase twice",
+        ),
+    ] {
+        let PhrasesSet::Refused(reply) = phrases_set_as_subscribe(&text.to_string()) else {
+            panic!("{text} was not refused");
+        };
+        assert_eq!(reply["error"]["code"], "bad_request", "{reply}");
+        assert_eq!(reply["error"]["why"], why, "{reply}");
+        assert_eq!(reply["re"], 1);
     }
     let mut ok = json!({"re": 4, "ok": true, "events": ["phrase.heard"]});
     phrases_reply(&mut ok, 2);
