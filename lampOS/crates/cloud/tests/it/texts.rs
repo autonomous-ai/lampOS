@@ -49,6 +49,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         consent: None,
         monitor: None,
         devices: None,
+        apps: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
