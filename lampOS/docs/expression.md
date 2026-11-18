@@ -89,7 +89,7 @@ writes only when set (an empty list, `false`, none) is not named. Tests:
 | Nod in a pause | Only after true human activity followed by a pause in the same turn. Begin after 120 ms quiet, authored stroke at 150 ms into the 320 ms clip, no more than once per 4 s. Resume speech cancels the nod |
 | Follow played sound | Sway and light brightness follow valid playout intervals and their 0..1 level, not transcript timing or cloud packet arrival. A supplied measured body lag advances only the body's sample into the committed schedule; light samples the current interval. No valid interval means no audio modulation |
 | Yield when interrupted | Retire the old turn's queued sound. Change the requested face on the next tick and blend the body from its last requested offsets to listening over 350 ms. Listening is shown only if capture can retain input |
-| Stay still for work | Explicit concentration holds the body and suppresses expressive movement. A quiet room alone is not evidence that someone is concentrating |
+| Stay still for work | A head held down (`room/activity` `head_down` for 3 s, `LAMP_EXPRESSION_HEAD_DOWN=on`, off by default) holds the body and suppresses expressive movement: no nod, look or tilt while a person reads or writes; the breath and the idle light stay, and it moves again as the head comes up. Only a fresh reading counts (stale after `context_stale_us`, 5 s; the eyes say it each second), so dead eyes never freeze it. A quiet room alone is not evidence that someone is concentrating |
 
 A requested trajectory is not observed motion. The built-in amplitudes and
 signs have not been tuned on the lamp. Small offsets can fall below the
@@ -140,7 +140,7 @@ combined catalogue or establish a general body lag. `body_lag_us` remains
 +0.045 radians over two seconds and returns to zero over two seconds. It
 starts only after 45 seconds continuously eligible: fresh Resting Voice with
 `accepting_input=true`, fresh joints, a fresh Quiet room, no held turn and no
-explicit concentration. Input inhibition cancels it and requires a new dwell.
+a head held down. Input inhibition cancels it and requires a new dwell.
 It then waits at least 90 seconds after completion before another clip.
 Normal heartbeats preserve the dwell; lost eligibility cancels the clip and
 requires a new continuous dwell. An interrupted rest clip also starts its
@@ -503,9 +503,9 @@ retired audio must not acquire authority.
 The existing bus header's `at_us` is a publisher's **private** clock and must
 not be compared across processes. Live adaptation of legacy inputs uses
 receipt time minus the header's Unix-millisecond age. It rejects stale,
-expired, untyped and more-than-50-ms-future wall timestamps. Lasting light
-and concentration settings are exempt from observation-age limits; they
-remain in effect until explicitly changed. Loading an old light setting
+expired, untyped and more-than-50-ms-future wall timestamps. The lasting
+light setting is exempt from observation-age limits; it
+remains in effect until explicitly changed. Loading an old light setting
 stamps its receipt, not an imaginary new physical observation. This estimates
 legacy observation age; it does not convert transcripts into audio timing.
 
@@ -516,7 +516,7 @@ legacy observation age; it does not convert transcripts into audio timing.
 | `voice/playout` / `VoicePlayout` | Voice: non-overlapping committed speaker intervals, at most 200 ms each and at most 2 s ahead, with a normalized level. Revisions/cancellation must retire old scheduled intervals |
 | `voice/progress` / `VoiceProgress` | Opt-in replacement for `voice/timing`: the same timing fields, plus positive `audio_generation` and durable `held` state; Latest, 100 ms heartbeat, 500 ms lifespan |
 | `voice/sound` / `VoiceSound` | Opt-in replacement for `voice/playout`: the same interval fields plus matching positive `audio_generation`; Event, 20 ms declaration, 200 ms lifespan |
-| `attention/concentration` / `Concentration` | An explicit user/attention owner: concentration on or off, default false until received. Room state or missing speech is never substituted |
+| `room/activity` / `RoomActivity` | Eyes: read only with `LAMP_EXPRESSION_HEAD_DOWN=on`; `head_down` held 3 s stops the expressive moves while it lasts, and only while the reading is fresh. The old `attention/concentration` input had no publisher and is gone |
 | `voice/state`, `voice/heard`, `voice/said` | Existing Voice context; none can establish playback timing or safe listening readiness |
 | `humans/faces/tracked` | Eyes: largest fresh confident face can supply normalized gaze; the body still owns camera calibration and its stillness/observation filter |
 | `body/joint_states` | Body: fresh readback is required for body requests; absolute servo-middle angles are not reused as relative offsets |
@@ -640,9 +640,9 @@ legacy pair on the lamp. Selecting the new catalogue against the current
 publisher leaves required progress missing; it does not manufacture a hold
 from `voice/state` or a transcript.
 
-Concentration now starts false without a missing-input warning. Once an
-explicit true setting is accepted it remains true until a newer accepted
-false setting, including while the setting publisher is absent. Room Quiet
+Concentration starts false without a missing-input warning, and is true only
+while a fresh `room/activity` says `head_down` (held 3 s); a stale or missing
+reading, or the switch off, is false. Room Quiet
 does not mean a person is free from work. Other missing-input reports remain,
 including the unmeasured body lag; removing the concentration warning is not
 a claim that the whole planner is ready without its required inputs.
@@ -802,8 +802,8 @@ restarts its voice at every update, would have within weeks.
 Room evidence expires after five seconds by default. The room publisher
 sent on change only; since 2026-10-14 it says the room again every second.
 Merely starting Expression does not make an old quiet-room observation
-fresh. Lasting light and explicit concentration settings are the persistent
-exceptions.
+fresh. The lasting light setting is the persistent
+exception.
 
 ## Output contract and First's integration
 

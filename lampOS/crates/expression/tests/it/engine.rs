@@ -1,8 +1,8 @@
 use lamp_expression::{Catalogue, Engine, Input, LEASE_US, MAX_PLAYOUT_FRAMES, Output, Trigger};
 use lamp_msgs::{
-    BodyOffsets, ClockStamp, Concentration, ExpressionFace, Face, Faces, JointState, Light,
-    NameHeard, PersonActivity, Room, RoomState, Speech, Voice, VoiceEvent, VoicePlayout,
-    VoiceState, VoiceTiming,
+    BodyOffsets, ClockStamp, ExpressionFace, Face, Faces, JointState, Light, NameHeard,
+    PersonActivity, Room, RoomState, Speech, Voice, VoiceEvent, VoicePlayout, VoiceState,
+    VoiceTiming,
 };
 
 const CLOCK: &str = "test-boot";
@@ -85,10 +85,10 @@ fn configured(catalogue: Catalogue, enabled: bool) -> Engine {
             stamp: stamp(0, 1),
             value: Light::new(true, "blue", 2).unwrap(),
         },
-        Input::Concentration(Concentration {
+        Input::HeadDown {
             stamp: stamp(0, 1),
-            concentrating: false,
-        }),
+            down: false,
+        },
     ] {
         send(&mut engine, input);
     }
@@ -601,17 +601,17 @@ fn future_playout_queue_is_bounded_and_expired_frames_cannot_reappear() {
 }
 
 #[test]
-fn explicit_concentration_holds_actual_pose_and_remains_a_setting_across_silence() {
+fn a_fresh_head_down_holds_the_actual_pose_and_lets_go_when_it_goes_stale_or_lifts() {
     let mut engine = engine();
     heartbeat(&mut engine, 10_000, Voice::Speaking);
     send(&mut engine, playout(20_000, 1, 20_000, 120_000, 1.0));
     assert!(has(&engine.tick(20_000), "follow played sound"));
     send(
         &mut engine,
-        Input::Concentration(Concentration {
+        Input::HeadDown {
             stamp: stamp(30_000, 2),
-            concentrating: true,
-        }),
+            down: true,
+        },
     );
     let still = engine.tick(30_000);
     assert!(has(&still, "stay still for work"));
@@ -627,31 +627,104 @@ fn explicit_concentration_holds_actual_pose_and_remains_a_setting_across_silence
     next.session_id = "voice-two".into();
     send(&mut engine, Input::Voice(next));
     send(&mut engine, joints(6_000_000, 6_000_002));
-    assert!(engine.tick(6_000_000).body.unwrap().hold);
-    // The setting publisher may restart its sequence, but only a newer
-    // monotonic observation can release the stillness setting.
+    // Six seconds on with no `room/activity`: the reading is stale, so the
+    // lamp is not concentrating (a dead eyes never freezes it).
+    assert!(!engine.tick(6_000_000).body.unwrap().hold);
+    // A fresh head down holds it again, and the head coming up lets go.
     send(
         &mut engine,
-        Input::Concentration(Concentration {
-            stamp: stamp(6_000_010, 1),
-            concentrating: false,
+        Input::HeadDown {
+            stamp: stamp(6_000_010, 3),
+            down: true,
+        },
+    );
+    assert!(engine.tick(6_000_010).body.unwrap().hold);
+    send(
+        &mut engine,
+        Input::HeadDown {
+            stamp: stamp(6_100_000, 4),
+            down: false,
+        },
+    );
+    assert!(!engine.tick(6_100_000).body.unwrap().hold);
+}
+
+/// Rule 8, the lamp reads alive: a person reads for 30 s with their head
+/// down and the lamp does not fidget (no move following a played sound), then
+/// they look up and it moves again within a second.
+#[test]
+fn thirty_seconds_head_down_is_still_then_looking_up_lets_it_go_within_a_second() {
+    let mut engine = engine();
+    heartbeat(&mut engine, 10_000, Voice::Listening);
+    let mut sequence = 10;
+    for second in 1..=30u64 {
+        let at = second * 1_000_000;
+        heartbeat(&mut engine, at, Voice::Listening);
+        sequence += 1;
+        send(
+            &mut engine,
+            Input::HeadDown {
+                stamp: stamp(at, sequence),
+                down: true,
+            },
+        );
+        let out = engine.tick(at + 50_000);
+        assert!(!has(&out, "follow played sound"), "second {second}");
+        assert!(out.body.unwrap().hold, "second {second}");
+    }
+    // The head lifts and the next thing the voice says is followed again,
+    // within a second.
+    let at = 31_000_000;
+    sequence += 1;
+    send(
+        &mut engine,
+        Input::HeadDown {
+            stamp: stamp(at, sequence),
+            down: false,
+        },
+    );
+    // A new turn: the head-down retired the old one.
+    let mut next = voice(at, at + 3, Voice::Speaking, VoiceEvent::State);
+    next.turn = 2;
+    next.request = 8;
+    send(&mut engine, Input::Voice(next));
+    send(&mut engine, joints(at, at + 3));
+    send(
+        &mut engine,
+        Input::Playout(VoicePlayout {
+            stamp: stamp(at, 1),
+            session_id: "voice-one".into(),
+            turn: 2,
+            request: 8,
+            start_us: at,
+            end_us: at + 120_000,
+            level: 1.0,
         }),
     );
-    assert!(!engine.tick(6_000_010).body.unwrap().hold);
+    let out = engine.tick(at + 50_000);
+    // Let go within the second: no stillness, the body is free again.
+    assert!(!has(&out, "stay still for work"));
+    assert!(
+        !out.body.unwrap().hold,
+        "free within a second of looking up"
+    );
 }
 
 #[test]
-fn persistent_settings_can_be_read_long_after_they_were_published() {
+fn a_head_down_observed_long_ago_is_refused_and_the_light_setting_still_persists() {
     let mut engine = Engine::new(Catalogue::builtin(), true, CLOCK).unwrap();
-    engine
-        .ingest(
-            10_000_000,
-            Input::Concentration(Concentration {
-                stamp: stamp(0, 99),
-                concentrating: true,
-            }),
-        )
-        .unwrap();
+    assert!(
+        engine
+            .ingest(
+                10_000_000,
+                Input::HeadDown {
+                    stamp: stamp(0, 99),
+                    down: true,
+                },
+            )
+            .is_err(),
+        "stale at arrival"
+    );
     engine
         .ingest(
             10_000_000,
@@ -667,19 +740,8 @@ fn persistent_settings_can_be_read_long_after_they_were_published() {
     );
     send(&mut engine, joints(10_000_000, 1));
     let out = engine.tick(10_000_000);
-    assert!(out.body.unwrap().hold);
+    assert!(!out.body.unwrap().hold);
     assert_eq!(out.light.unwrap().brightness, 0.0);
-    assert!(
-        engine
-            .ingest(
-                10_000_000,
-                Input::Concentration(Concentration {
-                    stamp: stamp(0, 98),
-                    concentrating: false
-                })
-            )
-            .is_err()
-    );
 }
 
 #[test]

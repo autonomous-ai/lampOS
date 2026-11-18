@@ -176,7 +176,6 @@ at the crate root. Their new topics do not change any existing type:
 | `VoicePlayout` | `voice/playout` | event | 20 / 200 ms | Committed speaker interval and its level, with cancellation identity |
 | `VoiceProgress` | `voice/progress` | latest | 100 / 500 ms | Optional complete timing heartbeat with a positive audio generation and explicit resumable hold |
 | `VoiceSound` | `voice/sound` | event | 20 / 200 ms | Optional committed playout interval belonging to one matching audio generation |
-| `Concentration` | `attention/concentration` | latest | none | Explicit concentration, initially false until supplied; never inferred from a quiet room |
 | `ExpressionBody` | `expression/body` | latest | 20 / 200 ms | Relative radian offsets, hold or a normalized calibrated-owner gaze request |
 | `ExpressionLight` | `expression/light` | latest | 20 / 200 ms | Face and brightness multiplier preserving the lasting `Light` setting |
 | `ExpressionState` | `expression/state` | latest | 200 / 500 ms | Planned behaviors, shadow/enabled status, missing facts and warnings |

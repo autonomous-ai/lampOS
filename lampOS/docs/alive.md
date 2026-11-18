@@ -312,7 +312,7 @@ not more life.
 |---|---|---|
 | `voice/progress` (or `voice/timing`) | The voice | Resting or not; thinking or speaking wakes it |
 | `body/joint_states` | The body | Fresh joints, as every request needs |
-| `attention/concentration` | Its owner | Explicit concentration stops it all, as before |
+| `room/activity` | The eyes | With `LAMP_EXPRESSION_HEAD_DOWN=on`, a head held down 3 s stops the expressive moves while it lasts (breath and idle light stay) |
 | `humans/faces/tracked` | The eyes | Nobody there, someone working close and still (with a work light only), the first face of the morning |
 | `name/heard` | The name listener | Waking |
 | `voice/activity` | The voice's validated person-speech detector | Corroborates a sleeping name only with `sleep.name_requires_speech: true` |
@@ -481,7 +481,7 @@ Smallest first. Nothing below moves the lamp until step 3.
    ```sh
    lamp-bus record /tmp/quiet-hour voice/progress voice/activity voice/sound \
      body/joint_states humans/faces/tracked room/state light/command \
-     attention/concentration name/heard ears/sudden controls/gesture schedule/due \
+     room/activity name/heard ears/sudden controls/gesture schedule/due \
      --seconds 3600 --max-mb 128
    ```
 

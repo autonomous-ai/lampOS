@@ -2,8 +2,8 @@
 use crate::{Catalogue, Engine, Input, Output};
 use lamp_bus::{Bus, Message, Publisher, Subscriber};
 use lamp_msgs::{
-    ClockStamp, Concentration, ControlGesture, Diagnostic, ExpressionBody, ExpressionLight,
-    ExpressionState, Faces, JointState, Level, Light, NameHeard, PersonActivity, RoomState,
+    ClockStamp, ControlGesture, Diagnostic, ExpressionBody, ExpressionLight, ExpressionState,
+    Faces, JointState, Level, Light, NameHeard, PersonActivity, RoomActivity, RoomState,
     ScheduleDue, Speech, SuddenSound, TouchEvent, TouchState, VoiceMute, VoicePlayout,
     VoiceProgress, VoiceRemarked, VoiceSound, VoiceState, VoiceTiming,
 };
@@ -22,11 +22,10 @@ use std::{
 };
 
 /// Every input has a separate bounded drain so noisy text cannot starve a stop.
-pub const INPUTS: [(&str, &str); 17] = [
+pub const INPUTS: [(&str, &str); 16] = [
     (VoiceTiming::TOPIC, VoiceTiming::TYPE),
     (VoiceProgress::TOPIC, VoiceProgress::TYPE),
     (PersonActivity::TOPIC, PersonActivity::TYPE),
-    (Concentration::TOPIC, Concentration::TYPE),
     (VoicePlayout::TOPIC, VoicePlayout::TYPE),
     (VoiceSound::TOPIC, VoiceSound::TYPE),
     (JointState::TOPIC, JointState::TYPE),
@@ -51,6 +50,27 @@ pub const HEAD_INPUTS: [(&str, &str); 3] = [
 /// The voice's remarks about the lamp (#4175), read only with
 /// `LAMP_REMARK_GLANCE=on`.
 pub const REMARK_INPUTS: [(&str, &str); 1] = [(VoiceRemarked::TOPIC, VoiceRemarked::TYPE)];
+/// What the person at the desk is doing (`room/activity`), read only with
+/// `LAMP_EXPRESSION_HEAD_DOWN=on`: a head held down a few seconds stops the
+/// expressive moves.
+pub const HEAD_DOWN_INPUTS: [(&str, &str); 1] = [(RoomActivity::TOPIC, RoomActivity::TYPE)];
+/// `on`, and nothing else.
+pub const HEAD_DOWN_ENVIRONMENT: &str = "LAMP_EXPRESSION_HEAD_DOWN";
+/// How long `room/activity`'s `head_down` must have held before it stops the
+/// expressive moves: a glance down does not (the eyes already say it only
+/// after their own dwell).
+pub const HEAD_DOWN_HELD_S: u32 = 3;
+
+/// Whether `room/activity` says the head is down and has held for
+/// [`HEAD_DOWN_HELD_S`]: any other state, or a glance down, is not.
+pub fn head_down_held(activity: &RoomActivity) -> bool {
+    activity.state == lamp_msgs::Activity::HeadDown && activity.for_s >= HEAD_DOWN_HELD_S
+}
+
+/// Whether [`HEAD_DOWN_ENVIRONMENT`] is `on`.
+pub fn head_down_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
 
 /// Whether a `lamp/online` message says the internet cannot be reached: only
 /// a fresh, valid one with `online` false. Stale, absent or unknown is not.
@@ -252,6 +272,7 @@ pub fn input_from_message(
         .iter()
         .chain(&HEAD_INPUTS)
         .chain(&REMARK_INPUTS)
+        .chain(&HEAD_DOWN_INPUTS)
         .find(|(name, _)| *name == topic)
         .ok_or_else(|| invalid(format!("unsupported expression input {topic}")))?
         .1;
@@ -263,7 +284,7 @@ pub fn input_from_message(
     if message.expired || message.header.expired_at(now_unix_ms) {
         return Err(invalid(format!("expired {topic}")));
     }
-    let persistent_setting = topic == "light/command" || topic == Concentration::TOPIC;
+    let persistent_setting = topic == "light/command";
     if !persistent_setting && message.header.at_unix_ms > now_unix_ms.saturating_add(50) {
         return Err(invalid(format!("future wall timestamp on {topic}")));
     }
@@ -296,7 +317,6 @@ pub fn input_from_message(
         PersonActivity::TOPIC => Input::Activity(message.parse()?),
         VoicePlayout::TOPIC => Input::Playout(message.parse()?),
         VoiceSound::TOPIC => Input::Sound(message.parse()?),
-        Concentration::TOPIC => Input::Concentration(message.parse()?),
         JointState::TOPIC => Input::Joints {
             stamp,
             value: message.parse()?,
@@ -353,11 +373,17 @@ pub fn input_from_message(
             stamp,
             value: message.parse()?,
         },
+        RoomActivity::TOPIC => Input::HeadDown {
+            stamp,
+            down: head_down_held(&message.parse()?),
+        },
         VoiceRemarked::TOPIC => Input::Remarked {
             stamp,
             value: message.parse()?,
         },
-        _ => unreachable!("INPUTS, HEAD_INPUTS, REMARK_INPUTS and this match list the same topics"),
+        _ => unreachable!(
+            "INPUTS, HEAD_INPUTS, REMARK_INPUTS, HEAD_DOWN_INPUTS and this match list the same topics"
+        ),
     })
 }
 
@@ -697,6 +723,17 @@ impl Service {
     /// Also read the voice's remarks about the lamp (`voice/remarked`,
     /// #4175), for the glance at a remark the catalogue was given. Off unless
     /// `LAMP_REMARK_GLANCE=on`.
+    /// Also read what the person at the desk is doing (`room/activity`), so a
+    /// head held down stops the expressive moves. Off unless
+    /// `LAMP_EXPRESSION_HEAD_DOWN=on`.
+    pub fn with_head_down(mut self, bus: &Bus) -> io::Result<Self> {
+        for (topic, kind) in HEAD_DOWN_INPUTS {
+            self.inputs
+                .push(bus.subscribe_typed(topic, "expression", kind)?);
+        }
+        Ok(self)
+    }
+
     pub fn with_remark_glance(mut self, bus: &Bus) -> io::Result<Self> {
         for (topic, kind) in REMARK_INPUTS {
             self.inputs
@@ -1414,5 +1451,48 @@ mod unplug_tests {
         fixture.step(unix_ms());
         assert!(fixture.service.counts.output_errors > 0);
         assert!(!fixture.ack());
+    }
+}
+
+#[cfg(test)]
+mod head_down_tests {
+    use super::*;
+    use lamp_msgs::Activity;
+
+    fn said(state: Activity, for_s: u32) -> RoomActivity {
+        RoomActivity {
+            state,
+            for_s,
+            sitting_s: 600,
+            baseline: true,
+            yawns: 0,
+        }
+    }
+
+    #[test]
+    fn only_a_head_held_down_a_few_seconds_stops_the_moves() {
+        assert!(head_down_held(&said(Activity::HeadDown, 3)));
+        assert!(head_down_held(&said(Activity::HeadDown, 120)));
+        assert!(
+            !head_down_held(&said(Activity::HeadDown, 2)),
+            "a glance down"
+        );
+        for other in [Activity::Away, Activity::AtDesk, Activity::LeaningIn] {
+            assert!(!head_down_held(&said(other, 120)), "{other:?}");
+        }
+    }
+
+    #[test]
+    fn the_switch_is_on_for_on_and_nothing_else() {
+        assert!(head_down_on(Some("on")));
+        for other in [None, Some(""), Some("1"), Some("true"), Some("ON")] {
+            assert!(!head_down_on(other), "{other:?}");
+        }
+        assert_eq!(HEAD_DOWN_ENVIRONMENT, "LAMP_EXPRESSION_HEAD_DOWN");
+        assert!(
+            HEAD_DOWN_INPUTS
+                .iter()
+                .all(|(topic, _)| *topic == "room/activity")
+        );
     }
 }

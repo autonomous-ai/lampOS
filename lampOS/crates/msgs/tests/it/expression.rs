@@ -36,7 +36,7 @@ fn roundtrip<T: Serialize + DeserializeOwned + Debug + PartialEq>(value: &T) {
 #[test]
 fn optional_expression_topics_have_own_types_and_do_not_replace_light_setting() {
     let topics = expression_topics();
-    assert_eq!(topics.len(), 12);
+    assert_eq!(topics.len(), 11);
     assert_eq!(first_topics().len(), 17);
     for (topic, declaration) in &topics {
         assert_eq!(declaration_of(topic).as_ref(), Some(declaration));
@@ -52,7 +52,8 @@ fn optional_expression_topics_have_own_types_and_do_not_replace_light_setting() 
         declaration_of("light/command").unwrap().type_name,
         Light::TYPE
     );
-    assert_eq!(Concentration::declaration().lifespan_ms, None);
+    // The dead attention/concentration input is gone (core-verifier's audit, item 3).
+    assert!(declaration_of("attention/concentration").is_none());
 }
 
 #[test]
@@ -89,12 +90,6 @@ fn every_new_wire_type_round_trips_and_ignores_future_fields() {
     };
     played.check().unwrap();
     roundtrip(&played);
-    let concentration = Concentration {
-        stamp: stamp(),
-        concentrating: true,
-    };
-    concentration.check().unwrap();
-    roundtrip(&concentration);
     let gaze = ExpressionGaze {
         face_id: "face-one".into(),
         x: -0.3,
