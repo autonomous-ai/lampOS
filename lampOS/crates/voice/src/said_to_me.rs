@@ -13,7 +13,12 @@
 //! 2. **in a live conversation** (its window): unless it is 0 to
 //!    [`SHORT_WORDS`] words, no face seen speaking it and a face in view
 //!    read silent (no face, no eyes or a mouth never read is unknown, and
-//!    unknown blocks nothing: the first builder's HOLD on #7457);
+//!    unknown blocks nothing: the first builder's HOLD on #7457), and
+//!    unless the speaker's head is down (pitch outside [`PITCH_DEG`]) or
+//!    looking away over the line (a yes the lamp waits for stands, below):
+//!    a person head down talking at a phone just
+//!    after the lamp answered is not going on with it (#7721, lamp-74ff,
+//!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]);
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away, when the eyes say so), seen
 //!    speaking the line, and at least [`SHORT_WORDS`] + 1 words, or a
@@ -41,6 +46,17 @@ pub const SHORT_WORDS: usize = 2;
 /// depend on the eyes): `lamp-eyes` `facing::MAX_PITCH_UP_DEG` (20) up and
 /// `facing::MAX_PITCH_DOWN_DEG` (25) down. A guess, set on the row (#7442).
 pub const PITCH_DEG: std::ops::RangeInclusive<f32> = -20.0..=25.0;
+
+/// The pitch, in degrees, the eyes give for marks no head could make
+/// (`lamp-eyes` `facing::LOST_DEG`, copied): not a measure of the head, so
+/// the speaker's pose in a conversation reads it as unread, not down
+/// (#7721: on lamp-74ff the mouth went unread in 1085 of 1125 looks).
+pub const LOST_DEG: f32 = 90.0;
+
+/// Whether `pitch` (radians) is the eyes' [`LOST_DEG`] sentinel.
+pub fn lost(pitch: f32) -> bool {
+    (pitch.to_degrees() - LOST_DEG).abs() < 0.01
+}
 
 /// Whether the switch is on in this process's environment.
 pub fn on() -> bool {
@@ -74,6 +90,12 @@ pub enum Held {
     NotFacingPitch,
     /// The eyes say it is looking away.
     LookingAway,
+    /// In a conversation's window, the speaker's pitch over the line is
+    /// outside [`PITCH_DEG`] (#7721).
+    NotFacingInConversation,
+    /// In a conversation's window, the speaker looked away over the line
+    /// (#7721).
+    AwayInConversation,
     /// No face turned to the lamp was seen speaking it.
     NotSeenSpeaking,
     /// A face seen speaking it, but [`SHORT_WORDS`] words or fewer, and no
@@ -87,6 +109,8 @@ impl Held {
         match self {
             Self::NotFacingPitch => "held: not facing (pitch)",
             Self::LookingAway => "held: looking away",
+            Self::NotFacingInConversation => "held: not facing in a conversation (pitch)",
+            Self::AwayInConversation => "held: looking away in a conversation",
             Self::NotSeenSpeaking => "held: no face seen speaking it",
             Self::Short => "held: a short line",
         }
@@ -104,9 +128,13 @@ pub struct Line<'a> {
     pub going_on: bool,
     /// A face turned to the lamp through it (the eyes' `facing`, yaw).
     pub turned: bool,
-    /// That face's pitch, in radians, down positive (`lamp_msgs::Face::pitch`), when the eyes give one.
+    /// The pitch, in radians, down positive (`lamp_msgs::Face::pitch`),
+    /// when the eyes give one: in a conversation's window the speaker's
+    /// over the line (`speaking_faces::SpeakingFaces::speaker_pose_between`),
+    /// else the turned face's (`turned_pose_between`).
     pub pitch: Option<f32>,
-    /// Whether that face looks at the lamp, when the eyes give it.
+    /// Whether that face looks at the lamp, when the eyes give it, read as
+    /// [`Self::pitch`].
     pub looking: Option<bool>,
     /// A face seen speaking it: some face read `yes` in a look of it
     /// (`speaking_faces::SpeakingFaces::seen_speaking_between`).
@@ -125,10 +153,35 @@ pub enum Said {
     Stands,
     /// In a live conversation and let out by it.
     InConversation,
+    /// In a live conversation and let out by it, the speaker's pose unread
+    /// (no pitch, no gaze): journaled so a row can count it (#6902: a head
+    /// down may give no pitch; #7721).
+    PoseUnread,
     /// Said to the lamp: facing, seen speaking, long enough or a question.
     ToTheLamp,
     /// Not said to the lamp: the face and the conversation are no sign.
     Held(Held),
+}
+
+impl Said {
+    /// How the journal says it was let through or held.
+    pub fn verdict(self) -> &'static str {
+        match self {
+            Self::Stands => "stands (named, a yes awaited, or not judged here)",
+            Self::InConversation => "said to the lamp, in a conversation",
+            Self::PoseUnread => "said to the lamp, in a conversation, the speaker's pose unread",
+            Self::ToTheLamp => "said to the lamp, facing and seen speaking",
+            Self::Held(held) => held.reason(),
+        }
+    }
+}
+
+/// The pose as the journal says it: `pitch <degrees>|unread, looking
+/// true|false|unread, <n> looks`.
+pub fn pose(pitch: Option<f32>, looking: Option<bool>, looks: usize) -> String {
+    let pitch = pitch.map_or("unread".to_owned(), |pitch| format!("{:.0}", pitch.to_degrees()));
+    let looking = looking.map_or("unread".to_owned(), |looking| looking.to_string());
+    format!("pitch {pitch}, looking {looking}, {looks} looks")
 }
 
 /// The rule, on one line (see the module).
@@ -143,6 +196,12 @@ pub fn judge(line: Line<'_>) -> Said {
     if line.going_on {
         return if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
             Said::Held(Held::NotSeenSpeaking)
+        } else if outside_pitch(line.pitch) {
+            Said::Held(Held::NotFacingInConversation)
+        } else if line.looking == Some(false) {
+            Said::Held(Held::AwayInConversation)
+        } else if line.pitch.is_none() && line.looking.is_none() {
+            Said::PoseUnread
         } else {
             Said::InConversation
         };
@@ -150,10 +209,7 @@ pub fn judge(line: Line<'_>) -> Said {
     if !line.turned {
         return Said::Stands;
     }
-    if line
-        .pitch
-        .is_some_and(|pitch| !PITCH_DEG.contains(&pitch.to_degrees()))
-    {
+    if outside_pitch(line.pitch) {
         Said::Held(Held::NotFacingPitch)
     } else if line.looking == Some(false) {
         Said::Held(Held::LookingAway)
@@ -164,6 +220,11 @@ pub fn judge(line: Line<'_>) -> Said {
     } else {
         Said::ToTheLamp
     }
+}
+
+/// A pitch (radians) outside [`PITCH_DEG`]; unknown is not.
+fn outside_pitch(pitch: Option<f32>) -> bool {
+    pitch.is_some_and(|pitch| !PITCH_DEG.contains(&pitch.to_degrees()))
 }
 
 #[cfg(test)]
@@ -230,18 +291,19 @@ mod tests {
             read_silent: !seen_speaking,
             ..Line::default()
         };
-        // No face read at all: unknown, so a short reply stands.
+        // No face read at all: unknown, so a short reply stands, its pose
+        // unread (#7721).
         let unknown = Line {
             heard: "Pasta.",
             going_on: true,
             ..Line::default()
         };
-        assert_eq!(judge(unknown), Said::InConversation);
+        assert_eq!(judge(unknown), Said::PoseUnread);
         assert_eq!(
             judge(going_on("And tomorrow in Hanoi?", false)),
-            Said::InConversation
+            Said::PoseUnread
         );
-        assert_eq!(judge(going_on("Thanks.", true)), Said::InConversation);
+        assert_eq!(judge(going_on("Thanks.", true)), Said::PoseUnread);
         assert_eq!(
             judge(going_on("Uh huh.", false)),
             Said::Held(Held::NotSeenSpeaking)
@@ -260,6 +322,93 @@ mod tests {
         assert_eq!(
             judge(going_on("Yes.", false)),
             Said::Held(Held::NotSeenSpeaking)
+        );
+    }
+
+    /// #7721: in a conversation's window, Jay says six words head down at
+    /// his phone, no name, the lamp asked nothing: held, as with his eyes
+    /// read away; a level face answered; a pose unread lets it out, said so.
+    fn in_the_window(heard: &str, pitch_deg: Option<f32>, looking: Option<bool>) -> Line<'_> {
+        Line {
+            heard,
+            going_on: true,
+            seen_speaking: true,
+            pitch: pitch_deg.map(f32::to_radians),
+            looking,
+            ..Line::default()
+        }
+    }
+
+    #[test]
+    fn in_the_window_a_line_said_head_down_to_a_phone_is_held() {
+        let line = "Tell Ada I'm running late now";
+        assert_eq!(line.split_whitespace().count(), 6);
+        assert_eq!(
+            judge(in_the_window(line, Some(40.0), None)),
+            Said::Held(Held::NotFacingInConversation)
+        );
+    }
+
+    #[test]
+    fn in_the_window_a_line_said_looking_away_is_held() {
+        let line = "Tell Ada I'm running late now";
+        assert_eq!(
+            judge(in_the_window(line, None, Some(false))),
+            Said::Held(Held::AwayInConversation)
+        );
+        assert_eq!(
+            judge(in_the_window(line, Some(5.0), Some(false))),
+            Said::Held(Held::AwayInConversation)
+        );
+    }
+
+    #[test]
+    fn in_the_window_a_head_down_line_naming_the_lamp_is_answered() {
+        let named = in_the_window("Lamp, what time is it?", Some(40.0), Some(false));
+        assert_eq!(judge(named), Said::Stands);
+    }
+
+    #[test]
+    fn in_the_window_a_head_down_yes_to_the_lamps_question_is_answered() {
+        // The lamp's own yes awaited: answered, head down or not.
+        let held_yes = in_the_window("Yes.", Some(40.0), Some(false));
+        assert_eq!(awaiting_yes(true, || judge(held_yes)), Said::Stands);
+    }
+
+    #[test]
+    fn in_the_window_a_head_down_line_with_pitch_unread_passes_said_unread() {
+        let line = in_the_window("Tell Ada I'm running late now", None, None);
+        assert_eq!(judge(line), Said::PoseUnread);
+    }
+
+    #[test]
+    fn in_the_window_a_facing_line_is_answered() {
+        let line = in_the_window("And what about tomorrow then?", Some(5.0), Some(true));
+        assert_eq!(judge(line), Said::InConversation);
+        // Near the edge of the eyes' window, 24 degrees down, still facing.
+        let edge = in_the_window("And what about tomorrow then?", Some(24.0), None);
+        assert_eq!(judge(edge), Said::InConversation);
+    }
+
+    /// #7721: lost marks (the eyes' 90 degrees) are no pitch, and every
+    /// decision's journal line gives the pose and the looks used.
+    #[test]
+    fn lost_marks_are_unread_and_the_journal_says_the_pose() {
+        assert!(lost(std::f32::consts::FRAC_PI_2));
+        assert!(!lost(80f32.to_radians()));
+        assert_eq!(
+            pose(Some(40f32.to_radians()), Some(false), 3),
+            "pitch 40, looking false, 3 looks"
+        );
+        assert_eq!(pose(None, None, 0), "pitch unread, looking unread, 0 looks");
+        let unread = judge(in_the_window("Tell Ada I'm running late now", None, None));
+        assert_eq!(
+            unread.verdict(),
+            "said to the lamp, in a conversation, the speaker's pose unread"
+        );
+        assert_eq!(
+            Said::Held(Held::NotFacingInConversation).verdict(),
+            "held: not facing in a conversation (pitch)"
         );
     }
 }

@@ -5807,7 +5807,21 @@ after a take-over, but now for every turn:
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking while a face in view was read silent
   (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never
-  read is unknown and blocks nothing); or when a face turned to the lamp is facing it
+  read is unknown and blocks nothing); but in the window a line whose
+  speaker's head is down or up past that window (pitch outside
+  `said_to_me::PITCH_DEG`) or looking away over the line is held (#7721,
+  lamp-74ff, 18 Nov: the owner, head down talking at his phone just after
+  an answer, was answered): the speaker is each look's one face read
+  speaking or, none read speaking, its only face in view whose mouth was
+  not read still, turned to the lamp or not, and the line's pose is the
+  median `pitch` and the most-read `looking` over its looks, so one level
+  look among many down is still down
+  (`SpeakingFaces::speaker_pose_between`); the eyes' lost marks (pitch 90
+  degrees, `said_to_me::LOST_DEG`) are no pitch, and a pose unread lets the
+  line out as `said to the lamp, in a conversation, the speaker's pose
+  unread` (#6902: a head down may give no pitch; on lamp-74ff the mouth
+  went unread in 1085 of 1125 looks); or
+  when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
   as the eyes' `facing` window, and not looking away: the newest `pitch`
   and `looking` of the one turned face read speaking, both from that face in
@@ -5819,8 +5833,14 @@ after a take-over, but now for every turn:
   speaking), with 3 words or more, a question or an ask. Otherwise the face
   and the conversation are no sign, for every use of them in `attention`,
   and the journal says `request N: not said to the lamp, held: <reason>`
-  (`not facing (pitch)`, `looking away`, `no face seen speaking it`, `a
-  short line`). A tap, near or addressed still lets a line out.
+  (`not facing (pitch)`, `looking away`, `not facing in a conversation
+  (pitch)`, `looking away in a conversation`, `no face seen speaking it`,
+  `a short line`), followed by `; pitch <degrees>|unread, looking
+  true|false|unread, <n> looks` (#7721). A line let through, in the window
+  or out of it, has its own line, `request N: said to me: let through:
+  <verdict>: <W> words, in the window|out of the window; pitch …, looking
+  …, <n> looks (LAMP_SAID_TO_ME)`. A tap, near or
+  addressed still lets a line out.
   `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
   whose mouth the eyes cannot read, or who says one word that is no
   question, needs its name.
