@@ -7616,6 +7616,13 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    on #7249), said to the person: "the words “take a photo” would start
    both test note and another skill, photo booth, so neither would start;
    say other words for test note". The same skill made again is no other.
+   That reason is said to the person as it is (`made_skill::words_taken`
+   in `plain_reason`; #7828's DEFAULT-ON, fix 3: on lamp-9adf it was heard
+   as "I couldn't make that one. Try asking for one thing…"): "I couldn't
+   make that: the words “take a photo” would start both test note and
+   another skill, photo booth, so neither would start; say other words for
+   test note.", with `LAMP_MAKE_NO_ASKS` on or off. With it on, words that
+   clash with the person's own made skill replace it ("Nothing asked").
 4. **Said back with the words** (`made_skill::plainly`): "When you say
    “send my test note”, it mails me@example.com from your Gmail, subject
    “Test note”, saying “This is my test note.”. It starts only when you say
@@ -7791,6 +7798,20 @@ reset still ask. On (`crate::make_no_asks`):
   "Made evening dim. Your other rest glow is still on. Say 'remove it' to
   undo." A make with code of its own, and an agent make, never replace:
   they go on beside. Nothing waits for a choice.
+- **Words that clash with their own skill replace it, on the owner's ask**
+  (#7828's DEFAULT-ON, fix 3: on lamp-9adf "the words “flip a coin” would
+  start both coin flip and another skill, flip a coin, so neither would
+  start" refused the make). At the make (`made_skill::asks_taken_sparing`),
+  a plain voice make (no code, no write, no agent task) whose words would
+  start the person's own made skills on the lamp (`made_skill::own_on`: in
+  the made skills' index, on, never one added from a file) is kept; any
+  other skill its words would start (the lamp's own, one added from a
+  file, a pushed one, a made one kept and not on) refuses it as before.
+  Then (`make_skill_local::made_no_asks`, `made_skill::own_asks_taken`),
+  on the owner's own ask, those skills are replaced together with any
+  trigger clash, as above: "Made coin flip and replaced your old flip a
+  coin. Say 'keep the old one' to undo." Anyone else's make is refused
+  with the same reason and nothing of it kept (`made_skill::forget_unput`).
 - **A remove happens at once.** `make_skill`'s `remove`, the name matched
   to the person's own made skills as before (`made_remove::found`), removes
   it on the owner's ask (`services::owners_yes_now`) with no question:

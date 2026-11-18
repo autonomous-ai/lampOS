@@ -28,6 +28,7 @@
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeSet,
     fs,
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -946,6 +947,95 @@ fn asks_taken_of(
     asks.iter().find_map(|ask| taken_among(ask, name, &others))
 }
 
+/// [`asks_taken`] with the skills in `spare` set apart (`LAMP_MAKE_NO_ASKS`,
+/// #7828's fix 3: the person's own made skills on the lamp,
+/// [`own_on`]): a phrase that would start any other skill is refused with
+/// why, as before; each of `spare` its words would start is given back,
+/// by name with why, for the make to replace on the owner's ask
+/// (`crate::make_no_asks::clashed`) or to be refused there. None with the
+/// switch off, or when it gives no asks.
+pub fn asks_taken_sparing(
+    installed: &Path,
+    kept: &Path,
+    name: &str,
+    toml: &str,
+    spare: &BTreeSet<String>,
+) -> Result<Vec<(String, String)>, String> {
+    if !asks_on() {
+        return Ok(Vec::new());
+    }
+    let Some(asks) = toml::from_str::<toml::Table>(toml)
+        .ok()
+        .and_then(|table| made_asks_of(&table, MOST_MADE_ASKS).ok())
+    else {
+        return Ok(Vec::new());
+    };
+    asks_clash(&asks, name, &other_skills(installed, kept, name), spare)
+}
+
+/// [`asks_taken_sparing`] for the made skill `made`, kept and not on, its
+/// asks as its index entry keeps them ([`note_asks`]): the person's own
+/// made skills on the lamp ([`own_on`]) set apart.
+pub fn own_asks_taken(keeping: &Keeping, made: &Made) -> Result<Vec<(String, String)>, String> {
+    if !asks_on() {
+        return Ok(Vec::new());
+    }
+    let asks: Vec<String> = index(&keeping.directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == made.sha256.as_str())
+        .and_then(|entry| entry["asks"].as_array().cloned())
+        .into_iter()
+        .flatten()
+        .filter_map(|ask| ask.as_str().map(str::to_owned))
+        .collect();
+    if asks.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut spare = own_on(&keeping.directory);
+    spare.remove(&made.name);
+    asks_clash(
+        &asks,
+        &made.name,
+        &other_skills(&keeping.installed, &keeping.directory, &made.name),
+        &spare,
+    )
+}
+
+/// The person's own made skills on the lamp: in the made skills' index in
+/// `kept`, on, made by voice or in the app, never one added from a file.
+pub fn own_on(kept: &Path) -> BTreeSet<String> {
+    index(kept)
+        .into_iter()
+        .filter(|entry| entry["on"] == true && entry["added"] != "file")
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// Each of `asks`, given the skill `name`, held to `others`: the first that
+/// would start one not in `spare` refused with why; else each of `spare`
+/// they would start, once, with why.
+fn asks_clash(
+    asks: &[String],
+    name: &str,
+    others: &Others,
+    spare: &BTreeSet<String>,
+) -> Result<Vec<(String, String)>, String> {
+    let mut spared: Vec<(String, String)> = Vec::new();
+    for ask in asks {
+        for skill in started_too(ask, others) {
+            let why = taken_why(ask, name, skill);
+            let skill = skill.replace('_', "-");
+            if !spare.contains(&skill) {
+                return Err(why);
+            }
+            if !spared.iter().any(|(seen, _)| *seen == skill) {
+                spared.push((skill, why));
+            }
+        }
+    }
+    Ok(spared)
+}
+
 /// [`asks_taken`] for one phrase: why `ask` can't start the skill `name`
 /// on this lamp, or none. With the switch off, none.
 pub fn ask_taken(installed: &Path, kept: &Path, name: &str, ask: &str) -> Option<String> {
@@ -962,23 +1052,48 @@ type Others = Vec<(String, Vec<String>, Vec<String>)>;
 /// Why `ask`, given the skill `name`, would start one of `others` too,
 /// naming both, or none.
 fn taken_among(ask: &str, name: &str, others: &Others) -> Option<String> {
-    for (skill, names, theirs) in others {
-        if theirs
-            .iter()
-            .any(|their| crate::skill_named::same_ask(ask, their))
-            || names
+    started_too(ask, others)
+        .next()
+        .map(|skill| taken_why(ask, name, skill))
+}
+
+/// The skills of `others` the phrase `ask` would start too: one of their
+/// asks, or a phrase holding one of their names or functions.
+fn started_too<'a>(ask: &'a str, others: &'a Others) -> impl Iterator<Item = &'a str> + 'a {
+    others
+        .iter()
+        .filter(move |(_, names, theirs)| {
+            theirs
                 .iter()
-                .any(|other| crate::skill_named::ask_holds_name(ask, other))
-        {
-            let this = spoken_name(&name.replace('_', "-"));
-            return Some(format!(
-                "the words “{ask}” would start both {this} and another skill, {}, so neither \
-                 would start; say other words for {this}",
-                spoken_name(&skill.replace('_', "-"))
-            ));
-        }
-    }
-    None
+                .any(|their| crate::skill_named::same_ask(ask, their))
+                || names
+                    .iter()
+                    .any(|other| crate::skill_named::ask_holds_name(ask, other))
+        })
+        .map(|(skill, ..)| skill.as_str())
+}
+
+/// How [`taken_why`] begins, and what it says between: so it is said to the
+/// person as it is ([`plain_reason`]).
+const TAKEN_HEAD: &str = "the words “";
+const TAKEN_BOTH: &str = " would start both ";
+const TAKEN_NEITHER: &str = ", so neither would start; say other words for ";
+
+/// Why the phrase `ask` can't start the skill `name`, since it would start
+/// `skill` too, naming both.
+fn taken_why(ask: &str, name: &str, skill: &str) -> String {
+    let this = spoken_name(&name.replace('_', "-"));
+    format!(
+        "{TAKEN_HEAD}{ask}”{TAKEN_BOTH}{this} and another skill, {}{TAKEN_NEITHER}{this}",
+        spoken_name(&skill.replace('_', "-"))
+    )
+}
+
+/// Whether `why` is [`taken_why`]'s: a made skill's words that would start
+/// another skill too, said to the person as it is (#7828's fix 3: on
+/// lamp-9adf it was heard as "Try asking for one thing").
+pub fn words_taken(why: &str) -> bool {
+    why.starts_with(TAKEN_HEAD) && why.contains(TAKEN_BOTH) && why.contains(TAKEN_NEITHER)
 }
 
 /// The skills on the lamp but `name` ([`Others`]): installed in
@@ -1858,7 +1973,8 @@ pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and 
 /// lamp's own reason `why` (never the model's `cannot:` sentence, which
 /// is already the person's words and goes as it is) in everyday words.
 /// What it can't do yet ([`CANT_YET`]), that they already have it
-/// ([`ALREADY_HAVE`]), the model's silence or cut, the lamp's agent's own
+/// ([`ALREADY_HAVE`]), words that would start another skill
+/// ([`words_taken`]), the model's silence or cut, the lamp's agent's own
 /// failure ([`AGENT_BUSY_TRY`] and the two beside it) and a name with no
 /// free one left go as they are; the lamp failing to write, check or keep it is
 /// [`NOT_KEPT_TRY`]; any other (the check's refusal, a skill that couldn't
@@ -1874,6 +1990,7 @@ pub fn plain_reason(why: &str) -> String {
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
         || why == UNRELATED
+        || words_taken(why)
     {
         return why.to_owned();
     }
@@ -9134,10 +9251,32 @@ impl Ending<'_> {
             MOST_NAME_BYTES,
         )?;
         // Its own words, never another skill's (`LAMP_MADE_SKILL_ASKS`):
-        // said to the person, never repaired, the words being theirs.
-        if let Some(why) = asks_taken(&keeping.installed, &keeping.directory, &free, toml) {
-            eprintln!("lamp-voice: a made skill was not made: its words start another skill");
-            return Err(Refused::new(why));
+        // said to the person, never repaired, the words being theirs. With
+        // `LAMP_MAKE_NO_ASKS`, a plain voice make's words that would start
+        // the person's own made skills on the lamp are kept, for the make
+        // to replace those on the owner's ask or refuse as before
+        // (`make_skill_local::made_no_asks`, #7828's fix 3).
+        let spare = if crate::make_no_asks::on()
+            && Maker::of(from) == Maker::Voice
+            && uses.writes.is_empty()
+            && !uses.code
+            && !uses.agent_task
+            && files.scripts.is_empty()
+        {
+            own_on(&keeping.directory)
+        } else {
+            BTreeSet::new()
+        };
+        match asks_taken_sparing(&keeping.installed, &keeping.directory, &free, toml, &spare) {
+            Err(why) => {
+                eprintln!("lamp-voice: a made skill was not made: its words start another skill");
+                return Err(Refused::new(why));
+            }
+            Ok(spared) if !spared.is_empty() => eprintln!(
+                "lamp-voice: a made skill's words start {} skill(s) the person made: kept, to replace them on the owner's ask (LAMP_MAKE_NO_ASKS)",
+                spared.len()
+            ),
+            Ok(_) => {}
         }
         let marked = if free == name {
             marked
