@@ -3361,26 +3361,50 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   đồng ý, vì `lamp-services` gửi theo lời đồng ý đó. Kỹ năng của agent
   (`LAMP_MAKE_NO_CANNOT`) được bật ngay và vẫn đọc lại tác vụ trước lần chạy
   đầu.
-- **Trùng thì thay thế.** Một lần tạo bằng giọng nói trùng với kỹ năng trên
-  đèn (`made_clash::found`) được bật, rồi từng kỹ năng kia được tắt qua
-  `{"off": NAME}` của trình quản lý, như công tắc trong app, không bao giờ bị
-  xóa: "Made evening dim and replaced your old rest glow. Say 'keep the old
-  one' to undo." Bật không được thì không tắt gì. Không chờ lựa chọn nào.
+- **Trùng thì thay thế, khi chủ đèn yêu cầu.** Một lần tạo bằng giọng nói
+  không có code, trùng với kỹ năng trên đèn (`made_clash::found`), được bật
+  trước; bật không được thì không đổi gì khác. Sau đó, chỉ khi chính chủ đèn
+  yêu cầu (như lần tạo code, `services::owners_yes_of`; P1 của Twelve trên
+  #7783), từng kỹ năng trùng đang bật (đọc tệp `off` của lamp-skills; kỹ
+  năng đã tắt thì để nguyên, và không đọc được tệp thì không thay thế gì)
+  được tắt qua `{"off": NAME}` của trình quản lý, như công tắc trong app,
+  không bao giờ bị xóa: "Made evening dim and replaced your old rest glow.
+  Say 'keep the old one' to undo." Lần tạo của người khác được bật bên cạnh
+  chúng, và chúng vẫn bật: "Made evening dim. Your other rest glow is still
+  on. Say 'remove it' to undo." Lần tạo có code riêng, và lần tạo của
+  agent, không bao giờ thay thế: chúng được bật bên cạnh. Không chờ lựa
+  chọn nào.
 - **Xóa ngay.** `remove` của `make_skill`, tên được so với các kỹ năng chính
   người dùng tạo như trước (`made_remove::found`), xóa kỹ năng khi chủ đèn
   yêu cầu (`services::owners_yes_now`) mà không hỏi: trình quản lý gỡ nó
-  khỏi đèn, rồi nó được cất riêng 7 ngày, mục chỉ mục trong `undo.json` và
-  gói trong `undo/` trong thư mục kỹ năng tự tạo: "Removed moon fact. Say
-  'put it back' to undo." Nhiều kỹ năng có tên giống nhau, một kỹ năng họ
-  không tạo, hay không có kỹ năng nào, thì không xóa gì và không hỏi gì.
+  khỏi đèn, rồi nó được cất riêng, mục chỉ mục trong `undo.json` và gói
+  trong `undo/` trong thư mục kỹ năng tự tạo: "Removed moon fact. Say 'put
+  it back' to undo." Nhiều kỹ năng có tên giống nhau, một kỹ năng họ không
+  tạo, hay không có kỹ năng nào, thì không xóa gì và không hỏi gì. Câu trả
+  lời là `{"removed": NAME}`, như lời đồng ý xóa trả lời.
 - **Hoàn tác.** Khi bật, `make_skill` nhận `undo`: "last", hoặc tên kỹ năng
   như đã nghe; một câu có phải là yêu cầu hoàn tác hay không là do mô hình
   phán đoán ("remove it", "keep the old one", "put it back"), không bao giờ
-  dùng danh sách từ. Chỉ chủ đèn. Một lần tạo trong vòng 10 phút thì bị xóa
-  (và cất riêng); một lần thay thế trong vòng 10 phút thì bật lại các kỹ năng
-  cũ rồi xóa kỹ năng mới; một lần xóa trong vòng 7 ngày thì được đưa lại vào
-  chỉ mục và bật, kỹ năng có code bằng chính đường của lời đồng ý. Sau 7
-  ngày gói được cất sẽ bị xóa.
+  dùng danh sách từ. Chỉ chủ đèn. Mỗi lần hoàn tác gắn với đúng một việc
+  được nói tới (P2 của Twelve trên #7783): "last" là việc mới nhất trong
+  tất cả, và một tên là việc mới nhất của kỹ năng đó hoặc của kỹ năng nó đã
+  thay thế; cả hai chỉ trong thời hạn riêng của việc đó, ngoài ra không hoàn
+  tác gì và nói rõ như vậy. Một lần tạo, hay một lần đưa lại, trong vòng 10
+  phút thì bị xóa và cất riêng; một lần thay thế trong vòng 10 phút thì bật
+  lại các kỹ năng cũ, rồi xóa kỹ năng mới và cũng cất riêng nó; một lần xóa
+  trong vòng 7 ngày thì được đưa lại vào chỉ mục và bật (`{"made": NAME,
+  "on": true}`). Kỹ năng có code riêng được đưa lại thì chỉ bật bằng chính
+  đường của lời đồng ý khi `LAMP_MADE_SCRIPTS=on`; khi tắt thì nó được đưa
+  lại nhưng vẫn tắt, và nói rõ lý do. Bản ghi của một lần thay thế vẫn còn
+  sau khi kỹ năng mới của nó bị xóa.
+- **Nơi cất, chính xác.** Mọi bản ghi việc đã làm được giữ 7 ngày, gói của
+  kỹ năng đã xóa đi cùng bản ghi của nó; nhiều nhất 50 kỹ năng đã xóa và
+  100 bản ghi tất cả, cũ nhất ra trước, gói đi cùng. `lamp-voice` dọn nó khi
+  khởi động và mỗi giờ sau đó (khi `LAMP_MAKE_SKILL` bật, bất kể công tắc
+  này), và ở mỗi lần tạo, xóa hay hoàn tác, nên một gói đi chậm nhất một giờ
+  sau 7 ngày của nó; gói không bản ghi nào nhắc tới (do sự cố) bị xóa khi
+  dọn. "Quên hết" của chủ đèn xóa toàn bộ `undo.json` và `undo/`, như bản
+  in giọng nói của họ.
 - **Không chắc thì không làm.** Lần tạo bị đánh giá là không đúng điều được
   yêu cầu (`LAMP_MADE_UNRELATED_REFUSED`), hoặc lời gọi không có yêu cầu,
   không tạo gì và không hỏi gì: không có "Could you say it again?".

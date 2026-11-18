@@ -44,6 +44,7 @@
 use crate::made_remove::{self, Found};
 use crate::made_skill::{self, Keeping, Made};
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -82,6 +83,12 @@ pub const LAST: &str = "last";
 pub const UNDO_WITHIN: Duration = Duration::from_secs(10 * 60);
 /// How long a skill removed with no yes is kept to be put back.
 pub const KEPT_FOR: Duration = Duration::from_secs(7 * 86_400);
+/// The most removed skills kept to be put back, the oldest out first.
+pub const MOST_KEPT: usize = 50;
+/// The most records of what was done kept in all, the oldest out first.
+pub const MOST_RECORDS: usize = 100;
+/// How often the keep is purged ([`start_purge`]).
+pub const PURGE_EVERY: Duration = Duration::from_secs(60 * 60);
 /// What was done and may be undone, in the made skills' folder.
 pub const RECORDS: &str = "undo.json";
 /// Where a removed skill's package is kept, in the made skills' folder.
@@ -252,11 +259,21 @@ pub fn made_told(
 }
 
 /// `made`, kept and not on, clashes with the skills on the lamp `others`
-/// (`made_clash::found`): it goes on, then each of them is turned off by
-/// the manage helper (never deleted), so "keep the old one" turns them back
-/// on ([`undo`]). A put-on that fails turns nothing off. What the model is
-/// told, and the one line.
-pub fn replaced(keeping: &Keeping, made: &Made, others: &[String]) -> (Value, String) {
+/// (`made_clash::found`): it goes on first, and a put-on that fails changes
+/// nothing else. Of the others, only those on (`off`, lamp-skills' `off`
+/// file as read: none when it couldn't be read, and then nothing is
+/// replaced) are replaced, and only on the owner's ask (`owner`, asked only
+/// then; Twelve's P1 on #7783): each turned off by the manage helper, never
+/// deleted, so "keep the old one" turns them back on ([`undo`]). Anyone
+/// else's make goes on beside them, which stay on. What the model is told,
+/// and the one line.
+pub fn clashed(
+    keeping: &Keeping,
+    made: &Made,
+    others: &[String],
+    off: Option<&BTreeSet<String>>,
+    owner: impl FnOnce() -> bool,
+) -> (Value, String) {
     if let Err(why) = made_skill::put_on(keeping, made) {
         let line = made_skill::not_on_line(&why);
         return (
@@ -269,48 +286,81 @@ pub fn replaced(keeping: &Keeping, made: &Made, others: &[String]) -> (Value, St
             line,
         );
     }
-    let mut off = Vec::new();
+    let new = made_skill::spoken_name(&made.name);
+    let on_others: Vec<String> = match off {
+        Some(off) => others
+            .iter()
+            .filter(|other| !off.contains(*other))
+            .cloned()
+            .collect(),
+        None => Vec::new(),
+    };
+    if on_others.is_empty() || !owner() {
+        noted(
+            &keeping.directory,
+            json!({ "kind": "made", "name": made.name, "sha256": made.sha256 }),
+        );
+        let line = if on_others.is_empty() {
+            made_line(made, "")
+        } else {
+            eprintln!(
+                "lamp-voice: a made skill clashes with {} on the lamp, made by someone not the owner: put on beside them (LAMP_MAKE_NO_ASKS)",
+                on_others.len()
+            );
+            format!(
+                "Made {new}. Your other {} {} still on. Say 'remove it' to undo.",
+                crate::made_clash::spoken_list(&on_others),
+                if on_others.len() > 1 { "are" } else { "is" }
+            )
+        };
+        let told = json!({
+            "made": made.name,
+            "on": true,
+            "next": told(&line, Some(&made.description)),
+        });
+        return (told, line);
+    }
+    let mut turned = Vec::new();
     let mut still_on = Vec::new();
-    for other in others {
+    for other in &on_others {
         match crate::made_turn::turned_by_helper(&keeping.manage, other, true) {
-            Ok(()) => off.push(other.clone()),
+            Ok(()) => turned.push(other.clone()),
             Err(why) => still_on.push((other.clone(), why)),
         }
     }
     eprintln!(
-        "lamp-voice: a made skill replaced {} on the lamp with no ask, {} left on (LAMP_MAKE_NO_ASKS)",
-        off.len(),
+        "lamp-voice: a made skill replaced {} on the lamp on the owner's ask, {} left on (LAMP_MAKE_NO_ASKS)",
+        turned.len(),
         still_on.len()
     );
     noted(
         &keeping.directory,
-        if off.is_empty() {
+        if turned.is_empty() {
             json!({ "kind": "made", "name": made.name, "sha256": made.sha256 })
         } else {
             json!({
                 "kind": "replaced",
                 "name": made.name,
                 "sha256": made.sha256,
-                "others": off,
+                "others": turned,
             })
         },
     );
     let line = match still_on.first() {
-        None => replaced_line(made, &off),
+        None => replaced_line(made, &turned),
         Some((_, why)) => {
             let names: Vec<String> = still_on.iter().map(|(name, _)| name.clone()).collect();
             let (still, are) = (
                 crate::made_clash::spoken_list(&names),
                 if names.len() > 1 { "are" } else { "is" },
             );
-            let new = made_skill::spoken_name(&made.name);
-            if off.is_empty() {
+            if turned.is_empty() {
                 format!("Made {new}, but {still} {are} still on: {why}. Say 'remove it' to undo.")
             } else {
                 format!(
                     "Made {new} and replaced your old {}, but {still} {are} still on: {why}. Say \
                      'keep the old one' to undo.",
-                    crate::made_clash::spoken_list(&off)
+                    crate::made_clash::spoken_list(&turned)
                 )
             }
         }
@@ -318,7 +368,7 @@ pub fn replaced(keeping: &Keeping, made: &Made, others: &[String]) -> (Value, St
     let mut told = json!({
         "made": made.name,
         "on": true,
-        "replaced": off,
+        "replaced": turned,
         "next": told(&line, Some(&made.description)),
     });
     if !still_on.is_empty() {
@@ -332,25 +382,74 @@ pub fn replaced(keeping: &Keeping, made: &Made, others: &[String]) -> (Value, St
     (told, line)
 }
 
-/// The records of what may be undone in `directory`, as kept, with those
-/// past their time dropped (a removed one's kept package with it): a make
-/// or a replace after [`UNDO_WITHIN`], a remove after [`KEPT_FOR`].
+#[cfg(test)]
+thread_local! {
+    /// [`turned_off_here`]'s folder as a test of this thread sets it.
+    static STATE_HERE: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
+/// [`turned_off_here`] reading `state` on this test's thread.
+#[cfg(test)]
+pub(crate) fn set_state_here(state: Option<PathBuf>) {
+    STATE_HERE.with(|here| *here.borrow_mut() = state);
+}
+
+/// The skills turned off on the lamp, as lamp-skills' `off` file says
+/// (`skill_about::turned_off`); none when it can't be read.
+pub fn turned_off_here() -> Option<BTreeSet<String>> {
+    #[cfg(test)]
+    if let Some(state) = STATE_HERE.with(|here| here.borrow().clone()) {
+        return crate::skill_about::turned_off(&state).ok();
+    }
+    crate::skill_about::turned_off(Path::new(crate::skill_about::STATE_DIR)).ok()
+}
+
+/// How long `record` may be undone: a remove [`KEPT_FOR`], a make or a
+/// replace [`UNDO_WITHIN`].
+fn window(record: &Value) -> Duration {
+    if record["kind"] == "removed" {
+        KEPT_FOR
+    } else {
+        UNDO_WITHIN
+    }
+}
+
+/// Whether `record` may still be undone at `now_unix_ms` ([`window`]).
+fn in_window(record: &Value, now_unix_ms: u64) -> bool {
+    record["at_unix_ms"]
+        .as_u64()
+        .is_some_and(|at| now_unix_ms.saturating_sub(at) <= window(record).as_millis() as u64)
+}
+
+/// The records in `directory`, oldest first, as kept, with those past
+/// [`KEPT_FOR`] dropped, and past the newest [`MOST_KEPT`] removes or
+/// [`MOST_RECORDS`] in all (oldest out first), a removed one's kept package
+/// with it. Every action is kept so long, whatever its own [`window`], so
+/// "last" is always the latest action ([`undo`]).
 fn records(directory: &Path, now_unix_ms: u64) -> Vec<Value> {
-    let all: Vec<Value> = fs::read(directory.join(RECORDS))
+    let mut all: Vec<Value> = fs::read(directory.join(RECORDS))
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
-    let fresh = |record: &Value| {
-        let within = if record["kind"] == "removed" {
-            KEPT_FOR
-        } else {
-            UNDO_WITHIN
-        };
-        record["at_unix_ms"]
+    all.sort_by_key(|record| record["at_unix_ms"].as_u64().unwrap_or_default());
+    let mut removes = 0;
+    let mut count = 0;
+    let mut kept = Vec::new();
+    let mut gone = Vec::new();
+    for record in all.into_iter().rev() {
+        let fresh = record["at_unix_ms"]
             .as_u64()
-            .is_some_and(|at| now_unix_ms.saturating_sub(at) <= within.as_millis() as u64)
-    };
-    let (kept, gone): (Vec<Value>, Vec<Value>) = all.into_iter().partition(fresh);
+            .is_some_and(|at| now_unix_ms.saturating_sub(at) <= KEPT_FOR.as_millis() as u64);
+        let removed = record["kind"] == "removed";
+        if fresh && count < MOST_RECORDS && !(removed && removes >= MOST_KEPT) {
+            count += 1;
+            removes += usize::from(removed);
+            kept.push(record);
+        } else {
+            gone.push(record);
+        }
+    }
+    kept.reverse();
     if !gone.is_empty() {
         for record in &gone {
             if let Some(path) = kept_package(directory, record) {
@@ -364,6 +463,119 @@ fn records(directory: &Path, now_unix_ms: u64) -> Vec<Value> {
     kept
 }
 
+/// The keep trimmed ([`records`]), and any package in [`KEPT_FOLDER`] no
+/// record names (a crash's) deleted: at the voice's start and every
+/// [`PURGE_EVERY`] ([`start_purge`]), so a kept package goes within an
+/// hour of its 7 days, whether or not anything else is made.
+pub fn purge(directory: &Path, now_unix_ms: u64) {
+    if !directory.join(RECORDS).exists() && !directory.join(KEPT_FOLDER).exists() {
+        return;
+    }
+    let named: BTreeSet<PathBuf> = records(directory, now_unix_ms)
+        .iter()
+        .filter_map(|record| kept_package(directory, record))
+        .collect();
+    for entry in fs::read_dir(directory.join(KEPT_FOLDER))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        if !named.contains(&entry.path()) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+}
+
+/// [`purge`] of the made skills' folder at the voice's start and every
+/// [`PURGE_EVERY`] after, on a thread of its own, with `LAMP_MAKE_SKILL`
+/// on, whatever this switch says, so a keep made while it was on still
+/// goes.
+pub fn start_purge() {
+    let Some(keeping) = Keeping::from_environment() else {
+        return;
+    };
+    let started = std::thread::Builder::new()
+        .name("lamp-voice-undo-purge".into())
+        .spawn(move || {
+            loop {
+                purge(&keeping.directory, now_unix_ms());
+                std::thread::sleep(PURGE_EVERY);
+            }
+        });
+    if let Err(error) = started {
+        eprintln!("lamp-voice: the made skills' undo keep isn't purged on a timer: {error}");
+    }
+}
+
+/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`]:
+/// whether there was any.
+pub fn clear(directory: &Path) -> io::Result<bool> {
+    let mut any = false;
+    match fs::remove_file(directory.join(RECORDS)) {
+        Ok(()) => any = true,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    match fs::remove_dir_all(directory.join(KEPT_FOLDER)) {
+        Ok(()) => any = true,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    Ok(any)
+}
+
+/// The owner's "forget everything about me", marked by the second route's
+/// guard: the made skills' undo keep goes too ([`clear`]), as the owner's
+/// voice print does. Another person's forget, an unmarked one, or one whose
+/// memory was not emptied, leaves it.
+pub fn forget_with_everything(
+    told: (Value, bool),
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !lease.everything_marked() {
+        return told;
+    }
+    forget_if(
+        Path::new(made_skill::DIRECTORY),
+        told,
+        lease.admitted_person(),
+        &crate::person::owner_ids(),
+    )
+}
+
+/// [`forget_with_everything`] once its mark is judged: the keep in
+/// `directory` cleared when `admitted` is one of `owners` and `told` says
+/// their memory was emptied.
+pub(crate) fn forget_if(
+    directory: &Path,
+    mut told: (Value, bool),
+    admitted: Option<&str>,
+    owners: &[String],
+) -> (Value, bool) {
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
+    if !emptied || !theirs {
+        return told;
+    }
+    match clear(directory) {
+        Ok(true) => {
+            eprintln!("lamp-voice: the made skills' undo keep: cleared with everything about them");
+            told.0["removed_skills_kept"] = json!("forgotten too");
+        }
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!(
+                "lamp-voice: the made skills' undo keep could not be cleared with everything about them: {}",
+                error.kind()
+            );
+            told.0["everything"] = json!(false);
+            told.0["removed_skills_kept"] = json!("kept: it could not be removed");
+        }
+    }
+    told
+}
+
 /// The records written whole beside them and moved over them.
 fn write_records(directory: &Path, records: &[Value]) -> io::Result<()> {
     fs::create_dir_all(directory)?;
@@ -372,13 +584,13 @@ fn write_records(directory: &Path, records: &[Value]) -> io::Result<()> {
     fs::rename(new, directory.join(RECORDS))
 }
 
-/// `record` kept as what was done last, at the lamp's clock now; an
-/// earlier make or replace of the same skill gives way to it.
+/// `record` kept as what was done last, at the lamp's clock now. Earlier
+/// records stay (Twelve's P2 on #7783: a replace's record outlives the
+/// remove of its new skill), each undone only as its own.
 fn noted(directory: &Path, mut record: Value) {
     let now = now_unix_ms();
     record["at_unix_ms"] = json!(now);
     let mut all = records(directory, now);
-    all.retain(|old| old["kind"] == "removed" || old["name"] != record["name"]);
     all.push(record);
     if let Err(error) = write_records(directory, &all) {
         eprintln!("lamp-voice: a made skill's undo record wasn't kept: {error}");
@@ -515,8 +727,7 @@ pub fn remove_asked(
             }
             match remove_at_once(keeping, &made, &sha256, remove) {
                 Ok(()) => json!({
-                    made_remove::REMOVE: made,
-                    "removed": true,
+                    "removed": made,
                     "next": said(&removed_line(&made)),
                 }),
                 Err(why) => {
@@ -565,10 +776,15 @@ pub fn remove_asked(
 }
 
 /// The undo `asked` ([`LAST`], or a skill's name as heard) of what was
-/// done to a skill they made: the newest record that is it
-/// ([`records`]). A make is removed and kept aside; a replace turns the
-/// old ones back on, then removes the new one; a remove is put back and
-/// on. What the model is told, in one plain line.
+/// done to a skill they made, bound to the one action it was said for
+/// (Twelve's P2 on #7783): "last" is the latest action of all, and a name
+/// the latest action of that skill (or of a skill it replaced); either only
+/// within that action's own [`window`], else there is nothing to undo. A
+/// make is removed and kept aside; a replace turns the old ones back on,
+/// then removes the new one and keeps it aside; a remove is put back and
+/// on. Each answers as `make_skill`'s other calls do: `removed` its name,
+/// `made` and `on` the skill on again. What the model is told, in one
+/// plain line.
 pub fn undo(keeping: &Keeping, asked: &str, now_unix_ms: u64) -> Value {
     let all = records(&keeping.directory, now_unix_ms);
     let asked = asked.trim();
@@ -585,8 +801,9 @@ pub fn undo(keeping: &Keeping, asked: &str, now_unix_ms: u64) -> Value {
     };
     let Some(record) = all
         .iter()
-        .filter(|record| last || is_named(record))
-        .max_by_key(|record| record["at_unix_ms"].as_u64().unwrap_or_default())
+        .rev()
+        .find(|record| last || is_named(record))
+        .filter(|record| in_window(record, now_unix_ms))
         .cloned()
     else {
         return json!({
@@ -602,17 +819,15 @@ pub fn undo(keeping: &Keeping, asked: &str, now_unix_ms: u64) -> Value {
         eprintln!("lamp-voice: an undo of a made skill wasn't done: {why}");
         json!({ "error": format!("not undone: {why}"), "next": said(&format!("I couldn't undo that: {why}.")) })
     };
+    let remove = |skill: &str| crate::made_clash::remove_by_helper(&keeping.manage, skill);
     match record["kind"].as_str() {
-        Some("made") => {
-            match remove_at_once(keeping, &name, &sha256, |skill| {
-                crate::made_clash::remove_by_helper(&keeping.manage, skill)
-            }) {
-                Ok(()) => {
-                    json!({ made_remove::REMOVE: name, "removed": true, "next": said(&removed_line(&name)) })
-                }
-                Err(why) => failed(why),
+        Some("made") => match remove_at_once(keeping, &name, &sha256, remove) {
+            Ok(()) => {
+                drop_record(&keeping.directory, &record);
+                json!({ "removed": name, "next": said(&removed_line(&name)) })
             }
-        }
+            Err(why) => failed(why),
+        },
         Some("replaced") => {
             let others: Vec<String> = record["others"]
                 .as_array()
@@ -629,37 +844,40 @@ pub fn undo(keeping: &Keeping, asked: &str, now_unix_ms: u64) -> Value {
                     ));
                 }
             }
-            let off = match made_skill::went_on_as(keeping, &name) {
-                Ok(Some(on)) if on == sha256 => {
-                    crate::made_clash::remove_by_helper(&keeping.manage, &name)
-                }
-                Ok(None) => Ok(()),
-                _ => Err(format!(
-                    "the skill called {spoken} on the lamp now isn't the one made"
-                )),
-            };
             drop_record(&keeping.directory, &record);
             let old = crate::made_clash::spoken_list(&others);
-            match off {
-                Ok(()) => {
-                    made_skill::forget_named(&keeping.directory, &name);
-                    eprintln!(
-                        "lamp-voice: a replace was undone: the old skills back on, the new one removed (LAMP_MAKE_NO_ASKS)"
-                    );
-                    json!({
-                        "kept_old": others,
-                        made_remove::REMOVE: name,
-                        "next": said(&format!("Your old {old} is back on, and I removed {spoken}.")),
-                    })
+            let mut told = json!({
+                "made": others.first(),
+                "on": true,
+                "kept_old": others,
+            });
+            // The new one kept aside as a make's undo keeps it; one removed
+            // already is left as it is.
+            let still_kept = made_skill::entries(&keeping.directory)
+                .iter()
+                .any(|entry| entry["name"] == name.as_str() && entry["sha256"] == sha256.as_str());
+            let line = if !still_kept {
+                format!("Your old {old} is back on.")
+            } else {
+                match remove_at_once(keeping, &name, &sha256, remove) {
+                    Ok(()) => {
+                        told["removed"] = json!(name);
+                        format!(
+                            "Your old {old} is back on, and I removed {spoken}. Say 'put it back' \
+                             to undo."
+                        )
+                    }
+                    Err(why) => {
+                        told["error"] = json!(format!("not removed: {why}"));
+                        format!("Your old {old} is back on, but I couldn't remove {spoken}: {why}.")
+                    }
                 }
-                Err(why) => json!({
-                    "kept_old": others,
-                    "error": format!("not removed: {why}"),
-                    "next": said(&format!(
-                        "Your old {old} is back on, but I couldn't remove {spoken}: {why}."
-                    )),
-                }),
-            }
+            };
+            eprintln!(
+                "lamp-voice: a replace was undone: the old skills back on (LAMP_MAKE_NO_ASKS)"
+            );
+            told["next"] = json!(said(&line));
+            told
         }
         Some("removed") => put_back(keeping, &record),
         _ => failed("the lamp doesn't know what that was".into()),
@@ -715,6 +933,9 @@ fn put_back(keeping: &Keeping, record: &Value) -> Value {
     }
     drop_record(directory, record);
     let on = match made_skill::made_of(directory, &entry) {
+        // Its code runs only with `LAMP_MADE_SCRIPTS` on: else it stays
+        // off, and why is said.
+        Some(made) if made.uses.code && !made_skill::scripts_on() => Err(CODE_OFF.to_owned()),
         Some(made) if made.uses.code => {
             crate::make_skill_local::code_on_at_once(keeping, &made).map(|_| ())
         }
@@ -731,13 +952,19 @@ fn put_back(keeping: &Keeping, record: &Value) -> Value {
     match on {
         Ok(()) => {
             eprintln!("lamp-voice: a removed made skill was put back on (LAMP_MAKE_NO_ASKS)");
-            json!({ "put_back": name, "on": true, "next": said(&format!("{spoken} is back on.")) })
+            // Undone again as a make is: "remove it" takes it off.
+            noted(
+                directory,
+                json!({ "kind": "made", "name": name, "sha256": sha256 }),
+            );
+            json!({ "made": name, "on": true, "put_back": true, "next": said(&format!("{spoken} is back on.")) })
         }
         Err(why) => json!({
-            "put_back": name,
+            "made": name,
             "on": false,
+            "put_back": true,
             "not_on": why,
-            "next": said(&format!("I put {spoken} back, but couldn't turn it on: {why}.")),
+            "next": said(&format!("I put {spoken} back, but it stays off: {why}.")),
         }),
     }
 }

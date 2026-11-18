@@ -143,6 +143,7 @@ fn a_plain_make_is_on_at_once_with_the_one_line() {
         "Removed evening dim. Say 'put it back' to undo.",
         "{undone}"
     );
+    assert_eq!(undone["removed"], "evening-dim", "{undone}");
     assert_eq!(remover.join().unwrap()[0]["remove"], "evening-dim");
     assert!(names(&keeping).is_empty());
     set_here(None);
@@ -232,7 +233,9 @@ fn a_code_make_is_on_at_once_with_no_yes_and_scripts_on_still_holds() {
 #[test]
 fn a_clash_replaces_and_its_undo_restores() {
     set_here(Some(true));
+    set_owner_here(Some(true));
     let (root, keeping) = keeping("no-asks-clash");
+    set_state_here(Some(root.join("state")));
     installed(&keeping, "rest-glow");
     let (url, served) = service(vec![(200, good())]);
     let asked = helper(&keeping.manage, 2);
@@ -262,18 +265,29 @@ fn a_clash_replaces_and_its_undo_restores() {
     let undone = undo(&keeping, "rest glow", now_unix_ms());
     assert_eq!(
         quoted(undone["next"].as_str().unwrap()),
-        "Your old rest glow is back on, and I removed evening dim.",
+        "Your old rest glow is back on, and I removed evening dim. Say 'put it back' to undo.",
+        "{undone}"
+    );
+    // The fields `make_skill`'s other answers have (#7730's status).
+    assert_eq!(
+        (&undone["made"], &undone["on"], &undone["removed"]),
+        (&json!("rest-glow"), &json!(true), &json!("evening-dim")),
         "{undone}"
     );
     let undoing = undoing.join().unwrap();
     assert_eq!(undoing[0], json!({ "on": "rest-glow" }));
     assert_eq!(undoing[1], json!({ "remove": "evening-dim" }));
     assert!(names(&keeping).is_empty());
-    // Nothing more to undo.
-    assert_eq!(
-        undo(&keeping, LAST, now_unix_ms())["error"],
-        NOTHING_TO_UNDO
+    // The new one kept aside, as a make's undo keeps it: "put it back".
+    assert!(
+        keeping
+            .directory
+            .join(KEPT_FOLDER)
+            .join(format!("{sha256}.tar"))
+            .is_file()
     );
+    set_state_here(None);
+    set_owner_here(None);
     set_here(None);
     let _ = fs::remove_dir_all(&root);
 }
@@ -336,7 +350,7 @@ fn a_remove_happens_with_no_yes_and_put_it_back_restores() {
         },
     );
     assert_eq!(removed, ["moon-fact"]);
-    assert_eq!(told["removed"], true, "{told}");
+    assert_eq!(told["removed"], "moon-fact", "{told}");
     assert!(
         told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
         "{told}"
@@ -352,7 +366,11 @@ fn a_remove_happens_with_no_yes_and_put_it_back_restores() {
     let _ = fs::remove_dir_all(keeping.installed.join("moon-fact"));
     let asked = helper(&keeping.manage, 1);
     let back = undo(&keeping, "moon fact", now_unix_ms());
-    assert_eq!(back["on"], true, "{back}");
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("moon-fact"), &json!(true)),
+        "{back}"
+    );
     assert_eq!(
         quoted(back["next"].as_str().unwrap()),
         "moon fact is back on."
@@ -448,4 +466,256 @@ fn with_the_switch_on_the_tool_takes_the_undo() {
     );
     made_skill::set_scripts_here(None);
     set_here(None);
+}
+
+/// A records file in `keeping`'s folder holding `records`.
+fn records_are(keeping: &Keeping, records: &[Value]) {
+    fs::create_dir_all(&keeping.directory).unwrap();
+    fs::write(
+        keeping.directory.join(RECORDS),
+        serde_json::to_vec(records).unwrap(),
+    )
+    .unwrap();
+}
+
+/// A removed skill `name` kept aside at `at`, its package in the keep.
+fn removed_at(keeping: &Keeping, name: &str, sha: char, at: u64) -> Value {
+    let sha256 = sha.to_string().repeat(64);
+    let kept = keeping.directory.join(KEPT_FOLDER);
+    fs::create_dir_all(&kept).unwrap();
+    fs::write(kept.join(format!("{sha256}.tar")), "tar").unwrap();
+    json!({
+        "kind": "removed",
+        "name": name,
+        "at_unix_ms": at,
+        "entry": {
+            "name": name,
+            "sha256": sha256,
+            "package": format!("{name}-1.0.0.tar"),
+            "version": "1.0.0",
+            "description": "",
+            "uses": {},
+            "on": true,
+        },
+    })
+}
+
+const MINUTE: u64 = 60_000;
+const DAY: u64 = 86_400_000;
+
+/// Twelve's P1 on #7783: a guest's make that clashes goes on beside the
+/// owner's skill, which stays on, and nothing is asked; a clash with a
+/// skill already off turns nothing off and restores nothing later.
+#[test]
+fn a_guests_clash_and_a_clash_with_an_off_skill_turn_nothing_off() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-guest");
+    set_state_here(Some(root.join("state")));
+    installed(&keeping, "rest-glow");
+    set_owner_here(Some(false));
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], true, "{told}");
+    assert!(told.get("replaced").is_none(), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made evening dim. Your other rest glow is still on. Say 'remove it' to undo."
+    );
+    assert!(!told.to_string().contains("keep the old one"), "{told}");
+    // Only the put-on was asked of the helper: rest glow never off.
+    assert_eq!(asked.join().unwrap().len(), 1);
+    let _ = take_said_line();
+    let _ = fs::remove_dir_all(&root);
+
+    // The owner's make, the other skill off already: nothing turned off,
+    // and nothing to turn back on.
+    let (root, keeping) = crate::make_skill_local::tests::keeping("no-asks-off-clash");
+    set_state_here(Some(root.join("state")));
+    fs::create_dir_all(root.join("state")).unwrap();
+    fs::write(root.join("state").join("off"), "rest-glow\n").unwrap();
+    installed(&keeping, "rest-glow");
+    set_owner_here(Some(true));
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made evening dim. Say 'remove it' to undo."
+    );
+    assert_eq!(asked.join().unwrap().len(), 1);
+    let records = records(&keeping.directory, now_unix_ms());
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["kind"], "made", "{records:?}");
+    let _ = take_said_line();
+    set_state_here(None);
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Twelve's P2 on #7783: "last" is the latest action, undone only within
+/// its own window. A remove on Monday, a make 15 minutes ago: "remove it"
+/// is past the make's 10 minutes and never puts Monday's remove back; the
+/// remove alone, latest, still is put back within its 7 days.
+#[test]
+fn an_undo_is_bound_to_the_latest_action_and_its_own_window() {
+    let (root, keeping) = keeping("no-asks-last");
+    let now = NOW;
+    let monday = removed_at(&keeping, "moon-fact", 'a', now - 3 * DAY);
+    records_are(
+        &keeping,
+        &[
+            monday.clone(),
+            json!({ "kind": "made", "name": "joke-time", "sha256": "b".repeat(64), "at_unix_ms": now - 15 * MINUTE }),
+        ],
+    );
+    assert_eq!(undo(&keeping, LAST, now)["error"], NOTHING_TO_UNDO);
+    assert_eq!(undo(&keeping, "joke time", now)["error"], NOTHING_TO_UNDO);
+    assert!(
+        made_skill::entries(&keeping.directory).is_empty(),
+        "nothing put back"
+    );
+    // Named, the remove is its own latest action: put back.
+    let asked = helper(&keeping.manage, 1);
+    let back = undo(&keeping, "moon fact", now);
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("moon-fact"), &json!(true)),
+        "{back}"
+    );
+    asked.join().unwrap();
+    // A replace's record outlives the remove of its new skill.
+    let (root2, keeping2) = crate::make_skill_local::tests::keeping("no-asks-last-replaced");
+    records_are(
+        &keeping2,
+        &[
+            json!({ "kind": "replaced", "name": "evening-dim", "sha256": "c".repeat(64), "others": ["rest-glow"], "at_unix_ms": now_unix_ms() - MINUTE }),
+        ],
+    );
+    noted(
+        &keeping2.directory,
+        removed_at(&keeping2, "evening-dim", 'c', 0),
+    );
+    let kinds: Vec<Value> = records(&keeping2.directory, now_unix_ms())
+        .iter()
+        .map(|record| record["kind"].clone())
+        .collect();
+    assert_eq!(kinds, [json!("replaced"), json!("removed")]);
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_dir_all(&root2);
+}
+
+/// The 7-day keep: past it, a record and its package go at the purge (at
+/// the voice's start and hourly), and a package no record names; at most
+/// `MOST_KEPT` removes are kept, the oldest out first; the owner's
+/// "forget everything" clears it all.
+#[test]
+fn the_keep_is_purged_bounded_and_forgotten_with_everything() {
+    let (root, keeping) = keeping("no-asks-purge");
+    let now = NOW;
+    let old = removed_at(&keeping, "old-one", 'a', now - 8 * DAY);
+    let fresh = removed_at(&keeping, "fresh-one", 'b', now - DAY);
+    records_are(&keeping, &[old, fresh]);
+    let stray = keeping.directory.join(KEPT_FOLDER).join("stray.tar");
+    fs::write(&stray, "tar").unwrap();
+    purge(&keeping.directory, now);
+    let kept = records(&keeping.directory, now);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0]["name"], "fresh-one");
+    let folder = keeping.directory.join(KEPT_FOLDER);
+    assert!(!folder.join(format!("{}.tar", "a".repeat(64))).exists());
+    assert!(folder.join(format!("{}.tar", "b".repeat(64))).exists());
+    assert!(!stray.exists());
+    // Bounded: the oldest removes out first, their packages with them.
+    let many: Vec<Value> = (0..MOST_KEPT + 3)
+        .map(|at| {
+            let mut record =
+                removed_at(&keeping, &format!("skill-{at}"), 'c', now - DAY + at as u64);
+            record["entry"]["sha256"] = json!(format!("{at:064x}"));
+            fs::write(folder.join(format!("{at:064x}.tar")), "tar").unwrap();
+            record
+        })
+        .collect();
+    records_are(&keeping, &many);
+    purge(&keeping.directory, now);
+    let kept = records(&keeping.directory, now);
+    assert_eq!(kept.len(), MOST_KEPT);
+    assert_eq!(kept[0]["name"], "skill-3");
+    assert!(!folder.join(format!("{:064x}.tar", 0)).exists());
+    assert!(folder.join(format!("{:064x}.tar", 3)).exists());
+    // Another person's forget, or one not emptied, leaves it.
+    let owners = ["owner".to_owned()];
+    let told = (json!({ "forgotten": true }), true);
+    let (left, _) = forget_if(&keeping.directory, told.clone(), Some("guest"), &owners);
+    assert!(left.get("removed_skills_kept").is_none());
+    assert!(keeping.directory.join(RECORDS).exists());
+    let (left, _) = forget_if(
+        &keeping.directory,
+        (json!({}), true),
+        Some("owner"),
+        &owners,
+    );
+    assert!(left.get("removed_skills_kept").is_none());
+    // The owner's "forget everything": the records and the packages go.
+    let (cleared, _) = forget_if(&keeping.directory, told, Some("owner"), &owners);
+    assert_eq!(cleared["removed_skills_kept"], "forgotten too");
+    assert!(!keeping.directory.join(RECORDS).exists());
+    assert!(!folder.exists());
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A skill that sends keeps its read-back and yes: nothing here puts it on.
+#[test]
+fn a_sending_skill_keeps_its_yes() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-sends");
+    let mut made = Made {
+        name: "leaving-mail".to_owned(),
+        version: "1.0.0".to_owned(),
+        sha256: "d".repeat(64),
+        description: String::new(),
+        uses: Default::default(),
+        package: root.join("none"),
+    };
+    made.uses.writes = vec!["gmail".to_owned()];
+    assert!(!keeps_no_yes(&made));
+    assert!(put_on(&keeping, &made, || true).is_none());
+    made.uses.writes.clear();
+    made.uses.code = true;
+    made.uses.messages = true;
+    assert!(!keeps_no_yes(&made));
+    assert!(put_on(&keeping, &made, || true).is_none());
+    assert!(!keeping.directory.join(RECORDS).exists());
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A put-back of a skill with code of its own, `LAMP_MADE_SCRIPTS` off:
+/// back in the index, kept off, and why said; never on.
+#[test]
+fn a_code_skill_put_back_with_scripts_off_stays_off() {
+    made_skill::set_scripts_here(Some(false));
+    let (root, keeping) = keeping("no-asks-put-back-code");
+    let mut record = removed_at(&keeping, "photo-booth", 'e', NOW);
+    record["entry"]["uses"] = json!({ "code": true });
+    records_are(&keeping, &[record]);
+    let back = undo(&keeping, LAST, NOW);
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("photo-booth"), &json!(false)),
+        "{back}"
+    );
+    assert_eq!(back["not_on"], CODE_OFF);
+    assert_eq!(
+        quoted(back["next"].as_str().unwrap()),
+        format!("I put photo booth back, but it stays off: {CODE_OFF}.")
+    );
+    let entries = made_skill::entries(&keeping.directory);
+    assert_eq!(entries.len(), 1);
+    assert_ne!(entries[0]["on"], true);
+    made_skill::set_scripts_here(None);
+    let _ = fs::remove_dir_all(&root);
 }
