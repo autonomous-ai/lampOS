@@ -3865,12 +3865,13 @@ từng byte như trước.
 
 ## Không hỏi gì (`LAMP_MAKE_NO_ASKS=on`, tắt)
 
-Tắt nếu không đặt `LAMP_MAKE_NO_ASKS=on`, chưa có trong unit sản phẩm nào
-(người xây dựng đầu tiên, 18/11 lúc 18:41, theo chủ sản phẩm: "A made skill
-is made and said in one line, with an undo ('Made it, say "remove it" to
+Tắt nếu không đặt `LAMP_MAKE_NO_ASKS=on`; bật trong `lamp-voice` của sản
+phẩm từ lần bật #7783 (phán quyết của người xây dựng đầu tiên trên #7819,
+19/11 lúc 01:26). Người xây dựng đầu tiên, 18/11 lúc 18:41, theo chủ sản
+phẩm: "A made skill is made and said in one line, with an undo ('Made it, say "remove it" to
 undo'), never read back for a yes. Offers become the action plus that one
 line. An unsure line is simply not acted on, with no 'did you say…?'"; và
-lúc 18:45: việc xóa kỹ năng tự tạo không nằm trong ngoại lệ). Chỉ "quên hết"
+lúc 18:45: việc xóa kỹ năng tự tạo không nằm trong ngoại lệ. Chỉ "quên hết"
 và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_asks`):
 
 - **Tạo xong, bật, một câu.** Một lần tạo bằng giọng nói, thường hay có code

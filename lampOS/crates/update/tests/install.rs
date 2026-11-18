@@ -2145,6 +2145,33 @@ fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
     assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
+/// A voice make is made, on at once and said in one line with its undo,
+/// never asked (`LAMP_MAKE_NO_ASKS`, #7783; the first builder's ruling on
+/// #7819, under the product owner's 18:41 rule): `on` once in
+/// `lamp-voice.service`, the one unit that reads it (`make_no_asks::on`,
+/// passed to its provider and second workers), and no other product unit
+/// names it.
+#[test]
+fn the_product_makes_and_removes_with_nothing_asked_in_the_voice_alone() {
+    let name = lamp_voice::make_no_asks::ENVIRONMENT;
+    assert_eq!(name, "LAMP_MAKE_NO_ASKS");
+    let owner = "lamp-voice.service";
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
 /// A made skill started on a request said to the lamp (#6526,
 /// `LAMP_MADE_SKILL_SAID`): `on` once in the two units that read it,
 /// `lamp-voice` (makes the skill, both routes) and `lamp-skills`' manage
