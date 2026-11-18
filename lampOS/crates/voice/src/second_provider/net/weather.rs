@@ -10,7 +10,9 @@
 //! weather every 15 minutes and only one location"; "what's the weather in
 //! Hanoi tomorrow?" had been answered with Ho Chi Minh City's. The first
 //! builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
-//! place's name and its coordinates leave the lamp.
+//! place's name, the lamp's country's two-letter code with it
+//! ([`Weather::with_country`], #7593), and the place's coordinates leave
+//! the lamp.
 use super::{Result, get_public_json_within, public::OPEN_WITHIN};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
@@ -53,11 +55,13 @@ const MOST_NAMES: usize = 8;
 /// The longest place name looked up, in characters.
 const MOST_NAME_CHARS: usize = 100;
 /// A place found anywhere goes over the first of its name in the lamp's
-/// own country ([`Weather::with_country`]) only when it is a city of at
-/// least [`LARGE_CITY`] people and [`FAR_LARGER`] times as many as that
-/// one: "Sapa" asked of a lamp in Vietnam is Sa Pa, Lao Cai, not Sapa,
-/// Romania (lamp-9adf, 18 Nov, #7593), while "Paris" asked of one in the
-/// US is still Paris, France, not Paris, Texas.
+/// own country ([`Weather::with_country`]) only when both say how many
+/// live there and it is a city of at least [`LARGE_CITY`] people and
+/// [`FAR_LARGER`] times as many as that one: "Sapa" asked of a lamp in
+/// Vietnam is Sa Pa, Lao Cai, not Sapa, Romania (lamp-9adf, 18 Nov,
+/// #7593), while "Paris" asked of one in the US is still Paris, France,
+/// not Paris, Texas. A place at home with no count is chosen: unknown is
+/// not small.
 const FAR_LARGER: u64 = 10;
 /// See [`FAR_LARGER`].
 const LARGE_CITY: u64 = 100_000;
@@ -157,20 +161,21 @@ pub fn geocoding_url(name: &str, country: Option<&str>) -> Option<String> {
 }
 
 /// How many people live at the first place found, as the geocoding says;
-/// 0 when it doesn't.
-fn population(answer: &Value) -> u64 {
-    answer["results"][0]["population"].as_u64().unwrap_or(0)
+/// `None` when it doesn't say (unknown, not none).
+fn population(answer: &Value) -> Option<u64> {
+    answer["results"][0]["population"].as_u64()
 }
 
 /// The place a name finds from its two answers, anywhere and in the
 /// lamp's own country: the one in the lamp's country while there is one,
-/// unless the one found anywhere is a far larger city ([`FAR_LARGER`]).
+/// unless the one found anywhere is known to be a far larger city than
+/// the one at home is known to be ([`FAR_LARGER`]).
 fn chosen(anywhere: &Value, at_home: &Value) -> Option<Place> {
     let Some(home) = found(at_home) else {
         return found(anywhere);
     };
-    let (far, near) = (population(anywhere), population(at_home));
-    if far >= LARGE_CITY
+    if let (Some(far), Some(near)) = (population(anywhere), population(at_home))
+        && far >= LARGE_CITY
         && far >= near.saturating_mul(FAR_LARGER)
         && let Some(far) = found(anywhere)
     {
@@ -1698,7 +1703,7 @@ mod tests {
 
     /// The place chosen of two answers: the one in the lamp's country,
     /// unless none, or the one anywhere is a city of 100,000 people or
-    /// more and ten times as many.
+    /// more and ten times as many, both counts known.
     #[test]
     fn the_place_in_the_lamps_country_goes_first_unless_far_smaller() {
         let named =
@@ -1715,6 +1720,25 @@ mod tests {
         assert_eq!(named(&city, &sapa_vn).as_deref(), Some("Sapa, Philippines"));
         let near_city = geocoded_in("Sa Pa", ("Vietnam", "VN"), Some(10_555), 22.3);
         assert_eq!(named(&city, &near_city).as_deref(), Some("Sa Pa, Vietnam"));
+    }
+
+    /// El on #7700: a place at home the geocoding gives no count for is
+    /// unknown, not empty, and is chosen over a foreign namesake of any
+    /// size, as a home place with a count of 0 is not.
+    #[test]
+    fn a_place_at_home_with_no_count_is_chosen_over_a_foreign_city() {
+        let named =
+            |anywhere: &Value, at_home: &Value| chosen(anywhere, at_home).map(|place| place.name);
+        let home = geocoded_in("Sapa", ("Vietnam", "VN"), None, 22.3);
+        let city = geocoded_in("Sapa", ("Philippines", "PH"), Some(2_000_000), 13.0);
+        assert_eq!(named(&city, &home).as_deref(), Some("Sapa, Vietnam"));
+        let empty = geocoded_in("Sapa", ("Vietnam", "VN"), Some(0), 22.3);
+        assert_eq!(named(&city, &empty).as_deref(), Some("Sapa, Philippines"));
+        let unknown_far = geocoded_in("Sapa", ("Romania", "RO"), None, 46.0);
+        assert_eq!(
+            named(&unknown_far, &empty).as_deref(),
+            Some("Sapa, Vietnam")
+        );
     }
 
     /// The whole call on lamp-9adf on 18 Nov (#7593): a place looked up in

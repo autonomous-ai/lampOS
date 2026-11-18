@@ -24,11 +24,13 @@
 //! while the same host at the address Google's resolver gives,
 //! 157.90.83.168, answered in 240 ms: the host's own name server answers
 //! each resolver with a server of its choosing. 2 of 5 forecasts failed. A
-//! name none of whose tries has opened by the second's start ([`STAGGER`]
-//! in, or at once when a try fails outright) is now looked up a second
-//! time through another resolver ([`ELSEWHERE`]), and its addresses not
-//! raced before join the race, the next try to the first of them, up to
-//! [`MORE_TRIES`] tries more.
+//! name none of whose tries has opened once a try to each of its addresses
+//! has failed outright, or once [`ELSEWHERE_AFTER`] has passed with none
+//! open, is now looked up a
+//! second time through another resolver ([`ELSEWHERE`]), and its global
+//! addresses not raced before join the race, the next try to the first of
+//! them, up to [`MORE_TRIES`] tries more. `LAMP_WEATHER_SECOND_LOOKUP=off`
+//! ([`SECOND_LOOKUP_ENVIRONMENT`]) never looks a name up a second time.
 use super::{
     Error, OPENING, Result, fetch_json_on, kept_builder,
     watch::{Opening, OpeningTold, Opens},
@@ -81,6 +83,23 @@ pub(crate) const ELSEWHERE: &str = "https://8.8.8.8/resolve";
 /// lookup gave addresses not raced before: two, so one dropped SYN on a
 /// new address doesn't end the request.
 pub(crate) const MORE_TRIES: usize = 2;
+/// With not every address failed outright, the name is looked up a second time only
+/// once this has passed from the first try's start with none open: past a
+/// healthy open, so an ordinary fetch never asks [`ELSEWHERE`]. From
+/// lamp-9adf on 18 Nov, TLS ended 0.65–1.37 s after a curl began and
+/// healthy opens of the forecast came under about 1 s; Vietnam to Germany
+/// takes past [`STAGGER`] often. The address it adds still has about 2.5 s
+/// to open within a forecast's 4 s after a place looked up in 1.2 s.
+pub(crate) const ELSEWHERE_AFTER: Duration = Duration::from_millis(1500);
+/// The switch for the second lookup, in the voice service's environment:
+/// on unless exactly `off` ([`second_lookup_on`]).
+pub const SECOND_LOOKUP_ENVIRONMENT: &str = "LAMP_WEATHER_SECOND_LOOKUP";
+
+/// Whether a name is looked up a second time another way: on unless the
+/// switch is exactly `off`.
+pub fn second_lookup_on(value: Option<&str>) -> bool {
+    value != Some("off")
+}
 
 /// How each try's client is made beyond the lamp's own, for the address
 /// it goes to: unchanged on the lamp, a connector that never opens in a
@@ -102,8 +121,16 @@ struct Ways {
 }
 
 impl Ways {
-    /// The lamp's: its own resolver, then Google's over HTTPS.
+    /// The lamp's: its own resolver, then Google's over HTTPS unless
+    /// [`SECOND_LOOKUP_ENVIRONMENT`] is `off`.
     fn lamps() -> Self {
+        Self::lamps_with(second_lookup_on(
+            std::env::var(SECOND_LOOKUP_ENVIRONMENT).ok().as_deref(),
+        ))
+    }
+
+    /// The lamp's, with the second lookup or with none at all.
+    fn lamps_with(second_lookup: bool) -> Self {
         Self {
             lookup: Arc::new(|domain, port| {
                 Box::pin(async move {
@@ -113,7 +140,8 @@ impl Ways {
                     Ok(found.collect())
                 })
             }),
-            elsewhere: Some(Arc::new(|domain, port| Box::pin(elsewhere(domain, port)))),
+            elsewhere: second_lookup
+                .then(|| -> Lookup { Arc::new(|domain, port| Box::pin(elsewhere(domain, port))) }),
             shape: Arc::new(|builder, _| builder),
         }
     }
@@ -150,6 +178,10 @@ struct Race<'a> {
     addresses: Vec<SocketAddr>,
     /// How many tries each of `addresses` has been sent.
     sent: Vec<usize>,
+    /// Whether a try to each of `addresses` has failed outright.
+    refused: Vec<bool>,
+    /// The address each try went to, by its index.
+    went: Vec<usize>,
     open_within: Duration,
     shape: Shape,
     opened: mpsc::UnboundedSender<usize>,
@@ -170,6 +202,7 @@ impl Race<'_> {
             .min_by_key(|&at| self.sent[at])
             .unwrap_or(0);
         self.sent[at] += 1;
+        self.went.push(at);
         let index = self.handles.len();
         self.handles.push(self.tries.spawn(attempt(
             index,
@@ -189,9 +222,24 @@ impl Race<'_> {
             if !self.addresses.contains(&address) {
                 self.addresses.push(address);
                 self.sent.push(0);
+                self.refused.push(false);
             }
         }
         self.addresses.len() - before
+    }
+
+    /// Mark the address try `index` went to as one a try failed outright.
+    fn refused_at(&mut self, index: usize) {
+        if let Some(&at) = self.went.get(index) {
+            self.refused[at] = true;
+        }
+    }
+
+    /// Whether a try to every address has failed outright: the lamp's
+    /// resolver gave none it can reach. An IPv6 address a lamp with no
+    /// IPv6 route fails at once beside a healthy IPv4 one is not that.
+    fn every_address_refused(&self) -> bool {
+        self.refused.iter().all(|&refused| refused)
     }
 }
 
@@ -217,6 +265,8 @@ async fn raced(url: &str, open_within: Duration, ways: Ways) -> Result<serde_jso
         url,
         domain,
         sent: vec![0; addresses.len()],
+        refused: vec![false; addresses.len()],
+        went: Vec::new(),
         addresses,
         open_within,
         shape: ways.shape,
@@ -225,11 +275,13 @@ async fn raced(url: &str, open_within: Duration, ways: Ways) -> Result<serde_jso
         handles: Vec::new(),
     };
     let mut most = MOST_TRIES;
+    let stalled = began + ELSEWHERE_AFTER;
     race.begin();
     let mut next = next_begins(1, began, deadline);
     let winner = loop {
-        // None open as a second try begins: the name is looked up again.
-        if race.begun() > 1
+        // None open, and every address refused or the first try stalled
+        // past a healthy open: the name is looked up again.
+        if (race.every_address_refused() || Instant::now() >= stalled)
             && let (Some(lookup), Some(domain)) = (elsewhere.take(), race.domain.clone())
         {
             asking = Some((lookup(domain, port), Instant::now()));
@@ -238,9 +290,12 @@ async fn raced(url: &str, open_within: Duration, ways: Ways) -> Result<serde_jso
             biased;
             Some(index) = opened.recv() => break index,
             joined = race.tries.join_next(), if !race.tries.is_empty() => match joined {
-                Some(Ok((_, Err(Error::Transport(OPENING) | Error::Timeout(OPENING))))) | Some(Err(_)) => {
+                Some(unopened @ (Ok((_, Err(Error::Transport(OPENING) | Error::Timeout(OPENING)))) | Err(_))) => {
                     // A try that couldn't open (an address the lamp has no
                     // route to fails at once): the next begins now.
+                    if let Ok((index, _)) = unopened {
+                        race.refused_at(index);
+                    }
                     if race.begun() < most {
                         let now = Instant::now();
                         race.begin();
@@ -281,6 +336,9 @@ async fn raced(url: &str, open_within: Duration, ways: Ways) -> Result<serde_jso
                 race.begin();
                 next = next_begins(race.begun(), next, deadline);
             }
+            // The first try stalled past a healthy open: the loop's top
+            // asks the second lookup.
+            _ = tokio::time::sleep_until(stalled), if elsewhere.is_some() => {}
             _ = tokio::time::sleep_until(deadline) => {
                 told_unopened(began, race.begun(), race.addresses.len());
                 return Err(Error::Timeout(OPENING));
@@ -356,8 +414,8 @@ async fn elsewhere(domain: String, port: u16) -> Result<Vec<SocketAddr>> {
     Ok(found)
 }
 
-/// The addresses in a JSON DNS answer (`Answer[].data` of type A or AAAA,
-/// an alias's name left out), for `port`.
+/// The global addresses in a JSON DNS answer (`Answer[].data` of type A
+/// or AAAA, an alias's name left out, [`global`]), for `port`.
 fn resolved(answer: &serde_json::Value, port: u16) -> Vec<SocketAddr> {
     answer["Answer"]
         .as_array()
@@ -365,8 +423,47 @@ fn resolved(answer: &serde_json::Value, port: u16) -> Vec<SocketAddr> {
         .flatten()
         .filter(|record| matches!(record["type"].as_u64(), Some(1 | 28)))
         .filter_map(|record| record["data"].as_str()?.parse::<IpAddr>().ok())
+        .filter(|ip| global(*ip))
         .map(|ip| SocketAddr::new(ip, port))
         .collect()
+}
+
+/// Whether `ip` is a global unicast address: not private, loopback,
+/// link-local, shared (CGNAT, 100.64.0.0/10), multicast, unspecified,
+/// broadcast, documentation, benchmarking or reserved; an IPv6 one not
+/// unique-local, link-local or documentation either, and one mapping an
+/// IPv4 address as that address. The second lookup's answer never sends a
+/// try into the lamp's own network.
+fn global(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            !(v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || a == 0
+                || a >= 240
+                || (a == 100 && (64..128).contains(&b))
+                || (a == 198 && (18..20).contains(&b))
+                || (a == 192 && b == 0 && v4.octets()[2] == 0))
+        }
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return global(IpAddr::V4(v4));
+            }
+            let first = v6.segments()[0];
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+                || (first == 0x2001 && v6.segments()[1] == 0x0db8))
+        }
+    }
 }
 
 /// One try: a client of its own, keeping no connection, so its socket is
@@ -748,10 +845,11 @@ pub(crate) mod tests {
     }
 
     /// lamp-9adf on 18 Nov (#7593): the forecast host's one address never
-    /// opens. Looked up again another way as the second try begins
-    /// (0.4 s), the address it adds is tried at once (0.7 s) and asked,
-    /// well within what a forecast has to open after a place looked up in
-    /// 1.2 s (4 s), inside the weather's 6 s.
+    /// opens. Looked up again another way once the first try has stalled
+    /// past a healthy open ([`ELSEWHERE_AFTER`], 1.5 s), the address it adds
+    /// is tried at once (1.8 s) and asked, within what a forecast has to
+    /// open after a place looked up in 1.2 s (4 s), inside the weather's
+    /// 6 s.
     #[tokio::test]
     async fn a_name_whose_only_address_never_opens_is_reached_through_a_second_lookup() {
         let local = answering(r#"{"ok":1}"#).await;
@@ -769,13 +867,14 @@ pub(crate) mod tests {
             "{took:?}"
         );
         assert!(
-            took >= STAGGER + Duration::from_millis(300) && took < Duration::from_millis(1500),
+            took >= ELSEWHERE_AFTER + Duration::from_millis(300)
+                && took < ELSEWHERE_AFTER + Duration::from_millis(1000),
             "{took:?}"
         );
         assert_eq!(
             sent[0].load(Ordering::SeqCst),
-            2,
-            "the dead address at 0 and 0.4 s"
+            3,
+            "the dead address at 0, 0.4 and 1 s"
         );
         assert_eq!(
             sent[1].load(Ordering::SeqCst),
@@ -849,5 +948,237 @@ pub(crate) mod tests {
             matches!(&found, Ok(found) if !found.is_empty()),
             "{found:?}"
         );
+    }
+
+    /// A connector that refuses every connection at once, as an address
+    /// nothing listens at does.
+    #[derive(Clone)]
+    struct Refusing;
+
+    impl<S> tower_layer::Layer<S> for Refusing {
+        type Service = Refused<S>;
+
+        fn layer(&self, inner: S) -> Refused<S> {
+            Refused(inner)
+        }
+    }
+
+    #[derive(Clone)]
+    struct Refused<S>(S);
+
+    impl<S, R> tower_service::Service<R> for Refused<S>
+    where
+        S: tower_service::Service<R>,
+        S::Response: Send + 'static,
+        S::Error: From<std::io::Error> + Send + 'static,
+    {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = std::pin::Pin<
+            Box<
+                dyn std::future::Future<Output = std::result::Result<S::Response, S::Error>> + Send,
+            >,
+        >;
+
+        fn poll_ready(
+            &mut self,
+            context: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::result::Result<(), S::Error>> {
+            self.0.poll_ready(context)
+        }
+
+        fn call(&mut self, _: R) -> Self::Future {
+            Box::pin(std::future::ready(Err(std::io::Error::from(
+                std::io::ErrorKind::ConnectionRefused,
+            )
+            .into())))
+        }
+    }
+
+    /// A second lookup that counts how often it is asked, and answers with
+    /// `found` at once.
+    fn counted_lookup(found: SocketAddr) -> (Arc<AtomicUsize>, Lookup) {
+        let asked = Arc::new(AtomicUsize::new(0));
+        let count = asked.clone();
+        (
+            asked,
+            Arc::new(move |_, _| {
+                count.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async move { Ok(vec![found]) })
+            }),
+        )
+    }
+
+    /// A healthy but slow open, 0.8 s as Vietnam to Germany may take, never
+    /// asks the second lookup: the first try opens and is asked, the
+    /// second begun at 0.4 s is dropped, and nothing goes to Google.
+    #[tokio::test]
+    async fn a_healthy_open_at_eight_tenths_of_a_second_never_asks_the_second_lookup() {
+        let local = answering(r#"{"ok":1}"#).await;
+        let url = local.replace("127.0.0.1", "forecast.test");
+        let alive: SocketAddr = local
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let (asked_elsewhere, elsewhere) = counted_lookup(alive);
+        let (began, slow) = hanging_first_then_slow(0, Duration::from_millis(800));
+        let ways = Ways {
+            lookup: Arc::new(move |_, _| Box::pin(async move { Ok(vec![alive]) })),
+            elsewhere: Some(elsewhere),
+            ..slow
+        };
+        let asked = std::time::Instant::now();
+        let answered = raced(&url, Duration::from_secs(4), ways).await;
+        let took = asked.elapsed();
+        assert_eq!(answered.ok(), Some(serde_json::json!({"ok": 1})));
+        assert!(took < Duration::from_millis(1100), "{took:?}");
+        assert_eq!(began.load(Ordering::SeqCst), 2, "tries at 0 and 0.4 s");
+        assert_eq!(asked_elsewhere.load(Ordering::SeqCst), 0);
+    }
+
+    /// A try that fails outright (nothing listening at the one address the
+    /// lamp's resolver gave) asks the second lookup at once, and the
+    /// address it adds is asked well before [`ELSEWHERE_AFTER`].
+    #[tokio::test]
+    async fn a_try_failed_outright_asks_the_second_lookup_at_once() {
+        let local = answering(r#"{"ok":1}"#).await;
+        let url = local.replace("127.0.0.1", "forecast.test");
+        let alive: SocketAddr = local
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        // A try to the URL's own port goes there whatever address it is
+        // sent to, so the refusal is the connector's own, at once.
+        let refused = SocketAddr::new(DEAD, alive.port());
+        let (asked_elsewhere, elsewhere) = counted_lookup(alive);
+        let ways = Ways {
+            lookup: Arc::new(move |_, _| Box::pin(async move { Ok(vec![refused]) })),
+            elsewhere: Some(elsewhere),
+            shape: Arc::new(|builder, address| {
+                if address.ip() == DEAD {
+                    builder.connector_layer(Refusing)
+                } else {
+                    builder
+                }
+            }),
+        };
+        let asked = std::time::Instant::now();
+        let answered = raced(&url, Duration::from_secs(4), ways).await;
+        let took = asked.elapsed();
+        assert_eq!(
+            answered.ok(),
+            Some(serde_json::json!({"ok": 1})),
+            "{took:?}"
+        );
+        assert!(took < STAGGER, "{took:?}");
+        assert_eq!(asked_elsewhere.load(Ordering::SeqCst), 1);
+    }
+
+    /// One address that fails at once (as IPv6 does on a lamp with no IPv6
+    /// route) beside a healthy one that opens in 0.8 s: the healthy one is
+    /// asked and the second lookup never is, as not every address failed.
+    #[tokio::test]
+    async fn one_address_refused_beside_a_healthy_one_never_asks_the_second_lookup() {
+        let local = answering(r#"{"ok":1}"#).await;
+        let url = local.replace("127.0.0.1", "forecast.test");
+        let alive: SocketAddr = local
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let refused = SocketAddr::new(DEAD, alive.port());
+        let (asked_elsewhere, elsewhere) = counted_lookup(alive);
+        let slow = FirstHang {
+            hung: 0,
+            slow: Duration::from_millis(800),
+            began: Arc::new(AtomicUsize::new(0)),
+        };
+        let ways = Ways {
+            lookup: Arc::new(move |_, _| Box::pin(async move { Ok(vec![refused, alive]) })),
+            elsewhere: Some(elsewhere),
+            shape: Arc::new(move |builder, address| {
+                if address.ip() == DEAD {
+                    builder.connector_layer(Refusing)
+                } else {
+                    builder.connector_layer(slow.clone())
+                }
+            }),
+        };
+        let asked = std::time::Instant::now();
+        let answered = raced(&url, Duration::from_secs(4), ways).await;
+        let took = asked.elapsed();
+        assert_eq!(
+            answered.ok(),
+            Some(serde_json::json!({"ok": 1})),
+            "{took:?}"
+        );
+        assert!(took < Duration::from_millis(1100), "{took:?}");
+        assert_eq!(asked_elsewhere.load(Ordering::SeqCst), 0);
+    }
+
+    /// `LAMP_WEATHER_SECOND_LOOKUP`: on unless exactly `off`; off, the
+    /// lamp's ways have no second lookup at all.
+    #[test]
+    fn the_second_lookup_is_on_unless_switched_off() {
+        assert!(second_lookup_on(None));
+        assert!(second_lookup_on(Some("on")));
+        assert!(second_lookup_on(Some("")));
+        assert!(!second_lookup_on(Some("off")));
+        assert!(Ways::lamps_with(true).elsewhere.is_some());
+        assert!(Ways::lamps_with(false).elsewhere.is_none());
+    }
+
+    /// Only global unicast addresses of a second lookup's answer are raced.
+    #[test]
+    fn a_second_lookups_private_and_special_addresses_are_left_out() {
+        let record = |data: &str| {
+            let kind = if data.contains(':') { 28 } else { 1 };
+            serde_json::json!({"type": kind, "data": data})
+        };
+        let left_out = [
+            "10.0.0.1",
+            "172.16.5.4",
+            "192.168.1.1",
+            "127.0.0.1",
+            "169.254.1.1",
+            "100.64.0.1",
+            "100.127.255.254",
+            "224.0.0.1",
+            "0.0.0.0",
+            "255.255.255.255",
+            "192.0.2.1",
+            "198.18.0.1",
+            "240.0.0.1",
+            "::1",
+            "::",
+            "fe80::1",
+            "fc00::1",
+            "fd12::1",
+            "ff02::1",
+            "2001:db8::1",
+            "::ffff:192.168.1.1",
+        ];
+        let kept = [
+            "157.90.83.168",
+            "100.128.0.1",
+            "2a01:4f8::1",
+            "::ffff:157.90.83.168",
+        ];
+        let answer = serde_json::json!({"Answer": left_out
+            .iter()
+            .chain(kept.iter())
+            .map(|data| record(data))
+            .collect::<Vec<_>>()});
+        let found: Vec<IpAddr> = resolved(&answer, 443).iter().map(SocketAddr::ip).collect();
+        let expected: Vec<IpAddr> = kept.iter().map(|ip| ip.parse().unwrap()).collect();
+        assert_eq!(found, expected);
     }
 }
