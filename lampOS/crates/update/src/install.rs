@@ -1051,11 +1051,20 @@ pub fn sysstat_kept_removed(
     let entries = match fs::read_dir(&folder) {
         Ok(entries) => entries,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(format!("{SYSSTAT_KEPT}: {error}")),
+        // A folder it can't list never fails the region's boot work: said,
+        // and nothing removed (the first builder's P3 on #7720).
+        Err(error) => {
+            say(&format!(
+                "sysstat's kept files are left: {SYSSTAT_KEPT}: {error}"
+            ));
+            return Ok(Vec::new());
+        }
     };
     let mut kept: Vec<(String, u64)> = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|error| format!("{SYSSTAT_KEPT}: {error}"))?;
+        let Ok(entry) = entry else {
+            continue;
+        };
         let name = entry.file_name().to_string_lossy().into_owned();
         if !sysstat_kept_name(&name) {
             continue;
