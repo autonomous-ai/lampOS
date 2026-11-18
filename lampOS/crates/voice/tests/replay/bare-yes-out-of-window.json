@@ -1,0 +1,31 @@
+[
+{
+  "case": "7698-06c1-r99",
+  "source": "#7698, Friday's journal lines from lamp-06c1, 18 Nov 11:28:24 (stock 14072), request 99: heard 1 words, journaled held: no face seen speaking it, out of the window, a bare yes (Friday's reading) to the rename's read-back asked in request 98, the owner's face the one face in view; turned, as out of the window only a turned face reaches that verdict. Not recorded: the eyes' looks (none kept, so eyes is empty and the turned face's pose and mouth are unknown; line_s is then a placeholder) and the time since the lamp's question (the thread's lamp_asked has no clock). Held on lamp-voice before #7698's out-of-window rule, answered with it",
+  "line_s": [
+    0.0,
+    0.5
+  ],
+  "words": 1,
+  "turned": true,
+  "lamp_asked": true,
+  "yes_no": true,
+  "expect": "answered",
+  "journal": "held: no face seen speaking it",
+  "eyes": []
+}
+,
+{
+  "case": "7698-06c1-r99-no-question",
+  "source": "#7698's control on request 99's inputs: the same bare yes out of the window, the face turned, no eyes kept, but no question of the lamp's pending: still held",
+  "line_s": [
+    0.0,
+    0.5
+  ],
+  "words": 1,
+  "turned": true,
+  "yes_no": true,
+  "expect": "held: no face seen speaking it",
+  "eyes": []
+}
+]
