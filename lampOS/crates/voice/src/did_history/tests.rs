@@ -65,7 +65,7 @@ fn a_did_that_fails_its_check_is_never_kept() {
 #[test]
 fn the_switch_and_the_one_teller_are_named() {
     assert_eq!(ENVIRONMENT, "LAMP_DID_KEEP");
-    assert_eq!(TELLERS, ["skills", "body"]);
+    assert_eq!(TELLERS, ["skills", "body", "ring"]);
 }
 
 /// The keeper reads the bus on a thread of its own and a turn only the
@@ -145,9 +145,9 @@ fn a_body_flood_never_pushes_the_skills_dids_out() {
         history.keep(did(MINUTE + at, "a skill's"), MINUTE + at);
     }
     for at in 0..400 {
-        history.keep_from(
+        history.keep_part(
             did(MINUTE + 200 + at, "the body's"),
-            true,
+            Part::Body,
             MINUTE + 200 + at,
         );
     }
@@ -170,9 +170,9 @@ fn skills_alone_still_fill_all_two_hundred() {
     assert_eq!(history.len(), MOST);
     // And a body that tells a little leaves the rest to the skills.
     for at in 0..10 {
-        history.keep_from(
+        history.keep_part(
             did(MINUTE + 400 + at, "the body's"),
-            true,
+            Part::Body,
             MINUTE + 400 + at,
         );
     }
@@ -221,4 +221,62 @@ fn dids_told_by_the_body_on_the_bus_take_the_bodys_share() {
         std::thread::sleep(Duration::from_millis(50));
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The ring tells a few faces a day: its share is at most RING_MOST, and
+/// neither a body flood nor a skills flood pushes its dids out.
+#[test]
+fn the_rings_share_is_its_own_and_a_body_flood_does_not_push_it_out() {
+    let mut history = DidHistory::default();
+    for at in 0..5 {
+        history.keep_part(did(MINUTE + at, "the ring's"), Part::Ring, MINUTE + at);
+    }
+    for at in 0..120 {
+        history.keep(did(MINUTE + 10 + at, "a skill's"), MINUTE + 10 + at);
+    }
+    for at in 0..400 {
+        history.keep_part(
+            did(MINUTE + 200 + at, "the body's"),
+            Part::Body,
+            MINUTE + 200 + at,
+        );
+    }
+    let all = history.newest(MOST * 2, MINUTE + 700);
+    let count = |why: &str| all.iter().filter(|d| d.why == why).count();
+    assert_eq!(
+        count("the ring's"),
+        5,
+        "the ring's five are all still there"
+    );
+    assert!(
+        count("a skill's") >= MOST - BODY_MOST,
+        "{}",
+        count("a skill's")
+    );
+    assert!(count("the body's") <= BODY_MOST - 5);
+    assert_eq!(all.len(), MOST);
+    // The ring's own oldest goes first past its share.
+    for at in 0..40 {
+        history.keep_part(
+            did(MINUTE + 700 + at, "the ring's"),
+            Part::Ring,
+            MINUTE + 700 + at,
+        );
+    }
+    let all = history.newest(MOST * 2, MINUTE + 800);
+    assert_eq!(
+        all.iter().filter(|d| d.why == "the ring's").count(),
+        RING_MOST
+    );
+}
+
+#[test]
+fn only_the_named_parts_have_a_share() {
+    assert_eq!(Part::of("skills"), Some(Part::Skills));
+    assert_eq!(Part::of("body"), Some(Part::Body));
+    assert_eq!(Part::of("ring"), Some(Part::Ring));
+    assert_eq!(Part::of("voice"), None);
+    for source in TELLERS {
+        assert!(Part::of(source).is_some(), "{source}");
+    }
 }
