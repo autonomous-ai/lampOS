@@ -1086,12 +1086,21 @@ fn task_plain(request: &str) -> String {
 
 /// The whole task skill, as a model's answer: its `skill.toml` (the grants,
 /// the trigger's `block`, `[ask]` a nudge, one `do.task` of `words` running
-/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] as [`SCRIPT`].
+/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] as [`SCRIPT`]. With
+/// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`, the
+/// first builder's 19:50 ruling on #6811), sip-of-water's guards
+/// (`made_skill::template_guards`) after the trigger: never in the middle
+/// of a conversation or with the head down. Off, as before.
 pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> String {
     let grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
+    let guards = if made_skill::reactions_on() {
+        format!("{}\n\n", made_skill::template_guards())
+    } else {
+        String::new()
+    };
     format!(
         "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\ngrants = [{grants}]\n\n\
-         {block}\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\ntask = {{ task = \"{words}\", run = \
+         {block}\n\n{guards}[ask]\npolicy = \"nudge\"\n\n[[do]]\ntask = {{ task = \"{words}\", run = \
          \"{RUN}\" }}\n```\n\n```SKILL.md\n---\nname: {name}\ndescription: The lamp's agent \
          does a task you asked for.\n---\n\n# {name}\n\nThe lamp's agent does this task: \
          {words}\n```\n\n```{RUN}\n{SCRIPT}```\n",
@@ -2041,5 +2050,45 @@ mod tests {
         ] {
             assert!(system.contains(part), "{part}");
         }
+    }
+
+    /// The first builder's 19:50 ruling on #6811 (the middle form): with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, a task the lamp writes on a
+    /// trigger carries sip-of-water's three guards and still only its one
+    /// task step, no say; its cap takes it. Off, as before, byte for byte.
+    #[test]
+    fn with_the_reactions_switch_a_timed_task_keeps_sip_of_waters_guards_and_no_say() {
+        crate::skill_task_yes::set_net_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        set_on_here(Some(false));
+        let block = EXAMPLE.split_once("```skill.toml\n").unwrap().1;
+        let block = block_kept(block.trim_end_matches("```")).unwrap();
+        let words = task_words("tell me the BTC price at 9");
+        let kept = covered(&grants(&["net", "speak"]), false).unwrap();
+        made_skill::set_reactions_here(Some(false));
+        let before = skill_text("btc-price", &kept, &block, &words);
+        assert!(!before.contains("[[while]]"), "{before}");
+        made_skill::set_reactions_here(Some(true));
+        let text = skill_text("btc-price", &kept, &block, &words);
+        let files = made_skill::files(&text).unwrap();
+        let table: toml::Table = toml::from_str(&files.toml).unwrap();
+        assert_eq!(table["while"].as_array().map(Vec::len), Some(3), "{text}");
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0]["task"]["task"].as_str(), Some(words.as_str()));
+        assert!(!files.toml.contains("say"), "{text}");
+        let guards = format!("{}\n\n", made_skill::template_guards());
+        assert_eq!(text.replace(&guards, ""), before, "only the guards added");
+        let paced = made_skill::paced(&files.toml);
+        let capped = made_skill::capped(&paced);
+        assert!(capped.is_ok(), "{capped:?}");
+        made_skill::set_reactions_here(None);
+        crate::skill_task_yes::set_net_here(None);
+        made_skill::set_scripts_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        crate::upload_agent::set_on_here(None);
+        set_on_here(None);
     }
 }
