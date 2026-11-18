@@ -1695,6 +1695,22 @@ const AGENT_TRIES: [&str; 4] = [
     AGENT_MISSING,
 ];
 
+/// Whether a make's refusal `why`, the lamp's own check's and not the
+/// model's `cannot:`, stands whoever writes the skill, so the lamp's agent
+/// would not have taken it over: they already have it ([`ALREADY_HAVE`]),
+/// its name is taken with no free one left, the lamp has nothing that
+/// reads it ([`NOTHING_READS`]), or what the lamp's check says a skill
+/// can't do yet here ([`cant_yet`]), but for a say that hands the ask back
+/// ([`ECHOES_THE_ASK`]), which the agent does itself. Said as it is even
+/// while the agent is busy (Heron's P3 on #7555).
+pub fn lamps_own_reason(why: &str) -> bool {
+    let why = why.trim();
+    why.starts_with(ALREADY_HAVE)
+        || why.starts_with(NAME_TAKEN_HEAD)
+        || why == NOTHING_READS
+        || (why.starts_with(CANT_YET) && why != ECHOES_THE_ASK)
+}
+
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
 const PLAIN_REASONS: [&str; 4] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE, NOTHING_READS];
@@ -1822,7 +1838,17 @@ pub fn cannot_in_a_say(answer: &str) -> Option<String> {
     }
     let files = files(answer).ok()?;
     match says_it_cannot(&files.toml)? {
-        (text, true) => Some(format!("{CANNOT} {text}")),
+        // The `cannot:` head is the answer's form, never words the person
+        // hears: a say that begins with it is read without it, so it is
+        // never said "I couldn't make that: cannot: ..." (Heron's P3 on
+        // #7555).
+        (text, true) => {
+            let mut why = text.as_str();
+            while let Some(rest) = after_word(why, CANNOT) {
+                why = rest.trim_start();
+            }
+            Some(format!("{CANNOT} {why}"))
+        }
         (_, false) => None,
     }
 }
@@ -10517,6 +10543,16 @@ light = { dim = 1 }
             Some(("cannot: checking prices.".to_owned(), false))
         );
         assert_eq!(cannot_in_a_say(&answer(&mixed, CARD)), None);
+        // A say that begins with the `cannot:` head is read without it, so
+        // the person never hears "cannot:" (Heron's P3 on #7555).
+        let headed = TOML.replace(
+            "[[do]]\nlight = { dim = 1 }\n",
+            "[[do]]\nsay = { text = \"Cannot: cannot: checking prices.\" }\n",
+        );
+        assert_eq!(
+            cannot_in_a_say(&answer(&headed, CARD)),
+            Some(format!("{CANNOT} checking prices."))
+        );
         // Any other say, or the model's own one-line `cannot:`, is none.
         let said = TOML.replace(
             "[[do]]\nlight = { dim = 1 }\n",

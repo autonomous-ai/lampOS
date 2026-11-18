@@ -2997,25 +2997,47 @@ fn repaired(
 /// ask for one thing ([`made_skill::NOT_MADE_TRY`], [`made_skill::NOT_KEPT_TRY`])
 /// or DeepSeek's `cannot:` of what the agent could make (the audit's A3,
 /// 16 Nov: "each morning read my unread mail" with the agent busy was told
-/// "Try asking for one thing"). A skill DeepSeek made after all, a lamp
-/// reason of its own (it can't do that yet, they have it already) and the
-/// brief's own refusals stand as they are.
+/// "Try asking for one thing"). Busy with another make, a refusal the agent
+/// would have taken over is said as busy, whatever DeepSeek said: its
+/// `cannot:` but for one that stays DeepSeek's ([`stays_deepseeks`], with
+/// the agent's `one_path`), or a check's refusal the agent would have
+/// written again. A skill DeepSeek made after all, a lamp reason of its own
+/// that stands whoever writes it ([`made_skill::lamps_own_reason`]: they
+/// have it already, its name is taken, it can't do that yet here) and the
+/// brief's own refusals stand as they are, busy or not (Heron's P3 on
+/// #7555).
 fn agent_side(
     stood: Result<Made, Refused>,
     why: &str,
     models_cannot: &std::cell::Cell<bool>,
+    one_path: bool,
 ) -> Result<Made, Refused> {
     let agents = |said: &str| match models_cannot.get() {
         true => !made_skill::briefs_own_refusal(said) || made_skill::briefs_send_refusal(said),
         false => [made_skill::NOT_MADE_TRY, made_skill::NOT_KEPT_TRY]
             .contains(&made_skill::plain_reason(said).as_str()),
     };
-    // Busy with another make (lamp-9adf, 17 Nov 18:19): the agent would
-    // have made it, so whatever DeepSeek said, the person hears that
-    // another skill is being made, never an inability.
+    // Busy with another make (lamp-9adf, 17 Nov 18:19): what the agent
+    // would have taken over, whatever DeepSeek said, is said as another
+    // skill being made, never an inability; a lamp reason of its own
+    // stands (Heron's P3 on #7555: "You already have that skill" was said
+    // as busy).
     let busy = crate::make_skill_agent::not_made_try(why) == made_skill::AGENT_BUSY_TRY;
+    let takes_over = |said: &str| match models_cannot.get() {
+        true => !stays_deepseeks(
+            &Err(Refused(said.to_owned(), None)),
+            true,
+            crate::make_skill_agent::services_through_agent(),
+            one_path,
+        ),
+        false => !made_skill::lamps_own_reason(said),
+    };
+    let the_agents = |said: &str| match busy {
+        true => takes_over(said),
+        false => agents(said),
+    };
     match stood {
-        Err(Refused(said, lines)) if busy || agents(&said) => {
+        Err(Refused(said, lines)) if the_agents(&said) => {
             models_cannot.set(false);
             Err(Refused(
                 crate::make_skill_agent::not_made_try(why).to_owned(),
@@ -3119,7 +3141,7 @@ fn handed_to_agent(
             // `cannot:` is still DeepSeek's (`models_cannot`); said as the
             // agent's own failure ([`agent_side`]), after DeepSeek's repairs
             // for the app's.
-            return agent_side(untaken(deepseek), &why, models_cannot);
+            return agent_side(untaken(deepseek), &why, models_cannot, agent.one_path);
         }
     };
     let (made, _) = repaired(
@@ -6577,7 +6599,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         };
         let models_cannot = std::cell::Cell::new(true);
         assert_eq!(
-            agent_side(deepseeks(), busy, &models_cannot),
+            agent_side(deepseeks(), busy, &models_cannot, true),
             Err(Refused(made_skill::AGENT_BUSY_TRY.to_owned(), None))
         );
         assert!(!models_cannot.get());
@@ -6587,7 +6609,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             agent_side(
                 deepseeks(),
                 "lamp-tasks didn't make it (run_failed)",
-                &models_cannot
+                &models_cannot,
+                true
             ),
             deepseeks()
         );
@@ -6616,6 +6639,99 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(tasks.hand_overs(), 2);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #7555: busy said whatever DeepSeek said overrode the
+    /// lamp's own reasons too. Asked for a skill they already have while
+    /// the agent is busy, the person hears that they have it, never "ask me
+    /// again in a minute"; so for a taken name and what the lamp has
+    /// nothing to read, and a brief's own refusal that stays DeepSeek's.
+    #[test]
+    fn a_lamps_own_reason_stands_while_the_agent_is_busy() {
+        let busy = "lamp-tasks didn't make it (busy)";
+        let have = made_skill::already_have_line("evening-dim");
+        for (why, cannot) in [
+            (have.as_str(), false),
+            ("a skill called evening dim is already on the lamp", false),
+            (made_skill::NOTHING_READS, false),
+            (
+                "I can't do that yet: hearing what is said. You could ask for a glow instead.",
+                true,
+            ),
+        ] {
+            let stood = || Err(Refused(why.to_owned(), None));
+            let models_cannot = std::cell::Cell::new(cannot);
+            assert_eq!(agent_side(stood(), busy, &models_cannot, false), stood());
+            assert_eq!(models_cannot.get(), cannot, "{why}");
+        }
+        // lamp-tasks' `full` (every connection held, no make running) is
+        // never said as another skill being made.
+        assert_eq!(
+            crate::make_skill_agent::not_made_try("lamp-tasks didn't make it (full)"),
+            made_skill::AGENT_FAILED_TRY
+        );
+        // End to end: the same skill made again, the agent busy.
+        let (root, keeping) = keeping("agent-busy-have");
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("busy"),
+            std::sync::Arc::new(|_: &str| Some(good())),
+        );
+        let (url, served) = service(vec![(200, good())]);
+        let asked = manage_helper(&keeping.manage);
+        let first = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(first["made"], "evening-dim", "{first}");
+        assert_eq!(first["on"], true, "{first}");
+        assert_eq!(served.join().unwrap(), 1);
+        asked.join().unwrap();
+        let _ = take_said_line();
+        // On the lamp, as the helper would have put it.
+        let on = keeping.installed.join("evening-dim");
+        std::fs::create_dir_all(&on).unwrap();
+        std::fs::write(
+            on.join("SKILL.md"),
+            "---\nname: evening-dim\nmade: here\n---\n",
+        )
+        .unwrap();
+        let (url, served) = service(vec![(200, good())]);
+        let later = NOW + ONE_ASK_WITHIN.as_millis() as u64 + 1;
+        let again = made_by(&keeping, url, Some(&tasks.agent()), later);
+        assert_eq!(served.join().unwrap(), 1);
+        let said = again.to_string();
+        assert!(
+            said.contains("You already have that skill: evening dim."),
+            "{again}"
+        );
+        assert!(!said.contains(made_skill::AGENT_BUSY_TRY), "{again}");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = take_said_line();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #7555: a skill whose one say begins "cannot:" was
+    /// said "I couldn't make that: cannot: ...". The head is the model's
+    /// answer form, never words the person hears.
+    #[test]
+    fn a_say_that_begins_cannot_is_never_spoken_with_its_head() {
+        let gold = good().replace(
+            "[[do]]\nlight = { dim = 1 }\n",
+            "[[do]]\nsay = { text = \"cannot: checking the gold price for you.\" }\n",
+        );
+        assert_ne!(gold, good());
+        let (root, keeping) = keeping("cannot-say");
+        let (url, served) = service(vec![(200, gold)]);
+        let told = make(PLANT, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 1);
+        assert!(told.get("made").is_none(), "{told}");
+        let why = "checking the gold price for you.";
+        assert_eq!(told["error"], format!("the skill couldn't be made: {why}"));
+        let line = made_skill::not_made_line(why);
+        assert_eq!(told["next"], made_skill::not_made_in_their_language(&line));
+        assert!(
+            !told.to_string().to_lowercase().contains("cannot:"),
+            "{told}"
+        );
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }

@@ -5311,10 +5311,18 @@ the same code for both writers.
   make run here (`NoMakeRun`) is not the agent's failure: DeepSeek's
   stands as it is. So does a skill DeepSeek made after all, a lamp reason
   of its own (it can't do that yet, they already have it) and the brief's
-  own refusals, but never when the agent was busy: busy, the agent would
-  have made it, so the busy line is said whatever DeepSeek answered
-  (lamp-9adf, 17 Nov 18:19, a busy hand-over said as "I couldn't make
-  that: I couldn't make that one."). A repair the agent doesn't answer
+  own refusals. When the agent was busy, a refusal it would have taken
+  over is said as busy, whatever DeepSeek answered: its `cannot:` but for
+  a brief's own refusal that stays DeepSeek's (`stays_deepseeks`), or a
+  check's refusal it would have written again (lamp-9adf, 17 Nov 18:19, a
+  busy hand-over said as "I couldn't make that: I couldn't make that
+  one."). A lamp reason that stands whoever writes the skill
+  (`made_skill::lamps_own_reason`: they already have it, its name is taken
+  with no free one, the lamp has nothing that reads it, or what the
+  lamp's check says a skill can't do yet but for `ECHOES_THE_ASK`) stands
+  even while the agent is busy, so asking for a skill they already have
+  is told "You already have that skill: ..." (Heron's P3 on #7555; test
+  `a_lamps_own_reason_stands_while_the_agent_is_busy`). A repair the agent doesn't answer
   (busy, late, failed) is said the same way, never "the lamp's model
   didn't answer". With no Hermes agent on the lamp nothing changes: DeepSeek makes
   it alone with its repairs. Either switch off, every make tries DeepSeek
@@ -5392,7 +5400,10 @@ the same code for both writers.
   (`made_skill::cannot_in_a_say`, in the make's `kept`, by DeepSeek or the
   agent): it goes to the agent, or with `LAMP_MAKE_NO_CANNOT=on` becomes
   its task, and off is refused with those words ("I can't do that yet:
-  checking the gold price for you."). Such a say beside other steps is
+  checking the gold price for you."). A say that itself begins with
+  `cannot:` is read without that head, so the person never hears
+  "cannot:" (Heron's P3 on #7555; test
+  `a_say_that_begins_cannot_is_never_spoken_with_its_head`). Such a say beside other steps is
   refused by the check (`made_skill::SAYS_IT_CANNOT`) and repaired to
   leave that part out. On lamp-9adf, 17 Nov, "tell me the gold price every
   evening at six" was kept as one say of it, said each evening.

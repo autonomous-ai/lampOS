@@ -2176,9 +2176,16 @@ cả hai người viết.
   `no_answer`; không trả lời trong 90 giây) và thất bại của DeepSeek giữ
   nguyên, người dùng nghe câu của agent thay cho lời khuyên "Try asking for
   one thing" (mục A3, 16/11): "Another skill is being made right now; ask
-  me again in a minute." (bận: luôn nói câu này, dù DeepSeek trả lời gì;
-  lamp-9adf, 17/11 18:19, một lần giao lúc bận bị nói thành "I couldn't make
-  that: I couldn't make that one."; một lần sửa mà agent không trả lời cũng
+  me again in a minute." (bận: lời từ chối mà agent lẽ ra đã nhận thì nói
+  câu này, dù DeepSeek trả lời gì; lamp-9adf, 17/11 18:19, một lần giao lúc
+  bận bị nói thành "I couldn't make that: I couldn't make that one."; một lý
+  do của chính đèn, đứng vững dù ai viết skill
+  (`made_skill::lamps_own_reason`: người dùng đã có skill đó, tên đã bị dùng
+  mà không còn tên trống, đèn không có gì đọc được điều đó, hoặc điều mà
+  bước kiểm tra của đèn nói skill chưa làm được, trừ `ECHOES_THE_ASK`), và
+  một lời từ chối của chính brief vẫn là của DeepSeek, thì giữ nguyên cả khi
+  agent bận, nên xin một skill đã có thì nghe "You already have that skill:
+  ..." (P3 của Heron trên #7555); một lần sửa mà agent không trả lời cũng
   nói câu của agent, không bao giờ "the lamp's model didn't answer"), "The
   lamp's agent didn't answer in time; try again." hoặc "The
   lamp's agent couldn't make it just now; try again."; khi rốt cuộc không
@@ -2230,7 +2237,8 @@ cả hai người viết.
   tạo, của DeepSeek hay agent): nó đi tới agent, hoặc với
   `LAMP_MAKE_NO_CANNOT=on` thành việc của agent, và khi tắt thì bị từ chối
   bằng chính lời đó ("I can't do that yet: checking the gold price for
-  you."). Say như vậy bên cạnh bước khác bị bước kiểm tra từ chối
+  you."). Một say tự bắt đầu bằng `cannot:` được đọc mà bỏ phần đầu đó, nên
+  người dùng không bao giờ nghe "cannot:" (P3 của Heron trên #7555). Say như vậy bên cạnh bước khác bị bước kiểm tra từ chối
   (`made_skill::SAYS_IT_CANNOT`) và được sửa để bỏ phần đó. Trên lamp-9adf,
   17/11, "tell me the gold price every evening at six" được giữ là một say
   như vậy, nói mỗi tối.

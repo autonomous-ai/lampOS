@@ -3537,7 +3537,12 @@ as a Harness task with the agent's own tools
   `skill-task.sock`, made as its other sockets are. It takes lines only
   from `lamp-voice.service` run as root, as the kernel names the caller; any
   other caller is closed with no answer. One make runs at a time; a second
-  is refused `busy`. It is bound with `LAMP_SKILL_TASKS`, not only when
+  is refused `busy`. With every connection it holds (`MOST_CONNECTIONS`,
+  2) taken while no make runs, each still sending its line or taking its
+  answer, a make is refused `full` (`skill_make::FULL`), never `busy`, so
+  the voice says "The lamp's agent couldn't make it just now; try
+  again.", never that another skill is being made (Heron's P3 on #7555;
+  test `every_connection_held_with_no_make_running_is_full_not_busy`). It is bound with `LAMP_SKILL_TASKS`, not only when
   the hand-over is on: the hand-over's switch, `LAMP_MAKE_SKILL_AGENT`, is
   lamp-voice's alone (set in lamp-voice's unit, and the unit census keeps
   it there), so lamp-tasks can't see it; a socket no one hands a make to
