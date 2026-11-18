@@ -719,3 +719,67 @@ fn a_code_skill_put_back_with_scripts_off_stays_off() {
     made_skill::set_scripts_here(None);
     let _ = fs::remove_dir_all(&root);
 }
+
+/// Fix 1 of #7828's DEFAULT-ON (lamp-9adf, 19 Nov, on the second route:
+/// "Do you want me to make it again?", "Did you mean the flip-a-coin
+/// skill? Say the word and I'll remove it.", "Which one…?" to "remove
+/// it"): with the switch on, `make_skill` tells the model to make and to
+/// remove at once with the undo in its line, never asking first, and
+/// asking which only when two skills they made fit alike, never of "it";
+/// within the link's bounds with every switch the lamp's unit sets on.
+/// Off, the description and the remove are as before.
+#[test]
+fn make_and_remove_are_told_at_once_and_never_asked_first() {
+    made_skill::set_scripts_here(Some(true));
+    made_skill::set_writes_here(Some(true));
+    made_skill::set_off_said_here(Some(true));
+    crate::skill_task_yes::set_on_here(Some(true));
+    let remove_of = |tool: &lamp_gemini::Tool| {
+        tool.parameters.as_ref().unwrap()["properties"][crate::made_remove::REMOVE]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    set_here(Some(false));
+    let off = crate::make_skill_local::tool();
+    assert!(
+        !off.description.contains(AT_ONCE_TOLD),
+        "{}",
+        off.description
+    );
+    assert!(!remove_of(&off).contains(REMOVE_AT_ONCE_TOLD));
+    set_here(Some(true));
+    let on = crate::make_skill_local::tool();
+    assert!(on.description.ends_with(AT_ONCE_TOLD), "{}", on.description);
+    for part in ["at once", "never ask", "undo"] {
+        assert!(on.description.contains(part), "{part}: {}", on.description);
+    }
+    let remove = remove_of(&on);
+    assert!(remove.ends_with(REMOVE_AT_ONCE_TOLD), "{remove}");
+    for part in [
+        "at once",
+        "never asking first",
+        "two skills they made",
+        "\"it\"",
+    ] {
+        assert!(remove.contains(part), "{part}: {remove}");
+    }
+    // "Put it back" by a removed skill's name is the undo, never a make.
+    let undo = on.parameters.as_ref().unwrap()["properties"][UNDO]["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(undo.contains("never a new make"), "{undo}");
+    assert!(on.description.len() <= 1_024, "{}", on.description.len());
+    let parameters = on.parameters.as_ref().unwrap().to_string().len();
+    assert!(
+        parameters <= lamp_gemini::MAX_TOOL_JSON_BYTES,
+        "{parameters}"
+    );
+    assert!(on.validate().is_ok());
+    crate::skill_task_yes::set_on_here(None);
+    made_skill::set_off_said_here(None);
+    made_skill::set_writes_here(None);
+    made_skill::set_scripts_here(None);
+    set_here(None);
+}

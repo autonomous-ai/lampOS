@@ -934,6 +934,11 @@ pub fn tool() -> lamp_gemini::Tool {
     } else {
         REMOVE_TOLD
     });
+    // A make or a remove at once, never asked first (`LAMP_MAKE_NO_ASKS`,
+    // #7828's fix 1), the rest told on the remove's parameter.
+    if crate::make_no_asks::on() {
+        description.push_str(crate::make_no_asks::AT_ONCE_TOLD);
+    }
     // A thing for the lamp to do at a time or on a repeat is a skill, never
     // a reminder (`LAMP_SKILL_RECURRING_TOLD`, lamp-9adf, 17 Nov): told on
     // the request, since with every switch on the description has no room.
@@ -1084,11 +1089,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     });
     // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`,
     // [`crate::make_no_asks::undo`]): the model judges the words.
+    // With it, a remove is called at once and asked of only when two fit
+    // (#7828's fix 1), and a removed skill asked back by its name is the
+    // undo, never a new make (fix 2).
     if crate::make_no_asks::on() {
         parameters["properties"][crate::make_no_asks::UNDO] = json!({
             "type": "string",
-            "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request."
+            "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" or \"put NAME back\" after one was removed, never a new make): \"last\", or the skill's name as they said it, given alone with no request."
         });
+        let remove = format!(
+            "{}{}",
+            parameters["properties"][crate::made_remove::REMOVE]["description"]
+                .as_str()
+                .unwrap_or_default(),
+            crate::make_no_asks::REMOVE_AT_ONCE_TOLD
+        );
+        parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(remove);
     }
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",

@@ -7828,6 +7828,19 @@ reset still ask. On (`crate::make_no_asks`):
 - **Never "on" while off.** A put-on that fails is said in one plain line
   with why ("I made it but couldn't put it on: …"), and leaves nothing to
   undo.
+- **Called at once, never asked first** (#7828's DEFAULT-ON, fix 1: on
+  lamp-9adf's second route the model still asked "Do you want me to make
+  it again?", "Did you mean the flip-a-coin skill? Say the word and I'll
+  remove it." and, to "remove it", "Which one…?"). `make_skill`'s
+  description ends "Make or remove at once, never asking first, even of
+  one they have: your line gives the undo."
+  (`make_no_asks::AT_ONCE_TOLD`); its `remove` parameter adds "Call it at
+  once, never asking first or for a yes; ask which only when two skills
+  they made fit the words alike, never of "it"."
+  (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` names "put NAME back"
+  beside "put it back", never a new make. With every switch the product's
+  unit sets on, the description stays within the link's 1,024 bytes and
+  the parameters within its 4,096.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
