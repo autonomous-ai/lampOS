@@ -524,6 +524,26 @@ pub fn quick_reaction(toml: &str) -> bool {
         && reaction_steps
         && !table.contains_key("while")
         && !table.contains_key("grants")
+        && !says_a_marker(&table)
+}
+
+/// Whether a say step's words begin, in any case, with the make's own
+/// marker: [`crate::make_no_cannot::NEEDS_NET`] or [`CANNOT`], the model's
+/// line for what no step does, written as words to say (lamp-9adf, 18
+/// Nov: "internet: current price of Zorbo coin"). Never a quick reaction
+/// ([`quick_reaction`]) and never kept ([`held`]).
+fn says_a_marker(table: &toml::Table) -> bool {
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("say")?.get("text")?.as_str())
+        .any(|text| {
+            [crate::make_no_cannot::NEEDS_NET, CANNOT]
+                .iter()
+                .any(|marker| after_word(text.trim_start(), marker).is_some())
+        })
 }
 
 /// Why `answer`, a DeepSeek draft, goes to the lamp's agent with
@@ -3016,6 +3036,12 @@ pub const SAY_HOURS: (&str, &str) = ("07:00", "22:00");
 const SAY_NOT_TEXT: &str = "what it would say isn't its exact words; try saying the words \
                             themselves, like 'Welcome back!'";
 
+/// Why a say step whose words are the make's own marker is refused
+/// (lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" kept as a say of
+/// "internet: current price of Zorbo coin", read aloud as it stood): a
+/// draft the model got wrong, never kept, whatever the switches.
+pub const SAY_IS_MARKER: &str = "what it would say is a note for the lamp, not words to say";
+
 /// A Unicode format character (general category Cf): zero-width marks,
 /// bidirectional controls and the like (U+200B, U+202E), which
 /// [`char::is_control`] doesn't cover (App Only's P2b on #6062).
@@ -5179,6 +5205,24 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 .flatten()
         };
         let says: Vec<&toml::Value> = steps().filter_map(|step| step.get("say")).collect();
+        // The make's own marker as its words (lamp-9adf, 18 Nov): a draft
+        // the model got wrong, refused for its repair whatever the
+        // switches, so never a skill that reads a note aloud.
+        if says_a_marker(table) {
+            let net = crate::make_no_cannot::net_by_agent();
+            let markers = if net {
+                format!("A {} or {CANNOT} line", crate::make_no_cannot::NEEDS_NET)
+            } else {
+                format!("A {CANNOT} line")
+            };
+            return Err(Refused(
+                SAY_IS_MARKER.into(),
+                Some(format!(
+                    "The lamp refused it: {SAY_IS_MARKER}. {markers} is the whole answer, one \
+                     line and no blocks, never the words of a say step."
+                )),
+            ));
+        }
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
@@ -18803,6 +18847,72 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         ] {
             assert_eq!(not_a_reaction(answer), None, "{answer}");
         }
+    }
+
+    /// lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" was kept as a
+    /// say of DeepSeek's own `internet:` line, read aloud as it stood. A
+    /// say that is the model's marker (`internet:` or `cannot:`) is never
+    /// a quick reaction, so the lamp's agent makes it, and never kept, on
+    /// any route and whatever the switches.
+    const ZORBO_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+                              permissions = { speak = true }\n\
+                              asks = [\"tell me the price of Zorbo coin\"]\n\
+                              [ask]\npolicy = \"nudge\"\n\
+                              [[do]]\nsay = { text = \"internet: current price of Zorbo coin\" }\n";
+
+    #[test]
+    fn a_say_of_the_models_marker_is_no_quick_reaction() {
+        assert!(!quick_reaction(ZORBO_TOML));
+        assert_eq!(
+            not_a_reaction(&answer(ZORBO_TOML, CARD)).as_deref(),
+            Some("not a quick reaction")
+        );
+        for marker in ["  Internet: the price", "CANNOT: look it up", "cannot:x"] {
+            let made = ZORBO_TOML.replace("internet: current price of Zorbo coin", marker);
+            assert!(!quick_reaction(&made), "{made}");
+        }
+        // Exact words of the person's own are still DeepSeek's.
+        let coffee = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "go get that coffee, champ",
+        );
+        assert!(quick_reaction(&coffee), "{coffee}");
+        assert_eq!(not_a_reaction(&answer(&coffee, CARD)), None);
+        // Only at its start: a word inside the line is words.
+        let inside = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "the internet: what a place",
+        );
+        assert!(quick_reaction(&inside), "{inside}");
+    }
+
+    #[test]
+    fn a_say_of_the_models_marker_is_never_kept() {
+        set_asks_here(Some(true));
+        for reads in [false, true] {
+            let refused = capped_with(ZORBO_TOML, reads).unwrap_err();
+            assert_eq!(refused.0, SAY_IS_MARKER, "{reads}");
+            let lines = refused.1.expect("repair lines");
+            assert!(lines.contains(SAY_IS_MARKER), "{lines}");
+        }
+        assert_eq!(put_on_cap(ZORBO_TOML).unwrap_err().0, SAY_IS_MARKER);
+        let cannot = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            " Cannot: check prices",
+        );
+        assert_eq!(capped(&cannot).unwrap_err().0, SAY_IS_MARKER);
+        // Whatever the route's switch.
+        for on in [Some(false), Some(true)] {
+            set_reactions_here(on);
+            assert_eq!(capped(ZORBO_TOML).unwrap_err().0, SAY_IS_MARKER);
+        }
+        set_reactions_here(None);
+        let coffee = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "go get that coffee, champ",
+        );
+        assert!(capped(&coffee).is_ok(), "{coffee}");
+        set_asks_here(None);
     }
 
     /// sip-of-water's guards in the agent's template (#6811, points 2 and
