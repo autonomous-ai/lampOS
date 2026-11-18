@@ -557,28 +557,6 @@ impl VoiceSound {
     }
 }
 
-/// An explicit setting from a trusted attention/user input owner. Quiet room,
-/// silence, a transcript and a wake word must never be substituted for it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Concentration {
-    pub stamp: ClockStamp,
-    pub concentrating: bool,
-}
-
-impl Concentration {
-    pub const TYPE: &str = "lamp_msgs/Concentration";
-    pub const VERSION: u32 = 1;
-    pub const TOPIC: &str = "attention/concentration";
-
-    pub fn declaration() -> Declaration {
-        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
-    }
-
-    pub fn check(&self) -> Result<(), Invalid> {
-        self.stamp.check()
-    }
-}
-
 /// Offsets in radians, not servo counts or absolute readback positions.
 /// The body adds these to its calibrated safe posture / attended heading,
 /// arbitrates deliberate Actions first, and enforces its own motion limits.
@@ -932,7 +910,6 @@ pub fn expression_topics() -> Vec<(&'static str, Declaration)> {
         (VoicePlayout::TOPIC, VoicePlayout::declaration()),
         (VoiceProgress::TOPIC, VoiceProgress::declaration()),
         (VoiceSound::TOPIC, VoiceSound::declaration()),
-        (Concentration::TOPIC, Concentration::declaration()),
         (ExpressionBody::TOPIC, ExpressionBody::declaration()),
         (ExpressionLight::TOPIC, ExpressionLight::declaration()),
         (ExpressionState::TOPIC, ExpressionState::declaration()),

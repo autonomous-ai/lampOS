@@ -1,10 +1,10 @@
 use lamp_bus::{Bus, Header, Kind, Message};
 use lamp_expression::{Catalogue, Engine, Input, Output, runtime};
 use lamp_msgs::{
-    ClockStamp, Concentration, ExpressionBody, ExpressionRestOp as Op,
-    ExpressionRestPhase as Phase, ExpressionRestRequest as Request, ExpressionRestState as Receipt,
-    ExpressionSleepClaim, ExpressionState, JointState, MuteReason, NameHeard, Pause, Voice,
-    VoiceEvent, VoiceMute, VoiceProgress, VoiceTiming,
+    ClockStamp, ExpressionBody, ExpressionRestOp as Op, ExpressionRestPhase as Phase,
+    ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionSleepClaim,
+    ExpressionState, JointState, MuteReason, NameHeard, Pause, Voice, VoiceEvent, VoiceMute,
+    VoiceProgress, VoiceTiming,
 };
 use std::{
     fs,
@@ -419,10 +419,10 @@ fn privacy_concentration_and_cancelled_voice_cancel_without_resumption() {
                 .engine
                 .ingest(
                     fixture.now,
-                    Input::Concentration(Concentration {
+                    Input::HeadDown {
                         stamp: stamp(fixture.now, 1),
-                        concentrating: true,
-                    }),
+                        down: true,
+                    },
                 )
                 .unwrap(),
             _ => {
@@ -1101,10 +1101,10 @@ fn the_claimed_nights_sleep_holds_through_what_does_not_wake_the_built_in_one() 
             .engine
             .ingest(
                 fixture.now,
-                Input::Concentration(Concentration {
+                Input::HeadDown {
                     stamp: stamp(fixture.now, 1),
-                    concentrating: true,
-                }),
+                    down: true,
+                },
             )
             .unwrap();
         fixture.offer(1, Op::Rest).unwrap();

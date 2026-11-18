@@ -102,7 +102,7 @@ fn every_authored_fixture_has_exact_counts_and_only_its_declared_refusals() {
         ("no-concentration", DEFAULT_CONCENTRATION, 7, 0),
         ("rest-quiet", QUIET, 2244, 0),
         ("rest-busy", BUSY, 804, 0),
-        ("rest-concentrating", CONCENTRATING, 805, 0),
+        ("rest-concentrating", CONCENTRATING, 855, 0),
         ("rest-expired", EXPIRED, 766, 0),
     ] {
         let (summary, ticks, _) = run(text.as_bytes(), catalogue(), true, None);

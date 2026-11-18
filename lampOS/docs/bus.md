@@ -569,8 +569,8 @@ service, and keeps trying`, with for how long.
 ## Optional Expression topics (Third, 2026-10-14)
 
 The new `lamp-expression` process subscribes to existing context and new
-`voice/timing`, `voice/activity`, `voice/playout` and
-`attention/concentration` messages. It publishes `expression/state` and
+`voice/timing`, `voice/activity`, `voice/playout` and, with
+`LAMP_EXPRESSION_HEAD_DOWN=on`, `room/activity` messages. It publishes `expression/state` and
 its `diagnostics`, and only with `--enable` may publish leased
 `expression/body` and `expression/light` requests. It does not publish on
 the existing Actions-owned `light/command`. Their types, periods and
