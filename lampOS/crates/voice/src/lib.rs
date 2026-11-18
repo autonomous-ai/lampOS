@@ -109,6 +109,7 @@ pub mod known_faces;
 pub mod language;
 pub mod light_told;
 pub mod listen_gaps;
+pub mod live_fact;
 pub mod local_time;
 pub mod long_make;
 pub mod made_clash;

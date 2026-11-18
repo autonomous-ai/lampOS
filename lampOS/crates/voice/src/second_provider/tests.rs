@@ -25,6 +25,7 @@ mod just_made_note;
 mod keep_at_once;
 mod keep_whole;
 mod limit_local;
+mod live_fact;
 mod made_line;
 mod made_not_on;
 mod made_turn_said;
@@ -105,6 +106,8 @@ struct Script {
     unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
+    /// Functions the chat declares none of ([`Services::declares`]).
+    undeclared: &'static [&'static str],
     /// Speech of this sentence is this many samples, in whole packets: a
     /// line as long as the lamp's voice says it.
     lasting: Option<(&'static str, usize)>,
@@ -368,7 +371,7 @@ impl Services for Script {
     }
 
     fn declares(&self, _messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
-        Some(!without.contains(&name))
+        Some(!without.contains(&name) && !self.undeclared.contains(&name))
     }
 
     fn measured(&self, messages: &[Message], _told: ChatTold) -> Option<(usize, usize)> {
