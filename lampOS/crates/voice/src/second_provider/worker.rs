@@ -4128,6 +4128,12 @@ pub fn serve(
             );
         }
     }
+    // With `LAMP_FACE_NO_ASK` and names checked, a yes at setup runs no
+    // face save and asks no face question: the setup face is kept only on
+    // the speaker's own proof (the first builder's ruling on #7810).
+    if crate::known_faces::face_no_ask_on() && renames_checked {
+        engine = engine.keeping_faces_unasked(true);
+    }
     // A reply that says it saved their face with no remember_my_face call
     // is judged as a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`,
     // #5141 row 8).
