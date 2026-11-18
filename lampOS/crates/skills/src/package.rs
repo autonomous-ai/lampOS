@@ -374,10 +374,15 @@ fn part_ok(part: &str) -> bool {
 
 /// A file's path in a skill: 1 to `MOST_DEPTH` good parts.
 fn path_ok(path: &str) -> Result<(), String> {
+    path_ok_within(path, MOST_DEPTH)
+}
+
+/// A file's path: 1 to `depth` good parts.
+pub(crate) fn path_ok_within(path: &str, depth: usize) -> Result<(), String> {
     let parts: Vec<&str> = path.split('/').collect();
-    if parts.len() > MOST_DEPTH || !parts.iter().all(|part| part_ok(part)) {
+    if parts.len() > depth || !parts.iter().all(|part| part_ok(part)) {
         return Err(format!(
-            "{path:?}: a skill's paths are at most {MOST_DEPTH} parts of letters, digits, -, _ and ., \
+            "{path:?}: a skill's paths are at most {depth} parts of letters, digits, -, _ and ., \
              none beginning with a dot"
         ));
     }
@@ -650,7 +655,18 @@ enum Check<'a> {
     Author(&'a [[u8; 32]]),
 }
 
-fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
+/// A package's tar read: the manifest's and the signature's bytes, if
+/// present, and every other file by its path in the one folder, which
+/// is the package's. Nothing is checked against the manifest here.
+pub(crate) struct Tar {
+    pub manifest: Option<Vec<u8>>,
+    pub signature: Option<Vec<u8>>,
+    pub files: Files,
+    pub folder: Option<String>,
+}
+
+/// Reads a package's tar, `depth` parts of path at most inside the folder.
+pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
@@ -686,7 +702,7 @@ fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
             }
             folder = Some(top.to_owned());
             match rest {
-                Some(rest) => path_ok(rest).map(|()| Some(rest.to_owned())),
+                Some(rest) => path_ok_within(rest, depth).map(|()| Some(rest.to_owned())),
                 None => Ok(None),
             }
         };
@@ -730,6 +746,21 @@ fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
             return Err(format!("{path}: twice in the package"));
         }
     }
+    Ok(Tar {
+        manifest,
+        signature,
+        files,
+        folder,
+    })
+}
+
+fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
+    let Tar {
+        manifest,
+        signature,
+        files,
+        folder,
+    } = read_tar(bytes, MOST_DEPTH)?;
     let manifest = manifest.ok_or(format!("no {MANIFEST}: not a skill's package"))?;
     let (signed_by, author) = match check {
         Check::None => (None, None),
@@ -749,6 +780,17 @@ fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
             (Some(author.fingerprint.clone()), Some(author))
         }
     };
+    // The format first, so a package of another format (an app's, 2) is
+    // said to be one, not refused for a field it has (#7415 piece 1).
+    if let Some(format) = serde_json::from_slice::<serde_json::Value>(&manifest)
+        .ok()
+        .and_then(|value| value.get("format").and_then(serde_json::Value::as_u64))
+        && format != u64::from(FORMAT)
+    {
+        return Err(format!(
+            "{MANIFEST}: format {format} is not one this lamp reads ({FORMAT})"
+        ));
+    }
     let manifest: Manifest =
         serde_json::from_slice(&manifest).map_err(|error| format!("{MANIFEST}: {error}"))?;
     if manifest.format != FORMAT {
