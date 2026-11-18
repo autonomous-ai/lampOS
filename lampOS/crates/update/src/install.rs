@@ -4373,14 +4373,18 @@ mod tests {
         );
         // The CDN's copy does not match: GitHub's is taken.
         let mut channel = Mirrors::default();
-        channel.files.insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        channel
+            .files
+            .insert(CDN_MODEL.into(), b"tampered model".to_vec());
         channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
         let served = fetch_genuine(&mut channel, GITHUB_MODEL);
         assert_eq!(served, (Ok(()), genuine.clone()));
         assert_eq!(channel.asked.len(), 2);
         // Neither matches: refused, and GitHub's answer is the one said.
         let mut channel = Mirrors::default();
-        channel.files.insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        channel
+            .files
+            .insert(CDN_MODEL.into(), b"tampered model".to_vec());
         let (fetched, _) = fetch_genuine(&mut channel, GITHUB_MODEL);
         assert_eq!(
             fetched,
