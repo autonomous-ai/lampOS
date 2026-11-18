@@ -106,12 +106,16 @@ fn went_all(
 
 /// How a turn is set up: `late` as for [`went_all`]; `switch`,
 /// `LAMP_MADE_SKILL_OFF_SAID` on; `owner`, the lines the owner's (a guest's
-/// turn is refused by `make_skill` as `made_turn::asked` refuses it).
+/// turn is refused by `make_skill` as `made_turn::asked` refuses it);
+/// `refuses`, every run once on refused ([`REFUSED`], and btc price's
+/// function [`STILL_DOING`]), as a skill that does something only at its
+/// own moment.
 #[derive(Clone, Copy, Debug)]
 struct Setup {
     late: usize,
     switch: bool,
     owner: bool,
+    refuses: bool,
 }
 
 impl Default for Setup {
@@ -120,9 +124,17 @@ impl Default for Setup {
             late: 0,
             switch: true,
             owner: true,
+            refuses: false,
         }
     }
 }
+
+/// lamp-skills' refusal of a run now of a skill that does something only at
+/// its own moment.
+const REFUSED: &str = "it has nothing to do but at its own moment";
+
+/// btc price's function refusing its call once on.
+const STILL_DOING: &str = "I'm still doing that.";
 
 /// [`went_all`] as `setup` says.
 fn went_as(
@@ -135,6 +147,7 @@ fn went_as(
         late,
         switch,
         owner,
+        refuses,
     } = setup;
     crate::made_skill::set_off_said_here(Some(switch));
     let history: Vec<Message> = before
@@ -155,10 +168,11 @@ fn went_as(
             && owner
             && let Some(asked) = args[crate::made_run::RUN].as_str()
         {
-            run_now(asked, &keeping, &on, late, switch)
+            run_now(asked, &keeping, &on, late, switch, refuses)
         } else if name == FUNCTION {
             let mut on = on.lock().unwrap();
             match on.as_mut() {
+                Some(0) if refuses => json!({ "error": STILL_DOING }),
                 Some(0) => json!({"price": "90,000 dollars"}),
                 Some(late) => {
                     *late -= 1;
@@ -172,6 +186,8 @@ fn went_as(
             let answer = make_skill_answers(&args);
             if answer["off"] == false {
                 *on.lock().unwrap() = Some(late);
+            } else if answer["off"] == true {
+                *on.lock().unwrap() = None;
             }
             answer
         } else {
@@ -263,15 +279,21 @@ fn run_now(
     on: &Mutex<Option<usize>>,
     late: usize,
     switch: bool,
+    refuses: bool,
 ) -> Value {
     let is_off = |_: &str| on.lock().unwrap().is_none();
     let turn_on = |_: &str| {
         *on.lock().unwrap() = Some(late);
         Ok(())
     };
+    let turn_off = |_: &str| {
+        *on.lock().unwrap() = None;
+        Ok(())
+    };
     let turns = switch.then_some(crate::made_run::TurnsOn {
         is_off: &is_off,
         turn_on: &turn_on,
+        turn_off: &turn_off,
         wait: Duration::from_millis(1),
     });
     crate::made_run::asked_turning(
@@ -287,6 +309,7 @@ fn run_now(
         |_| {
             let mut on = on.lock().unwrap();
             match on.as_mut() {
+                Some(0) if refuses => Err(REFUSED.to_owned()),
                 Some(0) => Ok(false),
                 Some(late) => {
                     *late -= 1;
@@ -804,4 +827,110 @@ fn switch_off_a_run_now_of_an_off_skill_is_as_before() {
     assert!(told.contains(crate::made_run::STOPPED), "{told}");
     assert!(told.contains("space facts didn't run now"), "{told}");
     assert!(!told.contains("undo"), "{told}");
+}
+
+/// Heron's P3 on #7562: the model's own `turn_on` of space facts, then its
+/// run now twice in the turn: the undo line is said once, with the first
+/// run; the second is told as any run.
+#[test]
+fn the_undo_after_the_models_turn_on_is_said_once_in_the_turn() {
+    let went = went(
+        "Lamp, tell me a space fact with my space facts skill.",
+        vec![
+            calls(
+                "c1",
+                crate::made_skill::MAKE,
+                json!({ crate::made_turn::TURN_ON: "space facts" }),
+            ),
+            run_space("c2"),
+            run_space("c3"),
+            saying(&format!("{SPACE_UNDO} Space facts is running now.")),
+        ],
+    );
+    assert_eq!(names(&went), vec![crate::made_skill::MAKE; 3], "{went:?}");
+    let first = told_for(&went, "c2");
+    assert!(first.contains(SPACE_UNDO), "{first}");
+    let again = told_for(&went, "c3");
+    assert!(again.contains("\"ran\":true"), "{again}");
+    assert!(!again.contains(SPACE_UNDO), "{again}");
+    assert!(!again.contains("turned_on"), "{again}");
+}
+
+/// Heron's P2 on #7562, the second route: space facts turned on by the
+/// model's own `turn_on`, then its run now refused (it does something only
+/// at its own moment): turned off again by the lamp's own `make_skill`
+/// `turn_off`, and the model told plainly it didn't run and is still off,
+/// with no undo.
+#[test]
+fn a_run_refused_after_the_models_turn_on_turns_it_off_again() {
+    let went = went_as(
+        None,
+        &["Lamp, tell me a space fact with my space facts skill."],
+        vec![
+            calls(
+                "c1",
+                crate::made_skill::MAKE,
+                json!({ crate::made_turn::TURN_ON: "space facts" }),
+            ),
+            run_space("c2"),
+            saying("Space facts didn't run, and it is still off."),
+        ],
+        Setup {
+            refuses: true,
+            ..Setup::default()
+        },
+    );
+    assert_eq!(went.ran.len(), 3, "{went:?}");
+    assert_eq!(
+        went.ran[2],
+        (
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_turn::TURN_OFF: "space facts" })
+        ),
+        "{went:?}"
+    );
+    let told = told_for(&went, "c2");
+    assert!(told.contains(REFUSED), "{told}");
+    assert!(told.contains("still off"), "{told}");
+    assert!(!told.contains(SPACE_UNDO), "{told}");
+}
+
+/// The same for the lamp's own turn on for a use of btc price's function:
+/// its run again refused, btc price is turned off again and said still
+/// off; a call of it again in the turn is never run.
+#[test]
+fn a_function_refused_after_the_turn_on_for_the_ask_turns_it_off_again() {
+    let went = went_as(
+        None,
+        &[USE],
+        vec![
+            calls("c1", FUNCTION, json!({})),
+            calls("c2", FUNCTION, json!({})),
+            saying("Btc price didn't run, and it is still off."),
+        ],
+        Setup {
+            refuses: true,
+            ..Setup::default()
+        },
+    );
+    assert_eq!(
+        names(&went),
+        [
+            FUNCTION,
+            crate::made_skill::MAKE,
+            FUNCTION,
+            crate::made_skill::MAKE
+        ],
+        "{went:?}"
+    );
+    assert_eq!(
+        went.ran[3].1,
+        json!({ crate::made_turn::TURN_OFF: "btc price" }),
+        "{went:?}"
+    );
+    let told = told_for(&went, "c1");
+    assert!(told.contains(STILL_DOING), "{told}");
+    assert!(told.contains("still off"), "{told}");
+    assert!(!told.contains(UNDO), "{told}");
+    assert!(told_for(&went, "c2").contains("Not run again"), "{went:?}");
 }

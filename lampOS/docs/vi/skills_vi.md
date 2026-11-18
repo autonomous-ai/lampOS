@@ -2254,8 +2254,9 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   `off` của lamp-skills, mỗi lượt được nghe trên tuyến thứ hai cho mô hình
   một ghi chú (`made_turn::off_note`): có bao nhiêu kỹ năng đang tắt, không
   bao giờ nói là kỹ năng nào; rằng một câu xin dùng hay chạy một kỹ năng
-  như vậy gọi hàm của nó như mọi kỹ năng, và đèn bật nó lên cho yêu cầu
-  của chủ (bên dưới); và `made_turn::BACK_ON_BY_CALL` ("A skill turned off
+  như vậy gọi nó như mọi kỹ năng, bằng hàm của nó, bằng `use_skill` với tên
+  của nó, hoặc bằng `make_skill` với `run`, không bao giờ chỉ `turn_on`, và
+  đèn bật nó lên cho yêu cầu của chủ (bên dưới); và `made_turn::BACK_ON_BY_CALL` ("A skill turned off
   is turned back on by calling make_skill with turn_on and its name, when
   their line asks to turn it on, or by the lamp when the owner asks to use
   it; never say it is on or back on unless a call's answer says so."). Câu
@@ -2293,7 +2294,9 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   (không danh sách từ, không đọc câu "có" đơn thuần). "Turn on btc price and
   run it" bật nó, theo thứ tự nào cũng vậy; một lần chạy được gọi sau khi
   bật trong cùng lượt đi tới kỹ năng và được thử lại như trên. Khi công tắc
-  tắt, hoặc lượt không được nghe, câu trả lời của hàm được giữ nguyên.
+  tắt, hoặc lượt không được nghe, câu trả lời của hàm được giữ nguyên. Nếu
+  lần chạy lại đó bị từ chối vì lý do khác (bất kỳ `error` nào ngoài việc
+  vẫn tắt), việc bật được hoàn tác, như bên dưới.
 - **Lệnh chạy ngay cũng bật nó lên** (dòng thử của #7562 trên lamp-9adf,
   18/11: "Lamp, use my space facts skill." là lời gọi `make_skill` với `run`
   của mô hình, bị từ chối `made_run::STOPPED`, "it is turned off or
@@ -2303,10 +2306,43 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   trả lời `made_run::told_turned_on`: vẫn là một lần chạy, cùng câu hoàn tác
   (`made_turn::undo_line`). Một kỹ năng đang tạm hoãn (snooze), không có
   trong tệp `off`, không bao giờ được bật và vẫn là "didn't run now". Một
-  lời gọi có cả `turn_on` và `run` là lần chạy; câu trả lời của `turn_on`
-  bảo mô hình gọi `run` khi câu nói xin dùng nó, và một lần chạy sau
-  `turn_on` của chính mô hình cho kỹ năng đó trong lượt cũng kèm câu hoàn
-  tác. Khi công tắc tắt, giữ như trước.
+  lời gọi có cả `turn_on` và `run` cho một kỹ năng (`made_run::one_skill`:
+  cùng tên như cách viết, hoặc cùng một kỹ năng đã tạo được tìm thấy từ mỗi
+  tên) là lần chạy; cho hai kỹ năng, không làm gì và mô hình được bảo
+  `made_run::two_skills`, gọi lại từng cái riêng (P3 của Heron), không bao
+  giờ làm một cái và bỏ cái kia. Câu trả lời của `turn_on` bảo mô hình gọi
+  `run` khi câu nói xin dùng nó, và một lần chạy sau `turn_on` của chính mô
+  hình cho kỹ năng đó trong lượt cũng kèm câu hoàn tác, một lần trong lượt:
+  một lần chạy lại nó sau đó được báo như mọi lần chạy. Khi công tắc tắt,
+  giữ như trước.
+- **Qua `use_skill` cũng vậy** (dòng thử của #7562 trên lamp-9adf, 18/11:
+  sau "turn it off", "Lamp, tell me a space fact with my space facts
+  skill." là lời gọi `use_skill` của mô hình, vốn không nêu được kỹ năng đã
+  tạo nào, vì một kỹ năng đã tạo có bộ kích hoạt mà không có hàm; nó được
+  báo không có kỹ năng nào tên đó, và đèn nói nó "may have been deleted").
+  Khi công tắc bật và câu được nghe, một lời gọi `use_skill` có `skill`
+  không nêu hàm của kỹ năng nào được khớp với các kỹ năng chủ đã tạo như
+  tên của một lần chạy (`made_run::off_named`, `made_remove::found`); một
+  kỹ năng có trong tệp `off` của lamp-skills (không bao giờ là snooze) là
+  lệnh chạy ngay của `make_skill` cho nó (`made_run::use_skill_off_here`,
+  `made_run::asked_here`): chỉ của chủ, được bật cho yêu cầu, chạy, nói kèm
+  câu hoàn tác, nhật ký ghi là `tools::MADE_RUN_WHOM`. Một kỹ năng đang
+  bật, không phải của họ, hoặc khi công tắc tắt: lời từ chối như trước.
+- **Chạy hỏng thì để nó tắt** (P2 của Heron trên #7562). Một kỹ năng được
+  bật cho yêu cầu mà lần chạy sau đó bị từ chối vì lý do khác ngoài việc
+  vẫn tắt (nó chỉ làm việc vào thời điểm riêng của nó, "it has nothing to
+  do but at its own moment", hoặc `made_run::NOT_ANSWERED`) được tắt lại,
+  như chủ đã để: trong `made_run::asked_turning` bằng lệnh tắt riêng của
+  manage helper (`TurnsOn::turn_off`, `made_turn::turned_by_helper`), và
+  trên tuyến thứ hai, sau khi đèn tự bật cho một hàm hoặc sau `turn_on` của
+  chính mô hình rồi lần chạy của nó (`made_turn::failed_after_turn_on`; lời
+  từ chối thông thường của một lần chạy mang tên kỹ năng ở
+  `made_run::NOT_RAN`), bằng lời gọi `make_skill` với `turn_off` của chính
+  đèn (`made_turn::off_again`, id `OFF_AGAIN_ID`). Mô hình được bảo
+  `made_turn::not_run_still_off`: nó đã không chạy, vì sao, và nó vẫn tắt,
+  không có câu hoàn tác; nó không bao giờ được chạy lại trong lượt. Nếu
+  việc tắt lại thất bại thì nó vẫn bật: `made_turn::not_run_left_on`, nó đã
+  không chạy, vì sao, và câu hoàn tác.
 - **Chỉ nói đã tắt hay đã bật lại sau lời gọi đã làm việc đó** (dòng thử
   của #7562 trên lamp-9adf, 18/11 lúc 10:57: "Lamp, turn off my bitcoin
   price skill." không tìm thấy gì gần btc price và đưa ra các kỹ năng của

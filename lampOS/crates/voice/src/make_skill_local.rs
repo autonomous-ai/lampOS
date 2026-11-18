@@ -3977,9 +3977,14 @@ pub fn answer(
         // A turn on with a run now in the same call (#7562's row on
         // lamp-9adf, 18 Nov, request 9) is the run now, which turns a skill
         // turned off on itself ([`crate::made_run::asked_turning`]).
-        if call.args[crate::made_turn::TURN_ON].is_string()
+        // One that names two skills (Heron's P3) does neither: each is asked
+        // again as its own call, never one done and the other dropped.
+        if let Some(on) = call.args[crate::made_turn::TURN_ON].as_str()
             && let Some(name) = call.args[crate::made_run::RUN].as_str()
         {
+            if !crate::made_run::one_skill(on, name, Keeping::when(true).as_ref()) {
+                return crate::made_run::two_skills(on, name);
+            }
             return crate::made_run::asked_here(name, request, heard, lease, skills);
         }
         for (key, off) in [
