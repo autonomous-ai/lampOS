@@ -3406,6 +3406,13 @@ cả hai người viết.
   mục `made.json`; dòng do mô hình viết bị bỏ, như `made_by`, dù bật hay
   tắt. Tắt: mọi lần tạo giữ nguyên từng byte như trước. Kiểm thử: như bản
   tiếng Anh.
+- **Một `say` là dấu của chính lần tạo không bao giờ được giữ (lamp-9adf,
+  18/11: `zorbo-coin-price`, đọc to "internet: current price of Zorbo
+  coin").** Một `say` có lời bắt đầu, không phân biệt hoa thường sau khi bỏ
+  khoảng trắng, bằng `internet:` hoặc `cannot:` không phải phản ứng nhanh,
+  nên khi tuyến bật thì agent của đèn tạo nó, và luôn bị từ chối ở bước
+  kiểm tra skill tự tạo (`made_skill::SAY_IS_MARKER`, kèm dòng sửa rằng
+  dòng dấu là cả câu trả lời), bất kể công tắc. Kiểm thử: như bản tiếng Anh.
 - **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
   nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần
