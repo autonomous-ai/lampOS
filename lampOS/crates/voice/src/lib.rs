@@ -54,6 +54,7 @@ pub mod app_remember;
 pub mod app_tools;
 pub mod app_triggers;
 pub mod asker_first;
+pub mod attachments;
 pub mod attention;
 pub mod body_ask;
 pub mod body_link;
