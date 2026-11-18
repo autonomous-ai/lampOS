@@ -3952,7 +3952,7 @@ của lamp-skills.
 ## Bắt đầu bằng chính lời của người dùng (`LAMP_MADE_SKILL_ASKS=on`, tắt)
 
 Tắt nếu không đặt `LAMP_MADE_SKILL_ASKS=on`, bật trong sản phẩm, ở lamp-voice,
-lamp-skills, helper quản lý của nó, lamp-cloud và lamp-control (#7233;
+lamp-skills, helper quản lý của nó, lamp-cloud, lamp-control và lamp-tasks (#7233; lamp-tasks cho bước kiểm tra pack của agent, #7245;
 chủ đèn, 16/11: "Every task must be doable; no 'couldn't' here"). Một kỹ năng tạo tại đây, bằng giọng nói hay trong app, có thể được
 bắt đầu bằng những từ người dùng đặt cho nó, với bất kỳ bước nào một kỹ
 năng tự tạo có: một lần ghi cố định (`do.write`, gửi Gmail), một `do.task`
