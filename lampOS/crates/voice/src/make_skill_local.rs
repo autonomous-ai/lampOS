@@ -1314,7 +1314,8 @@ fn make_with_by(
 
 /// A made skill `made` with `LAMP_MAKE_NO_ASKS` ([`crate::make_no_asks`]):
 /// one that clashes, made by voice with no code of its own, replaces the
-/// others ([`crate::make_no_asks::replaced`]); any other goes on at once
+/// others on, on the owner's ask, or goes on beside them
+/// ([`crate::make_no_asks::clashed`]); any other goes on at once
 /// ([`crate::make_no_asks::put_on`]), code only on the owner's ask
 /// ([`owners_make`]). Its line kept for a cut turn. None with the switch
 /// off, or for a skill that sends, which keeps its yes.
@@ -1331,7 +1332,15 @@ fn made_no_asks(
         let clashes = crate::made_clash::found(keeping, made);
         if !clashes.is_empty() {
             let others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
-            let (told, line) = crate::make_no_asks::replaced(keeping, made, &others);
+            // Only skills on are replaced, and only on the owner's ask
+            // (Twelve's P1 on #7783); anyone else's goes on beside them.
+            let (told, line) = crate::make_no_asks::clashed(
+                keeping,
+                made,
+                &others,
+                crate::make_no_asks::turned_off_here().as_ref(),
+                || owners_make(made_in),
+            );
             MADE_LINE.with(|kept| kept.replace(Some(line)));
             return Some(told);
         }
