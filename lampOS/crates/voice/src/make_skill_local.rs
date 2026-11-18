@@ -2769,58 +2769,67 @@ fn made_and_journaled_by(
             &agent_kept,
             &models_cannot,
             &deepseek_repaired,
-            None,
         );
         return agents_made(made);
     }
-    let first = ask(Arc::clone(&chat), brief.clone());
     // With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (#6811, the first
-    // builder's ruling and the wider route he said yes to at 16:34): a
-    // draft that is no quick reaction ([`made_skill::quick_reaction`]:
+    // builder's ruling and the wider route he said yes to at 16:34), and an
+    // agent on the lamp or surely none: only a quick reaction is
+    // DeepSeek's. The owner's "do it like V1" on #7764: the make's first
+    // call is DeepSeek's judgement of the request's meaning
+    // ([`reaction_judged`]), never a draft. Judged one, DeepSeek drafts it,
+    // and a draft that is no quick reaction ([`made_skill::quick_reaction`]:
     // started by the person's own act, with only the light, a gesture, its
-    // words or its hum) is never kept. It goes to the lamp's agent with the
-    // same brief and sip-of-water's guards as its template; the agent
-    // making none, it is said so plainly and nothing is kept, never
-    // DeepSeek's unguarded draft. A `cannot:` (a one-off reminder among
-    // them, the lamp's own timer's), the internet's line or what can't be
-    // read keeps its own route. With no agent on the lamp (`missing`),
-    // told so; an agent not known, DeepSeek's as before.
-    let route = made_skill::reactions_on()
-        .then(|| {
-            first
-                .as_ref()
-                .ok()
-                .and_then(|text| made_skill::not_a_reaction(text))
-        })
-        .flatten();
+    // exact words or its hum, never the model's marker said) is never
+    // kept. Judged none, unsure or with no answer, no draft is asked for.
+    // Either way the first builder's 19:50 ruling (the middle form): the
+    // lamp writes it itself, as one task for its agent ([`agent_task`]):
+    // the trigger its own model picks in one more call (or the words that
+    // ask for it), one `do.task` whose words are the person's request,
+    // done by the agent when it fires, and sip-of-water's guards
+    // (`make_no_cannot::skill_text`); no say and no other step a model
+    // wrote. Not made, it is said so plainly and nothing is kept. A
+    // `cannot:` (a one-off reminder among them, the lamp's own timer's),
+    // the internet's line or what can't be read keeps its own route. With
+    // no agent on the lamp (`missing`), told so; an agent not known, no
+    // judgement: DeepSeek's as before.
+    let routed = made_skill::reactions_on() && (engine.is_some() || missing);
+    let judged_none = routed && reaction_judged(Arc::clone(&chat), request) != Some(true);
+    let first = (!judged_none).then(|| ask(Arc::clone(&chat), brief.clone()));
+    let route = if judged_none {
+        Some("judged not a quick reaction".to_owned())
+    } else {
+        routed
+            .then(|| {
+                first
+                    .as_ref()?
+                    .as_ref()
+                    .ok()
+                    .and_then(|text| made_skill::not_a_reaction(text))
+                    .map(|why| format!("drafted, not a quick reaction ({why})"))
+            })
+            .flatten()
+    };
     if let Some(why) = route {
-        if let Some((agent, engine)) = engine {
+        if let Some((_, engine)) = engine {
             eprintln!(
-                "lamp-voice: a skill made here: not a quick reaction ({why}): made by the agent \
-                 ({engine}), DeepSeek's draft not kept"
+                "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
+                 one task of the request; no DeepSeek draft kept"
             );
-            let made = handed_to_agent(
-                Before::Drafted,
-                request,
-                &brief,
-                (agent, engine),
-                &agent_kept,
-                &models_cannot,
-                &deepseek_repaired,
-                Some(made_skill::BEHAVIOUR_TEMPLATE),
-            );
-            return agents_made(made);
-        }
-        if missing {
-            eprintln!(
-                "lamp-voice: a skill made here: not a quick reaction ({why}): no agent on the \
-                 lamp to make it: told so, DeepSeek's draft not kept"
-            );
-            let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
+            let made = agent_task(request, &chat, began, &agent_kept, (from, keeping));
             let line = kept_line(&made, false, began.elapsed().as_millis());
             return (plain_unless_cannot(made, false), line);
         }
+        eprintln!(
+            "lamp-voice: a skill made here: {why}: no agent on the lamp to make it: told so, \
+             no DeepSeek draft kept"
+        );
+        let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
+        let line = kept_line(&made, false, began.elapsed().as_millis());
+        return (plain_unless_cannot(made, false), line);
     }
+    // Never left unasked here: a route with no draft returned above.
+    let first = first.unwrap_or_else(|| ask(Arc::clone(&chat), brief.clone()));
     let mut made = kept(first);
     // Judged not what was asked (#7621): no repair, no agent, asked again.
     if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
@@ -2880,7 +2889,6 @@ fn made_and_journaled_by(
                 &agent_kept,
                 &models_cannot,
                 &deepseek_repaired,
-                None,
             )
         }
         Some(_) => {
@@ -3107,10 +3115,6 @@ fn plain_unless_cannot(made: Result<Made, Refused>, models_cannot: bool) -> Resu
 enum Before<'a> {
     Asked(Box<Result<Made, Refused>>),
     NotAsked(Box<dyn FnOnce() -> Result<Made, Refused> + 'a>),
-    /// A draft that is no quick reaction (#6811, with
-    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on): never kept, so nothing
-    /// stands, and the agent making none is said so plainly.
-    Drafted,
 }
 
 impl Before<'_> {
@@ -3120,7 +3124,6 @@ impl Before<'_> {
         match self {
             Self::Asked(made) => *made,
             Self::NotAsked(ask) => ask(),
-            Self::Drafted => Err(Refused(made_skill::AGENT_FAILED_TRY.to_owned(), None)),
         }
     }
 
@@ -3129,7 +3132,6 @@ impl Before<'_> {
         match self {
             Self::Asked(_) => "DeepSeek's one answer, given no repairs, stands as not made",
             Self::NotAsked(_) => "DeepSeek is asked once, given no repairs",
-            Self::Drafted => "nothing is kept, DeepSeek's draft being no quick reaction",
         }
     }
 }
@@ -3226,21 +3228,13 @@ fn handed_to_agent(
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     models_cannot: &std::cell::Cell<bool>,
     deepseek_repaired: &impl Fn(Result<Made, Refused>, Duration) -> Result<Made, Refused>,
-    template: Option<&str>,
 ) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
     // The person's own addresses never go in the agent's rules file: each
     // stands there as a placeholder, put back in its answer before the
-    // checks (the Reviewer-lead on #6439). A make that is no quick
-    // reaction (#6811) is told sip-of-water's guards after the rules
-    // (`template`, [`made_skill::BEHAVIOUR_TEMPLATE`]), in every answer's
-    // rules, its repairs' too.
+    // checks (the Reviewer-lead on #6439).
     let hidden = placeholders(&own_accounts());
-    let system = match template {
-        Some(template) => format!("{}\n\n{template}", system()),
-        None => system(),
-    };
-    let system = hide(&system, &hidden);
+    let system = hide(&system(), &hidden);
     // Its `internet:` line taken as the prompt it was given says.
     let net = crate::make_no_cannot::net_by_agent();
     // The waiting line with the first hand-over only, and never when the
@@ -3256,14 +3250,13 @@ fn handed_to_agent(
     // Not taken by the agent: DeepSeek's one answer stands for a voice
     // make, and gets its repairs for the app's (Heron's P2 on #6788).
     let stands = match (agent.repairs_if_untaken, &deepseek) {
-        (_, Before::Drafted) | (false, _) => deepseek.journaled(),
+        (false, _) => deepseek.journaled(),
         (true, Before::Asked(_)) => "DeepSeek gets its repairs, as without the agent",
         (true, Before::NotAsked(_)) => "DeepSeek is asked, with its repairs, as without the agent",
     };
     let untaken = |deepseek: Before<'_>| {
-        let drafted = matches!(deepseek, Before::Drafted);
         let made = deepseek.stands();
-        if drafted || !agent.repairs_if_untaken {
+        if !agent.repairs_if_untaken {
             return made;
         }
         eprintln!("lamp-voice: a skill made here: not taken by the agent: DeepSeek's repairs");
@@ -3296,14 +3289,6 @@ fn handed_to_agent(
             // `cannot:` is still DeepSeek's (`models_cannot`); said as the
             // agent's own failure ([`agent_side`]), after DeepSeek's repairs
             // for the app's.
-            // A draft that was no quick reaction (#6811): nothing kept, and
-            // the agent's own failure said plainly.
-            if matches!(deepseek, Before::Drafted) {
-                return Err(Refused(
-                    crate::make_skill_agent::not_made_try(&why).to_owned(),
-                    None,
-                ));
-            }
             return agent_side(untaken(deepseek), &why, models_cannot);
         }
     };
@@ -3435,6 +3420,54 @@ fn judged(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     question: String,
 ) -> made_skill::Judged {
+    judge_text(chat, JUDGE_SYSTEM, question, JUDGE_WITHIN)
+        .map(|text| made_skill::Judged::read(&text))
+        .unwrap_or_else(|judged| judged)
+}
+
+/// The longest DeepSeek's judgement of whether a make is a quick reaction
+/// is waited for ([`made_skill::REACTION_JUDGE`], the owner's "do it like
+/// V1" on #7764): about a second is usual; past it, the make goes to the
+/// lamp's agent, as for an unsure judgement.
+pub const REACTION_JUDGE_WITHIN: Duration = Duration::from_millis(4_000);
+
+/// DeepSeek's judgement of whether `request` is a quick reaction
+/// ([`made_skill::REACTION_JUDGE`]), from the make's own chat within
+/// [`REACTION_JUDGE_WITHIN`]: `None` when unsure, late or failed. Its
+/// reason is never read; the journal has its time and its outcome alone.
+fn reaction_judged(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    request: &str,
+) -> Option<bool> {
+    let began = std::time::Instant::now();
+    let judged = judge_text(
+        chat,
+        made_skill::REACTION_JUDGE,
+        made_skill::reaction_brief(request),
+        REACTION_JUDGE_WITHIN,
+    )
+    .ok()
+    .and_then(|text| made_skill::reaction_judged(&text));
+    eprintln!(
+        "lamp-voice: a skill made here: judged in {} ms: {}",
+        began.elapsed().as_millis(),
+        match judged {
+            Some(true) => "a quick reaction",
+            Some(false) => "not a quick reaction",
+            None => "unsure or no answer",
+        }
+    );
+    judged
+}
+
+/// The answer to `question` under `system` from the make's own chat, on a
+/// thread of its own, within `within`: its text, or a timeout or an error.
+fn judge_text(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: &'static str,
+    question: String,
+    within: Duration,
+) -> Result<String, made_skill::Judged> {
     use made_skill::Judged;
     // Its answer by a channel, waited on for its bound and a little more:
     // never a join, which a DNS lookup hung on tokio's blocking pool holds
@@ -3444,52 +3477,49 @@ fn judged(
     let answer = std::thread::Builder::new()
         .name("lamp-voice-make-judge".into())
         .spawn(move || {
-            let _ = sent.send(judge_once(chat, question));
+            let _ = sent.send(judge_once(chat, system, question, within));
         });
     match answer {
         Ok(_) => answered
-            .recv_timeout(JUDGE_WITHIN + Duration::from_millis(100))
-            .unwrap_or(Err(Judged::Timeout))
-            .unwrap_or_else(|judged| judged),
-        Err(_) => Judged::Failed,
+            .recv_timeout(within + Duration::from_millis(100))
+            .unwrap_or(Err(Judged::Timeout)),
+        Err(_) => Err(Judged::Failed),
     }
 }
 
-/// One judge call within [`JUDGE_WITHIN`], on its own runtime ([`judged`]).
+/// One judge call within `within`, on its own runtime ([`judge_text`]).
 fn judge_once(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: &str,
     question: String,
-) -> Result<made_skill::Judged, made_skill::Judged> {
+    within: Duration,
+) -> Result<String, made_skill::Judged> {
     use made_skill::Judged;
-    {
-        {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|_| Judged::Failed)?;
-            let chat = chat().map_err(|_| Judged::Failed)?;
-            runtime.block_on(async {
-                tokio::time::timeout(JUDGE_WITHIN, async {
-                    let mut stream = chat
-                        .send(&[Message::system(JUDGE_SYSTEM), Message::user(&question)])
-                        .await
-                        .map_err(|_| Judged::Failed)?;
-                    let mut text = String::new();
-                    while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
-                        if let ChatEvent::Text(words) = event {
-                            text.push_str(&words);
-                            if text.len() > JUDGE_MOST_BYTES {
-                                break;
-                            }
-                        }
-                    }
-                    Ok(Judged::read(&text))
-                })
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| Judged::Failed)?;
+    let chat = chat().map_err(|_| Judged::Failed)?;
+    runtime.block_on(async {
+        tokio::time::timeout(within, async {
+            let mut stream = chat
+                .send(&[Message::system(system), Message::user(&question)])
                 .await
-                .unwrap_or(Err(Judged::Timeout))
-            })
-        }
-    }
+                .map_err(|_| Judged::Failed)?;
+            let mut text = String::new();
+            while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
+                if let ChatEvent::Text(words) = event {
+                    text.push_str(&words);
+                    if text.len() > JUDGE_MOST_BYTES {
+                        break;
+                    }
+                }
+            }
+            Ok(text)
+        })
+        .await
+        .unwrap_or(Err(Judged::Timeout))
+    })
 }
 
 thread_local! {
@@ -4285,10 +4315,12 @@ light = { dim = 1 }
                     };
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
-                    // A make's brief, or its judge's question (#7621).
+                    // A make's brief, its judge's question (#7621), or the
+                    // judgement of a quick reaction (#7764).
                     assert!(
                         body.contains(made_skill::BRIEF_HEAD)
-                            || body.contains("Does the made skill do what was asked?"),
+                            || body.contains("Does the made skill do what was asked?")
+                            || body.contains("You judge, for a desk lamp"),
                         "{body}"
                     );
                     assert!(!body.contains("\"tools\""), "{body}");
@@ -9656,103 +9688,351 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .and_then(|entry| entry[made_skill::MADE_WITH].as_str().map(str::to_owned))
     }
 
-    /// The first builder's ruling on #6811 (18 Nov 16:23) and the wider
-    /// route he said yes to at 16:34, with
-    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: a draft that is no quick
-    /// reaction (someone at the desk, 8 am) is never kept; the make goes
-    /// to the lamp's agent with the same brief and sip-of-water's guards,
-    /// and the agent's is kept, `made_with: hermes`. A pat that nods, or a
-    /// phrase that glows, stays DeepSeek's, `made_with: deepseek`.
+    /// [`keeping`], its pack stand-in also copying the `skill.toml` it
+    /// packs to `last-skill.toml` in the test's folder, so a test reads
+    /// what was kept.
+    fn keeping_copied(name: &str) -> (PathBuf, Keeping, PathBuf) {
+        let (root, keeping) = keeping(name);
+        let copy = root.join("last-skill.toml");
+        std::fs::write(
+            &keeping.program,
+            format!(
+                "#!/bin/sh\nname=$(basename \"$4\")\ncp \"$4/skill.toml\" \"{}\"\n\
+                 printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+                copy.display()
+            ),
+        )
+        .unwrap();
+        (root, keeping, copy)
+    }
+
+    /// The kept `skill.toml` at `copy`: one step, a task whose words are
+    /// `words`, run by `run`, and no say anywhere.
+    fn one_task_of(copy: &Path, words: &str, run: &str) -> toml::Table {
+        let text = std::fs::read_to_string(copy).unwrap();
+        let table: toml::Table = toml::from_str(&text).unwrap();
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1, "{text}");
+        assert_eq!(steps[0]["task"]["task"].as_str(), Some(words), "{text}");
+        assert_eq!(steps[0]["task"]["run"].as_str(), Some(run), "{text}");
+        assert!(!text.contains("say"), "no say step at all: {text}");
+        table
+    }
+
+    /// The one more call's answer: `name`, `grants` and a trigger on
+    /// `topic` with `trigger`'s keys.
+    fn trigger_answer(name: &str, grants: &str, topic: &str, trigger: &str) -> String {
+        format!(
+            "name: {name}\ngrants: {grants}\n```skill.toml\n[permissions]\n\
+             topics = [\"{topic}\"]\n\n[trigger]\ntopic = \"{topic}\"\n{trigger}```\n"
+        )
+    }
+
+    /// The judgement's answer ([`made_skill::REACTION_JUDGE`]).
+    fn judgement(reaction: bool) -> (u16, String) {
+        (
+            200,
+            format!("{{\"quick_reaction\": {reaction}, \"reason\": \"PRIVATE-REASON-7\"}}"),
+        )
+    }
+
+    /// Whether `sent` is the judgement's call, asking of `request` alone.
+    fn is_judgement(sent: &str, request: &str) -> bool {
+        sent.contains("You judge, for a desk lamp, what kind of skill")
+            && sent.contains(&format!("Request: {request}"))
+            && !sent.contains(made_skill::BRIEF_HEAD)
+    }
+
+    /// The first builder's 19:50 ruling on #6811 (the middle form) and the
+    /// owner's "do it like V1" on #7764, with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: the make's first call is
+    /// DeepSeek's judgement of the request's meaning. Judged no quick
+    /// reaction, no draft is ever asked for: the lamp writes the skill
+    /// itself, the trigger its own model picks in one more call and one
+    /// task step whose words are the person's request, done by the lamp's
+    /// agent when it fires; no say, no other step, sip-of-water's guards in
+    /// `[[while]]`, `made_with` the agent's. The agent is never asked to
+    /// write it.
     #[test]
-    fn with_the_switch_only_a_quick_reaction_stays_deepseeks() {
+    fn with_the_switch_a_make_judged_no_reaction_is_its_trigger_and_one_task_never_drafted() {
         made_skill::set_reactions_here(Some(true));
-        let (root, keeping) = keeping("reactions-route");
-        let guarded = made_skill::behaviour_template_toml()
-            .replace("One short, warm line.", "Time for a sip of water.");
-        let eight = say_on(
-            "clock/local",
-            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
-             during = { from = \"08:00\", to = \"08:01\" }\n",
-        );
-        for (at, (draft, name)) in [(presence_say(), "sip-at-desk"), (eight, "morning-line")]
-            .into_iter()
-            .enumerate()
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-middle");
+        const BTC: &str = "tell me the BTC price at 9";
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let nine = "field = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                    during = { from = \"09:00\", to = \"09:01\" }\n";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        for (at, (request, answer, name, topic)) in [
+            (
+                BTC,
+                trigger_answer("btc-price", "net, speak", "clock/local", nine),
+                "btc-price",
+                "clock/local",
+            ),
+            (
+                SIP,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+                "sip-at-desk",
+                "room/presence",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
         {
-            let tasks = agent_answering(vec![Some(route_answer(&guarded, name))]);
-            let (url, served) = service(vec![(200, route_answer(&draft, "deepseek-draft"))]);
-            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + at as u64);
-            assert_eq!(told["made"], name, "{told}");
-            assert_eq!(served.join().unwrap(), 1);
-            assert_eq!(tasks.hand_overs(), 1);
-            let rules = handed_rules(&tasks);
-            assert!(
-                rules[0].0.contains(made_skill::BEHAVIOUR_TEMPLATE),
-                "the template beside the rules"
+            let tasks = agent_answering(vec![]);
+            let (url, served) = service_sent(vec![judgement(false), (200, answer)]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
             );
-            assert!(!rules[0].0.contains("deepseek-draft"));
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(
+                sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+                "never DeepSeek's draft: {}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!(told["code_waits_for_yes"], true, "{told}");
+            assert!(!told.to_string().contains("PRIVATE-REASON-7"), "{told}");
+            let table = one_task_of(&copy, request, crate::make_no_cannot::RUN);
+            assert_eq!(table["trigger"]["topic"].as_str(), Some(topic));
+            let guards = table["while"].as_array().unwrap();
+            assert_eq!(guards.len(), 3, "sip-of-water's guards: {table:?}");
+            let topics = table["permissions"]["topics"].as_array().unwrap();
+            for guard in ["voice/state", "room/activity"] {
+                assert!(
+                    topics.iter().any(|t| t.as_str() == Some(guard)),
+                    "{table:?}"
+                );
+            }
             assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
-            assert!(made_with_of(&keeping, "deepseek-draft").is_none());
         }
-        // A phrase the person names that turns the light green
-        // (`LAMP_MADE_SKILL_ASKS`, on in the product).
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's "do it like V1": a judgement with no answer, or one that
+    /// isn't sure, sends the make straight to the agent's middle form,
+    /// never to a DeepSeek draft.
+    #[test]
+    fn with_the_switch_a_failed_judgement_goes_to_the_agent() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-unsure");
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        for (at, judgement) in [
+            (200, "maybe, it depends".to_owned()),
+            (200, "{\"quick_reaction\": \"unsure\"}".to_owned()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let name = format!("sip-at-desk-{at}");
+            let (url, served) = service_sent(vec![
+                judgement,
+                (200, trigger_answer(&name, "speak", "room/presence", sat)),
+            ]);
+            let told = make_with_by(
+                0,
+                None,
+                SIP,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], SIP), "{}", sent[0]);
+            assert_eq!(told["made"], name.as_str(), "{told}");
+            one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The 19:50 ruling and "do it like V1": judged a quick reaction,
+    /// DeepSeek drafts it, and its draft stays as it is, reflex steps
+    /// alone, `made_with: deepseek`, the agent never asked: "when I pat
+    /// you, glow", a pat that nods, a phrase that glows.
+    #[test]
+    fn with_the_switch_a_quick_reaction_is_judged_one_and_drafted_with_reflex_steps() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
         made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-route");
+        let glow = "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"light\"]\n\n\
+                    [permissions]\nlight = true\ntopics = [\"controls/pet\"]\n\n[trigger]\n\
+                    topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\n\
+                    rearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                    light = { colour = \"green\", level = 3 }\n"
+            .to_owned();
         let phrase = "asks = [\"green light please\"]\nkind = \"installable\"\n\
                       version = \"1.0.0\"\nneeds = [\"light\"]\n\n[permissions]\nlight = true\n\n\
                       [[do]]\nlight = { colour = \"green\", level = 3 }\n"
             .to_owned();
-        for (at, (draft, name)) in [(pat_nod(), "pat-nod"), (phrase, "green-phrase")]
-            .into_iter()
-            .enumerate()
+        for (at, (request, draft, name, kind)) in [
+            ("when I pat you, glow", glow, "pat-glow", "light"),
+            ("when I pat you, nod", pat_nod(), "pat-nod", "body"),
+            ("green light please", phrase, "green-phrase", "light"),
+        ]
+        .into_iter()
+        .enumerate()
         {
             let tasks = agent_answering(vec![]);
-            let (url, served) = service(vec![(200, route_answer(&draft, name))]);
-            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + 10 + at as u64);
+            let (url, served) =
+                service_sent(vec![judgement(true), (200, route_answer(&draft, name))]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
             assert_eq!(told["made"], name, "{told}");
-            assert_eq!(served.join().unwrap(), 1);
-            assert_eq!(tasks.hand_overs(), 0);
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(
+                sent[1].contains(made_skill::BRIEF_HEAD),
+                "drafted: {}",
+                sent[1]
+            );
             assert_eq!(made_with_of(&keeping, name).as_deref(), Some("deepseek"));
+            let text = std::fs::read_to_string(&copy).unwrap();
+            let table: toml::Table = toml::from_str(&text).unwrap();
+            let steps = table["do"].as_array().unwrap();
+            assert!(
+                steps
+                    .iter()
+                    .all(|step| step.as_table().unwrap().keys().all(|key| key == kind)),
+                "{text}"
+            );
+            assert!(!table.contains_key("while") && !table.contains_key("grants"));
         }
         made_skill::set_asks_here(None);
+        net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
-    /// as before, the agent never asked and no `made_with` written.
+    /// lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" was kept as a
+    /// say of DeepSeek's `internet:` line. Judged a quick reaction all the
+    /// same, its draft is held to [`made_skill::quick_reaction`] and is no
+    /// quick reaction: the request becomes one task for the lamp's agent,
+    /// asked for by its words, granted `net`, never a say. So is a draft
+    /// on someone at the desk: a true judgement never lets a draft that
+    /// isn't one stand.
     #[test]
-    fn with_the_switch_off_a_presence_draft_is_deepseeks_as_before() {
-        made_skill::set_reactions_here(Some(false));
-        let (root, keeping) = keeping("reactions-off");
+    fn with_the_switch_a_true_judgement_whose_draft_is_no_reaction_goes_to_the_agent() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-zorbo");
+        let helper = manage_helper(&keeping.manage);
+        const ZORBO: &str = "tell me the price of Zorbo coin";
+        let draft = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+                     permissions = { speak = true }\n\
+                     asks = [\"tell me the price of Zorbo coin\"]\n\
+                     [ask]\npolicy = \"nudge\"\n[[do]]\n\
+                     say = { text = \"internet: current price of Zorbo coin\" }\n";
         let tasks = agent_answering(vec![]);
-        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
-        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            (200, route_answer(draft, "zorbo-coin-price")),
+            (
+                200,
+                "name: zorbo-coin-price\ngrants: net, speak\nasks: tell me the price of Zorbo coin"
+                    .to_owned(),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            ZORBO,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (3, 0), "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "zorbo-coin-price", "{told}");
+        let table = one_task_of(&copy, ZORBO, crate::upload_agent::INSTRUCTIONS);
+        assert_eq!(
+            table["grants"],
+            toml::Value::Array(vec!["net".into(), "speak".into()])
+        );
+        // A draft on someone at the desk, judged a reaction: the agent's.
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            (200, route_answer(&presence_say(), "deepseek-draft")),
+            (
+                200,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!(served.join().unwrap().len(), 3, "{told}");
         assert_eq!(told["made"], "sip-at-desk", "{told}");
-        assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.hand_overs(), 0);
-        assert_eq!(made_with_of(&keeping, "sip-at-desk"), None);
+        one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        made_skill::set_asks_here(None);
+        net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The first builder at 16:34 on #6811: a make the route sends to the
-    /// agent that the agent doesn't make (silent past its time, busy) is
-    /// said so plainly, in the agent's own failure words, and nothing is
-    /// kept: never DeepSeek's quick, unguarded draft. With no agent on the
-    /// lamp, told so.
+    /// The 19:50 ruling: a make judged no quick reaction, on a lamp whose
+    /// skills can't hand tasks to its agent, keeps nothing and says so
+    /// plainly, never a DeepSeek draft, the agent never asked to write it.
+    /// With no agent known, no judgement: DeepSeek's as before.
     #[test]
-    fn with_the_switch_an_agent_making_none_keeps_nothing_and_says_so() {
+    fn with_the_switch_a_make_not_a_reaction_keeps_nothing_when_tasks_are_off() {
         made_skill::set_reactions_here(Some(true));
         let (root, keeping) = keeping("reactions-failed");
-        let silent = agent_answering(vec![None]);
-        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
-        let told = made_by(&keeping, url, Some(&silent.agent()), NOW);
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![judgement(false)]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
         assert!(told.get("made").is_none(), "{told}");
-        assert_eq!(
-            told["error"],
-            format!("the skill couldn't be made: {}", made_skill::AGENT_LATE_TRY)
+        assert!(
+            told["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("can't hand tasks to it yet")),
+            "{told}"
         );
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(silent.hand_overs(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         // No agent known on the lamp (no lamp target, the one path off):
         // the route has no agent to send it to, so DeepSeek's, as before.
@@ -9769,21 +10049,42 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
+    /// as before, no judgement, the agent never asked and no `made_with`
+    /// written.
+    #[test]
+    fn with_the_switch_off_a_presence_draft_is_deepseeks_as_before() {
+        made_skill::set_reactions_here(Some(false));
+        let (root, keeping) = keeping("reactions-off");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert_eq!(made_with_of(&keeping, "sip-at-desk"), None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The first builder at 16:34 on #6811: a one-off reminder is never a
-    /// make. Should the make be called for one, DeepSeek's answer is the
-    /// lamp's own timer's `cannot:`, which the route never hands to the
-    /// agent's make.
+    /// make. Should the make be called for one, it is judged the lamp's own
+    /// timer's ([`made_skill::REACTION_JUDGE`]), and DeepSeek's answer is
+    /// that timer's `cannot:`, which the route never hands to the agent.
     #[test]
     fn with_the_switch_a_one_off_reminder_never_reaches_the_agents_make() {
         made_skill::set_reactions_here(Some(true));
         let (root, keeping) = keeping("reactions-reminder");
         let tasks = agent_answering(vec![]);
-        let (url, served) = service(vec![(
-            200,
-            "cannot: I can't do that yet: a reminder at a time. Ask me for a reminder instead, \
-             like 'remind me every hour to stand up'."
-                .to_owned(),
-        )]);
+        let (url, served) = service(vec![
+            judgement(true),
+            (
+                200,
+                "cannot: I can't do that yet: a reminder at a time. Ask me for a reminder \
+                 instead, like 'remind me every hour to stand up'."
+                    .to_owned(),
+            ),
+        ]);
         let told = make_with_by(
             0,
             None,
@@ -9795,32 +10096,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             Some(&tasks.agent()),
         );
         assert!(told.get("made").is_none(), "{told}");
-        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(served.join().unwrap(), 2);
         assert_eq!(tasks.hand_overs(), 0);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
-    }
-
-    /// #6811, point 2: the template the agent is told beside its rules,
-    /// with the longest brief, fits lamp-tasks' rules bound; the brief
-    /// itself is unchanged, within its own.
-    #[test]
-    fn the_template_and_the_longest_brief_fit_the_agents_rules() {
-        let longest = made_skill::brief(&"w".repeat(made_skill::MOST_REQUEST_BYTES)).unwrap();
-        assert!(longest.len() <= made_skill::MOST_BRIEF_BYTES);
-        let before = format!("{}\n\n{longest}\n", system());
-        let after = format!(
-            "{}\n\n{}\n\n{longest}\n",
-            system(),
-            made_skill::BEHAVIOUR_TEMPLATE
-        );
-        eprintln!(
-            "rules {} bytes, with the template {} (template {}, brief {})",
-            before.len(),
-            after.len(),
-            made_skill::BEHAVIOUR_TEMPLATE.len(),
-            longest.len()
-        );
-        assert!(after.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES);
     }
 }
