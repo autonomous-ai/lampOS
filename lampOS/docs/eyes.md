@@ -1658,8 +1658,14 @@ With the switch:
   no or another answer, sends nothing, before the name's own checks, and
   the model is told to ask that question (`ASK_FACE_FIRST`). A name is no
   yes to keeping a face (the first builder on #7331). Setup asks its own
-  face question, and a rename takes its own yes. Off, a new face is kept
-  on the call as before
+  face question, and a rename takes its own yes. While the eyes' known
+  file names a face at the lamp (`known_faces::known_now`, the file the
+  second voice's rename force reads), the save goes to the eyes as before:
+  a known face's "Call me Jay." is answered "known as" and the rename is
+  held for their yes, and two faces are the eyes' own refusal (#7653,
+  row-7422c on lamp-52e6;
+  `a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename`).
+  Off, a new face is kept on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
