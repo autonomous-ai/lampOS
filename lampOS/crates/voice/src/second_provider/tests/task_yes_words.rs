@@ -645,3 +645,31 @@ fn a_skill_not_listed_named_before_skill_is_still_no_yes() {
     yes::set_installed_here(None);
     task_yes::set_on_here(None);
 }
+
+/// The pre-push read's false yes on #7634: an unlisted name ending in a
+/// word that comes before a name ("play", "lamp"), or a describing word
+/// alone, is another skill, with the lamp's skills read or none read.
+#[test]
+fn a_name_ending_in_a_bounding_word_is_still_no_yes() {
+    for installed in [
+        Some(vec!["page-title".to_owned(), "timer".to_owned()]),
+        None,
+    ] {
+        for heard in [
+            "yes, use my role play skill",
+            "yes, my desk lamp skill",
+            "yes, the daily skill",
+        ] {
+            let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+            yes::set_installed_here(installed.clone());
+            let went = went(
+                heard,
+                vec![answers_naming(&id, "yes", "page-title"), said("Okay.")],
+            );
+            assert_eq!(went.approved, 0, "{heard}: {:?}", went.ran);
+            assert!(!yes::waits(&id), "{heard}");
+        }
+    }
+    yes::set_installed_here(None);
+    task_yes::set_on_here(None);
+}

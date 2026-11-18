@@ -4998,16 +4998,18 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   tên của chính nó ("yes, use my lamp test email two skill", "Có, dùng
   skill page title"). Nếu không có cả hai, các từ trước "skill", lùi về tới một từ đứng
   trước tên hoặc đầu mệnh đề, được đọc sau khi bỏ các từ đệm ("the", "my",
-  "run", "use", "new", "daily", "great", "chạy", "cái", "đó", "em", "cho",
-  "làm", …, `skill_write_yes::FILLERS`): không còn từ nào, hoặc chỉ còn
-  các từ trong chính tên kỹ năng đang chờ, là cái "có" của nó ("Yes, run
+  "run", "use", "great", "chạy", "cái", "đó", "em", "cho", "làm", …,
+  `skill_write_yes::FILLERS`); từ ngay trước "skill" luôn được giữ trừ khi
+  là từ đệm ("my role play skill", "my desk lamp skill"). Không còn từ
+  nào, hoặc chỉ còn các từ trong chính tên kỹ năng đang chờ, kèm "new",
+  "old" hay "daily" bên cạnh (`DESCRIBING`), là cái "có" của nó ("Yes, run
   my new weather skill", "the daily weather skill", "yes, the weather
   skill" cho weather report, "Ừ, chạy cái skill đó đi", "Có, cái skill
   đó"); còn bất kỳ từ nào khác thì là tên kỹ năng khác, có trong danh sách
   hay không ("Lamp, use my look title skill." kể cả khi look title không
   có trên đèn: đang được tạo, bị từ chối lúc nạp hoặc nghe nhầm; "my
-  backup page title skill"). An toàn trước: một cái "có" sai chạy quyền
-  của một kỹ năng mà không có sự đồng ý, còn một lời từ chối sai chỉ bỏ
+  backup page title skill"; "yes, the daily skill"). An toàn trước: một
+  cái "có" sai chạy quyền của một kỹ năng mà không có sự đồng ý, còn một lời từ chối sai chỉ bỏ
   việc chờ. Sau "skill", khi đã đọc được các kỹ năng trên đèn, các từ
   không nêu tên kỹ năng đã cài nào thì không là gì ("yes, run the skill
   again"); khi không đọc được kỹ năng nào (không có trong danh sách, hoặc
@@ -5020,7 +5022,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   là cái "có" của page title; "Yes, and use my weather skill." khi có
   weather trên đèn thì không. Giới hạn được chấp nhận: câu không có từ
   "skill" thì không được đọc (chỉ `named` gắn nó, #7545); "kỹ năng" không
-  được đọc; một từ mô tả không phải từ đệm ("Yes, awesome skill.") thất
+  được đọc; một từ mô tả không phải từ đệm ("Yes, awesome skill.", "my old-style weather skill") thất
   bại theo hướng an toàn. Việc chờ gỡ kỹ năng không được đọc để tìm kỹ năng khác:
   nó giữ quy tắc riêng, một cái "có" đơn thuần ở ngay câu sau câu hỏi
   (#7683), nên "Yes, and remove the joke time skill too." không gỡ gì.

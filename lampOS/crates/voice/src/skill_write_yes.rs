@@ -1152,10 +1152,14 @@ const AFTER_A_NAME: &[&str] = &["please", "now", "too", "for", "to", "is", "inst
 /// remains is read against the waiting skill's own name words
 /// ([`other_skill_named`]).
 const FILLERS: &[&str] = &[
-    "great", "nice", "the", "that", "this", "same", "new", "old", "daily", "my", "run", "use",
-    "start", "open", "chạy", "dùng", "mở", "bật", "cái", "đó", "này", "kia", "em", "anh", "chị",
-    "cho", "làm",
+    "great", "nice", "the", "that", "this", "same", "my", "run", "use", "start", "open", "chạy",
+    "dùng", "mở", "bật", "cái", "đó", "này", "kia", "em", "anh", "chị", "cho", "làm",
 ];
+
+/// Describing words before "skill" that take nothing from the waiting
+/// skill's own name beside it ("my new weather skill", "the daily weather
+/// skill"), but alone are a name ("yes, the daily skill").
+const DESCRIBING: &[&str] = &["new", "old", "daily"];
 
 /// The most words a skill's name is said in, before or after "skill".
 const NAME_WORDS: usize = 6;
@@ -1265,11 +1269,19 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
             // another skill, listed or not ("my look title skill", "my
             // backup page title skill"): a false refusal only lets the wait
             // go, a false yes runs a skill's grants without consent.
-            let start = (0..at)
+            // The word right before "skill" is always part of it unless a
+            // filler, even a word that comes before a name ("my role play
+            // skill", "my desk lamp skill"): the pre-push read's false yes.
+            let kept = at
+                .checked_sub(1)
+                .filter(|&before| !FILLERS.contains(&words[before].as_str()));
+            let from = kept.unwrap_or(at);
+            let start = (0..from)
                 .rev()
-                .take(NAME_WORDS)
+                .take(NAME_WORDS - (at - from))
                 .take_while(|&before| !BEFORE_A_NAME.contains(&words[before].as_str()))
-                .last();
+                .last()
+                .or(kept);
             if let Some(start) = start {
                 let name = &words[start..at];
                 let left: Vec<&String> = name
@@ -1277,9 +1289,11 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
                     .filter(|word| !FILLERS.contains(&word.as_str()))
                     .collect();
                 if !left.is_empty() {
-                    if left
-                        .iter()
-                        .all(|word| own_words.contains(&said_word(word.as_str())))
+                    let own_word = |word: &&String| own_words.contains(&said_word(word.as_str()));
+                    if left.iter().any(own_word)
+                        && left
+                            .iter()
+                            .all(|word| own_word(word) || DESCRIBING.contains(&word.as_str()))
                     {
                         continue;
                     }
@@ -3006,6 +3020,22 @@ mod tests {
                 "backup page title",
             ),
             ("Yes, awesome skill.", "page-title", &backup[..], "awesome"),
+            // A name ending in a word that comes before a name (the
+            // pre-push read's false yes on #7634), or a describing word
+            // alone.
+            (
+                "yes, use my role play skill",
+                "page-title",
+                &backup[..],
+                "role play",
+            ),
+            (
+                "yes, my desk lamp skill",
+                "page-title",
+                &backup[..],
+                "desk lamp",
+            ),
+            ("yes, the daily skill", "page-title", &backup[..], "daily"),
         ] {
             assert_eq!(read(heard, skill, installed), Some(named.into()), "{heard}");
         }
@@ -3018,6 +3048,17 @@ mod tests {
             assert_eq!(other_skill_named(heard, "weather", &[]), None, "{heard}");
         }
         assert_eq!(other("Ừ, chạy cái skill đó đi"), Some("đó đi".into()));
+        for (heard, named) in [
+            ("yes, use my role play skill", "role play"),
+            ("yes, my desk lamp skill", "desk lamp"),
+            ("yes, the daily skill", "daily"),
+        ] {
+            assert_eq!(other(heard), Some(named.into()), "{heard}");
+        }
+        for heard in ["yes, that skill", "yes, the skill please", "yes, run it"] {
+            assert_eq!(other(heard), None, "{heard}");
+            assert_eq!(read(heard, "page-title", &backup), None, "{heard}");
+        }
         // A yes said without its comma still bounds another skill's name.
         assert_eq!(
             other_skill_named("okay timer skill", "weather", &[]),

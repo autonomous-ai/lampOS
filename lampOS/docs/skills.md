@@ -1997,14 +1997,17 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   ("yes, use my lamp test email two skill", "Có, dùng skill page title").
   With neither, the words before "skill", back to a word that comes
   before a name or the clause's start, are read with the fillers left out
-  ("the", "my", "run", "use", "new", "daily", "great", "chạy", "cái", "đó",
-  "em", "cho", "làm", …, `skill_write_yes::FILLERS`): none left, or only
-  the waiting skill's own name words, is its yes ("Yes, run my new weather
+  ("the", "my", "run", "use", "great", "chạy", "cái", "đó", "em", "cho",
+  "làm", …, `skill_write_yes::FILLERS`); the word right before "skill"
+  always stays unless a filler ("my role play skill", "my desk lamp
+  skill"). None left, or only the waiting skill's own name words, with
+  "new", "old" or "daily" beside them (`DESCRIBING`), is its yes ("Yes, run my new weather
   skill", "the daily weather skill", "yes, the weather skill" for weather
   report, "Ừ, chạy cái skill đó đi", "Có, cái skill đó"); any other word
   left names another skill, listed or not ("Lamp, use my look title
   skill." even when look title is not on the lamp: being made, refused at
-  load or misheard; "my backup page title skill"). Safety first: a false
+  load or misheard; "my backup page title skill"; "yes, the daily
+  skill"). Safety first: a false
   yes runs a skill's grants without consent, a false refusal only lets
   the wait go. After "skill", with the lamp's skills read, words that name
   no installed skill are nothing ("yes, run the skill again"); with none
