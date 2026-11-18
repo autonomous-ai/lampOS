@@ -15,8 +15,8 @@
 //!    read silent (no face, no eyes or a mouth never read is unknown, and
 //!    unknown blocks nothing: the first builder's HOLD on #7457), and
 //!    unless the speaker's head is down (pitch outside [`PITCH_DEG`]) or
-//!    looking away over the line (a yes the lamp waits for stands, below):
-//!    a person head down talking at a phone just
+//!    looking away over the line, no question of the lamp's waiting
+//!    ([`Line::lamp_asked`]): a person head down talking at a phone just
 //!    after the lamp answered is not going on with it (#7721, lamp-74ff,
 //!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]);
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
@@ -126,6 +126,10 @@ pub struct Line<'a> {
     pub name_heard: bool,
     /// Inside a live conversation's window.
     pub going_on: bool,
+    /// The lamp's own question waits for its answer: its newest words
+    /// asked something, or a read-back waits for its answer (the rule's
+    /// `Attention::lamp_asked`, as the worker tells it).
+    pub lamp_asked: bool,
     /// A face turned to the lamp through it (the eyes' `facing`, yaw).
     pub turned: bool,
     /// The pitch, in radians, down positive (`lamp_msgs::Face::pitch`),
@@ -196,7 +200,9 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     if line.going_on {
-        return if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
+        return if line.lamp_asked {
+            Said::InConversation
+        } else if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
             Said::Held(Held::NotSeenSpeaking)
         } else if outside_pitch(line.pitch) {
             Said::Held(Held::NotFacingInConversation)
@@ -372,7 +378,18 @@ mod tests {
 
     #[test]
     fn in_the_window_a_head_down_yes_to_the_lamps_question_is_answered() {
-        // The lamp's own yes awaited: answered, head down or not.
+        let answer = Line {
+            lamp_asked: true,
+            ..in_the_window("Yes.", Some(40.0), Some(false))
+        };
+        assert_eq!(judge(answer), Said::InConversation);
+        // A longer reply to the lamp's open question, head down: the same.
+        let reply = Line {
+            lamp_asked: true,
+            ..in_the_window("Pasta with garlic, please", Some(40.0), None)
+        };
+        assert_eq!(judge(reply), Said::InConversation);
+        // The lamp's own yes awaited: the same, asked or not.
         let held_yes = in_the_window("Yes.", Some(40.0), Some(false));
         assert_eq!(awaiting_yes(true, || judge(held_yes)), Said::Stands);
     }
