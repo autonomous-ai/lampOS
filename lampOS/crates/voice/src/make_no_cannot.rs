@@ -262,6 +262,9 @@ pub enum Uncovered {
     Missing(String),
     /// No time and no moment named for it to run.
     NoWhen,
+    /// A reminder, the lamp's own timer: the model's `cannot:` with the
+    /// make's own refusal of one ([`reminder_rule`]).
+    Reminder,
     /// A request longer than its read-back ([`task_cut`]) whose model's
     /// own words for it ([`task_kept`]) left out what it names twice: the
     /// agent is told only what the person heard, never the request cut
@@ -283,6 +286,7 @@ impl Uncovered {
             Self::Other => "other",
             Self::Missing(_) => "missing",
             Self::NoWhen => "no_when",
+            Self::Reminder => "reminder",
             Self::TooLong => "too_long",
         }
     }
@@ -328,6 +332,10 @@ impl Uncovered {
                 "{CANT_MAKE_YET} it needs {what}, which no skill on this lamp can be given yet."
             ),
             Self::NoWhen => no_when(),
+            Self::Reminder => format!(
+                "{CANT_MAKE_YET} a reminder is my own timer, not a skill. {}",
+                made_skill::REMINDER_INSTEAD
+            ),
             Self::TooLong => format!(
                 "{CANT_MAKE_YET} it's too long for me to read back to you whole, so ask for it in \
                  fewer words."
@@ -416,7 +424,16 @@ const ASKED_EXAMPLE_ASKED: &str =
 
 /// What the lamp's own model is told for the one more call: it picks the
 /// name, the fewest grants and when the task runs, never the task or code.
+/// With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`),
+/// where a make judged no quick reaction comes here first, it also refuses
+/// a reminder as the make's own brief does ([`reminder_rule`], the
+/// Reviewer-lead's P2 on #7764); off, as before.
 pub fn system() -> String {
+    let reminder = if made_skill::reactions_on() {
+        reminder_rule()
+    } else {
+        String::new()
+    };
     format!(
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
          agent on the lamp, does the person's request itself as one task each time the skill \
@@ -434,11 +451,26 @@ pub fn system() -> String {
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
-         words (\"needs: paying for things\"). A whole answer, \
+         words (\"needs: paying for things\").{reminder} A whole answer, \
          for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
          {ASKED_EXAMPLE}\n",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
+    )
+}
+
+/// The make's own refusal of a reminder ([`made_skill::REMINDER_IS_TIMER`],
+/// its `cannot:` ending [`made_skill::REMINDER_INSTEAD`]), told the one
+/// more call: a one-off reminder judged no quick reaction, or not judged in
+/// time, is refused ([`Uncovered::Reminder`]), never kept as a daily task.
+fn reminder_rule() -> String {
+    format!(
+        " {}. A request for one is answered with only this one line: {} then one short \
+         sentence said to the person, beginning \"{}\" and naming it, ending \"{}\"",
+        made_skill::REMINDER_IS_TIMER,
+        made_skill::CANNOT,
+        made_skill::CANT_YET,
+        made_skill::REMINDER_INSTEAD,
     )
 }
 
@@ -541,6 +573,14 @@ pub fn read(answer: &str) -> Result<Answer, String> {
         let lower = trimmed.to_lowercase();
         if let Some(rest) = after_head(trimmed, "needs:") {
             return Ok(Answer::Uncovered(missing(rest)));
+        }
+        // Only the make's own refusal of a reminder ([`reminder_rule`]):
+        // any other `cannot:` is not the form, never said.
+        if let Some(rest) = after_head(trimmed, made_skill::CANNOT) {
+            if made_skill::briefs_reminder_refusal(rest) {
+                return Ok(Answer::Uncovered(Uncovered::Reminder));
+            }
+            return Err(NOT_THE_FORM.to_owned());
         }
         if let Some(rest) = after_head(trimmed, "asks:") {
             for said in rest.split('|').filter_map(phrase) {
@@ -1352,6 +1392,36 @@ mod tests {
         ] {
             assert!(!on_with(value), "{value:?}");
         }
+    }
+
+    /// The Reviewer-lead's P2 on #7764: with only quick reactions made by
+    /// DeepSeek, the one more call refuses a reminder as the make's own
+    /// brief does, and only that `cannot:` is read, as the lamp's own line;
+    /// any other is not the form. Off, the prompt is as before.
+    #[test]
+    fn with_reactions_on_a_reminder_is_refused_as_the_brief_does() {
+        made_skill::set_reactions_here(Some(false));
+        assert!(!system().contains(made_skill::REMINDER_IS_TIMER));
+        made_skill::set_reactions_here(Some(true));
+        let told = system();
+        assert!(
+            told.contains(made_skill::REMINDER_IS_TIMER)
+                && told.contains(made_skill::REMINDER_INSTEAD)
+                && told.contains(made_skill::CANT_YET),
+            "{told}"
+        );
+        made_skill::set_reactions_here(None);
+        let reminder = format!(
+            "cannot: I can't do that yet: a reminder at nine. {}",
+            made_skill::REMINDER_INSTEAD
+        );
+        assert_eq!(read(&reminder), Ok(Answer::Uncovered(Uncovered::Reminder)));
+        assert_eq!(Uncovered::Reminder.class(), "reminder");
+        assert!(said_as_is(&Uncovered::Reminder.line()));
+        assert_eq!(
+            read("cannot: I can't do that yet: checking the weather."),
+            Err(NOT_THE_FORM.to_owned())
+        );
     }
 
     #[test]
