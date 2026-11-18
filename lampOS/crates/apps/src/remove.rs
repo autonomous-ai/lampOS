@@ -6,12 +6,15 @@
 //!
 //! Order: mark; stop both unit variants; wait until neither has a process;
 //! clear their failed state; the data (never through the link); the code;
-//! the companion skills; the stopped mark; the removing mark. There is no
+//! the companion skills (with the apps lock let go); the stopped mark; the
+//! removing mark. There is no
 //! user to delete: systemd's dynamic user goes with the unit.
 use crate::{
     effects::{Effects, Verb},
     layout::Layout,
+    lock::AppsLock,
     name::{app_name_ok, net_unit, plain_unit},
+    package::SkillFolder,
     state::{Mark, clear, has, set},
 };
 use std::{fs, io, path::Path};
@@ -28,8 +31,17 @@ pub enum Removed {
 
 /// The app's companion skills, placed and removed by the helper itself
 /// (under the skills lock, never held with the apps' own).
+///
+/// Neither call is ever made with the apps lock held: the skills have a lock
+/// of their own and the two are never nested.
 pub trait Companions {
+    /// Removes every skill of the app's; none is not an error.
     fn remove_for(&mut self, app: &str) -> Result<(), String>;
+    /// Puts the app's companion skills in, replacing the ones it had, with
+    /// the skill checks and under the skills lock; all or none.
+    fn place(&mut self, app: &str, folders: &[SkillFolder]) -> Result<(), String>;
+    /// Whether a skill (core, installed or made) already has this name.
+    fn taken_by_skill(&mut self, name: &str) -> bool;
 }
 
 fn gone_ok(result: io::Result<()>) -> io::Result<()> {
@@ -104,6 +116,7 @@ pub fn remove(
     if !app_name_ok(name) {
         return Err(format!("not an app name: {name:?}"));
     }
+    let held = AppsLock::take(&layout.state, layout.lock_wait)?;
     let there = |path: &Path| fs::symlink_metadata(path).is_ok();
     if !(there(&layout.code.join(name))
         || there(&layout.data.join(name))
@@ -127,7 +140,10 @@ pub fn remove(
     remove_data(layout, name)?;
     let code = layout.code.join(name);
     remove_entry(&code).map_err(|e| format!("{}: {e}", code.display()))?;
+    // The skills have their own lock: not taken inside this one.
+    drop(held);
     skills.remove_for(name)?;
+    let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
     for mark in [Mark::Stopped, Mark::Installing, Mark::Removing] {
         clear(&layout.state, name, mark).map_err(|e| format!("a mark: {e}"))?;
     }

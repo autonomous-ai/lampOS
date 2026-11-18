@@ -4,8 +4,12 @@
 use crate::{
     effects::{Effects, Verb, argv},
     facts::AppFacts,
+    lock::AppsLock,
+    package::{AppPackage, SkillFolder},
     remove::Companions,
+    yes::{Yes, YesKey},
 };
+use std::{path::PathBuf, time::Duration};
 
 #[derive(Default)]
 pub struct FakeEffects {
@@ -49,17 +53,110 @@ impl Effects for FakeEffects {
 
 #[derive(Default)]
 pub struct FakeCompanions {
+    /// Runs inside `place`, before it answers: another caller's turn in the
+    /// gap where the apps lock is let go.
+    pub on_place: Option<Box<dyn FnMut()>>,
     pub removed: Vec<String>,
     pub fail: bool,
+    /// Each placement: the app and its skills' names.
+    pub placed: Vec<(String, Vec<String>)>,
+    pub fail_place: bool,
+    /// Names a skill already has.
+    pub taken: Vec<String>,
+    /// The state folder whose apps lock must NOT be held in a call here.
+    pub lock_probe: Option<PathBuf>,
+    /// A call was made with the apps lock held.
+    pub violation: bool,
+}
+
+impl FakeCompanions {
+    fn probe(&mut self) {
+        // A little patience: a test that starts a process in another thread
+        // holds a copy of every open file until its exec, the lock with it.
+        // A lock held by the caller is held for much longer than this.
+        if let Some(state) = &self.lock_probe
+            && AppsLock::take(state, Duration::from_millis(400)).is_err()
+        {
+            self.violation = true;
+        }
+    }
 }
 
 impl Companions for FakeCompanions {
     fn remove_for(&mut self, app: &str) -> Result<(), String> {
+        self.probe();
         if self.fail {
             return Err("the fake companions failed".into());
         }
         self.removed.push(app.to_owned());
         Ok(())
+    }
+
+    fn place(&mut self, app: &str, folders: &[SkillFolder]) -> Result<(), String> {
+        self.probe();
+        if let Some(turn) = self.on_place.as_mut() {
+            turn();
+        }
+        if self.fail_place {
+            return Err("the fake companions failed to place".into());
+        }
+        self.placed.push((
+            app.to_owned(),
+            folders.iter().map(|f| f.name.clone()).collect(),
+        ));
+        Ok(())
+    }
+
+    fn taken_by_skill(&mut self, name: &str) -> bool {
+        self.taken.iter().any(|n| n == name)
+    }
+}
+
+/// The owner's yes as lamp-control would keep it: a list of keys, each used
+/// up once.
+pub struct FakeYes {
+    granted: Vec<YesKey>,
+    /// How many times the yes was asked for.
+    pub asked: usize,
+}
+
+impl FakeYes {
+    pub fn granting(keys: Vec<YesKey>) -> Self {
+        Self {
+            granted: keys,
+            asked: 0,
+        }
+    }
+}
+
+impl Yes for FakeYes {
+    fn take(&mut self, key: &YesKey) -> Result<(), String> {
+        self.asked += 1;
+        match self.granted.iter().position(|granted| granted == key) {
+            Some(at) => {
+                self.granted.remove(at);
+                Ok(())
+            }
+            None => Err("no yes for this".into()),
+        }
+    }
+}
+
+/// A reader that returns a fixed package whatever the bytes (the real one
+/// verifies them).
+pub struct StubReader {
+    package: AppPackage,
+}
+
+impl StubReader {
+    pub fn new(package: AppPackage) -> Self {
+        Self { package }
+    }
+}
+
+impl crate::package::PackageReader for StubReader {
+    fn read(&self, _bytes: &[u8]) -> Result<AppPackage, String> {
+        Ok(self.package.clone())
     }
 }
 
