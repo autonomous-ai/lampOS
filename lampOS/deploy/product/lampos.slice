@@ -1,0 +1,10 @@
+# The slice over every lampOS part (lampos-voice.slice and lampos-parts.slice). systemd makes it
+# implicitly from their names; this file is here only for the voice's memory protection (#7383):
+# lamp-voice.service's MemoryMin holds only with the same on each ancestor slice but the root.
+# Under an agent's work the board swaps; protected, the voice's pages (lamp-voice 105-119 MB on
+# lamp-c0a4, 17 Nov) are reclaimed last. The gateway keeps no MemoryHigh (#6226).
+[Unit]
+Description=lampOS slice
+
+[Slice]
+MemoryMin=256M

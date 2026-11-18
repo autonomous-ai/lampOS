@@ -149,6 +149,17 @@ static CHAPTERS: AtomicBool = AtomicBool::new(false);
 pub fn chapters_on() -> bool {
     CHAPTERS.load(Ordering::Relaxed)
 }
+
+/// A route's worker's own [`chapters_on`]: its recall runs there, in a
+/// cleared environment where no night starts, so it reads
+/// [`CHAPTERS_ENVIRONMENT`] and [`ENVIRONMENT`] itself, both `on` as
+/// `worker_command` passes them. Only ever switches it on, never off.
+pub fn chapters_from_environment() {
+    let on = |name: &str| switched_on(std::env::var(name).ok().as_deref());
+    if on(ENVIRONMENT) && on(CHAPTERS_ENVIRONMENT) {
+        CHAPTERS.store(true, Ordering::Relaxed);
+    }
+}
 /// Speech, a line, or the slide closing: each moves it on.
 static STIRS: AtomicU64 = AtomicU64::new(0);
 static LAST_STIR_US: AtomicU64 = AtomicU64::new(0);

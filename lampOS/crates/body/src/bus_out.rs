@@ -266,18 +266,49 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
             ],
         };
     }
-    let (level, message) = if reading >= WARM {
+    // A seated lamp is said seated before any warmth (#7281): a lamp that
+    // seated itself hot shows as that, not as a warm joint.
+    let (level, message) = if let Some((joint, why)) = glimpse.seated {
         (
             Level::Warn,
-            format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
+            if glimpse.seat_rests {
+                format!(
+                    "seated: the {} sat down hot twice in an hour; it stands again by itself once it reads under {} for {} min, or when its head is held a second",
+                    said_as(joint),
+                    crate::body::StrainGuard::COOL,
+                    crate::body::StrainGuard::COOL_FOR.as_secs() / 60
+                )
+            } else {
+                format!(
+                    "seated: the {} retreated twice in an hour ({why}); hold its head a second, or run a health check, to let it stand again",
+                    said_as(joint)
+                )
+            },
         )
-    } else if let Some((joint, why)) = glimpse.seated {
+    } else if let Some((joint, cooling)) = glimpse.rest_waits {
+        // #7344: a rest that ends folded says so at once, and what brings it up,
+        // before a hot joint's warmth: that is why it lies there.
+        let cool = if cooling {
+            format!(
+                "it reads under {} for {} min, and then ",
+                crate::body::StrainGuard::COOL,
+                crate::body::StrainGuard::COOL_FOR.as_secs() / 60
+            )
+        } else {
+            String::new()
+        };
         (
             Level::Warn,
             format!(
-                "seated: the {} retreated twice in an hour ({why}); hold its head a second, or run a health check, to let it stand again",
-                said_as(joint)
+                "resting: the {} sat down{}; it stays folded until {cool}someone speaks to it, holds its head a second or runs a health check",
+                said_as(joint),
+                if cooling { " hot" } else { " for a strain" }
             ),
+        )
+    } else if reading >= WARM {
+        (
+            Level::Warn,
+            format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
         )
     } else if let Some(joint) = glimpse.cannot_lift {
         (
@@ -529,6 +560,8 @@ pub struct FoldSaid {
     began: Option<u64>,
     /// The retreats counted when it was last folded (none at the start).
     folded_retreats: u16,
+    /// Of them, those for heat (#7281).
+    folded_hot: u16,
 }
 
 impl FoldSaid {
@@ -551,6 +584,10 @@ impl FoldSaid {
         }
         let retreats = glimpse.retreats.saturating_sub(self.folded_retreats);
         self.folded_retreats = glimpse.retreats;
+        // #7281: heat is said as heat.
+        let hot = glimpse.hot_retreats > self.folded_hot;
+        self.folded_hot = glimpse.hot_retreats;
+        let cause = if hot { "hot" } else { "for a strain" };
         let began = self.began.take()?;
         Some(format!(
             "lamp-body: step {} folded in {:.1} s; arm goals {:?} ended at {:?}; head and base goals {:?} at {:?}; {}",
@@ -562,8 +599,8 @@ impl FoldSaid {
             glimpse.positions,
             match retreats {
                 0 => "nothing retreated since it was last folded".to_owned(),
-                1 => "it sat down for a strain once since it was last folded".to_owned(),
-                sat => format!("it sat down for a strain {sat} times since it was last folded"),
+                1 => format!("it sat down {cause} once since it was last folded"),
+                sat => format!("it sat down {cause} {sat} times since it was last folded"),
             }
         ))
     }
@@ -1075,12 +1112,15 @@ mod tests {
             toward_refused: None,
             bad_reads: [0; 5],
             retreats: 0,
+            hot_retreats: 0,
             resting_s: 0,
             cannot_lift: None,
             unlifted: None,
             strained: None,
             warming: None,
             seated: None,
+            seat_rests: false,
+            rest_waits: None,
             home: None,
             waiting: None,
             stand_ask: None,
@@ -1239,6 +1279,21 @@ mod tests {
             lines[0].ends_with("it sat down for a strain once since it was last folded"),
             "{}",
             lines[0]
+        );
+        // #7281: one for heat says so.
+        let mut said = FoldSaid::default();
+        let mut lines = Vec::new();
+        for g in stands(600, 1.0, 0.0, 200) {
+            let g = Glimpse {
+                retreats: u16::from(g.step >= 700),
+                hot_retreats: u16::from(g.step >= 700),
+                ..g
+            };
+            lines.extend(said.step(&g));
+        }
+        assert!(
+            lines[0].ends_with("it sat down hot once since it was last folded"),
+            "{lines:?}"
         );
         // A body that never stands says no fold.
         let mut said = FoldSaid::default();
@@ -1412,7 +1467,7 @@ mod tests {
 
     /// The strain guard's warnings (#4390, #4501): seated first, then a
     /// long strain, an arm that did not lift, and a fast warming. Warmth is
-    /// said before them all.
+    /// said before them all but the seat (#7281).
     #[test]
     fn the_strain_guards_warnings_name_the_joint_and_what_it_did() {
         let said = |glimpse: &Glimpse| {
@@ -1444,8 +1499,29 @@ mod tests {
             said(&seated),
             "seated: the shoulder retreated twice in an hour (hot); hold its head a second, or run a health check, to let it stand again"
         );
-        seated.arm_temperatures = [WARM, 40];
-        assert!(said(&seated).starts_with("shoulder is warm"));
+        // #7281: seated is said before a joint's warmth, as it is what the
+        // lamp does about it; one that rests says it stands by itself.
+        seated.arm_temperatures = [WARM + 7, 40];
+        assert!(said(&seated).starts_with("seated: the shoulder"));
+        seated.seat_rests = true;
+        assert_eq!(
+            said(&seated),
+            "seated: the shoulder sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second"
+        );
+        // #7344: a rest that ends folded is said before a warm joint.
+        // A seat is said before it (#7281); this one never seated.
+        let mut rest = seated;
+        rest.seated = None;
+        rest.rest_waits = Some(("elbow_pitch", true));
+        assert_eq!(
+            said(&rest),
+            "resting: the elbow sat down hot; it stays folded until it reads under 50 for 5 min, and then someone speaks to it, holds its head a second or runs a health check"
+        );
+        rest.rest_waits = Some(("base_pitch", false));
+        assert_eq!(
+            said(&rest),
+            "resting: the shoulder sat down for a strain; it stays folded until someone speaks to it, holds its head a second or runs a health check"
+        );
     }
 
     #[test]

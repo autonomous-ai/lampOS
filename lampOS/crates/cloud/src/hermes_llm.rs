@@ -19,10 +19,18 @@
 //! model but [`MODEL`] 400. A body is at most [`MOST_BODY`]; at most
 //! [`AT_ONCE`] requests run at once and [`PER_MINUTE`] start in a minute,
 //! both taken before a body is read. No body, token or key is ever logged.
+//!
+//! With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342, [`Meter`]), each relay
+//! answer's day used (`X-Usage-Day-Used`) and each chat answer's `usage` are
+//! kept in `day-used.json` in the state folder, for lamp-skills' bound on
+//! skills' runs (`lamp_skills::relay_share`), and each chat answer has one
+//! journal line of its numbers. Only read: every request is forwarded as
+//! before. Off, nothing is read, kept or said.
+use serde_json::Value;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -210,6 +218,161 @@ pub struct Forwarder {
     running: Arc<Semaphore>,
     unread: Arc<Semaphore>,
     started: Mutex<Started>,
+    meter: Option<Meter>,
+}
+
+/// The relay's day as its answers say it, kept for lamp-skills
+/// (`lamp_skills::relay_share`, #7342): with the switch set only.
+#[derive(Clone)]
+struct Meter {
+    dir: PathBuf,
+    reading: Arc<Mutex<lamp_skills::relay_share::Reading>>,
+    /// Held across a write, so the last one written is the newest reading.
+    writing: Arc<Mutex<()>>,
+}
+
+impl Meter {
+    /// An answer's header and, for a chat, its `usage`, kept in memory and
+    /// then in the file, off the runtime's threads; a chat's line in the
+    /// journal.
+    async fn note(&self, success: bool, header: Option<String>, chat: Option<Option<Value>>) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let used = {
+            let mut reading = self
+                .reading
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            reading.heard(now_ms, header.as_deref(), success);
+            if let Some(usage) = &chat {
+                reading.counted(usage.as_ref());
+            }
+            reading.used
+        };
+        if let Some(usage) = &chat {
+            eprintln!(
+                "lamp-cloud: the Hermes forwarder: {}",
+                told(usage.as_ref(), used)
+            );
+        }
+        let meter = self.clone();
+        let kept = tokio::task::spawn_blocking(move || {
+            let _writing = meter
+                .writing
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            let reading = meter
+                .reading
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .clone();
+            lamp_skills::relay_share::keep(&meter.dir, &reading)
+        })
+        .await;
+        if !matches!(kept, Ok(Ok(()))) {
+            eprintln!("lamp-cloud: the Hermes forwarder: the relay's day used can't be kept");
+        }
+    }
+}
+
+/// A chat answer's journal line: its tokens, as its `usage` gives them, and
+/// the day used as the relay last said. Numbers only.
+fn told(usage: Option<&Value>, used: Option<f64>) -> String {
+    let count = |pointer: &str| usage.and_then(|usage| usage.pointer(pointer)?.as_u64());
+    let tokens = match (count("/prompt_tokens"), count("/completion_tokens")) {
+        (Some(prompt), Some(completion)) => format!(
+            "{prompt} prompt tokens ({} from the cache), {completion} completion tokens",
+            count("/prompt_cache_hit_tokens")
+                .or_else(|| count("/prompt_tokens_details/cached_tokens"))
+                .unwrap_or(0)
+        ),
+        _ => "no usage given".to_owned(),
+    };
+    let day = used.map_or_else(|| "not limited".to_owned(), |used| format!("{used:.3}"));
+    format!("a chat answer: {tokens}; the relay's day used {day}")
+}
+
+/// The most of an answer looked through for its `usage`: a Server-Sent
+/// Events line, or a whole JSON answer.
+const MOST_SCANNED: usize = 1024 * 1024;
+
+/// A chat answer's `usage`, found as its pieces pass: the last one an
+/// event carries in a stream, or the JSON answer's own.
+#[derive(Default)]
+struct Usage {
+    stream: bool,
+    kept: Vec<u8>,
+    /// The line or answer past [`MOST_SCANNED`]: not looked at.
+    over: bool,
+    found: Option<Value>,
+}
+
+impl Usage {
+    fn new(kind: &str) -> Self {
+        Self {
+            stream: kind.contains("text/event-stream"),
+            ..Self::default()
+        }
+    }
+
+    fn feed(&mut self, piece: &[u8]) {
+        if !self.stream {
+            if self.kept.len() + piece.len() > MOST_SCANNED {
+                self.over = true;
+                self.kept = Vec::new();
+            } else if !self.over {
+                self.kept.extend_from_slice(piece);
+            }
+            return;
+        }
+        for part in piece.split_inclusive(|byte| *byte == b'\n') {
+            if !self.over {
+                if self.kept.len() + part.len() > MOST_SCANNED {
+                    self.over = true;
+                    self.kept = Vec::new();
+                } else {
+                    self.kept.extend_from_slice(part);
+                }
+            }
+            if part.ends_with(b"\n") {
+                let line = std::mem::take(&mut self.kept);
+                if !std::mem::take(&mut self.over) {
+                    self.line(&line);
+                }
+            }
+        }
+    }
+
+    fn line(&mut self, line: &[u8]) {
+        let line = String::from_utf8_lossy(line);
+        let Some(data) = line.trim().strip_prefix("data:") else {
+            return;
+        };
+        if let Some(usage) = serde_json::from_str::<Value>(data.trim())
+            .ok()
+            .and_then(|event| event.get("usage").cloned())
+            .filter(Value::is_object)
+        {
+            self.found = Some(usage);
+        }
+    }
+
+    fn end(mut self) -> Option<Value> {
+        if self.over {
+            return self.found;
+        }
+        let kept = std::mem::take(&mut self.kept);
+        if self.stream {
+            self.line(&kept);
+            return self.found;
+        }
+        serde_json::from_slice::<Value>(&kept)
+            .ok()?
+            .get("usage")
+            .cloned()
+            .filter(Value::is_object)
+    }
 }
 
 impl std::fmt::Debug for Forwarder {
@@ -290,7 +453,21 @@ impl Forwarder {
             running: Arc::new(Semaphore::new(AT_ONCE)),
             unread: Arc::new(Semaphore::new(UNREAD_AT_ONCE)),
             started: Mutex::new(Started::default()),
+            meter: None,
         })
+    }
+
+    /// The relay's day used and the chats' tokens kept in `dir`'s
+    /// `lamp_skills::relay_share::FILE` (#7342): today's, if it holds them,
+    /// counted on from there.
+    pub fn with_meter(mut self, dir: &Path) -> Self {
+        let reading = lamp_skills::relay_share::read(dir).unwrap_or_default();
+        self.meter = Some(Meter {
+            dir: dir.to_path_buf(),
+            reading: Arc::new(Mutex::new(reading)),
+            writing: Arc::new(Mutex::new(())),
+        });
+        self
     }
 
     /// The listener on `127.0.0.1:port` ([`PORT`] in the product).
@@ -481,6 +658,7 @@ impl Forwarder {
             Ok(request) => request,
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
         };
+        let chat = request.path == CHAT_PATH;
         let upstream = match (request.method.as_str(), request.path.as_str()) {
             ("POST", CHAT_PATH) => self
                 .client
@@ -507,24 +685,56 @@ impl Forwarder {
             status.as_u16(),
             status.canonical_reason().unwrap_or("Answer"),
         );
-        send(&mut stream, head.as_bytes()).await?;
-        // Each piece as it comes, so an SSE stream reaches Hermes as the
-        // relay sends it. A cut answer ends the connection without the
-        // closing chunk, so Hermes sees it cut.
+        // The relay's day used, read only with the switch set (#7342).
+        let header = self.meter.as_ref().and_then(|_| {
+            answer
+                .headers()
+                .get(lamp_skills::relay_share::HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+        });
+        let mut usage = (self.meter.is_some() && chat).then(|| Usage::new(&kind));
+        let passed = Self::pass(&mut stream, &mut answer, head, usage.as_mut()).await;
+        if let Some(meter) = &self.meter {
+            meter
+                .note(status.is_success(), header, usage.map(Usage::end))
+                .await;
+        }
+        match passed {
+            Ok(true) => stream.shutdown().await,
+            Ok(false) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// The answer's `head`, then each piece as it comes, so an SSE stream
+    /// reaches Hermes as the relay sends it, each seen by `usage` too; then
+    /// the closing chunk (`true`). A cut answer ends without the closing
+    /// chunk (`false`), so Hermes sees it cut.
+    async fn pass(
+        stream: &mut TcpStream,
+        answer: &mut reqwest::Response,
+        head: String,
+        mut usage: Option<&mut Usage>,
+    ) -> io::Result<bool> {
+        send(stream, head.as_bytes()).await?;
         loop {
             match answer.chunk().await {
                 Ok(Some(piece)) if piece.is_empty() => continue,
                 Ok(Some(piece)) => {
-                    send(&mut stream, format!("{:x}\r\n", piece.len()).as_bytes()).await?;
-                    send(&mut stream, &piece).await?;
-                    send(&mut stream, b"\r\n").await?;
+                    if let Some(usage) = usage.as_deref_mut() {
+                        usage.feed(&piece);
+                    }
+                    send(stream, format!("{:x}\r\n", piece.len()).as_bytes()).await?;
+                    send(stream, &piece).await?;
+                    send(stream, b"\r\n").await?;
                 }
                 Ok(None) => break,
-                Err(_) => return Ok(()),
+                Err(_) => return Ok(false),
             }
         }
-        send(&mut stream, b"0\r\n\r\n").await?;
-        stream.shutdown().await
+        send(stream, b"0\r\n\r\n").await?;
+        Ok(true)
     }
 }
 
@@ -560,7 +770,10 @@ pub async fn serve_when(
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
         let token = token(state).map_err(|_| "the local token can't be kept")?;
-        let forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
+        let mut forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
+        if lamp_skills::relay_share::on() {
+            forwarder = forwarder.with_meter(state);
+        }
         let listener = Forwarder::bind(port)
             .await
             .map_err(|_| format!("127.0.0.1:{port} can't be listened on"))?;
@@ -572,6 +785,13 @@ pub async fn serve_when(
                 .local_addr()
                 .map_or_else(|_| format!("127.0.0.1:{port}"), |at| at.to_string());
             say(&format!("the Hermes forwarder listens on {at}"));
+            if forwarder.meter.is_some() {
+                say(&format!(
+                    "the Hermes forwarder keeps the relay's day used in {} ({})",
+                    lamp_skills::relay_share::FILE,
+                    lamp_skills::relay_share::SWITCH
+                ));
+            }
             forwarder.serve(listener).await;
         }
         Err(why) => {

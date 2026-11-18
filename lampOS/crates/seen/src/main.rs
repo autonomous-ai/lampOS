@@ -16,21 +16,20 @@
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
-    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, HumanPosture, Level,
+    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanDoingMore, HumanPosture, Level,
     MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
 };
 use lamp_seen::{
     BUS_NAME, ENVIRONMENT, HEALTH_NAME,
     activity::{self, Activity},
-    burst::{Outcome, Pace},
+    burst::Pace,
     endpoint::Endpoint,
-    frames::{self, Sink, Taker},
-    gate, link,
+    frames::{self, Drained, Sink, Taker},
+    gate, hold, keep, link,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
     outlet::Outlet,
-    pause::{self, Pause},
     pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
     sitting::{BREAK_IS_STANDING, Sitting},
@@ -48,7 +47,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 | --frame-link-file ABSOLUTE_PATH] [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]] [--run-for-ms N]\n       lamp-seen frame-link [--file ABSOLUTE_PATH] [--socket ABSOLUTE_PATH]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer (or, with --frame-link-file, the link and boots that file keeps):\na frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes, encrypted,\nto the pose model on a socket closed after it, and humans/posture is said every 30 s while\nsomeone sits (#6543 phase 3).\n\nframe-link: with LAMP_SEEN_ACTIVITY=on, keeps in --file (/run/lampos-seen/frame-link.env)\ntwo new boots from /dev/urandom, made once, as LAMP_EYES_FRAME_LINK=--frame-link SOCKET\n--frame-link-controller HEX32 --frame-link-reader HEX32 and LAMP_EYES_VISITS=--visits on\n(the stranger check's humans/familiar) for lamp-eyes.service, the socket\n--socket (/run/lampos-eyes-frames/camera.frames); off, removes the file.";
+const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 | --frame-link-file ABSOLUTE_PATH] [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]] [--run-for-ms N]\n       lamp-seen frame-link [--file ABSOLUTE_PATH] [--socket ABSOLUTE_PATH]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile someone sits at the desk (no stranger check). With --frames-socket it is the camera frame\nlink's perception consumer (or, with --frame-link-file, the link and boots that file keeps):\na frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes, encrypted,\nto the pose model on a socket closed after it, and humans/posture is said every 30 s while\nsomeone sits (#6543 phase 3).\n\nframe-link: with LAMP_SEEN_ACTIVITY=on, keeps in --file (/run/lampos-seen/frame-link.env)\ntwo new boots from /dev/urandom, made once, as LAMP_EYES_FRAME_LINK=--frame-link SOCKET\n--frame-link-controller HEX32 --frame-link-reader HEX32 and LAMP_EYES_VISITS=--visits on\n(humans/familiar, kept as it was) for lamp-eyes.service, the socket\n--socket (/run/lampos-eyes-frames/camera.frames); off, removes the file.";
 
 /// One step of the loop.
 const TICK: Duration = Duration::from_millis(100);
@@ -236,7 +235,6 @@ struct Inputs {
     privacy: Subscriber,
     presence: Subscriber,
     faces: Subscriber,
-    familiar: Subscriber,
     expression: Subscriber,
     forgot: Subscriber,
     activity: Subscriber,
@@ -259,7 +257,6 @@ impl Inputs {
             privacy: typed(MicrophonePrivacy::TOPIC, MicrophonePrivacy::TYPE)?,
             presence: typed(RoomPresence::TOPIC, RoomPresence::TYPE)?,
             faces: typed(Faces::TOPIC, Faces::TYPE)?,
-            familiar: typed(HumanFamiliar::TOPIC, HumanFamiliar::TYPE)?,
             expression: typed(ExpressionState::TOPIC, ExpressionState::TYPE)?,
             forgot: typed(MemoryForgot::TOPIC, MemoryForgot::TYPE)?,
             activity: typed(RoomActivity::TOPIC, RoomActivity::TYPE)?,
@@ -292,9 +289,6 @@ impl Inputs {
         if let Some(faces) = newest::<Faces>(&mut self.faces) {
             readings.faces(&faces, now);
         }
-        if let Some(familiar) = newest::<HumanFamiliar>(&mut self.familiar) {
-            readings.familiar(&familiar, now);
-        }
         if let Some(state) = newest::<ExpressionState>(&mut self.expression) {
             readings.expression(&state, now);
         }
@@ -324,14 +318,9 @@ fn said_word(said: opt_in::Said) -> &'static str {
     }
 }
 
-type Frames = (Taker<FrameClient>, Marked<BusRing, Outlet>);
+type Frames = (Taker<Drained<FrameClient>>, Marked<BusRing, Outlet>);
 
-fn health(
-    publisher: &mut Publisher,
-    gate: Result<(), gate::Closed>,
-    pause: pause::Counts,
-    frames: Option<&Frames>,
-) {
+fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Option<&Frames>) {
     let activity = frames.and_then(|(_, marked)| marked.inner().activity.as_deref());
     let posture = frames.and_then(|(_, marked)| marked.inner().pose.as_deref());
     let warn = activity.is_some_and(|activity| activity.retreat().warn())
@@ -348,9 +337,7 @@ fn health(
     .with(
         "gate",
         gate.map_or_else(|closed| closed.as_str(), |()| "open"),
-    )
-    .with("paused", pause.paused)
-    .with("misread_on_track", pause.misread_on_track);
+    );
     diagnostic = match activity {
         None => diagnostic.with("sends", "none"),
         Some(activity) => {
@@ -426,6 +413,22 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         bus.publisher_declared(HumanDoing::TOPIC, &HumanDoing::declaration(), BUS_NAME)?;
     let mut seen_out =
         bus.publisher_declared(DoingSeen::TOPIC, &DoingSeen::declaration(), BUS_NAME)?;
+    // Tiredness, desk work and celebrating, on a topic of their own: off,
+    // it is not even declared.
+    let more_doings = lamp_seen::sitting::more(
+        std::env::var(lamp_seen::sitting::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    let mut doing_more_out = if more_doings {
+        Some(bus.publisher_declared(
+            HumanDoingMore::TOPIC,
+            &HumanDoingMore::declaration(),
+            BUS_NAME,
+        )?)
+    } else {
+        None
+    };
     let opt_in_file = opt_in::File::in_folder(&config.opt_in_folder);
     let record = opt_in::Record::in_folder(&config.state_folder);
     let mut kept = lamp_msgs::consent::Kept::default();
@@ -500,14 +503,16 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut frames: Option<Frames> = match config.frames.clone().or(from_file).as_ref() {
         None => None,
         Some((socket, own, controller)) => Some((
+            // Read on a thread of its own, so the link is drained however
+            // long a step takes (the camera's 0.5 s stall rule).
             Taker::with_every(
-                FrameClient::new(
+                Drained::new(FrameClient::new(
                     socket,
                     Role::Perception,
                     *own,
                     *controller,
                     lamp_camera::MAX_FRAME_BYTES,
-                ),
+                ))?,
                 every_us,
             ),
             Marked::new(BusRing::on(&bus, boot_clock_id())?, outlet),
@@ -522,7 +527,26 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         eprintln!("lamp-seen: a break is a stand-up, not a stretch");
     }
     let mut stood_up_us: Option<u64> = None;
-    let mut pause = Pause::default();
+    let mut keep = keep::Keep::default();
+    // The sitting held while a close person is seen
+    // (`hold.rs`); off, none, and every step is as without it.
+    let mut holds =
+        switched_on(std::env::var(hold::ENVIRONMENT).ok().as_deref()).then(hold::Hold::default);
+    if holds.is_some() {
+        eprintln!(
+            "lamp-seen: {}=on: the sitting is held while a close person is seen",
+            hold::ENVIRONMENT
+        );
+    }
+    // What the journal may name of what was seen: counts and outcomes only
+    // unless the diagnostics switch is on.
+    let labels = switched_on(std::env::var(lamp_seen::JOURNAL_LABELS).ok().as_deref());
+    if labels {
+        eprintln!(
+            "lamp-seen: {}=on: the journal names each label and score",
+            lamp_seen::JOURNAL_LABELS
+        );
+    }
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -573,35 +597,39 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         // No frame before the lamp has begun saying it will look.
         let said_on = said_back.said_on(&kept, &record);
         let now_inputs = readings.inputs(opted_in, said_on, now);
+        // Held, the presence rule is taken as holding while
+        // the newest pose answer sees a close person (`hold.rs`).
+        let answers = frames
+            .as_mut()
+            .and_then(|(_, marked)| marked.inner_mut().pose.as_mut())
+            .map(|pose| pose.answers())
+            .unwrap_or_default();
+        // A hold beginning now begins with the newest answer when its frame
+        // went under 30 s ago (the rate lets no new frame go yet).
+        let posture_now = frames
+            .as_ref()
+            .and_then(|(_, marked)| marked.inner().pose.as_deref());
+        let posture_frames = posture_now.is_some();
+        let recent_answer = posture_now.and_then(|pose| pose.recent_answer(now));
+        let on_track = readings.on_track(now);
+        let now_inputs = hold::wire(
+            holds.as_mut(),
+            &answers,
+            &hold::Now {
+                now_us: now,
+                inputs: &now_inputs,
+                stood_up: came.stood_up,
+                forgot: came.forgot,
+                recent_answer,
+                posture: posture_frames,
+            },
+        );
+        if let Some(holds) = holds.as_mut() {
+            for note in holds.notes() {
+                eprintln!("lamp-seen: {}", note.line());
+            }
+        }
         let gate = gate::may_request(&now_inputs);
-        // A stranger reading on the same tracked face pauses: the gate stays
-        // closed, and the window and timers are kept unsaid, at most 5 s.
-        let was_paused = pause.paused();
-        let before = pause.counts();
-        let verdict = pause.step(now, &now_inputs, &readings.on_track(now));
-        let verdict = pause::after_stood_up(&mut pause, verdict, came.stood_up);
-        if pause.counts().paused != before.paused {
-            let counts = pause.counts();
-            eprintln!(
-                "lamp-seen: gate paused on a misread (paused {}, misread_on_track {})",
-                counts.paused, counts.misread_on_track
-            );
-        } else if was_paused && !verdict.paused {
-            eprintln!(
-                "lamp-seen: the pause ended: {}",
-                if verdict.wipe { "wiped" } else { "kept" }
-            );
-        }
-        if verdict.wipe {
-            if sitting.take().is_some() {
-                doing_said = None;
-            }
-            if let Some((_, marked)) = frames.as_mut()
-                && let Some(pose) = marked.inner_mut().pose.as_mut()
-            {
-                pose.forget();
-            }
-        }
         if last_gate != Some(gate) {
             eprintln!(
                 "lamp-seen: gate {}",
@@ -609,10 +637,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             );
             last_gate = Some(gate);
         }
-        // The sitting: begun when one remembered face is at the desk
-        // (whatever the opt-in, its said-back line, the privacy or sleep
-        // say), ended on room/stood_up and when nobody or a stranger is
-        // there. Frames still go only under `gate`, said-back included.
+        // The sitting: begun when someone is at the desk with a face in
+        // view (whatever the opt-in, its said-back line, the privacy or
+        // sleep say), ended on room/stood_up and when nobody is there. Frames still go only under `gate`, said-back included.
         let desk = gate::may_request(&gate::Inputs {
             opted_in: true,
             said_on: true,
@@ -620,50 +647,84 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             asleep: Some(false),
             ..now_inputs
         });
-        if pause::ends_sitting(verdict, came.stood_up, desk) && sitting.take().is_some() {
+        // Posture's own gate: closed `not_said_yet` until a line naming
+        // posture was said for this yes, whatever activity's says.
+        let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
+        let watching = frames
+            .as_ref()
+            .and_then(|(_, marked)| marked.inner().pose.as_deref())
+            .is_some_and(Pose::watching);
+        // What a closing wipes at once, and what it keeps unsaid for up to
+        // 120 s (`keep.rs`).
+        let plan = keep.step(&keep::Now {
+            now_us: now,
+            inputs: &now_inputs,
+            seen: &on_track,
+            stood_up: came.stood_up,
+            forgot: came.forgot,
+            posture_gate,
+            desk,
+            watching,
+            sitting: sitting.is_some(),
+        });
+        let word =
+            |closed: Result<(), gate::Closed>| closed.map_or_else(|c| c.as_str(), |()| "open");
+        if let Some(line) = plan.posture.line("posture's window", word(posture_gate)) {
+            eprintln!("lamp-seen: {line}");
+        }
+        if let Some(line) = plan.sitting.line("the sitting's timers", word(desk)) {
+            eprintln!("lamp-seen: {line}");
+        }
+        if plan.sitting.wipes() && sitting.take().is_some() {
             doing_said = None;
         }
+        if plan.posture.wipes()
+            && let Some((_, marked)) = frames.as_mut()
+            && let Some(pose) = marked.inner_mut().pose.as_mut()
+        {
+            pose.forget();
+        }
         if desk.is_ok() && sitting.is_none() {
-            let begun = Sitting::new(inputs.arrived_us(now));
+            let begun = Sitting::with_more(inputs.arrived_us(now), more_doings);
             sitting = Some(if break_is_standing {
                 begun.break_is_standing(now, stood_up_us)
             } else {
                 begun
             });
         }
+        // Kept through a short closing: nothing said from it.
+        let sitting_held = plan.sitting.holds();
         if let Some((taker, marked)) = frames.as_mut() {
-            // Posture's own gate: closed `not_said_yet` until a line naming
-            // posture was said for this yes, whatever activity's says.
-            let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
-            if verdict.paused
+            if plan.posture.holds()
                 && let Some(pose) = marked.inner_mut().pose.as_mut()
             {
                 pose.hold(now);
             } else if let (Some(pose), Some(posture_out)) =
                 (marked.inner_mut().pose.as_mut(), posture_out.as_mut())
                 && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
-                && let Err(error) = posture_out.publish_json(now, &posture)
             {
-                eprintln!("lamp-seen: humans/posture could not be said: {error}");
+                eprintln!(
+                    "lamp-seen: {}",
+                    pose::said_line(&posture, pose.samples(), labels)
+                );
+                if let Err(error) = posture_out.publish_json(now, &posture) {
+                    eprintln!("lamp-seen: humans/posture could not be said: {error}");
+                }
             }
             if let Some(activity) = marked.inner_mut().activity.as_mut()
                 && let Some(finished) = activity.poll(now)
             {
-                match finished.outcome {
-                    Outcome::Answered => {}
-                    Outcome::Busy => eprintln!("lamp-seen: the server is busy: the burst dropped"),
-                    Outcome::Failed(failure) => {
-                        eprintln!("lamp-seen: a burst failed ({})", failure.as_str())
-                    }
-                }
-                // Paused: the burst under way is aborted below, and what it
-                // saw is dropped, never said.
-                if let Some(sitting) = sitting.as_mut().filter(|_| !verdict.paused) {
+                // Kept: the burst under way is aborted below, and
+                // what it saw is dropped, never said.
+                if let Some(sitting) = sitting.as_mut().filter(|_| !sitting_held) {
                     for newly in sitting.saw(&finished.seen, now) {
                         if newly.check().is_ok() {
                             let _ = seen_out.publish_json(now, &newly);
                         }
                     }
+                    // Its other timers wait for the next 30 s, so
+                    // humans/doing goes out as often as without them.
+                    sitting.saw_more(&finished.more, now);
                     if finished.seen.iter().any(|seen| sitting.takes(seen.what)) {
                         // Said at once, not at the next 30 s.
                         doing_said = None;
@@ -671,18 +732,36 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 }
             }
             taker.step(gate, now, marked);
+            // The journal: each burst and posture sample, and its answer.
+            let stopped = match gate {
+                Ok(()) => "the link lost or its grant changed".to_owned(),
+                Err(closed) => format!("gate {}", closed.as_str()),
+            };
+            if let Some(activity) = marked.inner_mut().activity.as_mut() {
+                for note in activity.notes() {
+                    eprintln!("lamp-seen: {}", note.line(&stopped, labels));
+                }
+            }
+            if let Some(pose) = marked.inner_mut().pose.as_mut() {
+                for note in pose.notes() {
+                    eprintln!("lamp-seen: {}", note.line(labels));
+                }
+            }
         }
-        if let Some(sitting) = sitting.as_ref().filter(|_| !verdict.paused)
+        if let Some(sitting) = sitting.as_ref().filter(|_| !sitting_held)
             && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
         {
             let doing = sitting.doing(now);
             if doing.check().is_ok() {
                 let _ = doing_out.publish_json(now, &doing);
             }
+            if let (Some(out), Some(more)) = (doing_more_out.as_mut(), sitting.doing_more(now)) {
+                let _ = out.publish_json(now, &more);
+            }
             doing_said = Some(Instant::now());
         }
         if said_at.is_none_or(|at| at.elapsed() >= HEALTH_EVERY) {
-            health(&mut diagnostics, gate, pause.counts(), frames.as_ref());
+            health(&mut diagnostics, gate, frames.as_ref());
             said_at = Some(Instant::now());
         }
         std::thread::sleep(TICK);

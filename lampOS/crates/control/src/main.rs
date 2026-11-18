@@ -58,6 +58,9 @@ const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
 /// The owner's switch for `speaker.stream`, off unless `on`.
 const SPEAKER_ENVIRONMENT: &str = "LAMP_CONTROL_SPEAKER";
+/// `on` makes a new computer's pairing glow once on the ring (a soft pulse,
+/// docs/control.md, "Pairing, once per computer"); off unless given.
+const PAIR_CUE_ENVIRONMENT: &str = "LAMP_CONTROL_PAIR_CUE";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -531,6 +534,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(_) => return Err("--remote is on or off".to_owned()),
     };
     shared.set_remote(remote);
+    let pair_cue = std::env::var(PAIR_CUE_ENVIRONMENT).as_deref() == Ok("on");
+    shared.set_pair_cue(pair_cue);
+    eprintln!(
+        "lamp-control: {}",
+        if pair_cue {
+            "a new pairing glows once on the ring (LAMP_CONTROL_PAIR_CUE=on)"
+        } else {
+            "a new pairing shows nothing on the ring (LAMP_CONTROL_PAIR_CUE)"
+        }
+    );
     shared.set_listening(door_on);
     shared.set_features(features);
     eprintln!(

@@ -246,6 +246,12 @@ pub struct NewsWords {
     /// the built-in words.
     #[serde(default = "failed_closed_soon")]
     pub failed_closed_soon: String,
+    /// ...or was not sent, as the lamp is still getting ready (lamp-tasks'
+    /// `openclaw_gateway_not_ready`, or `harness_not_running`, #7282):
+    /// told at once in [`NOT_READY_LINE`]'s words, not as a plain
+    /// failure. A skill without it says the built-in words.
+    #[serde(default = "failed_not_ready")]
+    pub failed_not_ready: String,
     /// A hand-over that went into an earlier session of the person's, by
     /// its name (lamp-tasks' `serve --reply-named`, #5535): `{asked}`,
     /// `{who}` and `{session}`, so a wrong one is heard at once. A skill
@@ -334,6 +340,40 @@ fn failed_closed_soon() -> String {
     "The work the person asked you to hand over, \"{asked}\", did not reach {who}: the earlier session they named is closed, and reopening it could not be confirmed yet, so nothing was typed into it and nothing new was started. Tell them in these words, and nothing more: \"That session is closed. Open it in the Harness app and ask me again, or I can start a new one in the same project. Or try again in a moment.\"".into()
 }
 
+/// What the person hears when the lamp is still getting ready. The same
+/// sentence as #7278's `made_skill::NOT_READY_LINE`; merge the two into
+/// one constant once both are on lamp-voice.
+pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and ask me again.";
+
+/// How long after the lamp starts a not-ready refusal is told as
+/// [`NOT_READY_LINE`] (El's P2 on #7351): lamp-tasks' own most for a lamp
+/// said to be starting (`STARTING_AT_MOST`, 180 s). Past it, a Gateway or
+/// Harness still not up is broken, not starting, and is told as a plain
+/// failure, as before, never "give me a minute" for good.
+pub const NOT_READY_WITHIN_MS: u64 = 180_000;
+
+/// Whether a not-ready refusal at `since_boot_ms` after the lamp started
+/// is told as [`NOT_READY_LINE`]: within [`NOT_READY_WITHIN_MS`]; an
+/// unknown time is not.
+pub fn not_ready_told(since_boot_ms: Option<u64>) -> bool {
+    since_boot_ms.is_some_and(|since| since <= NOT_READY_WITHIN_MS)
+}
+
+/// The time since the lamp started, from `/proc/uptime`; none where it
+/// can't be read.
+pub fn since_boot_ms() -> Option<u64> {
+    let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+    let seconds: f64 = uptime.split_whitespace().next()?.parse().ok()?;
+    (seconds.is_finite() && seconds >= 0.0).then_some((seconds * 1000.0) as u64)
+}
+
+/// [`NewsWords::failed_not_ready`]'s words, built in.
+fn failed_not_ready() -> String {
+    format!(
+        "The work the person asked you to hand over, \"{{asked}}\", was not handed to {{who}}: the lamp is still getting ready, so nothing was started. Tell them in these words, and nothing more: \"{NOT_READY_LINE}\""
+    )
+}
+
 /// [`NewsWords::joined_reopened`]'s words, built in.
 fn joined_reopened() -> String {
     "It was closed, and you reopened it for this with its earlier conversation: begin with \"I reopened that session\".".into()
@@ -400,6 +440,7 @@ impl NewsWords {
             failed_busy: failed_busy(),
             failed_closed: failed_closed(),
             failed_closed_soon: failed_closed_soon(),
+            failed_not_ready: failed_not_ready(),
             joined: joined(),
             joined_asked: joined_asked(),
             joined_reopened: joined_reopened(),
@@ -492,6 +533,11 @@ impl NewsWords {
                     &self.failed_closed_soon,
                     &["asked", "who"],
                 ),
+                (
+                    "failed_not_ready",
+                    &self.failed_not_ready,
+                    &["asked", "who"],
+                ),
                 ("joined_reopened", &self.joined_reopened, &[]),
                 ("joined_fresh", &self.joined_fresh, &[]),
                 ("joined", &self.joined, &["asked", "session", "who"]),
@@ -582,6 +628,7 @@ impl NewsWords {
                 ("failed_busy", note(&self.failed_busy, &[])),
                 ("failed_closed", note(&self.failed_closed, &[])),
                 ("failed_closed_soon", note(&self.failed_closed_soon, &[])),
+                ("failed_not_ready", note(&self.failed_not_ready, &[])),
                 ("answered", note(&self.answered, &done)),
                 ("answered_cut", note(&self.answered_cut, &done)),
                 (
@@ -786,6 +833,7 @@ mod tests {
                     "failed_busy = ",
                     "failed_closed = ",
                     "failed_closed_soon = ",
+                    "failed_not_ready = ",
                     "joined_reopened = ",
                     "joined_fresh = ",
                     "answered = ",
@@ -810,6 +858,7 @@ mod tests {
         assert_eq!(read.failed_busy, failed_busy());
         assert_eq!(read.failed_closed, failed_closed());
         assert_eq!(read.failed_closed_soon, failed_closed_soon());
+        assert_eq!(read.failed_not_ready, failed_not_ready());
         assert_eq!(read.joined_reopened, joined_reopened());
         assert_eq!(read.joined_fresh, joined_fresh());
         assert_eq!(NewsWords::in_dir(&skills()).failed_closed, failed_closed());
@@ -817,6 +866,7 @@ mod tests {
         assert_eq!(installed.failed_folder, failed_folder());
         assert_eq!(installed.failed_signed_out, failed_signed_out());
         assert_eq!(installed.failed_no_prompt, failed_no_prompt());
+        assert_eq!(installed.failed_not_ready, failed_not_ready());
         assert_eq!(read.answered, answered());
         assert_eq!(read.answered_cut, answered_cut());
         let installed = NewsWords::in_dir(&skills());

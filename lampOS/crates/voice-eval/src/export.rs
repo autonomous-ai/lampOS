@@ -688,6 +688,9 @@ const BUS_TOPICS: &[&str] = &[
     "controls/state",
     "controls/touch",
     "controls/touch_state",
+    "devices/answer",
+    "devices/ask",
+    "devices/event",
     "diagnostics",
     "ears/classes",
     "ears/level",
@@ -701,6 +704,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/unplug_state",
     "eyes/camera_closed",
     "humans/doing",
+    "humans/doing_more",
     "humans/doing_seen",
     "humans/faces/tracked",
     "humans/familiar",
@@ -774,6 +778,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/timing",
     "voice/tone",
     "voice/turn",
+    "voice/turn_time",
 ];
 
 /// Standard base64, as `lamp-bus record` writes payloads.

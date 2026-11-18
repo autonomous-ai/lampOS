@@ -65,6 +65,55 @@ async fn a_make_whose_turn_was_cut_still_says_its_line_once() {
     assert!(line.1.is_err(), "said once: {:?}", line.1);
 }
 
+/// Cut with a wait of its own request's for code (#7245, c0a4 17 Nov
+/// 22:39): the say service is given its say-back word for word, never the
+/// cut turn's own line, so the yes after it is heard whole is forced.
+#[tokio::test]
+async fn a_cut_code_makes_say_back_goes_to_the_say_service_whole() {
+    let (go, wait) = mpsc::channel();
+    let (say, said) = mpsc::channel();
+    let made = make("cut-code-wait", wait);
+    // On the make's own thread, whose store the cut branch reads.
+    let work = move || {
+        let answer = made();
+        let asks = crate::skill_write_yes::Asks {
+            skill: "evening-dim".into(),
+            sha256: "0".repeat(64),
+            writes: Vec::new(),
+            say_back: crate::made_skill::code_said_as(&["camera".to_owned()], false)
+                .trim()
+                .to_owned(),
+            grants: Some(vec!["camera".to_owned()]),
+            code: true,
+            remove: false,
+        };
+        crate::skill_write_yes::wait_for_yes(asks, 3, std::time::Instant::now());
+        // Its cut line as a code make's is (`made_skill::cut_code_line`).
+        crate::make_skill_local::set_said_line(format!(
+            "I made evening dim.{} {}",
+            crate::made_skill::code_said_as(&["camera".to_owned()], false),
+            crate::made_skill::CUT_ASK_AGAIN
+        ));
+        answer
+    };
+    let running = made_running(3, work, move |line| {
+        say.send(line).unwrap();
+    });
+    drop(running);
+    go.send(()).unwrap();
+    let line = tokio::task::spawn_blocking(move || said.recv_timeout(Duration::from_secs(20)))
+        .await
+        .unwrap();
+    assert_eq!(
+        line.as_deref(),
+        Ok(format!(
+            "I made evening dim.{}",
+            crate::made_skill::code_said_as(&["camera".to_owned()], false)
+        )
+        .as_str())
+    );
+}
+
 /// Its turn still waiting: the answer goes to the turn, whose model says
 /// the line, and nothing is said through the say service.
 #[tokio::test]

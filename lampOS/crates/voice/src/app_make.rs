@@ -835,11 +835,15 @@ fn said(
 /// code of its own made from the app (#6307), its line ending on
 /// [`made_skill::RUNS_AFTER_YES`], is told as a voice make's say-back is,
 /// word for word ([`crate::skill_write_yes::say_whole`]), as its yes
-/// needs it heard whole.
+/// needs it heard whole; so is a voice make's with code whose turn was cut
+/// (`skill_write_yes::said_by_the_say_service`, #7245), and a task for the
+/// lamp's agent's, ending on [`made_skill::RUNS_ONCE_AGREED`].
 fn say_note(line: &str) -> Option<String> {
     let note = if line.starts_with(made_skill::NOT_MADE_HEAD) {
         made_skill::not_made_in_their_language(line)
-    } else if line.ends_with(made_skill::RUNS_AFTER_YES.trim_start()) {
+    } else if line.ends_with(made_skill::RUNS_AFTER_YES.trim_start())
+        || line.ends_with(made_skill::RUNS_ONCE_AGREED.trim_start())
+    {
         format!(
             "{}{}",
             made_skill::ALREADY_DONE,
@@ -1445,6 +1449,34 @@ mod tests {
         let note = say_note(&line).unwrap();
         assert_eq!(note, made_skill::not_made_in_their_language(&line));
         assert!(note.contains("call no tool"), "{note}");
+    }
+
+    /// A cut voice make's say-back for code, or a task for the lamp's
+    /// agent (#7245, `skill_write_yes::said_by_the_say_service`): told word
+    /// for word, never in the person's own words, as its yes needs it heard
+    /// whole.
+    #[test]
+    fn a_cut_voice_makes_say_back_is_told_word_for_word() {
+        let grants = ["camera".to_owned()];
+        for line in [
+            format!(
+                "I made fruit notes.{}",
+                made_skill::code_said_as(&grants, false)
+            ),
+            format!(
+                "I can have the lamp's agent do fruit notes.{}",
+                made_skill::agent_said(&grants)
+            ),
+        ] {
+            assert_eq!(
+                say_note(&line).unwrap(),
+                format!(
+                    "{}{}",
+                    made_skill::ALREADY_DONE,
+                    crate::skill_write_yes::say_whole(&line)
+                )
+            );
+        }
     }
 
     /// A voice make's line from the second route's worker (lamp-9adf, 11

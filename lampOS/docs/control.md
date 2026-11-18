@@ -427,7 +427,16 @@ next connection; a missing, empty or unknown value says `en`, as the voice reads
    update went back, is never granted and is written back as it was, so an
    older lamp-control still starts and going forward again keeps it), answers
    `{"re":1,"ok":true,"client":"c_3f9a","grants":["body","light","speak"]}`,
-   and gives a small nod with the ring's "someone new paired" cue.
+   and, with `LAMP_CONTROL_PAIR_CUE=on` (off unless set), lets the ring glow
+   once for a key paired for the first time: one soft pulse once around
+   (4 s, `PatternKind::Pulse`) in the person's own light, a request at skill
+   priority that lapses after 4.5 s, asked only after the reply has gone and
+   by a one-slot channel that drops a cue rather than queue it. It shows
+   nothing for the same key paired again, while the lamp is private, paused,
+   asleep or talking, with its light off or at level 1 (a dim room: raising it
+   to the pulse's least level would flash the whole ring), while a computer
+   holds the light, or while the ring shows another light. There is no nod and
+   no sound.
 4. **No pairing without the app's pin.** A code alone, said aloud or typed
    without its pin, can't pair (the spoken-code fallback is dropped, below).
 
@@ -1357,8 +1366,8 @@ on the lamp that run on their own".
 - **`skill.list` and `skill.remove`** need `skills` too, and see only this
   computer's own pushes. Each is a request to root's helper, so each is
   bounded before it is asked: 6 a minute (`limits.manage`), one at a time
-  for a computer, and 4 at once on the lamp; past either, `busy`. The owner turns any of them off or removes it in
-  the app.
+  for a computer, and 4 at once on the lamp; past either, `busy`. The owner turns a computer's pushed skills off
+  by revoking the computer in the app; the Skills page lists them without a switch or a remove.
 - **On the lamp:** `lamp-control` gathers the parts in memory (one push
   on the lamp at a time, so 1 MiB at most) and, once whole and matching its
   SHA-256, keeps the package in its state folder as `push/package.tar`,

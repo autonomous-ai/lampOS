@@ -8,24 +8,20 @@
 //! |---|---|---|
 //! | privacy open | `voice/privacy` (`MicrophonePrivacy`) | a valid lease, `permitted` |
 //! | someone at the desk | `room/presence` (`RoomPresence`) | `someone` |
-//! | a face in view, one face | `humans/faces/tracked` (`Faces`) | `faces.len()` |
-//! | not a stranger | `humans/familiar` (`HumanFamiliar`) | `level` is some, said after the one face in view came |
+//! | a face in view | `humans/faces/tracked` (`Faces`) | `faces.len()` |
 //! | awake | `expression/state` (`ExpressionState`) | `says_asleep()` |
 //! | the opt-in off after a forget | `memory/forgot` (`MemoryForgot`) | any |
 //!
-//! `humans/familiar` names no face, so a level is taken only for the one
-//! face that was already in view when it was said: it counts only when it
-//! came at or after the moment the one face now in view, by its passing id,
-//! came into view as the only face. Another id, a second face, no face or
-//! an invalid list since then means the level was about someone else, and
-//! the gate stays closed until the eyes say a level again (the
-//! Reviewer-lead's P2 on #6602). A new id that `follows` an old one counts
-//! as a new face.
+//! `humans/familiar` is not read: there is no stranger check (the owner's
+//! word on #6543), so whose face is in view never closes the gate. The one
+//! face in view's passing id is still kept ([`OnTrack`]), for the keep's
+//! rule that a sitting kept through a short closing goes on only for the
+//! same face ([`crate::keep`]).
 //!
 //! Nothing here is the eyes' private files (`--presence-file`,
 //! `--known-file`): the bus only.
 use crate::gate::Inputs;
-use lamp_msgs::{ExpressionState, Faces, HumanFamiliar, MicrophonePrivacy, RoomPresence};
+use lamp_msgs::{ExpressionState, Faces, MicrophonePrivacy, RoomPresence};
 
 /// How long a `voice/privacy` lease is held after it came: its declared
 /// lifespan.
@@ -35,8 +31,6 @@ pub const PRESENCE_LAST_US: u64 = 3_000_000;
 /// `humans/faces/tracked` declares no lifespan; the eyes say it with each
 /// look, at least about twice a second while they look.
 pub const FACES_LAST_US: u64 = 2_000_000;
-/// `humans/familiar`'s declared lifespan.
-pub const FAMILIAR_LAST_US: u64 = 5_000_000;
 /// `expression/state`'s declared lifespan.
 pub const EXPRESSION_LAST_US: u64 = ExpressionState::LASTS_US;
 
@@ -48,16 +42,11 @@ pub struct Track {
     pub edges: [f32; 4],
 }
 
-/// What the pause reads ([`Readings::on_track`]).
+/// The one face in view, as the keep reads it ([`Readings::on_track`]).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OnTrack {
     /// The one face in view; `None` for no face, two, or not known.
     pub track: Option<Track>,
-    /// The newest `humans/familiar` is fresh, says nobody remembered, and
-    /// came after that face came into view alone: a stranger reading on it.
-    pub stranger: bool,
-    /// When the newest `humans/familiar` came, fresh or not.
-    pub reading_at: Option<u64>,
 }
 
 /// The newest reading of each topic, and when it came (this process's
@@ -67,11 +56,9 @@ pub struct Readings {
     privacy: Option<(Option<bool>, u64)>,
     presence: Option<(Option<bool>, u64)>,
     faces: Option<(Option<usize>, u64)>,
-    /// The one face in view, by its passing id, when it came into view as
-    /// the only face, and its box in the newest list; `None` while not
-    /// exactly one valid face.
-    alone: Option<(String, u64, [f32; 4])>,
-    familiar: Option<(bool, u64)>,
+    /// The one face in view, by its passing id, and its box in the newest
+    /// list; `None` while not exactly one valid face.
+    alone: Option<(String, [f32; 4])>,
     asleep: Option<(Option<bool>, u64)>,
 }
 
@@ -97,19 +84,12 @@ impl Readings {
         let count = faces.check().is_ok().then_some(faces.faces.len());
         self.faces = Some((count, now_us));
         self.alone = match (count, faces.faces.first()) {
-            (Some(1), Some(face)) => {
-                let edges = [face.xmin, face.ymin, face.xmax, face.ymax];
-                match self.alone.take() {
-                    Some((id, since, _)) if id == face.id => Some((id, since, edges)),
-                    _ => Some((face.id.clone(), now_us, edges)),
-                }
-            }
+            (Some(1), Some(face)) => Some((
+                face.id.clone(),
+                [face.xmin, face.ymin, face.xmax, face.ymax],
+            )),
             _ => None,
         };
-    }
-
-    pub fn familiar(&mut self, familiar: &HumanFamiliar, now_us: u64) {
-        self.familiar = Some((familiar.level.is_some(), now_us));
     }
 
     /// Expression's state: asleep or not, when valid and enabled; an
@@ -119,34 +99,19 @@ impl Readings {
         self.asleep = Some((asleep, now_us));
     }
 
-    /// Whether the newest `humans/familiar` came at or after the one face
-    /// now in view came into view alone.
-    fn familiar_after_alone(&self) -> bool {
-        match (self.familiar, &self.alone) {
-            (Some((_, said)), Some((_, since, _))) => said >= *since,
-            _ => false,
-        }
-    }
-
-    /// The one face in view and what the newest `humans/familiar` says of
-    /// it, for the pause ([`crate::pause`]): its passing id and box while
-    /// the newest list is fresh and has exactly one face.
+    /// The one face in view, for the keep ([`crate::keep`]): its passing id
+    /// and box while the newest list is fresh and has exactly one face.
     pub fn on_track(&self, now_us: u64) -> OnTrack {
         let one = fresh(self.faces, FACES_LAST_US, now_us).flatten() == Some(1);
         let track = self
             .alone
             .as_ref()
             .filter(|_| one)
-            .map(|(id, _, edges)| Track {
+            .map(|(id, edges)| Track {
                 id: id.clone(),
                 edges: *edges,
             });
-        let familiar = fresh(self.familiar, FAMILIAR_LAST_US, now_us);
-        OnTrack {
-            stranger: track.is_some() && familiar == Some(false) && self.familiar_after_alone(),
-            reading_at: self.familiar.map(|(_, at)| at),
-            track,
-        }
+        OnTrack { track }
     }
 
     /// The gate's inputs at `now_us`, with the opt-in and whether its on
@@ -158,8 +123,6 @@ impl Readings {
             privacy_open: fresh(self.privacy, PRIVACY_LAST_US, now_us).flatten(),
             someone: fresh(self.presence, PRESENCE_LAST_US, now_us).flatten(),
             faces: fresh(self.faces, FACES_LAST_US, now_us).flatten(),
-            familiar: fresh(self.familiar, FAMILIAR_LAST_US, now_us)
-                .map(|level| level && self.familiar_after_alone()),
             asleep: fresh(self.asleep, EXPRESSION_LAST_US, now_us).flatten(),
         }
     }
@@ -169,7 +132,7 @@ impl Readings {
 mod tests {
     use super::*;
     use crate::gate::{Closed, may_request};
-    use lamp_msgs::{ClockStamp, Face, FamiliarLevel, SeenBy};
+    use lamp_msgs::{ClockStamp, Face, SeenBy};
 
     const S: u64 = 1_000_000;
 
@@ -193,6 +156,8 @@ mod tests {
 
     fn face(id: &str) -> Face {
         Face {
+            pitch: None,
+            looking: None,
             id: id.into(),
             xmin: 0.3,
             ymin: 0.3,
@@ -247,12 +212,6 @@ mod tests {
             },
             at,
         );
-        readings.familiar(
-            &HumanFamiliar {
-                level: Some(FamiliarLevel::Regular),
-            },
-            at,
-        );
         readings.expression(&state(Some(false)), at);
         readings
     }
@@ -288,7 +247,6 @@ mod tests {
         let inputs = readings.inputs(true, true, S + 10 * S);
         assert_eq!(inputs.someone, None);
         assert_eq!(inputs.faces, None);
-        assert_eq!(inputs.familiar, None);
         assert_eq!(inputs.asleep, None);
         // A reading from the future (another clock) is not taken.
         assert_eq!(readings.inputs(true, true, S - 1).privacy_open, None);
@@ -313,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn nobody_and_strangers_are_read_from_presence_faces_and_familiar() {
+    fn nobody_is_read_from_presence_and_faces() {
         let mut readings = all_clear(S);
         readings.presence(
             &RoomPresence {
@@ -335,6 +293,7 @@ mod tests {
             Err(Closed::Nobody)
         );
 
+        // Two faces, or a face nobody remembers: no stranger check, open.
         let mut readings = all_clear(S);
         readings.faces(
             &Faces {
@@ -342,136 +301,25 @@ mod tests {
             },
             S,
         );
-        assert_eq!(
-            may_request(&readings.inputs(true, true, S)),
-            Err(Closed::Stranger)
-        );
-
-        let mut readings = all_clear(S);
-        readings.familiar(&HumanFamiliar { level: None }, S);
-        assert_eq!(
-            may_request(&readings.inputs(true, true, S)),
-            Err(Closed::Stranger)
-        );
+        assert_eq!(may_request(&readings.inputs(true, true, S)), Ok(()));
+        assert_eq!(readings.on_track(S).track, None);
     }
 
-    fn one_face(readings: &mut Readings, id: &str, at: u64) {
+    #[test]
+    fn a_guest_who_sits_down_is_seen_as_the_owner_was() {
+        // The owner (f1) at 1 s; they leave, and a guest (f2) sits down.
+        let mut readings = all_clear(S);
+        readings.faces(&Faces { faces: Vec::new() }, S + 10);
         readings.faces(
             &Faces {
-                faces: vec![face(id)],
+                faces: vec![face("f2")],
             },
-            at,
+            S + 20,
         );
-    }
-
-    fn regular(readings: &mut Readings, at: u64) {
-        readings.familiar(
-            &HumanFamiliar {
-                level: Some(FamiliarLevel::Regular),
-            },
-            at,
-        );
-    }
-
-    /// Fresh privacy, presence and awake at `at`, so only the faces and the
-    /// familiar reading decide.
-    fn renew(readings: &mut Readings, at: u64) {
-        readings.privacy(&lease(true), at);
-        readings.presence(
-            &RoomPresence {
-                someone: true,
-                nobody_s: 0,
-                by: Some(SeenBy::Face),
-            },
-            at,
-        );
-        readings.expression(&state(Some(false)), at);
-    }
-
-    #[test]
-    fn the_owners_level_does_not_carry_over_to_a_guest_who_sits_down() {
-        // The owner (f1) recognised at 1 s; they leave, and a guest (f2)
-        // sits down within 1 s, or within 4 s, while the level is fresh.
-        for gap in [S / 2, S, 4 * S] {
-            let mut readings = all_clear(S);
-            readings.faces(&Faces { faces: Vec::new() }, S + gap / 2);
-            one_face(&mut readings, "f2", S + gap);
-            renew(&mut readings, S + gap);
-            let inputs = readings.inputs(true, true, S + gap);
-            assert!(inputs.familiar.is_some(), "the level is still fresh");
-            assert_eq!(may_request(&inputs), Err(Closed::Stranger), "{gap}");
-        }
-        // The owner's face swapped for the guest's in one look, no empty
-        // list between.
-        let mut readings = all_clear(S);
-        one_face(&mut readings, "f2", S + S / 10);
-        renew(&mut readings, S + S / 10);
+        assert_eq!(may_request(&readings.inputs(true, true, S + 30)), Ok(()));
         assert_eq!(
-            may_request(&readings.inputs(true, true, S + S / 10)),
-            Err(Closed::Stranger)
-        );
-    }
-
-    #[test]
-    fn a_second_face_since_the_level_closes_until_a_new_level() {
-        // The owner, then a guest beside them, then the owner alone again:
-        // the level said before the guest came is not taken.
-        let mut readings = all_clear(S);
-        readings.faces(
-            &Faces {
-                faces: vec![face("f1"), face("f2")],
-            },
-            S + S / 2,
-        );
-        one_face(&mut readings, "f1", S + S);
-        renew(&mut readings, 2 * S);
-        assert_eq!(
-            may_request(&readings.inputs(true, true, 2 * S)),
-            Err(Closed::Stranger)
-        );
-        regular(&mut readings, 2 * S + 1);
-        assert_eq!(may_request(&readings.inputs(true, true, 2 * S + 1)), Ok(()));
-    }
-
-    #[test]
-    fn the_same_person_staying_keeps_the_gate_open() {
-        let mut readings = all_clear(S);
-        for step in 1..=4 {
-            let at = S + step * S / 2;
-            one_face(&mut readings, "f1", at);
-            renew(&mut readings, at);
-            assert_eq!(
-                may_request(&readings.inputs(true, true, at)),
-                Ok(()),
-                "{at}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_level_said_after_the_guest_reopens_the_gate() {
-        let mut readings = all_clear(S);
-        one_face(&mut readings, "f2", 2 * S);
-        renew(&mut readings, 2 * S);
-        assert_eq!(
-            may_request(&readings.inputs(true, true, 2 * S)),
-            Err(Closed::Stranger)
-        );
-        // The eyes recognise the one now in view as remembered.
-        regular(&mut readings, 3 * S);
-        renew(&mut readings, 3 * S);
-        assert_eq!(may_request(&readings.inputs(true, true, 3 * S)), Ok(()));
-    }
-
-    #[test]
-    fn a_level_with_no_face_seen_yet_is_not_taken() {
-        let mut readings = Readings::default();
-        regular(&mut readings, S);
-        one_face(&mut readings, "f1", S + 1);
-        renew(&mut readings, S + 1);
-        assert_eq!(
-            may_request(&readings.inputs(true, true, S + 1)),
-            Err(Closed::Stranger)
+            readings.on_track(S + 30).track.map(|track| track.id),
+            Some("f2".to_owned())
         );
     }
 

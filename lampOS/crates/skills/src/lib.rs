@@ -28,6 +28,7 @@ pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod relay_share;
 pub mod remind;
 pub mod requested_audio;
 pub mod routine;
@@ -319,6 +320,13 @@ struct BudgetFile {
     /// (#5207, Fourteen's finding on #5208).
     #[serde(default)]
     give_back_unsaid: bool,
+    /// The most runs the group starts a local day between its skills,
+    /// counted from the lamp's local day start as `most_a_day` is (#6543).
+    per_day: Option<u32>,
+    /// A `follows` word of a member counts as one of the group's runs: it
+    /// spends the group's hour, day and gap, and waits for them (#6543).
+    #[serde(default)]
+    follows_count: bool,
 }
 
 /// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
@@ -341,6 +349,8 @@ pub struct Rest {
 pub const MOST_A_DAY_AT_MOST: u32 = 24;
 /// The most runs an hour a group may share.
 pub const PER_HOUR_AT_MOST: u32 = 6;
+/// The most runs a day a group may share (#6543).
+pub const PER_DAY_AT_MOST: u32 = 48;
 /// The least `[budget] gap` a skill may name.
 const BUDGET_GAP_LEAST_US: u64 = 60_000_000;
 /// How long after a run a look or a movement counts as noticing it, when
@@ -780,34 +790,48 @@ struct SoonerFile {
     lasting: String,
 }
 
-/// A trigger's `sooner`: one table, as before, or a list of them (#6543).
+/// A `sooner`: one table, as before, or a list of them (#6543): a
+/// trigger's ([`SoonerFile`]) or a `[[while]]`'s ([`WhileSoonerFile`]).
 /// Read by its shape, so a single table's errors read as they always did.
-struct SoonersFile(Vec<SoonerFile>);
+struct SoonersFile<T = SoonerFile>(Vec<T>);
 
-impl<'de> Deserialize<'de> for SoonersFile {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for SoonersFile<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct Shape;
-        impl<'de> serde::de::Visitor<'de> for Shape {
-            type Value = SoonersFile;
+        struct Shape<T>(std::marker::PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Shape<T> {
+            type Value = SoonersFile<T>;
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a sooner table or a list of them")
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 map: A,
-            ) -> Result<SoonersFile, A::Error> {
-                SoonerFile::deserialize(serde::de::value::MapAccessDeserializer::new(map))
+            ) -> Result<SoonersFile<T>, A::Error> {
+                T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
                     .map(|one| SoonersFile(vec![one]))
             }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,
                 seq: A,
-            ) -> Result<SoonersFile, A::Error> {
+            ) -> Result<SoonersFile<T>, A::Error> {
                 Vec::deserialize(serde::de::value::SeqAccessDeserializer::new(seq)).map(SoonersFile)
             }
         }
-        deserializer.deserialize_any(Shape)
+        deserializer.deserialize_any(Shape(std::marker::PhantomData))
     }
+}
+
+/// A `[[while]]`'s `sooner` (#6543): `{ topic = "humans/doing_more", field =
+/// "drank_seen", above = 0, above_to = 3599 }`. While the sooner's own field
+/// is above its `above`, the `[[while]]`'s own `above` is `above_to`: the
+/// number lowered, never what the `[[while]]` watches.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WhileSoonerFile {
+    topic: String,
+    field: String,
+    above: f64,
+    above_to: f64,
 }
 
 /// `follows = { trigger = "leaned_in", within = "15m" }`.
@@ -868,6 +892,9 @@ struct TestFile {
     /// Topics whose messages begin that clock again ([`BROKEN_BY`]): words
     /// heard, a new push. With `through`.
     broken_by: Option<Vec<String>>,
+    /// A lower `above` while another topic's field is above a line (#6543):
+    /// one table or a list of them, each naming its own `above_to`.
+    sooner: Option<SoonersFile<WhileSoonerFile>>,
 }
 
 #[derive(Deserialize)]
@@ -1006,6 +1033,30 @@ const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
 /// The most bytes of a skill's own words the voice takes
 /// (`lamp_voice::say::MOST_WORDS_BYTES`).
 pub const MOST_WORDS_BYTES: usize = 900;
+
+/// The keys a `say` table of words may have (`say = { note = "…", … }`):
+/// docs/skill-format.schema.json lists the same (tests/it/format.rs).
+pub const SAY_TABLE_KEYS: [&str; 6] = [
+    "text",
+    "note",
+    "priority",
+    "expires",
+    "question",
+    "may_end_unsaid",
+];
+
+/// How the voice's `unsaid` outcome is written in a run's outcome
+/// ([`ended_unsaid`]).
+pub const UNSAID: &str = "say: unsaid";
+
+/// Whether a run's outcome, as lamp-skills writes it, holds its note let go
+/// unsaid by the voice, never begun, as the moment for it passed
+/// (`say.may_end_unsaid`, #6543): `say: unsaid (why)`.
+pub fn ended_unsaid(outcome: &str) -> bool {
+    outcome
+        .split("; ")
+        .any(|part| part == UNSAID || part.starts_with("say: unsaid ("))
+}
 
 /// The longest a news say (`say = { from = "tasks" }`) refused because the
 /// lamp is muted or listening is held, and asked again, before it is
@@ -1243,6 +1294,117 @@ pub fn yield_notes(skills: &[Skill]) -> Vec<String> {
 /// (#3997: Head pat's seven).
 pub const MOST_SAY_LINES: usize = 16;
 
+/// Why a new skill's plain say or exact words with a `{field}` is not made:
+/// they are said as written ([`Skill::made_refuses`]).
+const COUNT_IN_A_TABLE: &str =
+    "a {field} is filled in a note only: say = { note = \"... {field} ...\" }";
+
+/// Why a new skill's note with braces that are no number slot is not made:
+/// one already on a lamp says them as written ([`Skill::made_refuses`]).
+const NOTE_BRACES: &str = "a note's braces are one {field} that every trigger running it tests \
+                           as a number with above, below or rise; any other brace is said as written";
+
+/// The longest field name a note's `{field}` may give.
+const MOST_COUNT_FIELD_BYTES: usize = 64;
+
+/// The most bytes a number filled in a note adds: [`MOST_COUNT`]'s digits.
+const MOST_COUNT_BYTES: usize = 7;
+
+/// The largest number a note says ([`whole`]): a count of a person's
+/// moments is far below it, so one above is a wrong reading, dropped.
+const MOST_COUNT: i64 = 1_000_000;
+
+/// A note's one number (#6543, B3): `{field}` names a number field of the
+/// topic whose reading fired the run, and the note is said with that
+/// reading's value there, as a whole number ("drink {drank_seen} this
+/// sitting" → "drink 2 this sitting"). Only a number is ever filled: every
+/// trigger that can run the note tests the field as a number (checked at
+/// load), and a reading whose field is missing, `null`, a word, negative,
+/// above [`MOST_COUNT`] or anything but a number drops the slot, so the note
+/// is said without it ("drink this sitting"), never with `{drank_seen}` or
+/// `None` in it. No word or label of a topic reaches a note this way. Read
+/// leniently ([`note_count`]): a note whose braces are anything else is said
+/// as written, as before slots, so a skill already on a lamp never stops
+/// loading for a brace; a new skill is refused it ([`Skill::made_refuses`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Count {
+    /// The field, as a trigger's `field` names it (a dot steps in).
+    pub field: String,
+    /// The note's words before the number, and after it.
+    before: String,
+    after: String,
+}
+
+impl Count {
+    /// The note with `reading`'s field in it, or, with no number there,
+    /// without it.
+    fn said(&self, reading: Option<&Value>) -> String {
+        match reading.and_then(|reading| whole(at(reading, &self.field))) {
+            Some(number) => format!("{}{number}{}", self.before, self.after),
+            None => self.without(),
+        }
+    }
+
+    /// The note as written, its `{field}` in it: what a note whose field no
+    /// trigger gives says ([`manifest`]).
+    fn written(&self) -> String {
+        format!("{}{{{}}}{}", self.before, self.field, self.after)
+    }
+
+    /// The note with its slot dropped: one space where the slot stood
+    /// between words, none at an end.
+    fn without(&self) -> String {
+        let (before, after) = (self.before.trim_end(), self.after.trim_start());
+        let spaced = self.before.len() != before.len() || self.after.len() != after.len();
+        if spaced && !before.is_empty() && !after.is_empty() {
+            format!("{before} {after}")
+        } else {
+            format!("{before}{after}")
+        }
+    }
+}
+
+/// A reading's value as a whole number, rounded down: the count as the topic
+/// holds it (a `_s` field stays whole seconds, which the model phrases).
+/// Anything but a finite number from 0 to [`MOST_COUNT`] is none.
+fn whole(value: &Value) -> Option<i64> {
+    let number = match value.as_i64() {
+        Some(number) => number,
+        None => value
+            .as_f64()
+            // Bounded first, so the whole number fits an i64.
+            .filter(|number| number.is_finite() && number.abs() <= MOST_COUNT as f64)?
+            .floor() as i64,
+    };
+    (0..=MOST_COUNT).contains(&number).then_some(number)
+}
+
+/// A note's slot, read leniently: a note with exactly one `{`, one `}` after
+/// it, a field name between them and words besides is a [`Count`]. Any
+/// other note is none, and is said as written, braces and all (a lone `}`,
+/// `{a short break}`, two slots, `{{`).
+fn note_count(note: &str) -> Option<Count> {
+    let open = note.find('{')?;
+    let close = note.find('}')?;
+    if close < open || note.matches('{').count() != 1 || note.matches('}').count() != 1 {
+        return None;
+    }
+    let field = &note[open + 1..close];
+    let named = field.len() <= MOST_COUNT_FIELD_BYTES
+        && field.split('.').all(|name| {
+            name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        });
+    let count = Count {
+        field: field.to_owned(),
+        before: note[..open].to_owned(),
+        after: note[close + 1..].to_owned(),
+    };
+    let without = count.without();
+    (named && !without.trim().is_empty() && without.len() + MOST_COUNT_BYTES <= MOST_WORDS_BYTES)
+        .then_some(count)
+}
+
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
 /// what it keeps; or one of several lines of words, picked as it runs.
 fn say_step(say: toml::Value) -> Result<Step, String> {
@@ -1274,9 +1436,10 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
             }
         }
         toml::Value::Table(table) => {
-            if let Some(key) = table.keys().find(|key| {
-                !["text", "note", "priority", "expires", "question"].contains(&key.as_str())
-            }) {
+            if let Some(key) = table
+                .keys()
+                .find(|key| !SAY_TABLE_KEYS.contains(&key.as_str()))
+            {
                 return Err(format!("{WHAT}: say.{key} is not known"));
             }
             let (words, exact) = match (table.get("text"), table.get("note")) {
@@ -1348,14 +1511,33 @@ fn say_call(say: toml::Value) -> Result<(Call, Option<Vec<Words>>), String> {
             if question && exact {
                 return Err("say.question goes with a note, never exact words".into());
             }
+            // A note the voice may let go, unsaid, once its moment has
+            // passed (#6543): someone heard, or the face gone, since it was
+            // asked. Its run is then given back ([`Engine::unwritten`]).
+            let may_end_unsaid = match table.get("may_end_unsaid") {
+                None => false,
+                Some(toml::Value::Boolean(may)) => *may,
+                Some(_) => return Err("say.may_end_unsaid is true or false".into()),
+            };
+            if may_end_unsaid && exact {
+                return Err("say.may_end_unsaid goes with a note, never exact words".into());
+            }
+            // A note's one number from the reading that fired it (#6543,
+            // B3), read leniently: exact words, and a note with any other
+            // braces, are said as written.
             let mut lines: Vec<Words> = lines
                 .into_iter()
-                .map(|words| Words {
-                    words,
-                    exact,
-                    priority,
-                    expires_ms,
-                    question,
+                .map(|line| {
+                    let count = if exact { None } else { note_count(&line) };
+                    Words {
+                        words: count.as_ref().map_or(line, Count::without),
+                        exact,
+                        priority,
+                        expires_ms,
+                        question,
+                        may_end_unsaid,
+                        count,
+                    }
                 })
                 .collect();
             let first = Call::Words(lines[0].clone());
@@ -2170,6 +2352,12 @@ pub struct Skill {
     /// With `[budget] give_back_unsaid = true`: a run of its group that
     /// said nothing gives its place in the hour back ([`Engine::unsaid`]).
     pub budget_gives_back: bool,
+    /// With `[budget] per_day`: the most runs its group starts a local day,
+    /// as this skill names it (#6543).
+    pub budget_per_day: Option<u32>,
+    /// With `[budget] follows_count = true`: its group counts a `follows`
+    /// word of a member as one of its runs (#6543).
+    pub budget_follows_count: bool,
     /// When it rests after runs nobody noticed.
     pub rest: Option<Rest>,
     /// The function that snoozes it or turns it off (#1685).
@@ -2221,9 +2409,38 @@ impl Skill {
     /// A skill already on a lamp loads with that order read as no query,
     /// so a stricter check never strands it, nor holds the lamp's update
     /// back (build 10300's round on lamp-9adf, 5 Nov).
+    ///
+    /// Also a note's braces that are no number slot, and a `{field}` in a
+    /// plain say or exact words (#6543): a skill already on a lamp says them
+    /// as written ([`Count`]), and a new one is told its slot is never
+    /// filled.
     pub fn made_refuses(&self) -> Option<&'static str> {
+        self.read_refuses().or_else(|| self.note_refuses())
+    }
+
+    /// [`Skill::made_refuses`]'s read's `query` that is an order alone.
+    pub fn read_refuses(&self) -> Option<&'static str> {
         self.steps.iter().find_map(|(_, step)| match step {
             Step::Call(Call::ServiceRead(read)) => read.made_refuses(),
+            _ => None,
+        })
+    }
+
+    /// [`Skill::made_refuses`]'s braces said as written (#6543).
+    fn note_refuses(&self) -> Option<&'static str> {
+        let refuses = |words: &Words| {
+            if words.exact {
+                note_count(&words.words).map(|_| COUNT_IN_A_TABLE)
+            } else if words.count.is_none() && words.words.contains(['{', '}']) {
+                Some(NOTE_BRACES)
+            } else {
+                None
+            }
+        };
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::Say(note)) => note_count(note).map(|_| COUNT_IN_A_TABLE),
+            Step::Call(Call::Words(words)) => refuses(words),
+            Step::Lines(lines) => lines.iter().find_map(refuses),
             _ => None,
         })
     }
@@ -2307,6 +2524,12 @@ impl Skill {
                     .sooner
                     .iter()
                     .map(|sooner| (sooner.topic.clone(), "a trigger's sooner"))
+            }))
+            .chain(self.conditions.iter().flat_map(|condition| {
+                condition
+                    .sooner
+                    .iter()
+                    .map(|sooner| (sooner.topic.clone(), "a [[while]]'s sooner"))
             }))
             .chain(
                 self.triggers
@@ -2447,6 +2670,16 @@ impl Skill {
             [(_, Step::Call(Call::ServiceWrite(_)))]
         )
     }
+
+    /// Whether a note of its own may end unsaid (`say.may_end_unsaid`,
+    /// #6543): its start is kept, to be given back if it does.
+    fn may_end_unsaid(&self) -> bool {
+        self.steps.iter().any(|(_, step)| match step {
+            Step::Call(Call::Words(words)) => words.may_end_unsaid,
+            Step::Lines(lines) => lines.iter().any(|words| words.may_end_unsaid),
+            _ => false,
+        })
+    }
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
@@ -2491,6 +2724,14 @@ enum Test {
 }
 
 impl Test {
+    /// The field this tests as a number (`above`, `below`, or a `rise`'s).
+    fn number(&self) -> Option<&String> {
+        match self {
+            Self::Above(field, _) | Self::Below(field, _) | Self::Number(field) => Some(field),
+            _ => None,
+        }
+    }
+
     /// Whether `value` says a level test's field is not known: the field
     /// there and `null`, as the air part sends a CO2 its sensor does not
     /// know yet (`crates/air/src/lib.rs`'s `reading`). Such a message says
@@ -2647,9 +2888,33 @@ struct Condition {
     through: Vec<Value>,
     /// The topics that begin its clock again (`broken_by`).
     broken_by: Vec<String>,
+    /// Its lower `above`s, each while another topic's field is above a line
+    /// ([`SOONER_ENVIRONMENT`], #6543); empty without `sooner`. Of those
+    /// holding, the lowest wins. Only on an `above` without `for`.
+    sooner: Vec<WhileSooner>,
+}
+
+/// A `[[while]]`'s `sooner` (#6543): while `test` holds on `topic`'s newest
+/// value that lasts, the `[[while]]`'s own `above` is `above`.
+#[derive(Clone, Debug, PartialEq)]
+struct WhileSooner {
+    topic: String,
+    test: Test,
+    above: f64,
 }
 
 impl Condition {
+    /// Whether `value` holds, on `lowered` in place of its own `above`
+    /// when a sooner lowered it ([`Engine::lowered`]).
+    fn holds_on(&self, value: &Value, lowered: Option<f64>) -> bool {
+        match (&self.test, lowered) {
+            (Test::Above(field, _), Some(line)) => {
+                at(value, field).as_f64().is_some_and(|got| got > line)
+            }
+            _ => self.test.holds(value),
+        }
+    }
+
     /// Whether `value` is one its clock is carried through (`through`).
     fn carries(&self, value: &Value) -> bool {
         match &self.test {
@@ -2962,6 +3227,12 @@ pub struct Words {
     /// `question = true`: a hello (a skill given `who`) whose note asks one
     /// question may ask it; the voice is told so (#5207).
     pub question: bool,
+    /// `may_end_unsaid = true`: a note the voice may let go, never begun,
+    /// once its moment has passed (#6543); the voice is told so.
+    pub may_end_unsaid: bool,
+    /// A note's one number from the reading that fired its run (#6543):
+    /// `words` is the note without it, and the run fills it ([`Count`]).
+    pub count: Option<Count>,
 }
 
 impl Words {
@@ -2971,6 +3242,9 @@ impl Words {
         ask[self.key()] = json!(self.words);
         if self.question {
             ask["question"] = json!(true);
+        }
+        if self.may_end_unsaid {
+            ask["may_end_unsaid"] = json!(true);
         }
         ask
     }
@@ -4311,6 +4585,50 @@ fn manifest(
                 ));
             }
         }
+        // A sooner lowers this condition's own `above`, never what it
+        // watches (#6543): the lowered topic and field are always its own.
+        let soonest = match condition.sooner {
+            None => Vec::new(),
+            Some(SoonersFile(each)) if each.is_empty() => {
+                return Err(format!(
+                    "on {}: sooner is a table or a list of them, not an empty list",
+                    condition.topic
+                ));
+            }
+            Some(SoonersFile(each)) => each,
+        };
+        let mut sooner = Vec::with_capacity(soonest.len());
+        for one in soonest {
+            let Test::Above(_, own) = &test else {
+                return Err(format!(
+                    "on {}: sooner lowers a [[while]]'s above: give it an above",
+                    condition.topic
+                ));
+            };
+            if condition.lasting.is_some() {
+                return Err(format!(
+                    "on {}: sooner lowers a [[while]]'s above, not with its for",
+                    condition.topic
+                ));
+            }
+            if !one.above.is_finite() || !one.above_to.is_finite() {
+                return Err(format!(
+                    "on {}: sooner.above and sooner.above_to are numbers",
+                    condition.topic
+                ));
+            }
+            if one.above_to >= *own {
+                return Err(format!(
+                    "on {}: sooner.above_to is below the [[while]]'s above",
+                    condition.topic
+                ));
+            }
+            sooner.push(WhileSooner {
+                test: crate::test(&one.topic, Some(one.field), None, Some(one.above), None)?,
+                topic: one.topic,
+                above: one.above_to,
+            });
+        }
         conditions.push(Condition {
             topic: condition.topic,
             test,
@@ -4319,6 +4637,7 @@ fn manifest(
             stale_holds,
             through,
             broken_by,
+            sooner,
         });
     }
     let quiet = match file.quiet {
@@ -4375,24 +4694,37 @@ fn manifest(
             if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
                 return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
             }
-            Some((
-                budget.group,
-                budget.per_hour,
-                budget.gap,
-                budget.give_back_unsaid,
-            ))
-        }
-    };
-    let (budget, budget_gap_us, budget_gives_back) = match budget {
-        None => (None, 0, false),
-        Some((group, per_hour, gap, gives_back)) => {
-            let gap_us = gap.as_deref().map(duration_us).transpose()?.unwrap_or(0);
-            if gap.is_some() && !(BUDGET_GAP_LEAST_US..=HOUR_US).contains(&gap_us) {
-                return Err("[budget] gap is 1m to 1h".into());
+            if budget
+                .per_day
+                .is_some_and(|most| !(1..=PER_DAY_AT_MOST).contains(&most))
+            {
+                return Err(format!("[budget] per_day is 1 to {PER_DAY_AT_MOST}"));
             }
-            (Some((group, per_hour)), gap_us, gives_back)
+            Some(budget)
         }
     };
+    let (budget, budget_gap_us, budget_gives_back, budget_per_day, budget_follows_count) =
+        match budget {
+            None => (None, 0, false, None, false),
+            Some(budget) => {
+                let gap_us = budget
+                    .gap
+                    .as_deref()
+                    .map(duration_us)
+                    .transpose()?
+                    .unwrap_or(0);
+                if budget.gap.is_some() && !(BUDGET_GAP_LEAST_US..=HOUR_US).contains(&gap_us) {
+                    return Err("[budget] gap is 1m to 1h".into());
+                }
+                (
+                    Some((budget.group, budget.per_hour)),
+                    gap_us,
+                    budget.give_back_unsaid,
+                    budget.per_day,
+                    budget.follows_count,
+                )
+            }
+        };
     let rest = match file.rest {
         None => None,
         Some(rest) => {
@@ -4592,7 +4924,7 @@ fn manifest(
                         .into(),
                 );
             }
-            steps.push(Step::Call(Call::Task(Box::new(task.step(dir)?))));
+            steps.push(Step::Call(Call::Task(Box::new(task.step(dir, quiet)?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -5303,7 +5635,7 @@ fn manifest(
     {
         return Err("a skill granted core = [\"sleep\"] has only rest steps and no tool".into());
     }
-    let skill = Skill {
+    let mut skill = Skill {
         name,
         description,
         when: None,
@@ -5332,6 +5664,8 @@ fn manifest(
         budget,
         budget_gap_us,
         budget_gives_back,
+        budget_per_day,
+        budget_follows_count,
         rest,
         stop,
         steps,
@@ -5390,6 +5724,41 @@ fn manifest(
             "not permitted: say.question is a hello's one question, only in a skill given who = true"
                 .into(),
         );
+    }
+    // A note's number is a number (#6543): every trigger that can run the
+    // note tests its field as a number, so no word or label of a topic is
+    // ever said through it, whichever trigger fired. An `each` trigger's
+    // field is an item's, not the message's, and a choice's run or a tool's
+    // has no reading of its own: none gives one. A note whose field no such
+    // trigger gives is said as written, braces and all, as before slots: a
+    // skill already on a lamp loads, and a new one is refused it
+    // ([`Skill::made_refuses`]).
+    let triggers = &skill.triggers;
+    for (on, step) in &mut skill.steps {
+        let lines: &mut [Words] = match step {
+            Step::Call(Call::Words(words)) => std::slice::from_mut(words),
+            Step::Lines(lines) => lines,
+            _ => &mut [],
+        };
+        for words in lines {
+            let Some(count) = &words.count else { continue };
+            let mut running = triggers
+                .iter()
+                .filter(|trigger| match on {
+                    None => true,
+                    Some(Only::Trigger(name)) => trigger.name.as_ref() == Some(name),
+                    Some(Only::Choice(_)) => false,
+                })
+                .peekable();
+            let numbered = running.peek().is_some()
+                && running.all(|trigger| {
+                    trigger.each.is_none() && trigger.test.number() == Some(&count.field)
+                });
+            if !numbered {
+                words.words = count.written();
+                words.count = None;
+            }
+        }
     }
     for (_, step) in &skill.steps {
         // A gesture's clip is picked as it runs; any clip needs the body.
@@ -6012,6 +6381,8 @@ pub fn shed_made_manners(skill: &mut Skill, folder: &Path) {
             group == MANNERS_GROUP && *per_hour == MANNERS_PER_HOUR
         }) && skill.budget_gap_us == 0
             && !skill.budget_gives_back
+            && skill.budget_per_day.is_none()
+            && !skill.budget_follows_count
             && skill.stop.is_none();
     let lamp_most = skill.most_a_day == Some(MANNERS_MOST_A_DAY);
     if !(lamp_budget || lamp_most) || !made_by_ask(skill, folder) {
@@ -6485,6 +6856,9 @@ pub struct Engine {
     clock: Option<(i32, u64, u64)>,
     /// The runs each skill with `most_a_day` started: its day and how many.
     day_runs: HashMap<String, (i64, u32)>,
+    /// The runs each group with a `[budget] per_day` started: its day and
+    /// how many (#6543).
+    group_day: HashMap<String, (i64, u32)>,
     /// When each group's runs began, within the last hour, by group.
     group_runs: HashMap<String, std::collections::VecDeque<u64>>,
     /// By group, each member waiting for its hour: since when, and when it
@@ -6557,8 +6931,13 @@ pub struct Engine {
     /// With [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on: a `[[while]]`'s
     /// `through` and `broken_by` are kept (#1672).
     rest_through_sounds: bool,
-    /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709).
+    /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709),
+    /// and a `[[while]]`'s (#6543).
     sooner: bool,
+    /// The `[[while]]` conditions, by skill and index, a `sooner` lowered at
+    /// the last look, with the `above` it gave (#6543): a line in the
+    /// journal as one is lowered, changes or goes back, never each tick.
+    lowered: HashMap<(String, usize), f64>,
     /// The line each skill last picked from a list of lines, by skill: its
     /// next pick is one of the others, so a pet twice in a row never gets
     /// the same words twice (#3997). Behind a lock as [`Engine::still`]
@@ -6665,6 +7044,34 @@ fn nudged(
 
 /// The local day `now_us` is in: its date with the local time known, else
 /// a day of the engine's own clock.
+/// The most runs a day `group` starts, the least any member names
+/// (`[budget] per_day`, #6543), as its hour is the least `per_hour`.
+fn group_per_day(skills: &[Skill], group: &str) -> Option<u32> {
+    skills
+        .iter()
+        .filter(|skill| {
+            skill
+                .budget
+                .as_ref()
+                .is_some_and(|(named, _)| named == group)
+        })
+        .filter_map(|skill| skill.budget_per_day)
+        .min()
+}
+
+/// Whether `group` counts its members' `follows` words as its runs: any
+/// member naming `[budget] follows_count = true` (#6543), as one naming
+/// `give_back_unsaid` gives back for all.
+fn group_follows_count(skills: &[Skill], group: &str) -> bool {
+    skills.iter().any(|skill| {
+        skill.budget_follows_count
+            && skill
+                .budget
+                .as_ref()
+                .is_some_and(|(named, _)| named == group)
+    })
+}
+
 fn day_of(clock: Option<(i32, u64, u64)>, now_us: u64) -> i64 {
     match clock {
         Some((offset, at_us, unix_ms)) => {
@@ -6766,6 +7173,7 @@ impl Engine {
             ask_policy: false,
             clock: None,
             day_runs: HashMap::new(),
+            group_day: HashMap::new(),
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
             word_windows: HashMap::new(),
@@ -6788,6 +7196,7 @@ impl Engine {
             reads: HashMap::new(),
             rest_through_sounds: false,
             sooner: false,
+            lowered: HashMap::new(),
             picked: std::sync::Mutex::default(),
             holds: None,
             restoring: None,
@@ -6812,10 +7221,61 @@ impl Engine {
     }
 
     /// A trigger's `sooner` shortens its `for` while its field is past its
-    /// line (`LAMP_YAWN_SOONER=on`, #3709). Without it `sooner` is ignored.
+    /// line (`LAMP_YAWN_SOONER=on`, #3709), and a `[[while]]`'s lowers its
+    /// `above` (#6543). Without it `sooner` is ignored.
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
         self
+    }
+
+    /// Says in the journal, once as it happens, each `[[while]]` a `sooner`
+    /// lowered, lowered to another number, or let go back to its own
+    /// `above` (#6543): `comfort-break while room/activity sitting_s above
+    /// 7199 lowered to 3599 (sooner humans/doing_more drank_seen above 0)`.
+    /// Numbers and the topics and fields only.
+    fn note_lowered(&mut self, now_us: u64) {
+        if !self.sooner {
+            return;
+        }
+        for skill in &self.skills {
+            for (index, condition) in skill.conditions.iter().enumerate() {
+                let Test::Above(field, own) = &condition.test else {
+                    continue;
+                };
+                let key = (skill.name.clone(), index);
+                let now = Self::lowered(&self.latest, condition, true, now_us);
+                let was = self.lowered.get(&key).copied();
+                let line = match (was, now) {
+                    (None, None) => continue,
+                    (Some(was), Some(now)) if was == now.above => continue,
+                    (was, Some(now)) => {
+                        let field_of = match &now.test {
+                            Test::Above(field, line) => format!("{field} above {line}"),
+                            test => test.shows(),
+                        };
+                        self.lowered.insert(key, now.above);
+                        format!(
+                            "{} while {} {field} above {} lowered to {} (sooner {} {field_of})",
+                            skill.name,
+                            condition.topic,
+                            was.unwrap_or(*own),
+                            now.above,
+                            now.topic,
+                        )
+                    }
+                    (Some(was), None) => {
+                        self.lowered.remove(&key);
+                        format!(
+                            "{} while {} {field} above {own} again, from {was}: no sooner holds",
+                            skill.name, condition.topic,
+                        )
+                    }
+                };
+                if self.dropped.len() < DROPPED_LINES_KEPT {
+                    self.dropped.push(line);
+                }
+            }
+        }
     }
 
     /// The long holds kept in `file` across a short restart of the program
@@ -6900,6 +7360,11 @@ impl Engine {
                 limits.groups.entry(group.clone()).or_default().began_us = began;
             }
         }
+        for (group, (on, count)) in &self.group_day {
+            if *on == day {
+                limits.groups.entry(group.clone()).or_default().day = Some((*on, *count));
+            }
+        }
         for (group, waits) in &self.budget_waits {
             let waits: BTreeMap<String, (u64, u64)> = waits
                 .iter()
@@ -6943,6 +7408,12 @@ impl Engine {
             }
         }
         for (group, kept) in limits.groups {
+            if let Some((on, count)) = kept.day {
+                let now = self.group_day.entry(group.clone()).or_insert((on, 0));
+                if now.0 == on {
+                    now.1 = now.1.max(count);
+                }
+            }
             if !kept.began_us.is_empty() {
                 let began = self.group_runs.entry(group.clone()).or_default();
                 began.extend(kept.began_us);
@@ -7562,7 +8033,9 @@ impl Engine {
     }
 
     /// `skill`'s run was its write, told "not sent: waiting for the
-    /// owner's yes" ([`service_write::waiting`]): it did nothing, so what
+    /// owner's yes" ([`service_write::waiting`]), or its note that may end
+    /// unsaid was let go by the voice, never begun ([`ended_unsaid`],
+    /// #6543): it did nothing, so what
     /// its start spent is given back (lamp-9adf, 12 Nov: an unapproved mail
     /// held an approved skill of its group back for the hour). Its place in
     /// its group's hour and its gap, its cooldown, its day's count for
@@ -7593,6 +8066,12 @@ impl Engine {
         {
             began.remove(at);
         }
+        if let Some(group) = &spent.group
+            && let Some((on, count)) = self.group_day.get_mut(group)
+            && *on == day_of(self.clock, spent.at_us)
+        {
+            *count = count.saturating_sub(1);
+        }
         if self.group_ran.get(skill) == Some(&spent.at_us) {
             match spent.group_ran {
                 Some(at) => self.group_ran.insert(skill.to_owned(), at),
@@ -7612,6 +8091,14 @@ impl Engine {
             None => {}
         }
         true
+    }
+
+    /// `skill`'s run ended having done its part (a write sent, a note
+    /// spoken): its start stands, and what [`Engine::unwritten`] would give
+    /// back is forgotten, so a later run that ends unsaid without a start of
+    /// its own (a queued `each` item) gives back nothing of this one.
+    pub fn kept(&mut self, skill: &str) {
+        self.unwritten.remove(skill);
     }
 
     /// Until when `skill` rests after runs nobody noticed, if it does.
@@ -7656,6 +8143,7 @@ impl Engine {
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
         self.judge_nudges(now_us);
+        self.note_lowered(now_us);
         self.invalidate_changes(now_us);
         let mut runs = Vec::new();
         let moment = self.local_moment(now_us);
@@ -7907,6 +8395,11 @@ impl Engine {
             let before = condition(&old, name, *index);
             before.is_some() && before == condition(new, name, *index)
         });
+        // A lowered `[[while]]` the edit kept is not said again (#6543).
+        self.lowered.retain(|(name, index), _| {
+            let before = condition(&old, name, *index);
+            before.is_some() && before == condition(new, name, *index)
+        });
         self.restore_holds();
         ends
     }
@@ -8025,12 +8518,35 @@ impl Engine {
             .map(|(value, _, _)| value)
     }
 
+    /// The `above` a holding `sooner` of `condition` lowers its own to, the
+    /// lowest of those holding (#6543), with the one that gives it; none
+    /// while none holds, or with `sooner` (the switch) off.
+    fn lowered<'a>(
+        latest: &HashMap<String, (Value, u64, Option<u64>)>,
+        condition: &'a Condition,
+        sooner: bool,
+        now_us: u64,
+    ) -> Option<&'a WhileSooner> {
+        if !sooner {
+            return None;
+        }
+        condition
+            .sooner
+            .iter()
+            .filter(|one| {
+                Self::fresh(latest, &one.topic, now_us).is_some_and(|value| one.test.holds(value))
+            })
+            .min_by(|a, b| a.above.total_cmp(&b.above))
+    }
+
     /// The condition holds on its topic's newest value that still lasts, and
-    /// has since `since_us` for its `for`.
+    /// has since `since_us` for its `for`. A `sooner` holding lowers its
+    /// `above` (#6543); it has no `for`, so no clock is asked then.
     fn condition_holds(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         condition: &Condition,
         since_us: Option<&u64>,
+        sooner: bool,
         now_us: u64,
     ) -> bool {
         // A topic that has said nothing yet: held only when asked to be.
@@ -8041,6 +8557,10 @@ impl Engine {
         if condition.stale_holds && Self::fresh(latest, &condition.topic, now_us).is_none() {
             return true;
         }
+        if let Some(lowered) = Self::lowered(latest, condition, sooner, now_us) {
+            return Self::fresh(latest, &condition.topic, now_us)
+                .is_some_and(|value| condition.holds_on(value, Some(lowered.above)));
+        }
         Self::fresh(latest, &condition.topic, now_us)
             .is_some_and(|value| condition.test.holds(value))
             && since_us.is_some_and(|since| now_us - since >= condition.for_us)
@@ -8050,6 +8570,7 @@ impl Engine {
     fn conditions_hold(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> bool {
@@ -8065,6 +8586,7 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), index)),
+                    sooner,
                     now_us,
                 )
             })
@@ -8077,6 +8599,7 @@ impl Engine {
     fn held_back(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> String {
@@ -8110,6 +8633,7 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), *index)),
+                    sooner,
                     now_us,
                 )
             });
@@ -8162,6 +8686,7 @@ impl Engine {
     fn unmet(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         holding: &HashMap<(String, usize), u64>,
+        sooner: bool,
         skill: &Skill,
         now_us: u64,
     ) -> String {
@@ -8177,11 +8702,22 @@ impl Engine {
                     latest,
                     condition,
                     holding.get(&(skill.name.clone(), *index)),
+                    sooner,
                     now_us,
                 )
             })
             .map_or_else(String::new, |(_, condition)| {
-                let mut wanted = format!("{} {}", condition.topic, condition.test.shows());
+                // A lowered `above` is the one it wants now (#6543).
+                let shows = match (
+                    &condition.test,
+                    Self::lowered(latest, condition, sooner, now_us),
+                ) {
+                    (Test::Above(field, _), Some(lowered)) => {
+                        Test::Above(field.clone(), lowered.above).shows()
+                    }
+                    (test, _) => test.shows(),
+                };
+                let mut wanted = format!("{} {}", condition.topic, shows);
                 if condition.for_us > 0 {
                     wanted += &format!(" for {} s", condition.for_us / 1_000_000);
                 }
@@ -8263,7 +8799,7 @@ impl Engine {
                 .then_some(None)?,
         };
         let run_item = run.from.as_ref().and_then(|(_, item)| item.as_deref());
-        Self::conditions_hold(&self.latest, &self.holding, skill, now_us).then(|| {
+        Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us).then(|| {
             calls(
                 &self.latest,
                 &self.picked,
@@ -8288,7 +8824,8 @@ impl Engine {
             {
                 continue;
             }
-            let conditions = Self::conditions_hold(&self.latest, &self.holding, skill, now_us);
+            let conditions =
+                Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us);
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 if trigger.when == When::Changes
                     && (!conditions
@@ -8403,6 +8940,7 @@ impl Engine {
                 }
             }
         }
+        self.note_lowered(now_us);
         // Words heard or a new push: the clocks carried through a sound
         // begin again at the next value that holds.
         if self.rest_through_sounds && breaks(topic, &value, before.as_ref()) {
@@ -8547,8 +9085,20 @@ impl Engine {
                     };
                     watch.items = Some(items);
                     for name in came {
-                        if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
-                            let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                        if !Self::conditions_hold(
+                            &self.latest,
+                            &self.holding,
+                            self.sooner,
+                            skill,
+                            now_us,
+                        ) {
+                            let unmet = Self::unmet(
+                                &self.latest,
+                                &self.holding,
+                                self.sooner,
+                                skill,
+                                now_us,
+                            );
                             dropped(
                                 &mut self.dropped,
                                 watch,
@@ -8859,6 +9409,15 @@ impl Engine {
                     None => !silent(trigger.name.as_ref()),
                     Some((other, _)) => silent(Some(other)),
                 };
+                // Its group's limits count the nudges, and with `[budget]
+                // follows_count = true` named by a member a `follows` word
+                // too (#6543): the day's most and the rest count as before.
+                let counted = nudge
+                    || (trigger.follows.is_some()
+                        && skill
+                            .budget
+                            .as_ref()
+                            .is_some_and(|(group, _)| group_follows_count(&self.skills, group)));
                 if let Some(most) = skill.most_a_day.filter(|most| {
                     nudge
                         && self
@@ -8873,6 +9432,29 @@ impl Engine {
                         "most",
                         now_us,
                         || format!("its {most} a day already run"),
+                    );
+                    continue;
+                }
+                // Past its group's day (#6543): spent, as the skill's own
+                // day's most is.
+                if let Some((group, most)) = skill
+                    .budget
+                    .as_ref()
+                    .filter(|_| counted)
+                    .and_then(|(group, _)| Some((group, group_per_day(&self.skills, group)?)))
+                    .filter(|(group, most)| {
+                        self.group_day
+                            .get(*group)
+                            .is_some_and(|(on, count)| *on == day && count >= most)
+                    })
+                {
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "budget-day",
+                        now_us,
+                        || format!("its {group} group's {most} a day already run"),
                     );
                     continue;
                 }
@@ -8953,7 +9535,13 @@ impl Engine {
                 // chance its own conditions hold back would not have spoken
                 // anyway, so it goes on as without the key.
                 if let Some(by) = stood_in
-                    && Self::conditions_hold(&self.latest, &self.holding, skill, now_us)
+                    && Self::conditions_hold(
+                        &self.latest,
+                        &self.holding,
+                        self.sooner,
+                        skill,
+                        now_us,
+                    )
                 {
                     if trigger.when != When::Appears {
                         watch.spent = false;
@@ -8986,7 +9574,7 @@ impl Engine {
                     skill
                         .budget
                         .as_ref()
-                        .filter(|_| nudge)
+                        .filter(|_| counted)
                         .is_some_and(|(group, _)| {
                             let limit = self
                                 .skills
@@ -9010,7 +9598,7 @@ impl Engine {
                 let gap_left = skill
                     .budget
                     .as_ref()
-                    .filter(|_| nudge)
+                    .filter(|_| counted)
                     .and_then(|(group, _)| {
                         let gap_us = self
                             .skills
@@ -9036,7 +9624,7 @@ impl Engine {
                 let behind = skill
                     .budget
                     .as_ref()
-                    .filter(|_| nudge)
+                    .filter(|_| counted)
                     .is_some_and(|(group, _)| {
                         self.budget_waits.get(group).is_some_and(|waits| {
                             let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
@@ -9086,7 +9674,7 @@ impl Engine {
                     dropped(&mut self.dropped, watch, &skill.name, gate, now_us, || why);
                     continue;
                 }
-                if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
+                if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
                     // Held back by a condition (someone talking): with a
                     // `wait`, the chance is kept while the trigger holds,
                     // and taken at its next message once they hold.
@@ -9098,7 +9686,7 @@ impl Engine {
                         // A chance kept waiting says so, once a hold: a
                         // matured spell waiting out a talk left no line for
                         // up to its whole `wait` (#6592).
-                        let (latest, holding) = (&self.latest, &self.holding);
+                        let (latest, holding, sooner) = (&self.latest, &self.holding, self.sooner);
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9109,7 +9697,7 @@ impl Engine {
                                 format!(
                                     "its while did not hold: kept up to {} s for it (held by {})",
                                     trigger.wait_us / 1_000_000,
-                                    Self::held_back(latest, holding, skill, now_us)
+                                    Self::held_back(latest, holding, sooner, skill, now_us)
                                 )
                             },
                         );
@@ -9149,7 +9737,13 @@ impl Engine {
                         if !trigger.once_per_day {
                             why = format!(
                                 "{why} (held by {})",
-                                Self::held_back(&self.latest, &self.holding, skill, now_us)
+                                Self::held_back(
+                                    &self.latest,
+                                    &self.holding,
+                                    self.sooner,
+                                    skill,
+                                    now_us
+                                )
                             );
                         }
                         runs.push(Run {
@@ -9173,7 +9767,8 @@ impl Engine {
                     // which #3007 gives every trigger with a `wait`, not
                     // here: it must not be said twice.
                     if trigger.wait_us == 0 && !(once && trigger.once_per_day) {
-                        let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                        let unmet =
+                            Self::unmet(&self.latest, &self.holding, self.sooner, skill, now_us);
                         dropped(
                             &mut self.dropped,
                             watch,
@@ -9367,8 +9962,9 @@ impl Engine {
                 }
                 if acts {
                     // A write's start, as it was before: given back if the
-                    // write waits for the owner's yes (#6066).
-                    if skill.writes_a_service() {
+                    // write waits for the owner's yes (#6066), or if a note
+                    // that may end unsaid does (#6543).
+                    if skill.writes_a_service() || skill.may_end_unsaid() {
                         self.unwritten.insert(
                             skill.name.clone(),
                             Spent {
@@ -9381,7 +9977,7 @@ impl Engine {
                                 group: skill
                                     .budget
                                     .as_ref()
-                                    .filter(|_| nudge)
+                                    .filter(|_| counted)
                                     .map(|(group, _)| group.clone()),
                                 nudge: None,
                             },
@@ -9422,7 +10018,14 @@ impl Engine {
                         // A word after a nudge: its say is not the nudge's.
                         self.unsaid_from.remove(&skill.name);
                     }
-                    if let Some((group, _)) = skill.budget.as_ref().filter(|_| nudge) {
+                    if let Some((group, _)) = skill.budget.as_ref().filter(|_| counted) {
+                        if group_per_day(&self.skills, group).is_some() {
+                            let count = self.group_day.entry(group.clone()).or_insert((day, 0));
+                            if count.0 != day {
+                                *count = (day, 0);
+                            }
+                            count.1 += 1;
+                        }
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);
@@ -9584,7 +10187,7 @@ impl Engine {
             return Err("Requested audio is disabled or has no spoken context.".into());
         }
         arguments(skill, args)?;
-        if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
+        if !Self::conditions_hold(&self.latest, &self.holding, self.sooner, skill, now_us) {
             return Err("I can't do that just now.".into());
         }
         let ran = self.tool_ran.get(&skill.name).copied();
@@ -9987,6 +10590,17 @@ fn calls(
         .flag
         .as_ref()
         .is_some_and(|flag| args[&flag.name] == true);
+    // A note's number, from the trigger's own message as it fired (#6543);
+    // a run with no trigger, or no number there, says the note without it.
+    let reading = trigger.and_then(|trigger| latest.get(&trigger.topic).map(|(value, _, _)| value));
+    let counted = |words: &Words| match &words.count {
+        Some(count) => Words {
+            words: count.said(reading),
+            count: None,
+            ..words.clone()
+        },
+        None => words.clone(),
+    };
     skill
         .steps
         .iter()
@@ -10011,6 +10625,7 @@ fn calls(
                     .flatten();
                 vec![Call::SayFrom(*source, task)]
             }
+            Step::Call(Call::Words(words)) => vec![Call::Words(counted(words))],
             Step::Call(other) => vec![other.clone()],
             Step::Lines(lines) => {
                 let mut picked = picked
@@ -10018,7 +10633,7 @@ fn calls(
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
                 let line = next_line(now_us, lines.len(), picked.get(&skill.name).copied());
                 picked.insert(skill.name.clone(), line);
-                vec![Call::Words(lines[line].clone())]
+                vec![Call::Words(counted(&lines[line]))]
             }
             Step::Gesture { by, again } => {
                 let names: Vec<&String> =
@@ -11071,6 +11686,261 @@ mod tests {
         );
     }
 
+    /// #6543, B3: a note's one `{field}` is filled from the reading that
+    /// fired its run, as a whole number; with no number there it is said
+    /// without it. Read leniently: any other brace, and a field not every
+    /// trigger running the note tests as a number, is said as written, so a
+    /// skill already on a lamp still loads; a new one is refused it.
+    #[test]
+    fn a_note_says_one_number_from_the_reading_that_fired_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let load_raw = |name: &str, rest: &str| {
+            let skill = dir.path().join(name);
+            std::fs::create_dir_all(&skill).unwrap();
+            std::fs::write(
+                skill.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: A test.\n---\n"),
+            )
+            .unwrap();
+            std::fs::write(
+                skill.join("skill.toml"),
+                format!(
+                    "[permissions]\ntopics = [\"air/state\"]\nspeak = true\n\
+                     [ask]\npolicy = \"moment\"\n{rest}"
+                ),
+            )
+            .unwrap();
+            load(&skill)
+        };
+        let load_with = |name: &str, trigger: &str, say: &str| {
+            load_raw(
+                name,
+                &format!("[trigger]\ntopic = \"air/state\"\n{trigger}\n[[do]]\nsay = {say}\n"),
+            )
+        };
+        let above = "field = \"pm2_5\"\nabove = 1";
+        // Kept across runs, so a list's next run says another line.
+        let picked = std::sync::Mutex::new(HashMap::new());
+        let said_by = |skill: &Skill, trigger: Option<&Trigger>, reading: Option<Value>| {
+            let latest: HashMap<String, (Value, u64, Option<u64>)> = reading
+                .into_iter()
+                .map(|value| ("air/state".to_owned(), (value, 0, None)))
+                .collect();
+            let ran = calls(&latest, &picked, skill, trigger, 0, &json!({}), None);
+            let [Call::Words(words)] = ran.as_slice() else {
+                panic!("{ran:?}")
+            };
+            assert_eq!(words.count, None);
+            words.words.clone()
+        };
+        let said =
+            |skill: &Skill, reading: Option<Value>| said_by(skill, skill.triggers.first(), reading);
+        let skill = load_with(
+            "fill",
+            above,
+            r#"{ note = "Say {pm2_5} drinks this sitting, kindly." }"#,
+        )
+        .unwrap();
+        assert_eq!(skill.made_refuses(), None);
+        // Filled, a fraction rounded down, from the reading as it fired.
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 3}))),
+            "Say 3 drinks this sitting, kindly."
+        );
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 2.7}))),
+            "Say 2 drinks this sitting, kindly."
+        );
+        assert_eq!(
+            said(&skill, Some(json!({"pm2_5": 1_000_000}))),
+            "Say 1000000 drinks this sitting, kindly."
+        );
+        // Missing, null, a word, a bool, negative, huge or not finite: said
+        // without the number, never with the slot, "None" or "-3".
+        for reading in [
+            None,
+            Some(json!({})),
+            Some(json!({"pm2_5": null})),
+            Some(json!({"pm2_5": "three"})),
+            Some(json!({"pm2_5": true})),
+            Some(json!({"pm2_5": -3})),
+            Some(json!({"pm2_5": -0.5})),
+            Some(json!({"pm2_5": 1_000_001})),
+            Some(json!({"pm2_5": 1e300})),
+            Some(json!({"pm2_5": u64::MAX})),
+        ] {
+            assert_eq!(
+                said(&skill, reading.clone()),
+                "Say drinks this sitting, kindly.",
+                "{reading:?}"
+            );
+        }
+        // A tool's run has no reading: the note without its number.
+        let latest = HashMap::from([("air/state".to_owned(), (json!({"pm2_5": 3}), 0, None))]);
+        assert_eq!(
+            calls(&latest, &picked, &skill, None, 0, &json!({}), None),
+            [Call::Words(Words {
+                words: "Say drinks this sitting, kindly.".into(),
+                exact: false,
+                priority: SAY_PRIORITY,
+                expires_ms: SAY_EXPIRES_MS,
+                question: false,
+                may_end_unsaid: false,
+                count: None,
+            })]
+        );
+        // A slot at an end leaves no stray space; a list's lines each fill.
+        let lines = load_with(
+            "lines",
+            "field = \"pm2_5\"\nrise = { by = 1, within = \"1m\" }",
+            r#"{ note = ["{pm2_5} drinks so far.", "Drinks so far: {pm2_5}"] }"#,
+        )
+        .unwrap();
+        let mut both = BTreeSet::new();
+        for _ in 0..2 {
+            both.insert(said(&lines, Some(json!({"pm2_5": 4}))));
+        }
+        assert_eq!(
+            both,
+            BTreeSet::from(["4 drinks so far.".to_owned(), "Drinks so far: 4".to_owned()])
+        );
+        let without = said(&lines, Some(json!({})));
+        assert!(
+            ["drinks so far.", "Drinks so far:"].contains(&without.as_str()),
+            "{without}"
+        );
+        // No slot: the note as written, and the say as before.
+        let plain = load_with("plain", above, r#"{ note = "Have some water." }"#).unwrap();
+        assert_eq!(said(&plain, Some(json!({"pm2_5": 3}))), "Have some water.");
+        assert_eq!(plain.made_refuses(), None);
+        // Every trigger that can run the note gives the field: a step any
+        // trigger runs, with one testing another field, is said as written;
+        // a step only the testing trigger runs, or both testing it, fills.
+        let two = |name: &str, other: &str, on: &str| {
+            load_raw(
+                name,
+                &format!(
+                    "[[trigger]]\nname = \"a\"\ntopic = \"air/state\"\nfield = \"pm2_5\"\nabove = 1\n\
+                     [[trigger]]\nname = \"b\"\ntopic = \"air/state\"\n{other}\n\
+                     [[do]]\n{on}say = {{ note = \"It is {{pm2_5}} now.\" }}\n"
+                ),
+            )
+            .unwrap()
+        };
+        let reading = json!({"pm2_5": 7, "co2": 900});
+        let mixed = two("mixed", "field = \"co2\"\nabove = 800", "");
+        for trigger in &mixed.triggers {
+            assert_eq!(
+                said_by(&mixed, Some(trigger), Some(reading.clone())),
+                "It is {pm2_5} now."
+            );
+        }
+        assert_eq!(mixed.made_refuses(), Some(NOTE_BRACES));
+        let only = two("only", "field = \"co2\"\nabove = 800", "on = \"a\"\n");
+        assert_eq!(
+            said_by(&only, only.triggers.first(), Some(reading.clone())),
+            "It is 7 now."
+        );
+        assert_eq!(only.made_refuses(), None);
+        let both = two("both", "field = \"pm2_5\"\nbelow = 100", "");
+        for trigger in &both.triggers {
+            assert_eq!(
+                said_by(&both, Some(trigger), Some(reading.clone())),
+                "It is 7 now."
+            );
+        }
+        // Said as written, braces and all, as before slots: a skill already
+        // on a lamp loads; a new one is refused at make, pack or install.
+        for (trigger, say, written, why) in [
+            // A word field: a trigger tests it by equals, never as a number.
+            (
+                "field = \"label\"\nequals = \"smoke\"",
+                r#"{ note = "It is {label}." }"#,
+                "It is {label}.",
+                NOTE_BRACES,
+            ),
+            // A field no trigger tests.
+            (
+                above,
+                r#"{ note = "It is {label}." }"#,
+                "It is {label}.",
+                NOTE_BRACES,
+            ),
+            // An `each` trigger's field is an item's, not the reading's.
+            (
+                "each = \"items\"\nkey = \"id\"\nfield = \"pm2_5\"\nabove = 1",
+                r#"{ note = "It is {pm2_5}." }"#,
+                "It is {pm2_5}.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ text = "It is {pm2_5}." }"#,
+                "It is {pm2_5}.",
+                COUNT_IN_A_TABLE,
+            ),
+            (
+                above,
+                r#"{ note = "{pm2_5} and {pm2_5}" }"#,
+                "{pm2_5} and {pm2_5}",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "Take {a short break}." }"#,
+                "Take {a short break}.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "It is {pm2_5." }"#,
+                "It is {pm2_5.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "It is } here." }"#,
+                "It is } here.",
+                NOTE_BRACES,
+            ),
+            (
+                above,
+                r#"{ note = "A {{brace}} stays." }"#,
+                "A {{brace}} stays.",
+                NOTE_BRACES,
+            ),
+            (above, r#"{ note = "{pm2_5}" }"#, "{pm2_5}", NOTE_BRACES),
+        ] {
+            let Ok(skill) = load_with("written", trigger, say) else {
+                // An `each` with a number test may itself not load: then no
+                // slot could ever be filled from it either.
+                assert!(trigger.starts_with("each"), "{say}");
+                continue;
+            };
+            assert_eq!(said(&skill, Some(json!({"pm2_5": 3}))), written, "{say}");
+            assert_eq!(skill.made_refuses(), Some(why), "{say}");
+        }
+        // A plain say keeps its braces as words, and a new one is told a
+        // slot fills in a note only.
+        let say = load_with("say", above, r#""It is {pm2_5}.""#).unwrap();
+        let ran = calls(
+            &HashMap::new(),
+            &picked,
+            &say,
+            say.triggers.first(),
+            0,
+            &json!({}),
+            None,
+        );
+        assert_eq!(ran, [Call::Say("It is {pm2_5}.".into())]);
+        assert_eq!(say.made_refuses(), Some(COUNT_IN_A_TABLE));
+        // Exact words with braces that name no field are said as written,
+        // and made: no slot is meant there.
+        let exact = load_with("exact", above, r#"{ text = "A {{brace}} and }" }"#).unwrap();
+        assert_eq!(said(&exact, None), "A {{brace}} and }");
+        assert_eq!(exact.made_refuses(), None);
+    }
+
     /// #939, (c): `say = { from = ... }` is a say of what the voice keeps,
     /// by where, at that kind's priority.
     #[test]
@@ -11635,6 +12505,109 @@ mod tests {
         }
     }
 
+    /// #6543: a note that may end unsaid, let go by the voice as its moment
+    /// passed, spends nothing: its cooldown, its group's hour and gap, its
+    /// day's count and its `[rest]` count are given back, and it comes again
+    /// the next time its trigger holds. A note without it keeps what it
+    /// spent, as before; only an opted-in note tells the voice so.
+    #[test]
+    fn a_note_ended_unsaid_gives_its_run_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let note = |may: &str| {
+            format!(
+                "version = \"1.0.0\"\nmost_a_day = 1\n\
+                 [permissions]\ntopics = [\"room/presence\"]\nspeak = true\n\
+                 [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\
+                 cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n\
+                 [budget]\ngroup = \"wellbeing\"\nper_hour = 1\ngap = \"15m\"\n\
+                 [rest]\nafter_ignored = 1\nwithin = \"10s\"\n\
+                 [[do]]\nsay = {{ note = \"Ask if they want a sip of water.\"{may} }}\n"
+            )
+        };
+        let may = load(&write_skill(
+            dir.path(),
+            "sip",
+            &note(", may_end_unsaid = true"),
+        ))
+        .unwrap();
+        let plain = load(&write_skill(dir.path(), "sip-plain", &note(""))).unwrap();
+        let ask = |skill: &Skill| {
+            skill.steps.iter().find_map(|(_, step)| match step {
+                Step::Call(Call::Words(words)) => Some(words.ask()),
+                _ => None,
+            })
+        };
+        assert_eq!(ask(&may).unwrap()["may_end_unsaid"], true);
+        assert!(ask(&plain).unwrap().get("may_end_unsaid").is_none());
+        for (skill, gives_back) in [(may, true), (plain, false)] {
+            let mut engine = Engine::new(vec![skill.clone()], true);
+            let ran = |engine: &mut Engine, second: u64, present: bool| -> Vec<String> {
+                let now = second * 1_000_000;
+                let message = format!(r#"{{"present":{present}}}"#);
+                engine
+                    .observe("room/presence", now, message.as_bytes(), None)
+                    .into_iter()
+                    .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+                    .map(|run| run.skill)
+                    .collect()
+            };
+            assert_eq!(ran(&mut engine, 0, true), std::slice::from_ref(&skill.name));
+            // The voice let its note go: "say: unsaid (someone started
+            // talking)".
+            assert!(ended_unsaid("say: unsaid (someone started talking)"));
+            assert_eq!(engine.unwritten(&skill.name), gives_back, "{}", skill.name);
+            // Given back once: a second unsaid end has nothing to give.
+            assert!(!engine.unwritten(&skill.name), "{}", skill.name);
+            // Not again while its trigger still holds.
+            assert!(ran(&mut engine, 5, true).is_empty(), "{}", skill.name);
+            ran(&mut engine, 20, false);
+            assert_eq!(
+                engine.resting_until(&skill.name, 20_000_000).is_none(),
+                gives_back,
+                "{}",
+                skill.name
+            );
+            // Back: its cooldown, gap, hour and day's one are its own again.
+            assert_eq!(
+                ran(&mut engine, 40, true).len(),
+                usize::from(gives_back),
+                "{}",
+                skill.name
+            );
+        }
+        assert!(!ended_unsaid("say: spoken"));
+        assert!(!ended_unsaid("say: expired"));
+        assert!(ended_unsaid(
+            "light: warm; say: unsaid (the person turned away)"
+        ));
+    }
+
+    /// #6543: an opted-in note that was spoken keeps its start: a later
+    /// unsaid end with no start of its own gives back nothing of it.
+    #[test]
+    fn a_spoken_note_keeps_its_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = load(&write_skill(
+            dir.path(),
+            "sip",
+            "version = \"1.0.0\"\nmost_a_day = 1\n\
+             [permissions]\ntopics = [\"room/presence\"]\nspeak = true\n\
+             [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\
+             cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n\
+             [[do]]\nsay = { note = \"Ask if they want a sip of water.\", may_end_unsaid = true }\n",
+        ))
+        .unwrap();
+        let mut engine = Engine::new(vec![skill], true);
+        let ran = engine
+            .observe("room/presence", 0, br#"{"present":true}"#, None)
+            .into_iter()
+            .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+            .count();
+        assert_eq!(ran, 1);
+        engine.kept("sip");
+        assert!(!engine.unwritten("sip"));
+    }
+
     const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\
         tool = \"photo_booth\"\n[permissions]\nlight = true\nspeak = true\n\
         [[do]]\nlight = { colour = \"warm\" }\n[[do]]\nsay = \"Say cheese.\"\n\
@@ -11851,6 +12824,26 @@ mod tests {
         assert_eq!(lamp_voice::made_skill::MANNERS_GROUP, "wellbeing");
         assert_eq!(lamp_voice::made_skill::MANNERS_PER_HOUR, 1);
         assert_eq!(lamp_voice::made_skill::MANNERS_MOST_A_DAY, 3);
+    }
+
+    /// #7104 (P3): a `do.task` loads with its skill's own `[quiet]`, as a
+    /// `do.read` does, for what its agent found to be held to it.
+    #[test]
+    fn a_task_step_loads_with_its_skills_own_quiet() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(
+            dir.path(),
+            "evening-mail",
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\n[ask]\npolicy = \"nudge\"\n[quiet]\nfrom = \"22:00\"\n\
+             to = \"08:00\"\n[permissions]\ntopics = [\"voice/state\"]\n\
+             [[do]]\ntask = { task = \"Sum up today's mail\", run = \"scripts/main.py\" }\n",
+        );
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.quiet, Some((22 * 60, 8 * 60)));
+        assert_eq!(skill.task_step().unwrap().quiet, skill.quiet);
+        let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
+        assert_eq!(load(&folder).unwrap().task_step().unwrap().quiet, None);
     }
 
     const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\

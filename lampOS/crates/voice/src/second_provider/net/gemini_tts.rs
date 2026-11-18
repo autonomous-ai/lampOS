@@ -117,6 +117,8 @@ impl GeminiTts {
         let Some(body) = body(&self.voice, text) else {
             return Ok(GeminiSpeech::default());
         };
+        // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
+        crate::day_tally::spoken(text);
         if let Ok(mut used) = self.used.lock() {
             *used = Some(Instant::now());
         }

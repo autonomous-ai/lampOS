@@ -796,7 +796,17 @@ const HELPER_WAIT: Duration = Duration::from_secs(8);
 /// no `do.task`, or none of that name; why not when the helper refused or
 /// couldn't be reached.
 fn read_by(manage: &Path, name: &str) -> Result<Option<TaskAsks>, String> {
-    let answer = crate::tools::reached(manage, &json!({ "task_asks": name }), HELPER_WAIT)
+    read_within(manage, name, HELPER_WAIT)
+}
+
+/// [`read_by`], the helper waited for at most `wait` (a spoken question
+/// about a skill, `crate::skill_about`, waits less than a yes does).
+pub(crate) fn read_within(
+    manage: &Path,
+    name: &str,
+    wait: Duration,
+) -> Result<Option<TaskAsks>, String> {
+    let answer = crate::tools::reached(manage, &json!({ "task_asks": name }), wait)
         .ok_or("the lamp's skills couldn't be reached")?
         .ok_or("the lamp's skills didn't answer in time")?;
     if let Some(why) = answer.get("refused").and_then(Value::as_str) {
@@ -845,8 +855,19 @@ pub fn agreed_by(
     sha256: &str,
     grants: &[String],
 ) -> Result<Agreement, String> {
+    agreed_within(control, name, sha256, grants, HELPER_WAIT)
+}
+
+/// [`agreed_by`], lamp-control waited for at most `wait`.
+pub(crate) fn agreed_within(
+    control: &Path,
+    name: &str,
+    sha256: &str,
+    grants: &[String],
+    wait: Duration,
+) -> Result<Agreement, String> {
     let line = json!({ CHECK: {"name": name, "sha256": sha256, "grants": grants} });
-    let answer = crate::tools::reached(control, &line, HELPER_WAIT)
+    let answer = crate::tools::reached(control, &line, wait)
         .ok_or("lamp-control couldn't be reached")?
         .ok_or("lamp-control didn't answer in time")?;
     if let Some(why) = answer.get("error").and_then(Value::as_str) {

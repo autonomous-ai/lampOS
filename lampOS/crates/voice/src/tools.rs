@@ -248,6 +248,11 @@ pub struct Settings {
     /// The person may put the lamp to sleep by voice
     /// ([`crate::sleep_asked`], `LAMP_SLEEP_ASKED=on`, #3748).
     pub sleep_asked: bool,
+    /// The owner may turn seen activity on by voice, and anyone off
+    /// ([`crate::seen_yes`], `LAMP_SEEN_ACTIVITY=on`, #6543).
+    pub seen_activity: bool,
+    /// With it, posture too: the offer names it (`LAMP_SEEN_POSTURE=on`).
+    pub seen_posture: bool,
     /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
@@ -328,6 +333,12 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::without_a_tool::arguments(
         std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
+    ));
+    flags.extend(crate::seen_yes::arguments(
+        std::env::var(crate::seen_yes::ENVIRONMENT).ok().as_deref(),
+        std::env::var(crate::seen_yes::POSTURE_ENVIRONMENT)
+            .ok()
+            .as_deref(),
     ));
     flags.extend(crate::services::arguments(
         std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
@@ -417,6 +428,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--skills-dir must be absolute"));
         }
         settings.skills = Some(PathBuf::from(folder));
+        // The voice's skills folder, for the skills' records a schedule
+        // answer carries (`skill_about::with_reminders_here`), whose route
+        // has no settings.
+        crate::skill_about::note_tools_dir(Path::new(folder));
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -549,6 +564,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::without_a_tool::SHUTDOWN_FLAG
     {
         settings.shutdown_from_app = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::seen_yes::FLAG
+    {
+        settings.seen_activity = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::seen_yes::POSTURE_FLAG
+    {
+        settings.seen_posture = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -891,10 +918,18 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
     }
+    if settings.seen_activity {
+        tools.extend(crate::seen_yes::tools());
+    }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
+    // A recurring thing for the lamp to do is a skill to make, told in the
+    // reminders' and the read's own words (`LAMP_SKILL_RECURRING_TOLD`),
+    // only while `make_skill` is declared.
+    let recurring = settings.make_skill && crate::skill_recurring::on();
     if let Some(folder) = &settings.services {
-        tools.extend(crate::services::tools(folder));
+        let read = recurring.then_some(crate::skill_recurring::READ_TOLD);
+        tools.extend(crate::services::tools_told(folder, read));
     }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
@@ -907,6 +942,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
                 })
                 .take(room),
         );
+    }
+    if recurring {
+        crate::skill_recurring::tell_reminders(&mut tools);
     }
     tools
 }
@@ -962,6 +1000,7 @@ fn voices_own(name: &str) -> bool {
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
         || crate::sleep_asked::is_tool(name)
+        || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
 }
 
@@ -1079,6 +1118,10 @@ pub enum Route {
     /// answered here, at once, with the line to say, or not now while
     /// onboarding is under way.
     Sleep,
+    /// The owner's yes to seen activity kept, or any "stop looking" taking
+    /// it back ([`crate::seen_yes`], #6543). True when the offer also names
+    /// posture (`LAMP_SEEN_POSTURE`).
+    SeenActivity(bool),
     /// A connected service's function, through `lamp-services`' tools
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
@@ -1131,6 +1174,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A rename's yes judged by its guards (`LAMP_NAMES_RENAME_YES`,
         // #5485): only with names checked.
         rename_yes: settings.names_checked && crate::known_faces::rename_yes_on(),
+        // A name the face paths lost on lamp-74ff kept (`LAMP_NAME_LEARN_FIX`,
+        // #7331): only with names checked.
+        name_learn_fix: settings.names_checked && crate::known_faces::name_learn_fix_on(),
     }
 }
 
@@ -1200,6 +1246,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::sleep_asked::is_tool(name) {
         return if settings.sleep_asked {
             Route::Sleep
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::seen_yes::is_tool(name) {
+        return if settings.seen_activity {
+            Route::SeenActivity(settings.seen_posture)
         } else {
             Route::Nobody
         };
@@ -2129,13 +2182,32 @@ fn run_call_with_scope(
                                     eprintln!(
                                         "lamp-voice: request {request}: the forget their yes agreed to runs in their scope by its id (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
                                     );
-                                    crate::remember::run_scoped_for(
+                                    // By its id alone; the words it was
+                                    // about then take their exchanges about
+                                    // it, theirs only, as a forget about
+                                    // does (C128, lamp-06c1 build 13523).
+                                    let by_id = ToolCall {
+                                        args: json!({"source_id": call.args["source_id"]}),
+                                        ..call.clone()
+                                    };
+                                    let told = crate::remember::run_scoped_for(
                                         socket,
-                                        call,
+                                        &by_id,
                                         deadline.saturating_sub(started.elapsed()),
                                         lease,
                                         &person,
-                                    )
+                                    );
+                                    match call.args.get("about") {
+                                        Some(about) => crate::remember::agreed_forget_exchanges(
+                                            socket,
+                                            told,
+                                            about,
+                                            &person,
+                                            deadline.saturating_sub(started.elapsed()),
+                                            lease,
+                                        ),
+                                        None => told,
+                                    }
                                 }
                                 None => {
                                     eprintln!(
@@ -2313,22 +2385,37 @@ fn run_call_with_scope(
                 crate::agent_tasks::DEADLINE,
             ),
         ),
-        Route::MakeLocal(skills) => (
-            "the lamp's own model",
-            (
-                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref()),
-                true,
-            ),
-        ),
-        Route::Schedule(directory) => (
-            "the schedule through the executive",
-            ask_schedule_for(
+        Route::MakeLocal(skills) => {
+            let mut told =
+                crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref());
+            // A question about their skills that came to the made ones
+            // (`LAMP_SKILL_STATE_TOLD`, #7335's row): the answer carries
+            // every skill's line too. A make's is untouched; off, as before.
+            crate::skill_about::with_made_here(
+                call,
+                &mut told,
+                request,
+                heard,
+                lease,
+                skills.as_deref(),
+            );
+            ("the lamp's own model", (told, true))
+        }
+        Route::Schedule(directory) => {
+            let (mut told, answered) = ask_schedule_for(
                 directory,
                 call,
                 deadline,
                 Some(&schedule_whose::caller(lease, &call.name)),
-            ),
-        ),
+            );
+            // A reminder asked about may be one of the lamp's skills
+            // (`LAMP_SKILL_STATE_TOLD`, #7335's row): `list_reminders`'
+            // answer carries the skills' lines too. Off, as before.
+            crate::skill_about::with_reminders_here(
+                &call.name, &mut told, answered, request, heard, lease,
+            );
+            ("the schedule through the executive", (told, answered))
+        }
         // A face is the person's at the lamp: only words they said there
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
@@ -2339,7 +2426,15 @@ fn run_call_with_scope(
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
-        Route::Faces(socket, switches, onboarding) => {
+        Route::Faces(socket, switches, onboarding) => 'faces: {
+            // The owner's "I'm <the typed name>" from their own face kept
+            // under another name links that face as the owner in place of a
+            // rename (`LAMP_OWNER_LINK`, #7501); anything else goes on.
+            if let Some(told) =
+                crate::owner_link::taken(call, request, heard, lease, onboarding.as_deref())
+            {
+                break 'faces ("the owner link", told);
+            }
             let person = lease
                 .and_then(|lease| lease.scope())
                 .and_then(|scope| scope.person());
@@ -2505,6 +2600,13 @@ fn run_call_with_scope(
         Route::Services(folder) => (
             "the services",
             crate::services::run(folder, call, request, heard, lease),
+        ),
+        Route::SeenActivity(posture) => (
+            "the seen activity yes",
+            (
+                crate::seen_yes::run(call, request, heard, lease, *posture),
+                true,
+            ),
         ),
         Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
             ("nobody", (unavailable(), false))
@@ -3075,6 +3177,7 @@ mod tests {
             at_setup: false,
             record: false,
             rename_yes: false,
+            name_learn_fix: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
@@ -3268,6 +3371,8 @@ mod tests {
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
             sleep_asked: false,
+            seen_activity: false,
+            seen_posture: false,
             shutdown_from_app: false,
             services: None,
             decline: true,
@@ -3623,6 +3728,8 @@ mod tests {
             settings,
             Settings {
                 sleep_asked: false,
+                seen_activity: false,
+                seen_posture: false,
                 shutdown_from_app: false,
                 services: None,
                 decline: true,
@@ -3822,6 +3929,72 @@ mod tests {
             json!({"op":"call","name":"set_timer","args":{"text":"Tea","seconds":60}})
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `make_skill`'s list of
+    /// the skills made, run through its route, carries the skills' records
+    /// too (here none can be read at the product's place, so the lamp says
+    /// it can't check them); off, it is the list alone.
+    #[test]
+    fn a_made_skills_list_carries_the_skills_only_with_the_switch() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({crate::made_list::LIST: true}),
+        };
+        let route = Route::MakeLocal(None);
+        crate::skill_about::set_on_here(Some(false));
+        let (_, (off, _)) = run_call_with_scope(&route, &call, 1, true, None);
+        crate::skill_about::set_on_here(Some(true));
+        let (whom, (on, answered)) = run_call_with_scope(&route, &call, 2, true, None);
+        crate::skill_about::set_on_here(None);
+        assert_eq!(whom, "the lamp's own model");
+        assert!(answered);
+        assert!(off.get(crate::skill_about::SKILLS_NOTE).is_none(), "{off}");
+        assert!(on[crate::skill_about::SKILLS_NOTE].is_string(), "{on}");
+        let mut without = on.clone();
+        for key in [
+            crate::skill_about::SKILLS_NOTE,
+            crate::skill_about::SKILLS_ON_THE_LAMP,
+            "made_here_not_named",
+        ] {
+            without.as_object_mut().unwrap().remove(key);
+        }
+        assert_eq!(without, off);
+    }
+
+    /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `list_reminders`' answer
+    /// through the schedule carries the skills' records too, the schedule's
+    /// own words kept; off, it is the schedule's answer, byte for byte.
+    #[test]
+    fn a_reminders_answer_carries_the_skills_only_with_the_switch() {
+        let call = ToolCall {
+            id: "1".into(),
+            name: "list_reminders".into(),
+            args: json!({}),
+        };
+        for on in [false, true] {
+            let dir = schedule_directory(if on { "reminders-on" } else { "reminders-off" });
+            let served = executive(
+                &dir,
+                b"{\"ok\":true,\"result\":{\"reminders\":[]}}\n",
+                Duration::ZERO,
+            );
+            crate::skill_about::set_on_here(Some(on));
+            let (whom, (told, answered)) =
+                run_call_with_scope(&Route::Schedule(dir.clone()), &call, 1, true, None);
+            crate::skill_about::set_on_here(None);
+            assert_eq!(whom, "the schedule through the executive");
+            assert!(answered);
+            assert_eq!(served.join().unwrap()["name"], "list_reminders");
+            assert_eq!(told["reminders"], json!([]), "{told}");
+            if on {
+                assert!(told[crate::skill_about::SKILLS_NOTE].is_string(), "{told}");
+            } else {
+                assert_eq!(told.to_string(), json!({"reminders": []}).to_string());
+            }
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]
@@ -5421,6 +5594,52 @@ mod tests {
         assert!(!walking.sleep);
     }
 
+    /// #6543: the seen activity functions are declared and routed only
+    /// with `LAMP_SEEN_ACTIVITY=on`, their flags taken after the shutdown's,
+    /// and a yes with no offer just before keeps nothing.
+    #[test]
+    fn the_seen_activity_yes_is_the_voices_own_and_only_the_owners() {
+        let untouched = ["--session".to_owned(), "7".to_owned()];
+        let mut flags = crate::without_a_tool::arguments(Some("on"));
+        flags.extend(crate::seen_yes::arguments(Some("on"), Some("on")));
+        flags.extend(untouched.clone());
+        let (on, rest) = take(&flags).unwrap();
+        assert!(on.seen_activity && on.seen_posture && on.shutdown_from_app);
+        assert_eq!(rest, untouched);
+        let (off, _) = take(&untouched).unwrap();
+        assert!(!off.seen_activity);
+        for name in [
+            crate::seen_yes::OFFER,
+            crate::seen_yes::LOOK,
+            crate::seen_yes::STOP,
+        ] {
+            let named =
+                |settings: &Settings| core_tools(settings).iter().any(|tool| tool.name == name);
+            assert!(named(&on) && !named(&off), "{name}");
+            assert!(voices_own(name));
+            assert_eq!(route(&on, name), Route::SeenActivity(on.seen_posture));
+            assert_eq!(route(&off, name), Route::Nobody);
+            assert_eq!(answer(&off, &call(name), 7, true), unavailable());
+        }
+        // An ordinary "look at my desk, where are my keys" called as a
+        // yes, spoken or typed: no offer was said, so nothing is kept.
+        let look = call(crate::seen_yes::LOOK);
+        assert_eq!(
+            answer_typed(&on, &look, crate::messages::REQUESTS_FROM + 1)["note"],
+            crate::seen_yes::OFFER_FIRST
+        );
+        assert_eq!(
+            answer(&on, &look, 70_101, true)["note"],
+            crate::seen_yes::OFFER_FIRST
+        );
+        // The offer names posture with its switch.
+        let offer = call(crate::seen_yes::OFFER);
+        assert_eq!(
+            answer(&on, &offer, 70_102, false)["say"],
+            crate::seen_yes::SEEN_DISCLOSURE_POSTURE
+        );
+    }
+
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,
     /// the skills past its bound and its lines named alone or left out.
     #[test]
@@ -6610,6 +6829,96 @@ mod tests {
                         .is_some_and(|note| note.contains("still kept")),
                     "{told}"
                 );
+            }
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
+
+    /// lamp-06c1, build 13523 (C128): the agreed one-face forget held with
+    /// its `about` words runs the kept thing by its id, and then that
+    /// person's exchanges about those words (`exchanges_forget`), as a
+    /// forget about does: in their scope alone, never another's or the
+    /// room's. A by-id forget the memory did not confirm takes no
+    /// exchanges.
+    #[test]
+    fn an_agreed_one_face_forget_about_takes_their_exchanges_about_it() {
+        let nell = crate::remember::person_id("Nell");
+        for (at, confirmed) in [(0u64, true), (1, false)] {
+            let socket = std::env::temp_dir().join(format!(
+                "one-face-agreed-about-{at}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let by_id: &'static [u8] = if confirmed {
+                b"{\"ok\":true,\"removed\":1}\n"
+            } else {
+                b"{\"ok\":false,\"error\":\"busy\"}\n"
+            };
+            // Each line the memory is asked, answered in turn; the next
+            // waited for half a second at most.
+            listener.set_nonblocking(true).unwrap();
+            let served = std::thread::spawn(move || {
+                let mut asked = vec![];
+                for answer in [by_id, b"{\"ok\":true,\"removed\":2}\n".as_slice()] {
+                    let until = Instant::now() + Duration::from_millis(500);
+                    let mut stream = loop {
+                        match listener.accept() {
+                            Ok((stream, _)) => break stream,
+                            Err(_) if Instant::now() < until => {
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(_) => return asked,
+                        }
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    let mut line = String::new();
+                    BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .unwrap();
+                    stream.write_all(answer).unwrap();
+                    asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                }
+                asked
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x58; 16]).unwrap(),
+                    session: 1,
+                    request: 6_674_000 + at,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Nell"),
+            );
+            let lease = owner.lease();
+            assert!(lease.read_by_one_face());
+            let yes = crate::second_provider::one_face_forget_yes_for_test();
+            lease.mark_forget_agreed(&yes, 3);
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "a13523".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({"source_id": 3, "about": "the recheck party"}),
+            };
+            assert!(lease.agreed_forget(&call.args), "agreed with its words");
+            let told = answer_scoped(&settings, &call, 6_674_000 + at, false, &lease);
+            let asked = served.join().unwrap();
+            assert_eq!(asked[0]["person"], json!(nell), "{told}");
+            assert!(asked[0].get("about").is_none(), "by its id: {asked:?}");
+            if confirmed {
+                assert_eq!(asked.len(), 2, "{asked:?} {told}");
+                assert_eq!(asked[1]["op"], json!("exchanges_forget"), "{asked:?}");
+                assert_eq!(asked[1]["person"], json!(nell), "theirs only: {asked:?}");
+                assert_eq!(
+                    asked[1]["about"],
+                    json!([["recheck", "party"]]),
+                    "{asked:?}"
+                );
+                assert_eq!(told["exchanges"], json!(2), "{told}");
+            } else {
+                assert_eq!(asked.len(), 1, "no exchanges asked: {asked:?} {told}");
             }
             std::fs::remove_file(socket).unwrap();
         }

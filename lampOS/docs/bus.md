@@ -37,6 +37,13 @@ A subscriber binds as `<...>.new` and links that to its `.sock` name, the
 only names publishers look at: a socket's file is there a moment before the
 socket can be sent to, and on the Mac 61 of 400 bound directly were removed
 as dead by a publisher that looked with every message.
+A subscriber's file is removed when it is dropped, and a publisher that is
+refused removes it. One that ends without its Drop (an `exec`, a crash, a
+kill) leaves it, and a process that `exec`s keeps its pid and counts from 0
+again (`lamp-update` does, onto each new build). So a subscriber that finds
+its name taken (`.new` or `.sock`) connects to it: refused, nobody is bound
+there, and it removes the file and takes the name; answered, it takes the
+next count, and after 8 it fails with `no free socket name` (#7439).
 
 A publisher's entry in `pubs/` is a file whose time says when the
 publisher last showed that it was alive. It is empty unless the publisher
@@ -84,11 +91,12 @@ characters it picked when it was made, `seq` its count on this topic from 1,
 `at_us` the caller's monotonic clock in microseconds, `at_unix_ms` the wall
 clock, `expires_ms` (optional) how long after its stamp the value means
 anything, and `clock` (optional, last) the kernel's boot id
-(`/proc/sys/kernel/random/boot_id`), said only by a publisher that has told
+(`/proc/sys/kernel/random/boot_id`; on a Mac the boot session uuid,
+`kern.bootsessionuuid`), said only by a publisher that has told
 the bus its `at_us` is CLOCK_MONOTONIC (`Publisher::stamp_monotonic_clock`).
 The bus never guesses that: only the caller knows what its `at_us` is, so a
-publisher that does not call it, or whose bus knows no boot id (macOS),
-says no `clock`. A build from before `clock` passes the field over as it
+publisher that does not call it, or whose bus knows no boot id (a platform
+with none, or a read that failed), says no `clock`. A build from before `clock` passes the field over as it
 does any field it does not know, and reads the rest as before; a header
 without it reads to a new build as one with no clock. Controls' state
 publisher says it whenever Controls' stamp clock is this boot's (queue
@@ -525,6 +533,7 @@ that owns it:
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
 | `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
 | `humans/doing`, `humans/doing_seen`, `humans/posture` | `lamp-seen` (`lamp_seen`), from pictures sent to be labelled (#6543); declared in `lamp_msgs::doing_topics()`; `humans/doing` and `humans/doing_seen` published by `lamp-seen` from phase 2 (off unless `LAMP_SEEN_ACTIVITY=on`), `humans/posture` by nobody yet | the voice (`humans/doing`, with `LAMP_SECOND_DOING=on`, second-voice.md), memory, the policy and skills, each as it is built (#6543); a skill names them in `[permissions] topics`, the `seen` use ([cloud.md](cloud.md)) |
+| `humans/doing_more` | `lamp-seen` (`lamp_seen`), only with `LAMP_SEEN_MORE_DOINGS=on`: tiredness, desk work as a coarse kind and celebrating, timed from the same bursts (#6543); declared in `lamp_msgs::doing_topics()` | nobody yet; a skill names it in `[permissions] topics`, the `seen_more` use, apart from `seen` ([cloud.md](cloud.md)) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
 | `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |

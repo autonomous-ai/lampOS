@@ -1,5 +1,6 @@
 # 10:00, a face at the desk for 100 minutes without a break, but the eyes say
-# someone else sat down at 60 minutes (room/activity's sitting_s begins
-# again): at 90 minutes that sitter has sat 30, so nothing (#1678).
+# someone else sat down at 20 minutes (room/activity's sitting_s begins
+# again): at 30 minutes that sitter has sat 10, and 20 when its ten
+# minutes' wait lets it go, so nothing (#1678).
 clock = "10:00"
 none = true

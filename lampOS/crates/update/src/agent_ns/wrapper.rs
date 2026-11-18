@@ -308,12 +308,95 @@ fi
 /// [`task_entry`]'s text.
 pub const TASK_ENTRY: &str = task_entry!();
 
+/// The one run path's way out for a skill's run granted the internet
+/// (#7200, lamp-tasks' `LAMP_TASK_NET`), after the run lines, the same for
+/// every agent: Harness passes the wrapper none of lamp-tasks' variables,
+/// so the run's egress socket and fresh home are found by its run id, as
+/// its token file is. The caller's `LAMP_NS_EGRESS` is dropped first. Only
+/// in a run whose egress socket lamp-tasks made,
+/// [`hermes_install::EGRESS_DIR`]`/skill-<run-id>.sock` (a socket, never a
+/// link: anything else there ends it), is the run given
+/// `LAMP_NS_EGRESS=skill-<run-id>`, which [`NS`] shows alone, read-only,
+/// with the proxy and DNS inside the run (`hermes_install`'s `TASKS_EDITS`),
+/// and its fresh home as `LAMP_NS_HOME`
+/// (`<lamp-tasks' work folder>/lamp/make-<run-id>/home`, a folder, never a
+/// link: missing, it ends), which an agent whose data takes a make's home
+/// (Hermes's, [`MAKE_HOMES`]) makes its `HOME`, its lasting home hidden.
+/// [`ONE_PATH_EGRESS_GUARD`] then ends a run granted the internet whose
+/// agent took no such home. lamp-tasks makes both only for a run granted
+/// `net`, and only once it finds these lines
+/// (`lamp_tasks::skill_task::ONE_PATH_EGRESS_LINES`).
+macro_rules! egress_lines {
+    () => {
+        r#"# A skill's run granted the internet (#7200): lamp-tasks makes its egress socket /run/lampos-tasks/egress/skill-<run-id>.sock
+# and its fresh home /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/home before it starts the run; Harness
+# passes none of lamp-tasks' variables, so both are found by the run's id. Anything else at the socket's place ends it.
+unset LAMP_NS_EGRESS
+V=/run/lampos-tasks/egress/skill-$R.sock
+if [ -n "$R" ] && { [ -e "$V" ] || [ -L "$V" ]; }; then
+  [ -S "$V" ] && [ ! -L "$V" ] || fail "the way out of run $R is not lamp-tasks' socket"
+  D=/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-$R
+  [ -d "$D/home" ] && [ ! -L "$D" ] && [ ! -L "$D/home" ] || fail "run $R is granted the internet but has no fresh home of its own"
+  LAMP_NS_EGRESS=skill-$R LAMP_NS_HOME=$D/home
+  export LAMP_NS_EGRESS LAMP_NS_HOME
+  unset D
+fi
+unset V
+"#
+    };
+}
+/// [`egress_lines`]'s text.
+pub const ONE_PATH_EGRESS_LINES: &str = egress_lines!();
+
+/// The one run path's keys for a skill's run (lamp-tasks'
+/// `LAMP_SKILL_SECRETS`), after the run lines and before anything else,
+/// the same for every agent: Harness passes the wrapper none of lamp-tasks'
+/// variables, so the run's keys file is found by its run id, as its token
+/// file and way out are. lamp-tasks writes it in the run's own folder,
+/// `<lamp-tasks' work folder>/lamp/make-<run-id>/.run-env`
+/// (`lamp_tasks::skill_keys::ENV_FILE`, 0400, `export NAME='value'` a line,
+/// each value one quoted shell word). Only in a run, and only when there:
+/// a file (never a link, in a folder that is no link) is read once, then
+/// deleted whatever came of the read, before the agent's data or
+/// namespace runs, so the keys are in the agent's environment alone, never
+/// an argument, a log line or a file the agent can read; one not read ends
+/// the run. lamp-tasks gives a run its keys on the one run path only once
+/// it finds these lines (`lamp_tasks::skill_task::ONE_PATH_KEY_LINES`), and
+/// removes the folder when the run ends, however it ends.
+macro_rules! key_lines {
+    () => {
+        r#"# A skill's run given its keys (#7200): lamp-tasks writes them in the run's own folder, found by its id,
+# /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/.run-env; read once and deleted here before anything runs,
+# so they are in the agent's environment alone, never an argument. Anything there not read ends it.
+K=/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-$R/.run-env
+if [ -n "$R" ] && { [ -e "$K" ] || [ -L "$K" ]; }; then
+  s=1
+  [ -f "$K" ] && [ ! -L "$K" ] && [ ! -L "${K%/.run-env}" ] && . "$K" && s=0
+  rm -f -- "$K" || fail "the keys file of run $R is not deleted"
+  [ "$s" = 0 ] || fail "the keys of run $R are not read"
+fi
+unset K s
+"#
+    };
+}
+/// [`key_lines`]'s text.
+pub const ONE_PATH_KEY_LINES: &str = key_lines!();
+/// The line after the agent's own lines in [`ONE_PATH_RUN`]: a run given
+/// its way out ([`ONE_PATH_EGRESS_LINES`]) whose agent took no make's home
+/// (`LAMP_NS_MAKE`, set only by its data) ends before anything runs, so a
+/// run granted the internet never runs in an agent's lasting home (P1
+/// #6643).
+pub const ONE_PATH_EGRESS_GUARD: &str = "[ -z \"${LAMP_NS_EGRESS-}\" ] || [ -n \"${LAMP_NS_MAKE-}\" ] || fail \"a run granted the internet never runs in the agent's lasting home\"\n";
+
 /// The run path of [`one_path_text`], after the agent's data: the same
 /// bytes for every agent, naming none. The caller's token and network
 /// switch are dropped; the run lines ([`hermes_install::ONE_RUN_LINES`])
 /// read a run's token file first, so a wrapper that fails later leaves
-/// none behind; then the agent's own lines (`agent_env`, and
-/// `agent_run_env` in a run); `--net` only in a run; the agent's program
+/// none behind; then a run's keys file, read once and deleted
+/// ([`ONE_PATH_KEY_LINES`]); then a run's way out, when lamp-tasks made one
+/// ([`ONE_PATH_EGRESS_LINES`]); then the agent's own lines (`agent_env`,
+/// and `agent_run_env` in a run) and [`ONE_PATH_EGRESS_GUARD`]; `--net`
+/// only in a run; the agent's program
 /// (its own, or the first on `PATH` that is no lamp-update wrapper);
 /// the hook stand-in's journal line ([`super::HOOK_NOTE`]); and the one
 /// `unshare` into [`NS`], which is given the agent, its program and its
@@ -325,8 +408,11 @@ pub const ONE_PATH_RUN: &str = concat!(
 unset LAMP_CONTROL_TOKEN LAMP_NS_NET
 "#,
     hermes_install::one_run_lines!(),
+    key_lines!(),
+    egress_lines!(),
     r#"agent_env
 [ -z "$R" ] || agent_run_env
+[ -z "${LAMP_NS_EGRESS-}" ] || [ -n "${LAMP_NS_MAKE-}" ] || fail "a run granted the internet never runs in the agent's lasting home"
 N=
 [ "${LAMP_NS_NET-}" != run ] || N=--net
 if [ -n "$X" ]; then

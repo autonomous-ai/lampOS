@@ -147,6 +147,12 @@ sample, microphone sequence, or render call is inserted or removed. Future,
 duplicate, stale, or wrong-epoch starts fail; the origin cannot move again until
 an explicitly validated playback reset. Prime observation, request, completion,
 and notice receipt must be ordered; both call bounds must be under 40 ms old.
+One exception (#7420): capture-clocked with `--reference-recovery bounded`, the
+reference is paired by count through the ring the prime filled and the start's
+stamps feed only the delay hint, so a notice taken older than 40 ms after a
+load stall is used and counted (`late_starts`, one stderr line saying how
+late) up to recovery's untrusted bound of 1 s. A completion after receipt is
+still a fault, and with the fixed margin or recovery off the 40 ms rule stands.
 A failed or expired start call publishes no successful start notice and cannot
 announce readiness. This corrects restart phase accounting,
 not echo admission or adaptation lost when the DSP resets.

@@ -60,11 +60,19 @@ const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
 /// Renders a line to 24 kHz mono samples, or says why not.
 pub type Render = Box<dyn Fn(&str) -> Result<Vec<i16>, String> + Send + Sync>;
 
+/// Renders a line in another of the lamp's voices, by its name
+/// (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), or says why not: the
+/// app's voice preview (#7485), one line, the voice in use left as it is.
+pub type RenderIn = Box<dyn Fn(&str, &str) -> Result<Vec<i16>, String> + Send + Sync>;
+
 pub struct TtsCache {
     dir: PathBuf,
     /// `voice|model|language`, the key's prefix.
     identity: String,
     render: Render,
+    /// [`RenderIn`], when the speech service can speak in another voice:
+    /// none, a line in another voice is refused.
+    render_in: Option<RenderIn>,
     /// The owner's language, when not English (#4473 (c)).
     owners: Option<Language>,
     /// `LAMP_SLEEP_HEARS_NAME=on` (migrate-P2): the line a wake by name says
@@ -97,6 +105,7 @@ impl TtsCache {
             dir: dir.into(),
             identity: format!("{voice}|{model}|{language}"),
             render,
+            render_in: None,
             owners: None,
             hears_name: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
@@ -107,6 +116,13 @@ impl TtsCache {
     /// and plays ([`Self::warm_lines`], [`Self::owners_kept`]).
     pub fn speaking(mut self, owners: Option<Language>) -> Self {
         self.owners = owners;
+        self
+    }
+
+    /// Lines in another of the lamp's voices are rendered by `render_in`
+    /// ([`Self::render_once_in`], #7485).
+    pub fn speaking_in(mut self, render_in: RenderIn) -> Self {
+        self.render_in = Some(render_in);
         self
     }
 
@@ -208,6 +224,25 @@ impl TtsCache {
     /// [`MOST_FRAMES`].
     pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
         let samples = (self.render)(text).map_err(|why| format!("not rendered: {why}"))?;
+        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
+            return Err(format!(
+                "rendered empty or past {} s",
+                MOST_FRAMES / SOUND_RATE
+            ));
+        }
+        Ok(samples)
+    }
+
+    /// `text` rendered now in the lamp's voice named `voice`, never kept:
+    /// the app's voice preview (#7485), which must not fill [`MOST_FILES`]
+    /// with lines in voices the lamp does not speak in. Or why not, as
+    /// [`Self::render_once`] says it.
+    pub fn render_once_in(&self, text: &str, voice: &str) -> Result<Vec<i16>, String> {
+        let render_in = self
+            .render_in
+            .as_ref()
+            .ok_or_else(|| "this lamp's speech service speaks in its own voice only".to_owned())?;
+        let samples = render_in(text, voice).map_err(|why| format!("not rendered: {why}"))?;
         if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
             return Err(format!(
                 "rendered empty or past {} s",
@@ -347,8 +382,36 @@ pub fn from_environment() -> Option<Arc<TtsCache>> {
     SHARED.get_or_init(made_from_environment).clone()
 }
 
+/// `text` rendered through the speech service `config` names, whole, within
+/// [`RENDER_WITHIN`], on a runtime of its own.
+fn render_with(
+    config: &crate::second_config::SecondConfig,
+    text: &str,
+) -> Result<Vec<i16>, String> {
+    use crate::second_provider::net::Tts;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|why| why.to_string())?;
+    runtime.block_on(async {
+        let whole = async {
+            let tts = Tts::new(config)?;
+            let mut speech = tts.speak(text).await?;
+            let mut samples = Vec::new();
+            while let Some(packet) = speech.next().await? {
+                samples.extend_from_slice(&packet);
+            }
+            Ok::<_, crate::second_provider::net::Error>(samples)
+        };
+        match tokio::time::timeout(RENDER_WITHIN, whole).await {
+            Ok(samples) => samples.map_err(|why| why.to_string()),
+            Err(_) => Err(format!("not within {} s", RENDER_WITHIN.as_secs())),
+        }
+    })
+}
+
 fn made_from_environment() -> Option<Arc<TtsCache>> {
-    use crate::second_provider::net::{Tts, default_model, voice_name};
+    use crate::second_provider::net::{default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
             .map(|config| config.with_environment(|name| std::env::var_os(name)))
@@ -367,29 +430,25 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
         .clone()
         .unwrap_or_else(|| default_model(config.tts_provider).to_owned());
     let language = config.stt_language.clone().unwrap_or_default();
-    let render: Render = Box::new(move |text: &str| {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|why| why.to_string())?;
-        runtime.block_on(async {
-            let whole = async {
-                let tts = Tts::new(&config)?;
-                let mut speech = tts.speak(text).await?;
-                let mut samples = Vec::new();
-                while let Some(packet) = speech.next().await? {
-                    samples.extend_from_slice(&packet);
-                }
-                Ok::<_, crate::second_provider::net::Error>(samples)
-            };
-            match tokio::time::timeout(RENDER_WITHIN, whole).await {
-                Ok(samples) => samples.map_err(|why| why.to_string()),
-                Err(_) => Err(format!("not within {} s", RENDER_WITHIN.as_secs())),
-            }
-        })
-    });
+    // Another of the lamp's voices (#7485): the same service and model,
+    // only its voice changed, for ElevenLabs, whose voices the lamp names.
+    let render_in: Option<RenderIn> =
+        (config.tts_provider == crate::second_config::TtsProvider::ElevenLabs).then(|| {
+            let config = config.clone();
+            Box::new(move |text: &str, voice: &str| {
+                let mut config = config.clone();
+                config.tts_voice = Some(voice.to_owned());
+                render_with(&config, text)
+            }) as RenderIn
+        });
+    let render: Render = Box::new(move |text: &str| render_with(&config, text));
+    let cache = TtsCache::new(DIR, &voice, &model, &language, render);
+    let cache = match render_in {
+        Some(render_in) => cache.speaking_in(render_in),
+        None => cache,
+    };
     let cache = Arc::new(
-        TtsCache::new(DIR, &voice, &model, &language, render)
+        cache
             .speaking(crate::language::at_start())
             .hearing_its_name(
                 crate::sleep_capture::Mode::from_environment() == crate::sleep_capture::Mode::On,
@@ -537,8 +596,9 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 48 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[48..], WARM);
+            let fixed = language.fixed_lines().count();
+            assert_eq!(lines.len(), fixed + WARM.len(), "{language:?}");
+            assert_eq!(&lines[fixed..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
@@ -574,7 +634,10 @@ mod tests {
         let (off, _) = counted(&dir, "Rachel");
         let off = off.speaking(Some(Language::Vietnamese));
         assert!(!off.warm_lines().contains(&"Dạ?"));
-        assert_eq!(off.warm_lines().len(), 48 + WARM.len());
+        assert_eq!(
+            off.warm_lines().len(),
+            Language::Vietnamese.fixed_lines().count() + WARM.len()
+        );
         let (vietnamese, calls) = counted(&dir, "Rachel");
         let vietnamese = vietnamese
             .speaking(Some(Language::Vietnamese))

@@ -171,8 +171,14 @@ pub fn chosen_now(dir: &std::path::Path) -> Value {
 /// every time it is said, so a `character.set` or a reset is said within
 /// five seconds. None kept, or one that does not read, is level 1. Inert
 /// data, so no switch: the body reads it only with its own. Without a bus,
-/// or a topic it can publish, it only waits.
-pub async fn tell_energy(dir: PathBuf, bus: Option<lamp_bus::Bus>) {
+/// or a topic it can publish, it only waits. With a `rater`
+/// (`LAMP_ENERGY_FROM_MODEL=on`, #7314) a level not chosen in the app is
+/// the model's for the kept words, asked once per new words.
+pub async fn tell_energy(
+    dir: PathBuf,
+    bus: Option<lamp_bus::Bus>,
+    mut rater: Option<crate::energy_rate::Rater>,
+) {
     use lamp_msgs::Energy;
     let publisher = bus.and_then(|bus| {
         bus.publisher_declared(Energy::TOPIC, &Energy::declaration(), crate::lamp::SOURCE)
@@ -182,7 +188,12 @@ pub async fn tell_energy(dir: PathBuf, bus: Option<lamp_bus::Bus>) {
         return std::future::pending().await;
     };
     loop {
-        let now = lamp_msgs::chosen_voice::energy_kept(&dir.join("energy"));
+        let mut now = lamp_msgs::chosen_voice::energy_kept(&dir.join("energy"));
+        if let Some(rater) = rater.as_mut().filter(|_| !now.chosen)
+            && let Some(words) = chosen_now(&dir)["text"].as_str().filter(|w| !w.is_empty())
+        {
+            now.level = rater.level(words).await;
+        }
         let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &now);
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
@@ -232,6 +243,123 @@ pub fn voice_line(kind: &str, data: &Value) -> Result<String, String> {
             .to_string())
         }
         _ => Err(crate::wire::not_here(kind)),
+    }
+}
+
+/// The app's voice preview (#7485, V1's `tts.preview`:
+/// `{"text", "provider"?, "voice"?, "language"?, "speed"?}`), with the same
+/// switch as [`VOICE_KINDS`]: the lamp says `text` once in that voice
+/// through the voice's say service, and nothing is kept. Answered
+/// `starting`, then `success` once played whole or `failure` with why.
+pub const PREVIEW_KIND: &str = "tts.preview";
+
+/// The asker's name on the say socket.
+pub const PREVIEW_SKILL: &str = "voice-preview";
+
+/// How long a preview may wait to begin: the voice holds an exact line
+/// while someone is talking with the lamp, and past this it is `busy`.
+pub const PREVIEW_EXPIRES_MS: u64 = 15_000;
+
+/// How long the say service is waited on in all: the wait to begin, the
+/// speech service's render (`lamp-voice`'s 30 s at most) and the line.
+const PREVIEW_WAIT: Duration = Duration::from_millis(PREVIEW_EXPIRES_MS + 30_000 + 30_000);
+
+/// The longest preview text, in characters, as the character words are.
+pub const PREVIEW_MOST: usize = 200;
+
+/// The voice's say socket, `LAMP_SAY_SOCKET` unless the default.
+pub const SAY_SOCKET: &str = "/run/lampos-say/say.sock";
+
+/// Why a preview that couldn't begin in time failed.
+pub const PREVIEW_BUSY: &str = "the lamp is busy; try again in a moment";
+
+/// The say service's line for the app's `tts.preview` `data`, or why not.
+/// `language` is taken and left alone; `speed` is checked as V1 does
+/// (0.25 to 4.0) and the line said at the voice's own. No error holds the
+/// text.
+pub fn preview_line(data: &Value) -> Result<String, String> {
+    if !matches!(data.get("provider"), None | Some(Value::Null))
+        && data.get("provider").and_then(Value::as_str) != Some("elevenlabs")
+    {
+        return Err("provider must be elevenlabs".into());
+    }
+    let text = data
+        .get("text")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .ok_or("text is required")?;
+    if text.chars().count() > PREVIEW_MOST || text.chars().any(char::is_control) {
+        return Err(format!(
+            "text must be one line of at most {PREVIEW_MOST} characters"
+        ));
+    }
+    let voice = match data.get("voice") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(voice)) => lamp_msgs::chosen_voice::fit_voice(voice)?,
+        Some(_) => return Err("voice must be text".into()),
+    };
+    match data.get("speed") {
+        None | Some(Value::Null) => {}
+        Some(speed)
+            if speed
+                .as_f64()
+                .is_some_and(|speed| (0.25..=4.0).contains(&speed)) => {}
+        Some(_) => return Err("speed must be from 0.25 to 4.0".into()),
+    }
+    let mut line = json!({
+        "skill": PREVIEW_SKILL,
+        "text": text,
+        "exact": true,
+        "expires_in_ms": PREVIEW_EXPIRES_MS,
+    });
+    if let Some(voice) = voice {
+        line["voice"] = json!(voice);
+    }
+    Ok(line.to_string())
+}
+
+/// The say service's answer to a preview, as the app's result: `spoken` is
+/// a success, anything else a failure with why.
+pub fn preview_result(answer: &str) -> Result<Option<Value>, String> {
+    let answer: Value =
+        serde_json::from_str(answer).map_err(|_| "the lamp's voice did not answer".to_owned())?;
+    let why = || {
+        answer["why"]
+            .as_str()
+            .unwrap_or("no reason given")
+            .to_owned()
+    };
+    match answer["outcome"].as_str() {
+        Some("spoken") => Ok(None),
+        Some("expired") => Err(PREVIEW_BUSY.into()),
+        Some("dropped") => Err(format!("not played whole: {}", why())),
+        Some("refused") => Err(format!("not played: {}", why())),
+        _ => Err("the lamp's voice did not answer".into()),
+    }
+}
+
+/// Hands a preview's `line` to the say socket and waits for its outcome,
+/// past its `begun`, at most [`PREVIEW_WAIT`].
+fn say_preview(socket: &std::path::Path, line: &str) -> Result<Option<Value>, String> {
+    let gone = |_| "the lamp's voice is not running".to_owned();
+    let mut stream = UnixStream::connect(socket).map_err(gone)?;
+    stream
+        .set_read_timeout(Some(PREVIEW_WAIT))
+        .and_then(|()| stream.set_write_timeout(Some(Duration::from_secs(2))))
+        .map_err(gone)?;
+    stream
+        .write_all(format!("{line}\n").as_bytes())
+        .map_err(gone)?;
+    let mut lines = BufReader::new(stream);
+    let mut answer = String::new();
+    loop {
+        answer.clear();
+        match lines.read_line(&mut answer) {
+            Ok(0) | Err(_) => return Err("the lamp's voice did not answer".into()),
+            Ok(_) if answer.contains("\"event\"") => continue,
+            Ok(_) => return preview_result(answer.trim()),
+        }
     }
 }
 
@@ -869,6 +997,10 @@ pub struct Changes {
     place: bool,
     /// [`VOICE_KINDS`] are taken, with `LAMP_CHOSEN_VOICE=on` (#5394).
     voice: bool,
+    /// The voice's say socket, for [`PREVIEW_KIND`] (#7485).
+    say_socket: PathBuf,
+    /// A preview is under way: a second fails `busy`.
+    preview_busy: Arc<AtomicBool>,
     done: Arc<Mutex<Vec<Outcome>>>,
     /// How long a failure with no join waits for the broker's ack before
     /// the link is made again: [`WIFI_RESULT_ACK_WAIT`], shorter only in
@@ -908,6 +1040,9 @@ impl Changes {
             keys_busy: Arc::default(),
             place: false,
             voice: false,
+            say_socket: std::env::var_os("LAMP_SAY_SOCKET")
+                .map_or_else(|| PathBuf::from(SAY_SOCKET), PathBuf::from),
+            preview_busy: Arc::default(),
             done: Arc::default(),
             result_ack_wait: WIFI_RESULT_ACK_WAIT,
         })
@@ -965,6 +1100,43 @@ impl Changes {
     /// Whether [`VOICE_KINDS`] are taken.
     pub fn voice_on(&self) -> bool {
         self.voice
+    }
+
+    /// Previews go to the say socket at `socket`, as
+    /// [`Changes::taking_the_place`].
+    pub fn previewing_through(mut self: Arc<Self>, socket: impl Into<PathBuf>) -> Arc<Self> {
+        if let Some(changes) = Arc::get_mut(&mut self) {
+            changes.say_socket = socket.into();
+        }
+        self
+    }
+
+    /// The app's voice preview (#7485): checked here, then said by the
+    /// voice on a thread of its own; its result is kept for [`Self::take`].
+    /// One at a time: a second while one plays fails at once.
+    pub fn start_preview(&self, data: &Value) -> Result<(), String> {
+        let line = preview_line(data)?;
+        if self.preview_busy.swap(true, Ordering::SeqCst) {
+            return Err(PREVIEW_BUSY.into());
+        }
+        let (socket, busy, done) = (
+            self.say_socket.clone(),
+            self.preview_busy.clone(),
+            self.done.clone(),
+        );
+        std::thread::spawn(move || {
+            let result = say_preview(&socket, &line);
+            busy.store(false, Ordering::SeqCst);
+            if let Ok(mut done) = done.lock() {
+                done.push(Outcome {
+                    kind: PREVIEW_KIND.into(),
+                    result,
+                    request_id: None,
+                    code: None,
+                });
+            }
+        });
+        Ok(())
     }
 
     /// Whether [`KEYS_KINDS`] are taken.
@@ -2636,5 +2808,148 @@ mod tests {
         std::fs::write(dir.join("character"), "</system>\n").unwrap();
         assert_eq!(chosen_now(&dir), defaults);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #7485: `tts.preview` in V1's shape becomes one exact line for the
+    /// say service, in the voice named or the one in use; a bad field is
+    /// refused with no text in the reason.
+    #[test]
+    fn a_preview_becomes_one_exact_line_in_the_voice_named() {
+        let line =
+            |data: Value| -> Value { serde_json::from_str(&preview_line(&data).unwrap()).unwrap() };
+        assert_eq!(
+            line(
+                json!({"text": " Hello there. ", "voice": "Adam", "speed": 1.5, "language": "en"})
+            ),
+            json!({"skill": "voice-preview", "text": "Hello there.", "exact": true,
+                   "expires_in_ms": PREVIEW_EXPIRES_MS, "voice": "Adam"})
+        );
+        assert_eq!(
+            line(json!({"text": "Hi", "provider": "elevenlabs", "voice": "", "speed": null})),
+            json!({"skill": "voice-preview", "text": "Hi", "exact": true,
+                   "expires_in_ms": PREVIEW_EXPIRES_MS}),
+            "no voice is the voice in use"
+        );
+        for (data, why) in [
+            (json!({}), "text is required"),
+            (json!({"text": "   "}), "text is required"),
+            (
+                json!({"text": "a\nSECRET"}),
+                "text must be one line of at most 200 characters",
+            ),
+            (
+                json!({"text": "SECRET".repeat(40)}),
+                "text must be one line of at most 200 characters",
+            ),
+            (
+                json!({"text": "SECRET", "voice": "NotAVoice"}),
+                "voice must be one of the lamp's voices, such as Rachel",
+            ),
+            (json!({"text": "SECRET", "voice": 3}), "voice must be text"),
+            (
+                json!({"text": "SECRET", "provider": "openai"}),
+                "provider must be elevenlabs",
+            ),
+            (
+                json!({"text": "SECRET", "speed": 5}),
+                "speed must be from 0.25 to 4.0",
+            ),
+            (
+                json!({"text": "SECRET", "speed": "fast"}),
+                "speed must be from 0.25 to 4.0",
+            ),
+        ] {
+            assert_eq!(preview_line(&data).unwrap_err(), why, "{data}");
+        }
+    }
+
+    /// #7485: the say service's outcome is the app's result: spoken is a
+    /// success, expired is busy, anything else a failure with why.
+    #[test]
+    fn a_previews_outcome_is_the_apps_result() {
+        assert_eq!(preview_result(r#"{"outcome":"spoken"}"#), Ok(None));
+        assert_eq!(
+            preview_result(r#"{"outcome":"expired"}"#),
+            Err(PREVIEW_BUSY.into())
+        );
+        assert_eq!(
+            preview_result(r#"{"outcome":"refused","why":"muted"}"#),
+            Err("not played: muted".into())
+        );
+        assert_eq!(
+            preview_result(r#"{"outcome":"dropped","why":"cut short"}"#),
+            Err("not played whole: cut short".into())
+        );
+        assert_eq!(
+            preview_result("nonsense"),
+            Err("the lamp's voice did not answer".into())
+        );
+    }
+
+    /// #7485: a preview asks the say socket, waits past `begun` for its
+    /// outcome and keeps the result for the app; a second one while it
+    /// plays is busy at once, and a voice not running is a failure.
+    #[test]
+    fn a_preview_is_said_through_the_say_socket_one_at_a_time() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-say.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let (release, held) = std::sync::mpsc::channel::<()>();
+        let voice = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream
+                .write_all(b"{\"event\":\"begun\",\"at_us\":1}\n")
+                .unwrap();
+            held.recv().unwrap();
+            stream.write_all(b"{\"outcome\":\"spoken\"}\n").unwrap();
+            line
+        });
+        let changes = Changes::new("/nowhere/settings.sock", WAIT)
+            .taking_the_voice(true)
+            .previewing_through(&socket);
+        let identity = identity();
+        changes
+            .start_preview(&json!({"text": "Hello there.", "voice": "Adam"}))
+            .unwrap();
+        assert_eq!(
+            changes.start_preview(&json!({"text": "Again."})),
+            Err(PREVIEW_BUSY.into()),
+            "one at a time"
+        );
+        release.send(()).unwrap();
+        let asked: Value = serde_json::from_str(&voice.join().unwrap()).unwrap();
+        assert_eq!(asked["voice"], "Adam");
+        assert_eq!(asked["exact"], true);
+        let started = Instant::now();
+        let outcome = loop {
+            if let Some(outcome) = changes.take().pop() {
+                break outcome;
+            }
+            assert!(started.elapsed() < Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        let reply = outcome.reply(&identity, "t");
+        assert_eq!(reply["kind"], PREVIEW_KIND);
+        assert_eq!(reply["status"], "success");
+        assert!(!reply.to_string().contains("Hello there."));
+        // Free again, and a voice not running is a failure.
+        let _ = std::fs::remove_file(&socket);
+        changes.start_preview(&json!({"text": "Hi."})).unwrap();
+        let started = Instant::now();
+        let outcome = loop {
+            if let Some(outcome) = changes.take().pop() {
+                break outcome;
+            }
+            assert!(started.elapsed() < Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(
+            outcome.result,
+            Err("the lamp's voice is not running".into())
+        );
     }
 }

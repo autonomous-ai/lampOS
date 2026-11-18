@@ -60,8 +60,8 @@ pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
 /// lamp-skills takes, and [`plainly`] says the triggers it knows
 /// (`SAYABLE_TOPICS`).
 pub const TOPICS: [&str; 5] = [
-    "voice/state",
-    "room/presence",
+    lamp_msgs::VoiceState::TOPIC,
+    lamp_msgs::RoomPresence::TOPIC,
     FACES_TOPIC,
     STOOD_UP_TOPIC,
     CLOCK_TOPIC,
@@ -186,9 +186,9 @@ pub(crate) fn set_writes_here(on: Option<bool>) {
 /// - a step [`plainly`] can't say is said in general words, never a send,
 ///   the camera or the microphone ([`named_exactly`]).
 ///
-/// A write's read-back and yes, the sends (10 a skill, 30 across all skills
-/// a day, in `lamp-services`), privacy refusals and the code grants stay
-/// as they are.
+/// A write's read-back and yes, the sends' bounds (`lamp-services`'
+/// `skill_writes::PER_SKILL`, `PER_SKILL_HOUR` and `ALL_SKILLS`), privacy
+/// refusals and the code grants stay as they are.
 pub const LOOSE_ENVIRONMENT: &str = "LAMP_MADE_SKILL_LOOSE";
 
 thread_local! {
@@ -271,7 +271,7 @@ pub fn set_said_here(on: Option<bool>) {
 
 /// The switch for a made skill started by its own words (the owner, 16
 /// Nov: "Every task must be doable; no 'couldn't' here"): `on` only, off
-/// unless set, in no product unit yet. On, a request that names words to
+/// unless set, on in the product. On, a request that names words to
 /// start it ("when I say send my test note, email me ...") is made with
 /// `asks = [...]`, those words, beside any step a made skill may have (a
 /// fixed write, a `do.task` for the lamp's agent, its code, the light...);
@@ -284,8 +284,9 @@ pub fn set_said_here(on: Option<bool>) {
 /// `asks` too (`crate::upload_agent::files`). Off, a made skill never gives
 /// `asks` (tidied out or refused [`MADE_ASKS`]) and everything is as
 /// before. Read by both routes, the app's make, the manage helper,
-/// lamp-skills and lamp-cloud: set it alike in `lamp-voice`,
-/// `lamp-skills`, `lamp-skills-manage@` and `lamp-cloud`.
+/// lamp-skills, lamp-cloud and lamp-control (each loads such a skill):
+/// set it alike in `lamp-voice`, `lamp-skills`, `lamp-skills-manage@`,
+/// `lamp-cloud` and `lamp-control`, as the product does.
 pub const ASKS_ENVIRONMENT: &str = "LAMP_MADE_SKILL_ASKS";
 
 thread_local! {
@@ -307,6 +308,500 @@ pub fn asks_on() -> bool {
 #[doc(hidden)]
 pub fn set_asks_here(on: Option<bool>) {
     ASKS_HERE.with(|here| here.set(on));
+}
+
+/// The switch for a made skill turned off and back on by voice (#7445: on
+/// lamp-9adf "turn off the coffee time skill" was asked "Remove coffee
+/// time?", since `make_skill` had only a remove for it): `on` only, off
+/// unless set, in no product unit. On, `make_skill` takes `turn_off` or
+/// `turn_on`, the name as heard, given alone, and its description tells a
+/// turn-off, a pause or a stop from a remove, so the model never reaches
+/// for the remove to turn one off (`crate::made_turn`): the owner's alone,
+/// set as the app's switch sets it, through the manage helper's own
+/// `{"off": NAME}` and `{"on": NAME}`. Off, the function's description and
+/// parameters, and every answer, are byte for byte as before. Read by the
+/// voice alone: set it in `lamp-voice`.
+pub const OFF_SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_OFF_SAID";
+
+thread_local! {
+    /// [`OFF_SAID_ENVIRONMENT`] as a test of this thread sets it.
+    static OFF_SAID_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may be turned off and on by voice in this process.
+pub fn off_said_on() -> bool {
+    if let Some(on) = OFF_SAID_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(OFF_SAID_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`off_said_on`] for the calling thread alone, for tests; `None` reads
+/// the environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_off_said_here(on: Option<bool>) {
+    OFF_SAID_HERE.with(|here| here.set(on));
+}
+
+/// The switch for a made skill that has nothing to do with what was asked
+/// (#7621: "every day at four fifteen in the morning, look up the title of
+/// the example dot com web page and tell me what it says" was made as
+/// `moon-time`, a say on "moon time", from an old ask the voice model
+/// wrote into `make_skill`'s `request`, and as `morning-skip`, a dance at
+/// 04:15): `on` only, off unless set, in no product unit. On, with the
+/// lamp in English, a voice make whose made skill shares no content word
+/// with the person's own line and the request ([`unrelated_words`], a fast
+/// pass of no cost) is judged in one short call ([`Judge`], [`judge_ask`]);
+/// a clear no refuses it, before anything is kept, and the person is
+/// asked again ([`UNRELATED`]). Yes or an unclear answer keeps it; a
+/// timeout or an error does as [`on_judge_lost`] says: kept when it runs only when asked and never moves the body, asked again otherwise. Off,
+/// every make is byte for byte as before. Read by the voice alone: set it
+/// in `lamp-voice`.
+pub const UNRELATED_ENVIRONMENT: &str = "LAMP_MADE_UNRELATED_REFUSED";
+
+thread_local! {
+    /// [`UNRELATED_ENVIRONMENT`] as a test of this thread sets it.
+    static UNRELATED_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a make unrelated to what was heard is refused in this process.
+pub fn unrelated_on() -> bool {
+    if let Some(on) = UNRELATED_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(UNRELATED_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`unrelated_on`] for the calling thread alone, for tests; `None` reads
+/// the environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_unrelated_here(on: Option<bool>) {
+    UNRELATED_HERE.with(|here| here.set(on));
+}
+
+thread_local! {
+    /// The lamp's language as a test of this thread sets it: `Some(true)`
+    /// for English.
+    static ENGLISH_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// [`unrelated_held`]'s language for the calling thread alone, for tests;
+/// `None` reads the lamp's own again. The product never calls it.
+#[doc(hidden)]
+pub fn set_english_here(english: Option<bool>) {
+    ENGLISH_HERE.with(|here| here.set(english));
+}
+
+/// Whether a make is held to what was heard (#7621): [`unrelated_on`], and
+/// the lamp's language English ([`crate::language::at_start`]), the only
+/// one whose words [`content_words`] reads. In another language the check
+/// is skipped, journaled with no one's words, and nothing is refused.
+fn unrelated_held() -> bool {
+    if !unrelated_on() {
+        return false;
+    }
+    let english = ENGLISH_HERE
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(|| crate::language::at_start().is_none());
+    if !english {
+        eprintln!(
+            "lamp-voice: a made skill's words were not held to the heard line: the lamp's \
+             language is not English"
+        );
+    }
+    english
+}
+
+/// Why a made skill is refused when the judge says it isn't what was asked
+/// ([`Judge`]): nothing is kept or put on, nothing repaired or handed to
+/// the agent, and the person is asked again in these words alone, never
+/// told what was nearly made: no skill's name, none of its words.
+pub const UNRELATED: &str = "I didn't catch which skill to make. Could you say it again?";
+
+/// The fewest distinct content words the person's line and the request
+/// have for [`unrelated_words`] to hold a made skill to them: fewer ("make
+/// that one") say too little to tell.
+pub const FEWEST_ASKED_WORDS: usize = 3;
+
+/// Small words that say nothing of what a skill is about, beside any word
+/// of fewer than three letters and any digit (#7621); and words of when it
+/// runs, never what it does: on c0a4 a heard "every day at four fifteen
+/// ..." ask was made as `morning-skip`, a dance at 04:15, the time kept and
+/// the doing swapped.
+// And verbs any ask may hold of any skill (the second adversarial read's
+// P2: a moon say "Look up at the moon" kept for a web-title ask by "look").
+const UNRELATED_STOP: [&str; 91] = [
+    "look",
+    "find",
+    "get",
+    "give",
+    "let",
+    "show",
+    "see",
+    "keep",
+    "want",
+    "need",
+    "can",
+    "the",
+    "and",
+    "you",
+    "your",
+    "say",
+    "tell",
+    "make",
+    "skill",
+    "lamp",
+    "when",
+    "every",
+    "what",
+    "that",
+    "this",
+    "with",
+    "for",
+    "its",
+    "are",
+    "was",
+    "has",
+    "have",
+    "from",
+    "then",
+    "please",
+    "can",
+    "will",
+    "want",
+    "just",
+    "also",
+    "but",
+    "they",
+    "them",
+    "there",
+    "about",
+    "how",
+    "who",
+    "day",
+    "daily",
+    "morning",
+    "evening",
+    "night",
+    "afternoon",
+    "today",
+    "tomorrow",
+    "hour",
+    "minute",
+    "second",
+    "week",
+    "weekday",
+    "weekend",
+    "clock",
+    "time",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "hundred",
+    "am",
+    "pm",
+    "noon",
+    "midnight",
+];
+
+/// The content words of `text` (#7621): lowercase alphabetic words of at
+/// least three letters, not in [`UNRELATED_STOP`], each without a trailing
+/// `s`.
+pub fn content_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphabetic())
+        .map(str::to_lowercase)
+        .filter(|word| word.chars().count() >= 3)
+        .filter(|word| !UNRELATED_STOP.contains(&word.as_str()))
+        .map(|word| match word.strip_suffix('s') {
+            Some(stem) if stem.chars().count() >= 3 && !stem.ends_with('s') => stem.to_owned(),
+            _ => word,
+        })
+        .filter(|word| !UNRELATED_STOP.contains(&word.as_str()))
+        .collect()
+}
+
+/// The fewest letters two words share at their start to be one word
+/// ([`same_word`]).
+const SAME_START_CHARS: usize = 4;
+
+/// The fewest letters of the shorter word for a shared start to make two
+/// words one ([`same_word`]): "good" is never "goodnight".
+const SAME_SHORTER_CHARS: usize = 5;
+
+/// Whether two content words are one word, as said and paraphrased: the
+/// same, or, the shorter of at least [`SAME_SHORTER_CHARS`] letters,
+/// sharing their first letters, at least [`SAME_START_CHARS`] and all of
+/// the shorter but its last ("stretch" and "stretching", "dance" and
+/// "dancing").
+fn same_word(one: &str, other: &str) -> bool {
+    if one == other {
+        return true;
+    }
+    let shared = one
+        .chars()
+        .zip(other.chars())
+        .take_while(|(one, other)| one == other)
+        .count();
+    let shorter = one.chars().count().min(other.chars().count());
+    shorter >= SAME_SHORTER_CHARS && shared >= SAME_START_CHARS && shared + 1 >= shorter
+}
+
+/// Whether `one` and `other` share no content word ([`content_words`],
+/// [`same_word`]).
+fn share_none(one: &[String], other: &[String]) -> bool {
+    !one.iter()
+        .any(|word| other.iter().any(|their| same_word(word, their)))
+}
+
+/// Every string of `value`, its keys left out.
+fn toml_strings(value: &toml::Value, out: &mut String) {
+    match value {
+        toml::Value::String(text) => {
+            out.push_str(text);
+            out.push(' ');
+        }
+        toml::Value::Array(values) => values.iter().for_each(|value| toml_strings(value, out)),
+        toml::Value::Table(table) => table.values().for_each(|value| toml_strings(value, out)),
+        _ => {}
+    }
+}
+
+/// What a made skill does, in words: its `asks`, and each `[[do]]` step's
+/// strings (its say text, its gesture, its task's words), never the step's
+/// kind (`light`, `task`), its guards, its trigger, its times or its
+/// permissions.
+fn doing_words(table: &toml::Table, out: &mut String) {
+    if let Some(asks) = table.get("asks") {
+        toml_strings(asks, out);
+    }
+    let steps = table.get("do").and_then(toml::Value::as_array);
+    for step in steps
+        .into_iter()
+        .flatten()
+        .filter_map(toml::Value::as_table)
+    {
+        for (kind, value) in step {
+            if GUARD_KEYS.contains(&kind.as_str()) {
+                continue;
+            }
+            toml_strings(value, out);
+        }
+    }
+}
+
+/// What a made skill does, in words, when none of its content words is
+/// one of the person's own `line` or the `request` (#7621, with
+/// [`UNRELATED_ENVIRONMENT`] on and the lamp in English): its name
+/// ([`card_name`]) and [`doing_words`], for the judge. None when one is
+/// shared (the fast pass: kept as it is, no call), when the line and the
+/// request have fewer than [`FEWEST_ASKED_WORDS`] distinct content words,
+/// or when its `skill.toml` doesn't read.
+fn unrelated_words(files: &Files, line: &str, request: &str) -> Option<String> {
+    if !unrelated_held() {
+        return None;
+    }
+    // The person's own line alone when it holds enough: a `request` the
+    // voice model filled from history (an earlier moon ask, #7621) would
+    // otherwise share its words with the skill made of it and pass (the
+    // second adversarial read's P1). The request only when no line is
+    // known or the line says too little.
+    let distinct = |text: &str| {
+        let mut words = content_words(text);
+        words.sort();
+        words.dedup();
+        words
+    };
+    let mut asked = distinct(line);
+    if asked.len() < FEWEST_ASKED_WORDS {
+        asked = distinct(&format!("{line} {request}"));
+    }
+    if asked.len() < FEWEST_ASKED_WORDS {
+        return None;
+    }
+    let table = files.toml.parse::<toml::Table>().ok()?;
+    let mut made = card_name(&files.card).unwrap_or_default();
+    made.push_str(": ");
+    doing_words(&table, &mut made);
+    let mut words = content_words(&made);
+    words.sort();
+    words.dedup();
+    if !share_none(&asked, &words) {
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: a made skill's {} content words share none of the ask's {}: judged",
+        words.len(),
+        asked.len()
+    );
+    Some(made.trim().to_owned())
+}
+
+/// What the judge answered of a made skill with no word of the ask
+/// ([`Judge`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Judged {
+    /// It does what was asked: kept.
+    Yes,
+    /// It doesn't: refused, the person asked again ([`UNRELATED`]).
+    No,
+    /// Neither a yes nor a no: kept.
+    Unclear,
+    /// No answer within its bound: kept.
+    Timeout,
+    /// The call failed: kept.
+    Failed,
+}
+
+impl Judged {
+    /// The judge's `answer` read: a clear no or yes at its start, else
+    /// [`Self::Unclear`].
+    pub fn read(answer: &str) -> Self {
+        let first = answer
+            .trim_start()
+            .split(|c: char| !c.is_alphabetic())
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
+        match first.as_str() {
+            "no" => Self::No,
+            "yes" => Self::Yes,
+            _ => Self::Unclear,
+        }
+    }
+
+    /// For the journal: `judge=no` and the like.
+    pub fn journaled(self) -> &'static str {
+        match self {
+            Self::Yes => "yes",
+            Self::No => "no",
+            Self::Unclear => "unclear",
+            Self::Timeout => "timeout",
+            Self::Failed => "error",
+        }
+    }
+}
+
+/// What a judge that gave no answer does to a made skill with no word of
+/// the ask ([`Judged::Timeout`], [`Judged::Failed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnJudgeLost {
+    /// Kept, as if the judge said yes (fail open).
+    Keep,
+    /// Refused, the person asked again (fail safe).
+    AskAgain,
+}
+
+/// What a judge's timeout or error does to a made skill (#7621, the first
+/// builder's ruling, 18 Nov 05:34): kept when it runs only when the person
+/// asks for it and never moves the body (wrong, it does nothing until
+/// asked, and its say-back is heard); asked again when it runs on its own
+/// (a trigger or a time) or moves the body (wrong, it is the 04:15 dance:
+/// unasked, at night, with nobody to stop it).
+pub fn on_judge_lost(toml: &str) -> OnJudgeLost {
+    let Ok(table) = toml.parse::<toml::Table>() else {
+        return OnJudgeLost::AskAgain;
+    };
+    let on_its_own = ["trigger", "triggers", "schedule", "at", "every"]
+        .iter()
+        .any(|key| table.contains_key(*key));
+    let body_granted = table
+        .get("permissions")
+        .and_then(|permissions| permissions.get("body"))
+        .and_then(toml::Value::as_bool)
+        .unwrap_or(false);
+    let body_step = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            steps.iter().any(|step| {
+                ["body", "gesture", "move"]
+                    .iter()
+                    .any(|key| step.get(*key).is_some())
+            })
+        });
+    if on_its_own || body_granted || body_step {
+        OnJudgeLost::AskAgain
+    } else {
+        OnJudgeLost::Keep
+    }
+}
+
+impl Judged {
+    /// Whether this answer refuses the skill, a lost judge's as `lost`
+    /// says: a clear no always; an unclear answer never.
+    pub fn refuses(self, lost: OnJudgeLost) -> bool {
+        match self {
+            Self::No => true,
+            Self::Timeout | Self::Failed => lost == OnJudgeLost::AskAgain,
+            Self::Yes | Self::Unclear => false,
+        }
+    }
+}
+
+/// The judge's question of a made skill with no word of the ask
+/// ([`unrelated_words`]): the person's own `line`, and what was `made`.
+pub fn judge_ask(line: &str, made: &str) -> String {
+    format!("Asked: {line}. Made: {made}. Does the made skill do what was asked? Answer yes or no.")
+}
+
+/// The judge of a voice make (#7621): the person's own line for it, and
+/// one short call that answers [`judge_ask`]'s question.
+#[derive(Clone, Copy)]
+pub struct Judge<'a> {
+    /// The person's own line for the make, never another utterance's.
+    pub line: &'a str,
+    /// The call: the question in, its answer read.
+    pub ask: &'a dyn Fn(&str) -> Judged,
+}
+
+impl std::fmt::Debug for Judge<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Judge")
+    }
+}
+
+/// Whether a made skill is refused as unrelated to what was asked (#7621):
+/// a clear no of `judge` for one with no word of the ask
+/// ([`unrelated_words`]), or its timeout or error as [`on_judge_lost`]
+/// says; none without a judge.
+fn judged_unrelated(files: &Files, request: &Asked<'_>) -> bool {
+    let Some(judge) = request.judge else {
+        return false;
+    };
+    let Some(made) = unrelated_words(files, judge.line, request.request) else {
+        return false;
+    };
+    let judged = (judge.ask)(&judge_ask(judge.line, &made));
+    let refused = judged.refuses(on_judge_lost(&files.toml));
+    eprintln!(
+        "lamp-voice: a made skill with no word of the ask: judge={}{}",
+        judged.journaled(),
+        match refused {
+            true => ": asked again, nothing kept or put on",
+            false => ": kept",
+        }
+    );
+    refused
 }
 
 /// The most phrases a made skill's `asks` lists ([`made_asks`]): fewer than
@@ -976,8 +1471,12 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     // A start said to the lamp as the system prompt says it (#6526), only
     // with its switch: off, the brief never offers it. On, it stands where
     // the desk's presence is named, which the system prompt says too, so
-    // the longest brief stays within [`MOST_BRIEF_BYTES`].
-    let trigger = if asks_on() {
+    // the longest brief stays within [`MOST_BRIEF_BYTES`]. With the
+    // person's own words on too ([`ASKS_ENVIRONMENT`]), both stand there,
+    // written short so the longest brief with all on still fits.
+    let trigger = if asks_on() && said_on() {
+        "one [trigger] listed, [said]/asks as above"
+    } else if asks_on() {
         "one [trigger] as listed, or asks as above"
     } else if said_on() {
         "one [trigger] as listed or [said] as above"
@@ -1197,7 +1696,7 @@ const AGENT_TRIES: [&str; 4] = [
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
-const PLAIN_REASONS: [&str; 3] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE];
+const PLAIN_REASONS: [&str; 4] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE, NOTHING_READS];
 
 /// What the person is told, at once, when lamp-tasks says a make on the
 /// lamp's agent can't start because Harness or the gateway isn't ready yet
@@ -1223,6 +1722,7 @@ pub fn plain_reason(why: &str) -> String {
         || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
+        || why == UNRELATED
     {
         return why.to_owned();
     }
@@ -1827,10 +2327,12 @@ pub fn agent_said(grants: &[String]) -> String {
 }
 
 /// Whether the made `table` is a task for the lamp's agent: with
-/// `LAMP_MAKE_NO_CANNOT` on, a `do.task` step whose `run` is the lamp's
-/// own [`crate::make_no_cannot::RUN`]. Off, never.
+/// `LAMP_MAKE_NO_CANNOT` on, or a make of what only the internet tells
+/// (`LAMP_TASK_NET`, [`crate::make_no_cannot::agent_tasks_made`]), a
+/// `do.task` step whose `run` is the lamp's own
+/// [`crate::make_no_cannot::RUN`]. Off, never.
 fn agent_task(table: &toml::Table) -> bool {
-    crate::make_no_cannot::on()
+    crate::make_no_cannot::agent_tasks_made()
         && AGENT_SCRIPT.with(|ours| ours.get()).unwrap_or(true)
         && table
             .get("do")
@@ -3996,7 +4498,9 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
 /// alone, `task = { task = "what it does", run = "scripts/main.py" }`
 /// (#6305's `do.task`), its words plain and at most [`MOST_TASK_CHARS`],
 /// its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
-/// [`GRANTS`] (none when it has no list), each once. No write beside it:
+/// [`GRANTS`] (none when it has no list), each once, and `net` beside them
+/// for the lamp's own task for its agent ([`agent_task`]) with
+/// `LAMP_TASK_NET` on. No write beside it:
 /// the person's yes is to its code, not to a send. Its grants, or why not.
 fn code_held(
     table: &toml::Table,
@@ -4066,7 +4570,14 @@ fn code_held(
             // A linked service's grant, only for a service task for the
             // lamp's agent (`LAMP_AGENT_SERVICES`, #6432's ruling).
             let service = agent_services_here() && service_grant(grant).is_some();
-            if !service && !GRANTS.iter().any(|(name, _)| *name == grant) {
+            // The internet, only for the lamp's own task for its agent
+            // with `LAMP_TASK_NET` on, on its trigger too (the owner's
+            // ruling, 17 Nov); its run reaches the web only with the
+            // owner's kept yes. Never for code a model wrote.
+            let net = grant == crate::skill_task_yes::NET.0
+                && crate::skill_task_yes::net_on()
+                && agent_task(table);
+            if !service && !net && !GRANTS.iter().any(|(name, _)| *name == grant) {
                 eprintln!(
                     "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
                     named(grant)
@@ -4429,6 +4940,12 @@ pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
 /// refused; what the lamp can't do yet, and a read or a write, still are.
 pub fn plainly_as(text: &str, reads: bool, general: bool) -> Result<String, Refused> {
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
+    // A read of a topic or a field the lamp doesn't have (#7357): refused
+    // first, loosened or not, and repaired with the ones it has.
+    if let Some((part, lines)) = unread(&table) {
+        eprintln!("lamp-voice: a made skill reads what the lamp doesn't have: {part}");
+        return Err(Refused(NOTHING_READS.into(), Some(lines)));
+    }
     said_plainly(&table, reads, general).map_err(|unsaid| {
         // The part's keys and topic, never a value nor the model's words.
         eprintln!(
@@ -5103,7 +5620,7 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     let words = words.trim_end_matches(['.', '!', '?']);
     // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`), as a skill's
     // `do.task` is read back.
-    let agents = crate::make_no_cannot::on()
+    let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
     (!words.is_empty()
         && words.chars().count() <= MOST_TASK_CHARS
@@ -5205,26 +5722,195 @@ fn manners_plainly(table: &toml::Table) -> Result<String, Unsaid> {
     Ok(said)
 }
 
-/// The trigger topics [`plainly`] can say (#6066): [`TOPICS`], a pat on
-/// the head (`controls/pet`), the air (`air/state`) and what someone at the
-/// desk is doing (`room/activity`). A trigger on any other is what the lamp
-/// can't start a made skill on yet ([`topic_cant_yet`]).
-const SAYABLE_TOPICS: [&str; 8] = [
-    "voice/state",
-    "room/presence",
-    FACES_TOPIC,
-    STOOD_UP_TOPIC,
-    CLOCK_TOPIC,
-    PET_TOPIC,
-    AIR_TOPIC,
-    ACTIVITY_TOPIC,
+/// The topics a made skill may read, in its `[trigger]`, a trigger's
+/// `sooner` or a `[[while]]`, each with the fields its message carries
+/// (#7357): every topic is its `lamp_msgs` declaration's own `TOPIC` (and
+/// lamp-skills' own clock, [`CLOCK_TOPIC`]), and every field a field of
+/// that message as it is serialized, held to it by
+/// `the_readable_fields_are_the_messages_own`. The clock's are what
+/// lamp-skills makes it (`known`, `day`, `minute`).
+const READABLE: [(&str, &[&str]); 8] = [
+    (lamp_msgs::VoiceState::TOPIC, &["state"]),
+    (
+        lamp_msgs::RoomPresence::TOPIC,
+        &["someone", "nobody_s", "by"],
+    ),
+    (FACES_TOPIC, &["faces"]),
+    (STOOD_UP_TOPIC, &["sitting_s", "side"]),
+    (CLOCK_TOPIC, &["known", "day", "minute"]),
+    (
+        PET_TOPIC,
+        &[
+            "stamp",
+            "session_id",
+            "reader_session_id",
+            "enabled",
+            "contact_id",
+            "began_us",
+            "petted_us",
+            "observed_us",
+            "swaps",
+            "swaps_per_second",
+            "resting",
+            "ended",
+        ],
+    ),
+    (
+        AIR_TOPIC,
+        &[
+            "pm1_0",
+            "pm2_5",
+            "pm4_0",
+            "pm10",
+            "humidity",
+            "temperature",
+            "co2_ppm",
+            "feel",
+        ],
+    ),
+    (
+        ACTIVITY_TOPIC,
+        &["state", "for_s", "sitting_s", "baseline", "yawns"],
+    ),
 ];
-/// A hand on the head's pads (`lamp_msgs` `controls/pet`).
-const PET_TOPIC: &str = "controls/pet";
+
+/// The trigger topics [`plainly`] can say (#6066): [`READABLE`]'s,
+/// [`TOPICS`] and a pat on the head (`controls/pet`), the air
+/// (`air/state`) and what someone at the desk is doing (`room/activity`).
+/// A trigger on any other is what the lamp can't start a made skill on
+/// yet ([`topic_cant_yet`]), or one it doesn't have ([`unread`]).
+const SAYABLE_TOPICS: [&str; 8] = [
+    READABLE[0].0,
+    READABLE[1].0,
+    READABLE[2].0,
+    READABLE[3].0,
+    READABLE[4].0,
+    READABLE[5].0,
+    READABLE[6].0,
+    READABLE[7].0,
+];
+
+/// [`READABLE`] named in a line, "voice/state (state); …": what the
+/// making model is told (`make_skill_local`) and a repair names.
+pub fn readable_named() -> String {
+    READABLE
+        .iter()
+        .map(|(topic, fields)| format!("{topic} ({})", fields.join(", ")))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Why a make reading a topic or a field the lamp doesn't have was
+/// refused (#7357), the person's line when its repairs are used up
+/// ([`plain_reason`] gives it as it is): one true line, never a made one.
+pub const NOTHING_READS: &str = "the lamp has nothing that reads that";
+
+/// What a made skill reads that the lamp doesn't have (#7357, lamp-c0a4,
+/// 16 Nov: "over 28 degrees turn the light blue" was made on a
+/// `device/temperature` trigger, field `max_c`, that nothing on the lamp
+/// sends, and kept in general words though it could never start): a
+/// topic no `lamp_msgs` declares, or a field its message doesn't carry (its
+/// first part, for a dotted one), in its `[trigger]` (a table or a list),
+/// a trigger's `sooner` or a `[[while]]`. A topic is one the lamp has
+/// when `lamp_msgs` declares it ([`lamp_has`]); a field is checked only on
+/// [`READABLE`]'s topics, and a declared topic not among them is none here
+/// (it keeps its loosened path in [`plainly`]). The part, for the journal,
+/// and the repair's lines, naming it and the topics there are with their
+/// fields. A topic the lamp has but can't start a made skill on yet
+/// ([`topic_cant_yet`]) is none here: it is said so, never repaired. The
+/// faces' field is left to [`plainly`], which says why a face has none.
+fn unread(table: &toml::Table) -> Option<(String, String)> {
+    let tables = |value: Option<&toml::Value>| -> Vec<toml::Table> {
+        match value {
+            Some(toml::Value::Table(one)) => vec![one.clone()],
+            Some(toml::Value::Array(many)) => many
+                .iter()
+                .filter_map(|one| one.as_table().cloned())
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    let mut reads: Vec<(&str, toml::Table)> = Vec::new();
+    for trigger in tables(table.get("trigger")) {
+        for sooner in tables(trigger.get("sooner")) {
+            reads.push(("the trigger's sooner", sooner));
+        }
+        reads.push(("the trigger", trigger));
+    }
+    for part in tables(table.get("while")) {
+        reads.push(("a [[while]]", part));
+    }
+    // The trigger first, then its sooner, then a while.
+    reads.sort_by_key(|(what, _)| match *what {
+        "the trigger" => 0,
+        "the trigger's sooner" => 1,
+        _ => 2,
+    });
+    let part = reads.iter().find_map(|(what, read)| {
+        let topic = read.get("topic")?.as_str()?;
+        if topic_cant_yet(topic).is_some() {
+            return None;
+        }
+        if !lamp_has(topic) {
+            return Some(format!(
+                "{what}'s topic {} is not one the lamp has",
+                named(topic)
+            ));
+        }
+        // A topic the lamp has but can't say keeps its loosened path
+        // ([`plainly`]); the fields are checked for [`READABLE`]'s only.
+        let (_, fields) = READABLE.iter().find(|(known, _)| *known == topic)?;
+        let field = read.get("field")?.as_str()?;
+        let head = field.split('.').next().unwrap_or(field);
+        (topic != FACES_TOPIC && !fields.contains(&head))
+            .then(|| format!("{what}'s field {} is not one {topic} carries", named(field)))
+    })?;
+    let lines = format!(
+        "{NOTHING_READS_HEAD}{part}. Read only one of these topics, each with the fields it \
+         carries: {}.",
+        readable_named()
+    );
+    Some((part, lines))
+}
+
+/// Whether the lamp has `topic` (#7357): one `lamp_msgs` declares
+/// ([`lamp_msgs::declaration_of`], or [`DECLARED_BESIDE`]), or
+/// lamp-skills' own clock ([`CLOCK_TOPIC`]). Not only [`READABLE`]'s: a
+/// hand on the lamp (`body/hand`) is one it has, though no saying here
+/// knows it. Held to every topic `lamp_msgs` names by
+/// `every_topic_lamp_msgs_names_is_one_the_lamp_has`.
+fn lamp_has(topic: &str) -> bool {
+    topic == CLOCK_TOPIC
+        || DECLARED_BESIDE.contains(&topic)
+        || lamp_msgs::declaration_of(topic).is_some()
+}
+
+/// The topics `lamp_msgs` declares a type for that
+/// [`lamp_msgs::declaration_of`] doesn't list, each by its own `TOPIC`.
+const DECLARED_BESIDE: [&str; 12] = [
+    lamp_msgs::AirState::TOPIC,
+    lamp_msgs::MoodState::TOPIC,
+    lamp_msgs::RoomSound::TOPIC,
+    lamp_msgs::SuddenSound::TOPIC,
+    lamp_msgs::Addressed::TOPIC,
+    lamp_msgs::VoiceRemarked::TOPIC,
+    lamp_msgs::SpeakerCheckRequest::TOPIC,
+    lamp_msgs::SpeakerCheck::TOPIC,
+    lamp_msgs::SelfTest::TOPIC,
+    lamp_msgs::EngineInstallAsk::TOPIC,
+    lamp_msgs::UpdateStatus::TOPIC,
+    lamp_msgs::UpdateCheck::TOPIC,
+];
+
+/// How a repair of a read the lamp doesn't have begins ([`unread`]).
+const NOTHING_READS_HEAD: &str = "The lamp has nothing that reads that: ";
+
+/// A hand on the head's pads (`controls/pet`).
+const PET_TOPIC: &str = lamp_msgs::HeadPet::TOPIC;
 /// The air at the desk.
-const AIR_TOPIC: &str = "air/state";
+const AIR_TOPIC: &str = lamp_msgs::AirState::TOPIC;
 /// What someone at the desk is doing, as the eyes see it.
-const ACTIVITY_TOPIC: &str = "room/activity";
+const ACTIVITY_TOPIC: &str = lamp_msgs::RoomActivity::TOPIC;
 
 /// What the lamp can't start a made skill on yet, by a real topic of the
 /// lamp's that no saying here knows, in plain words: "starting on words it
@@ -7137,7 +7823,8 @@ pub fn put_on_cap(text: &str) -> Result<(String, Uses), Refused> {
 /// its code, as [`files`] took it (a script's name and ending, plain text,
 /// at most [`MOST_SCRIPT_BYTES`] each, [`MOST_SCRIPTS`] and
 /// [`MOST_SCRIPTS_BYTES`] in all), only with [`SCRIPTS_ENVIRONMENT`] on, and
-/// matched to its `task` step ([`code_matches`]).
+/// matched to its `task` step ([`code_matches`]); granted `net`, only the
+/// lamp's own agent script ([`agent_script_only`]).
 pub fn put_on_scripts<'a>(
     toml: &str,
     uses: &Uses,
@@ -7170,6 +7857,17 @@ pub fn put_on_scripts<'a>(
     }
     if scripts.iter().map(|(_, text)| text.len()).sum::<usize>() > MOST_SCRIPTS_BYTES {
         return Err(scripts_not_held("more code than a made skill may carry"));
+    }
+    // The internet only for the lamp's own task for its agent: its one
+    // script the lamp's own, byte for byte, never code a model wrote at
+    // that path ([`agent_script_only`]).
+    if uses
+        .grants
+        .iter()
+        .any(|grant| grant == crate::skill_task_yes::NET.0)
+        && !agent_script_only(&scripts)
+    {
+        return Err(scripts_not_held("the internet for code of its own"));
     }
     let files = Files {
         toml: toml.to_owned(),
@@ -7446,6 +8144,9 @@ pub struct Asked<'a> {
     /// `request` argument, which may carry a read's (App Only's P1 on
     /// #6142). `None` for the app's typed ask, held to `request`.
     pub heard: Option<&'a str>,
+    /// The judge of a voice make with no word of the ask (#7621,
+    /// [`UNRELATED_ENVIRONMENT`]): none for the app's, and none off.
+    pub judge: Option<Judge<'a>>,
 }
 
 /// [`keep`], with the person's request: the times of day it named
@@ -7473,6 +8174,12 @@ pub fn keep_asked(
         return Err(Refused::new(MODEL_CUT_OFF));
     }
     let mut files = files(answer)?;
+    // A made skill the judge says isn't what was asked (#7621, its switch
+    // on): refused before a said start returns, so nothing is kept or put
+    // on, with no repair.
+    if judged_unrelated(&files, request) {
+        return Err(Refused(UNRELATED.into(), None));
+    }
     // A `do.task` running the agent's path is the agent's only with the
     // lamp's own script there, byte for byte (El's P2 on #7261).
     let _agent_script = AgentScript::set(agent_script_only(&files.scripts));
@@ -9374,10 +10081,17 @@ pub fn not_made_in_their_language(line: &str) -> String {
 }
 
 /// What [`not_made_in_their_language`] tells the model after
-/// [`ALREADY_DONE`], before the quoted line.
+/// [`ALREADY_DONE`], before the quoted line. It is this one make's outcome
+/// alone (Fourteen on lamp-9adf, 17 Nov 21:37: one make not made was told
+/// on as "my skill-making isn't working", kept in the thread as the lamp's
+/// words, and later turns answered a made skill's turn-off, turn-on and
+/// remove from that belief with no call).
 const NOT_MADE_TOLD: &str = "Tell the person this, in the language of the conversation, every \
                              part of it, leaving nothing out: that the skill wasn't made, why, \
-                             and what to try. Add nothing else: ";
+                             and what to try. It is this one ask's outcome alone: say it of this \
+                             skill, never that making skills isn't working; a later ask to make, \
+                             remove, or turn a skill off or on calls make_skill again. Add \
+                             nothing else: ";
 
 /// Whether `note` is the lamp's note of a skill made: it opens on
 /// [`ALREADY_DONE`] and isn't [`not_made_in_their_language`]'s note of
@@ -11035,6 +11749,287 @@ light = { colour = "green", level = 3, for = "20s" }
         )
     }
 
+    /// #7357, lamp-c0a4, 16 Nov: "over 28 degrees turn the light blue"
+    /// was made on a `device/temperature` trigger, field `max_c`, that
+    /// nothing on the lamp sends, and kept in general words though it could
+    /// never start. A read of a topic the lamp doesn't have, or of a field
+    /// its message doesn't carry, in the trigger, its sooner or a while, is
+    /// refused, loosened or not, its repair naming it and the topics there
+    /// are with their fields; the person, the repairs used up, hears one
+    /// true line. The same skill on the air's temperature is kept.
+    #[test]
+    fn a_read_of_a_topic_or_field_the_lamp_doesnt_have_is_refused_and_repaired() {
+        let light = "light = { colour = \"blue\" }";
+        let refused = |made: &str, part: &str| {
+            for (reads, general) in [(false, false), (false, true), (true, true)] {
+                match plainly_as(made, reads, general) {
+                    Err(Refused(why, Some(lines))) => {
+                        assert_eq!(why, NOTHING_READS);
+                        assert!(
+                            lines.starts_with(&format!(
+                                "The lamp has nothing that reads that: {part}. Read only one \
+                                 of these topics, each with the fields it carries: \
+                                 voice/state (state); room/presence (someone, nobody_s, by); \
+                                 humans/faces/tracked (faces); "
+                            )),
+                            "{lines}"
+                        );
+                        assert!(
+                            lines.contains(
+                                "air/state (pm1_0, pm2_5, pm4_0, pm10, humidity, \
+                                            temperature, co2_ppm, feel)"
+                            ),
+                            "{lines}"
+                        );
+                        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+                    }
+                    other => panic!("{part}, reads {reads}, general {general}: {other:?}"),
+                }
+            }
+        };
+        let tonight = made_with(
+            "topic = \"device/temperature\"\nfield = \"max_c\"\nabove = 28\n",
+            light,
+        );
+        refused(
+            &tonight,
+            "the trigger's topic device/temperature is not one the lamp has",
+        );
+        refused(
+            &made_with(
+                "topic = \"air/state\"\nfield = \"max_c\"\nabove = 28\n",
+                light,
+            ),
+            "the trigger's field max_c is not one air/state carries",
+        );
+        refused(
+            &made_with(
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                 sooner = { topic = \"room/activity\", field = \"sneezes\", above = 0, \
+                 for = \"1m\" }\n",
+                light,
+            ),
+            "the trigger's sooner's field sneezes is not one room/activity carries",
+        );
+        refused(
+            &format!(
+                "{}\n[[while]]\ntopic = \"device/temperature\"\nfield = \"max_c\"\nabove = 28\n",
+                made_with(
+                    "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n",
+                    light
+                )
+            ),
+            "a [[while]]'s topic device/temperature is not one the lamp has",
+        );
+        // The person hears one true line when the repairs are used up.
+        assert_eq!(plain_reason(NOTHING_READS), NOTHING_READS);
+        assert_eq!(
+            not_made_line(&plain_reason(NOTHING_READS)),
+            "I couldn't make that: the lamp has nothing that reads that."
+        );
+        // The same skill on the air's own temperature is kept, loosened as
+        // the lamp makes it, and never refused as a read it doesn't have.
+        let real = topic_granted(&made_with(
+            "topic = \"air/state\"\nfield = \"temperature\"\nabove = 28\n",
+            light,
+        ));
+        assert!(capped_with(&real, false).is_ok(), "{real}");
+        assert!(plainly_as(&real, false, true).is_ok(), "{real}");
+        assert!(
+            !matches!(plainly_as(&real, false, false), Err(Refused(why, _)) if why == NOTHING_READS)
+        );
+        // A dotted field is read by its first part; a topic the lamp can't
+        // start on yet is still said so, never repaired.
+        let dotted = made_with(
+            "topic = \"humans/faces/tracked\"\nfield = \"faces.0\"\nwhen = \"appears\"\n",
+            light,
+        );
+        assert!(unread(&toml::from_str(&dotted).unwrap()).is_none());
+        let heard = made_with("topic = \"voice/heard\"\nfield = \"text\"\n", light);
+        assert!(unread(&toml::from_str(&heard).unwrap()).is_none());
+        // The making model is told the same list.
+        assert_eq!(readable_named().split("; ").count(), SAYABLE_TOPICS.len());
+    }
+
+    /// #7357, Seventh's HOLD at d76106fea2: a topic the lamp has is one
+    /// `lamp_msgs` declares (or lamp-skills' clock), not only [`READABLE`]'s.
+    /// A loosened make on a hand pushing the lamp (`body/hand`, which
+    /// built-in skills trigger on) is kept in general words, as before
+    /// #7357, never refused as a read the lamp doesn't have; an invented
+    /// topic still is, in every mode.
+    #[test]
+    fn a_declared_topic_is_one_the_lamp_has_and_an_invented_one_is_not() {
+        let light = "light = { colour = \"blue\" }";
+        let hand = made_with(
+            "topic = \"body/hand\"\nfield = \"pushed\"\nequals = true\n",
+            light,
+        );
+        assert!(unread(&toml::from_str(&hand).unwrap()).is_none());
+        let kept = plainly_as(&topic_granted(&hand), false, true);
+        assert!(kept.is_ok(), "{kept:?}");
+        for (reads, general) in [(false, false), (false, true), (true, true)] {
+            assert!(
+                !matches!(plainly_as(&hand, reads, general), Err(Refused(why, _)) if why == NOTHING_READS),
+                "body/hand, reads {reads}, general {general}"
+            );
+        }
+        let phone = made_with(
+            "topic = \"phone/battery\"\nfield = \"percent\"\nbelow = 20\n",
+            light,
+        );
+        for (reads, general) in [(false, false), (false, true), (true, true)] {
+            match plainly_as(&phone, reads, general) {
+                Err(Refused(why, Some(lines))) => {
+                    assert_eq!(why, NOTHING_READS);
+                    assert!(
+                        lines.contains("the trigger's topic phone/battery is not one the lamp has"),
+                        "{lines}"
+                    );
+                }
+                other => panic!("phone/battery, reads {reads}, general {general}: {other:?}"),
+            }
+        }
+        // Every sayable topic is a declared one (the clock is lamp-skills').
+        for (topic, _) in READABLE {
+            assert!(lamp_has(topic), "{topic}");
+        }
+        assert!(lamp_has(lamp_msgs::Hand::TOPIC));
+        assert!(!lamp_has("phone/battery"));
+    }
+
+    /// #7357: every topic `lamp_msgs` names (each `TOPIC` const and
+    /// `TOPICS` list in its source, a census of the declarations) is one
+    /// the lamp has ([`lamp_has`]): a topic declared and left out of
+    /// [`lamp_msgs::declaration_of`] fails here until it is named.
+    #[test]
+    fn every_topic_lamp_msgs_names_is_one_the_lamp_has() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../msgs/src");
+        let mut named = Vec::new();
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|ext| ext != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            // Only the declarations, never the tests' own strings.
+            let text = text.split("#[cfg(test)]").next().unwrap_or(&text);
+            let mut rest = text;
+            while let Some(at) = rest.find("pub const ") {
+                rest = &rest[at + "pub const ".len()..];
+                let (name, after) = rest.split_once(':').unwrap();
+                if !name.ends_with("TOPIC") && !name.ends_with("TOPICS") {
+                    continue;
+                }
+                let value = &after[..after.find(';').unwrap()];
+                named.extend(value.split('"').skip(1).step_by(2).map(str::to_owned));
+            }
+        }
+        assert!(named.len() > 80, "{}", named.len());
+        let missing: Vec<&String> = named.iter().filter(|topic| !lamp_has(topic)).collect();
+        assert!(missing.is_empty(), "{missing:?}");
+    }
+
+    /// #7357: [`READABLE`]'s fields are each message's own, as it is
+    /// serialized: a field added to or taken from one fails here.
+    #[test]
+    fn the_readable_fields_are_the_messages_own() {
+        let fields = |value: serde_json::Value| -> Vec<String> {
+            let mut keys: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+            keys.sort();
+            keys
+        };
+        let readable = |topic: &str| -> Vec<String> {
+            let mut keys: Vec<String> = READABLE
+                .iter()
+                .find(|(known, _)| *known == topic)
+                .unwrap()
+                .1
+                .iter()
+                .map(|field| field.to_string())
+                .collect();
+            keys.sort();
+            keys
+        };
+        let json = |value: Result<serde_json::Value, _>| value.unwrap();
+        let messages: [(&str, serde_json::Value); 7] = [
+            (
+                lamp_msgs::VoiceState::TOPIC,
+                json(serde_json::to_value(lamp_msgs::VoiceState {
+                    state: lamp_msgs::Voice::Resting,
+                })),
+            ),
+            (
+                lamp_msgs::RoomPresence::TOPIC,
+                json(serde_json::to_value(lamp_msgs::RoomPresence {
+                    someone: true,
+                    nobody_s: 0,
+                    by: Some(lamp_msgs::SeenBy::Face),
+                })),
+            ),
+            (
+                lamp_msgs::Faces::TOPIC,
+                json(serde_json::to_value(lamp_msgs::Faces { faces: Vec::new() })),
+            ),
+            (
+                lamp_msgs::StoodUp::TOPIC,
+                json(serde_json::to_value(lamp_msgs::StoodUp {
+                    sitting_s: 60,
+                    side: Some(lamp_msgs::Side::Left),
+                })),
+            ),
+            (
+                lamp_msgs::HeadPet::TOPIC,
+                json(serde_json::to_value(lamp_msgs::HeadPet {
+                    stamp: lamp_msgs::ClockStamp {
+                        clock_id: "c".into(),
+                        at_us: 1,
+                        sequence: 1,
+                    },
+                    session_id: "s".into(),
+                    reader_session_id: "r".into(),
+                    enabled: true,
+                    contact_id: 1,
+                    began_us: 1,
+                    petted_us: 1,
+                    observed_us: 1,
+                    swaps: 1,
+                    swaps_per_second: 1.0,
+                    resting: false,
+                    ended: false,
+                })),
+            ),
+            (
+                lamp_msgs::AirState::TOPIC,
+                json(serde_json::to_value(lamp_msgs::AirState {
+                    pm1_0: None,
+                    pm2_5: None,
+                    pm4_0: None,
+                    pm10: None,
+                    humidity: None,
+                    temperature: Some(28.0),
+                    co2_ppm: None,
+                    feel: lamp_msgs::AirFeel::Unknown,
+                })),
+            ),
+            (
+                lamp_msgs::RoomActivity::TOPIC,
+                json(serde_json::to_value(lamp_msgs::RoomActivity {
+                    state: lamp_msgs::Activity::Away,
+                    for_s: 0,
+                    sitting_s: 0,
+                    baseline: false,
+                    yawns: 1,
+                })),
+            ),
+        ];
+        for (topic, message) in messages {
+            assert_eq!(readable(topic), fields(message), "{topic}");
+        }
+        // The clock is lamp-skills' own, held to it there.
+        assert_eq!(readable(CLOCK_TOPIC), ["day", "known", "minute"]);
+        assert_eq!(READABLE.len(), 8);
+    }
+
     /// #6066: each step and trigger kind a skill can declare is kept and
     /// said back: a pat, stuffy air and what someone at the desk is doing;
     /// a light's dim, out, shade and pattern, a turn to the face, the
@@ -11915,6 +12910,32 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(!tells_made(&note), "{note}");
         assert!(tells_made(&in_their_language("I made x, and it's on.")));
         assert!(!tells_made("I made x, and it's on."));
+    }
+
+    /// Fourteen on lamp-9adf, 17 Nov 21:37–21:57: one make not made ("I
+    /// can't do that yet: hearing what is said") was told on as "my
+    /// skill-making isn't working", and later turns kept that belief: a
+    /// made skill's turn-off was answered "CloudFact was never actually
+    /// made" with no call. The note of a make not made tells it as that one
+    /// make's outcome, never as making, removing or turning skills off or on
+    /// not working, and still opens on what [`tells_made`] reads.
+    #[test]
+    fn a_make_not_made_is_told_as_that_one_makes_outcome() {
+        let line = not_made_line("I can't do that yet: hearing what is said");
+        let note = not_made_in_their_language(&line);
+        assert!(note.contains("this one ask's outcome alone"), "{note}");
+        assert!(
+            note.contains("never that making skills isn't working"),
+            "{note}"
+        );
+        assert!(
+            note.contains(
+                "a later ask to make, remove, or turn a skill off or on calls make_skill"
+            ),
+            "{note}"
+        );
+        assert!(note.ends_with(&format!("\"{line}\"")), "{note}");
+        assert!(!tells_made(&note), "{note}");
     }
 
     /// With reads on, a read refused as unsaid goes back with lines that
@@ -15698,5 +16719,457 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             kind: "body".into()
         }));
         assert!(parts.contains(&Loose::Step(0)));
+    }
+
+    /// #7621: the line heard on c0a4, transcribed whole.
+    const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
+                            up the title of the example dot com web page and tell me what it says.";
+    /// What was asked in that line, as the voice model should write it.
+    const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
+                                example.com web page and tell me what it says";
+    /// What DeepSeek made from an old moon ask in `request`.
+    const MOON_TIME: &str = "asks = [\"moon time\"]\nkind = \"installable\"\nversion = \
+                             \"1.0.0\"\n[permissions]\nspeak = true\n[[do]]\nsay = { text = \
+                             \"The moon is moving away from Earth, a little more each year.\" }\n";
+    const MOON_CARD: &str = "---\nname: moon-time\ndescription: A moon fact.\n---\n\n# Moon time\n";
+    /// What was made from Fourteen's line on c0a4: the time kept, the
+    /// doing swapped.
+    const MORNING_SKIP: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\n\
+                                topics = [\"voice/state\"]\nbody = true\n[trigger]\ntopic = \
+                                \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+                                cooldown = \"12h\"\nduring = { from = \"04:15\", to = \"04:30\" }\n\
+                                [ask]\npolicy = \"nudge\"\n[[do]]\nbody = { gesture = \
+                                \"dance_hype\" }\n";
+    const MORNING_SKIP_CARD: &str =
+        "---\nname: morning-skip\ndescription: Every day at 04:15 it dances.\n---\n\n# Skip\n";
+
+    fn judged_by<'a>(
+        request: &'a str,
+        line: &'a str,
+        ask: &'a dyn Fn(&str) -> Judged,
+    ) -> Asked<'a> {
+        Asked {
+            request,
+            heard: Some(line),
+            judge: Some(Judge { line, ask }),
+            ..Asked::default()
+        }
+    }
+
+    /// A judge that is never to be called: the overlap's fast pass.
+    fn never_judged(question: &str) -> Judged {
+        panic!("judged: {question}")
+    }
+
+    /// #7621, its switch on: moon-time and morning-skip, with no word of
+    /// Fourteen's line, go to the judge; its clear no refuses them before
+    /// anything is kept, with no repair, and the person is asked again with
+    /// no word of what was nearly made.
+    #[test]
+    fn a_made_skill_judged_not_what_was_asked_is_refused_and_nothing_kept() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        set_asks_here(Some(true));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("unrelated-made");
+        let questions = std::cell::RefCell::new(Vec::new());
+        let no = |question: &str| {
+            questions.borrow_mut().push(question.to_owned());
+            Judged::No
+        };
+        for (index, (toml, card)) in [(MOON_TIME, MOON_CARD), (MORNING_SKIP, MORNING_SKIP_CARD)]
+            .into_iter()
+            .enumerate()
+        {
+            let refused = keep_asked(
+                &answer(toml, card),
+                false,
+                &format!("local:s1:{index}:1"),
+                &keeping,
+                &judged_by(FOURTEEN_ASK, FOURTEEN, &no),
+            )
+            .unwrap_err();
+            assert_eq!(refused, Refused(UNRELATED.into(), None), "{card}");
+            for nearly in ["moon", "skip", "dance", "time"] {
+                assert!(!refused.0.to_lowercase().contains(nearly), "{}", refused.0);
+            }
+        }
+        // The request the voice model filled from an earlier moon ask, as
+        // on 9adf: its moon words never pass the skill made of it, which is
+        // held to the person's own line (the second adversarial read's P1).
+        let refused = keep_asked(
+            &answer(MOON_TIME, MOON_CARD),
+            false,
+            "local:s1:2:1",
+            &keeping,
+            &judged_by("say a moon fact when I say moon time", FOURTEEN, &no),
+        )
+        .unwrap_err();
+        assert_eq!(refused, Refused(UNRELATED.into(), None));
+        let questions = questions.into_inner();
+        assert_eq!(questions.len(), 3, "{questions:?}");
+        assert!(questions[0].starts_with(&format!("Asked: {FOURTEEN}. Made: moon-time:")));
+        assert!(
+            questions[1].contains("morning-skip: dance_hype"),
+            "{}",
+            questions[1]
+        );
+        assert!(index(&keeping.directory).is_empty(), "nothing kept");
+        set_asks_here(None);
+        set_english_here(None);
+        set_unrelated_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #7621: the judge fails open. A yes, an unclear answer, a timeout or
+    /// an error keeps the skill; a moon ask's moon-time shares a word and
+    /// is kept with no call; off, or in another language, even Fourteen's
+    /// line keeps it with no call, exactly as before; and with no judge
+    /// (the app's make) nothing is refused.
+    #[test]
+    fn the_judge_fails_open_and_off_or_not_english_nothing_is_judged() {
+        set_asks_here(Some(true));
+        let (root, keeping) = crate::make_skill_local::tests::keeping("unrelated-kept");
+        let moon = "when I say moon time, tell me a moon fact";
+        let yes = |_: &str| Judged::Yes;
+        let unclear = |_: &str| Judged::Unclear;
+        let timeout = |_: &str| Judged::Timeout;
+        let failed = |_: &str| Judged::Failed;
+        type Case<'a> = (bool, bool, &'a str, &'a str, &'a dyn Fn(&str) -> Judged);
+        let cases: [Case<'_>; 7] = [
+            (true, true, moon, moon, &never_judged),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &yes),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &unclear),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &timeout),
+            (true, true, FOURTEEN_ASK, FOURTEEN, &failed),
+            (false, true, FOURTEEN_ASK, FOURTEEN, &never_judged),
+            (true, false, FOURTEEN_ASK, FOURTEEN, &never_judged),
+        ];
+        for (index, (on, english, request, line, judge)) in cases.into_iter().enumerate() {
+            set_unrelated_here(Some(on));
+            set_english_here(Some(english));
+            let made = keep_asked(
+                &answer(MOON_TIME, MOON_CARD),
+                false,
+                &format!("local:s1:{index}:1"),
+                &keeping,
+                &judged_by(request, line, judge),
+            );
+            assert_eq!(
+                made.map(|made| made.name),
+                Ok("moon-time".to_owned()),
+                "{index}"
+            );
+        }
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let unjudged = Asked {
+            request: FOURTEEN_ASK,
+            heard: Some(FOURTEEN),
+            ..Asked::default()
+        };
+        let made = keep_asked(
+            &answer(MOON_TIME, MOON_CARD),
+            false,
+            "local:s1:9:1",
+            &keeping,
+            &unjudged,
+        );
+        assert!(made.is_ok(), "{made:?}");
+        // A lost judge asks again of a skill that runs on its own and moves
+        // the body (the first builder's ruling, 05:34): the 04:15 dance.
+        for (index, lost) in [Judged::Timeout, Judged::Failed].into_iter().enumerate() {
+            let judge = move |_: &str| lost;
+            let refused = keep_asked(
+                &answer(MORNING_SKIP, MORNING_SKIP_CARD),
+                false,
+                &format!("local:s1:{}:1", 20 + index),
+                &keeping,
+                &judged_by(FOURTEEN_ASK, FOURTEEN, &judge),
+            );
+            assert_eq!(
+                refused.unwrap_err(),
+                Refused(UNRELATED.into(), None),
+                "{lost:?}"
+            );
+        }
+        set_asks_here(None);
+        set_english_here(None);
+        set_unrelated_here(None);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn made_files(name: &str, toml: &str) -> Files {
+        Files {
+            toml: format!("kind = \"installable\"\nversion = \"1.0.0\"\n{toml}"),
+            card: format!("---\nname: {name}\ndescription: made.\n---\n\n# Made\n"),
+            left_out: None,
+            scripts: Vec::new(),
+        }
+    }
+
+    fn say_step(text: &str) -> String {
+        format!("[[do]]\nsay = {{ text = \"{text}\" }}\n")
+    }
+
+    fn task_step(text: &str) -> String {
+        format!("[[do]]\ntask = {{ task = \"{text}\" }}\n")
+    }
+
+    /// #7621, the first builder's condition 3: ordinary makes that share a
+    /// word with their ask are kept by the fast pass, the judge never
+    /// called; a step's kind is no word of it, and "good" is not
+    /// "goodnight".
+    #[test]
+    fn makes_sharing_a_word_are_kept_with_no_judge() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let makes: [(&str, &str, &str, String); 10] = [
+            (
+                "Lamp, make a skill: tell me a moon fact when I'm back",
+                "tell me a moon fact when I come back to my desk",
+                "moon-fact-when-back",
+                say_step("The moon drifts a little further from Earth each year."),
+            ),
+            (
+                "Lamp, make a skill: read me the example page's title every morning",
+                "every morning look up the title of example.com and tell me",
+                "morning-page-title",
+                task_step("open https://example.com and read out its title"),
+            ),
+            (
+                "make a skill that reminds me to stretch my back every hour",
+                "remind me to stretch my back every hour",
+                // Alike only by their start: "stretch" and "stretching".
+                "posture-break",
+                say_step("Time for a stretching break."),
+            ),
+            (
+                "make a cozy reading light scene when I say reading mode",
+                "when I say reading mode, set a cozy reading light",
+                "reading-scene",
+                "[[do]]\nlight = { colour = \"warm\", level = 3 }\n".to_owned(),
+            ),
+            (
+                "remind me to drink some water every two hours",
+                "every two hours remind me to drink water",
+                "water-reminder",
+                say_step("Have a glass of water."),
+            ),
+            (
+                "make me a pomodoro focus timer of twenty five minutes",
+                "a twenty five minute pomodoro focus timer",
+                "focus-timer",
+                say_step("Your focus session is over; take a short break."),
+            ),
+            (
+                "tell me the weather forecast every morning at seven",
+                "every morning at seven tell me the weather forecast",
+                "morning-weather",
+                task_step("check today's weather and say the forecast"),
+            ),
+            (
+                "every morning give me a summary of my calendar",
+                "summarize my calendar every morning",
+                "calendar-summary",
+                task_step("read today's calendar events and summarize them briefly"),
+            ),
+            (
+                "Lamp, make a skill: dance when I say party",
+                "dance when I say party",
+                "party-dance",
+                "asks = [\"party time\"]\n[[do]]\nbody = { gesture = \"dance_hype\" }\n".to_owned(),
+            ),
+            (
+                "make a goodnight skill that dims the light slowly",
+                "when I say goodnight, dim the light slowly",
+                "goodnight-dim",
+                "[[do]]\nlight = { level = 1, for = \"30s\" }\n".to_owned(),
+            ),
+        ];
+        for (line, request, name, toml) in &makes {
+            let asked = judged_by(request, line, &never_judged);
+            assert!(!judged_unrelated(&made_files(name, toml), &asked), "{name}");
+        }
+        // Words counted once: "party" and "dance" twice are two, too few
+        // to hold anything to.
+        let unrelated = made_files("moon-time", &say_step("The moon drifts away."));
+        assert_eq!(
+            unrelated_words(&unrelated, "dance when I say party", "dance at my party"),
+            None
+        );
+        // A light step's kind, or "good" in "goodnight", is no shared word:
+        // these go to the judge.
+        let no = |_: &str| Judged::No;
+        for (line, name, toml) in [
+            (
+                "make the light turn on when I sit at the desk please",
+                "arrival-glow",
+                "[[do]]\nlight = { colour = \"warm\" }\n",
+            ),
+            (
+                "say good things to cheer me up please",
+                "goodnight-kiss",
+                "[[do]]\nbody = { gesture = \"nod\" }\n",
+            ),
+        ] {
+            let files = made_files(name, toml);
+            let asked = judged_by(line, line, &no);
+            assert!(
+                unrelated_words(&files, line, line).is_some(),
+                "{name}: {line}"
+            );
+            assert!(judged_unrelated(&files, &asked), "{name}");
+        }
+        set_english_here(None);
+        set_unrelated_here(None);
+    }
+
+    /// #7621: the overlap's fast pass adds no call and next to no time,
+    /// printed for the report.
+    #[test]
+    fn the_fast_pass_adds_next_to_no_time() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let files = made_files(
+            "water-reminder",
+            &say_step("Have a glass of water, and stretch a little."),
+        );
+        let asked = judged_by(
+            "every two hours remind me to drink water",
+            "remind me to drink some water every two hours",
+            &never_judged,
+        );
+        let rounds: u32 = 100;
+        let began = std::time::Instant::now();
+        for _ in 0..rounds {
+            assert!(!judged_unrelated(&files, &asked));
+        }
+        let each = began.elapsed() / rounds;
+        println!("#7621 fast pass: {} us a make", each.as_micros());
+        assert!(each < Duration::from_millis(5), "{each:?}");
+        set_english_here(None);
+        set_unrelated_here(None);
+    }
+
+    /// #7621, the adversarial read's P1s: eleven paraphrased makes with no
+    /// word of their ask are judged, and a yes keeps each; the same moon
+    /// and morning-skip makes of Fourteen's line are refused by a no.
+    #[test]
+    fn paraphrased_makes_judged_yes_are_kept() {
+        set_unrelated_here(Some(true));
+        set_english_here(Some(true));
+        let makes: [(&str, &str, &str, String); 11] = [
+            (
+                "make a skill that reminds me to drink water",
+                "remind me to drink water",
+                "hydration-nudge",
+                say_step("Hydrate!"),
+            ),
+            (
+                "make a skill that wakes me gently",
+                "wake me gently",
+                "sunrise",
+                "[[do]]\nlight = { colour = \"orange\", level = 2 }\n".to_owned(),
+            ),
+            (
+                "tell me a joke when I sit down",
+                "tell me a joke when I sit down",
+                "desk-humor",
+                say_step("Why did the lamp blush? It saw the switch."),
+            ),
+            (
+                "make a skill to check the weather",
+                "check the weather",
+                "forecast",
+                task_step("look up the forecast and say it"),
+            ),
+            (
+                "greet me when I come home",
+                "greet me when I come home",
+                "welcome-back",
+                say_step("Welcome back!"),
+            ),
+            (
+                "cheer me up when I'm sad",
+                "cheer me up when I'm sad",
+                "mood-lift",
+                say_step("You're doing great."),
+            ),
+            (
+                "blink when my timer ends",
+                "blink when my timer ends",
+                "alarm-flash",
+                "[[do]]\nlight = { colour = \"red\", for = \"3s\" }\n".to_owned(),
+            ),
+            (
+                "make a skill that reminds me to hydrate throughout the day",
+                "every two hours say drink some water",
+                "sip-break",
+                say_step("Time for a glass."),
+            ),
+            (
+                "make a skill to help me wind down before bed",
+                "help me relax before sleep",
+                "calm-evening",
+                "[[do]]\nlight = { colour = \"warm\", level = 1 }\n".to_owned(),
+            ),
+            (
+                "let me know when it's going to rain today",
+                "warn me about rain",
+                "umbrella-alert",
+                task_step("check for showers and say bring an umbrella"),
+            ),
+            (
+                "make a skill that tells me to sit up straight",
+                "posture reminder",
+                "spine-check",
+                say_step("Shoulders back."),
+            ),
+        ];
+        let judged = std::cell::Cell::new(0);
+        let yes = |_: &str| {
+            judged.set(judged.get() + 1);
+            Judged::Yes
+        };
+        for (line, request, name, toml) in &makes {
+            let asked = judged_by(request, line, &yes);
+            assert!(!judged_unrelated(&made_files(name, toml), &asked), "{name}");
+        }
+        assert!(judged.get() >= 7, "judged {}", judged.get());
+        let no = |_: &str| Judged::No;
+        for (toml, card) in [(MOON_TIME, MOON_CARD), (MORNING_SKIP, MORNING_SKIP_CARD)] {
+            let files = files(&answer(toml, card)).unwrap();
+            let asked = judged_by(FOURTEEN_ASK, FOURTEEN, &no);
+            assert!(judged_unrelated(&files, &asked), "{card}");
+        }
+        // A lost judge, both ways [`on_judge_lost`] may give.
+        for lost in [Judged::Timeout, Judged::Failed] {
+            assert!(!lost.refuses(OnJudgeLost::Keep), "{lost:?}");
+            assert!(lost.refuses(OnJudgeLost::AskAgain), "{lost:?}");
+        }
+        for (judged, refuses) in [
+            (Judged::No, true),
+            (Judged::Yes, false),
+            (Judged::Unclear, false),
+        ] {
+            for lost in [OnJudgeLost::Keep, OnJudgeLost::AskAgain] {
+                assert_eq!(judged.refuses(lost), refuses, "{judged:?} {lost:?}");
+            }
+        }
+        // The first builder's ruling (05:34): a lost judge keeps a say-only
+        // skill the person starts, and asks again of one that runs on its
+        // own or moves the body.
+        assert_eq!(on_judge_lost(MOON_TIME), OnJudgeLost::Keep);
+        assert_eq!(on_judge_lost(MORNING_SKIP), OnJudgeLost::AskAgain);
+        let timed = "asks = [\"moon time\"]\n[[do]]\nsay = { text = \"Hi.\" }\n[[do]]\nbody = { gesture = \"nod\" }\n";
+        assert_eq!(on_judge_lost(timed), OnJudgeLost::AskAgain, "a body step");
+        assert_eq!(on_judge_lost("every = \"1h\"\n"), OnJudgeLost::AskAgain);
+        assert_eq!(on_judge_lost("not toml ["), OnJudgeLost::AskAgain);
+        assert_eq!(Judged::read(" No, it doesn't."), Judged::No);
+        assert_eq!(Judged::read("Yes."), Judged::Yes);
+        assert_eq!(Judged::read("Nope"), Judged::Unclear);
+        assert_eq!(Judged::read(""), Judged::Unclear);
+        set_english_here(None);
+        set_unrelated_here(None);
     }
 }

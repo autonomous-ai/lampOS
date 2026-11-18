@@ -1200,6 +1200,12 @@ pub fn run(
     let joined = wifi::join(host, country, &accepted.ssid, &accepted.password);
     drop(joining);
     let _ = watcher.join();
+    // Counted for the opt-in report (#6256 F8), sent only with the yes.
+    if crate::wifi_counts::on()
+        && let Err(why) = crate::wifi_counts::count(Path::new(crate::wifi_counts::FILE), &joined)
+    {
+        eprintln!("lamp-setup: the Wi-Fi join could not be counted ({why})");
+    }
     let failure = match joined {
         Joined::Failed { reason } => Some(reason.detail().to_owned()),
         Joined::Connected => {

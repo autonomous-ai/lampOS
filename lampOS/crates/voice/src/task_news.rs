@@ -1553,7 +1553,10 @@ fn read_once_with(
                 // signed in on it: lamp-tasks says so only with `serve
                 // --folder-missing` (#2840) and `serve --engines-ready`
                 // (openharness#1788).
-                let code = item["dispatch"]["code"].as_str();
+                let code = told_code(
+                    item["dispatch"]["code"].as_str(),
+                    item["dispatch"]["finished"]["monotonic_ms"].as_u64(),
+                );
                 // Told once more only within its time of the hand-over
                 // ending, as `failed_hand_over` read it.
                 let until = if retelling.contains(&key) {
@@ -1778,6 +1781,22 @@ fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<Strin
     })
 }
 
+/// The refusal code a failed hand-over is told by: a not-ready one (its
+/// OpenClaw Gateway or Harness not up) only when it was refused within
+/// [`crate::skill_words::NOT_READY_WITHIN_MS`] of the lamp's start, at
+/// `refused_ms` on lamp-tasks' boot clock; past it, none, so the plain
+/// failure is told, as before (El's P2 on #7351).
+fn told_code(code: Option<&str>, refused_ms: Option<u64>) -> Option<&str> {
+    match code {
+        Some("openclaw_gateway_not_ready" | "harness_not_running")
+            if !crate::skill_words::not_ready_told(refused_ms) =>
+        {
+            None
+        }
+        code => code,
+    }
+}
+
 /// A hand-over that did not reach its agent, fitted to one written turn
 /// like other news ([`fitted`]): the task's words are cut first
 /// (reviewer-two's P2 on #2875). A missing folder's note with a computer
@@ -1813,6 +1832,10 @@ fn note_failed(
         // Reopening it could not be confirmed yet (`LAMP_TASKS_RESUME_CLOSED`):
         // the same, and that they may try again in a moment.
         Some("session_resume_unconfirmed") => Some(&words.failed_closed_soon),
+        // The lamp is still getting ready: its OpenClaw Gateway did not
+        // answer in time, or Harness is not running yet (#7282). Told so
+        // at once, not as a hand-over that could not be started.
+        Some("openclaw_gateway_not_ready" | "harness_not_running") => Some(&words.failed_not_ready),
         _ => None,
     };
     if let Some(line) = refused
@@ -3639,6 +3662,55 @@ mod tests {
                 && !no_prompt.contains("offer to try again"),
             "{no_prompt}"
         );
+    }
+
+    /// A hand-over not sent as the lamp is still getting ready (its
+    /// OpenClaw Gateway not answering yet, or Harness not running yet,
+    /// #7282) is told with the not-ready sentence, not as one that did not
+    /// reach its agent.
+    #[test]
+    fn a_hand_over_to_a_lamp_still_getting_ready_is_told_so() {
+        for code in ["openclaw_gateway_not_ready", "harness_not_running"] {
+            let told =
+                note_failed(&own(), &task("openclaw", json!([])), false, Some(code)).unwrap();
+            assert!(
+                told.contains(crate::skill_words::NOT_READY_LINE)
+                    && !told.contains("did not reach")
+                    && !told.contains("offer to try again"),
+                "{code}: {told}"
+            );
+        }
+    }
+
+    /// El's P2 on #7351: a not-ready refusal is told as one only within
+    /// the start window; one past it (a Gateway or Harness that stays
+    /// down) is told as the plain failure, never "give me a minute" for
+    /// good. Other codes pass as they are.
+    #[test]
+    fn a_not_ready_refusal_past_the_start_window_is_told_as_a_plain_failure() {
+        let window = crate::skill_words::NOT_READY_WITHIN_MS;
+        for code in ["openclaw_gateway_not_ready", "harness_not_running"] {
+            assert_eq!(told_code(Some(code), Some(60_000)), Some(code));
+            assert_eq!(told_code(Some(code), Some(window)), Some(code));
+            assert_eq!(told_code(Some(code), Some(window + 1)), None);
+            assert_eq!(told_code(Some(code), None), None);
+            let plain = note_failed(
+                &own(),
+                &task("openclaw", json!([])),
+                false,
+                told_code(Some(code), Some(3_600_000)),
+            )
+            .unwrap();
+            assert!(
+                !plain.contains(crate::skill_words::NOT_READY_LINE),
+                "{code}: {plain}"
+            );
+        }
+        assert_eq!(
+            told_code(Some("folder_missing"), Some(3_600_000)),
+            Some("folder_missing")
+        );
+        assert_eq!(told_code(None, Some(1)), None);
     }
 
     /// Reviewer-two's P2 on #2875: a valid task of 250 three-byte

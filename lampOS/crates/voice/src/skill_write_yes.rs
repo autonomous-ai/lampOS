@@ -107,6 +107,18 @@ pub struct Waiting {
     /// How many heard turns past [`YES_WITHIN`] have been guarded against
     /// saying it is on (#7270, [`late_guarded`]).
     pub late_guarded: u8,
+    /// Later requests whose line, as the model was asked it, was only the
+    /// lamp's name or no words at all ([`line_heard`]), at most
+    /// [`SAID_KEPT`]: no answer is taken in one, and the wait goes on.
+    pub name_only: Vec<u64>,
+    /// The newest later request whose line the second route asks of the
+    /// model ([`line_heard`]): its round is not forced to answer when that
+    /// line was only the lamp's name ([`approve_forced_now`]).
+    pub newest_line: u64,
+    /// When each request's words from the make's on were played to their
+    /// end, in monotonic µs ([`played_until`]): where the carry of a yes
+    /// counts from (`LAMP_SKILL_YES_CARRY`, #7148, [`asked_until`]).
+    pub played: VecDeque<(u64, u64)>,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -171,6 +183,58 @@ pub fn wait_for_yes_noted(asks: Asks, request: u64, now: Instant) -> String {
     wait_for_yes_with(asks, request, now, true)
 }
 
+/// The wait a voice make of `request` began, whose turn was cut while it
+/// ran, made [`Waiting::noted`]: its say-back is said through the say
+/// service (`second_provider::worker::made_running`), as an app's make's
+/// is, so the person's yes answers no call of the model's either, and the
+/// next line is forced to answer it ([`approve_force`]). On c0a4 (17 Nov
+/// 19:43, build 13838, #7245) a 116 s OpenClaw make outlived its turn, its
+/// say-back was said so, and the "yes" after it was told the approve_id but
+/// called nothing, so the skill was never kept.
+///
+/// For a make with code of its own (or a task for the lamp's agent), the
+/// line the say service is given in place of the cut turn's own
+/// ([`said_back_line`]): its say-back word for word, as an app's make's is,
+/// so the next line is forced once it was heard whole. On c0a4 (17 Nov
+/// 22:39, the combo build, #7245) the cut line ("ask me for it again") went
+/// as a note in the conversation's language, the model said it in 136
+/// chars, the say-back was never heard whole, and the "yes" after it was
+/// told to hear it again: nothing was forced or kept. Only in place of
+/// the cut turn's code line `cut` (`made_skill::cut_code_line`): a code
+/// make that also sends keeps `made_skill::cut_write_line`, which says it
+/// sends nothing yet, never a say-back silent on what it sends. None for
+/// no wait of `request`'s, or one whose line stays the cut turn's own.
+pub fn said_by_the_say_service(request: u64, cut: &str) -> Option<String> {
+    let code_line = cut.contains(crate::made_skill::CUT_ASK_AGAIN)
+        || cut.ends_with(crate::made_skill::CUT_CODE_UNSAID);
+    kept::waiting(|waiting| {
+        let waiting = waiting
+            .as_mut()
+            .filter(|waiting| waiting.request == request)?;
+        waiting.noted = true;
+        eprintln!(
+            "lamp-voice: request {request}: its made skill's say-back goes through the say service: the next line must answer its wait"
+        );
+        (code_line && waiting.asks.code && !waiting.asks.remove)
+            .then(|| said_back_line(&waiting.asks))
+    })
+}
+
+/// The line a cut make's code wait is said back in through the say
+/// service ([`said_by_the_say_service`]): its name, then its say-back
+/// whole, ending as the say-back ends, which `app_make::say_note` tells
+/// the model to say word for word (`made_skill::RUNS_AFTER_YES`, or
+/// `made_skill::RUNS_ONCE_AGREED` for a task for the lamp's agent).
+fn said_back_line(asks: &Asks) -> String {
+    let name = crate::made_skill::spoken_name(&asks.skill);
+    let say_back = asks.say_back.trim();
+    if say_back.ends_with(crate::made_skill::RUNS_ONCE_AGREED.trim()) {
+        format!("I can have the lamp's agent do {name}. {say_back}")
+    } else {
+        format!("I made {name}. {say_back}")
+    }
+}
+
 fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> String {
     let id = format!(
         "yes-{:08x}",
@@ -190,6 +254,9 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             noted,
             unclear: false,
             late_guarded: 0,
+            name_only: Vec::new(),
+            newest_line: 0,
+            played: VecDeque::new(),
         });
     });
     if remove {
@@ -258,15 +325,31 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         let waiting = waiting.as_ref().filter(|waiting| {
             request > waiting.request && now.saturating_duration_since(waiting.at) <= YES_WITHIN
         })?;
+        // Only the lamp's name ([`line_heard`]): no answer to it, so no
+        // approve_id either, and the wait goes on for the next line.
+        if name_only_line(waiting, request) {
+            return Some(format!(
+                "(For you to know, not to answer: the lamp still waits for their answer to what \
+                 it just said back about the skill {}. This line was only your name, which \
+                 answers nothing: answer the call as you would, and don't call make_skill now.)",
+                crate::made_skill::spoken_name(&waiting.asks.skill)
+            ));
+        }
         // A remove (#6960): the lamp asked its one question, and the
         // person's answer is the call's, whatever it is.
         if waiting.asks.remove {
             return Some(format!(
                 "(For you to know, not to answer: the lamp just asked them \"{}\" and waits for \
-                 their answer, approve_id \"{}\". Call make_skill with only that approve_id and \
+                 their answer, approve_id \"{}\". Call make_skill with only that approve_id, \
                  answer: \"yes\" only if they agree, \"no\" if they decline or wait, \"unclear\" \
-                 if you can't tell. Nothing is removed but on their yes.)",
-                waiting.asks.say_back, waiting.id
+                 if you can't tell, \"new_ask\" if their line answers nothing asked but asks \
+                 something new (another skill named, another thing asked), and named \"{spoken}\" \
+                 if their line names this skill, another skill's name if it names another, or \
+                 \"none\". A line naming {spoken} answers this question, never new_ask. Nothing \
+                 is removed but on their yes to this very question, for this very skill.)",
+                waiting.asks.say_back,
+                waiting.id,
+                spoken = crate::made_skill::spoken_name(&waiting.asks.skill)
             ));
         }
         // Cut, and not heard whole since (#6715, the first builder's
@@ -301,11 +384,18 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             crate::made_skill::spoken_name(&waiting.asks.skill),
             waiting.id,
             answer = if answer_forced(waiting) {
-                " For this one, always give answer with that approve_id: \"yes\" only if they \
-                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell; left \
-                 out, it is read as unclear."
+                format!(
+                    " For this one, always give answer with that approve_id: \"yes\" only if \
+                     they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell, \
+                     \"new_ask\" if their line answers nothing asked but asks something new; \
+                     left out, it is read as unclear. Give named too: \"{spoken}\" if their line \
+                     names this skill, another skill's name if it names another, or \"none\"; a \
+                     line naming {spoken} answers it, never new_ask, and a yes counts only for \
+                     this skill.",
+                    spoken = crate::made_skill::spoken_name(&waiting.asks.skill)
+                )
             } else {
-                ""
+                String::new()
             }
         ))
     })
@@ -343,6 +433,23 @@ pub fn drop_wait(id: &str) -> bool {
             *waiting = None;
         }
         waits
+    })
+}
+
+/// The remove waiting for the made skill `skill`'s yes (#6960) dropped,
+/// any other wait kept: the person turned that skill off or on by voice
+/// instead (#7445, Twelve's P2 on #7453: "Remove coffee time?", "no, just
+/// turn it off" left the remove waiting, and a later yes could take it).
+/// Whether one was.
+pub fn drop_remove_of(skill: &str) -> bool {
+    kept::waiting(|waiting| {
+        let removes = waiting
+            .as_ref()
+            .is_some_and(|waiting| waiting.asks.remove && waiting.asks.skill == skill);
+        if removes {
+            *waiting = None;
+        }
+        removes
     })
 }
 
@@ -514,18 +621,67 @@ pub fn awaited(now: Instant) -> bool {
 /// 13 Nov).
 pub fn answer_awaited(request: u64, now: Instant) -> bool {
     kept::waiting(|waiting| {
-        waiting.as_ref().is_some_and(|waiting| {
-            request > waiting.request
-                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
-                && waiting
-                    .said
-                    .iter()
-                    .filter(|kept| kept.0 < request && stands_between(waiting, kept))
-                    .max_by_key(|(id, ..)| *id)
-                    .is_some_and(|(_, said, cut)| {
-                        !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
-                    })
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| say_back_before(waiting, request, now).is_some())
+    })
+}
+
+/// The request whose answer held the whole say-back a line in `request` at
+/// `now` would answer ([`answer_awaited`]); none, no yes is awaited.
+fn say_back_before(waiting: &Waiting, request: u64, now: Instant) -> Option<u64> {
+    if request <= waiting.request || now.saturating_duration_since(waiting.at) > YES_WITHIN {
+        return None;
+    }
+    waiting
+        .said
+        .iter()
+        .filter(|kept| kept.0 < request && stands_between(waiting, kept))
+        .max_by_key(|(id, ..)| *id)
+        .filter(|(_, said, cut)| {
+            !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
         })
+        .map(|(id, ..)| *id)
+}
+
+/// The lamp's words in `request` play until `until_us` (monotonic µs,
+/// `second_provider::Did::Said`): kept while a yes waits, for the make's
+/// request and any after it, the latest end of each.
+pub fn played_until(request: u64, until_us: u64) {
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| request >= waiting.request)
+        else {
+            return;
+        };
+        match waiting.played.iter_mut().find(|(id, _)| *id == request) {
+            Some((_, until)) => *until = (*until).max(until_us),
+            None => {
+                if waiting.played.len() == SAID_KEPT {
+                    waiting.played.pop_front();
+                }
+                waiting.played.push_back((request, until_us));
+            }
+        }
+    });
+}
+
+/// The lamp's question a line in `request` at `now` answers, while a
+/// skill's yes is awaited ([`answer_awaited`]): the request whose answer
+/// held the whole say-back, and when its words ended as played (monotonic
+/// µs, [`played_until`]). The carry of a yes counts its 45 s from there
+/// (`LAMP_SKILL_YES_CARRY`, #7148), as #6749 C's thread window does. None
+/// when no yes is awaited or that answer's play was never told.
+pub fn asked_until(request: u64, now: Instant) -> Option<(u64, u64)> {
+    kept::waiting(|waiting| {
+        let waiting = waiting.as_ref()?;
+        let asked = say_back_before(waiting, request, now)?;
+        waiting
+            .played
+            .iter()
+            .find(|(id, _)| *id == asked)
+            .map(|&(_, until)| (asked, until))
     })
 }
 
@@ -534,8 +690,27 @@ pub fn answer_awaited(request: u64, now: Instant) -> bool {
 /// when the call is made ([`approve_force`]); the model decides what it
 /// says.
 pub const ANSWER: &str = "answer";
+/// The [`ANSWER`] for a line that answers nothing asked but asks
+/// something new: another skill named, another thing asked (lamp-9adf, 17
+/// Nov 18:12: "Remove mail count?", then "Lamp, remove the joke time
+/// skill", forced to a yes, no or unclear, was taken as the yes, and mail
+/// count was removed). The wait ends, nothing kept, and the new ask is
+/// answered ([`answered`]). Whether a line is one is the model's judgment,
+/// never a list of words.
+pub const NEW_ASK: &str = "new_ask";
 /// What [`ANSWER`] takes. Left out, it reads as `yes`, as before.
-pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
+pub const ANSWERS: [&str; 4] = ["yes", "no", "unclear", NEW_ASK];
+/// The `make_skill` argument beside [`ANSWER`] that binds a yes to its
+/// skill (#7545, Twelve's and El's HOLDs on #7561): the skill the person's
+/// line names, its name alone as they said it, or [`NAMED_NONE`]. The
+/// model fills it; code reads a yes whose name is not the waiting skill's
+/// ([`crate::made_remove::same_name`], the made-skill name match) as a
+/// [`NEW_ASK`], so a yes never acts on another skill's wait, whatever
+/// label the model gave the line. A forced wait's yes without it reads as
+/// unclear ([`answered`]).
+pub const NAMED: &str = "named";
+/// [`NAMED`] when the person's line names no skill ("Yes.").
+pub const NAMED_NONE: &str = "none";
 
 /// The force the second route's chat is given with a skill's tasks on and
 /// `make_skill` declared (`second_provider::net::Chat::forcing`, #6835
@@ -570,11 +745,12 @@ pub fn approve_force() -> crate::second_provider::net::Force {
     })
 }
 
-/// The only `make_skill` fields the forced approval round is told, both
-/// required ([`approve_force`], #6921): the wait's id and the person's
-/// answer, so the forced call, a task's yes or a remove's, can carry no
-/// make or edit beside them.
-pub const APPROVE_FIELDS: [&str; 2] = [APPROVE_ID, ANSWER];
+/// The only `make_skill` fields the forced approval round is told, all
+/// required ([`approve_force`], #6921): the wait's id, the person's
+/// answer and the skill their line names ([`NAMED`], #7545), so the
+/// forced call, a task's yes or a remove's, can carry no make or edit
+/// beside them, and its yes is bound to the skill asked about.
+pub const APPROVE_FIELDS: [&str; 3] = [APPROVE_ID, ANSWER, NAMED];
 
 /// Whether `waiting` is a skill's task's wait, a made skill's remove
 /// (#6960), or an app's make with code of its own (`noted`, #6307): the
@@ -600,9 +776,49 @@ fn answer_forced(waiting: &Waiting) -> bool {
 /// answer was the newest, so the yes was never forced. The wait's own
 /// request cut with nothing kept still stands: a say-back cut off before its
 /// first word (#7072).
+///
+/// Nor does the lamp's answer to a later line that was only its name
+/// ([`line_heard`]): it answered a call, not the say-back, so the line
+/// after it is still the say-back's answer, forced and awaited, as a
+/// call's answer is no other request of a waiting write's
+/// (`services::answered_in_place`). Else "Yes? I'm here." after "Hey
+/// Lamp" stood between, and the person's "Yes." after it was neither
+/// forced nor awaited.
 fn stands_between(waiting: &Waiting, kept: &(u64, String, bool)) -> bool {
     let (id, said, cut) = kept;
-    !(*id > waiting.request && *cut && said.is_empty())
+    !(*id > waiting.request && ((*cut && said.is_empty()) || name_only_line(waiting, *id)))
+}
+
+/// Whether the line of `request` was only the lamp's name, or no words at
+/// all, as the model was asked it ([`line_heard`]).
+fn name_only_line(waiting: &Waiting, request: u64) -> bool {
+    waiting.name_only.contains(&request)
+}
+
+/// The second route asks the model the line of `request`; `name_only`:
+/// as asked, it is only the lamp's name, or no words at all
+/// (`second_provider`, the same line told it was a call). While a yes is
+/// awaited, such a line answers nothing (lamp-9adf, 17 Nov 13:58: an app's
+/// make with code said back, then a lone "Hello?" heard as the name was
+/// asked as a call, its round forced to answer, and the model's yes put
+/// the Gmail-reading code on): no answer to the wait is taken in it, yes,
+/// no or unclear ([`approve`], [`answered`]), its round is not forced
+/// ([`approve_forced_now`]), the note gives no approve_id
+/// ([`waiting_note`]), and the wait goes on for the next line. State, not
+/// words: the route already judged the line a call.
+pub fn line_heard(request: u64, name_only: bool) {
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting.as_mut().filter(|waiting| request > waiting.request) else {
+            return;
+        };
+        waiting.newest_line = waiting.newest_line.max(request);
+        if name_only && !waiting.name_only.contains(&request) {
+            if waiting.name_only.len() == SAID_KEPT {
+                waiting.name_only.remove(0);
+            }
+            waiting.name_only.push(request);
+        }
+    });
 }
 
 /// Whether [`approve_force`] forces a request at `now`.
@@ -610,6 +826,7 @@ pub fn approve_forced_now(now: Instant) -> bool {
     kept::waiting(|waiting| {
         waiting.as_ref().is_some_and(|waiting| {
             answer_forced(waiting)
+                && !name_only_line(waiting, waiting.newest_line)
                 && now.saturating_duration_since(waiting.at) <= YES_WITHIN
                 && waiting
                     .said
@@ -623,6 +840,21 @@ pub fn approve_forced_now(now: Instant) -> bool {
                     })
         })
     })
+}
+
+/// What the model is told of an answer to a wait in a line that was only
+/// the lamp's name ([`line_heard`]): nothing taken, and it still waits.
+pub const NAME_ONLY_NOT_TAKEN: &str = "Not taken: that line was only your name, no answer to \
+     what you said back. Nothing changed, and it still waits for their answer. Answer the call \
+     only, in a few words, and call nothing.";
+
+/// [`NAME_ONLY_NOT_TAKEN`] told, and journaled, for `skill`'s wait in
+/// `request`.
+fn name_only_not_taken(request: u64, skill: &str) -> Value {
+    eprintln!(
+        "lamp-voice: request {request}: an answer to {skill}'s say-back not taken: its line was only the lamp's name; the wait goes on (#6307)"
+    );
+    json!({ "approved": false, "error": NAME_ONLY_NOT_TAKEN })
 }
 
 /// What the model is told when the person declined the say-back.
@@ -644,6 +876,26 @@ pub fn remove_unclear_next(spoken: &str) -> String {
          conversation's language: remove {spoken}, yes or no? Call nothing now."
     )
 }
+/// What the model is told when the line after a remove's question was a
+/// new ask ([`NEW_ASK`]): nothing removed, the skill left as it is, and
+/// the new ask answered as any line's.
+pub fn remove_left_next(spoken: &str) -> String {
+    format!(
+        "Nothing was removed: their line was a new ask, not an answer to the lamp's question. \
+         Say first, in a few words, in the conversation's language, that you left {spoken} as \
+         it is; then do what they asked in that line, as for any line."
+    )
+}
+/// What the model is told when the line after a say-back was a new ask
+/// ([`NEW_ASK`]): nothing agreed, and the new ask answered as any line's.
+pub fn new_ask_next(spoken: &str) -> String {
+    format!(
+        "Nothing was agreed: their line was a new ask, not an answer to the say-back, so \
+         {spoken} stays as it was and nothing runs or is sent for it. Say so first, in a few \
+         words, in the conversation's language; then do what they asked in that line, as for \
+         any line."
+    )
+}
 /// What the model is told when the person's answer was unclear, once.
 pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clear. Ask them \
      once, short, in the conversation's language, whether it may go ahead, yes or no. Call \
@@ -652,19 +904,37 @@ pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clea
 /// The person's `answer` ([`ANSWER`]) to the wait `id` in `request`, when
 /// it is not a yes: a no ends the wait and keeps nothing; an unclear one
 /// keeps nothing and asks once more, and a second unclear ends the wait as
-/// a no. What the model is told; none for a yes (or no answer given), so
+/// a no; a new ask ([`NEW_ASK`]) ends the wait, keeps nothing, and lets the
+/// model answer that line as any. What the model is told; none for a yes
+/// bound to its skill (below; or no answer given to a voice make's), so
 /// [`approve`] takes it with every guard, and none for an id not waiting.
 /// Read before the owner check: anyone's no or unclear (a guest's too)
 /// ends or re-asks the owner's wait, never keeping a yes. An answer
 /// outside [`ANSWERS`] reads as a no. Two answers in one line are taken
 /// in call order, each as its own: once the wait has ended, the next finds
 /// no id waiting.
-pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
-    if answer == Some("yes") {
-        return None;
-    }
+///
+/// A yes is bound to its skill (#7545, Twelve's and El's HOLDs on #7561):
+/// `named` ([`NAMED`]), the skill the person's line names as the model
+/// gave it, must be [`NAMED_NONE`] or the waiting skill's own name
+/// ([`crate::made_remove::same_name`]). A yes naming another skill is read
+/// as a [`NEW_ASK`], whatever the model labelled it, so it never acts on
+/// this wait; a forced wait's yes ([`answer_forced`]) with no name given
+/// reads as unclear. Structure, not words: code compares the name the
+/// model gave with the wait's skill, never the person's words.
+pub fn answered(
+    id: &str,
+    request: u64,
+    answer: Option<&str>,
+    named: Option<&str>,
+) -> Option<Value> {
     kept::waiting(|kept| {
         let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
+        // Only the lamp's name ([`line_heard`]): no answer at all, the wait
+        // as it was.
+        if name_only_line(waiting, request) {
+            return Some(name_only_not_taken(request, &waiting.asks.skill));
+        }
         // Left out: a yes for a made skill's writes or code, as before;
         // for a skill's task or an app's make with code, whose approval
         // call code forces whatever the person said ([`approve_force`]),
@@ -673,11 +943,56 @@ pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
         let answer = match answer {
             Some(answer) => answer,
             None if answer_forced(waiting) => "unclear",
-            None => return None,
+            None => "yes",
         };
         let skill = waiting.asks.skill.clone();
         let remove = waiting.asks.remove;
         let spoken = crate::made_skill::spoken_name(&skill);
+        // A yes, bound to the skill waiting (#7545): taken by [`approve`]
+        // with every guard only when the line names that skill or none.
+        let mut other = None;
+        let answer = if answer == "yes" {
+            match named.map(str::trim).filter(|named| !named.is_empty()) {
+                Some(named)
+                    if named.eq_ignore_ascii_case(NAMED_NONE)
+                        || crate::made_remove::same_name(named, &skill) =>
+                {
+                    return None;
+                }
+                Some(named) => {
+                    other = Some(named.to_owned());
+                    NEW_ASK
+                }
+                None if answer_forced(waiting) => {
+                    eprintln!(
+                        "lamp-voice: request {request}: a yes to {skill}'s wait named no skill: read as unclear"
+                    );
+                    "unclear"
+                }
+                None => return None,
+            }
+        } else {
+            answer
+        };
+        // A new ask, not an answer (#7545, lamp-9adf 17 Nov), or a yes
+        // naming another skill: the wait ends with nothing kept, so no
+        // later yes can take it, and the line is answered as any line's.
+        if answer == NEW_ASK {
+            *kept = None;
+            eprintln!(
+                "lamp-voice: request {request}: the line after {skill}'s {} was a new ask, not an answer{}: nothing kept, the wait dropped",
+                if remove { "question" } else { "say-back" },
+                other
+                    .map(|other| format!(" (a yes naming {other}, not {skill})"))
+                    .unwrap_or_default()
+            );
+            let next = if remove {
+                remove_left_next(&spoken)
+            } else {
+                new_ask_next(&spoken)
+            };
+            return Some(json!({ "approved": false, "left": skill, "next": next }));
+        }
         if answer == "unclear" && !waiting.unclear {
             waiting.unclear = true;
             eprintln!(
@@ -922,11 +1237,16 @@ pub const NOT_HERE: &str = "Not approved: this live voice can't take that yes. S
 pub const REMOVE_NOT_TAKEN: &str = "Not removed: that was not the person's own answer to the lamp's question, or it came too late. Say in a few words that nothing was removed, and that they can ask me again.";
 /// What the model is told when a remove's yes came on the Live route.
 pub const REMOVE_NOT_HERE: &str = "Not removed: this live voice can't take that answer. Say plainly that nothing was removed, and that I remove a skill only on my other voice: in a normal conversation with me, not this live one.";
-/// What the model is told once a remove is done (#6960).
+/// What the model is told once a remove is done (#6960). The rest of the
+/// person's line, if it asked for more ("yes, and remove the joke one
+/// too", El's P2 on #7561), is answered as any line's, never lost: a
+/// further remove gets its own question and wait ([`crate::made_remove`]).
 pub fn removed_next(spoken: &str) -> String {
     format!(
-        "Say only, in a few words, in the conversation's language, that {spoken} is removed. \
-         Ask nothing, call nothing."
+        "Say first, in a few words, in the conversation's language, that {spoken} is removed. \
+         If their line also asked for more (another skill to remove, another thing asked), do \
+         that now as for any line: another remove is asked as its own question. Else ask \
+         nothing more."
     )
 }
 /// What the model is told once approved: it sends at its next trigger,
@@ -1000,6 +1320,7 @@ pub fn approve(
     }
     enum Took {
         Nothing,
+        NameOnly(Value),
         NotSaid(String, String, Kind, String),
         Waiting(Box<Waiting>),
     }
@@ -1007,6 +1328,11 @@ pub fn approve(
         let Some(waiting) = kept.as_ref().filter(|waiting| waiting.id == id) else {
             return Took::Nothing;
         };
+        // Only the lamp's name ([`line_heard`]): never the yes, and the
+        // wait goes on.
+        if name_only_line(waiting, request) {
+            return Took::NameOnly(name_only_not_taken(request, &waiting.asks.skill));
+        }
         if refused(waiting, request, heard, now).is_none()
             && sends_here
             && !said_whole_before(waiting, request)
@@ -1033,6 +1359,7 @@ pub fn approve(
             eprintln!("lamp-voice: request {request}: a made skill's yes found nothing waiting");
             return json!({ "error": NOT_APPROVED });
         }
+        Took::NameOnly(told) => return told,
         Took::NotSaid(id, say_back, kind, line) => {
             eprintln!("{line}");
             let (error, say, wait) = match kind {
@@ -1172,6 +1499,9 @@ mod tests {
 
     const SAY_BACK: &str =
         "mails mai@example.com from your Gmail, subject “Leaving”, saying “I'm leaving now.”";
+
+    /// How a cut code make's own line ends (`made_skill::cut_code_line`).
+    const CUT: &str = crate::made_skill::CUT_CODE_UNSAID;
 
     fn asks(skill: &str, writes: &[Value]) -> Asks {
         Asks {
@@ -1403,7 +1733,7 @@ mod tests {
         assert!(note.contains(&id), "{note}");
         assert!(note.contains("always give answer"), "{note}");
         // The forced call's no ends the wait: it stays off.
-        let no = answered(&id, 19, Some("no")).unwrap();
+        let no = answered(&id, 19, Some("no"), None).unwrap();
         assert_eq!(no["next"], DECLINED_NEXT, "{no}");
         assert!(!awaited(now));
         // A cut answer that played words stands between.
@@ -1425,6 +1755,146 @@ mod tests {
         assert!(!approve_forced_now(now));
         let note = waiting_note(26, now).unwrap();
         assert!(!note.contains("always give answer"), "{note}");
+    }
+
+    /// #7245, c0a4 17 Nov 19:43: a voice make with code outlived its turn
+    /// (116 s on OpenClaw), its wait began in request 1, and its say-back
+    /// was said through the say service in request 2. The "yes" of request
+    /// 3 answers no call of the model's, as an app's make's: forced to
+    /// answer the wait, and told to give its answer. Only the cut make's
+    /// own wait is so.
+    #[test]
+    fn a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced() {
+        let now = Instant::now();
+        let code = Asks {
+            code: true,
+            writes: Vec::new(),
+            ..asks("fruit-note", &[])
+        };
+        let id = wait_for_yes(code.clone(), 1, now);
+        assert!(
+            said_by_the_say_service(2, CUT).is_none(),
+            "another request's make"
+        );
+        assert!(said_by_the_say_service(1, CUT).is_some());
+        lamp_said(2, SAY_BACK);
+        assert!(answer_awaited(3, now));
+        assert!(approve_forced_now(now), "the yes of request 3 is forced");
+        let note = waiting_note(3, now).unwrap();
+        assert!(note.contains(&id), "{note}");
+        assert!(note.contains("always give answer"), "{note}");
+        // A voice make whose turn waited: never forced, as before.
+        wait_for_yes(code, 4, now);
+        lamp_said(4, SAY_BACK);
+        assert!(!approve_forced_now(now));
+    }
+
+    /// #7245, c0a4 17 Nov 22:39 (the combo build): a voice make with code
+    /// (62.9 s on OpenClaw) outlived its turn, request 3, so its wait began
+    /// with nothing of request 3's kept toward it. Its say-back went through
+    /// the say service as request 4, a turn of its own with no heard line,
+    /// and the "yes" of request 5 must be forced to answer it. The say
+    /// service is given the say-back word for word, ending as it ends, so
+    /// the model says it whole: never the cut turn's "ask me for it again",
+    /// which went as a note in the person's language, was said in 136
+    /// chars, and left the say-back unheard, the yes told to hear it again,
+    /// and nothing forced or kept.
+    #[test]
+    fn a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes() {
+        let now = Instant::now();
+        let grants = vec!["camera".to_owned()];
+        let code = Asks {
+            say_back: crate::made_skill::code_said_as(&grants, false)
+                .trim()
+                .to_owned(),
+            grants: Some(grants),
+            code: true,
+            writes: Vec::new(),
+            ..asks("fruit-notes", &[])
+        };
+        let id = wait_for_yes(code.clone(), 3, now);
+        let line = said_by_the_say_service(3, CUT).expect("a code make's say-back is said whole");
+        assert!(
+            line.starts_with("I made fruit notes. The lamp's model wrote its code"),
+            "{line}"
+        );
+        assert!(line.ends_with(&code.say_back), "{line}");
+        assert!(
+            line.ends_with(crate::made_skill::RUNS_AFTER_YES.trim()),
+            "{line}"
+        );
+        // Request 4, the say service's own turn with no heard line, kept
+        // only a summary (the cut turn's line in the person's words, as on
+        // c0a4): not forced, and the next line is told to say it again.
+        lamp_said(4, "I made fruit notes. It isn't on yet, just ask me again.");
+        assert!(!approve_forced_now(now), "a summary is no say-back");
+        let note = waiting_note(5, now).unwrap();
+        assert!(!note.contains(&id) && note.contains("was cut"), "{note}");
+        // Said word for word: the yes of request 6 is forced.
+        lamp_said(5, &line);
+        assert!(approve_forced_now(now), "the yes of request 6 is forced");
+        let note = waiting_note(6, now).unwrap();
+        assert!(note.contains(&id), "{note}");
+        assert!(note.contains("always give answer"), "{note}");
+        // Cut by a barge-in while it was said: not forced.
+        lamp_cut(5);
+        assert!(!approve_forced_now(now), "a cut say-back is no say-back");
+        // Said whole again, then a "no": the wait ends, nothing kept.
+        lamp_said(6, &line);
+        assert!(approve_forced_now(now));
+        // With #7561's bound yes: the forced note asks for the name, a yes
+        // naming none is taken by the approve, and one with no name given
+        // is unclear, the wait kept and asked once more.
+        let note = waiting_note(7, now).unwrap();
+        assert!(note.contains("Give named too"), "{note}");
+        assert_eq!(answered(&id, 7, Some("yes"), Some(NAMED_NONE)), None);
+        assert_eq!(answered(&id, 7, Some("yes"), Some("fruit notes")), None);
+        let unclear = answered(&id, 7, Some("yes"), None).unwrap();
+        assert_eq!(unclear["approved"], false, "{unclear}");
+        assert!(waits(&id) && approve_forced_now(now));
+        let no = answered(&id, 7, Some("no"), None).unwrap();
+        assert_eq!(no["approved"], false, "{no}");
+        assert!(!waits(&id) && !approve_forced_now(now));
+        // A second make while one waits takes the wait: the first make's
+        // cut line is its own again, never the second's say-back.
+        wait_for_yes(code.clone(), 8, now);
+        wait_for_yes(code.clone(), 9, now);
+        assert_eq!(said_by_the_say_service(8, CUT), None);
+        // Past the yes window the say-back's line forces nothing.
+        let late = now + YES_WITHIN + Duration::from_secs(1);
+        lamp_said(10, &said_by_the_say_service(9, CUT).unwrap());
+        assert!(approve_forced_now(now));
+        assert!(!approve_forced_now(late));
+        // A task for the lamp's agent alike, its own head.
+        let agent = Asks {
+            say_back: crate::made_skill::agent_said(&["camera".to_owned()])
+                .trim()
+                .to_owned(),
+            ..code.clone()
+        };
+        wait_for_yes(agent, 11, now);
+        let line = said_by_the_say_service(11, CUT).unwrap();
+        assert!(
+            line.starts_with("I can have the lamp's agent do fruit notes. The lamp's agent"),
+            "{line}"
+        );
+        assert!(
+            line.ends_with(crate::made_skill::RUNS_ONCE_AGREED.trim()),
+            "{line}"
+        );
+        // A make's writes keep the cut turn's own line (never forced).
+        wait_for_yes(asks("leaving-mail", &[]), 12, now);
+        assert_eq!(said_by_the_say_service(12, CUT), None);
+        // So does a code make that also sends: its cut line is
+        // `cut_write_line`, never swapped for a say-back silent on what it
+        // sends.
+        wait_for_yes(code.clone(), 13, now);
+        let write_line = format!(
+            "I made fruit notes.{} {}",
+            crate::made_skill::WAITS_FOR_YES,
+            crate::made_skill::CUT_WRITE_UNSAID
+        );
+        assert_eq!(said_by_the_say_service(13, &write_line), None);
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
@@ -1579,6 +2049,134 @@ mod tests {
         assert_eq!(told["error"], NOT_APPROVED);
     }
 
+    /// A skill's task said back, then a line the model judges a new ask
+    /// (`new_ask`), not an answer to it: the wait ends with nothing agreed,
+    /// so no later yes takes it, and the model answers the new ask.
+    #[test]
+    fn a_new_ask_ends_a_tasks_wait_agreeing_nothing() {
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(
+            Asks {
+                skill: "photo-booth".into(),
+                sha256: "a".repeat(64),
+                writes: Vec::new(),
+                say_back: "It uses the camera.".into(),
+                grants: Some(vec!["camera".into()]),
+                code: false,
+                remove: false,
+            },
+            1,
+            now,
+        );
+        lamp_said(1, "It uses the camera.");
+        assert!(approve_forced_now(now));
+        let told = answered(&id, 2, Some("new_ask"), None).unwrap();
+        assert_eq!(told["approved"], false, "{told}");
+        assert_eq!(told["left"], "photo-booth", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("photo booth"), "{next}");
+        assert!(next.contains("what they asked"), "{next}");
+        assert!(!next.to_lowercase().contains("call nothing"), "{next}");
+        assert!(!awaited(now));
+        assert_eq!(
+            approve(&id, 3, true, true, now, never)["error"],
+            NOT_APPROVED
+        );
+    }
+
+    /// #7561's row on lamp-9adf (17 Nov 23:4x): "Remove rain joke?", then
+    /// "Yes, remove rain joke." was answered `new_ask` and the wait was
+    /// dropped. A line naming the very skill asked about answers it: the
+    /// note tells the model so, with that skill's name to copy into
+    /// `named`, and a yes naming it, in any case, with hyphens,
+    /// underscores or spaces, is its yes. Another skill's name is still a
+    /// new ask.
+    #[test]
+    fn a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask() {
+        let rain = || Asks {
+            skill: "rain-joke".into(),
+            sha256: "b".repeat(64),
+            writes: Vec::new(),
+            say_back: "Remove rain joke?".into(),
+            grants: None,
+            code: false,
+            remove: true,
+        };
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(rain(), 1, now);
+        lamp_said(1, "Remove rain joke?");
+        let note = waiting_note(2, now).unwrap();
+        assert!(note.contains("named \"rain joke\""), "{note}");
+        assert!(note.contains("never new_ask"), "{note}");
+        for named in ["rain joke", "Rain-Joke", "rain_joke", "RAIN JOKE skill"] {
+            assert_eq!(answered(&id, 2, Some("yes"), Some(named)), None, "{named}");
+            assert!(waits(&id), "{named}");
+        }
+        let told = answered(&id, 2, Some("yes"), Some("cloud joke")).unwrap();
+        assert_eq!(told["left"], "rain-joke", "{told}");
+        assert!(!waits(&id));
+        // A task's or an app's make's forced wait is told the same.
+        let id = wait_for_yes(
+            Asks {
+                remove: false,
+                grants: Some(vec!["camera".into()]),
+                skill: "photo-booth".into(),
+                say_back: "It uses the camera.".into(),
+                ..rain()
+            },
+            1,
+            now,
+        );
+        lamp_said(1, "It uses the camera.");
+        let note = waiting_note(2, now).unwrap();
+        assert!(
+            note.contains("named too: \"photo booth\" if their line names this skill"),
+            "{note}"
+        );
+        assert!(note.contains("never new_ask"), "{note}");
+        assert!(waits(&id));
+        clear_for_test();
+    }
+
+    /// #7545 on a task's wait too: photo booth's task said back, then a
+    /// line the model labels `yes` but whose named skill is another
+    /// (weather): bound to its skill, that yes agrees to nothing for photo
+    /// booth, ends the wait as a new ask, and no later yes takes it. Its
+    /// own name, or none, is its yes.
+    #[test]
+    fn a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait() {
+        let booth = || Asks {
+            skill: "photo-booth".into(),
+            sha256: "a".repeat(64),
+            writes: Vec::new(),
+            say_back: "It uses the camera.".into(),
+            grants: Some(vec!["camera".into()]),
+            code: false,
+            remove: false,
+        };
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(booth(), 1, now);
+        lamp_said(1, "It uses the camera.");
+        let told = answered(&id, 2, Some("yes"), Some("weather")).unwrap();
+        assert_eq!(told["approved"], false, "{told}");
+        assert_eq!(told["left"], "photo-booth", "{told}");
+        assert!(!awaited(now));
+        assert_eq!(
+            approve(&id, 3, true, true, now, never)["error"],
+            NOT_APPROVED
+        );
+        for named in ["photo booth", NAMED_NONE] {
+            clear_for_test();
+            let id = wait_for_yes(booth(), 1, now);
+            lamp_said(1, "It uses the camera.");
+            assert_eq!(answered(&id, 2, Some("yes"), Some(named)), None, "{named}");
+        }
+        clear_for_test();
+    }
+
     /// Thirteen's HOLD on #6223 (App Only confirming): the app has no yes
     /// for a made skill's writes (lamp-cloud has no kind for
     /// `skill_write_approve`, the app nothing), so no line the voice's
@@ -1616,6 +2214,8 @@ mod tests {
             removed_next("moon fact"),
             remove_declined_next("moon fact"),
             remove_unclear_next("moon fact"),
+            remove_left_next("moon fact"),
+            new_ask_next("photo booth"),
         ];
         for line in &lines {
             let words: Vec<String> = line

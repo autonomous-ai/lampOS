@@ -687,6 +687,7 @@ impl Chat {
             asked,
             first: None,
             last_ended: (!second).then(|| self.last_ended.clone()),
+            model: self.model.clone(),
         })
     }
 }
@@ -825,6 +826,8 @@ pub struct ChatStream {
     first: Option<std::time::Duration>,
     /// Told when the answer ends, on a client that keeps its connection.
     last_ended: Option<LastEnded>,
+    /// The model asked, for the day's tally ([`crate::day_tally`], #7347).
+    model: String,
 }
 
 impl ChatStream {
@@ -879,6 +882,8 @@ impl ChatStream {
                     "lamp-voice second: {}",
                     answer_told(self.deltas.usage.as_ref(), self.first, self.asked.elapsed())
                 );
+                // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
+                crate::day_tally::answered(&self.model, self.deltas.usage.as_ref());
             }
         }
     }

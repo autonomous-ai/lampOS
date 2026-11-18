@@ -98,6 +98,11 @@ when it is idle as `harness reply` does (openharness#2157, the person's
   working one is `NOT_IDLE` at the router, so `agent_busy`) keeps its task
   (a close under way holds every launch until it ends), and the words typed into it are `uncertain`
   (`reused_remote_id`), never sent again.
+  The voice may tell the earlier task's answer while the follow-up is being
+  typed: the store's last receipt then names the task the follow-up takes
+  over, so the takeover drops that receipt (as a replaced read's is), and a
+  retry of that request finds the revision moved on. Before, the store
+  failed its own check and lamp-tasks exited (lamp-c0a4, 17 Nov).
 - **`new` as before:** the router says new work, is off or can't be
   reached (`ROUTER_UNAVAILABLE`), refuses (`REPLY_OFF`, `NOT_YOURS`), or its
   pick is no longer running or its computer refused the words (`FAILED`).
@@ -741,6 +746,19 @@ of 5 s at most there). Only a known no refuses:
   with `engine_signed_out`, and the voice tells it with Task news'
   `failed_signed_out` words: the work didn't start, as the engine isn't
   signed in on their computer, and it has to be signed in there first.
+
+A hand-over that ends `not_sent` as the lamp is still getting ready,
+`openclaw_gateway_not_ready` (its OpenClaw Gateway didn't answer within
+60 s) or `harness_not_running` (#7282), is told with Task news'
+`failed_not_ready` words, "I'm still getting ready. Give me a minute and ask
+me again.", not as work that "did not reach" its agent. Only within 180 s
+of the lamp's start (`skill_words::NOT_READY_WITHIN_MS`, lamp-tasks' own
+`STARTING_AT_MOST`), by the refusal's `dispatch.finished.monotonic_ms` on
+lamp-tasks' boot clock: past it a Gateway or Harness still not up is broken,
+not starting, and the plain failure is told, as before, so a broken lamp
+never says "give me a minute" for good (El's P2 on #7351). Tests:
+`task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so` and
+`a_not_ready_refusal_past_the_start_window_is_told_as_a_plain_failure`.
 
 `null`, no row for that computer and engine, a failed exit, a timeout, or an
 older Harness without the command is no refusal, and is kept as long, so a
@@ -1777,6 +1795,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `engine::tests::the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes`
     and
     `agent_tasks::tests::a_lamp_whose_hermes_is_installing_says_so_instead_of_asking_for_a_computer`.
+  - **While the lamp is still starting.** With `serve --set-up-later`,
+    from a start or a sign-in until the first targets look has settled
+    (the targets file read and the sign-in answered; signed in, the
+    machines answered too; at most 180 s, `STARTING_AT_MOST`), the
+    `targets` answer says `"lamp":"starting"`. A hand-over then refused as
+    no target is told "I'm still getting ready. Give me a minute and ask me
+    again." (`Missing::Starting`), not that it needs setting up; after
+    that, as before. Tests:
+    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`
+    and the installing test above.
   - **Hermes' home.** Hermes keeps its settings in
     `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
     apart from Harness' sign-in and lamp-cloud's credentials. Hermes saves
@@ -2021,7 +2049,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     again once with the same note, and the journal says `request N: named
     agent, called <names> not start_agent_task: none run, asked again`
     (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
-    with no agent named, an own tool runs as before). The agent-task tools
+    with no agent named, an own tool runs as before). With
+    `LAMP_NAMED_AGENT_TAKES_LINE=on` (off unless set, #7269; lamp-9b34:
+    "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend"
+    answered with `weather` twice, no task) the model is never asked round
+    1 of such a line: code calls `start_agent_task` with the heard words as
+    the task, as the hand-over below, and round 2 says it back for a yes;
+    a line that named a skill keeps that skill's call
+    (`agent_tasks_named::a_named_agent_takes_the_line_before_the_weather_tool`,
+    `agent_tasks_named::with_the_switch_on_an_unnamed_ask_still_goes_to_the_model`).
+    The agent-task tools
     (`confirm_agent_task`, `check_agent_task`, `tasks_now`, the status read)
     are not own tools: "Hermes, go ahead and run it" answered with
     `confirm_agent_task` runs as called, nothing asked again (the
@@ -2848,24 +2885,63 @@ for each run, and is answered once the run ends
   `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
   no one-run token), `run_failed`, or `busy` (another skill's task is
   running: one runs at a time). With `LAMP_SKILL_TASK_SURE=on` in
-  lamp-skills (off unless set, in no product unit; docs/skills.md, "A
+  lamp-skills (off unless set, on in the product; docs/skills.md, "A
   skill's task"), lamp-skills says a refusal or a failed run to the owner
-  as one fixed line behind a told answer's gate, never the task's words
+  as one fixed line (in the conversation that asked for a run now by
+  voice, at once as its answer; otherwise as news, behind a told answer's
+  gate, the next time the owner is seen within 30 minutes, dropped at quiet
+  hours; #7363), never the task's words
   nor this message, and a run refused `busy` waits its turn in lamp-skills'
   one line (at most 4 in it, one being handed over among them, first in
   first out, each at most 15 minutes from when it began to wait) and is handed over again when the run going ends, so two
   skills due at one minute both run, one after the other. Nothing here
   changes for it.
-- **What its agent found** (`tells_answer`): with `LAMP_AGENT_SERVICES=on`
-  here, a run granted a linked service's read (`gmail-read`) that ended
-  well answers `{"ok":true,"id":N,"answer":"..."}`, the agent's last
+- **What its agent found** (`tells_answer`): every task's run, whatever
+  its grants (the owner, 17 Nov: the agent's results are read freely, not
+  only a linked service's), through a runner that keeps its agent's
+  answer (`Runner::answers`: Harness's, whichever path its run then
+  takes, as that path is read again at the run's start; a `net` run's
+  `NetRunner` by the one run path, as it goes through that Harness
+  runner) that ended well answers
+  `{"ok":true,"id":N,"answer":"..."}`, the agent's last
   answer as the run's end `show` gave it (`--chars 4000`, `Cli::shown_end`;
   for a `stopped` end, the `show` that found its session bound), every run
   of whitespace or control characters one space, at most 3,000 bytes
-  (`told_answer`, `MOST_TOLD_BYTES`). Its words end with `TELL_LINE`, so
-  the agent ends with a few plain sentences for the owner. lamp-skills says
-  them to the owner (docs/skills.md, "A linked service as a task for the
-  lamp's agent"). On lamp-9adf, 15 Nov (build 13135), a voice-made
+  (`told_answer`, `MOST_TOLD_BYTES`). Its words, and only such a run's,
+  a keyed run's too, end with its runner's `Runner::tell_words`
+  (`TELL_LINE` for Harness's), so the agent ends with only a short spoken
+  answer, one to three plain sentences, and with a lone dash (`-`) when
+  the skill already said it aloud through the lamp, which lamp-skills
+  says nothing of. A run in a fresh home through the make's
+  runner (`MakeHermes`: an uploaded agent skill's `scripts/SKILL.md` run,
+  one given keys, or a `net` one's without the one run path), whose chat
+  answer goes nowhere, is asked instead to write what to tell to its own
+  folder's `answer.md` (`tell_file_line`, the folder's full path: a short
+  spoken answer, one to three plain sentences, or the file left empty when
+  the skill already said it aloud, which tells nothing), and the
+  runner keeps it once the run ended well (`skill_make::keep_told_answer`,
+  read as a make's answer is: a regular file, never through a link, not
+  empty, at most 20 KiB; `its agent's answer: N bytes kept` or `none in
+  its answer.md`), so it is told as Harness's is. A fixed write's run
+  never tells, nor a run Harness's runner starts with no Harness: its
+  words end with `TELL_LINE` too, but it keeps no answer (`nothing`).
+  Read once at the hand-over, that path dropped a kept answer: on
+  lamp-9adf, 18 Nov, 46 s after lamp-tasks restarted, an uploaded skill's
+  `net` run read no Harness at its hand-over, went through Harness at its
+  start (`answer=894`, `894 bytes kept`) and logged `nothing: not a run
+  that tells`; the same skill told 45 bytes at 03:06. lamp-skills
+  says them to the owner as exact words, never a turn for the model, so
+  text from the open web is never an instruction (docs/skills.md, "A
+  linked service as a task for the lamp's agent"), at most about 400
+  characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
+  the last sentence end inside, then "There's more; ask me if you want
+  it." Nothing tracks whether the run's own script already spoke through
+  lamp-control's `say`; the agent is asked to leave its answer empty (a
+  dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On
+  lamp-9adf, 17 Nov (build 13929,
+  `LAMP_TASK_NET=on`), an uploaded `btc-price` granted `speak` and `net`
+  reached api.coinbase.com, kept its agent's 220-byte answer, and said
+  nothing: `nothing: not a run that tells`. On lamp-9adf, 15 Nov (build 13135), a voice-made
   `morning-unread-mail` ran 19 Gmail reads and ended idle, and nothing was
   said: the answer was read by that `show` and dropped. Any other run's
   answer is as before; the journal never has the answer. It has the
@@ -2878,8 +2954,14 @@ for each run, and is answered once the run ends
   lamp-skills says what lamp-tasks' answer carried (docs/skills.md). On
   lamp-9adf, 16 Nov, a run's end `show` gave 360 bytes and nothing was
   said (#7180), which these lines place. Tests:
-  `a_service_reads_ended_answer_carries_what_its_agent_found`,
-  `a_skill_runs_end_keeps_its_agents_last_answer`.
+  `every_runs_ended_answer_carries_what_its_agent_found`,
+  `a_net_runs_ended_answer_carries_what_its_agent_found`,
+  `a_harness_runner_tells_whatever_path_its_hand_over_reads`,
+  `an_agent_skills_and_a_keyed_runs_ended_answers_carry_what_their_agent_found`,
+  `skill_make::tests::a_net_runner_keeps_an_answer_by_either_path`,
+  `skill_make::tests::a_makes_runner_keeps_a_telling_runs_answer_from_its_folder`,
+  `a_skill_runs_end_keeps_its_agents_last_answer`,
+  `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 - **A one-run token** (the first builder's 12:45 conditions on #6071): for
   each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
   its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
@@ -3305,6 +3387,9 @@ for each run, and is answered once the run ends
     namespace script before Hermes, inside the namespace; it listens on a
     loopback address only, prints `ready`, closes its output, and pipes
     each connection to the bridge until the run's PID namespace ends it.
+    For a run granted `net`, `--egress <its socket>` too: the proxy on
+    `127.0.0.1:3128` and DNS on `127.0.0.1:53` ("An agent skill's run and
+    the `net` grant", below).
     Hermes's model calls go to `http://127.0.0.1:7741/v1/deepseek` as
     before.
   - **Bounded, and blind to what it pipes:** each side at most 4
@@ -3387,6 +3472,54 @@ lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run
 whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
+
+### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, off)
+
+A skill's run is an agent session. Its chats go through lamp-cloud's model
+forwarder on the voice's key, so they spend the same daily allowance the
+voice talks on. With up to 100 runs a day (#7151), skills must never leave
+the lamp unable to answer. The switch is off unless set, in no product unit.
+
+- **The meter:** the relay's `X-Usage-Day-Used` header, from 0 to 1, on each
+  HTTP answer of a metered route. It is counted the way the relay counts,
+  and absent when the lamp has no day limit (Backend on #7347). With the
+  switch set in lamp-cloud, the forwarder reads it from each answer and
+  keeps it in `/var/lib/lampos-cloud/day-used.json` (`lampos`'s, 0600). The
+  file holds the UTC day, the day used, when it was read, and the day's
+  count of agent chat answers and tokens from the relay's `usage`. Numbers
+  only. A new UTC day starts from nothing.
+- **The bound:** with the switch set in lamp-skills, a skill's run is refused
+  before it is handed over once what is left of the day, `1 - used`, is at
+  or below the voice's share. `on` keeps half the day; a decimal between 0
+  and 1 (`0.3`) keeps that share. The share is of the relay's own count,
+  never a token number guessed on the lamp. The refusal is not counted
+  against the day's runs, and its words are plain: "the lamp has used 62%
+  of its thinking for today, and the last 50% is kept for talking, so
+  skills' runs wait until its day starts again". A run asked for by voice
+  hears it; one started by a trigger is journaled only, since saying it
+  would spend the voice's share on words nobody asked for.
+- **The voice is never refused by it.** The voice talks to the relay itself.
+  The forwarder only reads the header and forwards every request as before,
+  the owner's own agent tasks and a request past the share included.
+- **Not known is let through:** no reading, one of another UTC day, a 2xx
+  answer with no header, or a file that can't be read. The relay's own
+  limit still holds.
+- **How fresh:** the reading is the forwarder's last answer's. The voice's
+  use since then is not in it yet, so a run may start a little past the
+  mark; its first chat updates the reading and the next run is refused.
+- **For measuring a run (#7342's part 1):** each chat answer has a journal
+  line in lamp-cloud, `a chat answer: P prompt tokens (H from the cache),
+  C completion tokens; the relay's day used U`, or `no usage given` when
+  the agent did not ask for it. Each run has one in lamp-skills, `the
+  relay's day used A before its run and B after; the agent's chats
+  meanwhile: N answers (M gave no count), P prompt tokens (H from the
+  cache), C completion tokens`. Any agent chat in that time is in it, and
+  the day used counts the voice's use too.
+- Tests: `relay_share::tests`,
+  `task::tests::a_run_is_refused_once_the_voices_share_is_reached`, and
+  the forwarder's
+  `hermes_llm::tests::the_meter_keeps_the_day_used_and_every_chat_still_goes`
+  and `without_the_meter_nothing_is_kept`.
 
 ### A voice make in a skill run's namespace (`skill_make`, #6643)
 
@@ -3645,13 +3778,13 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
-### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, off, #7245)
+### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, on, #7245)
 
 On lamp-c0a4 (build 13333, OpenClaw the default, 16 Nov 11:46) a make
 DeepSeek didn't keep was never handed over: "the lamp's agent is OpenClaw:
 only Hermes has a namespace runner for a make today". After #7133 an
 OpenClaw lamp could run a skill's job but not make one. With lamp-voice's
-`LAMP_MAKE_AGENT_ONE_PATH=on` (off unless set, in no unit;
+`LAMP_MAKE_AGENT_ONE_PATH=on` (on in the product's lamp-voice;
 [switches.md](switches.md)), the make goes to the lamp's agent whenever
 lamp-tasks says it takes runs, Hermes or OpenClaw, through the one run
 path, with no second runner:
@@ -3667,7 +3800,8 @@ path, with no second runner:
 - **The gateway make:** a fresh `make-<run id>` folder in the work folder,
   the rules in `rules.md`, sent as one turn through Harness's
   `harness new <engine>` in that folder (#7133's `HarnessRunner`, "A
-  skill's run on OpenClaw" below). `answer.md` is read back as above. No
+  skill's run on OpenClaw" below). `answer.md` is read back as above (with
+  none, the agent's chat answer, below). No
   token is minted and no skill-start run is opened (`gateway::open_start`
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its
@@ -3677,6 +3811,56 @@ path, with no second runner:
   voice still puts the answer through its whole check and repairs.
 - **A `cannot:` answer** goes back to the voice as written, for #7234's
   fallback.
+- **An answer said in chat (`skill_make::make_answer`, #7245, #7427):**
+  with no `answer.md` (missing or empty), and only then, the agent's final
+  chat answer is read, and taken only when it is a make's answer
+  (`chat_answer`). Harness's `show` gives at most 4000 characters of it
+  (`--chars 4000`) and says when it cut it (`truncated`, read with the
+  answer by `harness::Cli::shown_end`, Heron on #7441):
+  - **a `cannot:`** (`chat_cannot`): it begins with `cannot:` (any case,
+    after blank space) with a reason after it and holds no fenced block;
+    its first line alone is the answer. With the chat cut, only a first
+    line that ended before the cut (a line break follows it). The voice
+    takes it as the agent's `cannot:`, as from a file: it never says the
+    agent's words, but its own fixed line, "I couldn't make that one."
+    (`make_skill_agent::CANNOT_LINE`), or with `LAMP_MAKE_NO_CANNOT` on it
+    makes the request one task for the agent; either is said instead of
+    "try again";
+  - **a skill** (`chat_skill`): the whole chat, never a cut one, with
+    exactly one closed fenced block that is `skill.toml` and one that is
+    `SKILL.md`, found as the voice finds them (`made_skill::fenced`, line
+    for line: named whole, by language `toml`/`md`, or bare with front
+    matter for `SKILL.md`; a bare fence ends only a block of its own mark,
+    at least as long). A `scripts/…` block may come with them. Not the
+    rules' own example skill given back (`is_example`, as the voice's
+    `make_skill_local::is_example`: named `example-only`, or its
+    `skill.toml` the example's but for blank space). Words around the
+    blocks are kept, since the voice reads the blocks alone, and the voice
+    then puts it through the same `files` check, caps and repairs as a
+    file's answer. A skill longer than 4000 characters arrives cut and is
+    refused here: its make stays `no_answer`.
+
+  Any other chat answer (a skill's file missing or twice, a block left
+  open, a cut chat that isn't a whole `cannot:` line, the example, or
+  plain words) is dropped as before (`no_answer`). `answer.md` always wins
+  over chat. A chat answer taken is journaled: `[lamp-tasks] skill task
+  <run>: the make's answer was taken from the agent's chat (no answer.md),
+  <n> bytes`. Limits: lamp-voice depends on lamp-tasks, so lamp-tasks
+  keeps its own copy of the voice's fence reading and of the example's
+  `skill.toml`, as a gate only; the voice's own check still decides. On
+  lamp-c0a4 (OpenClaw, deepseek-flash) the agent put every make's answer
+  in chat, never in `answer.md`: 3 of 3 makes of a phone battery skill
+  said `cannot:` (13584), and on 17 Nov at 09:35:41 a whole, correct
+  `head-pat-next-event` (731 bytes, `skill.toml`, `SKILL.md` and
+  `scripts/main.py`) was dropped as `no_answer`. Tests:
+  `a_gateway_make_with_no_answer_file_takes_its_chat_cannot_line`,
+  `a_gateway_make_with_no_answer_file_takes_a_skill_said_in_chat`,
+  `a_gateway_make_with_no_answer_file_drops_any_other_chat_answer`,
+  `a_gateway_make_never_takes_a_chat_skill_harness_cut_short`,
+  `a_gateway_make_never_takes_a_cannot_line_harness_cut_short`,
+  `a_gateway_make_never_takes_the_rules_example_given_back_in_chat`,
+  `a_bare_fence_closes_only_a_block_of_its_mark_and_length`,
+  `a_gateway_make_with_an_answer_file_takes_the_file_over_its_chat`.
 - **One session (`LAMP_TASKS_ONE_SESSION`, #7258):** with it on, the make
   is to go into the one session as a message instead of a session of its
   own. The choice is one seam function, so #7258 takes it over there; a
@@ -3757,20 +3941,32 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
   `issue_7092_a_fixed_write_that_may_have_begun_is_never_asked_again`,
   `issue_7092_a_fixed_write_unmade_twice_or_unanswered_is_not_made`.
 
-### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` off)
+### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT` on, `LAMP_TASK_NET` on)
 
 The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
-agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` stays
-off and set in no unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET`, off in
+the product until its checks, goes in the six units below once on, so a run granted `net` with the
+owner's spoken yes reaches the public web on ports 80 and 443, held like
+every run (the first builder's decision on #7200: never the lamp's
+networks or its local ports; the home router's public address isn't
+closed, below). With lamp-update's one run path on
+(`LAMP_SKILL_DEFAULT_AGENT`, on in the product too) such a run goes through
+Harness as every skill's run, and its wrapper finds its way out and its
+fresh home by its run id ("On the one run path", below); a run that can't
+be given its way out is refused `no_net` and the lamp says why aloud.
+Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
 one runner (a fresh home per run, the token as a file) with no new rules:
 
 - **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
-  lamp-skills and its manage helper, lamp-control and lamp-voice): a task
+  lamp-skills and its manage helper, lamp-control, lamp-voice and
+  lamp-cloud, whose skills page loads with lamp-skills' loader): a task
   grant beside lamp-control's own (`NET_GRANT`). A hand-over whose grants
-  name it runs through the make's runner with its network kept
-  (`skill_make::lamp_runner(home, false)`: Hermes's namespace, no
-  `LAMP_NS_NET`); any other stays `LAMP_NS_NET=run`. lamp-control keeps
+  name it runs through `skill_make::NetRunner`: with the one run path off,
+  the make's net runner (`skill_make::net_runner`: held,
+  `LAMP_NS_NET=run`, with its own way out, below); on, lamp-tasks' Harness
+  runner ("On the one run path", below). Any other is held with none.
+  lamp-control keeps
   `net` in the owner's yes and checks it with the folder's declared
   grants, but never names it in the token (`task_yes::KeptYes`), so the
   minted grants are matched against the line's without it. So a run keeps
@@ -3783,10 +3979,142 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and a skill has one yes, so an agreed check is the owner's yes to `net`
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
+- **A skill made by voice or in the app that needs the internet**
+  (lamp-voice with `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`
+  and `LAMP_UPLOAD_TO_AGENT` on, `make_no_cannot::net_by_agent`): the
+  make's prompt, which is also the rules file of an agent's make here
+  (`skill_make`), tells the model to answer what only the internet tells
+  with one line, `internet:` and what it looks up, never `cannot:`. The
+  voice then makes it one task for the lamp's agent: asked for by its
+  words, an agent skill granted `net`, whose first ask reads it back and
+  waits for the owner's spoken yes before any run; on a trigger ("check
+  the Bitcoin price every day at 9 and tell me"), by the owner's ruling of
+  17 Nov, a made agent task on it granted `net`, said back and waiting for
+  the spoken yes, which lamp-control keeps with `net` in it. Its run at
+  the trigger is checked as any `net` run: no kept yes naming `net`, no
+  egress socket (docs/skills.md, "With `LAMP_TASK_NET=on`, what only the
+  internet tells is a task for the agent").
+- **A `net` run's way out** (`crate::egress`, the design note on #7200,
+  Heron's answers): every run is held, `net` or not. A `net` run goes
+  through `skill_make::net_runner(home)`: the held runner
+  (`LAMP_NS_NET=run`, so `--net`, only `lo` and the model relay on
+  `127.0.0.1:7741`), plus its own egress socket,
+  `/run/lampos-tasks/egress/make-<run id>.sock` (0600 in a 0700 folder),
+  made by lamp-tasks only after lamp-control's yes names `net` and removed
+  when the run ends (and when its deadline passes); one left by a stopped
+  lamp-tasks is swept at the next. `LAMP_NS_EGRESS` names it to the
+  namespace script, which shows that file alone, read-only (missing or not
+  a plain `make-*` name, the run ends), lowers
+  `net.ipv4.ip_unprivileged_port_start` to 53 in the run's own network
+  namespace (refused, the run ends: never a fallback to the lamp's
+  network), binds a `resolv.conf` of `nameserver 127.0.0.1` read-only over
+  the lamp's, and starts `net-relay --egress`: besides `127.0.0.1:7741`, an
+  HTTP proxy on `127.0.0.1:3128` (`CONNECT` and absolute-form `http://`)
+  and DNS on `127.0.0.1:53` (UDP and TCP), each piped to the egress
+  socket; any of them not bound, no `ready`, and the run ends. The run gets
+  `HTTPS_PROXY`/`HTTP_PROXY` (both cases) `http://127.0.0.1:3128`,
+  `NO_PROXY=127.0.0.1,localhost` (the model stays on its relay) and
+  `NODE_USE_ENV_PROXY=1`. Port 53 because `resolv.conf` can't name a port.
+  - **Outside, lamp-tasks checks everything** (the relay checks nothing:
+    the run could talk to the socket itself). A proxy request is read whole
+    (at most 8 KiB), its port must be 80 or 443, a single-label name is
+    closed, and the name is resolved by lamp-tasks, which connects only to
+    an address it checked, so a name that resolves somewhere private gets
+    nothing. Closed: the lamp's own networks (every interface's address
+    and prefix and point-to-point peer by `getifaddrs`, every route's
+    gateway and destination from `/proc/net/route` and
+    `/proc/net/ipv6_route`, the default routes' gateways among them but
+    never `0.0.0.0/0` or `::/0` as a network, read again at each connect,
+    so `172.168.20.0/24` and a home's routed IPv6 `/48` are closed whatever
+    their range; `/proc/net/route` unread, nothing passes, and
+    `/proc/net/ipv6_route` unread, every IPv6 address is closed); IPv4
+    `0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16`, `172.16/12`,
+    `192.0.0/24`, the three documentation /24s, `192.168/16`,
+    `198.18/15`, `224/4`, `240/4`; IPv6 `::`, `::1`, `::/96`, `fc00::/7`,
+    `fe80::/10`, `fec0::/10`, `ff00::/8`, `2001:db8::/32`, the local-use
+    NAT64 `64:ff9b:1::/48` whole; and an IPv4 address inside IPv6
+    (mapped, NAT64 `64:ff9b::/96`, 6to4) checked as IPv4. A closed
+    connection is closed with no answer (`curl` shows `000`).
+  - **Not closed** (Heron's P2 on #7200), as nothing on the lamp names
+    them: the home router's public (WAN) address, which a run can learn
+    from any what's-my-IP site and which many routers answer from inside
+    (their admin page, or a port forward looped back to a home host), and
+    an IPv6 network of the home that no route of the lamp's names. So the
+    promise is the public web on 80 and 443, the lamp's own networks
+    closed, the router's public address not blocked.
+  - **Names**: each query is forwarded as it came to the lamp's own name
+    servers (`/etc/resolv.conf`, at most three: over UDP for a datagram,
+    TCP for a stream), so only lamp-tasks talks to the router, only on
+    port 53. A run's DNS question, of any type, goes to the lamp's
+    resolver, usually the router. A single-label name (`printer`, `nas`) and any name under
+    `in-addr.arpa`/`ip6.arpa` that isn't a whole public address are
+    answered `REFUSED` and never leave.
+  - **Bounds and words**: at most 16 pipes at once each side, 10 s to
+    connect, 60 s with no byte, nothing past the run's deadline. Bytes are
+    never logged; a line is fixed text and an address's class, never the
+    address or a name.
+  - **What gets out**: only what uses a proxy: curl, pip, git over https,
+    Python's requests/httpx/urllib, Node with `NODE_USE_ENV_PROXY`. Raw
+    TCP, UDP and ICMP fail closed.
+- **On the one run path (`LAMP_SKILL_DEFAULT_AGENT` on in lamp-update and
+  lamp-tasks, as in the product): the wrapper finds a `net` run's way out
+  by its run id** (#7200's way (a)). Harness starts the run's agent
+  (`harness new` in `skill-<run-id>`) with Harness's own environment, so
+  nothing per run of lamp-tasks' gets through it; the one run path's
+  wrapper already finds the run's token file by the run's id, and now its
+  egress socket and fresh home the same way:
+  - **lamp-tasks** (`HarnessRunner::way_out`, with `LAMP_TASK_NET=on`:
+    `HarnessRunner::egress`) makes the run's fresh home
+    `<work>/lamp/make-<run-id>/home` (`skill_make::fresh_home_for_run`)
+    and its egress socket `/run/lampos-tasks/egress/skill-<run-id>.sock`
+    before its token file and `harness new` (or the wrapper's
+    `--lamp-task` entry with no Harness), only for a run granted `net`
+    with the owner's yes for it, and removes both when the run ends or at
+    its deadline, after its session is closed.
+  - **The wrapper** (`one-path-<agent>.sh`,
+    `agent_ns::wrapper::ONE_PATH_EGRESS_LINES`): it drops the caller's
+    `LAMP_NS_EGRESS`; in a `skill-<run-id>` pane whose socket is there (a
+    socket, never a link: anything else there ends the run) it sets
+    `LAMP_NS_EGRESS=skill-<run-id>` and `LAMP_NS_HOME` to that fresh home
+    (missing, or a link, the run ends). Hermes's data takes it as its
+    make's home (`LAMP_NS_MAKE`, `HERMES_HOME` under it), so the agent
+    namespace covers Hermes's lasting home as for a make, and
+    `ONE_PATH_EGRESS_GUARD` ends a run given its way out whose agent took
+    no such home: never the lasting home with the internet (P1 #6643).
+    The run gets `--net` as every run.
+  - **The agent namespace** takes `skill-<run-id>` as well as
+    `make-<run-id>` (`egress::NS_SKILL_LINE`) and does the same egress
+    steps: that socket alone, read-only, the proxy and DNS inside the run.
+  - **Checked before anything is made** (`skill_task::takes_net_runs`):
+    the default agent's wrapper carries `ONE_PATH_EGRESS_LINES` and
+    Hermes's make-home line, and the agent namespace the egress lines and
+    Hermes's make lines. Otherwise, a gateway default (OpenClaw: its turns
+    run in its gateway's namespaces, shared by every turn, which no one run
+    can be held in), `LAMP_TASK_NET` off in lamp-tasks, or the lamp's
+    Hermes not yet on the one run path's wrapper (#6898's round): refused
+    in `skill_task::NET_REFUSED`'s words, nothing made, asked or started.
+  - **Every refusal is said.** A `net` run refused before anything of it
+    ran (any of the above, `NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH` or
+    `egress::NO_EGRESS`) is answered `no_net` (`skill_task::NO_NET`);
+    lamp-skills takes it off the day's runs (`service_write::NOT_TAKEN`)
+    and says `task::NO_NET_SAID` aloud, behind a told answer's gate:
+    "I can't run that one: it needs the internet, and this lamp's agent
+    can't reach it yet." The journal keeps lamp-tasks' words.
+  - The make's runner, which an agent skill's run and a run given keys
+    still go through, can't be held by the one run path's wrapper (it holds
+    only a run started in its own `skill-<run-id>` folder): refused
+    `NOT_HELD_OFF_ONE_PATH`, which no longer blames `LAMP_SKILL_TASKS` or
+    a round.
+  - Tests: `harness::a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new`,
+    `skill_task::tests::a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net`,
+    `the_one_path_wrappers_carry_the_egress_lines_once`,
+    `skill_make::tests::with_the_one_run_path_a_make_is_ready`;
+    lamp-update's `agent_ns::wrapper::tests::a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not`;
+    lamp-skills' `task::tests::a_net_run_lamp_tasks_refused_is_said_in_plain_words`.
 - **An agent skill's run** (`run` = `scripts/SKILL.md`,
   `AGENT_INSTRUCTIONS`) follows the file only within its grants and its
-  network: the token holds lamp-control's grants, and the network is held
-  unless lamp-control's yes names `net`. Hermes is told to read that file
+  network: the token holds lamp-control's grants, and the run is held
+  with no way out but the model's unless lamp-control's yes names `net`. Hermes is told to read that file
   in the skill's read-only folder and do what it says, as data, reaching the lamp only
   through `control.sock` with the run's own token, never asking anyone for
   a key or token by voice nor saying one aloud. It goes through the make's
@@ -3824,7 +4152,8 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   reached through those tools, with no key. Off, or with no service
   granted, its config has none, as a make's.
 
-Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it`,
+Tests: `skill_task::tests::the_net_grant_is_held_with_its_way_out_and_no_grant_has_none`,
+`the_egress_socket_is_there_only_for_a_net_run_with_its_yes`,
 `a_net_run_has_a_fresh_home_of_its_own_never_the_lasting_one`,
 `a_fresh_home_is_taken_with_the_lasting_home_covered`,
 `an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
@@ -3866,12 +4195,48 @@ hand-over, before its token is minted (`skill_task::answer_with`, `Agent::keys`)
   values are never in the token, the arguments, the run's words (which
   name the variables and say never to print, write, send or say one), a
   journal line (counts only) or the skill's folder.
+- **Read once on the one run path** (a `net` run with lamp-update's one
+  run path, which `skill_make::NetRunner` hands to the lamp's own Harness
+  runner, `HarnessRunner`): Harness passes the agent's wrapper none of
+  lamp-tasks' variables, so lamp-tasks starts no shell of its own there.
+  The file stays in the run's own folder, and the wrapper finds it by the
+  run's id, as it does the token file and the way out
+  (`agent_ns::wrapper::ONE_PATH_KEY_LINES` in lamp-update,
+  `skill_task::ONE_PATH_KEY_LINES` here):
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run-id>/.run-env`,
+  only in a run, only a regular file in a folder that is no link. It is
+  read once (`. "$K"`, sourced, never an argument), deleted whatever came of
+  the read, and a file not read ends the run, all right after the run's
+  token is read and before the agent's data, its way out or its namespace
+  runs. So the keys are in the agent's environment alone, and the agent,
+  which sees its own folder inside the namespace, finds no file there.
+  lamp-tasks removes the file again after the run, and the folder with it.
+- **Refused where the keys can't reach the agent**, before Harness is
+  asked and before any token file or task file is written, so the run's
+  words never promise keys it doesn't have (`HarnessRunner::keys_reach`,
+  `skill_task::KEYS_REFUSED`, "a run given its keys can't be given them
+  on this lamp yet (...), so nothing was started", answered `run_failed`):
+  a wrapper without the key lines (lamp-update's round hasn't run,
+  `skill_task::takes_keyed_runs`), a gateway agent (OpenClaw: its turns
+  never start through the wrapper), a keys file anywhere but
+  `make-<run id>/.run-env`, or a lamp off the one run path in the Harness
+  runner. A `net` refusal (`no_net`) is said first when both apply. This
+  keeps keyed `net` skills (a web API or webhook) working on the product's
+  one run path rather than refusing them: the file never leaves the run's
+  own folder, which goes with the run.
 
 Tests: `skill_keys::tests` (the answer read whole or not at all, the file
 0400 and quoted, the launch reading it once and deleting it before the
 program, a missing name said, a `skill.toml` naming `secrets` seen),
 `skill_task::tests::a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing`,
-`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`.
+`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`,
+`harness::a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone`
+(through `NetRunner`: the file in the run's own folder as Harness starts
+it, the wrapper's own key lines putting the key in the environment and
+deleting the file, no Harness call carrying it; and each refusal), and
+lamp-update's `agent_ns::wrapper::tests::a_runs_keys_file_is_read_once_deleted_and_never_in_argv`
+(the real wrapper: the key in the agent's environment, never in its argv
+or output, the file gone, a second start given none, a link refused).
 
 ## A skill's run on OpenClaw (#6685, #7133, the lead's decision, 15 Nov)
 
@@ -4000,7 +4365,19 @@ file:
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", or "did
   not answer on 127.0.0.1:18789" when the port never answered), and the
   run's error is `Harness didn't start the run
-  (openclaw_gateway_not_ready)`. Each read starts OpenClaw's CLI, about
+  (openclaw_gateway_not_ready)`. The 240 s count from the port's first
+  answer, so a gateway started mid-wait has its whole start (#7550: on
+  lamp-c0a4 its port answers 51-53 s after systemd's `Started`, and it
+  serves 126-144 s after), within the run's own deadline. A gateway whose
+  port has not answered within 60 s (`gateway::READY_WITHIN`, a spoken
+  task's bound) is then asked about once: if its unit
+  (`lamp-openclaw-gateway.service`, `systemctl show -p ActiveState
+  --value`, only read, at most 2 s, never started or stopped) is `active`,
+  `activating` or `reloading`, it is starting and is waited for ("tasks: the OpenClaw Gateway's port has not answered in 60 s, but its
+  unit is up: waited for as it starts"); otherwise, or when systemd can't
+  say within 2 s, it is stopped, and the wait ends then ("tasks: the OpenClaw Gateway
+  did not answer on 127.0.0.1:18789 within 60 s"), never held to 240 s
+  (#6577, lamp-fc4b, 17 Nov: a stopped gateway held a skill's run 240 s). Each read starts OpenClaw's CLI, about
   10 s on lamp-c0a4 even on a warm gateway (C7170, 15 Nov), so it is made
   once per gateway start: a read that succeeded is kept against the inode
   of the socket listening on 18789 (`/proc/net/tcp`,
@@ -4010,7 +4387,15 @@ file:
   The wait is also bounded by the remaining run deadline; shutdown cancels
   an active approvals subprocess and its process group. No hand-over is
   sent after cancellation or expiry. A spoken task still waits only for
-  the port, up to 60 s.
+  the port, up to 60 s. A run the person asked for by voice that is refused
+  so (`openclaw_gateway_not_ready`), or as `harness_not_running` (#7282), is
+  said once in exact words, "I'm still getting ready. Give me a minute and
+  ask me again." (lamp-skills' `task::not_ready_line`), only within 180 s
+  of the lamp's start (`/proc/uptime`, `skill_words::NOT_READY_WITHIN_MS`);
+  past it, or with no time read, the run's failure is told as before. A
+  trigger's run says nothing. A refusal for no lamp target of its own is not told so, as it
+  also stands for Hermes on the lamp being off. Test:
+  `task::tests::a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so`.
 - **A fixed write is refused.** A task with no script (a fixed write) is
   refused before anything is made live: "a fixed write is not taken by a
   gateway agent, so nothing was started".
@@ -4137,6 +4522,404 @@ is the name Harness's `show` gives for the session, or `the lamp's default
 agent` when Harness says stopped, or `not known (harness show: …)` when its
 reply can't be read. The same holds for Hermes and OpenClaw.
 
+### One session for the lamp's default agent (#7246, `LAMP_TASKS_ONE_SESSION=on` in the product's lamp-tasks unit)
+
+Phase 1 of #7246, the lead's final design: the lamp's default agent keeps
+ONE Harness pane, and every spoken task and every skill run is a message
+typed into it. It is on in the product's lamp-tasks unit
+(`deploy/product/lamp-tasks.service`). Switched off (any value but `on`
+exactly, the default when unset), every task and run is its own
+`harness new` as above, the old per-task panes, byte for byte
+(`crates/tasks/src/one_session.rs`).
+
+- **OpenClaw first.** The pane is opened only when the lamp's default
+  agent is OpenClaw. A Hermes default keeps today's per-task path, one
+  pane per task and per run, until row H1 shows it on a Hermes lamp.
+- **Opened at start, when the agent is ready.** With the switch on (and
+  `LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT`), a thread of
+  lamp-tasks (`one-session`) ticks every 2 s. It opens the pane only once
+  Harness is set up, Harness is called as the person
+  (`--harness-as-person`, as the product's unit does), the lamp's own
+  machine is known, its default agent is OpenClaw and the gateway
+  answers within 25 s (`LAMP_PLACE_GATEWAY_WITHIN`: one read of its
+  approvals, about 10 s on a lamp even warm; read on this thread only,
+  never on a hand-over's way). The open is `harness new openclaw` in
+  `~/harnesses/lamp-tasks/one-session` (lamp-tasks' Harness project
+  `~/harnesses/lamp-tasks` and `FOLDER`, folder 0700), named
+  `lamp-one-openclaw` (for `harness ps` only), with a short first prompt;
+  it waits up to 120 s for that first turn to be idle. A `new` that fails
+  is tried again after 5 s, doubling to 5 min.
+- **No agent ready: no session, no loop.** On a fresh or signed-out lamp,
+  or one whose default is not OpenClaw, no pane is opened and no `harness
+  new` is tried. The lamp is looked at again after 60 s
+  (`NOT_READY_FIRST`), doubling to 10 min (`NOT_READY_MOST`), or at once
+  when a trigger fires: Harness's daemon started, or the lamp's machine or
+  default engine changed (a cheap read of both at each tick, with no
+  gateway call). Each new reason is journaled once: `tasks: one session:
+  not opened: <why>`, for example `Harness is not set up`, `Harness is
+  called as an agent`, `the lamp's own machine is not known (signed
+  out?)`, `the default engine is hermes, not OpenClaw` or `OpenClaw's
+  gateway is not ready: <why>`. Once the pane is open, it is not looked
+  for again.
+- **As the person only.** Harness closes an idle pane after 30 min only
+  when an agent started it, so with Harness called as an agent no pane is
+  opened and every task goes the per-run way.
+- **The per-run way, with the switch on.** A spoken task still gets its
+  own `harness new` only when it is not for the pane (another machine or
+  engine than the lamp's own default, or a session the person named); a
+  skill run only when it is not for OpenClaw as the gateway default agent
+  (a Hermes default, say) or Harness is called as an agent. Both also go
+  the per-run way once Harness takes no reply here (`reply_off`, below).
+  Otherwise work for the pane never falls back to its own `new`.
+- **Held while the lamp's place is not known.** A spoken task that may be
+  for the pane while the lamp's place is not known yet (just after a
+  start, or with Harness's daemon down; signed in or out alike) is not
+  sent the per-run way. It is held in the queue until the place is known,
+  at most 15 min (`QUEUE_WAIT`), then fails `busy` with no `harness new`.
+- **Found again by its kept id.** The pane's agent id from its `new` is
+  kept in `one-session.json` in lamp-tasks' store folder
+  (`/var/lib/lampos-tasks/store`, 0600). At the next open (a lamp-tasks
+  restart, or a boot, which Harness's own restore brings back under the
+  same id) it is looked up with `show`: live, it is adopted with no
+  `new`; stopped or gone, `harness resume <id>` once; else a fresh `new`.
+  It is never found by name: a `new` with a name already there makes a
+  second pane, and the agent may retitle it.
+- **A kept pane that is asking is not adopted.** A kept pane read
+  `needs-input` has an ask nobody holds. It is not adopted. Like every
+  kept pane not taken back (gone and not resumed, resumed gone, not read,
+  or for another machine or engine), it is closed `--now` and its OpenClaw
+  conversation deleted (`sessions.delete`) before the new pane is opened
+  (`dropped <id> (not taken back)`).
+  A close that fails on this machine backs off and is tried again, never
+  a `new` beside a pane that may still be live (`<id> not closed:
+  <code>`), except a close Harness answers `UNKNOWN_HARNESS` (or `GONE`):
+  that pane is already gone, so it is dropped as a closed one is and the
+  new pane opened (`<id> already gone (UNKNOWN_HARNESS); a new pane`).
+- **An uncertain `new` is never made twice.** A `harness new` that comes
+  back uncertain or not started at once may have made the pane. It is
+  looked for with one `harness ps`, matched on the pane's own folder
+  (`one-session`). Found, it is kept as the pane. Not found, or `ps`
+  cannot say, the open fails (`harness new: uncertain, looked for next`),
+  backs off as a failed `new` does, and the next open looks again before
+  any other `new`.
+- **Reopened only when dead.** Stopped, failed, gone (`UNKNOWN_HARNESS`)
+  or not running: reopened once for that turn. `offline`, `unknown`,
+  `starting`, `installing` and `working` are waited on. A restart of
+  Harness's daemon (a sign-in, #7141, or its env file changed) only drops
+  the pane from memory; the next open adopts it by its kept id. A second
+  failure is journaled `<task> not typed: <why>` and makes no second
+  session: a skill run fails (`the lamp's one session could not take the
+  run: <why>`), a spoken task is answered `busy` (below).
+- **Everything is a message.** A spoken task for the lamp itself (its
+  machine id, its default engine, no session named) and a skill run for
+  the gateway default agent are typed into the pane with
+  `harness reply --machine <id> <pane> --json -- <words>`
+  (`Cli::reply_to`). The words start with one line, `New task <id>:`,
+  then the task (a skill run's: the launcher's task as before). They are
+  typed only once `show` reads the pane idle with its last words taken
+  (no `told`, or `told.taken`): Harness queues words typed before that,
+  which would mix two tasks. The pane is never closed at a task's end.
+- **Harness takes no reply here (`reply_off`).** Harness takes a reply
+  only with the person's `programs-reply` setting on (`harness settings`,
+  off by default, so off on a customer's fresh lamp). A reply refused
+  `REPLY_OFF` (exit 5, `reply_off`) types nothing, so that task goes the
+  per-task way, exactly as with the switch off: its own `harness new`
+  with its words as `--task`, which needs no reply (a skill run its own
+  `new` in `skill-<run id>` and `close` at its end; a spoken task its own
+  launch). It is not failed and not `busy`. lamp-tasks remembers it until
+  it starts again (`OneSession::takes_reply`): every later task goes the
+  per-task way at once, with no reply tried and no wait for the pane, and
+  the first time is journaled `tasks: one session: Harness takes no reply
+  here (reply_off); each task gets its own pane`. The pane, unused from
+  then on, is removed as at a sign-out: once nothing holds it, the
+  `one-session` thread closes it `--now`, deletes its OpenClaw session
+  and its kept id (`dropped <id> (Harness takes no reply here
+  (reply_off))`), and opens no pane again until lamp-tasks starts again.
+  Any other refused reply (`reply_failed`, a busy, gone or not
+  ready pane) is as before: no second session.
+- **A spoken task's turn.** The store watches the pane as a session the
+  person already had (`Joined`) and never closes it. The store reads the
+  pane for the task only once its words were seen taken. Not seen taken
+  within 120 s (`OPEN_IDLE_WITHIN`) or by lamp-tasks' stop, the task is
+  uncertain (`one_session_not_taken`) and never typed again.
+- **Held until the answer is told.** The pane is held until the task's
+  answer is told by the voice, not only read: the next turn in the pane
+  takes the task's place in the store. A playout under way is not told
+  yet. An answer still untold 60 s after it was read (`UNTOLD_CLOSE_MS`),
+  or read in an earlier boot, lets the pane go too. Then the queue goes
+  on.
+- **An untold answer outlives the takeover (#7600).** The next turn
+  joins the same agent and takes over its session in the store
+  (`finish_launch`, journaled `tasks: task <B> takes over the session of
+  <n> earlier one(s)`). With `LAMP_TASKS_ONE_SESSION` on, an earlier task
+  whose newest kept answer is still untold is kept, not dropped: an idle
+  answer with words, no telling claimed (or its playout still under way),
+  not told in the voice's own words, kept in this boot at most 24 h ago
+  (`WATCH_AT_MOST_MS`). It is marked given on (`close.state` `handed_on`):
+  never read, followed, pushed or closed again, and an `observe` of it is
+  refused, since its session is the later task's. The voice still lists
+  it and tells it once, as any newest settled answer (lamp-voice
+  `read_once_with`, key `<store>:<task>:<observation>`). Once told, the
+  next join drops it as before; one from an earlier boot is dropped too.
+  It counts toward the store's 16 tasks, and a full store lets the oldest
+  spent task give way, as before. Journaled `tasks: task <B> joins the session of <n>
+  earlier one(s) whose answer is still untold: kept for the voice`. A
+  store holding one is written as schema 8, which a build before sets
+  aside. Off (a session a task), nothing changes.
+  - **Tests:** `engine::tests::a_joining_turn_keeps_an_earlier_answer_still_untold`,
+    `a_joining_turn_drops_an_earlier_told_answer`.
+- **A spoken task that ends unanswered.** A spoken task that ends with no
+  answer (cancelled, or an ask nobody answered) keeps the pane held. The
+  `one-session` thread then closes it `--now`, deletes its OpenClaw
+  conversation (`sessions.delete`) and its kept id, and lets the pane go.
+  The next look opens a new pane.
+- **A spoken task's short wait (`SPOKEN_PANE_WAIT`).** The store hands a
+  spoken task for the pane to the tasks-harness worker, which serves
+  every hand-over and read, only with the pane free: while the pane is
+  held, another spoken task is being handed over, or one was put back
+  less than 2 s ago, it stays `queued` in the store, first in the pane's
+  queue. On the worker, its wait for its turn and for an idle pane is
+  bounded by 5 s or lamp-tasks' stop. Answered `busy` past that bound or
+  at the stop, with nothing typed, it is put back in the store's queue in
+  its place (`Engine::put_back_launch`), journaled, and the pane is not
+  tried again for 2 s (`PANE_RETRY`). A full queue answers at once and
+  the task fails `busy` as before, and so does a task already put back
+  for 15 min in all since its first hand-over (`QUEUE_WAIT`).
+- **A skill run's turn.** It ends when `harness wait`, then `show`, read
+  the pane idle on that run's own header line; a pane idle on another ask
+  is waited on again, so each run keeps only its own turn's answer. The
+  launcher's `started` still decides whether the skill ran. A turn that
+  stops to ask the person something (`needs-input`) ends that run, and
+  the pane is closed `--now` and opened again next.
+- **A skill run waits for skill-start on the allow-list.** Right after a
+  gateway start, agent `main`'s exec allow-list has no
+  `/usr/local/lib/lampos/skill-start` until lamp-update adds it again, and
+  the agent's exec would be denied. So before a skill run is typed into
+  the pane, lamp-tasks reads the gateway's approvals
+  (`openclaw approvals get --gateway --json`, within 20 s). With no entry
+  for the launcher under `main` or `*`, the run is not typed: it fails at
+  once with code `skill_start_not_allowed` (a fixed write's stays
+  `not_started`), with nothing queued or made. A read that fails or is
+  not JSON lets the run be typed. A read that found the entry is kept
+  until the gateway's listening socket changes.
+- **One queue, one turn at a time.** Harness has no steer verb and no
+  turn id: a busy pane answers `NOT_IDLE`. So work that arrives while the
+  pane is held waits in one FIFO in lamp-tasks: at most 4 waiting, each
+  at most 15 min, spoken tasks ahead of skill runs. A full queue, or one
+  that waited 15 min, is refused `busy` ("the lamp's agent session is
+  busy and its queue is full; one task runs at a time"), so lamp-skills'
+  retry (#7239) still applies. There is no overflow session.
+- **A waiting task is told.** A spoken task that waits stays `queued` in
+  the store, and its task metadata carries `"queued": {"position": <n>}`
+  (1 the next), so the lamp's first line can say it is finishing the
+  earlier task. The voice's words for it are a follow-up.
+- **No reset after a skill run.** What a run read stays in the session
+  (one user in this phase, the lead's reason 2). OpenClaw's pane is never
+  rotated by count: its gateway compacts the session itself
+  (`agents.defaults.compaction`), so the lamp keeps one conversation
+  (`rotation_due`). Only an engine without compaction would get a new pane
+  after 40 turns (`ROTATE_TURNS`) or 250k tokens (`ROTATE_TOKENS`), as
+  Hermes' gateway rotates (`runtimes/hermes/rotation.go`).
+  Harness shows no token count, so tokens are estimated at 4 characters
+  a token from the words typed, the skill runs' answers read and the
+  spoken tasks' answers the store read. The counts start at 0 when a pane
+  is opened or adopted. At the next turn past either bound the old pane
+  is closed `--now`, its OpenClaw session is deleted
+  (`sessions.delete`) and its kept id forgotten, and a new one is opened,
+  never adopted back. Within a pane, compaction is the engine's own.
+- **Per run, as before.** A skill run's folder `skill-<run id>`, its
+  launcher claim, its pass and its token for linked services stay its
+  own, and are ended and removed at its end; only the session is shared.
+  A write to a linked service still needs the owner's spoken yes.
+- **A skill run's cancel or deadline** ends the turn: the run's token is
+  ended first, then the pane is closed `--now`, since Harness has no
+  interrupt verb, its OpenClaw session is deleted (`sessions.delete`) and
+  its kept id file removed; the next open makes a new pane. A skill run's
+  `needs-input` close is the same.
+- **Journal.** Ids are the pane's first 8 characters; each line starts
+  `tasks: one session: ` but the per-task and per-run lines at the end.
+  `on (LAMP_TASKS_ONE_SESSION=on)`; `not opened: <why>` (with no agent
+  ready, or `<why>; tried again in <s> s` after a failed `new`);
+  `opened <id> (openclaw) in <ms> ms`, after `reopened after <why>` when
+  it replaces one; `adopted <id> (<state>)`, `resumed <id> (<state>)`,
+  `<id> resumed <state>; a new pane`, `<id> not resumed: <code>; a new
+  pane`; `rotated after <n> turns, ~<t> tokens`; `reused (<n>th turn) for
+  <task>`; `<task> queued behind <holder>`; `<task> refused busy, <n>
+  already wait`; `<task> waited its most, refused busy`; `<task>'s turn
+  is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
+  typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  `closed --now after <task>'s turn was cancelled; opened again next`,
+  or `not closed after <task>'s turn was cancelled: <why>`;
+  `<task>'s turn asks something; closed --now, opened again next`;
+  `<task>'s turn ended unanswered; the pane is closed next`; `found <id>
+  an uncertain new made`; `Harness takes no reply here (reply_off); each
+  task gets its own pane` (once per lamp-tasks start);
+  `let go: Harness's daemon started` or `let go: Harness's daemon
+  restarted`; `the lamp signed out; its pane is removed`; `dropped <id>
+  (<why>)`. Per task and per skill run: `tasks: <task>: turn accepted in
+  <ms> ms (<n>th turn)`, the time from the hand-over to the agent taking
+  the words. Per spoken task put back: `tasks: <task>: the lamp's pane
+  was not free within 5 s; queued again`. Per spoken task whose words
+  were not seen taken: `tasks: <task>: its words were not seen taken in
+  <ms> ms`. Per spoken task held for the lamp's place: `tasks: <task>:
+  held until the lamp's place is known (at most <n> min)`, then `tasks:
+  <task>: the lamp's place is known; held no longer` or `tasks: <task>:
+  the lamp's place not known in <n> min; busy`. Per skill run not typed:
+  `tasks: <task>: not typed into the one session: <why>`.
+
+#### What the one session keeps
+
+The pane's words are kept in these places on the lamp, all owned by
+`lampos`:
+
+| What | Where | Mode |
+|------|-------|------|
+| The pane's agent id, machine and engine | `/var/lib/lampos-tasks/store/one-session.json` | 0600, in the 0700 state folder |
+| The pane's folder, where `harness new` is started | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | folder 0700 (lamp-tasks creates it); `/var/lib/lampos-tasks` is 0700 (`StateDirectoryMode=0700`) |
+| Harness's records of the pane (registry, stopped-agent record) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | inside the 0700 Harness home |
+| The conversation itself (OpenClaw session `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (older OpenClaw releases: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` and `state` 0700 (lamp-update creates them); OpenClaw writes with no `UMask=`, so the 0700 folders keep other users out |
+| With a Hermes pane (not opened in phase 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+
+When it is removed:
+
+- **Default engine switch: removed.** When the default is no longer
+  OpenClaw, or the lamp's machine id changes, the `one-session` thread
+  closes the pane `--now`, deletes its OpenClaw session through the
+  gateway (`openclaw gateway call sessions.delete`, with its transcript),
+  and deletes `one-session.json` (`OneSession::drop_pane`). Harness's
+  `close` keeps OpenClaw's own store, which is why lamp-tasks deletes the
+  session itself. Only a real move counts: the old and the new machine
+  and engine both known and different. A read with either unknown
+  (Harness not set up yet, the machine list failed) keeps the pane, and
+  so does any other field of its place, such as its folder.
+- **Factory reset: removed.** The reset stops `lampos`'s user manager
+  (and with it Harness's daemon and the pane), then wipes the store
+  folder, `harnesses/lamp-tasks` and `.harness/cli/data`, OpenClaw's
+  state but `openclaw.json`, and Hermes' `state.db` and `sessions/`.
+- **Sign-out: removed.** When Harness's sign-in, read signed in, is next
+  read signed out (`harness_sign_in_read`), the pane is removed the same
+  way (`OneSession::drop_pane`) at the `one-session` thread's next tick
+  with nothing holding it. A restart of Harness's daemon alone only drops
+  the id from memory; the pane is kept.
+- **A start signed out.** `one-session.json` also keeps `signed_in`:
+  whether the lamp was signed in when the pane was made (written then
+  only). At a start that reads the lamp signed out, a kept pane made
+  signed in is removed the same way; a file without the field counts as
+  signed in. A kept pane made signed out is adopted while the lamp is
+  still signed out (the ship lamp runs signed out, #6407).
+
+#### What a skill run's pass bounds in the one session
+
+A skill run's pass is its one-run token: lamp-control mints it from the
+owner's yes for that skill, and it names that yes's grants
+(`Tokens::mint`). In the one session it stays the run's own, not the
+session's: the `skill-start` launcher claims the run once and hands the
+token to the skill's script on fd 3 inside the run's fence, never in the
+pane's words, a file or an argument. With it the script reaches the lamp
+through lamp-control's socket (`LAMP_CONTROL_SOCKET`) for the grants the
+yes names, and the owner's linked services only as the `<code>-read` or
+`<code>-write` grants it names (`SERVICE_GRANTS`), through lamp-control
+to lamp-services; the services' own tokens never leave root's store. The
+token is ended when the run ends, however it ends (answered, cancelled,
+at its deadline or at lamp-tasks' stop), the launcher's claim with it,
+and the run's folder `skill-<run id>` is removed, so a later turn in the
+same session holds no pass. A write to a linked service still waits for
+the owner's spoken yes: lamp-services sends only what the owner said yes
+to, once a run.
+
+Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
+
+- **Rows on c0a4 (#7246):** M1 (memory, the switch off then on: one
+  session, no OOM kill, no lamp-voice exit, lowest MemAvailable at least
+  600 MB), then L1 with the switch off and L2 and G1 with it on: spoken
+  tasks and skill runs through one pane (one `new`, `reply` per task, no
+  `close`), each skill run's token ended and folder gone, and a task said
+  `queued` while another works.
+
+### The kept session (openharness#4393, `LAMP_TASKS_KEPT_SESSION=on` in the product's lamp-tasks unit)
+
+With `LAMP_TASKS_ONE_SESSION` on, the one pane can be the lamp's own kept
+session, a Harness session a program owns, which Harness takes replies for
+with no sign-in and no `programs-reply` setting
+(`crates/tasks/src/one_session.rs`). It is on in the product's lamp-tasks
+unit and gated on Harness: at the one session's first open, and again after
+Harness's daemon starts again, lamp-tasks asks `harness capabilities
+--json` (`programSessions` 1 or more is yes). A Harness without that verb
+(the first builds with program sessions have none) is asked `harness ensure
+--help`: `--program-token-file` in its help is yes. Neither, an older
+Harness: the one session is exactly as above, its `reply_off` fallback
+included. Proven on lamp-c0a4 (17 Nov) on Harness 0.6.58-p4393.5, signed
+in and signed out, and on 0.6.60, signed in (#7507's ROW).
+
+- **Token.** `kept-session.token` in lamp-tasks' store folder: 0600, this
+  user's, 32 random bytes as hex, made once and kept across restarts (made
+  again only when it is not a plain 0600 file of 32 bytes or more). Only its
+  path is passed, as `--program-token-file`; its text is in no argument,
+  journal line or environment.
+- **Open.** `harness ensure openclaw <folder> --name lamp-one-openclaw
+  --program-token-file … --json`: `live`, `resumed` (a pane that died, a
+  reboot) or `new`, with its OpenClaw session key (`engineSession`,
+  `agent:main:harness-<id>`) kept in the record. A new one is given the
+  open's first words with an acknowledged reply and its turn waited for. A
+  pane the old way kept holds the name, so it is closed and its conversation
+  deleted first. `ENGINE_NOT_READY` (the engine still starting, or a crashed
+  one still exiting) is tried again every 5 s for up to 45 s, then after
+  60 s, doubling to 10 min; `NAME_TAKEN` or `NOT_YOURS` sends the pane the
+  old way until the daemon starts again. The gateway's approvals read
+  (`LAMP_PLACE_GATEWAY_WITHIN`) is skipped on this path: `ensure` and
+  `reply` wait for the engine themselves, and that read alone took 17 s on
+  a loaded lamp, so the kept session never opened.
+- **Adopted at a start.** The record (`one-session.json`) says whether the
+  session was opened signed in. An adopt right after lamp-tasks starts,
+  before its first sign-in read, keeps what the record says, so a session
+  opened signed out is never mistaken for a signed-in one and removed when
+  its engine later dies; a turn typed signed in marks it signed in.
+- **Each task.** `harness reply lamp-one-openclaw --program-token-file …
+  --timeout 60s --json -- <header and words>`, which returns only once the
+  engine took them (`{"state":"taken","inputId":"program:<uuid>"}`); only
+  then is the turn counted, and a spoken task joined with no look at
+  `show`. The 60 s hold is past Harness's own 30 s default: the first reply
+  after the engine starts took 21 to 34 s on lamp-c0a4, and 47.5 s for the
+  first words into a new kept session on 0.6.60 (#7507's ROW), so the hold
+  has about 13 s to spare; a later one 1 to 4 s. Words whose first character is `!` or `/` (OpenClaw's TUI would take
+  them as a shell or TUI command) get `Task: ` before them. `NOT_IDLE` and
+  `ENGINE_NOT_READY` keep the task in lamp-tasks' own queue, tried again
+  until its end. A `TIMEOUT` with `cancelled: true` typed nothing and is
+  tried again; one with `cancelled: false` and an `inputId` was typed and is
+  waited after, never typed again. `NOT_RUNNING` (its engine died) or a
+  `TIMEOUT` with nothing taken ensures the session again once, which comes
+  back `resumed` with the same id and its conversation, then the task fails
+  as before. The turn's end is `harness wait lamp-one-openclaw --after
+  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
+- **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
+- **Rotation and removal.** OpenClaw's kept session is not rotated by
+  count (its gateway compacts the session itself, `agents.defaults.compaction`);
+  a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one
+  answers, a sign-out or an engine switch is `harness close
+  lamp-one-openclaw --program-token-file …` and then `openclaw gateway call
+  sessions.delete` of its `engineSession`, which deletes the conversation
+  (Harness's `close --forget` is not built yet); a sign-out or an engine
+  switch removes the token file too. One not closed is tried again at the
+  next look, and no pane is opened meanwhile. A factory reset wipes the
+  store folder, token included.
+- **Forget, and a long idle: dropped, and a new one opened.** The owner's
+  "forget everything" (`ForgetSessions`, #6274) drops the kept session as
+  a sign-out does, once nothing holds it: `harness close`, then
+  `sessions.delete` of its `engineSession`, then its token file removed,
+  so the next task recalls nothing (`one_session::forgotten`). A kept
+  session left with no task for 2 h (`KEPT_IDLE_MAX`, from its open or its
+  last turn) is dropped the same way, since OpenClaw's is never rotated by
+  count. Either way the keep-open loop opens a new one (a new agent id and
+  token, so a new OpenClaw session) in the same look, right after the
+  drop, not at the next task. A task that asks for the pane while a drop
+  is asked for or under way (a forget, a sign-out) waits for it in the
+  queue, then goes into the new session, never the old one
+  (`OneSession::enter`). Journal: `the kept session dropped (the
+  owner asked to forget); a new one opens` (or `(no task for 120 min)`),
+  `dropped the kept session <id> (…); its conversation forgotten`, then
+  `kept session new <id> (openclaw, …) in <ms> ms`.
+
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
 Accepted for Monday's ship as #6882 (a) (the first builder, #7133,
@@ -4196,7 +4979,9 @@ transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
   (`EngineKind::typed_after`, `Cli::first_message`).
   - **The person's switch.** Harness takes the reply only with the
     person's `programs-reply` switch on (`harness settings`, off by
-    default).
+    default). The one session's replies need it too: with it off, each
+    task gets its own pane (`reply_off`, "One session for the lamp's
+    default agent").
   - **Not typed in.** The harness is started either way, so a task not
     typed in is uncertain, never sent again: `reply_off` (the switch is
     off), `reply_not_idle`, `reply_not_running` or `reply_failed` (the

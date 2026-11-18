@@ -18,6 +18,16 @@
 //!   that name every key word of it ([`Days::service_records_forget`]).
 //! - **Bounded.** At most [`MOST_PER_PERSON`] a person (the oldest change
 //!   goes first past it), [`DETAIL_BYTES`] of detail each.
+//! - **A source kind** (the linked-service memory plan, slice 1): `voice`,
+//!   the connector records the voice writes today, or a linked kind
+//!   (`task`, `agent`, `reminder`) that names its source in `source_ref`
+//!   (`{service, id, session?, computer?}`, at most [`SOURCE_REF_BYTES`])
+//!   with a one-line `summary` (at most [`SUMMARY_BYTES`]). Each linked
+//!   kind keeps at most [`MOST_PER_KIND`] a person, inside the
+//!   [`MOST_PER_PERSON`], its oldest change going first. A put that names
+//!   none of them is a `voice` record, as before.
+//! - **A forget wins by the deed's time** (`deed_unix_ms`): a put whose
+//!   deed or ask is before the person's last forget is refused.
 //!
 //! What a read found is stored by the voice as metadata and a short masked
 //! excerpt only; this store keeps what it is given and checks only sizes
@@ -26,7 +36,7 @@ use crate::{
     days::{Days, Error, Result, ensure_person},
     store::{self, Person},
 };
-use rusqlite::{OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
 
@@ -57,6 +67,67 @@ const LINKS_MOST: usize = 8;
 /// The most forgets about a thing held to refuse a record asked before
 /// one ([`Days::service_records_forget`]).
 pub const FORGOT_ABOUT_HELD: usize = 64;
+/// A record's source kinds, as the wire and the table write them: the
+/// voice's connector records, then the linked kinds.
+pub const SOURCE_KINDS: [&str; 4] = ["voice", "task", "agent", "reminder"];
+/// The most records of one linked kind (not `voice`) a person keeps,
+/// inside [`MOST_PER_PERSON`]. Past it that kind's record changed longest
+/// ago goes.
+pub const MOST_PER_KIND: usize = 2_000;
+/// The most bytes of a record's `source_ref`, as JSON.
+pub const SOURCE_REF_BYTES: usize = 512;
+/// The most bytes of a record's one-line summary, cut at a whole character.
+pub const SUMMARY_BYTES: usize = 160;
+/// The fields a `source_ref` may have; `service` and `id` are required.
+const SOURCE_REF_FIELDS: [&str; 4] = ["service", "id", "session", "computer"];
+
+/// The columns the linked-service memory plan (slice 1) adds to
+/// `service_records`, each added once by [`migrate`]: the first `ALTER`
+/// of `days.sql`'s tables. An older build names its columns on every
+/// insert and select, so it passes these over (a row it writes is a
+/// `voice` one), and its forget still deletes the whole row, pointer
+/// included.
+const ADDED_COLUMNS: [(&str, &str); 4] = [
+    (
+        "source_kind",
+        "ALTER TABLE service_records ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'voice' CHECK(source_kind IN ('voice','task','agent','reminder'))",
+    ),
+    (
+        "source_ref",
+        "ALTER TABLE service_records ADD COLUMN source_ref TEXT NOT NULL DEFAULT '{}'",
+    ),
+    (
+        "summary",
+        "ALTER TABLE service_records ADD COLUMN summary TEXT NOT NULL DEFAULT ''",
+    ),
+    (
+        "deed_unix_ms",
+        "ALTER TABLE service_records ADD COLUMN deed_unix_ms INTEGER",
+    ),
+];
+
+/// Adds [`ADDED_COLUMNS`] the table lacks (`pragma table_info`), then
+/// their index, in one transaction: run at every open after `days.sql`,
+/// so it is idempotent; `user_version` stays 1.
+pub(crate) fn migrate(db: &mut Connection) -> Result<()> {
+    let tx = db.transaction()?;
+    let have: Vec<String> = {
+        let mut statement = tx.prepare("SELECT name FROM pragma_table_info('service_records')")?;
+        statement
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    for (column, alter) in ADDED_COLUMNS {
+        if !have.iter().any(|name| name == column) {
+            tx.execute_batch(alter)?;
+        }
+    }
+    tx.execute_batch(
+        "CREATE INDEX IF NOT EXISTS service_records_kind ON service_records(person,source_kind,changed_unix_ms);",
+    )?;
+    tx.commit()?;
+    Ok(())
+}
 
 /// One record as the voice puts it.
 #[derive(Debug, Clone)]
@@ -73,6 +144,92 @@ pub struct RecordIn {
     pub links: Vec<String>,
     /// The key of the record that replaced this one (a redo), or empty.
     pub replaced_by: String,
+    /// One of [`SOURCE_KINDS`]; none is `voice` (every put before the
+    /// linked kinds). A record keeps the kind it was made with.
+    pub source_kind: Option<String>,
+    /// Where a linked record's thing lives (`{service, id, session?,
+    /// computer?}`): required for a linked kind; none keeps what is held.
+    pub source_ref: Option<Value>,
+    /// A one-line summary, tidied to [`SUMMARY_BYTES`]; none keeps what is
+    /// held.
+    pub summary: Option<String>,
+    /// When the deed was done at its service; none keeps what is held (an
+    /// older row has none). A forget after it refuses the put.
+    pub deed_unix_ms: Option<u64>,
+}
+
+/// How far ahead of memory's own clock a linked record's deed may be:
+/// a deed later than that could pass a forget made after it arrived.
+pub const DEED_AHEAD_MS: u64 = 5_000;
+
+/// One record as `linked.sock` takes it (the linked-service memory plan,
+/// slice 1b): an agent's read in a skill run, sent by lamp-services. It
+/// names no person: memory finds the owner itself, from the task row the
+/// voice wrote for that run ([`Days::linked_record_put`]).
+#[derive(Debug, Clone)]
+pub struct LinkedIn {
+    /// Required; `agent` only (the voice writes tasks and reminders).
+    pub source_kind: String,
+    /// The key of the task row (`t-…`) whose `source_ref.session` is `run`.
+    pub task: String,
+    /// The skill run the read was made in.
+    pub run: String,
+    /// The read's number in its run: the record's key is `a-<run>-<n>`.
+    pub n: u32,
+    pub action: String,
+    pub status: String,
+    pub deed_unix_ms: u64,
+    pub summary: String,
+    /// `{service, id, session?, computer?}`; its `service` is the record's.
+    pub source_ref: Value,
+}
+
+/// `record`'s kind, checked.
+fn kind_of(record: &RecordIn) -> Result<&str> {
+    let kind = record.source_kind.as_deref().unwrap_or("voice");
+    if SOURCE_KINDS.contains(&kind) {
+        Ok(kind)
+    } else {
+        Err(Error::new(
+            "bad_kind",
+            "the record's source kind is unknown",
+        ))
+    }
+}
+
+/// `record`'s `source_ref` as stored, checked: an object of
+/// [`SOURCE_REF_FIELDS`] only, texts without control characters, a
+/// non-empty `service` and `id`, at most [`SOURCE_REF_BYTES`]. A linked
+/// kind must name one; a `voice` record may. None: keep what is held.
+fn source_ref_of(kind: &str, value: Option<&Value>) -> Result<Option<String>> {
+    let bad = || {
+        Err(Error::new(
+            "bad_source_ref",
+            "a linked record's source_ref is an object of a service and an id (and a session and a computer), at most 512 bytes",
+        ))
+    };
+    let object = match value {
+        None | Some(Value::Null) if kind == "voice" => return Ok(None),
+        Some(Value::Object(object)) => object,
+        _ => return bad(),
+    };
+    let texts_ok = object.iter().all(|(field, value)| {
+        SOURCE_REF_FIELDS.contains(&field.as_str())
+            && value
+                .as_str()
+                .is_some_and(|text| !text.chars().any(char::is_control))
+    });
+    let named = |field: &str| {
+        object
+            .get(field)
+            .and_then(Value::as_str)
+            .is_some_and(|text| !text.trim().is_empty())
+    };
+    let text = Value::Object(object.clone()).to_string();
+    if !texts_ok || !named("service") || !named("id") || text.len() > SOURCE_REF_BYTES {
+        return bad();
+    }
+    Ok(Some(text))
 }
 
 fn key_ok(key: &str) -> bool {
@@ -161,12 +318,25 @@ pub(crate) fn about_any(subjects: &[Vec<String>], text: &str) -> bool {
         .any(|subject| subject.iter().all(|word| has_word(&words, word)))
 }
 
-/// The record's words, as a forget about a thing matches them.
-fn text_of(service: &str, action: &str, reason: &str, result_id: &str, detail: &Value) -> String {
-    let mut text = format!("{service} {action} {reason} {result_id} ");
+/// The record's words, as a forget about a thing matches them: its
+/// service, action, reason, result id, summary and every text of its
+/// detail.
+fn text_of(
+    service: &str,
+    action: &str,
+    reason: &str,
+    result_id: &str,
+    summary: &str,
+    detail: &Value,
+) -> String {
+    let mut text = format!("{service} {action} {reason} {result_id} {summary} ");
     words_of(detail, &mut text);
     text
 }
+
+/// A stored record's words before its detail, as [`text_of`] has them, in
+/// SQL: what a recall's and a forget's search read.
+const TEXT_SQL: &str = "service||' '||action||' '||reason||' '||result_id||' '||summary";
 
 /// The mail addresses a record's `detail` was sent to: its `to`, `cc`
 /// and `bcc`, each a list or a comma-separated text, an entry's
@@ -290,26 +460,44 @@ impl Days {
         }
         let reason = store::tidy(&record.reason, REASON_BYTES);
         let result_id = store::tidy(&record.result_id, RESULT_ID_BYTES);
+        let kind = kind_of(record)?;
+        let source_ref = source_ref_of(kind, record.source_ref.as_ref())?;
+        let summary = record
+            .summary
+            .as_deref()
+            .map(|summary| store::tidy(summary, SUMMARY_BYTES));
+        let deed = record
+            .deed_unix_ms
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| Error::new("bad_time", "the deed's time is out of range"))?;
         self.refuse_forgotten(person, record, || {
             text_of(
                 &service,
                 &action,
                 &reason,
                 &result_id,
+                summary.as_deref().unwrap_or(""),
                 record.detail.as_ref().unwrap_or(&Value::Null),
             )
         })?;
         let links = json!(record.links).to_string();
         let tx = self.db.transaction()?;
         ensure_person(&tx, person)?;
-        let kept: Option<String> = tx
+        let kept: Option<(String, String)> = tx
             .query_row(
-                "SELECT status FROM service_records WHERE person=?1 AND key=?2",
+                "SELECT status, source_kind FROM service_records WHERE person=?1 AND key=?2",
                 params![person.as_str(), record.key],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?;
-        let status = match kept {
+        if kept.as_ref().is_some_and(|(_, held)| held != kind) {
+            return Err(Error::new(
+                "bad_kind",
+                "a record keeps the source kind it was made with",
+            ));
+        }
+        let status = match kept.map(|(status, _)| status) {
             Some(kept) if kept != "prepared" => {
                 // Final: only who replaced it may still be said.
                 if !record.replaced_by.is_empty() {
@@ -322,7 +510,7 @@ impl Days {
             }
             Some(_) => {
                 tx.execute(
-                    "UPDATE service_records SET service=?3,action=?4,status=?5,reason=?6,detail=?7,result_id=?8,changed_unix_ms=max(changed_unix_ms,?9),links=?10,replaced_by=?11 WHERE person=?1 AND key=?2",
+                    "UPDATE service_records SET service=?3,action=?4,status=?5,reason=?6,detail=?7,result_id=?8,changed_unix_ms=max(changed_unix_ms,?9),links=?10,replaced_by=?11,source_ref=coalesce(?12,source_ref),summary=coalesce(?13,summary),deed_unix_ms=coalesce(?14,deed_unix_ms) WHERE person=?1 AND key=?2",
                     params![
                         person.as_str(),
                         record.key,
@@ -334,14 +522,17 @@ impl Days {
                         result_id,
                         record.changed_unix_ms,
                         links,
-                        record.replaced_by
+                        record.replaced_by,
+                        source_ref,
+                        summary,
+                        deed
                     ],
                 )?;
                 record.status.clone()
             }
             None => {
                 tx.execute(
-                    "INSERT INTO service_records(person,key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+                    "INSERT INTO service_records(person,key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by,source_kind,source_ref,summary,deed_unix_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
                     params![
                         person.as_str(),
                         record.key,
@@ -354,9 +545,14 @@ impl Days {
                         record.asked_unix_ms,
                         record.changed_unix_ms.max(record.asked_unix_ms),
                         links,
-                        record.replaced_by
+                        record.replaced_by,
+                        kind,
+                        source_ref.as_deref().unwrap_or("{}"),
+                        summary.as_deref().unwrap_or(""),
+                        deed
                     ],
                 )?;
+                trim_kind(&tx, person, kind)?;
                 trim(&tx, person)?;
                 record.status.clone()
             }
@@ -365,11 +561,116 @@ impl Days {
         Ok(status)
     }
 
+    /// Puts an agent's record from `linked.sock` under the owner memory
+    /// finds itself (the first builder's condition 1): the one known
+    /// person holding a `task` row keyed `record.task` whose
+    /// `source_ref.session` is `record.run`. No such row, or two people's,
+    /// is `no_owner`, and nothing is kept. The record goes through
+    /// [`Self::service_record_put`], so a forget wins by its deed
+    /// (condition 2) and its summary and pointer are bounded (condition
+    /// 5); a deed more than [`DEED_AHEAD_MS`] ahead of `now` is refused.
+    /// The record's key and the status kept.
+    pub fn linked_record_put(&mut self, record: &LinkedIn, now: u64) -> Result<(String, String)> {
+        if record.source_kind != "agent" {
+            return Err(Error::new(
+                "bad_kind",
+                "a linked record from this socket is an agent's",
+            ));
+        }
+        // A linked record says what was done: a blank summary leaves a
+        // forget about a thing no words to match (El's P2 on #7463).
+        if store::tidy(&record.summary, SUMMARY_BYTES).is_empty() {
+            return Err(Error::new(
+                "empty",
+                "a linked record says what was done in its summary",
+            ));
+        }
+        let key = format!("a-{}-{}", record.run, record.n);
+        if !key_ok(&record.run)
+            || !key_ok(&key)
+            || !key_ok(&record.task)
+            || !record.task.starts_with("t-")
+        {
+            return Err(Error::new(
+                "bad_key",
+                "a linked record names a task row's key (t-…) and a run that make a record key",
+            ));
+        }
+        if record.deed_unix_ms > now.saturating_add(DEED_AHEAD_MS) {
+            return Err(Error::new(
+                "bad_time",
+                "the deed's time is ahead of memory's clock",
+            ));
+        }
+        let service = record
+            .source_ref
+            .get("service")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        if service.trim().is_empty() {
+            return Err(Error::new(
+                "bad_source_ref",
+                "a linked record's source_ref names its service",
+            ));
+        }
+        let owners: Vec<(String, String)> = {
+            let mut statement = self.db.prepare(
+                "SELECT person, source_ref FROM service_records WHERE key=?1 AND source_kind='task'",
+            )?;
+            statement
+                .query_map([record.task.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let owner = match owners.as_slice() {
+            [(person, source_ref)]
+                if lamp_msgs::known::is_person_id(person)
+                    && serde_json::from_str::<Value>(source_ref)
+                        .ok()
+                        .and_then(|source| source.get("session")?.as_str().map(str::to_owned))
+                        .is_some_and(|session| session == record.run) =>
+            {
+                Person::new(person)
+            }
+            _ => None,
+        }
+        .ok_or_else(|| {
+            Error::new(
+                "no_owner",
+                "no known person's task row matches this task and run",
+            )
+        })?;
+        let status = self.service_record_put(
+            &owner,
+            &RecordIn {
+                key: key.clone(),
+                service,
+                action: record.action.clone(),
+                status: record.status.clone(),
+                reason: String::new(),
+                detail: None,
+                result_id: String::new(),
+                asked_unix_ms: record.deed_unix_ms,
+                changed_unix_ms: now.max(record.deed_unix_ms),
+                links: vec![record.task.clone()],
+                replaced_by: String::new(),
+                source_kind: Some("agent".to_owned()),
+                source_ref: Some(record.source_ref.clone()),
+                summary: Some(record.summary.clone()),
+                deed_unix_ms: Some(record.deed_unix_ms),
+            },
+        )?;
+        Ok((key, status))
+    }
+
     /// A record asked before the latest forget of `person`'s everything
     /// (or everyone's), or before a forget about a thing it matches, is
     /// refused: a change the voice sent before the forget and this store
-    /// took after it is never kept (Jarvis's P2 on #6073). `text`: the
-    /// record's words.
+    /// took after it is never kept (Jarvis's P2 on #6073). A record whose
+    /// deed (`deed_unix_ms`) is before the forget is refused the same way,
+    /// whenever it was asked: a forget wins by the deed's time (the first
+    /// builder's condition 2 for linked records). `text`: the record's
+    /// words.
     fn refuse_forgotten(
         &self,
         person: &Person,
@@ -382,18 +683,22 @@ impl Days {
                 "the record was asked before a forget that takes it",
             ))
         };
+        // The earlier of its ask and its deed.
+        let since = record
+            .deed_unix_ms
+            .map_or(record.asked_unix_ms, |deed| deed.min(record.asked_unix_ms));
         let mark: Option<i64> = self.db.query_row(
             "SELECT max(at_unix_ms) FROM service_records_forgot WHERE person IN (?1,'')",
             [person.as_str()],
             |r| r.get(0),
         )?;
-        if mark.is_some_and(|mark| u64::try_from(mark).unwrap_or(0) > record.asked_unix_ms) {
+        if mark.is_some_and(|mark| u64::try_from(mark).unwrap_or(0) > since) {
             return refused();
         }
         let about: Vec<&Vec<Vec<String>>> = self
             .records_forgot_about
             .iter()
-            .filter(|(whose, _, at)| whose == person.as_str() && *at > record.asked_unix_ms)
+            .filter(|(whose, _, at)| whose == person.as_str() && *at > since)
             .map(|(_, subjects, _)| subjects)
             .collect();
         // Sent to an address a contact forget removed (step 5d).
@@ -404,7 +709,7 @@ impl Days {
                 .iter()
                 .any(|(whose, addresses, at)| {
                     whose == person.as_str()
-                        && *at > record.asked_unix_ms
+                        && *at > since
                         && addresses.iter().any(|address| sent_to.contains(address))
                 })
         {
@@ -412,6 +717,17 @@ impl Days {
         }
         if about.is_empty() {
             return Ok(());
+        }
+        // An agent's record with no summary, asked before a forget about a
+        // thing: with no words to match, it may be the very record that
+        // forget took, so it is refused (El's P2 on #7463).
+        if record.source_kind.as_deref() == Some("agent")
+            && record
+                .summary
+                .as_deref()
+                .is_none_or(|summary| store::tidy(summary, SUMMARY_BYTES).is_empty())
+        {
+            return refused();
         }
         let text = text();
         if about.iter().any(|subjects| about_any(subjects, &text)) {
@@ -458,7 +774,7 @@ impl Days {
         }
         let mut scored: Vec<(usize, i64, i64, String)> = {
             let mut statement = self.db.prepare(
-                "SELECT key, service||' '||action||' '||reason||' '||result_id, detail, changed_unix_ms, asked_unix_ms FROM service_records WHERE person=?1",
+                &format!("SELECT key, {TEXT_SQL}, detail, changed_unix_ms, asked_unix_ms FROM service_records WHERE person=?1"),
             )?;
             let rows = statement.query_map([person.as_str()], |r| {
                 let mut text: String = r.get(1)?;
@@ -555,9 +871,9 @@ impl Days {
         ));
         let tx = self.db.transaction()?;
         let rows: Vec<(String, String)> = {
-            let mut statement = tx.prepare(
-                "SELECT key, service||' '||action||' '||reason||' '||result_id, detail FROM service_records WHERE person=?1",
-            )?;
+            let mut statement = tx.prepare(&format!(
+                "SELECT key, {TEXT_SQL}, detail FROM service_records WHERE person=?1"
+            ))?;
             statement
                 .query_map([person.as_str()], |r| {
                     let mut text: String = r.get(1)?;
@@ -585,7 +901,7 @@ impl Days {
 }
 
 /// A record's columns, as [`listed`] reads them.
-const COLUMNS: &str = "key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by";
+const COLUMNS: &str = "key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by,source_kind,source_ref,summary,deed_unix_ms";
 
 /// One record of [`COLUMNS`], as a list gives it.
 fn listed(r: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
@@ -603,6 +919,10 @@ fn listed(r: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "changed_unix_ms": r.get::<_, i64>(8)?,
         "links": serde_json::from_str::<Value>(&links).unwrap_or_else(|_| json!([])),
         "replaced_by": r.get::<_, String>(10)?,
+        "source_kind": r.get::<_, String>(11)?,
+        "source_ref": serde_json::from_str::<Value>(&r.get::<_, String>(12)?).unwrap_or_else(|_| json!({})),
+        "summary": r.get::<_, String>(13)?,
+        "deed_unix_ms": r.get::<_, Option<i64>>(14)?,
     }))
 }
 
@@ -621,6 +941,20 @@ fn trim(tx: &Transaction<'_>, person: &Person) -> Result<()> {
     tx.execute(
         "DELETE FROM service_records WHERE person=?1 AND key IN (SELECT key FROM service_records WHERE person=?1 ORDER BY changed_unix_ms DESC, asked_unix_ms DESC, key LIMIT -1 OFFSET ?2)",
         params![person.as_str(), MOST_PER_PERSON as i64],
+    )?;
+    Ok(())
+}
+
+/// Past [`MOST_PER_KIND`], `person`'s record of linked `kind` changed
+/// longest ago goes; another kind's never. A `voice` record is bounded by
+/// [`MOST_PER_PERSON`] alone.
+fn trim_kind(tx: &Transaction<'_>, person: &Person, kind: &str) -> Result<()> {
+    if kind == "voice" {
+        return Ok(());
+    }
+    tx.execute(
+        "DELETE FROM service_records WHERE person=?1 AND source_kind=?2 AND key IN (SELECT key FROM service_records WHERE person=?1 AND source_kind=?2 ORDER BY changed_unix_ms DESC, asked_unix_ms DESC, key LIMIT -1 OFFSET ?3)",
+        params![person.as_str(), kind, MOST_PER_KIND as i64],
     )?;
     Ok(())
 }
@@ -1149,6 +1483,10 @@ mod tests {
                 changed_unix_ms: NOW + n,
                 links: vec![],
                 replaced_by: String::new(),
+                source_kind: None,
+                source_ref: None,
+                summary: None,
+                deed_unix_ms: None,
             };
             store.service_record_put(&person, &record).unwrap();
         }
@@ -1156,5 +1494,701 @@ mod tests {
         assert_eq!(listed.len(), 2);
         assert_eq!(listed[0]["key"], "k2");
         assert_eq!(listed[1]["key"], "k1");
+    }
+
+    /// A linked put: `kind` with a source and a summary, done at `deed`.
+    fn linked(person: &str, key: &str, kind: &str, summary: &str, deed: u64) -> Value {
+        json!({
+            "op": "service_record",
+            "person": person,
+            "key": key,
+            "service": "lamp_tasks",
+            "action": "task_settled",
+            "status": "done",
+            "asked_unix_ms": deed,
+            "changed_unix_ms": deed,
+            "source_kind": kind,
+            "source_ref": {"service": "lamp-tasks", "id": format!("{key}-id"), "computer": "c-1"},
+            "summary": summary,
+            "deed_unix_ms": deed,
+        })
+    }
+
+    fn database(scratch: &Scratch) -> rusqlite::Connection {
+        rusqlite::Connection::open(scratch.0.join(crate::days::DATABASE)).unwrap()
+    }
+
+    fn columns(db: &rusqlite::Connection) -> Vec<String> {
+        let mut statement = db
+            .prepare("SELECT name FROM pragma_table_info('service_records')")
+            .unwrap();
+        statement
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<String>>>()
+            .unwrap()
+    }
+
+    /// The linked columns are added once, by `pragma table_info`, however
+    /// often the store opens; their index is made; `user_version` stays 1.
+    #[test]
+    fn the_linked_columns_migration_is_idempotent() {
+        let (scratch, store) = Scratch::new("migrate-twice");
+        drop(store);
+        for _ in 0..2 {
+            drop(scratch.open());
+        }
+        let db = database(&scratch);
+        let have = columns(&db);
+        for column in ["source_kind", "source_ref", "summary", "deed_unix_ms"] {
+            assert_eq!(
+                have.iter().filter(|name| *name == column).count(),
+                1,
+                "{have:?}"
+            );
+        }
+        let index: u64 = db
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='service_records_kind'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(index, 1);
+        let version: u64 = db
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+    }
+
+    /// A database the current `lamp-voice` schema made (the table without
+    /// the linked columns, one record in it) opens: its record is a
+    /// `voice` one with no summary, pointer or deed, and an old-style put
+    /// still works. An older build's insert into the migrated table (its
+    /// own column list, after its `days.sql` runs again) still works too:
+    /// the rollback case.
+    #[test]
+    fn an_older_database_opens_and_works_after_the_migration() {
+        let (scratch, store) = Scratch::new("older-db");
+        drop(store);
+        fs::remove_dir_all(&scratch.0).unwrap();
+        crate::store::private_dir(&scratch.0).unwrap();
+        {
+            let db = database(&scratch);
+            db.execute_batch(include_str!("days.sql")).unwrap();
+            assert!(!columns(&db).iter().any(|name| name == "source_kind"));
+            db.execute_batch(&format!(
+                "INSERT INTO settings(key,value) VALUES('import_complete',1); PRAGMA user_version=1;
+                 INSERT INTO people(person) VALUES('{OWNER}');
+                 INSERT INTO service_records(person,key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by)
+                 VALUES('{OWNER}','old','gmail','send_mail','done','','{{\"subject\":\"Sunday\"}}','',{NOW},{NOW},'[]','');"
+            ))
+            .unwrap();
+        }
+        // Owner-only, as the store made it.
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(
+            scratch.0.join(crate::days::DATABASE),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let mut store = scratch.open();
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(kept[0]["key"], "old");
+        assert_eq!(kept[0]["source_kind"], "voice");
+        assert_eq!(kept[0]["source_ref"], json!({}));
+        assert_eq!(kept[0]["summary"], "");
+        assert_eq!(kept[0]["deed_unix_ms"], Value::Null);
+        assert_eq!(kept[0]["detail"]["subject"], "Sunday");
+        assert_eq!(
+            send(&mut store, put(OWNER, "new", "done", "", NOW + 1)),
+            json!({"ok":true,"status":"done"})
+        );
+        drop(store);
+        {
+            let db = database(&scratch);
+            db.execute_batch(include_str!("days.sql")).unwrap();
+            db.execute(
+                "INSERT INTO service_records(person,key,service,action,status,reason,detail,result_id,asked_unix_ms,changed_unix_ms,links,replaced_by) VALUES(?1,'rolled','gmail','send_mail','done','','{}','',?2,?2,'[]','')",
+                rusqlite::params![OWNER, NOW as i64 + 2],
+            )
+            .unwrap();
+        }
+        let mut store = scratch.open();
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept.len(), 3, "{kept:?}");
+        assert!(kept.iter().all(|r| r["source_kind"] == "voice"), "{kept:?}");
+    }
+
+    /// A put that names none of the linked fields (an old voice's) is a
+    /// `voice` record; an update of it without them keeps what is held.
+    #[test]
+    fn an_old_style_put_is_a_voice_record() {
+        let (_scratch, mut store) = Scratch::new("old-style");
+        assert_eq!(
+            send(&mut store, put(OWNER, "r1", "prepared", "", NOW))["status"],
+            "prepared"
+        );
+        let mut summed = put(OWNER, "r1", "prepared", "", NOW + 1);
+        summed["summary"] = json!("Hamburger party on Sunday");
+        send(&mut store, summed);
+        send(&mut store, put(OWNER, "r1", "done", "", NOW + 2));
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept[0]["status"], "done");
+        assert_eq!(kept[0]["source_kind"], "voice");
+        assert_eq!(kept[0]["source_ref"], json!({}));
+        assert_eq!(kept[0]["summary"], "Hamburger party on Sunday");
+        // A record keeps its kind.
+        let mut task = linked(OWNER, "r1", "task", "", NOW + 3);
+        task["status"] = json!("done");
+        assert_eq!(send(&mut store, task)["error"], "bad_kind");
+    }
+
+    /// Past [`super::MOST_PER_KIND`] of a linked kind, that kind's record
+    /// changed longest ago goes: no other kind's, and no voice record.
+    #[test]
+    fn the_per_kind_cap_trims_only_that_kind() {
+        let (scratch, store) = Scratch::new("per-kind");
+        drop(store);
+        {
+            let mut db = database(&scratch);
+            let tx = db.transaction().unwrap();
+            tx.execute("INSERT INTO people(person) VALUES(?1)", [OWNER])
+                .unwrap();
+            let add = |key: String, kind: &str, at: u64| {
+                tx.execute(
+                    "INSERT INTO service_records(person,key,service,action,status,asked_unix_ms,changed_unix_ms,source_kind,source_ref) VALUES(?1,?2,'s','a','done',?3,?3,?4,'{\"service\":\"s\",\"id\":\"i\"}')",
+                    rusqlite::params![OWNER, key, at as i64, kind],
+                )
+                .unwrap();
+            };
+            // The voice and agent records are older than every task one.
+            for n in 0..5u64 {
+                add(format!("v{n}"), "voice", NOW - 1_000 + n);
+                add(format!("a{n}"), "agent", NOW - 900 + n);
+            }
+            for n in 0..super::MOST_PER_KIND as u64 {
+                add(format!("t{n}"), "task", NOW + n);
+            }
+            tx.commit().unwrap();
+        }
+        let mut store = scratch.open();
+        let late = NOW + 10_000;
+        assert_eq!(
+            send_at(&mut store, linked(OWNER, "tnew", "task", "", late), late)["ok"],
+            true
+        );
+        drop(store);
+        let db = database(&scratch);
+        let count = |kind: &str| -> usize {
+            db.query_row(
+                "SELECT count(*) FROM service_records WHERE person=?1 AND source_kind=?2",
+                [OWNER, kind],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(count("task"), super::MOST_PER_KIND);
+        assert_eq!(count("agent"), 5);
+        assert_eq!(count("voice"), 5);
+        let gone: usize = db
+            .query_row(
+                "SELECT count(*) FROM service_records WHERE key='t0'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(gone, 0);
+    }
+
+    /// Forget everything removes the linked records with the voice ones,
+    /// pointer and summary included.
+    #[test]
+    fn forget_all_removes_linked_records() {
+        let (scratch, mut store) = Scratch::new("forget-linked");
+        send(
+            &mut store,
+            linked(OWNER, "t1", "task", "Booked the dentist", NOW),
+        );
+        send(
+            &mut store,
+            linked(OWNER, "m1", "reminder", "Take the pills", NOW),
+        );
+        send(
+            &mut store,
+            linked(OWNER, "a1", "agent", "Read the inbox", NOW),
+        );
+        send(&mut store, put(OWNER, "v1", "done", "", NOW));
+        assert_eq!(records(&mut store, OWNER).len(), 4);
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        assert!(records(&mut store, OWNER).is_empty());
+        drop(store);
+        let left: u64 = database(&scratch)
+            .query_row("SELECT count(*) FROM service_records", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(left, 0);
+    }
+
+    /// A forget about a thing matches a record's summary: it takes only
+    /// the record whose summary names it; a recall finds it by it too.
+    #[test]
+    fn a_forget_about_a_summary_takes_only_that_record() {
+        let (_scratch, mut store) = Scratch::new("forget-summary");
+        send(
+            &mut store,
+            linked(OWNER, "t1", "task", "Booked the dentist for Friday", NOW),
+        );
+        send(
+            &mut store,
+            linked(OWNER, "t2", "task", "Ordered printer paper", NOW),
+        );
+        let found = send(
+            &mut store,
+            json!({"op":"service_records","person":OWNER,"about":"the dentist","limit":5}),
+        );
+        assert_eq!(found["records"].as_array().unwrap().len(), 1, "{found}");
+        assert_eq!(found["records"][0]["key"], "t1");
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot, json!({"ok":true,"removed":1}));
+        let left = records(&mut store, OWNER);
+        assert_eq!(left.len(), 1, "{left:?}");
+        assert_eq!(left[0]["key"], "t2");
+        assert_eq!(left[0]["summary"], "Ordered printer paper");
+    }
+
+    /// A forget wins by the deed's time: a put whose deed is before the
+    /// person's last forget is refused, even asked after it; a deed after
+    /// it is kept. A forget about a thing refuses a matching earlier deed.
+    #[test]
+    fn a_put_with_a_deed_before_the_last_forget_is_refused() {
+        let (_scratch, mut store) = Scratch::new("deed-forget");
+        send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 1_000,
+        );
+        let mut early = linked(OWNER, "t1", "task", "Booked the dentist", NOW + 500);
+        early["asked_unix_ms"] = json!(NOW + 2_000);
+        early["changed_unix_ms"] = json!(NOW + 2_000);
+        let late = send_at(&mut store, early, NOW + 2_000);
+        assert_eq!(late["error"], "forgotten", "{late}");
+        let after = send_at(
+            &mut store,
+            linked(OWNER, "t2", "task", "Booked the dentist", NOW + 1_500),
+            NOW + 2_000,
+        );
+        assert_eq!(after["ok"], true, "{after}");
+        send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 3_000,
+        );
+        let mut early = linked(OWNER, "t3", "task", "Called the dentist", NOW + 2_500);
+        early["asked_unix_ms"] = json!(NOW + 4_000);
+        early["changed_unix_ms"] = json!(NOW + 4_000);
+        assert_eq!(
+            send_at(&mut store, early, NOW + 4_000)["error"],
+            "forgotten"
+        );
+        let other = linked(OWNER, "t4", "task", "Ordered paper", NOW + 2_500);
+        assert_eq!(send_at(&mut store, other, NOW + 4_000)["ok"], true);
+        let mut kept: Vec<String> = records(&mut store, OWNER)
+            .iter()
+            .map(|r| r["key"].as_str().unwrap().to_owned())
+            .collect();
+        kept.sort();
+        assert_eq!(kept, ["t4"]);
+    }
+
+    /// The summary is cut at a whole character to its 160 bytes and its
+    /// control characters stripped; a `source_ref` past 512 bytes, not an
+    /// object, without its service or id, with another field, or missing
+    /// from a linked kind is refused, as is an unknown kind.
+    #[test]
+    fn the_linked_bounds_hold() {
+        let (_scratch, mut store) = Scratch::new("linked-bounds");
+        let long = format!("Đặt\u{7} lịch\n{}", "é".repeat(200));
+        assert_eq!(
+            send(&mut store, linked(OWNER, "t1", "task", &long, NOW))["ok"],
+            true
+        );
+        let summary = records(&mut store, OWNER)[0]["summary"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(summary.len() <= super::SUMMARY_BYTES, "{}", summary.len());
+        assert!(
+            summary.len() > super::SUMMARY_BYTES - 2,
+            "{}",
+            summary.len()
+        );
+        assert!(summary.starts_with("Đặt lịch é"), "{summary}");
+        assert!(!summary.chars().any(char::is_control), "{summary}");
+        let refused = |store: &mut Days, source_ref: Value| -> Value {
+            let mut put = linked(OWNER, "t2", "reminder", "", NOW);
+            put["source_ref"] = source_ref;
+            send(store, put)
+        };
+        for source_ref in [
+            json!({"service":"lamp-schedule","id":"x".repeat(520)}),
+            json!("{\"service\":\"lamp-schedule\",\"id\":\"r1\"}"),
+            json!({"service":"lamp-schedule"}),
+            json!({"id":"r1"}),
+            json!({"service":"lamp-schedule","id":"r1","text":"secret"}),
+            json!({"service":"lamp-schedule","id":7}),
+            json!({"service":"lamp-schedule","id":"r\u{1}1"}),
+            Value::Null,
+        ] {
+            let answer = refused(&mut store, source_ref.clone());
+            assert_eq!(answer["error"], "bad_source_ref", "{source_ref} {answer}");
+        }
+        let fits = json!({"service":"lamp-schedule","id":"r1","session":"s-9","computer":"c-1"});
+        assert_eq!(refused(&mut store, fits)["ok"], true);
+        let mut odd = linked(OWNER, "t3", "mail", "", NOW);
+        odd["source_kind"] = json!("mail");
+        assert_eq!(send(&mut store, odd)["error"], "bad_kind");
+        let kept = records(&mut store, OWNER);
+        assert_eq!(kept.len(), 2, "{kept:?}");
+        let reminder = kept.iter().find(|r| r["key"] == "t2").unwrap();
+        assert_eq!(reminder["source_kind"], "reminder");
+        assert_eq!(reminder["source_ref"]["computer"], "c-1");
+        assert_eq!(reminder["deed_unix_ms"], NOW);
+    }
+
+    /// The task row the voice writes for a known person's task, run as
+    /// `run` (slice 1b's owner check matches its `session`).
+    fn task_row(person: &str, key: &str, run: &str, deed: u64) -> Value {
+        let mut row = linked(person, key, "task", "Book the dentist", deed);
+        row["source_ref"] = json!({"service":"lamp-tasks","id":"7","session":run});
+        row
+    }
+
+    /// What lamp-services sends on `linked.sock` (slice 1b): an agent's
+    /// read in `run` of the task `task`, done at `deed`, with no person.
+    fn agent_read(task: &str, run: &str, n: u64, deed: u64) -> Value {
+        json!({
+            "op": "linked_record",
+            "source_kind": "agent",
+            "task": task,
+            "run": run,
+            "n": n,
+            "action": "search_mail",
+            "status": "done",
+            "deed_unix_ms": deed,
+            "summary": "Searched mail for the dentist",
+            "source_ref": {"service": "gmail", "id": "res-1", "session": run},
+        })
+    }
+
+    /// Slice 1b, condition 1: memory finds the owner itself. An agent's
+    /// record is kept under the person whose task row names its run, keyed
+    /// `a-<run>-<n>` and linked to that task row; the request names no
+    /// person and may not.
+    #[test]
+    fn a_linked_record_is_kept_for_the_owner_of_its_task_row() {
+        let (_scratch, mut store) = Scratch::new("linked-owner");
+        assert_eq!(
+            send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW))["ok"],
+            true
+        );
+        let kept = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 10),
+            NOW + 20,
+        );
+        assert_eq!(
+            kept,
+            json!({"ok":true,"status":"done","key":"a-run-1-0"}),
+            "{kept}"
+        );
+        let rows = records(&mut store, OWNER);
+        let agent = rows.iter().find(|r| r["key"] == "a-run-1-0").unwrap();
+        assert_eq!(agent["source_kind"], "agent");
+        assert_eq!(agent["service"], "gmail");
+        assert_eq!(agent["action"], "search_mail");
+        assert_eq!(agent["links"], json!(["t-tasks-7"]));
+        assert_eq!(agent["summary"], "Searched mail for the dentist");
+        assert_eq!(agent["deed_unix_ms"], NOW + 10);
+        assert!(records(&mut store, OTHER).is_empty());
+        let mut named = agent_read("t-tasks-7", "run-1", 1, NOW + 10);
+        named["person"] = json!(OTHER);
+        assert_eq!(send(&mut store, named)["error"], "bad_request");
+    }
+
+    /// No task row, a task row of another run, a row of the same key that
+    /// is not a task, or a task key two people hold: no owner, nothing kept.
+    #[test]
+    fn a_linked_record_with_no_matching_task_row_is_refused() {
+        let (_scratch, mut store) = Scratch::new("linked-no-owner");
+        let no_owner = |store: &mut Days, request: Value| {
+            let answer = send_at(store, request, NOW + 20);
+            assert_eq!(answer["error"], "no_owner", "{answer}");
+        };
+        no_owner(&mut store, agent_read("t-tasks-7", "run-1", 0, NOW));
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        no_owner(&mut store, agent_read("t-tasks-7", "run-2", 0, NOW));
+        no_owner(&mut store, agent_read("t-tasks-8", "run-1", 0, NOW));
+        send(&mut store, put(OWNER, "t-tasks-9", "done", "", NOW));
+        no_owner(&mut store, agent_read("t-tasks-9", "run-1", 0, NOW));
+        send(&mut store, task_row(OTHER, "t-tasks-7", "run-1", NOW));
+        no_owner(&mut store, agent_read("t-tasks-7", "run-1", 0, NOW));
+        let keys: Vec<Value> = records(&mut store, OWNER)
+            .iter()
+            .map(|r| r["key"].clone())
+            .collect();
+        assert!(
+            !keys
+                .iter()
+                .any(|key| key.as_str().unwrap().starts_with("a-"))
+        );
+    }
+
+    /// Condition 4: each request names its source kind, and this op takes
+    /// an agent's alone (tasks and reminders are the voice's to write).
+    #[test]
+    fn a_linked_record_names_its_kind_and_it_is_an_agents() {
+        let (_scratch, mut store) = Scratch::new("linked-kind");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        let mut unnamed = agent_read("t-tasks-7", "run-1", 0, NOW);
+        unnamed.as_object_mut().unwrap().remove("source_kind");
+        assert_eq!(send(&mut store, unnamed)["error"], "bad_request");
+        for kind in ["task", "reminder", "voice", "mail", ""] {
+            let mut other = agent_read("t-tasks-7", "run-1", 0, NOW);
+            other["source_kind"] = json!(kind);
+            assert_eq!(send(&mut store, other)["error"], "bad_kind", "{kind}");
+        }
+    }
+
+    /// Condition 2: a forget wins by the deed's time. After a forget of
+    /// everything the task row is gone, so nothing has an owner; with the
+    /// task row written again after it, a deed from before the forget is
+    /// still refused, and a deed more than a few seconds ahead of memory's
+    /// clock is refused rather than let pass a later forget.
+    #[test]
+    fn a_forget_wins_over_a_linked_record_by_its_deed() {
+        let (_scratch, mut store) = Scratch::new("linked-forget");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        send_at(
+            &mut store,
+            json!({"op":"forget_all","person":OWNER}),
+            NOW + 1_000,
+        );
+        let gone = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(gone["error"], "no_owner", "{gone}");
+        send_at(
+            &mut store,
+            task_row(OWNER, "t-tasks-7", "run-1", NOW + 1_500),
+            NOW + 2_000,
+        );
+        let early = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 0, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(early["error"], "forgotten", "{early}");
+        let ahead = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 2_000 + 60_000),
+            NOW + 2_000,
+        );
+        assert_eq!(ahead["error"], "bad_time", "{ahead}");
+        let after = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 2, NOW + 1_800),
+            NOW + 2_000,
+        );
+        assert_eq!(after["ok"], true, "{after}");
+    }
+
+    /// Condition 5 and the key's shape: the summary is cut to its 160
+    /// bytes; a run or a task key that would not make a record key, a task
+    /// key not a task's (`t-`), and a `source_ref` past its bounds are
+    /// refused.
+    #[test]
+    fn a_linked_records_bounds_hold() {
+        let (_scratch, mut store) = Scratch::new("linked-bounds-1b");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        let mut long = agent_read("t-tasks-7", "run-1", 0, NOW);
+        long["summary"] = json!("é".repeat(200));
+        assert_eq!(send(&mut store, long)["ok"], true);
+        let kept = records(&mut store, OWNER);
+        let summary = kept.iter().find(|r| r["key"] == "a-run-1-0").unwrap()["summary"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(summary.len() <= super::SUMMARY_BYTES, "{}", summary.len());
+        for (task, run) in [
+            ("t-tasks-7", "run 1"),
+            ("t-tasks-7", ""),
+            ("t-tasks-7", &"r".repeat(61)),
+            ("tasks-7", "run-1"),
+            ("t-tasks/7", "run-1"),
+        ] {
+            let answer = send(&mut store, agent_read(task, run, 0, NOW));
+            assert_eq!(answer["error"], "bad_key", "{task} {run} {answer}");
+        }
+        let mut big = agent_read("t-tasks-7", "run-1", 3, NOW);
+        big["source_ref"]["id"] = json!("x".repeat(600));
+        assert_eq!(send(&mut store, big)["error"], "bad_source_ref");
+        let mut serviceless = agent_read("t-tasks-7", "run-1", 4, NOW);
+        serviceless["source_ref"]
+            .as_object_mut()
+            .unwrap()
+            .remove("service");
+        assert_eq!(send(&mut store, serviceless)["error"], "bad_source_ref");
+    }
+
+    /// A task row whose words share none with the agent's read (slice 1b's
+    /// P2 on #7463: the task row survives a forget about the read).
+    fn plain_task_row(person: &str, run: &str) -> Value {
+        let mut row = task_row(person, "t-tasks-7", run, NOW);
+        row["summary"] = json!("Plan the week");
+        row
+    }
+
+    /// A forget about a thing takes an agent's linked record whose summary
+    /// names it, and leaves its task row: a recall no longer finds it.
+    #[test]
+    fn a_forget_about_takes_an_agents_linked_record() {
+        let (_scratch, mut store) = Scratch::new("linked-forget-about");
+        send(&mut store, plain_task_row(OWNER, "run-1"));
+        let mut read = agent_read("t-tasks-7", "run-1", 0, NOW + 10);
+        read["summary"] = json!("Booked the dentist");
+        assert_eq!(send_at(&mut store, read, NOW + 20)["ok"], true);
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot, json!({"ok":true,"removed":1}));
+        let left = records(&mut store, OWNER);
+        assert_eq!(left.len(), 1, "{left:?}");
+        assert_eq!(left[0]["key"], "t-tasks-7");
+        let found = send(
+            &mut store,
+            json!({"op":"service_records","person":OWNER,"about":"the dentist","limit":5}),
+        );
+        assert!(found["records"].as_array().unwrap().is_empty(), "{found}");
+    }
+
+    /// El's P2 on #7463: after a forget about an agent's record, a late
+    /// put of the same key asked before the forget never comes back, with
+    /// its summary, with an empty one, or with none. `linked.sock` refuses
+    /// a blank summary outright; the store refuses an agent's put with no
+    /// summary asked before any forget about a thing of its owner.
+    #[test]
+    fn a_late_summaryless_linked_record_stays_forgotten() {
+        let (_scratch, mut store) = Scratch::new("linked-late-blank");
+        send(&mut store, plain_task_row(OWNER, "run-1"));
+        let mut read = agent_read("t-tasks-7", "run-1", 0, NOW + 10);
+        read["summary"] = json!("Booked the dentist");
+        assert_eq!(send_at(&mut store, read.clone(), NOW + 20)["ok"], true);
+        send_at(
+            &mut store,
+            json!({"op":"service_records_forget","person":OWNER,"about":[["dentist"]]}),
+            NOW + 1_000,
+        );
+        assert_eq!(
+            send_at(&mut store, read.clone(), NOW + 2_000)["error"],
+            "forgotten"
+        );
+        for blank in [json!(""), json!("   ")] {
+            let mut late = read.clone();
+            late["summary"] = blank;
+            let answer = send_at(&mut store, late, NOW + 2_000);
+            assert_eq!(answer["error"], "empty", "{answer}");
+        }
+        let mut unsaid = read.clone();
+        unsaid.as_object_mut().unwrap().remove("summary");
+        assert_eq!(
+            send_at(&mut store, unsaid, NOW + 2_000)["error"],
+            "bad_request"
+        );
+        // The same row put straight to the store, as an agent's, asked
+        // before the forget: refused with an empty summary and with none.
+        let mut direct = linked(OWNER, "a-run-1-0", "agent", "", NOW + 10);
+        assert_eq!(
+            send_at(&mut store, direct.clone(), NOW + 2_000)["error"],
+            "forgotten"
+        );
+        direct.as_object_mut().unwrap().remove("summary");
+        assert_eq!(
+            send_at(&mut store, direct, NOW + 2_000)["error"],
+            "forgotten"
+        );
+        let keys: Vec<Value> = records(&mut store, OWNER)
+            .iter()
+            .map(|r| r["key"].clone())
+            .collect();
+        assert_eq!(keys, vec![json!("t-tasks-7")]);
+        // Asked after the forget, a read of the run is kept as before.
+        let mut fresh = agent_read("t-tasks-7", "run-1", 1, NOW + 1_500);
+        fresh["summary"] = json!("Called the dentist back");
+        assert_eq!(send_at(&mut store, fresh, NOW + 2_000)["ok"], true);
+    }
+
+    /// The app's removal of a person takes their agents' rows with the
+    /// rest, and a late read of that run, made before it, is not kept:
+    /// no owner while the task row is gone, forgotten once it is back.
+    #[test]
+    fn forget_person_removes_agent_rows() {
+        let (_scratch, mut store) = Scratch::new("linked-forget-person");
+        send(&mut store, task_row(OWNER, "t-tasks-7", "run-1", NOW));
+        send(&mut store, task_row(OTHER, "t-tasks-8", "run-2", NOW));
+        assert_eq!(
+            send_at(
+                &mut store,
+                agent_read("t-tasks-7", "run-1", 0, NOW + 10),
+                NOW + 20
+            )["ok"],
+            true
+        );
+        assert_eq!(
+            send_at(
+                &mut store,
+                agent_read("t-tasks-8", "run-2", 0, NOW + 10),
+                NOW + 20
+            )["ok"],
+            true
+        );
+        let forgot = send_at(
+            &mut store,
+            json!({"op":"forget_person","person":OWNER}),
+            NOW + 1_000,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        assert!(records(&mut store, OWNER).is_empty());
+        assert_eq!(records(&mut store, OTHER).len(), 2);
+        let late = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(late["error"], "no_owner", "{late}");
+        send_at(
+            &mut store,
+            task_row(OWNER, "t-tasks-7", "run-1", NOW + 1_500),
+            NOW + 2_000,
+        );
+        let early = send_at(
+            &mut store,
+            agent_read("t-tasks-7", "run-1", 1, NOW + 500),
+            NOW + 2_000,
+        );
+        assert_eq!(early["error"], "forgotten", "{early}");
     }
 }

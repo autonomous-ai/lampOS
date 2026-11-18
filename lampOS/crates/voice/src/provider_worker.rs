@@ -1169,6 +1169,15 @@ pub enum ProviderOutput {
     SleepAsked {
         request: u64,
     },
+    /// A made skill was run now for `request`, as its owner asked by voice
+    /// (`crate::made_run`, a call's answer `"ran": true`): the coordinator
+    /// keeps it ([`crate::made_run::ran_now`]), as its say service reads it
+    /// there, never in this process (El's P1 on #7363). Sent once a call;
+    /// owed even for a retired request, as the run was made.
+    MadeRunNow {
+        request: u64,
+        skill: String,
+    },
     /// The model called a linked service's function
     /// ([`crate::services::NAMES`]: `service_read` and the rest) for
     /// `request` on the second route, so its own "Let me look." in that
@@ -1204,6 +1213,15 @@ pub enum ProviderOutput {
     /// says no `turn_lost` over it. Sent after the line's audio, before its
     /// `TurnFailed`; nothing is asked or answered.
     DownLineSaid {
+        request: u64,
+    },
+    /// With the make's one run path (`LAMP_MAKE_AGENT_ONE_PATH`, #7371),
+    /// the make's waiting line, or its long-wait line, was said whole for
+    /// `request`: sent just after that line's `GenerationComplete`, which
+    /// follows its last audio. The turn stays open for the make's answer;
+    /// the coordinator shows thinking until audio comes again. Never sent
+    /// with the switch off.
+    MakeWaiting {
         request: u64,
     },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
@@ -1575,6 +1593,8 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             // About a retired request by definition, and still owed.
             | ProviderOutput::InputDiscarded { .. }
             | ProviderOutput::OwnershipAssumed { .. }
+            // A run made: the coordinator keeps it whatever the turn.
+            | ProviderOutput::MadeRunNow { .. }
             | ProviderOutput::Ended { .. } => None,
             ProviderOutput::Transcript { request, .. } => *request,
             ProviderOutput::Started { request, .. }
@@ -1593,6 +1613,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
@@ -1698,6 +1719,9 @@ pub async fn run_with_continuation(
     if let Some(path) = files.look {
         let _ = LOOK_FILE.set(path);
     }
+    // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
+    // recall runs here, so this worker reads the switch itself.
+    crate::nightly::chapters_from_environment();
     LOOK_FULL.store(files.look_full, std::sync::atomic::Ordering::Relaxed);
     SESSION_FACT.store(files.session_fact, std::sync::atomic::Ordering::Relaxed);
     ROOM_FACTS.store(files.room_facts, std::sync::atomic::Ordering::Relaxed);
@@ -2385,6 +2409,9 @@ async fn serve_with_visual<C: Connect>(
                 }
                 for sleep in desk.take_sleeps() {
                     output.push_back(Outbound::Output(sleep));
+                }
+                for ran in desk.take_made_runs() {
+                    output.push_back(Outbound::Output(ran));
                 }
                 // Each call answered, for the first-output record when
                 // there is one (#799); let go when there is none.
@@ -3781,6 +3808,9 @@ struct ToolDesk {
     /// Requests whose `go_to_sleep` was answered with the line to say, since
     /// the worker last took them (#3748).
     sleeps: Vec<u64>,
+    /// Made skills run now by voice, since the worker last took them
+    /// ([`ProviderOutput::MadeRunNow`]).
+    made_runs: Vec<ProviderOutput>,
 }
 /// The longest a skill tool's look is owed after its answer: it begins
 /// within `LOOK_BEGINS_WITHIN` and waits `STILL_WAIT` for its still.
@@ -3878,6 +3908,7 @@ impl ToolDesk {
             looks: Vec::new(),
             news: Vec::new(),
             sleeps: Vec::new(),
+            made_runs: Vec::new(),
         }
     }
     /// The requests ended because they asked again for an action held,
@@ -3963,13 +3994,11 @@ impl ToolDesk {
         }
         // Requested recordings never run after the model declined their
         // spoken request. Keep the existing non-recording behavior when off;
-        // report-consent withdrawal retains its separate route.
+        // report-consent withdrawal retains its separate route, and so does
+        // seen activity's (the Reviewer-lead's P3 on #6912).
         if (self.settings.requested_audio
             && self.declined == Some(request)
-            && !matches!(
-                crate::tools::route(&self.settings, &call.name),
-                Route::ReportsStop(_)
-            ))
+            && !withdraws(&crate::tools::route(&self.settings, &call.name), &call.name))
             || (held
                 && matches!(
                     crate::tools::route(&self.settings, &call.name),
@@ -3984,6 +4013,7 @@ impl ToolDesk {
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
                         | Route::Sleep
+                        | Route::SeenActivity(_)
                 ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -4160,7 +4190,8 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop(_))
+            | Route::ReportsStop(_)
+            | Route::SeenActivity(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -4176,6 +4207,7 @@ impl ToolDesk {
             | Route::Mark(_)
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
+            | Route::SeenActivity(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -4227,6 +4259,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
+                    | Route::SeenActivity(_)
             )
         {
             self.acted = Some(request);
@@ -4657,6 +4690,13 @@ impl ToolDesk {
                 };
                 self.looks.push((done.request, done.session.get(), dropped));
             }
+            // A made skill run now: the coordinator keeps it (#7363).
+            if let Some(skill) = crate::made_run::ran_of(&done.told) {
+                self.made_runs.push(ProviderOutput::MadeRunNow {
+                    request: done.request,
+                    skill,
+                });
+            }
             // A finished task's news the model now has: the tasks part is
             // told it was heard only once that turn is heard whole (#1390).
             if taken && let Some(key) = &done.news {
@@ -4714,6 +4754,10 @@ impl ToolDesk {
             .into_iter()
             .map(|request| ProviderOutput::SleepAsked { request })
             .collect()
+    }
+    /// The made skills run now since the last take (#7363).
+    fn take_made_runs(&mut self) -> Vec<ProviderOutput> {
+        std::mem::take(&mut self.made_runs)
     }
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
         std::mem::take(&mut self.looks)
@@ -6410,6 +6454,9 @@ impl InputHandoff {
                 }
                 // A new line is not the sentence unless it is said to be.
                 crate::thread::count_only(None);
+                // An offer of seen activity is answered only in the line
+                // right after it (#6543).
+                crate::seen_yes::turn_began(request.get());
                 let expected = SessionId::new(session)?;
                 // Read before the line is sent, so it is bound to the face
                 // the eyes named as it began, never a later one.
@@ -6940,6 +6987,38 @@ fn rise_in(
         .filter(|(at, _)| (began..=until).contains(at))
         .map(|(_, rise)| *rise)
         .reduce(f32::max)
+}
+
+/// A withdrawal of a consent, never declined with its request: reports'
+/// stop, and seen activity's stop (`seen_yes::STOP`, the Reviewer-lead's
+/// P3 on #6912).
+fn withdraws(route: &crate::tools::Route, name: &str) -> bool {
+    matches!(route, crate::tools::Route::ReportsStop(_))
+        || (matches!(route, crate::tools::Route::SeenActivity(_)) && name == crate::seen_yes::STOP)
+}
+
+#[cfg(test)]
+mod withdraws_tests {
+    /// A declined request's "stop looking" still runs, as reports' stop
+    /// does; the seen activity offer and yes are declined with it.
+    #[test]
+    fn a_declined_requests_stop_looking_still_runs() {
+        use crate::tools::Route;
+        assert!(super::withdraws(&Route::ReportsStop(false), "stop_reports"));
+        assert!(super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::STOP
+        ));
+        assert!(!super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::LOOK
+        ));
+        assert!(!super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::OFFER
+        ));
+        assert!(!super::withdraws(&Route::Clock, crate::seen_yes::STOP));
+    }
 }
 
 /// What a request's note says once the staff's `part` takes the place of

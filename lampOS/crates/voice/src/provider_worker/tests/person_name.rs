@@ -110,6 +110,8 @@ impl Scene {
                 &lamp_msgs::Faces {
                     faces: (0..self.faces)
                         .map(|_| lamp_msgs::Face {
+                            pitch: None,
+                            looking: None,
                             id: "f".into(),
                             xmin: 0.4,
                             ymin: 0.0,

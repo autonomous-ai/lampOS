@@ -230,7 +230,7 @@ each line plays exactly as before.
 | A failed turn | `language::TURN_LOST` ("Sorry, I couldn't answer that. Could you ask me again?", #4883) | the notices release's file (none in the product: the sigh) | the cache's line when kept (`FailureNotices::owners_line`), the release's file or the sigh otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
-| The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
+| The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`, `DOWN_LINE_LIMIT` ("I've hit my usage limit."); `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710); `ProviderOutput::StopAnswered` tells the coordinator first, so a reminder's ring the line cut is held, not rung once more (`LAMP_RING_STOP_ENDS_IT`, schedule.md) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Um, excuse me, did anyone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, on in the product by the memory owner's call, 4 Nov; the lamp's own echo can still be asked, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
 | The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product by the memory owner's call, 5 Nov) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
@@ -472,7 +472,21 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   session is told them when it opens, so the executive's actions come and
   go with the executive (one that starts after the voice is not missed).
   The answer is read as server-sent events and cut into sentences as it
-  arrives (`net/sentences.rs`). It is whole at `[DONE]`, or at the
+  arrives (`net/sentences.rs`). The voice never says list markup (Queue
+  #6811, lamp-9adf, 17 Nov: a web answer was said "this week: - New
+  CEO… - Analysts…"): a `- `, `* `, `• `, `1. ` or `1) ` at a line's
+  start or the reply's start is taken out as a pause, the item before
+  it ending as a sentence (a `.` added when it has no stop or comma).
+  After a sentence's break inside a line (`.`, `!`, `?`, `…`, `:` or `;`
+  and a space) only a `- `, `* ` or `• ` is: a number there is said, as
+  it may be the answer ("The answer is: 2.", "Gate: 12."), and so is a
+  `-` before a number ("Temperature: - 5 degrees"). One marker a break;
+  a second right after it is said. A hyphen inside a word or number
+  (`e-mail`, `25-30`, `-5`) and a dash inside a sentence are kept. Each
+  word is decided once, when the whitespace after it has come (a `-`
+  after a break also waits for the word after it), so the text is the
+  same however the stream is cut into pieces. Always on, every voice;
+  the lamp's words get the same text. It is whole at `[DONE]`, or at the
   stream's end after a chunk with a `finish_reason`; a stream that ends
   before either was cut, and fails the turn (`TurnFailed`, as any chat
   failure) rather than leaving a half answer as the whole one. A turn's
@@ -574,11 +588,56 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   says "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) instead, at
   most once a minute, since asking again won't mend it and the slow line
   would promise it would (the Reviewer-lead's P3 on #3771); its journal:
-  `said it can't answer just now`. The journal: `said its thoughts are slow`,
-  and `(again, the shorter line)` for the second. Once the slow line (either one)
-  has been handed over, the route sends `DownLineSaid` for the request,
+  `said it can't answer just now`. A usage limit says so, not "slow"
+  (#7346: lamp-74ff's relay answered 429 for over an hour on 16 Nov, and
+  the lamp said "slow" and "still slow" the whole time). It is recognised
+  first by the relay's own word: a 429 whose body has `error.code`
+  `usage_limit` (Backend, #1711; `net::usage_limit`, read from the first
+  4 KiB of the body, `REFUSAL_BYTES`, so a large body is never read whole)
+  is a usage limit at once (`net::Error::UsageLimit`). Its time back is the
+  body's `reset_at` (RFC 3339), else `now + retry-after` seconds (at most
+  30 days). The journal: `the service's usage limit (HTTP 429, usage_limit)
+  resets at <unix s> (in N s)`, with no key and no account. Without that
+  word (an older relay, another service, a body that isn't JSON), the
+  fallback is persistence: the route keeps when the first 429 before any
+  word came, and a 429 that comes `LIMIT_AFTER` (2 min) or more after it,
+  with no chat round begun between, is a usage limit too (a rate burst's
+  per-minute window passes well within 2 min). Either says "I've hit my
+  usage limit." (`DOWN_LINE_LIMIT`, V1's `PhraseLLMLimit`) instead of the
+  slow line, and with a time back it says when, in the lamp's local time
+  (`local_time::offset_here`) and the owner's language
+  (`usage_limit::line_at`): "I've hit my usage limit. It comes back at
+  7 AM." ("Mình hết hạn mức rồi, 7 giờ sáng sẽ có lại."), and for a time
+  more than a day away the day only ("It comes back on Tuesday."). That
+  line can't be rendered ahead, so it is rendered when it is said, within
+  3 s (`LIMIT_RENDER_WITHIN`); if the voice can't render it (it may be at
+  the same limit), the plain line rendered ahead with the other down lines
+  is said instead, and with no local time known, the plain line too. It is
+  said to the first line heard in a run of 429s. After that, only a line
+  that names the lamp hears it again, at most once in five minutes
+  (`LIMIT_AGAIN_NAMED`); every other line hears no words at all, not the
+  limit line, the slow line nor the no-answer line (the first builder's
+  ruling on #7362, 23:56: a line to every heard line announces the limit to
+  a busy room all evening, and silence to every ask leaves an owner who
+  asks twenty minutes on thinking it broke; on lamp-52e6 at 23:21 and 23:24
+  it was said twice in one run). A line names the lamp when the model isn't
+  needed to tell: the name in its words (`attention::called_by_name_on`),
+  the name detector's note beside it (`called::NOTE`, `NOTE_HEARD_AS`), or
+  a wake by name just before it (`attention::marked_woken_by_name`). A
+  quiet ask still sends `DownLineSaid`, so the coordinator says no
+  `turn_lost` over it (the Reviewer-lead's question on #7362: `turn_lost`
+  is an audible recording). Any chat round that begins, or a refusal with
+  another status, ends the run, and the next run's first line hears it
+  again. Until the plain line is rendered the slow line is said as before.
+  Its journal: `said it has hit its usage limit (429s for N s)`, `, with
+  when it comes back` when timed, and `heard nothing: its usage limit was
+  said earlier in this run (not named)` or `(named within 5 min of it)` for
+  the quiet asks. The journal: `said its thoughts are slow`,
+  and `(again, the shorter line)` for the second. Once the slow line (either
+  one) or the usage-limit line has been handed over, or a quiet ask in a
+  limit run has ended, the route sends `DownLineSaid` for the request,
   before its `TurnFailed`, and the coordinator then says no `turn_lost` over
-  it (#4332, failure-notices.md): one failure line a turn. The three lines are
+  it (#4332, failure-notices.md): one failure line a turn. The four lines are
   rendered together, each until it is kept: one whose render failed is asked
   again after the next turn, and until the short one is kept the long one is
   said in its place, never silence (Third's P2 on #3771). With an owner's
@@ -667,16 +726,18 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   none (`deepseek-v4-pro`, DeepSeek's pricing page) is never sent one: a
   look asked of it is told it saw nothing (`Services::sees`).
 - **Web search** (`LAMP_SECOND_SEARCH`, `net/search.rs`), declared to the
-  model beside the lamp's tools, within this route's own bound of 48
+  model beside the lamp's tools, within this route's own bound of 64
   functions (`second_provider::MAX_TOOLS`; Live's is 32, Gemini Live's own;
-  the chat models take more, DeepSeek's API up to 128), cut
+  the chat models take more, DeepSeek's API up to 128; it was 48 until
+  17 Nov, when a product lamp's 52 left out the fetch, the time elsewhere,
+  `reports_state` and the weather on every turn, #7433), cut
   in the order `worker::chat_cut` declares: the fetch, the time elsewhere,
   `reports_state` with `LAMP_REPORTS=on`, the skills' functions not a core
   skill's (the last first), the weather with `LAMP_SECOND_WEATHER=on`, then
   the search, and never a core skill's
   function, `use_skill`, `reports_stop` or the actions part's (#2614,
   #2644, `worker::chat_tools`). What is cut is said once, on a plain
-  journal line (`past the bound of 48, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
+  journal line (`past the bound of 64, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
   its skills' and the search's came to 37, and Live's bound had left out the time, the
   light scenes and the search; at 37 the chat's first answer began a median 856 ms after
   it was asked against 1031 ms at 32 (6 and 210 requests, the request 5% larger, its
@@ -689,6 +750,13 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     is `POST <deepseek>/v1/tools/fetch` with `{"url"}`; the page's title and
     its Markdown cut at 2,000 characters go back. $0.75 a thousand
     successful calls of each from 1 Nov 2026; 5 a second an account.
+    `fetch_page` is told it reads a page a search found, so the model is
+    never steered to an address it writes itself. `web_search`'s
+    description says that asked what a site or page says, the model
+    searches for it at once and answers from what it finds, never offering
+    to search or asking first (Queue #6811, lamp-9adf, 17 Nov: "what does
+    the front page of the BBC say right now?" got "I can't browse… Want me
+    to search for the latest BBC headlines instead?").
   - **Prices** (Migrate's finding 5 on #3997: on lamp-29e7 on 30 Oct a
     searched $399 was given as the ErgoChair Pro's price, and argued for when
     the person said the page showed $499). `web_search`'s description says a
@@ -817,6 +885,106 @@ order is kept. A written turn is the same from the chat on.
   send it, else `no usage given` (#1712, the first builder at 18:56: the
   request was 31 KB with 31 tools, and its first event came in 976 to
   1296 ms).
+- **With `LAMP_VOICE_DAY_TALLY=on` those counts are added up for the day**
+  (off unless set; #7347, `day_tally.rs`). On 16 November a lamp at home
+  used up its day's allowance before six in the evening and answered
+  nothing for over an hour; the journal's lines above were gone within
+  minutes (#7254), and nothing on the lamp said what the day had cost.
+  With the switch on, each chat answer that ends is counted by its model:
+  answers, prompt tokens, those the cache held, completion tokens, and
+  answers whose service gave no count; each turn the model declined as
+  not said to the lamp; the sound sent to be heard, in milliseconds; and
+  the lines sent to be spoken, with their characters. The day is a UTC
+  day, as the allowance is counted. Numbers only: no word, name or request
+  is kept.
+  - **Where it is kept:** `/var/lib/lampOS/voice/day-tally/tally.json`,
+    root's: `{"today": {"day", "models": {NAME: {"answers", "uncounted",
+    "prompt_tokens", "cached_tokens", "completion_tokens"}}, "declined",
+    "heard_ms", "heard_lines", "heard_no_words_lines",
+    "heard_no_words_ms", "heard_declined_ms", "spoken_lines",
+    "spoken_chars"}, "yesterday": …}`. `day` is days since 1970. At the
+    first write of a
+    new UTC day the day before becomes `yesterday`, whole, so a morning's
+    read shows what a day cost; a day older than that is let go. Only a
+    later day turns it over: a clock that has gone back across midnight
+    goes on counting into the day the file is on. A file that is there
+    and cannot be read as a tally is begun again, with one journal line
+    saying so. At most eight models are kept apart, the rest as `other`.
+  - **A turn never waits on it.** An answer is counted in memory where it
+    ends, and a line where it is sent to be spoken (`Tts::speak_in`,
+    `speak_fresh`, the Gemini speech's `speak`), under a short lock. Sound
+    is counted where each block goes onto the speech-to-text socket, a
+    hundred times a second, so that takes no lock: one flag read and one
+    add. Both ways of listening count it (`stt.rs`'s `run` and Flux's),
+    the stop words' lines with them, and so does the quiet Flux sends to
+    keep a line. A thread of its own adds the counts to the
+    file at most once a minute, under a file lock, written whole beside
+    it and moved over it. The voice and its second-route worker are two
+    processes and each adds its own.
+  - **The journal** has one line in each hour in which the process counted
+    something: `thinking today (UTC): N chat answers, P prompt tokens (H
+    from the cache), C completion tokens; D turns declined; S s of sound
+    sent to be heard, of N lines ended M had no words (W s) and X s was in
+    declined turns; L lines sent to be spoken (K characters)`, and by
+    model when there is more than one.
+  - **Why sound and lines are counted too:** by the relay's own count of
+    that lamp's day (Backend on #7347, 16 Nov), thinking was about 38% of
+    what the day cost, listening 30%, speaking 27% and the second model
+    4%. A lamp in a busy room spends its day on hearing, even when it
+    says little. The relay counts a token its cache held as far less than
+    a fresh one, which the two token counts here keep apart.
+  - **The lamp's clock is not always right, and the day must not be lost
+    to it.** Until the clock is set, which is when it reads 1 Nov 2026 or
+    later, nothing is written: the counts wait in memory, and the journal
+    says once that the tally waits for the clock. So a boot before the
+    clock is set neither loses the day nor moves it. A file more than a
+    day ahead of a set clock was written under a clock set ahead and since
+    put right: it is brought back to today with its counts, and the day
+    before it is let go unless it is the day before today.
+  - **What the listening came to** (#7347: which listening can be cut).
+    When a line ends with its words asked for (`SttStream::finish` for a
+    request, `finished` for a stop word), it is counted (`heard_lines`).
+    If no words came back it is counted as that too
+    (`heard_no_words_lines`), with the sound queued on it
+    (`heard_no_words_ms`). When the model declines a
+    turn as not said to the lamp, the sound queued on that request's
+    lines is counted (`heard_declined_ms`); the newest 32 requests are
+    remembered for that, in memory only. So of a day's sound, three parts
+    can be told apart: sound that held no words, words not said to the
+    lamp, and the rest, which is what was answered, failed or given up.
+    The parts are the sound as queued on a line, and `heard_ms` is the
+    sound as sent, so they are close and not equal; a line given up
+    before its end is in `heard_ms` only, and a line nothing was queued
+    on is not counted at all.
+  - **Only the second route's listening and speaking are counted.** The
+    voice and its second-route worker both count, but only the second
+    route's speech-to-text and speech call these. On a lamp whose Live
+    route carries the day, the tally's sound and lines show only the
+    second route's share.
+  - **These are the lamp's own counts, not the bill.** Seconds of sound
+    and characters of speech are what the lamp sent. What each costs is
+    the relay's to say, and the relay's count of the day stays the true
+    figure. A line taken from the cache of fixed lines is not sent, so it
+    is not counted; a piece asked again after it failed to start is
+    counted again.
+  - **Not counted:** an answer cut before it ends (the service still
+    counts its prompt). Counts made in the last minute before 00:00 UTC
+    may be written into the new day, and those of the last minute before
+    the voice or its worker stops are lost.
+  - **Not yet:** the lamp does not read how much of its day the relay says
+    is used, warn, or shed anything near the limit. Those are #7347's
+    next parts. A reset does not wipe the file yet.
+  - Tests: `day_tally::tests` (an answer's usage is read in both services'
+    forms, nothing is counted until counting begins, two writers add up
+    by model, a new UTC day keeps the day before and begins again, a clock
+    gone back keeps today's counts, a file from a clock set ahead is
+    brought back with its counts, until the clock is set nothing is
+    written, a line's sound is told by what it came to, sound and spoken
+    lines add up and are told with the part of a millisecond carried, a
+    bad file begins again and many models are bounded, names are bounded
+    and an answer without usage is still counted), and the workers' census
+    (`process::switch_census_tests`), which fails if the switch does not
+    reach the second worker.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
   what stays** (off unless set; #1712, the first builder at 18:56). The
   system message keeps only the character and the skills. The memory note,
@@ -2120,7 +2288,19 @@ order is kept. A written turn is the same from the chat on.
   step." with no `volume_down` call in 4 of 14 action lines, and nothing
   changed. Only a call that ran and answered with no error and no keep
   refused is kept, never `more_functions`, and never one declined, held,
-  refused, or of a due reminder's or an add-on's quoted line. The calls go with
+  refused, or of a due reminder's or an add-on's quoted line. A call
+  answered with an error is kept bare as failed then
+  (`second_provider::FAILED_THEN`), never told as a call: the lamp's
+  words of its turn are followed by a system note,
+  `second_provider::failed_then_note`, "(For you to know: in that turn
+  <names> answered with an error. What you said there was about that one
+  try, never how things stand now: for a new ask, call the function
+  again, and say you couldn't reach or do something only when a call in
+  your own turn failed.)". On lamp-9adf at 13929 (17 Nov 23:20) three
+  asks in a row, sunrise in Hanoi, VnExpress's headlines and Apple's
+  stock, got `calls=none` and "I couldn't reach … just now", the
+  weather's own failure words carried in the history as the lamp's words
+  alone, a search never tried included. The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
@@ -2161,7 +2341,8 @@ order is kept. A written turn is the same from the chat on.
   of the last ten minutes as "Person: …"/"You: …" lines after a note
   ("A moment ago…", `Thread::recall_for`), so without more each exchange
   in the history is told twice (#6218: a long talk's prompt near 14k
-  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set) the thread
+  tokens). With `LAMP_HISTORY_SAID_ONCE=on` (off unless set, on in the product
+  unit, C131) the thread
   text leaves out every exchange the history of the same request tells,
   matched by its place in the thread as the history picked it
   (`Thread::recent_picks_for`, `Thread::recent_picks_with_room_lines`,
@@ -2174,7 +2355,7 @@ order is kept. A written turn is the same from the chat on.
   places. Scopes, the withheld name and the byte budget are as with it
   off; off, the thread text is told whole, byte for byte as before.
 - **What a stored running note holds is not told again as history**
-  (`LAMP_HISTORY_AFTER_NOTE=on`, off in the product; #6218). With
+  (`LAMP_HISTORY_AFTER_NOTE=on`, on in the product unit; #6218, C131). With
   `LAMP_CONVERSATION_SUMMARY` on, a turn's system message tells its scope's
   running note ("Earlier in this conversation"), then the thread's lines,
   and the chat is given the newest exchanges as history; off, the
@@ -2276,7 +2457,11 @@ order is kept. A written turn is the same from the chat on.
     line is still to be said, for at most `make_skill_local::MAKE_WITHIN`
     (2 minutes) after its call (`Shared::quiet_for_a_make`, lamp-9adf, 11
     Nov; skills.md, "A cut while it is made"): then the lamp stays quiet,
-    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. A cut-in whose
+    with `LAMP_CUT_IN_WORDLESS_RESUMES` too. With `LAMP_SAID_TO_ME` the
+    question is asked only when a face was seen speaking through the cut;
+    otherwise the lamp stays quiet and the cut is not counted against its
+    once a minute (`Shared::wordless_unseen`, #7442: a lip smack over the
+    answer on lamp-74ff). A cut-in whose
     final words came back empty but had words on the way is taken as that
     stop when they are one, and otherwise is neither (#4938). Neither is asked
     of the model; both are rendered ahead (`FixedClips`) and played at once
@@ -2425,7 +2610,8 @@ order is kept. A written turn is the same from the chat on.
   for. With
   Days memory, the note is asked once per run of turns for one person.
   A run ends when the person changes or the worker restarts, and, with
-  `LAMP_MEMORY_REOPEN_QUIET=on` (off unless set, #1693 (1)), when no turn
+  `LAMP_MEMORY_REOPEN_QUIET=on` (off unless set, on in the product unit;
+  #1693 (1), C20), when no turn
   was told for ten minutes (`thread::REMEMBERED_FOR`, after which the
   thread's exchanges aren't told either). The next turn then asks the note
   again as a new session, so the same person back the next morning can be
@@ -3498,7 +3684,8 @@ after a take-over, but now for every turn:
     on 30 Oct a follow-up begun 9 s after the lamp's words and spoken for
     13 s was held, judged 22 s after them (Migrate's launch finding 2 on
     #3997). A busy room's 15 s after the words is still counted to the
-    judging. The journal's "no conversation going on" line says how long
+    judging, unless `LAMP_BUSY_FOLLOW_UP_RENEWS=on` (#7332, below), which
+    measures them to the line's start too. The journal's "no conversation going on" line says how long
     the line ran ("the line ran N s"), when the lamp was "last heard
     saying words, to their end," and adds ", in a busy room, where it goes
     on 15 s".
@@ -3953,6 +4140,25 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+  **A light act told as under way** (`LAMP_ACTION_CLAIM_DOING=on`, off by
+  default, only beside `LAMP_ACTION_CLAIM_CHECKED`; #7285: lamp-52e6 core w2
+  on 13333, 13417 and 13495, "Hold on, hey Lamp, make the light a little
+  warmer." answered in three words with `calls=none`): the phrase runs
+  read only what was done or promised, and `LAMP_ACTION_CLAIM_WORDED` is
+  off in the product. With this switch a reply whose first sentence past
+  lead words opens with a verb acting on the light in "-ing"
+  (`action_claim::LIGHT_VERBS`: warm, cool, dim, brighten, switch, turn,
+  change, make, set, each held by a test to the light functions' text; not
+  "Thinking about blue whales.") (bare or after "I'm"), has at
+  most six words, names one of the light's acts as `lamp_actions::catalog`
+  declares them (a step function's name past `light_`, or a colour
+  `light_colour` takes), and has no '?', "not" or "n't" is a light claim
+  (`action_claim::doing_claim`: "Warming that up.", "Switching to
+  blue."), held and asked again as above. Only the reply is read, never
+  the person's line: "A red fox lived alone." and "Cool, glad you like
+  it." are said as they came. A reply whose first word is no "-ing" verb
+  is decided at that word, so it is not held. The journal adds
+  `, an act told as under way: LAMP_ACTION_CLAIM_DOING`.
   **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
   unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
   "I'm preparing to fold — please wait …", "Still preparing …",
@@ -4211,6 +4417,112 @@ after a take-over, but now for every turn:
   lamp." and "Not for me either.", and 160 ms for "Not for me to say, but
   it's lovely." and "Not for me to answer, but I think it's lovely.", each
   held to the word that decides it.
+- **Inside a live back-and-forth the doubt goes to the person, with
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`** (on in the product, off unless set elsewhere, #7332; Sixth's trace
+  and design, with the first builder's 19:54 conditions). On the owner's
+  lamp-74ff on 16 Nov (13500), in a busy room, the owner spoke three times
+  in 26 s and got no answer: r43 called the lamp, r44 followed it up, the
+  model called `not_for_me` on both, so neither of the busy room's clocks
+  moved (`said_until_us` moves only on words said, `called_at` only on a
+  call); r45, judged 16 s after the call, was held ("a busy room, and
+  nothing shows it was called"), and r46 was held as "a reply to a
+  question the lamp left unanswered" (`AFTER_QUESTION`), the owner's own
+  r45. With the switch, five things change, in a room of any kind but
+  mattering in a busy one:
+  - a line let out only as the conversation going on and spoken by the
+    caller (the caller's face alone seen speaking it,
+    `spoken_by_the_caller_alone`) renews the call (`Heeding::call_renewed_at`),
+    whatever the model makes of it; with `LAMP_DECLINE_SILENT` too, its
+    decline keeps that renewal. The renewed call carries only the caller's
+    own lines (`Heeding::call_for`, the same face check): a colleague's
+    line 20 s after the call is judged by the call alone, as off, and held
+    (the Reviewer-lead's P2 on #7349, #7297's half). A line in the
+    conversation's voice alone, with no face, renews nothing: the prints
+    come after the windows are read, and are for the services alone in the
+    product. Another face, or two, renew nothing, nor does a line untied to the lamp
+    (`LAMP_UNTIED_GOING_ON`) or whose words open nothing. Journal: `the caller's own
+    follow-up: it renews the call, and the model is told it is theirs
+    (LAMP_BUSY_FOLLOW_UP_RENEWS)`;
+  - such a line is told `worker::FOLLOW_UP_NOTE` in the place of
+    `CONVERSATION_ALONE`: it is the person the lamp was talking with,
+    speaking again, to be answered unless plainly said to someone else.
+    The first builder's point 1: the old note primed the model to decline
+    exactly the lines a conversation is made of. `LAMP_NOT_FOR_ME_WORDS`
+    and `LAMP_DECLINE_SILENT` treat it as they treat `CONVERSATION_ALONE`;
+  - the busy room's 15 s (`BUSY_GOING_ON_FOR` after the words,
+    `CALL_CARRIES_FOR` after the call, `went_on_told`) are measured to the
+    line's start with `LAMP_WINDOW_FROM_START`, as the conversation's own
+    check already was: a line begun 12 s after the call and judged 17 s
+    after it goes on;
+  - a question held just before a line, said by the same speaker (one face,
+    the same; or both in the conversation's voice), is no question to
+    someone else that the line answers (`Attention::after_a_question`,
+    `carried_past_a_question`). Journal: `the question held just before it
+    was the same speaker's: no reply to someone else`;
+  - with the wait sound, any tool a heard line calls makes it past
+    `cue_after` (1.5 s), not only a connected service's, and the chat round
+    after a call is timed for it too; one sound a round (a tool's sound
+    stands for the round after it, a round's own sound for its tools;
+    only a sound that played counts), none
+    once a newer line began, so never over the person's own words, and none
+    for a held line's calls (`attention::DONE_THOUGH_HELD`), whose line the
+    lamp won't answer. Journal: `made a sound while chat
+    round N had not begun in 1500 ms (LAMP_BUSY_FOLLOW_UP_RENEWS)`.
+  Latency: nothing waits for it. The renewal, the note and the question
+  check are bookkeeping at the verdict; the sound is raced against work
+  already in flight (a tool, a round's first event), never awaited before
+  it, and a round that begins before 1.5 s makes none. On the test clock a
+  3 s tool turn's first audio comes at 1.5 s with the switch, at 3 s
+  without (`tool_round_past_cue_after_makes_one_sound`). Tests (each fails
+  with the switch off): `busy_follow_up_declined_still_renews_the_call`
+  (lamp-74ff's r43 to r46, all let out; off, r45 and r46 held; a
+  colleague's line renews nothing), `busy_follow_up_is_told_it_is_the_callers`,
+  `busy_window_is_measured_to_the_line_start`,
+  `own_held_question_is_no_reply_to_another` (the owner's line let out, a
+  colleague's still held), `a_silent_decline_keeps_the_callers_renewal`,
+  `the_renewed_call_carries_only_the_caller`. Not yet shown on a lamp: the first builder's
+  row (the person's follow-ups answered three of three, the colleague
+  track's lines answered none, first audio on tool turns before and after).
+- **A follow-up no face was seen speaking renews the call too, with
+  `LAMP_BUSY_NO_FACE_RENEWS=on`** (off unless set, needs
+  `LAMP_BUSY_FOLLOW_UP_RENEWS=on`, #7332). On lamp-74ff on 17 Nov (13706,
+  the renewal on), in a busy room, the owner's r47 to r49 were a
+  back-and-forth with the lamp, each cut by the next, r49 declined
+  (`not_for_me`); no face was seen speaking any of them, so none renewed
+  the call (`spoken_by_the_caller_alone` needs the caller's one face), and
+  r50, r52 and r53 were held 22 to 38 s after the call ("a busy room, and
+  nothing shows it was called"). With the switch, `renews_for_the_caller`
+  takes no face seen speaking as the caller's too, for both the renewal
+  and the lines the renewed call carries (`Heeding::call_for`); a line
+  also needs no other voice (`seen.other_voice`) to renew. Another face, or
+  two, seen speaking it still renews nothing and is judged by the call
+  alone. Its cost: a colleague whose face the eyes miss can renew or be
+  carried by the owner's call. Journal at start: `in a busy room a
+  follow-up no face was seen speaking renews the caller's call too`.
+  Latency: none, bookkeeping at the verdict. Test (fails with the switch
+  off): `a_no_face_follow_up_renews_the_call`.
+- **Held desk talk makes a busy room, with `LAMP_ROOM_HELD_TALK=on`**
+  (off unless set, #7332; the first builder on #7570 at 07:14 on 18 Nov).
+  The room turns busy after three lines left alone as talk inside a
+  minute (`room_told.rs`, `BUSY_RUN`, `BUSY_WITHIN_US`). With only talk
+  counted (`LAMP_SPOKEN_TO`) a line the rule held as said to nobody
+  (`attention::NOT_SPOKEN_TO`) was no talk, and it counted only through
+  `LAMP_NAME_OR_FOLLOW_UP`, off in the product; so two people talking at
+  a desk, every line held, never turned the room busy, and the busy-room
+  paths (`LAMP_BUSY_NO_FACE_RENEWS` among them) rarely acted. With the
+  switch such a line is talk for the busy room, its run and its end
+  clock, as a line the Policy held as not the lamp's is
+  (`RoomTold::count_held_not_spoken_to`, `judged`); it ends no
+  conversation (`talked_past_the_lamp`), a held line the lamp then
+  carries or answers is no talk, and nothing else of
+  `LAMP_NAME_OR_FOLLOW_UP` comes with it. Its cost: a lone voice's held
+  lines count too, so one person talking to themselves, three lines in a
+  minute, turns the room busy. Journal at start: `a line held as said to
+  nobody is talk for the busy room`. Latency: none, bookkeeping at the
+  verdict. Tests (the first fails with the switch off):
+  `with_the_switch_held_not_spoken_to_lines_make_the_room_busy`,
+  `with_the_switch_a_held_line_carried_or_answered_is_no_talk`. Not yet
+  shown on a lamp: the first builder's row on lamp-52e6.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay
@@ -4697,6 +5009,41 @@ after a take-over, but now for every turn:
     a cut line neither joined nor carried keeps its exchange: with
     `LAMP_SAID_AS_HEARD` its part is "—", so the person's words are not
     lost.
+- **An ask left on its holding line is not told to later turns**
+  (`LAMP_LATE_ANSWER_LET_GO=on`; exactly `on`, off unless set, in no
+  product unit). A turn that said words ("Let me search that.") and then
+  called a function, and ended before saying any words after that
+  function's round (cut by a newer line, stopped or retired), is left on
+  its holding line. Its search was already let go (`Engine::begin` drops
+  the turn, so no result of it is ever spoken), but its exchange stayed in
+  the thread answered only by the holding line, and the next turn's model,
+  given "Person: How many dong is one US dollar? / You: Let me search
+  that." in the system message's thread text and as history messages,
+  kept the promise inside its own turn: on lamp-9adf on 17 Nov at 18:18
+  the dong ask was answered about 25 s later inside the next ask's make
+  turn. An agent hand-over carries nothing from the thread
+  (`make_skill_agent`), so it is the history alone. With the switch on,
+  the turn is marked as its round's calls start after words were said,
+  the mark cleared by any later words of the turn or its end; a turn ended
+  while marked (`Engine::begin`, `retire_through`, `stop_through`) has its
+  exchange marked in the thread (`thread::left_on_holding_line`; one not
+  yet opened is marked as it opens). Such an exchange is left out of every
+  later turn's history messages (`Thread::recent_picks_for`,
+  `recent_picks_with_room_lines`), the thread's text
+  (`recall_for_leaving_out`), the running summary (`summary_due`,
+  `summary_rest`) and the thread file. The person's line is still
+  journalled to memory, and the conversation goes on as before; a person
+  who still wants the answer asks again. The journal says `request N: ended
+  on its holding line, its function round unanswered; left out of later
+  turns' history (LAMP_LATE_ANSWER_LET_GO)`, with no words. An ask whose
+  answer was said after its function's round keeps its exchange whole.
+  Off, nothing is marked and every turn's history is as before, byte for
+  byte. A cut ask joined into the next line (`LAMP_JOIN_CUT_WORDS`) is
+  another case: the join takes its exchange out of the thread. Tests:
+  `an_ask_left_on_its_holding_line_is_not_given_to_the_next_turn_as_unanswered`,
+  `with_the_switch_off_an_ask_left_on_its_holding_line_is_still_given_to_the_next_turn`,
+  `an_ask_answered_after_its_search_is_still_given_to_the_next_turn`, and
+  the thread's `an_exchange_left_on_its_holding_line_is_told_to_no_later_turn`.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set, on in the product unit since #4547; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
@@ -5388,6 +5735,53 @@ after a take-over, but now for every turn:
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
+- **A line is answered when it was said to the lamp** (`LAMP_SAID_TO_ME=on`,
+  #7442; needs `LAMP_EYES_SPEAKING`). On lamp-74ff on 17 Nov lip smacks,
+  heard as 1 to 3 words while the owner faced the lamp, were answered as
+  `someone is turned to the lamp` though `no face was seen speaking it`;
+  `LAMP_TURNED_FACE_SPEAKS` needs a still face read in at least half of 3
+  looks, which a 0.5 s smack never has. One predicate,
+  `said_to_me::judge`, read first in `worker::Heeding::silence_turned`:
+  the line is said to the lamp when the lamp waits for a yes or no it
+  asked for (a held rename, forget or setup save, a read-back's send, a
+  skill's yes: the engine's `a_yes_held`, told to the judging by
+  `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
+  reaches `held_rename::take` and the other holds; when its name is heard
+  or written in it;
+  when it is in a live conversation (the window), unless it is 0 to 2 words
+  no face was seen speaking while a face in view was read silent
+  (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never
+  read is unknown and blocks nothing); or when a face turned to the lamp is facing it
+  (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
+  as the eyes' `facing` window, and not looking away: the newest `pitch`
+  and `looking` of the one turned face read speaking, both from that face in
+  one look, with `LAMP_EYES_PITCH_GAZE` (a bystander turned to the lamp says
+  nothing; two speaking faces give none),
+  `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
+  speaking it (one `yes` in a look of the line,
+  `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
+  speaking), with 3 words or more, a question or an ask. Otherwise the face
+  and the conversation are no sign, for every use of them in `attention`,
+  and the journal says `request N: not said to the lamp, held: <reason>`
+  (`not facing (pitch)`, `looking away`, `no face seen speaking it`, `a
+  short line`). A tap, near or addressed still lets a line out.
+  `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
+  whose mouth the eyes cannot read, or who says one word that is no
+  question, needs its name.
+- **Who spoke a line, from the looks its mouth was read**
+  (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
+  when it read `yes` in at least half of the line's looks
+  (`speaking_faces::half_of`); a look where the eyes tracked it but left its
+  mouth `unknown` counted against it, so a face read `yes` 3 times, `no` 3
+  and unread twice in 8 looks was journaled `no face was seen speaking it`
+  while the faces topic had it speaking (Seventh: 21 of 23 such lines had
+  the mark). With the switch the half is of the looks its mouth was read
+  (`speaking_faces::half_of_read`); a face out of view still counts
+  against it and 3 looks are still needed. Every reader of
+  `SpeakingFaces::speakers`, `speakers_with_boot`, `turned_speakers` and
+  `turned_speakers_with_boot` (the near-facing admission, the carry by the
+  same speaker) takes it; for a turned face the looks that say nothing are
+  those where it was turned with its mouth unread.
 - **Two faces must stay to make the room busy** (`LAMP_TWO_FACES_HELD=on`,
   with `LAMP_NAME_OR_FOLLOW_UP`; Sixth's plan under the 24 Oct freeze). A
   thread of the worker's own reads every look the eyes publish
@@ -5681,6 +6075,27 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal: `request N: no face was seen speaking it, in their conversation
   going on, no other face in view: told from that conversation, never
   memory's (LAMP_CONVERSATION_CARRIES)`.
+  **A skill's yes, from the lamp's question** (`LAMP_SKILL_YES_CARRY=on`,
+  with `LAMP_CONVERSATION_CARRIES`; off by default, #7148): while a skill's
+  yes is awaited after its say-back (`skill_write_yes::answer_awaited`,
+  #6749 C), the carry's 45 s count from the end of that say-back as played
+  (`skill_write_yes::played_until` and `asked_until`, from the played end
+  `Did::Said` reports; `Thread::going_on_asked`), not from the start of
+  the person's last exchange, when the say-back's exchange is still the
+  newest; a say-back still playing counts from now. With no face found
+  saying it, the line is read again by #7422's short-line rule
+  (`SpeakingFaces::short_line_speakers_with_boot`,
+  `second_provider::skill_yes_speakers`): a one-word yes their face was read
+  saying in under three looks is theirs, seen, and another face's is that
+  face's. Everything else of the carry stays (no other face in view, their
+  face within 5 s, another face seen saying it, another person's exchange
+  between, a later narrow or another voice). On lamp-9adf (build 13162,
+  15 Nov) an agent's make took 34 to 42 s and its say-back about 30 s
+  more, so the unseen "Yes." 36 to 40 s after it was past 45 s from the
+  person's last exchange and kept as the room's, while #6749 C's thread
+  window still held it open. Risk, as the carry's: an unseen yes, from the
+  known face alone in view with no other voice, turns on a skill with code.
+  Off: counted from the exchange, as before.
   **What `named_alone` means.** It is not "their mouth was seen saying
   it": no face was seen speaking the line (no face read speaking in at
   least half its looks), while their known face was the only face in view
@@ -6011,10 +6426,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 48:
+  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 64:
   a list at the bound before it keeps it, and the bound cuts the next in
   its order instead (`fetch_page` first), said once as every cut is
-  (`past the bound of 48, left out: …`). Added after the bound before, a
+  (`past the bound of 64, left out: …`). Added after the bound before, a
   list already at it left the look out and said nothing (the first builder
   on #2602, 22 Oct 12:3x, from lamp-75c9's runs that morning).
   The call asks the coordinator for the turn's full look (`LookAsked`, as a
@@ -7129,7 +7544,10 @@ from the Tiers night, #5000) once a run for a made-up person on a made-up
 day of 12 lines, through the second route's relay (`deepseek_base_url`,
 the relay's own credential), with the night's own bounds. With
 `LAMP_NIGHTLY_MEMORY` set to a lamp-memory binary that has the nightly ops,
-it runs that binary on a fresh folder of its own and prints Days' accepted
+it runs that binary on a fresh folder of its own, made 0700 whatever the
+umask (lamp-memory refuses a store folder others can enter; C108 on
+lamp-06c1, 10 Nov: under the default umask the folder was 755 and the probe
+ran only with `umask 077`), and prints Days' accepted
 and dropped counts per kind and the drop reasons; without it, what the
 model proposed per kind. `LAMP_MEMORY_NIGHTLY_PATTERNS` and
 `LAMP_MEMORY_NIGHTLY_FEELINGS` are read as the voice reads them. Counts

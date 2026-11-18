@@ -168,6 +168,11 @@ impl LightOut for lamp_bus::Publisher {
     }
 }
 
+/// How long the pairing cue's light request holds: the pulse's one way
+/// around ([`LightPattern::PULSE_DEFAULT_MS`]) and a half second more, then
+/// the ring shows the person's light as before.
+pub const PAIR_CUE_HOLD_US: u64 = (LightPattern::PULSE_DEFAULT_MS as u64 + 500) * 1_000;
+
 /// The name a computer's `move` is given to the body, and said back on
 /// `body/gesture`.
 pub const MOVE_NAME: &str = "control";
@@ -1647,6 +1652,47 @@ impl Parts for Lamp {
         }
     }
 
+    fn pair_cue(&mut self) {
+        // The person's own light, or none when a cue would be out of place
+        // (private, paused, asleep, talking, the light off, or the ring
+        // showing another light): then nothing is asked at all.
+        let Some(light) = self
+            .watch
+            .as_ref()
+            .and_then(|watch| watch.lock().ok().and_then(|watch| watch.cue_light()))
+        else {
+            return;
+        };
+        let Some(out) = self.light.as_mut() else {
+            return;
+        };
+        let request = LightRequest {
+            claim: Claim {
+                source: source("pairing"),
+                priority: Priority::Skill,
+                clock_id: self.clock_id.clone(),
+                until_us: (self.clock)() + PAIR_CUE_HOLD_US,
+            },
+            light,
+            // The ring's own "something came": one soft arc once around, then
+            // the person's light as it was (a request that lapses).
+            pattern: Some(LightPattern {
+                kind: PatternKind::Pulse,
+                period_ms: LightPattern::PULSE_DEFAULT_MS,
+                low: 1,
+            }),
+            fade_ms: None,
+            pixels: None,
+        };
+        // A ring that takes nothing (no light requests here) or an error is
+        // no one's business: the cue is a courtesy, never a reason to fail.
+        if matches!(out.publish(&request), Ok(delivered) if delivered > 0) {
+            eprintln!(
+                "lamp-control: pairing cue: a pulse asked of the ring (a new computer was let in)"
+            );
+        }
+    }
+
     fn media_end(&mut self, client: &str, media: Media) {
         match media {
             Media::Camera => {
@@ -1750,6 +1796,147 @@ mod tests {
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The pairing cue (#7471): one light request, the ring's own "something
+    /// came" (one pulse once around, four seconds) in the person's light, at
+    /// skill priority so a conversation or a person overrides it, holding
+    /// four and a half seconds and then lapsing; and nothing at all when the
+    /// lamp is private, paused, asleep, talking, the light is off or not
+    /// known, or the ring shows another light.
+    #[test]
+    fn a_pairing_cue_is_one_pulse_in_the_persons_light_and_none_when_it_is_out_of_place() {
+        let ring = Ring::default();
+        let watch = Arc::new(Mutex::new(crate::watch::Watch::new()));
+        let mut lamp = Lamp::new(
+            None,
+            Some(Box::new(ring.clone())),
+            None,
+            "boot".into(),
+            quiet(),
+        )
+        .with_clock(booted_61s_ago)
+        .watching(watch.clone());
+        // No light known: nothing is asked.
+        lamp.pair_cue();
+        assert!(ring.0.lock().unwrap().is_empty());
+        let take = |topic: &str, payload: Value| {
+            watch.lock().unwrap().take(topic, &payload, 1_000_000);
+        };
+        // A dim room (level 1, under the pulse's least): left quiet, not raised.
+        take(
+            "light/state",
+            json!({"on": true, "colour": "warm", "level": 1}),
+        );
+        lamp.pair_cue();
+        assert!(ring.0.lock().unwrap().is_empty(), "a dim room gets no cue");
+        take(
+            "light/state",
+            json!({"on": true, "colour": "warm", "level": 2}),
+        );
+        lamp.pair_cue();
+        let asked = ring.0.lock().unwrap().clone();
+        assert_eq!(asked.len(), 1, "exactly one request");
+        let request = &asked[0];
+        assert_eq!(request.claim.priority, Priority::Skill);
+        assert_eq!(request.claim.source, "control:pairing");
+        assert_eq!(request.claim.clock_id, "boot");
+        assert_eq!(request.claim.until_us, booted_61s_ago() + PAIR_CUE_HOLD_US);
+        assert_eq!(PAIR_CUE_HOLD_US, 4_500_000);
+        // The person's own warm at their own level, not a colour of ours.
+        assert_eq!(
+            (
+                request.light.colour.as_str(),
+                request.light.level,
+                request.light.on
+            ),
+            ("warm", 2, true)
+        );
+        let pattern = request.pattern.unwrap();
+        assert_eq!(
+            (pattern.kind, pattern.period_ms),
+            (PatternKind::Pulse, 4_000)
+        );
+        assert!(
+            pattern.check(request.light.level).is_ok(),
+            "a pattern the ring takes"
+        );
+        assert!(request.claim.check().is_ok());
+        assert_eq!((request.fade_ms, &request.pixels), (None, &None));
+        // Each way a cue would be out of place: asked of nothing.
+        ring.0.lock().unwrap().clear();
+        for (topic, on, off) in [
+            (
+                "voice/privacy",
+                json!({"permitted": false}),
+                json!({"permitted": true}),
+            ),
+            (
+                "lamp/pause",
+                json!({"paused": true}),
+                json!({"paused": false}),
+            ),
+            (
+                "voice/mute",
+                json!({"muted": true, "reason": "sleep"}),
+                json!({"muted": false}),
+            ),
+            (
+                "voice/state",
+                json!({"state": "speaking"}),
+                json!({"state": "resting"}),
+            ),
+        ] {
+            take(topic, on);
+            lamp.pair_cue();
+            assert!(ring.0.lock().unwrap().is_empty(), "{topic}: no request");
+            take(topic, off);
+        }
+        take(
+            "light/state",
+            json!({"on": false, "colour": "warm", "level": 3}),
+        );
+        lamp.pair_cue();
+        assert!(ring.0.lock().unwrap().is_empty(), "the light is off");
+        take(
+            "light/state",
+            json!({"on": true, "colour": "warm", "level": 3}),
+        );
+        take(
+            "light/drawn",
+            json!({"on": true, "colour": "red", "level": 5}),
+        );
+        lamp.pair_cue();
+        assert!(
+            ring.0.lock().unwrap().is_empty(),
+            "the ring shows another light"
+        );
+    }
+
+    /// A ring that takes no light request (nothing subscribed) or fails is no
+    /// reason for the cue to do anything but give up.
+    #[test]
+    fn a_ring_that_takes_nothing_or_no_ring_leaves_the_cue_a_no_op() {
+        struct Deaf;
+        impl LightOut for Deaf {
+            fn publish(&mut self, _: &LightRequest) -> std::io::Result<usize> {
+                Err(std::io::Error::other("no ring"))
+            }
+        }
+        let watch = Arc::new(Mutex::new(crate::watch::Watch::new()));
+        watch.lock().unwrap().take(
+            "light/state",
+            &json!({"on": true, "colour": "warm", "level": 3}),
+            1,
+        );
+        let mut lamp = Lamp::new(None, Some(Box::new(Deaf)), None, "boot".into(), quiet())
+            .with_clock(booted_61s_ago)
+            .watching(watch.clone());
+        lamp.pair_cue();
+        let mut none = Lamp::new(None, None, None, "boot".into(), quiet())
+            .with_clock(booted_61s_ago)
+            .watching(watch);
+        none.pair_cue();
     }
 
     /// `express` is the feelings skill's own move on the mood socket and

@@ -871,6 +871,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         // A fixture keeps no input and never reports one.
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::Ended { .. } => None,
         ProviderOutput::Started { request, .. }
         | ProviderOutput::Audio { request, .. }
@@ -888,6 +889,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,

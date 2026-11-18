@@ -457,6 +457,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         placings: Vec::new(),
         fetching: Vec::new(),
         model_backs: Vec::new(),
+        exit_notes: Vec::new(),
         envelope: Vec::new(),
         setting_writes: Vec::new(),
         image_writes: Vec::new(),
@@ -594,6 +595,9 @@ struct Run<'r, 'w> {
     fetching: Vec<Model>,
     /// The model paths a switch moved, as they were: put back in reverse.
     model_backs: Vec<ModelBack>,
+    /// The exit notes the switch writes ([`Self::exit_notes_owed`]), as
+    /// lamp paths: journaled, and removed again with a build put back.
+    exit_notes: Vec<String>,
     /// The envelope read, as it came: staged for `lamp-update-apply`.
     envelope: Vec<u8>,
     /// The settings the build writes here (crate::apply), and the build
@@ -1537,6 +1541,11 @@ impl Run<'_, '_> {
                 )
                 .map_err(Outcome::Refused)?;
             }
+            if settings {
+                apply::merge_own(&self.config.root, &mut steps).map_err(|error| {
+                    Outcome::Failed(format!("the settings cannot be read: {error}"))
+                })?;
+            }
             crate::head_touch::verify(
                 &self.config.root,
                 &self.config.on(&self.config.units),
@@ -1660,11 +1669,15 @@ impl Run<'_, '_> {
 
     fn say_kept(&mut self, steps: &[apply::Step]) {
         for step in steps {
-            if let apply::Act::Keep(why) = &step.act {
-                self.say(&format!(
+            match &step.act {
+                apply::Act::Keep(why) => self.say(&format!(
                     "kept {}: {why}; the build's is not written",
                     step.setting.path
-                ));
+                )),
+                apply::Act::Merge(added) => {
+                    self.say(&apply::merged_line(&step.setting.path, added))
+                }
+                _ => {}
             }
         }
     }
@@ -2370,6 +2383,21 @@ impl Run<'_, '_> {
         // An added unit is stopped and removed before the reload, so systemd
         // forgets it with the rest put back.
         self.remove_added(backs, &mut troubles);
+        // The exit notes the switch wrote, before the same reload: a lamp
+        // put back has the drop-ins it had. One that is not install's
+        // exactly is not the switch's, and is left.
+        for note in std::mem::take(&mut self.exit_notes) {
+            let path = self.config.on(&note);
+            if !fs::read(&path).is_ok_and(|now| now == crate::install::EXIT_NOTE.as_bytes()) {
+                continue;
+            }
+            if let Err(error) = fs::remove_file(&path) {
+                troubles.push(format!("{note} cannot be removed: {error}"));
+            } else if let Some(folder) = path.parent() {
+                // Only a folder left empty goes: a lamp's own drop-ins stay.
+                let _ = fs::remove_dir(folder);
+            }
+        }
         if let Err(why) = self.write_units(
             backs
                 .iter()
@@ -2441,8 +2469,10 @@ impl Run<'_, '_> {
     }
 
     fn write_changes(&mut self, changes: &[Change]) -> Result<(), String> {
-        // An added unit's enabling links, before the reload reads them.
+        // An added unit's enabling links, and any exit note a unit lacks,
+        // before the reload reads them.
         self.enable_added(changes)
+            .and_then(|()| self.write_exit_notes())
             .and_then(|()| {
                 self.write_units(
                     changes
@@ -2465,6 +2495,64 @@ impl Run<'_, '_> {
                 }))
             })
             .and_then(|()| self.switch_models())
+    }
+
+    /// The exit notes a switch owes, as lamp paths: install's
+    /// `<unit>.d/exit-note.conf` for each unit of
+    /// `install::EXIT_NOTE_UNITS` whose file is on the lamp or is written
+    /// by the switch, and which has none. A unit a round added had none,
+    /// since only `install` wrote them (a lamp's lamp-tasks.service after a
+    /// round, #7135). A note already there is the lamp's and never
+    /// rewritten. Only on a managed updater, as units are only added there.
+    /// Known before the journal is saved, so a switch cut short removes
+    /// them as it removes what it added.
+    fn exit_notes_owed(&self, changes: &[Change]) -> Vec<String> {
+        if !self.managed_updater() {
+            return Vec::new();
+        }
+        let units = self.config.on(&self.config.units);
+        crate::install::EXIT_NOTE_UNITS
+            .iter()
+            .filter(|name| {
+                (fs::symlink_metadata(units.join(name)).is_ok()
+                    || changes.iter().any(|change| change.unit == **name))
+                    && fs::symlink_metadata(units.join(format!("{name}.d/exit-note.conf"))).is_err()
+            })
+            .map(|name| format!("{}{name}.d/exit-note.conf", self.config.units))
+            .collect()
+    }
+
+    /// Each owed exit note ([`Self::exit_notes_owed`]) written as `install`
+    /// writes it (`install::EXIT_NOTE`, 0644), its folder made if it is
+    /// not there; one there by now is left. The reload of
+    /// [`Self::write_units`], which follows, reads them. One that cannot be
+    /// written is said and dropped from [`Self::exit_notes`], so a put-back
+    /// never removes it, and the round goes on: a missing note must not
+    /// hold every later build back.
+    fn write_exit_notes(&mut self) -> Result<(), String> {
+        for note in self.exit_notes.clone() {
+            let path = self.config.on(&note);
+            if fs::symlink_metadata(&path).is_ok() {
+                continue;
+            }
+            let written = path
+                .parent()
+                .map_or(Ok(()), fs::create_dir_all)
+                .and_then(|()| write_whole(&path, crate::install::EXIT_NOTE.as_bytes(), 0o644));
+            let line = match written {
+                Ok(()) => {
+                    format!(
+                        "wrote {note}: the exit note install writes, which its unit was without"
+                    )
+                }
+                Err(error) => {
+                    self.exit_notes.retain(|listed| *listed != note);
+                    format!("{note} is not written: {error}; the round goes on")
+                }
+            };
+            self.say(&line);
+        }
+        Ok(())
     }
 
     /// Each added unit's links, as `systemctl enable` writes them: to the
@@ -2627,6 +2715,7 @@ impl Run<'_, '_> {
             .iter()
             .map(|placing| placing.back.clone())
             .collect();
+        self.exit_notes = self.exit_notes_owed(&changes);
         let journal = Journal {
             build: build.clone(),
             rollback_order: self.rollback_order.clone(),
@@ -2642,6 +2731,7 @@ impl Run<'_, '_> {
             models: self.model_backs.clone(),
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
+            exit_notes: self.exit_notes.clone(),
             refusing: None,
         };
         if let Err(error) = self
@@ -3407,6 +3497,7 @@ impl Run<'_, '_> {
             journal.build.sequence
         ));
         self.model_backs = journal.models.clone();
+        self.exit_notes = journal.exit_notes.clone();
         self.applying = journal.settings.then_some(journal.build.sequence);
         let mut backs = Vec::new();
         for switching in &journal.units {

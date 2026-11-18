@@ -214,6 +214,13 @@ pub fn reads_only(name: &str) -> bool {
 /// with no file, or one that can't be read. [`WRITE`]'s `said` is never the
 /// model's to give ([`gate`]), so it is not offered.
 pub fn tools(folder: &Path) -> Vec<Tool> {
+    tools_told(folder, None)
+}
+
+/// [`tools`], with [`READ`] told `read` first, before [`RULE`], when given
+/// (`LAMP_SKILL_RECURRING_TOLD`, [`crate::skill_recurring::READ_TOLD`]): a
+/// part of its rule, so never the part cut.
+pub fn tools_told(folder: &Path, read: Option<&str>) -> Vec<Tool> {
     // Off until this read lists it: a file that can't be read, or no longer
     // lists `service_write`, never keeps an earlier read's yes.
     crate::service_records::redo::drafts_listed(false);
@@ -234,6 +241,8 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
             }
             let rule = if tool.name == WRITE {
                 format!("{WRITE_RULE} {RULE}")
+            } else if let Some(read) = read.filter(|_| tool.name == READ) {
+                format!("{read} {RULE}")
             } else {
                 RULE.to_owned()
             };
@@ -1807,6 +1816,25 @@ pub(crate) fn owners_yes_now(
     })
 }
 
+/// Whether the heard line `request` is in the owner's voice (the lamp's
+/// first owner) by the second route's judge, at
+/// `same_voice::SERVICES_SAME_FROM` or over: for the private room, where
+/// any heard line counts as the owner's seen ([`owner_seen_saying`]), a yes
+/// that must be theirs (seen activity's, #6543). No judge (the Live route)
+/// or no likeness is no.
+pub(crate) fn owners_voice_now(request: u64) -> bool {
+    let owner = crate::person::owner_ids().into_iter().next();
+    owner_likeness(judge().as_ref(), request, owner.as_deref())
+        .is_some_and(|alike| alike >= crate::same_voice::SERVICES_SAME_FROM)
+}
+
+/// Whether the owner of memory id `owner` has an enrolled voice print
+/// (`LAMP_SAME_VOICE_FOR=services`, `crate::owner_voice`): the owner's link
+/// is then held to it too (`owner_link::taken`, #7501).
+pub(crate) fn owner_has_print(owner: &str) -> bool {
+    crate::owner_voice::enrolled(owner).is_some()
+}
+
 /// Whether a heard line (`heard`: someone spoke it) is the owner's own,
 /// seen: in the private room (`private_room`) any heard line; outside it,
 /// the owner (`owner`, [`owner_of`]) seen saying it (`seen`, the eyes'
@@ -3071,6 +3099,112 @@ mod tests {
                 .description
                 .contains("Say a security mail or message only as")
         );
+    }
+
+    /// #7498: on lamp-a63e on 17 Nov the second route's model read Gmail
+    /// with a `what` none of its kinds, and only each retry answered. The
+    /// offered `service_read`'s `what` names each service's kinds of read,
+    /// the words a refusal names ([`lamp_services::reads::kinds`]), on the
+    /// field itself, so no cut of the description loses them; the
+    /// description and the parameters keep within the link's most.
+    #[test]
+    fn the_offered_reads_what_names_each_services_kinds() {
+        let dir = std::env::temp_dir().join(format!("lamp-services-kinds-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write(&dir).unwrap();
+        let offered = tools(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let read = offered.iter().find(|tool| tool.name == READ).unwrap();
+        let parameters = read.parameters.as_ref().unwrap();
+        let what = &parameters["properties"]["what"];
+        let said = what["description"].as_str().unwrap();
+        assert!(
+            said.contains("gmail: recent, search, drafts, message, attachment;"),
+            "{said}"
+        );
+        let services = parameters["properties"]["service"]["enum"]
+            .as_array()
+            .unwrap();
+        let (_, by_service) = said
+            .split_once(lamp_services::tools::KINDS_OPEN)
+            .unwrap_or_else(|| panic!("{said}"));
+        let by_service = by_service.split(". ").next().unwrap();
+        for code in services.iter().filter_map(Value::as_str) {
+            let kinds = lamp_services::reads::kinds(code);
+            if kinds.is_empty() {
+                continue;
+            }
+            let listed = by_service
+                .split("; ")
+                .find(|group| {
+                    group
+                        .split(": ")
+                        .next()
+                        .is_some_and(|codes| codes.split(", ").any(|named| named == code))
+                })
+                .unwrap_or_else(|| panic!("{code}: {said}"));
+            assert!(
+                listed
+                    .trim_end_matches('.')
+                    .ends_with(&format!(": {}", kinds.join(", "))),
+                "{code}: {listed}"
+            );
+            for kind in kinds {
+                assert!(
+                    what["enum"]
+                        .as_array()
+                        .is_some_and(|all| all.contains(&json!(kind))),
+                    "{kind}: {what}"
+                );
+            }
+        }
+        // What each kind needs is still told, here or in the description.
+        assert!(
+            said.contains("search {query}") || read.description.contains("search {query}"),
+            "{said}"
+        );
+        assert!(read.description.len() <= MOST_DESCRIPTION_BYTES);
+        assert!(parameters.to_string().len() <= MOST_PARAMETERS_BYTES);
+    }
+
+    /// With `LAMP_SKILL_RECURRING_TOLD`, the read alone is told first that
+    /// a read later or on a repeat is a skill's make, before its rule and
+    /// within the link's most; its service's words keep their list and
+    /// their security mail sentence. Without, it is as it was.
+    #[test]
+    fn a_read_told_a_repeat_is_a_skills_make_keeps_its_own_words() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-services-recurring-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        lamp_services::tools::write(&dir).unwrap();
+        let before = tools(&dir);
+        let none = tools_told(&dir, None);
+        let told = tools_told(&dir, Some(crate::skill_recurring::READ_TOLD));
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(before, none);
+        for (was, now) in before.iter().zip(&told) {
+            if now.name != READ {
+                assert_eq!(was, now);
+                continue;
+            }
+            assert!(
+                now.description
+                    .starts_with(&format!("{} {RULE}", crate::skill_recurring::READ_TOLD)),
+                "{}",
+                now.description
+            );
+            assert!(now.description.len() <= MOST_DESCRIPTION_BYTES);
+            assert!(
+                now.description
+                    .contains("Say a security mail or message as it comes"),
+                "{}",
+                now.description
+            );
+            let everywhere = format!("{} {}", now.description, now.parameters.clone().unwrap());
+            assert!(everywhere.contains(", by service:"), "{everywhere}");
+        }
     }
 
     /// The few words the model is told to say before a service call never

@@ -551,6 +551,35 @@ fn the_product_serves_the_fast_camera_stream_from_the_eyes() {
     );
 }
 
+/// The voice's memory kept from reclaim (#7383): `MemoryMin` on lamp-voice's
+/// unit holds only with the same on every ancestor slice but the root, so
+/// its cgroup `/lampos.slice/lampos-voice.slice/lamp-voice.service` has it
+/// at each level, and install writes the top slice too.
+#[test]
+fn the_voice_and_its_slices_keep_its_memory_from_reclaim() {
+    for (unit, kind) in [
+        ("lamp-voice.service", "Service"),
+        ("lampos-voice.slice", "Slice"),
+        ("lampos.slice", "Slice"),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == unit)
+            .unwrap_or_else(|| panic!("{unit} is not installed"))
+            .1;
+        assert!(
+            section(text, kind).contains(&"MemoryMin=256M"),
+            "{unit} lacks MemoryMin=256M in [{kind}]"
+        );
+    }
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(section(voice, "Service").contains(&"Slice=lampos-voice.slice"));
+}
+
 /// The lines install said about the lamp-update running it (#3733).
 fn updater_said(lamp: &Lamp) -> Vec<&str> {
     lamp.said
@@ -1822,6 +1851,33 @@ fn the_product_recalls_before_a_dont_know() {
     );
 }
 
+/// After ten quiet minutes the next turn asks the memory's note again
+/// (`LAMP_MEMORY_REOPEN_QUIET`, #1693 (1), C20): the owner's yes on 16 Nov,
+/// so the same person back the next morning can be asked after an open
+/// thread. It does anything only with Days, the second route and threads,
+/// which the unit sets too.
+#[test]
+fn the_product_asks_the_note_again_after_a_quiet() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_REOPEN_QUIET=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_MEMORY_THREADS=on",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+}
+
 /// A keep the round right after it doubts is taken back in the product
 /// and held for the person's yes (`LAMP_MEMORY_DOUBT_UNDOES`, C37): the
 /// memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus"
@@ -1918,6 +1974,33 @@ fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
             !unit(other).contains("Environment=LAMP_SERVICES_WRITE"),
             "{other}"
         );
+    }
+}
+
+/// A Google Calendar event is moved or cancelled in the product (#6067; the
+/// lamp-3e83 tester's report, 10 Nov): `LAMP_CALENDAR_EDITS=on` once in
+/// `lamp-services`, the only unit that reads it, beside its writes, and no
+/// other product unit names it.
+#[test]
+fn the_product_moves_and_cancels_a_calendar_event() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_CALENDAR_EDITS=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_CALENDAR_EDITS"))
+            .count();
+        assert_eq!(on, usize::from(*unit == "lamp-services.service"), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SERVICES_WRITE=on"),
+                "{unit} lacks LAMP_SERVICES_WRITE"
+            );
+        }
     }
 }
 
@@ -2026,6 +2109,29 @@ fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
             "{owner}"
         );
     }
+}
+
+/// A holding-only answer is asked once to go on in the product (#7458, the
+/// "Let me check." dead-end): `LAMP_HOLDING_ANSWER=on` once in
+/// `lamp-voice.service`, the one unit that reads it (`holding_answer::on`,
+/// and `--holding-answer` to its provider and second workers), and no other
+/// product unit names it.
+#[test]
+fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_HOLDING_ANSWER=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_HOLDING_ANSWER"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
 /// A made skill's write goes out after its owner's yes in the product
@@ -2279,7 +2385,8 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
 /// A voice make the lamp's own model can't keep goes to the lamp's own agent
 /// (#6059's proposal, `make_skill_agent`): on in lamp-voice alone, once,
 /// whose second route's worker reads it, beside the maker and the tasks part
-/// it hands the make over.
+/// it hands the make over; with the one run path on there too (#7245), so
+/// an OpenClaw lamp's agent takes it as a Hermes lamp's does.
 #[test]
 fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     for (unit, text) in install::PRODUCT {
@@ -2298,6 +2405,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
         }
         for line in [
             "Environment=LAMP_MAKE_SKILL_AGENT=on",
+            "Environment=LAMP_MAKE_AGENT_ONE_PATH=on",
             "Environment=LAMP_MAKE_SKILL=on",
             "Environment=LAMP_TASKS_DIR=/run/lampos-tasks",
         ] {
@@ -2305,6 +2413,70 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
                 service.iter().filter(|set| **set == line).count(),
                 1,
                 "the voice lacks {line}"
+            );
+        }
+    }
+}
+
+/// The skill flow's three switches (the owner, 16 Nov: "Every task must be
+/// doable; no 'couldn't' here"), each `on` once in the units whose part
+/// reads it and in no other: a made skill started by its own words
+/// (`LAMP_MADE_SKILL_ASKS`, #7233) in lamp-voice, which makes it, and the
+/// four that load it (lamp-skills, its manage helper, lamp-cloud's skills
+/// page and lamp-control's token), so such a skill is never refused at
+/// install, not loaded or listed as not loaded; a made skill not on never
+/// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
+/// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
+/// alone. A `cannot:` made a task for the lamp's agent
+/// (`LAMP_MAKE_NO_CANNOT`, #7234) stays off until its own row.
+#[test]
+fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
+    let switches: [(&str, &[&str]); 3] = [
+        (
+            lamp_voice::made_skill::ASKS_ENVIRONMENT,
+            &[
+                "lamp-voice.service",
+                "lamp-skills.service",
+                "lamp-skills-manage@.service",
+                "lamp-cloud.service",
+                "lamp-control.service",
+            ],
+        ),
+        (
+            lamp_voice::made_not_on::ENVIRONMENT,
+            &["lamp-voice.service"],
+        ),
+        (
+            lamp_skills::task_sure::ENVIRONMENT,
+            &["lamp-skills.service"],
+        ),
+    ];
+    assert_eq!(
+        switches.map(|(name, _)| name),
+        [
+            "LAMP_MADE_SKILL_ASKS",
+            "LAMP_MADE_NOT_ON_TOLD",
+            "LAMP_SKILL_TASK_SURE",
+        ]
+    );
+    for (name, owners) in switches {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
             );
         }
     }
@@ -2399,6 +2571,7 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
         lamp_voice::made_skill::LOOSE_ENVIRONMENT,
         lamp_voice::upload_agent::ENVIRONMENT,
         lamp_skills::PRESENT_ENVIRONMENT,
+        lamp_voice::made_skill::ASKS_ENVIRONMENT,
     ];
     assert_eq!(
         loading,
@@ -2409,6 +2582,7 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             "LAMP_MADE_SKILL_LOOSE",
             "LAMP_UPLOAD_TO_AGENT",
             "LAMP_NUDGES_PRESENT",
+            "LAMP_MADE_SKILL_ASKS",
         ]
     );
     let service = |name: &str| {
@@ -2529,7 +2703,7 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
 }
 
 /// The wellbeing nudges at a present spacing and Comfort break
-/// (`LAMP_NUDGES_PRESENT`, #5207): water after 50 minutes and each 50 after,
+/// (`LAMP_NUDGES_PRESENT`, #5207): water after 30 minutes and each 45 after,
 /// Comfort break after 90, two an hour at most. Each process that loads the
 /// skills folder reads it, so all three units set it together; set only in
 /// `lamp-skills`, Comfort break would speak while the app lists it off.
@@ -2550,6 +2724,39 @@ fn the_product_loads_the_skills_present_values_in_all_three_units() {
             "{name} lacks LAMP_NUDGES_PRESENT"
         );
     }
+}
+
+/// A skill asked about by voice is answered from the lamp's own records
+/// (`LAMP_SKILL_STATE_TOLD`, #7335), and with it the voice tells a skill on
+/// by its `[present]` spacing as lamp-skills runs it (`LAMP_NUDGES_PRESENT`,
+/// #5207): both `on`, once each, in lamp-voice, the only part of the voice
+/// that reads them (Twelve's P2 on #7364).
+#[test]
+fn the_voice_tells_a_skills_state_and_its_present_spacing() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for name in [
+        lamp_voice::skill_about::ENVIRONMENT,
+        lamp_voice::skill_about::PRESENT_ENVIRONMENT,
+    ] {
+        let line = format!("Environment={name}=on");
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice sets {line} once"
+        );
+    }
+    assert_eq!(
+        [
+            lamp_voice::skill_about::ENVIRONMENT,
+            lamp_voice::skill_about::PRESENT_ENVIRONMENT,
+        ],
+        ["LAMP_SKILL_STATE_TOLD", "LAMP_NUDGES_PRESENT"]
+    );
 }
 
 /// Each second-route turn is told the light as `light/state` says it now
@@ -2924,6 +3131,26 @@ fn the_product_names_a_lone_known_face_by_the_one_face_count() {
     }
 }
 
+/// A quiet keep counts as a known person's own when their face is the only
+/// face in view, or the line is carried in their conversation, without the
+/// mouth seen (`LAMP_KEEP_QUIETLY_ONE_FACE`): the memory owner's call, 17
+/// Nov, "skip the mouth gate for memory". Beside the quiet keep it widens.
+#[test]
+fn the_product_keeps_quietly_for_a_lone_known_face() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_KEEP_QUIETLY=on",
+        "Environment=LAMP_KEEP_QUIETLY_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// The lamp is a private room between it and its owner, with no ownership
 /// check (`LAMP_PRIVATE_ROOM`, the owner's call on 6 Nov).
 #[test]
@@ -2993,6 +3220,32 @@ fn the_product_summarises_a_long_conversation() {
         service.contains(&"Environment=LAMP_CONVERSATION_SUMMARY=on"),
         "the voice lacks LAMP_CONVERSATION_SUMMARY=on"
     );
+}
+
+/// Each recent exchange is told to the model once (#6218's history side,
+/// C131): the owner's yes on 16 Nov. `LAMP_HISTORY_SAID_ONCE` leaves the
+/// history's exchanges out of the thread text, and `LAMP_HISTORY_AFTER_NOTE`
+/// those a stored running note holds out of both, which needs the summary.
+#[test]
+fn the_product_tells_each_exchange_once() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_HISTORY_SAID_ONCE=on",
+        "Environment=LAMP_HISTORY_AFTER_NOTE=on",
+        "Environment=LAMP_CONVERSATION_SUMMARY=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
 }
 
 /// The privacy slide is the lamp's sleep and wake in the product (#5182, the
@@ -3142,6 +3395,31 @@ fn the_product_folds_for_an_unplug_in_every_part_that_reads_it() {
             .contains(&format!("Environment=LAMP_UNPLUG_OFF_SOCKET={listens}").as_str()),
         "lamp-skills does not turn the lamp off at the fold through {listens}"
     );
+}
+
+/// The energy level is on in the product (#6893, row-6893h on lamp-52e6,
+/// 15 Nov, level 5 PASS): Body, Expression, Skills and Voice each read
+/// `LAMP_BODY_ENERGY` (`lamp_body::energy_in`), so every one of their units
+/// sets it, or a level would move the body while its nods and gestures
+/// stayed at level 1.
+#[test]
+fn the_energy_level_is_on_in_every_product_part_that_reads_it() {
+    for name in [
+        "lamp-body.service",
+        "lamp-expression.service",
+        "lamp-skills.service",
+        "lamp-voice.service",
+    ] {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1;
+        assert!(
+            section(unit, "Service").contains(&"Environment=LAMP_BODY_ENERGY=on"),
+            "{name} lacks LAMP_BODY_ENERGY=on"
+        );
+    }
 }
 
 /// A lone known face's line is told and read as theirs, and a carried line
@@ -4367,6 +4645,46 @@ fn the_product_holds_harness_at_its_pinned_version() {
         section(tasks, "Service").contains(&"Environment=LAMP_HARNESS_HOLD_UPDATES=on"),
         "the product's lamp-tasks does not hold Harness's updates"
     );
+}
+
+/// #7246: the product's lamp-tasks keeps one session for the lamp's default
+/// agent (`LAMP_TASKS_ONE_SESSION`), once, beside the switches it needs.
+#[test]
+fn the_product_keeps_one_session_for_the_lamps_agent() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    let service = section(tasks, "Service");
+    let on = service
+        .iter()
+        .filter(|line| **line == "Environment=LAMP_TASKS_ONE_SESSION=on")
+        .count();
+    assert_eq!(on, 1, "the product's lamp-tasks keeps no one session");
+    for line in [
+        "Environment=LAMP_SKILL_TASKS=on",
+        "Environment=LAMP_SKILL_DEFAULT_AGENT=on",
+    ] {
+        assert!(service.contains(&line), "lamp-tasks lacks {line}");
+    }
+}
+
+/// openharness#4393: the product's lamp-tasks keeps the one session as
+/// the lamp's kept session (`LAMP_TASKS_KEPT_SESSION`), once, beside the
+/// one session it needs; on an older Harness it is the one session as
+/// before.
+#[test]
+fn the_product_keeps_the_one_session_as_the_kept_session() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    let service = section(tasks, "Service");
+    let on = |line: &str| service.iter().filter(|said| **said == line).count();
+    assert_eq!(on("Environment=LAMP_TASKS_KEPT_SESSION=on"), 1);
+    assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 1);
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the

@@ -179,6 +179,20 @@ fn main() -> ExitCode {
     // second.json, when the unit hands it in as `second`, names the relay.
     let hermes_key = key.clone();
     let hermes_second = std::fs::read_to_string(credentials.join("second")).ok();
+    // The energy level from the model, once per saved words (#7314): only
+    // with LAMP_ENERGY_FROM_MODEL=on, on the same relay and key.
+    let energy_rater = lamp_cloud::energy_rate::on_from(
+        std::env::var(lamp_cloud::energy_rate::SWITCH)
+            .ok()
+            .as_deref(),
+    )
+    .then(|| {
+        lamp_cloud::energy_rate::Rater::new(
+            &lamp_cloud::hermes_llm::relay_base(hermes_second.as_deref()),
+            &key,
+        )
+    })
+    .and_then(|rater| rater.map_err(|why| say(&why)).ok());
     let hermes_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     let build = std::fs::read_to_string(credentials.join("build"))
         .map(|state| lamp::build(&state))
@@ -193,9 +207,13 @@ fn main() -> ExitCode {
         .then(|| std::env::var_os("STATE_DIRECTORY"))
         .flatten()
         .map(|state| {
-            reports::Shared::new(reports::Reports::open(reports::Places::product(Path::new(
-                &state,
-            ))))
+            // The report counters (#6256 F8): only with their switch too.
+            let counting = reports::counters::on_from_environment()
+                .then(|| reports::counters::WIFI_FILE.into());
+            reports::Shared::new(
+                reports::Reports::open(reports::Places::product(Path::new(&state)))
+                    .counting(counting),
+            )
         });
     let reporting = shared
         .clone()
@@ -340,6 +358,8 @@ fn main() -> ExitCode {
         // The owner's dev monitor (#5883): only with LAMP_APP_MONITOR=on and
         // LAMP_SETTINGS_CHANGE=on, each link sealed to this lamp's device id.
         monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
+        // The owner's desk and Hydrate bottles (#7470): only with LAMP_DEVICES=on.
+        devices: lamp_cloud::devices::on_from_environment().then(Default::default),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -394,6 +414,7 @@ fn main() -> ExitCode {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
     };
@@ -459,7 +480,10 @@ fn main() -> ExitCode {
         };
         let energy = async move {
             match std::path::Path::new(lamp_msgs::chosen_voice::ENERGY_FILE).parent() {
-                Some(dir) => lamp_cloud::settings::tell_energy(dir.to_path_buf(), energy_bus).await,
+                Some(dir) => {
+                    lamp_cloud::settings::tell_energy(dir.to_path_buf(), energy_bus, energy_rater)
+                        .await
+                }
                 None => std::future::pending().await,
             }
         };

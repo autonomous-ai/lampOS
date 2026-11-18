@@ -9,6 +9,12 @@
 //!   the voice begins the turn, `{"event":"begun","at_us":…}`, so that the
 //!   body and the light can move with the words (the first builder on #939).
 //!   The connection stays open until the outcome.
+//! - **A note that may end unsaid** (#6543): a `note` with
+//!   `"may_end_unsaid": true` is let go while it waits, never begun, once
+//!   the moment for it has passed since it was asked ([`moment_passed`]):
+//!   someone was heard ([`SOMEONE_TALKING`]) or the face at the lamp left
+//!   its view ([`TURNED_AWAY`]). It is answered `unsaid` with why
+//!   ([`Outcome::Unsaid`]). An ask without it waits as before.
 //! - **Said** as a written turn, as the hello, task news and reminders are
 //!   ([`crate::coordinator`]'s `commit_written_turn`), through the gates a
 //!   reminder has: the keeper's pause, nobody being heard and nothing owed
@@ -84,6 +90,13 @@
 //!   With `"quiet": true` (#5999, a skill's fixed line) it also waits, as a
 //!   say, while anyone is heard and for its priority's quiet since the last
 //!   turn ([`may_play_exact_after`]).
+//! - **Another of the lamp's voices** (#7485, the app's voice preview):
+//!   with exact `text` only, `voice` names one of the lamp's voices
+//!   (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), and that line alone is
+//!   rendered in it ([`tts_cache::TtsCache::render_once_in`]), the words as
+//!   sent, never kept; the voice in use stays. Empty is the voice in use;
+//!   another name, or `voice` with anything but exact text, is refused.
+//!   It plays as any exact line does.
 //! - **A paired computer's clip** (the local leader's 3 Nov, lamp-control's
 //!   `sound` of a clip it keeps): in place of the words, `clip` is the
 //!   absolute path of a WAV under lamp-control's clips folder
@@ -243,6 +256,27 @@ pub const TURN_END_EXPIRY_MS: u64 = 10_000;
 /// Why a turn start still waiting is dropped when its connection closed:
 /// its computer went or was revoked, and lamp-control shut it.
 pub const ASKER_GONE: &str = "its asker went away";
+/// Why a note that may end unsaid was let go: someone was heard after it
+/// was asked ([`moment_passed`]).
+pub const SOMEONE_TALKING: &str = "someone started talking";
+/// Why a note that may end unsaid was let go: the face at the lamp left
+/// its view after it was asked ([`moment_passed`]).
+pub const TURNED_AWAY: &str = "the person turned away";
+
+/// Whether the moment for a note that may end unsaid, asked at
+/// `asked_us`, has passed, and why: someone heard since (`last_speech_us`,
+/// the voice's last frame of speech), or the face at the lamp gone from
+/// view since (`left`, [`crate::speak_up::Presence::left_since`]). The
+/// same monotonic clock throughout.
+pub fn moment_passed(asked_us: u64, last_speech_us: u64, left: bool) -> Option<&'static str> {
+    if last_speech_us > asked_us {
+        Some(SOMEONE_TALKING)
+    } else if left {
+        Some(TURNED_AWAY)
+    } else {
+        None
+    }
+}
 /// How often a waiting turn start's client looks whether its asker went.
 const GONE_LOOK: Duration = Duration::from_millis(50);
 /// The line an asker writes on its own connection, after its ask, to
@@ -307,6 +341,9 @@ pub enum Outcome {
     Expired,
     /// Not taken, with why.
     Refused(String),
+    /// A note that may end unsaid, let go while it waited, never begun,
+    /// with why the moment passed ([`moment_passed`]).
+    Unsaid(String),
     /// A `turn: "end"` ended the conversation of its turn.
     Ended,
     /// `listen: false`: the voice has taken this connection's mute, which
@@ -327,6 +364,7 @@ impl Outcome {
             Self::Dropped(why) => json!({"outcome": "dropped", "why": why}),
             Self::Expired => json!({"outcome": "expired"}),
             Self::Refused(why) => json!({"outcome": "refused", "why": why}),
+            Self::Unsaid(why) => json!({"outcome": "unsaid", "why": why}),
             Self::Ended => json!({"outcome": "ended"}),
             Self::Muted => json!({"outcome": "muted"}),
             Self::Lifted(why) => json!({"outcome": "lifted", "why": why}),
@@ -516,6 +554,15 @@ pub struct Request {
     /// An exact line that waits, as a say does, for nobody heard and the
     /// quiet its priority buys since the last turn (#5999, a skill's step).
     pub quiet: bool,
+    /// A note let go, unsaid, once its moment has passed (#6543,
+    /// [`Says::end_unsaid`]).
+    pub may_end_unsaid: bool,
+    /// An exact line that answers the conversation that ran its skill now
+    /// by the owner's voice (lamp-skills' failed task line under
+    /// `LAMP_SKILL_TASK_SURE`, #7363): a conversation going on doesn't hold
+    /// it, as the unplug's lines ([`Says::exact_answers`]), only while
+    /// `crate::made_run::answers_now` says that run was this one's.
+    pub answers: bool,
     /// For `voice/line` (#4209): who asked, and what it was once rendered.
     pub line: LineMeta,
 }
@@ -527,6 +574,9 @@ pub struct LineMeta {
     pub by: Option<String>,
     /// Its words and where they came from, kept as they are rendered.
     pub said: Option<(String, lamp_msgs::LineSource)>,
+    /// Another of the lamp's voices an exact `text` is said in, by name
+    /// (`voice`, the app's voice preview, #7485): that line only.
+    pub voice: Option<String>,
 }
 
 impl Request {
@@ -599,6 +649,10 @@ struct Wire {
     /// a say at its priority waits for ([`may_play_exact_after`]).
     #[serde(default)]
     quiet: bool,
+    /// With `exact`: a made skill's line asked as the answer to the
+    /// conversation that ran it now ([`Request::answers`]).
+    #[serde(default)]
+    answers: bool,
     #[serde(default)]
     unplug_request: Option<String>,
     #[serde(default)]
@@ -630,6 +684,11 @@ struct Wire {
     /// its name, so that the lamp can say whose words they were (#4209).
     #[serde(default)]
     by: Option<String>,
+    /// Another of the lamp's voices, by name, for an exact `text` only
+    /// (the app's voice preview, #7485): that line is rendered in it, and
+    /// the voice in use stays. Empty is the voice in use.
+    #[serde(default)]
+    voice: Option<String>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -640,6 +699,10 @@ struct Wire {
     /// ([`Words::TaskYes`]): alone, with a priority and an expiry only.
     #[serde(default)]
     task_yes: bool,
+    /// A note that may be let go, unsaid, once its moment has passed
+    /// (#6543, [`moment_passed`]): only with `note`.
+    #[serde(default)]
+    may_end_unsaid: bool,
 }
 
 // Missing is allowed for other sources, but an explicit null is not an ID.
@@ -698,6 +761,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     {
         return Err("skill is 1 to 64 of a-z, 0-9, - and _".into());
     }
+    if wire.may_end_unsaid && wire.note.is_none() {
+        return Err("may_end_unsaid goes only with note".into());
+    }
     if skill == SHUTDOWN_SKILL && caller != Caller::WifiHelper {
         return Err("skill shutdown is asked by root only".into());
     }
@@ -755,6 +821,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             );
         }
         return Ok(Request {
+            may_end_unsaid: false,
             skill,
             words: Words::Quoted(line),
             // Never urgent: an add-on waits the whole quiet a say waits.
@@ -771,6 +838,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             question: false,
             line: Default::default(),
             quiet: false,
+            answers: false,
         });
     }
     let words = if let Some(clip) = wire.clip {
@@ -912,6 +980,18 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if wire.quiet && !matches!(words, Words::Exact(_)) {
         return Err("quiet goes only with exact".into());
     }
+    // Another of the lamp's voices (#7485): an exact text's only, one of
+    // the lamp's names; empty is the voice in use.
+    let voice = match wire.voice.as_deref() {
+        None => None,
+        Some(_) if !matches!(words, Words::Exact(_)) => {
+            return Err("voice goes only with exact text".into());
+        }
+        Some(voice) => lamp_msgs::chosen_voice::fit_voice(voice)?,
+    };
+    if wire.answers && !matches!(words, Words::Exact(_)) {
+        return Err("answers goes only with exact".into());
+    }
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -930,11 +1010,14 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         unplug_request: wire.unplug_request,
         who: wire.who,
         question: wire.question,
+        may_end_unsaid: wire.may_end_unsaid,
         line: LineMeta {
             by: wire.by,
             said: None,
+            voice,
         },
         quiet: wire.quiet,
+        answers: wire.answers,
     })
 }
 
@@ -955,6 +1038,7 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         || wire.exact
         || wire.made
         || wire.quiet
+        || wire.answers
         || wire.unplug_request.is_some()
         || wire.by.is_some()
         || wire.who
@@ -970,6 +1054,7 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         return Err(format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"));
     }
     Ok(Request {
+        may_end_unsaid: false,
         skill,
         words: Words::TaskYes,
         priority,
@@ -982,6 +1067,7 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1057,6 +1143,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         }
     };
     Ok(Request {
+        may_end_unsaid: false,
         skill,
         words,
         priority: NORMAL_PRIORITY,
@@ -1069,6 +1156,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1082,6 +1170,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         return Err("listen goes alone".into());
     }
     Ok(Request {
+        may_end_unsaid: false,
         skill,
         words: Words::Listen(on),
         priority: NORMAL_PRIORITY,
@@ -1094,6 +1183,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1114,6 +1204,7 @@ fn parse_stream(skill: String, stream: StreamWire, wire: &Wire) -> Result<Reques
         return Err("by: a name of 1 to 64 characters, no control characters".into());
     }
     Ok(Request {
+        may_end_unsaid: false,
         skill,
         words: Words::Stream { by },
         priority: NORMAL_PRIORITY,
@@ -1126,6 +1217,7 @@ fn parse_stream(skill: String, stream: StreamWire, wire: &Wire) -> Result<Reques
         question: false,
         line: Default::default(),
         quiet: false,
+        answers: false,
     })
 }
 
@@ -1269,6 +1361,8 @@ struct Waiting {
     expires_at_us: u64,
     order: u64,
     cancel: Cancel,
+    /// When its line was read: what [`Says::end_unsaid`] counts from.
+    asked_at_us: u64,
 }
 
 impl Waiting {
@@ -1783,6 +1877,7 @@ impl Says {
         let (answer, answered) = mpsc::channel();
         ask.send(Asked {
             request: Request {
+                may_end_unsaid: false,
                 skill: skill.into(),
                 words: Words::From(source),
                 priority: NORMAL_PRIORITY,
@@ -1795,6 +1890,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -1816,6 +1912,7 @@ impl Says {
         let (answer, answered) = mpsc::channel();
         ask.send(Asked {
             request: Request {
+                may_end_unsaid: false,
                 skill: skill.into(),
                 words: Words::Sound(samples),
                 priority: NORMAL_PRIORITY,
@@ -1828,6 +1925,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: 0,
@@ -1887,7 +1985,20 @@ impl Says {
         says.waiting[0].request.line = LineMeta {
             by: by.map(str::to_owned),
             said: Some((text.to_owned(), source)),
+            voice: None,
         };
+        (says, answered)
+    }
+
+    /// For a test of the voice's loop: `skill`'s exact line asked as the
+    /// answer to the conversation that ran it now (#7363), rendered already.
+    #[cfg(test)]
+    pub(crate) fn answers_exact_for_test(
+        skill: &str,
+        samples: Vec<i16>,
+    ) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut says, answered) = Self::exact_for_test(skill, samples);
+        says.waiting[0].request.answers = true;
         (says, answered)
     }
 
@@ -1922,6 +2033,7 @@ impl Says {
         let (answer, answered) = mpsc::channel();
         ask.send(Asked {
             request: Request {
+                may_end_unsaid: false,
                 skill: skill.into(),
                 words,
                 priority,
@@ -1934,6 +2046,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             },
             answer,
             read_at_us: 0,
@@ -1992,6 +2105,7 @@ impl Says {
                 cancel: asked.cancel,
                 expires_at_us,
                 order: self.order,
+                asked_at_us: asked.read_at_us,
             });
         }
         self.expire(now_us);
@@ -2281,9 +2395,18 @@ impl Says {
     /// dropped). Held for the conversation, the update line
     /// after "Yes." waited out its 30 s and was never said (row-5747n D,
     /// lamp-52e6, build 12200).
+    /// Also a made skill's line asked as its run's answer
+    /// ([`Request::answers`]) while that run now by the owner's voice is
+    /// within [`crate::made_run::ANSWERS_WITHIN`] (#7363: "Fig facts is
+    /// running now.", then its failure held for the conversation and lost).
     pub fn exact_answers(&self) -> bool {
         self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))
-            .is_some_and(|index| self.waiting[index].request.skill == "prepare-unplug")
+            .is_some_and(|index| {
+                let request = &self.waiting[index].request;
+                request.skill == "prepare-unplug"
+                    || (request.answers
+                        && crate::made_run::answers_now(&request.skill, Instant::now()))
+            })
     }
 
     /// The quiet the next exact line needs since the last turn: none
@@ -2292,6 +2415,31 @@ impl Says {
         let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
         let request = &self.waiting[index].request;
         request.quiet.then(|| quiet_for(request.priority))
+    }
+
+    /// Lets go each note that may end unsaid and still waits whose moment
+    /// has passed: `passed` is given when it was asked and says why, if it
+    /// has ([`moment_passed`]). Each is answered `unsaid` with why, never
+    /// begun; its skill and why are returned, for the log.
+    pub fn end_unsaid(
+        &mut self,
+        passed: impl Fn(u64) -> Option<&'static str>,
+    ) -> Vec<(String, &'static str)> {
+        let mut ended = Vec::new();
+        self.waiting.retain(|waiting| {
+            if !waiting.request.may_end_unsaid {
+                return true;
+            }
+            let Some(why) = passed(waiting.asked_at_us) else {
+                return true;
+            };
+            let _ = waiting
+                .answer
+                .send(Answer::Done(Outcome::Unsaid(why.into())));
+            ended.push((waiting.request.skill.clone(), why));
+            false
+        });
+        ended
     }
 
     /// Take the next say to begin it at `now_us`: its written turn, its
@@ -2576,7 +2724,12 @@ fn serve_client(
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
-                    let (samples, said) = recordings.rendered(text)?;
+                    let (samples, said) = match request.line.voice.as_deref() {
+                        // The app's voice preview (#7485): the words as
+                        // sent, in that voice, never the owner's fixed line.
+                        Some(voice) => (recordings.rendered_in(text, voice)?, text.as_str()),
+                        None => recordings.rendered(text)?,
+                    };
                     request.line.said = Some((said.to_owned(), lamp_msgs::LineSource::Exact));
                     request.words = Words::ExactSound {
                         samples,
@@ -3035,6 +3188,15 @@ impl Recordings {
             }
             None => cache.render_once(text).map(|samples| (samples, text)),
         }
+    }
+
+    /// An exact `text` rendered now in the lamp's voice named `voice`, never
+    /// kept (the app's voice preview, #7485), or why not.
+    pub fn rendered_in(&self, text: &str, voice: &str) -> Result<Vec<i16>, String> {
+        self.cache
+            .as_ref()
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?
+            .render_once_in(text, voice)
     }
 
     /// The samples of a cached `text`, kept or rendered now, or why not:
@@ -4173,6 +4335,95 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// #7485: the app's voice preview asks an exact text in another of the
+    /// lamp's voices, by name. Only with exact text, only one of the lamp's
+    /// names; empty is the voice in use.
+    #[test]
+    fn a_voice_is_taken_for_an_exact_text_only_and_only_one_of_the_lamps() {
+        let asked = parse(
+            r#"{"skill":"voice-preview","text":"Hi there.","exact":true,"voice":"Adam","expires_in_ms":15000}"#,
+        )
+        .unwrap();
+        assert_eq!(asked.words, Words::Exact("Hi there.".into()));
+        assert_eq!(asked.line.voice.as_deref(), Some("Adam"));
+        let own = parse(
+            r#"{"skill":"voice-preview","text":"Hi there.","exact":true,"voice":"","expires_in_ms":15000}"#,
+        )
+        .unwrap();
+        assert_eq!(own.line.voice, None, "empty is the voice in use");
+        for (line, why) in [
+            (
+                r#"{"skill":"x","text":"Hi.","voice":"Adam","expires_in_ms":1}"#,
+                "voice goes only with exact text",
+            ),
+            (
+                r#"{"skill":"x","note":"greet","voice":"Adam","expires_in_ms":1}"#,
+                "voice goes only with exact text",
+            ),
+            (
+                r#"{"skill":"x","text":"Hi.","exact":true,"voice":"NotAVoice","expires_in_ms":1}"#,
+                "voice must be one of the lamp's voices, such as Rachel",
+            ),
+        ] {
+            assert_eq!(parse(line).unwrap_err(), why, "{line}");
+        }
+    }
+
+    /// #7485: a line in another voice is rendered in that voice, the words as
+    /// sent (never the owner's fixed line), and never kept; a speech service
+    /// that speaks only its own voice refuses it with why.
+    #[test]
+    fn a_line_in_another_voice_is_rendered_in_it_and_never_kept() {
+        use std::sync::Mutex;
+        let dir = std::env::temp_dir().join(format!("lamp-say-voice-in-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let asked: Arc<Mutex<Vec<(String, String)>>> = Arc::default();
+        let seen = asked.clone();
+        let cache = tts_cache::TtsCache::new(
+            dir.clone(),
+            "Rachel",
+            crate::language::SPEECH_MODEL,
+            "en",
+            Box::new(|_: &str| Ok(vec![1; 2_400])),
+        );
+        let speaks = Recordings::none().with_cache(Some(Arc::new(cache.speaking_in(Box::new(
+            move |text: &str, voice: &str| {
+                seen.lock()
+                    .unwrap()
+                    .push((text.to_owned(), voice.to_owned()));
+                Ok(vec![9; 2_400])
+            },
+        )))));
+        let pat = "Hehe, that tickles.";
+        assert_eq!(speaks.rendered_in(pat, "Adam").unwrap(), vec![9; 2_400]);
+        assert_eq!(speaks.rendered_in(pat, "Adam").unwrap(), vec![9; 2_400]);
+        assert_eq!(
+            *asked.lock().unwrap(),
+            vec![(pat.to_owned(), "Adam".to_owned()); 2],
+            "rendered each time, in that voice"
+        );
+        assert!(
+            fs::read_dir(&dir).map_or(true, |mut files| files.next().is_none()),
+            "nothing kept"
+        );
+        let own_only = Recordings::none().with_cache(Some(Arc::new(tts_cache::TtsCache::new(
+            dir.clone(),
+            "Rachel",
+            crate::language::SPEECH_MODEL,
+            "en",
+            Box::new(|_: &str| Ok(vec![1; 2_400])),
+        ))));
+        assert_eq!(
+            own_only.rendered_in(pat, "Adam").unwrap_err(),
+            "this lamp's speech service speaks in its own voice only"
+        );
+        assert_eq!(
+            Recordings::none().rendered_in(pat, "Adam").unwrap_err(),
+            "the speech service is off (no speech cache)"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #3697: the shutdown's line, warmed at start, reaches the voice as a
     /// sound from the cache with no further render (no network), as the
     /// shutdown asks for it. The helper is this test's own user here.
@@ -4337,6 +4588,7 @@ mod tests {
         (
             Asked {
                 request: Request {
+                    may_end_unsaid: false,
                     skill: skill.into(),
                     words: Words::Note(format!("{skill}'s note")),
                     priority,
@@ -4349,6 +4601,7 @@ mod tests {
                     question: false,
                     line: Default::default(),
                     quiet: false,
+                    answers: false,
                 },
                 answer,
                 read_at_us: expires_at_us.saturating_sub(60_000_000),
@@ -4424,6 +4677,45 @@ mod tests {
         assert_eq!(stay.unplug_request, None);
     }
 
+    /// #7363 (the first builder's 21:25): a made skill's exact line asked
+    /// as the answer to the conversation that ran it now is let through
+    /// that conversation, as the unplug's lines are, only while the voice's
+    /// own record says the owner ran that skill by voice within
+    /// [`crate::made_run::ANSWERS_WITHIN`]; asked by no run, or not asked
+    /// as an answer, it waits as any exact line. Only with exact text.
+    #[test]
+    fn a_made_skills_answer_goes_through_only_the_conversation_that_ran_it() {
+        let skill = "fig-facts-answers-7363";
+        let (mut says, _answered) = Says::exact_for_test(skill, vec![0; 16]);
+        says.waiting[0].request.answers = true;
+        assert!(!says.exact_answers(), "no run now by voice: it waits");
+        let ran = Instant::now();
+        crate::made_run::ran_now(skill, ran);
+        assert!(says.exact_answers());
+        // Keyed by the skill run: another skill's line is no answer of it
+        // (Heron's mutation on #7363).
+        assert!(!crate::made_run::answers_now("another-skill-7363", ran));
+        let (other, _other_answered) =
+            Says::answers_exact_for_test("another-skill-7363", vec![0; 16]);
+        assert!(!other.exact_answers(), "another skill's line waits");
+        let within = crate::made_run::ANSWERS_WITHIN;
+        assert!(crate::made_run::answers_now(skill, ran + within));
+        let past = ran + within + Duration::from_millis(1);
+        assert!(!crate::made_run::answers_now(skill, past));
+        says.waiting[0].request.answers = false;
+        assert!(!says.exact_answers(), "not asked as the answer");
+        let line = "Fig facts couldn't run this time.";
+        let exact = json!({"skill": skill, "text": line, "exact": true, "answers": true,
+                           "expires_in_ms": 30_000});
+        assert!(parse(&exact.to_string()).unwrap().answers);
+        let note = json!({"skill": skill, "note": "say it", "answers": true,
+                          "expires_in_ms": 30_000});
+        assert_eq!(
+            parse(&note.to_string()).unwrap_err(),
+            "answers goes only with exact"
+        );
+    }
+
     #[test]
     fn a_request_is_read_and_checked_and_a_refusal_names_the_field() {
         let reminder = parse(
@@ -4433,6 +4725,7 @@ mod tests {
         assert_eq!(
             reminder,
             Request {
+                may_end_unsaid: false,
                 skill: "reminders".into(),
                 words: Words::Note("Remind them to call the bank.".into()),
                 priority: 8,
@@ -4445,6 +4738,7 @@ mod tests {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             }
         );
         let text =
@@ -4798,6 +5092,7 @@ mod tests {
         assert_eq!(
             parse(r#"{"skill":"task-news","from":"tasks","expires_in_ms":30000}"#).unwrap(),
             Request {
+                may_end_unsaid: false,
                 skill: "task-news".into(),
                 words: Words::From(Source::Tasks),
                 priority: NORMAL_PRIORITY,
@@ -4810,6 +5105,7 @@ mod tests {
                 question: false,
                 line: Default::default(),
                 quiet: false,
+                answers: false,
             }
         );
         assert_eq!(
@@ -5425,6 +5721,95 @@ mod tests {
         ] {
             assert!(!is_cancel(other), "{}", String::from_utf8_lossy(other));
         }
+    }
+
+    /// #6543: `may_end_unsaid` goes with a note only; without it a request
+    /// is as before.
+    #[test]
+    fn may_end_unsaid_goes_with_a_note_only() {
+        let asked = parse(
+            r#"{"skill":"sip","note":"Offer water.","expires_in_ms":500,"may_end_unsaid":true}"#,
+        )
+        .unwrap();
+        assert!(asked.may_end_unsaid);
+        assert!(
+            !parse(r#"{"skill":"sip","note":"Offer water.","expires_in_ms":500}"#)
+                .unwrap()
+                .may_end_unsaid
+        );
+        for line in [
+            r#"{"skill":"sip","text":"Water?","expires_in_ms":500,"may_end_unsaid":true}"#,
+            r#"{"skill":"sip","from":"tasks","expires_in_ms":500,"may_end_unsaid":true}"#,
+            r#"{"skill":"sip","quoted":"Water?","expires_in_ms":500,"may_end_unsaid":true}"#,
+        ] {
+            assert_eq!(
+                parse(line).unwrap_err(),
+                "may_end_unsaid goes only with note",
+                "{line}"
+            );
+        }
+    }
+
+    /// #6543: the moment passed once someone was heard after the ask, or
+    /// the face left after it; speech before the ask is not it.
+    #[test]
+    fn the_moment_passes_on_speech_or_a_face_gone_after_the_ask() {
+        assert_eq!(moment_passed(10, 5, false), None);
+        assert_eq!(moment_passed(10, 10, false), None);
+        assert_eq!(moment_passed(10, 11, false), Some(SOMEONE_TALKING));
+        assert_eq!(moment_passed(10, 11, true), Some(SOMEONE_TALKING));
+        assert_eq!(moment_passed(10, 5, true), Some(TURNED_AWAY));
+        assert_eq!(
+            Outcome::Unsaid(TURNED_AWAY.into()).line(),
+            r#"{"outcome":"unsaid","why":"the person turned away"}"#
+        );
+    }
+
+    /// #6543, through the socket: a waiting note that may end unsaid is let
+    /// go when its moment passed, answered `unsaid` with why and never
+    /// begun; one without it keeps waiting, as before, and nothing is let
+    /// go while the moment holds.
+    #[test]
+    fn through_the_socket_a_note_that_may_end_unsaid_is_let_go() {
+        let dir = socket_dir("unsaid");
+        let path = dir.join("say.sock");
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+        let wait_for = |says: &mut Says, count: usize| {
+            for _ in 0..400 {
+                says.poll(1_000);
+                if says.waiting() == count {
+                    return;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+            panic!("{} wait, not {count}", says.waiting());
+        };
+        let mut theirs = UnixStream::connect(&path).unwrap();
+        writeln!(
+            theirs,
+            r#"{{"skill":"theirs","note":"Offer water.","expires_in_ms":60000}}"#
+        )
+        .unwrap();
+        wait_for(&mut says, 1);
+        let mut mine = UnixStream::connect(&path).unwrap();
+        writeln!(
+            mine,
+            r#"{{"skill":"mine","note":"Offer water.","expires_in_ms":60000,"may_end_unsaid":true}}"#
+        )
+        .unwrap();
+        wait_for(&mut says, 2);
+        assert!(says.end_unsaid(|_| None).is_empty());
+        assert_eq!(says.waiting(), 2);
+        let ended = says.end_unsaid(|_| Some(SOMEONE_TALKING));
+        assert_eq!(ended, [("mine".to_owned(), SOMEONE_TALKING)]);
+        assert_eq!(says.waiting(), 1);
+        let mut answer = String::new();
+        BufReader::new(&mine).read_line(&mut answer).unwrap();
+        assert_eq!(
+            answer,
+            format!("{}\n", Outcome::Unsaid(SOMEONE_TALKING.into()).line())
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Through the socket: an asker's cancel line on its own connection

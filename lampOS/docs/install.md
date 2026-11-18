@@ -94,7 +94,7 @@ differs. Folders are what the unit makes or names.
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder (none at first: the product unit's `--set-up-later --targets-from-machines claude` writes it from the person's machines once Harness is signed in); the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | addons | `lamp-addons serve` (off unless `LAMP_ADDONS=on`, `addons.md`) | lampos | none | none | the bus (`addon/proposal` and the lamp's state in, `light/request` out) |
-| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
+| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov, and Google Calendar's moves and cancels, `LAMP_CALENDAR_EDITS=on`, since 11 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
 | peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
 | seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
@@ -662,6 +662,34 @@ reads itself:
   `/var/lib/lampos-update/reset-plan.json.before-<build>` unless it is the
   plan install recorded. A lamp with no plan gets none without `--setup on`
   (docs/updates.md, "Setup's reset plan").
+- **The lamp's agents** (#7274): Harness, Hermes and OpenClaw, installed
+  and never signed in, so a new lamp's app shows them installed from its
+  setup instead of after a download of minutes. After `install --setup on`,
+  the imager runs `lamp-update agents-preinstall` in the image's root
+  (Phase 4b). It reads lamp-update's switches as a `serve` round on a
+  product lamp does, from the one function both use
+  (`crate::preinstall::wanted`), writes each missing part's ask as the
+  round writes it, and OpenClaw's gateway unit, then runs `harness-install`'s
+  one-shot: the same pinned installs a lamp runs after its setup. Every
+  `systemctl` they run is skipped, as there is no systemd on an image: the
+  lamp's first round after setup records the parts installed, enables and
+  starts OpenClaw's gateway and asks for its allow-list edit, and writes
+  again anything its switches show otherwise (no download). It ends with 1
+  unless every part wanted is there, and the imager then stops. It runs
+  under `pivot_root` in a mount namespace, not `chroot`: the kernel refuses
+  a user namespace to a chrooted process, and the Hermes and OpenClaw
+  installs try theirs as `lampos` first (`no_userns`). The factory reset
+  keeps the programs and wipes only the person's state (`forget_agents`).
+  Their size: Hermes about 2.4 GB, OpenClaw about 1.1 GB, Harness about
+  0.4 GB; the image is built at 12G (OpenClaw's install wants 2 GiB free in
+  `/var/lib`), so the card must hold 12 GB, and resize-once grows the root to
+  it at first boot. A set-up lamp has the same parts either way (they install
+  in its first hour otherwise): lamp-e82d on 13373 used 7.6 GB. On the 16 GB
+  card the lamps ship with, about 14.5 GB is usable, so about 7.5 GB stays
+  free; an update keeping the old build beside the new needs under 0.7 GB
+  more (all of `/opt/lampOS`, both builds, was 655 MB). A lamp-update
+  from before #7274 has no `agents-preinstall`, and the imager makes the
+  image without the agents, as before.
 
 ## At the factory, once per lamp
 
@@ -1294,9 +1322,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.6.52.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.60.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.6.52; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
+     when it named 0.6.60; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1311,7 +1339,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.6.52 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.60 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1322,7 +1350,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
        hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
        the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
-       are under `deploy/harness/`, copied on 13 Nov 2026, and compiled in
+       are under `deploy/harness/`, copied on 13 Nov 2026 (the four
+       manifests again on 17 Nov 2026, when Harness's CDN had moved the files
+       they name from `storage.googleapis.com` to `cdn.autonomous.ai`, #6256
+       F7, #7423: a lamp downloads those files), and compiled in
        (`product::INSTALLER`, `product::MANIFESTS`), each with its
        SHA-256. Every pinned install, the build's own pin or the env pair,
        checks all five against their SHA-256s before anything runs

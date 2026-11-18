@@ -54,6 +54,11 @@ pub const SKILL_TASKS_ENVIRONMENT: &str = "LAMP_SKILL_TASKS";
 /// id (`update_event`, `delete_event`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
 pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
+/// The switch for a Google Calendar read searching by the person's words
+/// over a bounded window, so an event from an earlier conversation can be
+/// found to move or cancel (tracker row C132), read by this program: off
+/// unless `on`, and only with [`CALENDAR_EDITS_ENVIRONMENT`] on too.
+pub const CALENDAR_EVENT_SEARCH_ENVIRONMENT: &str = "LAMP_CALENDAR_EVENT_SEARCH";
 /// The switch for changing and deleting a saved Gmail draft by its id
 /// (`update_draft`, `delete_draft`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.

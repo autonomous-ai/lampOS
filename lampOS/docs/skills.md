@@ -48,7 +48,11 @@ Senses are **topics** on the bus ([bus.md](bus.md), [msgs.md](msgs.md));
 actions are **services**, one JSON line in and one out on a socket.
 
 Topics a skill can read today: `humans/faces/tracked` (faces, a passing id,
-whether turned to the lamp), `voice/heard`, `voice/said`, `voice/state`,
+whether turned to the lamp; a face's `pitch` and `looking`, with the eyes'
+`LAMP_EYES_PITCH_GAZE=on`, only while the face-expressions yes is kept:
+without it, missing or unreadable, `lamp-skills` takes both out before any
+skill's trigger, condition or watch sees the faces, `Faces::for_skills`,
+#7442), `voice/heard`, `voice/said`, `voice/state`,
 `room/state`, `room/presence` (whether anyone is at the lamp, with the
 eyes' `LAMP_PRESENCE=on`, [presence.md](presence.md)), `name/heard`,
 `controls/touch`, `controls/gesture`,
@@ -63,9 +67,14 @@ an event) and `humans/posture` (the window's length, its share of bad
 samples and the region most often bad) ([msgs.md](msgs.md)). `lamp-seen`
 publishes them, coming with #6543 phases 2 and 3. A skill that names one in
 `[permissions] topics` shows the `seen` use, private ([cloud.md](cloud.md)).
+`humans/doing_more` (tiredness, desk work as a coarse kind and celebrating,
+said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`) is a topic of its
+own: a skill naming it shows the `seen_more` use, private and apart from
+`seen`, so a skill given `humans/doing` never receives it. No skill reads it
+yet.
 `humans/doing`'s three timers are always said, counted from the desk
 arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
-"drank_s_ago" above = 5399 unknown = "holds_stale"` holds for someone the
+"drank_s_ago" above = 1799 unknown = "holds_stale"` holds for someone the
 lamp has not seen drink, as the clock alone would; each `humans/posture`
 said has `window_s` (0 at its start), and it is not said while lamp-seen's
 window holds no sample (frames not going out, the server busy, a wipe), so it
@@ -75,8 +84,8 @@ no `[[while]]` with `unknown = "holds"`, which covers only a topic never said;
 
 Five shipped skills read them so (#6543, the skill side), each with
 `unknown = "holds_stale"`, so without `lamp-seen`, or with it gone quiet,
-each runs exactly as before: A sip of water (`drank_s_ago` above 5399, and
-2999 in its `[present]`), Stand up (`break_s_ago` above 5999), Stretch break
+each runs exactly as before: A sip of water (`drank_s_ago` above 1799, its
+triggers' 30 minutes, in both blocks), Stand up (`break_s_ago` above 5999), Stretch break
 (`break_s_ago` above 1799: its yawn `sooner`'s 30 minutes, not its own 50, so
 a yawn still brings it forward), A meal check (`ate_s_ago` above 4499, its
 triggers' 75 minutes; version 1.1.0) and Sit back (`humans/posture`'s
@@ -218,7 +227,7 @@ must not leave a step silently undone)*.
 | `trigger.once_per_day` | no | Boolean, false by default. Requires a named trigger and `during`, disallows `each`, and consumes a durable daily chance before Policy or output; needs `LAMP_SKILLS_DAILY_FILE` or `--daily-state` |
 | `trigger.unless_heard` | no | Boolean, false by default. Only with `during`, and not with `each` (an item's run never checks it). Once anything was heard on `voice/heard` since the window opened today, the trigger gives no chance: someone already spoke to the lamp (bedtime-morning's greeting). With `once_per_day`, the day's chance is claimed then and the journal says once `<name> chance let go: spoken to since HH:MM`. With it, `lamp-skills` subscribes to `voice/heard`, which the skill's `[permissions]` topics must list. What was heard is kept in memory: a restart forgets it |
 | `trigger.yields_to` | no | `{ skill = "NAME", trigger = "NAME" }`, with `when = "appears"` on the whole topic (#1672, the first builder's ruling): after a night the lamp rested, this trigger's chance waits for that skill's daily trigger to be judged first, so one greeting comes, not two (Welcome back: `{ skill = "bedtime-morning", trigger = "morning" }`). It waits while, at its moment, the routine manager says a routine's rest began the local day before today, the named skill is loaded and enabled, its named `once_per_day` trigger's `during` contains now, and that trigger's day is neither claimed in the daily journal nor dropped, and only while that trigger holds with its chance still to come (in its `for` or its `wait`), unbroken since this trigger first waited (the reviewer's P2 on #2757): a face it does not hold for, or a hold it lost (a face glancing down past its own `gap`), is not waited for until its window ends. Waiting, the chance is kept, not spent, while the trigger holds, as the `[quiet]` hours keep one; the journal says once `waits: the <trigger> greeting comes first`. When the other trigger takes its chance while this face is there, this face's run is done: `done: <skill>'s <trigger> greeting was this face's hello`. When that chance is dropped (its conditions did not hold within its `wait`) or let go (`unless_heard`), or its window or day passes, the kept chance is taken at the trigger's next message as before. A run taken in that window on that day, by the other trigger's not holding or its chance dropped, claims the other trigger's day in the daily journal, as its own greeting would (the first builder on #2757: one morning moment a day), and the journal says once `<skill> <trigger> chance let go: <this skill> already greeted this morning`; a later face is given this skill's ordinary run, never the other's. A later face, after `absent_for`, is greeted as always. No rested night (or `LAMP_SKILL_ROUTINES` off, which leaves no rest manager), the named skill disabled or not loaded (a routine with `LAMP_SKILL_ROUTINES` off), turned off, snoozed, or unable to act (no ask mode, no journal, a journal fault): it does not wait. A `yields_to` naming no loaded daily trigger is ignored, and the journal says so at each load: `<skill>: yields_to <skill>'s <trigger>, which is not a loaded daily trigger: ignored, it does not wait`. When it was judged is in memory; the night rested is kept with `--state-dir` in `DIR/rested` (the routine manager's, below). After a restart a day claimed in the journal is judged, with no record of when, so nothing waits and nothing is marked done: a face there at the start is no news to an `appears` trigger, and one that comes later is greeted as on any day. Tests (`crates/skills/tests/it/daily_engine.rs`): `a_rested_night_and_a_first_face_greet_once_with_the_morning`, `a_dropped_morning_lets_welcome_back_greet_after_it`, `a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once`, `welcome_backs_hello_after_a_dropped_morning_claims_the_morning`, `a_restart_after_the_morning_greets_nobody_twice`, `a_restart_before_the_morning_still_greets_with_it`, `without_a_rested_night_*`, `without_bedtime_morning_*`, `yields_to_goes_with_an_appears_trigger` |
-| `trigger.follows` | no | `{ trigger = "NAME", within = D }` (#3694, Sit back): a word after another of the skill's triggers ran. It holds only within `within` (10 s to 1 h) of that trigger's last run, counted from when that run began, and once for each of its runs; before that trigger has run, or past `within`, its own test is as if it did not hold, so its `for` is counted from the run on. It names another trigger of the same skill by `name`, never itself, and goes with `rearm` or `when = "appears"`, on the whole topic, without `once_per_day`, `unless_heard` or `yields_to`. Its runs are that run's, not nudges of their own: the day's `most_a_day`, `[rest]` and the `[budget]` group's hour neither count them nor hold them back. But a trigger no step names (no `[[do]]` with its `on`, and none without an `on`) makes nothing, so it is no nudge: those three neither count it nor hold it back, and the word that follows it is the nudge, counted and held back as any (Quiet focus: the silent 45 minutes head down take none of the wellbeing group's hour, its word when they look up does; Head pat wiggle, in no group and with no day's most or rest, does as before; test `a_silent_trigger_spends_no_hour_and_the_word_after_it_is_the_nudge`). `[quiet]`, `[active]`, the `[[while]]` conditions, its `cooldown` and the Policy do. With `LAMP_SKILLS_ASK=policy` the named trigger's run is counted from when it is asked, so a Policy no or a timeout still opens the window; the product asks nothing (`skip`). Tests: `follows_names_another_trigger_of_the_skill_and_is_refused_otherwise` and Sit back's cases |
+| `trigger.follows` | no | `{ trigger = "NAME", within = D }` (#3694, Sit back): a word after another of the skill's triggers ran. It holds only within `within` (10 s to 1 h) of that trigger's last run, counted from when that run began, and once for each of its runs; before that trigger has run, or past `within`, its own test is as if it did not hold, so its `for` is counted from the run on. It names another trigger of the same skill by `name`, never itself, and goes with `rearm` or `when = "appears"`, on the whole topic, without `once_per_day`, `unless_heard` or `yields_to`. Its runs are that run's, not nudges of their own: the day's `most_a_day`, `[rest]` and the `[budget]` group's hour neither count them nor hold them back (but a group naming `[budget] follows_count = true` counts them, #6543, see `[budget]`). But a trigger no step names (no `[[do]]` with its `on`, and none without an `on`) makes nothing, so it is no nudge: those three neither count it nor hold it back, and the word that follows it is the nudge, counted and held back as any (Quiet focus: the silent 45 minutes head down take none of the wellbeing group's hour, its word when they look up does; Head pat wiggle, in no group and with no day's most or rest, does as before; test `a_silent_trigger_spends_no_hour_and_the_word_after_it_is_the_nudge`). `[quiet]`, `[active]`, the `[[while]]` conditions, its `cooldown` and the Policy do. With `LAMP_SKILLS_ASK=policy` the named trigger's run is counted from when it is asked, so a Policy no or a timeout still opens the window; the product asks nothing (`skip`). Tests: `follows_names_another_trigger_of_the_skill_and_is_refused_otherwise` and Sit back's cases |
 | `trigger.instead_of` | no | A trigger's `name` (#5207, Welcome back's day's first hello): this trigger's run is that trigger's chance too. When this one runs, the named trigger's cooldown begins then, so at the same message it is held back by it (`in its cooldown`) and an `appears` chance is spent: one hello, not two. Only with `once_per_day`, not with `each`; it names a later trigger of the same skill on the same topic (`instead_of "NAME" names none of the skill's later triggers on TOPIC`), which is judged after it at each message. Its day claimed, or out of its `during`, it does not run and the named trigger runs as always. Tests (`crates/skills/tests/it/daily_engine.rs`): `with_the_switch_the_days_first_arrival_asks_whats_first_once`, `with_the_switch_a_first_arrival_after_noon_is_the_plain_hello` |
 | `trigger.stands_in_for_group` | no | `true` or `false` (the default) (#5620, the PM's call (a): Quiet focus's word for the wellbeing nudges): this `follows` word stands in for the nudges of its skill's own `[budget]` group when they are due. While the word is still to come (the trigger it `follows` ran within its `within`, the word has not run since, and its skill is not off, snoozed, at its day's `most_a_day` or resting), each other skill of that group's due chance, past its own quiet hours, off, snooze, day's most, rest and `cooldown`, is kept, not spent, as the quiet hours keep one, once its `[[while]]` holds and before its `[budget]` is judged; the journal says once for each `waits: <skill>'s word comes first`. So with `LAMP_NUDGES_PRESENT` Sip of water, due at the same look up, no longer speaks first and spends the group's hour (lamp-9adf, 7 Nov). While a held skill's `[[while]]` does not hold, its chance goes on as without the key (it would not have spoken anyway), and no wait line is said. When the word runs, each held skill's chance was the word's: the cooldown of each of its triggers that waited begins then, and the journal says `done: <skill>'s word stood in for it`. Nothing else of them changes (no day's count, no rest, no group's hour); a held skill that runs itself is handed nothing later. A word that never comes holds the group for one window at most (the reviewer's bound on #5704): once a window closes without the word (the trigger it `follows` runs again before the word, or the word's chance is let go past its `wait`), the group is not held again until the word has run once; a window whose `within` simply passes holds nothing after it either, and a kept chance is taken at its trigger's next message as before. A lamp without the standing-in skill, or with it and no word to come (no focus pending), behaves as without the key. Only with `follows` (`stands_in_for_group goes with follows`), and only in a skill with a `[budget]` group (`stands_in_for_group needs the skill's own [budget] group`, refused at load). It never holds a `warning`-policy skill (Smoky air), a skill of another group, or another skill that itself has the key, checked each time a chance is judged, so a skill installed later is held to the same; a pushed skill may not use the key (`pushed_refuses`). Tests (`crates/skills/tests/it/stands_in.rs`): `quiet_focus_word_stands_in_for_rest_your_eyes`, `with_every_wellbeing_nudge_present_only_the_word_speaks_at_the_look_up`, `a_word_that_never_comes_holds_the_group_once_at_most`, `rest_your_eyes_alone_still_speaks_in_that_sitting`, `with_quiet_focus_and_no_focus_rest_your_eyes_still_speaks`, `stands_in_for_group_goes_with_follows_and_a_budget_group`, `a_word_in_another_group_holds_nothing_back`, `a_word_holds_no_warning_of_its_group`, `a_pushed_skill_with_stands_in_for_group_is_refused`, `no_wait_line_while_the_held_skills_while_does_not_hold` |
 | `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. A dot steps into an object: `scores.music` is the `music` of `scores` (#1669, `ears/classes`); an empty step (`scores.`, `.music`) is refused. A field that is not there is null: it never holds for `equals`, `above` or `below`, and holds for `not_equals`. The same goes for `each`, `key`, `rise` and a `[[while]]` field. But a trigger's `above` or `below` field that is there and `null` (the air part's `co2_ppm` while its sensor does not know it) says nothing of the level: the message is passed over as if it never came, as a `rise` passes one over, so it neither ends the hold past its `gap` nor counts toward its `for` or its rearm line; a run held until the trigger ends ends once such messages have lasted as long as a silence would end it (15 minutes with no lifespan). Not with `when = "changes"`. A field left out stays not holding (`lamp/health` leaves `quiet_ms` out at 0). Before #6592 such a stretch past the `gap` ended the spell and began its `for` again with nothing said: on lamp-52e6 the kit read 2,277 ppm at 14:28, nothing over 1,200 until 14:30:04 and 2,200+ after, and Stuffy air left no line all afternoon (test `crates/skills/tests/it/stuffy_unknown.rs`, case `stuffy-through-unknown-readings`). On `humans/faces/tracked` without them, it holds while a face is in view |
@@ -236,13 +245,13 @@ must not leave a step silently undone)*.
 | `trigger.sooner` | no | `{ topic = T, field = F, above = N, for = D }` (#3709): while F of T's newest value that still lasts is above N, the trigger needs to have held only D, shorter than its own `for` (which it must have; 0 or longer is refused when it loads). It may also be a list of such tables (#6543), `sooner = [{ … }, { … }]`: each is checked when it loads as one alone is (an empty list is refused), and of those holding at a moment the shortest `for` wins; one table and a list of that one table behave alike. Each entry's topic is read only if `[permissions] topics` lists it. With `rearm` it still takes one chance each time it holds: brought forward, never twice. Kept only with `LAMP_YAWN_SOONER=on` in `lamp-skills`; off, it is read, checked and ignored. Stretch break has `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: a yawn the eyes saw this sitting (`LAMP_EYES_YAWN=on`) brings its stretch to 30 minutes, as V1's yawn rule did. Tests: `a_yawn_in_the_sitting_brings_the_stretch_forward_once`, `a_list_of_sooners_brings_the_trigger_to_the_shortest_holding` |
 | `trigger.name` | no | What a step's `on` calls it: lowercase letters, digits and `_`, a different one for each trigger (#1021) |
 | `trigger.each` with `trigger.key` | no | `each` names a field that is a list, and `key` the field that names one of its items (`each = "settled"`, `key = "task"` on `tasks/status`). The `field` test is then of each item on its own, and `when` must be `appears`: a run for each item that holds where, in the trigger's last message, it did not or was not in the list. So an item new to the list that holds counts (every item of #1048's `settled` is first seen already settled), and so does one that leaves and comes back. What is there at the first message since the program started is not news: it only says what is there *(chosen: a restart must not tell everything again)*. At a reload the items begin again from the topic's value the program keeps, so what was there then is not news and the next message, the next change, is compared with it (the reviewer on #1042); with no value kept yet, the topic's first message only says what is there, as at the start. A missing list is an empty one. Each item's run is asked about on its own, and two in one message are two runs, in the items' order across the skill's triggers: by number when the key is a number (task 9 before task 10), else by text. Not with `near`, `absent_for`, `for`, `gap`, `rearm`, `cooldown` or `wait`, which are timed over the whole topic *(chosen)*. Nor in a skill with `[quiet]` or a dim `until = "ends"`: an item's run has no quiet hours and no end of its own, so quiet would be passed over and a held dim would keep the skill busy *(chosen, the reviewer on #1042)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), its answer starts the item's run only if that item is still in the list and holds |
-| `[[while]]` | no | Conditions that must also hold, all of them, on the newest value of each topic while that value lasts: a `topic` with `field` and one of `equals`, `not_equals` (anything else, #1140), `above` or `below`, or `humans/faces/tracked` with `present = true`, or `humans/faces/tracked` with `faces_at_most`, 1 to 8 (#3504: at most that many faces in a list the eyes said whole, so `faces_at_most = 1` holds with nobody else in view; alone, with no field or `present`; test `faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere`); with `for`, it has also held that long, by the messages of its topic since this program started. `unknown = "holds"` (with a field's test, without `for` or `present`) makes it hold while its topic has said nothing yet, as on a lamp without the part that says it (#1677); a value that has run out still does not hold. `unknown = "holds_stale"` (with a field's test, without `present`; `for` is allowed) makes it hold while its topic has said nothing yet *and* on a value that has run out, a topic gone quiet (#6543, for `humans/doing`); a fresh value is judged on itself as ever, and a fresh value after one that ran out begins its `for` from itself, not from the old value. So with `for`, the condition closes for that long when the topic comes back (lamp-seen restarting, say), though it held while the topic was gone. Opt-in: `"holds"` keeps its meaning, and only the skills reading `humans/doing` or `humans/posture` use `"holds_stale"` (above, "Topics a skill can read"). Test `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out`. It begins again after a value that expired, and when a reload changes the condition. `through` (with `equals` and `for`, #1672) lists values of the field its clock is carried through: during a spell of one of them it does not hold, so nothing runs then, but its `for` is not begun again either; `broken_by` (with `through`) lists the topics whose messages do begin it again, only `voice/heard` with a letter or a digit in its text, `name/heard` (any hearing of the lamp's name, with no words written down too), `body/hand` with a new push (`pushed` going true: a push held, or said again and again, begins it once, as it begins) and `controls/touch` with `enabled` true, read as the skill's own (in `[permissions] topics`). `through` never lists the value it equals. Both only with `LAMP_REST_THROUGH_SOUNDS=on` ([switches.md](switches.md)); off, they are checked and ignored, and the `broken_by` topics are not listened to |
+| `[[while]]` | no | Conditions that must also hold, all of them, on the newest value of each topic while that value lasts: a `topic` with `field` and one of `equals`, `not_equals` (anything else, #1140), `above` or `below`, or `humans/faces/tracked` with `present = true`, or `humans/faces/tracked` with `faces_at_most`, 1 to 8 (#3504: at most that many faces in a list the eyes said whole, so `faces_at_most = 1` holds with nobody else in view; alone, with no field or `present`; test `faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere`); with `for`, it has also held that long, by the messages of its topic since this program started. `unknown = "holds"` (with a field's test, without `for` or `present`) makes it hold while its topic has said nothing yet, as on a lamp without the part that says it (#1677); a value that has run out still does not hold. `unknown = "holds_stale"` (with a field's test, without `present`; `for` is allowed) makes it hold while its topic has said nothing yet *and* on a value that has run out, a topic gone quiet (#6543, for `humans/doing`); a fresh value is judged on itself as ever, and a fresh value after one that ran out begins its `for` from itself, not from the old value. So with `for`, the condition closes for that long when the topic comes back (lamp-seen restarting, say), though it held while the topic was gone. Opt-in: `"holds"` keeps its meaning, and only the skills reading `humans/doing` or `humans/posture` use `"holds_stale"` (above, "Topics a skill can read"). Test `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out`. It begins again after a value that expired, and when a reload changes the condition. `through` (with `equals` and `for`, #1672) lists values of the field its clock is carried through: during a spell of one of them it does not hold, so nothing runs then, but its `for` is not begun again either; `broken_by` (with `through`) lists the topics whose messages do begin it again, only `voice/heard` with a letter or a digit in its text, `name/heard` (any hearing of the lamp's name, with no words written down too), `body/hand` with a new push (`pushed` going true: a push held, or said again and again, begins it once, as it begins) and `controls/touch` with `enabled` true, read as the skill's own (in `[permissions] topics`). `through` never lists the value it equals. Both only with `LAMP_REST_THROUGH_SOUNDS=on` ([switches.md](switches.md)); off, they are checked and ignored, and the `broken_by` topics are not listened to. `sooner` (#6543), on a condition with `above` and no `for`: `{ topic = T, field = F, above = N, above_to = M }`, or a list of such tables as a trigger's `sooner` takes (an empty one refused): while F of T's newest value that still lasts is above N, the condition's own `above` is M, which must be below it (refused when it loads otherwise). It changes only the number: the topic and field it judges stay the condition's own, so a sooner cannot add a condition or swap one, and its own condition is only `above`. The skill names each lower `above` itself; of those holding at a moment the lowest wins, and with none holding it is its own `above` again. Each entry's topic is read only if `[permissions] topics` lists it. Kept only with `LAMP_YAWN_SOONER=on`, as a trigger's `sooner`; off, it is read, checked and ignored. The journal says it once as it happens, numbers and topics only: `<skill> while <topic> <field> above 7199 lowered to 3599 (sooner humans/doing_more drank_seen above 1)` when a sooner lowers it or another lowers it further or less, and `<skill> while <topic> <field> above 7199 again, from 3599: no sooner holds` when it goes back (a sooner's value that ran out too, at the next tick). Test `a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding` |
 | `[quiet]` | no | `from` and `to`, two different local times as `"HH:MM"` (`from = "22:00"`, `to = "08:00"`, past midnight when `to` comes first): from `from` up to `to`, the skill never starts itself (#1021). A chance that comes then is kept, as `wait` keeps one through a talk, and taken at the trigger's first message after `to`, while the trigger still holds; the trigger stopping (past its `gap`) spends it (Stuffy air, stuffy from 23:00 to 10:00: one droop at 08:00, the reviewer on #1066). A trigger with `when = "appears"` spends it: someone who came at 22:30 is not greeted at 08:00. The local time is the program's wall clock and its `--zone` or `--utc-offset-minutes`; without either the time of day is not known, and a skill with quiet hours never starts itself *(chosen: "never at night" holds when the night cannot be told)*. Only with a trigger |
 | `most_a_day` | no | How many times a local day the skill may start itself, 1 to 24 (#1685). Counted as the cooldown is: when a run is started, or asked of the Policy whatever it answers *(chosen: a no is not asked again at once)*. The day is the local date, by the same local time as `[quiet]`'s; with the local time not known, a stretch of 24 h of the program's own clock. Past it, the chance is spent. Only with a trigger, and not with `each` (an item's run is news, not a nudge). Tests (`crates/skills/tests/it/skills.rs`): `most_a_day_*`, `the_nudge_limits_*` |
 | `[active]` | no | `from` and `to` as `[quiet]`'s, the other way round (#1685): the skill starts itself only from `from` up to `to` (`from = "09:00"`, `to = "18:00"`; past midnight when `to` comes first). A chance outside them is kept as in the quiet hours, and taken at the trigger's first message once they begin, while the trigger still holds; `when = "appears"` spends it. With the local time not known, never. With `[quiet]` as well, both hold. Only with a trigger, not with `each`. Tests: `an_active_window_*` |
-| `[budget]` | no | `group`, a name of lowercase letters, digits and hyphens (at most 64), and `per_hour`, 1 to 6 (#1685): the skills that name the same group start themselves at most that many times in any hour between them, by the smallest `per_hour` any of them names (a member can only make its group quieter). Counted as `most_a_day` is. A member's chance while the hour is spent is kept as `[active]` keeps one, and taken once the hour's oldest run is an hour old. First come, first served: with the hour free, a member that was held back for it earlier than this one, and again within the last 2 minutes (`BUDGET_WAIT_LIVE_US`), goes first, and this one's chance is kept; so the first member in folder order never takes every hour (Rest your eyes, once an hour, would otherwise keep A sip of water waiting all day). A member past that 2 minutes is no longer waiting (its trigger ended, or something else holds it back) and holds nobody back. The waits are in memory, kept by group. A skill in no group is not held back. Stretch break and the four wellbeing skills (A sip of water, Rest your eyes, Stand up, Wind down) name `group = "wellbeing"`, `per_hour = 1` (#1685): on a product lamp, with none of the four installed, Stretch break is the only member and nothing changes for it. The runs are counted in memory, among the skills loaded together, and the runs and waits are kept through a short restart on the same boot beside the holds ("A hold kept across a restart"); a reboot begins them again. Tests: `a_shared_budget_*`. **`gap`** (#5207), optional, 1 m to 1 h: a member does not start itself within that long of its group's last run, by the largest `gap` any member names, and its chance is kept as when the hour is spent (journal: `its GROUP group ran lately, N left`). Without it, as before. Test: `with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minutes`. **`give_back_unsaid = true`** (#5207, Fourteen's finding on #5208: Stretch break's say expired unheard and still spent the hour, so Sit back's word was dropped): a member's run done without its say ever begun (expired, refused, or the voice not reached; a run with no say counts as said once its body and light are made) gives its place in the group's hour, and its gap, back, when any member names it, and only while the run that spent the hour is the skill's latest: a later run that spends none (a `follows` word, as Sit back's warm word, or a tool's run) gives nothing back, so an unsaid warm word never frees the heard nudge's place (Fourteen's and Thirteen's P2 on #5237; test `with_the_switch_an_unsaid_word_after_a_heard_nudge_gives_nothing_back`); the day's `most_a_day` and `[rest]` count it as before, and it is no longer the one that came last for `[stop]`. The journal says `SKILL said nothing: its place in the GROUP group's hour is given back`. Tests: `with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back`, and `a_run_done_without_its_say_begun_is_unsaid_once` (the program's side). A member whose `do.write` waits for the owner's yes spends nothing at all, with or without `give_back_unsaid` (see `do.write`) |
+| `[budget]` | no | `group`, a name of lowercase letters, digits and hyphens (at most 64), and `per_hour`, 1 to 6 (#1685): the skills that name the same group start themselves at most that many times in any hour between them, by the smallest `per_hour` any of them names (a member can only make its group quieter). Counted as `most_a_day` is. A member's chance while the hour is spent is kept as `[active]` keeps one, and taken once the hour's oldest run is an hour old. First come, first served: with the hour free, a member that was held back for it earlier than this one, and again within the last 2 minutes (`BUDGET_WAIT_LIVE_US`), goes first, and this one's chance is kept; so the first member in folder order never takes every hour (Rest your eyes, once an hour, would otherwise keep A sip of water waiting all day). A member past that 2 minutes is no longer waiting (its trigger ended, or something else holds it back) and holds nobody back. The waits are in memory, kept by group. A skill in no group is not held back. Stretch break and the four wellbeing skills (A sip of water, Rest your eyes, Stand up, Wind down) name `group = "wellbeing"`, `per_hour = 1` (#1685): on a product lamp, with none of the four installed, Stretch break is the only member and nothing changes for it. The runs are counted in memory, among the skills loaded together, and the runs and waits are kept through a short restart on the same boot beside the holds ("A hold kept across a restart"); a reboot begins them again. Tests: `a_shared_budget_*`. **`gap`** (#5207), optional, 1 m to 1 h: a member does not start itself within that long of its group's last run, by the largest `gap` any member names, and its chance is kept as when the hour is spent (journal: `its GROUP group ran lately, N left`). Without it, as before. Test: `with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minutes`. **`give_back_unsaid = true`** (#5207, Fourteen's finding on #5208: Stretch break's say expired unheard and still spent the hour, so Sit back's word was dropped): a member's run done without its say ever begun (expired, refused, or the voice not reached; a run with no say counts as said once its body and light are made) gives its place in the group's hour, and its gap, back, when any member names it, and only while the run that spent the hour is the skill's latest: a later run that spends none (a `follows` word, as Sit back's warm word, or a tool's run) gives nothing back, so an unsaid warm word never frees the heard nudge's place (Fourteen's and Thirteen's P2 on #5237; test `with_the_switch_an_unsaid_word_after_a_heard_nudge_gives_nothing_back`); the day's `most_a_day` and `[rest]` count it as before, and it is no longer the one that came last for `[stop]`. The journal says `SKILL said nothing: its place in the GROUP group's hour is given back`. Tests: `with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back`, and `a_run_done_without_its_say_begun_is_unsaid_once` (the program's side). A member whose `do.write` waits for the owner's yes spends nothing at all, with or without `give_back_unsaid` (see `do.write`). **`per_day`** (#6543), optional, 1 to 48 (`PER_DAY_AT_MOST`): the group's skills start themselves at most that many times a local day between them, by the smallest `per_day` any member names; counted from the lamp's local day start as `most_a_day` is (with the local time not known, by the monotonic day), and kept beside the holds through a short restart on the same boot as `most_a_day`'s count is. A member's chance past it is spent, as at its own `most_a_day` (journal: `its GROUP group's N a day already run`, gate `budget-day`); the next local day the group begins again. `unsaid` gives nothing of the day back (as `most_a_day`), a `do.write` waiting for the yes gives its count back. Without it, as before (the reaction design's "about six a day in all", one key in place of a split of `most_a_day`). **`follows_count = true`** (#6543), optional, named by any member: a member's `follows` word is one of the group's runs, counted in its hour, its `per_day` and its `gap`, held back by them, and waiting first come, first served as any member; `most_a_day` and `[rest]` still do not count it. Without it a `follows` word is that run's, as before (`trigger.follows`). Tests (`crates/skills/tests/it/group_day.rs`): `a_groups_day_caps_its_runs_across_its_skills_and_begins_again_at_midnight`, `a_groups_day_stays_at_its_most_after_a_restart`, `a_follow_up_counts_toward_its_group_only_when_the_group_says_so`, `per_day_is_bounded_and_both_keys_are_off_by_default` |
 | `[rest]` | no | `after_ignored`, 1 to 5, and `within`, 10 s to 5 min (60 s without it) (#1685): after that many of the skill's runs in a row that nobody noticed, it does not start itself until the next local 06:00, or for 12 h with the local time not known; a run noticed begins the count again. Judged by the program from what the bus already says, not by the skill, so it needs no permission for it. From the run's start to `within` after, the run is noticed if a face in `humans/faces/tracked` is turned to the lamp (`facing`), the largest face moves 0.15 of the picture across or down from where it was as the run began, or a quarter of its height nearer or farther (leaning in, sitting back), anything is heard on `voice/heard` (only that something was said: the words are not kept), or the newest faces in that while show nobody (they got up). When the eyes say what the person at the desk is doing (`room/activity`, `LAMP_ACTIVITY=on`, #1678), their word counts too: `room/stood_up` in the while (they stood up and left), or `room/activity` saying something other than it said as the run began (looking up from the page, leaning in), is noticed, when the run began with the sitting's baseline in (before it, a baseline coming in mid-run could say `head_down` of someone who did nothing: the reviewer's P3 on #1938, `a_baseline_coming_in_mid_run_is_no_noticing`), and `away` is gone. Otherwise it was ignored: someone still in view, turned away, still and silent, the eyes saying the same all through. With the Policy asked, the while begins at the `say_now` that makes the run, so a run it said no to showed nothing and is not counted. With it, `lamp-skills` subscribes to `humans/faces/tracked`, `voice/heard`, `room/activity` and `room/stood_up`. Test (`crates/skills/tests/it/skills.rs`): `a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up`. The count and the rest are kept in memory, and through a short restart on the same boot beside the holds ("A hold kept across a restart"): a reboot begins them again. Only with a trigger, not with `each`. Tests: `a_skill_rests_*`, `a_run_noticed_*`, `with_the_policy_asked_only_a_run_made_*`, `asking_the_policy_a_hello_made_and_not_noticed_rests` |
-| `[present]` | no | The skill's values with `LAMP_NUDGES_PRESENT=on` in the loading process's environment (#5207; off unless set, and set in the product's `lamp-skills.service`, `lamp-skills-manage@.service` and `lamp-cloud.service`): `lamp-skills`, the manage helper (`lamp-skills-manage@`) and `lamp-cloud` (the skills page and report) each read it, so it is set in all three together: each key it gives stands in for the same key of the file whole (a `[present.trigger]` is the whole trigger, a `[[present.while]]` list every condition, a `[[present.do]]` list every step). Only `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask` and `do` (`PRESENT_KEYS`): when and how often a skill starts itself and what it does, never what it may read or use, its kind, its tool or its `[stop]`. The file as written and the file with them are both checked at every load, switch on or off, so a `[present]` that would not load refuses the skill (`[present]: why`). Read by `lamp_skills::load` at each load; `load_with` takes it as an argument. A case's `present = true` replays the skill with them. On a product lamp: Sip of water, Comfort break, Welcome back and the wellbeing group's `[budget]` (below) |
+| `[present]` | no | The skill's values with `LAMP_NUDGES_PRESENT=on` in the loading process's environment (#5207; off unless set, and set in the product's `lamp-skills.service`, `lamp-skills-manage@.service` and `lamp-cloud.service`, and in `lamp-voice.service` for a skill's state told by voice, `LAMP_SKILL_STATE_TOLD`): `lamp-skills`, the manage helper (`lamp-skills-manage@`) and `lamp-cloud` (the skills page and report) each read it, so it is set in all three together: each key it gives stands in for the same key of the file whole (a `[present.trigger]` is the whole trigger, a `[[present.while]]` list every condition, a `[[present.do]]` list every step). Only `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask` and `do` (`PRESENT_KEYS`): when and how often a skill starts itself and what it does, never what it may read or use, its kind, its tool or its `[stop]`. The file as written and the file with them are both checked at every load, switch on or off, so a `[present]` that would not load refuses the skill (`[present]: why`). Read by `lamp_skills::load` at each load; `load_with` takes it as an argument. A case's `present = true` replays the skill with them. On a product lamp: Sip of water, Comfort break, Welcome back and the wellbeing group's `[budget]` (below) |
 | `[stop]` | no | A function by which a person stops what the skill starts itself (#1685): `tool`, its name, as a `tool`'s (a lowercase letter, then at most 47 lowercase letters, digits and `_`; not the skill's own `tool`; one skill's, as a tool's name is, but for one shared by skills of one `[budget]` group: then it is one function for all of them, described with the first one's `about` in folder order, with a yes-or-no, `all`, beside `how`; called without `all`, it stops the one of them that started or was asked last, and with `all` (or before any of them has) every one, the words naming which, as "Done: none of the sip of water nudges until tomorrow morning." The four wellbeing skills share `wellbeing_nudges` so a session counts it once: a product session already declares 31 of its 32), and `about`, when the model calls it, 1 to 512 bytes with no control characters (`about = "When someone asks you to stop the stretch breaks, for today or for good, or to have them again."`). It is one function in the tools file, with one choice, `how`: `snooze`, nothing the skill starts itself until the next local 06:00 (12 h on with the local time not known); `off`, nothing until it is turned `on`; `on`, as before, a snooze or an off lifted. A chance that comes meanwhile is spent. What a person asks of the skill's own `tool` is not stopped. The model is answered with words to pass on, as a tool's say note: "Done: none of these until tomorrow morning. Tell them so in a few words."; another `how`, or none, is refused with "Say how: snooze, off or on." A snooze is in memory, kept through a short restart on the same boot beside the holds ("A hold kept across a restart"); a reboot forgets it. `off` is kept with `--state-dir DIR` as one line in `DIR/off`, the skill's name and nothing else (no person, no time), written whole beside it, synced, and moved over it, the folder synced after, so a power cut leaves the old file or the new one whole and the move holds (the reviewer's P3), and read at the start, so off stays off across a restart; `on` takes the line away. A line that is not a skill's name is passed over; one of a skill not loaded is kept, for when it is put on again. The product's unit gives `--state-dir /var/lib/lampos-skills-state` (`StateDirectory=lampos-skills-state`, mode 0700, the folder #1732's daily journal shares). Without `--state-dir`, off lasts until the program stops, and the model is told "only until the lamp restarts". Counted against a session's 32 as any skill's function, and reached through `use_skill` with `LAMP_USE_SKILL=on`, its `how` as the call's `choice`; `lamp-skills list` counts it. Only with a trigger, not with `each`, whose items' runs are news *(chosen)*. Tests (`crates/skills/tests/it/skills.rs`): `a_skills_stop_*`, `off_is_kept_as_one_line_*`, `the_program_keeps_a_skill_off_across_a_restart`, `the_program_forgets_a_snooze_at_a_restart` |
 | `[ask] policy` | yes, with a trigger | The Policy's question asked before anything is done *(chosen: required, since every trigger is something the lamp starts itself)*. A tool's call is not asked about: a person asked for it. Not with the core grant `sleep` (#940), which asks nobody, the Policy or `LAMP_SKILLS_ASK`: the night's sleep is the creature's own, as Expression's built-in sleep was |
 | `[[do]]` | at least one | The steps, in order. Within one table: body, then light, then say, then sound, then remind |
@@ -253,7 +262,7 @@ must not leave a step silently undone)*.
 | `do.body.mood` + `do.body.for` | no | A pose held: only `"reading"` (#1011: the head looks down at the desk and the arm leans forward). Sent to `mood.sock` as `{"mood":"reading","level":0}` when the step is made and again every second for `for` (more than 0, at most `2m`); the body lets it go 1.5 s after the last, and comes back. One without the other is refused. With `toward` (#1679), -1 to 1, the place across the camera's picture the base turns toward, as it would to a face seen there, sent as `{"mood":"reading","level":0,"toward":-0.5}` ([body.md](body.md), "Reading: a look down at the desk"); only beside `mood = "reading"`. A tool's call whose run would turn so, while the body listens on no gaze socket (lamp-body binds it only with a measured `--gaze`, which a factory lamp lacks), is refused before anything moves: the model is told `CANNOT_TURN` ("I can't turn toward it… ask them to move it in front of you"), and the pose already held stays (#5766's P2; test `a_turn_toward_a_place_is_refused_aloud_by_a_body_with_no_gaze`). A skill's newer pose ends its older hold, and a call again whose run has no pose ends it: one skill's two holds never take turns at the head |
 | `do.light` | no | A file in `lights/`, written as its name, or a table in place. A file `lights/NAME.toml` holds the same keys. `{ colour, level, for }`, with an optional `pattern = { kind, period, low }` (#940 item 3: `breathe`, `candle` or `pulse`; the period its kind's default when none, 6 s for a breath (4–12 s), 1.5 s for a candle (1–4 s), 4 s for a pulse (3–6 s); `low` only for a breath, from 1, its default, to under `level`; a candle at `level` 3 or more, a pulse at 2 or more; a pattern needs `level` named; no blink, flash or rainbow: a lamp is not a machine), asks the actions part for `light_colour`, then steps the light to `level` (1 to 5) with `light_brighter` or `light_dimmer` calls, counted from the level `light/state` shows; with that level not known it is left and the run says so. `for` holds the light in a run with no say. `{ dim = N }` asks for `light_dimmer` N times. A light is held until the run ends (the say ends, the run's longest `for`, or its last clip ends, whichever is last) and is then given back. With `until = "ends"` (#1021), only in a skill with a trigger and no `tool` (a tool's run has no trigger to end it), a dim, or a colour (#1681: Not feeling well's pale breath), is held instead until the trigger that ran it stops holding (its test fails past its `gap`), or its topic's newest value expires (its header's `expires_ms`), or, when that value names no lifespan, its topic says nothing for 15 minutes, or a reload (the folder is looked at every 2 s) finds its skill removed, no longer dimming `until = "ends"`, or with no trigger at that place in the skill on the same topic; then it is given back, but only if the light is still as the run left it (on, the colour and the level its steps left: N steps under, at the lowest, or the colour at its level): a light someone changed meanwhile is left as it is. The run stays under way meanwhile. A skill reloaded with the same trigger (its place in the skill and its topic) and still dimming `until = "ends"` keeps its hold, whatever else was edited: its end comes as before *(chosen: an edit is not an end, and a removed skill or trigger has nothing left to end its hold, the reviewer on #1066)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), the end is told whether or not it said `say_now`, and is let pass when no run holds anything; a `say_now` that comes after that end (the trigger's own, or a reload's) does nothing. With `LAMP_LIGHT_REQUESTS=on` it is asked of the ring instead, and the person's light is never touched (#940, below); a dim or a colour held `until = "ends"` is asked of the ring until its trigger ends, its pattern with it, and then given back the same way; through the actions part a colour's pattern is steady. A colour held `until = "ends"` takes no `for` and no `keep`: it has no while of its own, and it is given back, so it is never the person's. With `no_brighter = true` (#3691), only with a colour, a `level` and no `keep`, the light is never brighter than the person's as `light/state` shows it as the run begins: its level at most theirs, a breath's `low` under that, and steady at level 1, where no breath goes lower (Not feeling well's pale breath over a person at level 1 is a steady white 1); over a light that is off nothing is asked and the journal says `the light is off: no light brighter than the person's`; with the light not known it is asked as written. Or `{ out = true }` (#1677): the light shown, off (the ring's ember, never dark), asked only of the ring with `LAMP_LIGHT_REQUESTS=on`; through the actions part it is left alone and the run says so (`light out: left alone, since only the ring puts it out`), since that would turn the person's own light off and keep it so across a restart. No light on: left alone. With `over` (1 to 60 s, `LightRequest::FADE_MS`) the ring fades into it over that long, as falling asleep ([presence.md](presence.md)), and `done` says `light out: asked of the ring, faded into over 30000 ms`; with `until = "ends"` it is held and given back as a dim is. `out` takes no colour, dim, level, for, pattern or `no_brighter`, and `over` goes with `out` only *(chosen, until a skill needs a slow colour)*. With `keep = true` (#1679), only in a skill its `tool` alone starts and only with a colour, no `for` and no pattern, the light is the person's, as if they had asked for the colour and the level themselves: set through the actions part whatever `LAMP_LIGHT_REQUESTS` says, never given back, and set again by a call while the run is under way (Light scenes: a scene changed while the head is down). Or `{ relative = { warmer, dimmer }, for, pattern = { kind = "breathe", period } }` (#1672), only in a skill its triggers start, with no tool: steps from the person's light as `light/state` shows it as the run begins, `warmer` 0 or 1 along white then warm (warm, orange and other colours are kept), `dimmer` 0 to 4 levels, not both 0; `for` is required and the breath takes no `low`. With the breath the light stays at the person's level and breathes down the `dimmer` steps and back; without one it is steady that many levels down. It is always at least one level under the person's light and never over it, a `dimmer` of 0 counted as 1: a clamped warmth is never the visible change (#1672: "one visible level, never the colour"; #2655: "down, never up"). At level 1, off or not known, nothing is asked and the journal says why (`the person's light is at its dimmest: no evening glow`, `the light is off`, `the light shown is not known`). With `warm_at_dimmest = true` in `relative` (#3691, Glad and Lively), only with `warmer = 1`, a person at level 1 whose colour can still warm (white) is asked the warmth alone, steady at level 1, for its `for`: no level up, no breath; already warm, or a colour they chose, nothing, as without it. It is then a colour light like any other, given back after its `for` |
 | `do.show` | no | A light show (#1679), `shows/NAME.toml`: its `[[light]]` frames, 2 to 30, each `colour`, `level` (1 to 5) and `for` (2 s to 20 s), with a `pattern` as a light's, the whole show a minute at most: slow enough to read as a light that changes, never a flicker. Each frame's light in turn, asked of the ring with `LAMP_LIGHT_REQUESTS=on` (its breaths move) or set through the actions part (steady), then the light given back as any light of the run. It stops before its next frame, looked at every 200 ms, once the body is pushed, the lamp paused or words of a later turn than the one that asked are heard on `voice/heard` (someone spoke), as a search ends (`SearchStop`; lamp-skills reads `voice/heard` while a skill has a show, as it does for `[search]`, so words of the asking turn heard after the call do not stop it), and the light is given back then; the journal says `show NAME: stopped in frame N of M, someone spoke to the lamp`. The voice listening alone does not stop it: on lamp-52e6 a line of room sound, 0 words heard, stopped a show in its third frame (#5744), and now the show plays on and says `show NAME: M frames shown` (tests `a_line_with_no_words_does_not_stop_a_light_show`, `a_later_turns_words_stop_a_light_show`, `the_asking_turns_late_words_do_not_stop_a_light_show`). Only with `voice/heard` not readable does the voice listening stop it. Only in a skill its `tool` alone starts: a show is played only when a person asks, never on its own. Needs `light` |
-| `do.say` | no | A note for the voice to say in its own words, through the voice's say service (#954). One a skill. The run's other steps are made, in their order, when the voice begins the say, so the look and the light come with the words, and none if it is never begun. A light changed is given back when the say ends. A light asked of the ring is covered by the Speaking face while the voice speaks, unless `LAMP_SKILL_LIGHT_SPEAKING=on` (El on #1722, off unless set): then the face is tinted by it, in its colour, its least glow always level 3's (0.44 of the ceiling) whatever level the skill names, so a skill can't brighten it, as the expressions' accents ride over it ([ring-choreography.md](ring-choreography.md)). In a tool's run the note goes to the model in the call's answer instead. Or `{ from = "schedule" }` or `{ from = "tasks" }`: words the voice keeps itself and says when asked, the reminder due or the news of work handed over (#939, (c), the first builder's 12:32). The voice keeps their delivery (a reminder's acknowledgement, news told once); the skill says when, and moves and lights with them as with a note. The words the person hears are the skill's own, `[news.words]` and `[reminder.words]` (below), which the voice reads from the installed `skill.toml` each time it says one, with the skill's ask or without (#940); the framing, the quoting and cutting of the task's and the answer's words, and the delivery stay the voice's. Sent to the say service as `from` in place of `note`, at priority 8 for `schedule` and 5 for `tasks`. Any other `from`, another key beside it, or a `from` in a skill with a `tool` refuses the skill: what the voice keeps is said when a trigger starts the skill, never from the model's call (Fourth on #1033). Or a table of the skill's own words (#1684): `{ text = "..." }`, said as written, sent as the say service's `text` byte for byte, or `{ note = "..." }`, a note as above; each 1 to 900 bytes with no control characters, or a list of 2 to 16 different such lines (#3997, Head pat's seven), one picked by the time the run is made and never the one the skill picked last (`next_line`, test `a_line_never_comes_twice_in_a_row_and_every_line_still_comes`), so the words stay in the skill's file (`MOST_SAY_LINES`; test `head_pats_response_is_chosen_in_its_file`; an older lamp-skills refuses such a skill whole, as any key it does not know), with an optional `priority`, 0 to 8 (5 without it; 9 is the voice's own), and `expires`, 1 s to 1 h (30 s without it): not begun by then, the say is `expired` and its run makes nothing. A step's `text` that is one of the voice's fixed lines (`lamp_voice::language::is_fixed`: Smoky air's, Dusty air's and each of Head pat's, `FIXED_LINES`) is sent as the say service's exact words (`text` with `"exact": true, "quiet": true`, #5999, as #5777's `[unplug]` lines): rendered in the owner's language with no model turn, so the chat model can't decline or reword it, kept in the thread as the lamp's, and played once the person isn't talking and the room is as quiet as a say at its priority needs (below, "A say's priority"; test `a_skills_exact_line_waits_for_the_rooms_quiet_then_is_said`). On an English lamp such a line is rendered once and kept in the speech cache. Like any exact line it is refused while the lamp is muted or paused, and with no speech cache. Any other step's `text` (a made, routine or Store skill's, or a fixed line reworded in its file) stays a `text` the model is told to say as written (tests `exact_words_reach_the_voice_unchanged_at_their_priority`, `the_skills_word_for_word_lines_reach_the_voice_as_exact_fixed_lines`). A watch's line (Guard mode's "I'm off guard.") is not a step and still goes as a `text` the model is told to say as written ([speaking-first.md](speaking-first.md#asked-by-another-part-the-say-service-939)). Any other key, both `text` and `note`, or the table in a skill with a `tool` refuses the skill: the model answers a call in its own turn, so a tool's say is the note for it. Below, "A say's priority, the voice's turns, and sleep" |
+| `do.say` | no | A note for the voice to say in its own words, through the voice's say service (#954). One a skill. The run's other steps are made, in their order, when the voice begins the say, so the look and the light come with the words, and none if it is never begun. A light changed is given back when the say ends. A light asked of the ring is covered by the Speaking face while the voice speaks, unless `LAMP_SKILL_LIGHT_SPEAKING=on` (El on #1722, off unless set): then the face is tinted by it, in its colour, its least glow always level 3's (0.44 of the ceiling) whatever level the skill names, so a skill can't brighten it, as the expressions' accents ride over it ([ring-choreography.md](ring-choreography.md)). In a tool's run the note goes to the model in the call's answer instead. Or `{ from = "schedule" }` or `{ from = "tasks" }`: words the voice keeps itself and says when asked, the reminder due or the news of work handed over (#939, (c), the first builder's 12:32). The voice keeps their delivery (a reminder's acknowledgement, news told once); the skill says when, and moves and lights with them as with a note. The words the person hears are the skill's own, `[news.words]` and `[reminder.words]` (below), which the voice reads from the installed `skill.toml` each time it says one, with the skill's ask or without (#940); the framing, the quoting and cutting of the task's and the answer's words, and the delivery stay the voice's. Sent to the say service as `from` in place of `note`, at priority 8 for `schedule` and 5 for `tasks`. Any other `from`, another key beside it, or a `from` in a skill with a `tool` refuses the skill: what the voice keeps is said when a trigger starts the skill, never from the model's call (Fourth on #1033). Or a table of the skill's own words (#1684): `{ text = "..." }`, said as written, sent as the say service's `text` byte for byte, or `{ note = "..." }`, a note as above; each 1 to 900 bytes with no control characters, or a list of 2 to 16 different such lines (#3997, Head pat's seven), one picked by the time the run is made and never the one the skill picked last (`next_line`, test `a_line_never_comes_twice_in_a_row_and_every_line_still_comes`), so the words stay in the skill's file (`MOST_SAY_LINES`; test `head_pats_response_is_chosen_in_its_file`; an older lamp-skills refuses such a skill whole, as any key it does not know), with an optional `priority`, 0 to 8 (5 without it; 9 is the voice's own), and `expires`, 1 s to 1 h (30 s without it): not begun by then, the say is `expired` and its run makes nothing. A step's `text` that is one of the voice's fixed lines (`lamp_voice::language::is_fixed`: Smoky air's, Dusty air's and each of Head pat's, `FIXED_LINES`) is sent as the say service's exact words (`text` with `"exact": true, "quiet": true`, #5999, as #5777's `[unplug]` lines): rendered in the owner's language with no model turn, so the chat model can't decline or reword it, kept in the thread as the lamp's, and played once the person isn't talking and the room is as quiet as a say at its priority needs (below, "A say's priority"; test `a_skills_exact_line_waits_for_the_rooms_quiet_then_is_said`). On an English lamp such a line is rendered once and kept in the speech cache. Like any exact line it is refused while the lamp is muted or paused, and with no speech cache. Any other step's `text` (a made, routine or Store skill's, or a fixed line reworded in its file) stays a `text` the model is told to say as written (tests `exact_words_reach_the_voice_unchanged_at_their_priority`, `the_skills_word_for_word_lines_reach_the_voice_as_exact_fixed_lines`). A watch's line (Guard mode's "I'm off guard.") is not a step and still goes as a `text` the model is told to say as written ([speaking-first.md](speaking-first.md#asked-by-another-part-the-say-service-939)). Any other key, both `text` and `note`, or the table in a skill with a `tool` refuses the skill: the model answers a call in its own turn, so a tool's say is the note for it. **`may_end_unsaid = true`** (#6543, a note only; `true` or `false`, else the skill is refused, as with exact `text`): the voice may let the note go, unsaid, when its moment passes before the voice begins it, someone heard or the face at the lamp when it was asked gone from view for a second since, as fresh eyes saw (a stale presence file is no leaving) (`lamp_voice::say::moment_passed`, [speaking-first.md](speaking-first.md#asked-by-another-part-the-say-service-939)). It is answered `unsaid` with why, the run's `done` says `say: unsaid (someone started talking)` or `say: unsaid (the person turned away)`, nothing of the run is made, and what its start spent is given back as for a write waiting for the owner's yes (`Engine::unwritten`, see `do.write`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch; it comes again the next time its trigger holds. The journal says `SKILL's note ended unsaid: its group's hour, cooldown, day's count and rest are given back`. Opt-in: a skill without it sends the voice the same line as before and is said or expires as before; no shipped skill names it. Tests: `a_note_ended_unsaid_gives_its_run_back`, `a_says_may_end_unsaid_needs_a_note_and_no_shipped_skill_has_it`, `a_spoken_note_keeps_its_start` (a run that ends otherwise keeps its start, `Engine::kept`, so a later unsaid end gives back nothing of it), the voice's `say::tests::through_the_socket_a_note_that_may_end_unsaid_is_let_go`. Below, "A say's priority, the voice's turns, and sleep" |
 | `do.cue` | no | Only `"hum"`: a fixed quiet sound through Say, without a file. Shares the single say/sound slot and is refused on model-callable skills |
 | `do.rest` | no | `{ op = "rest", during = { from, to } }`, or `op = "wake"` / `"cancel"` without a window. Automatic non-item triggers only; leased to Expression. Wake must complete before accompanying presentation; unknown operations are refused. A rest may add `resettle = { most, after, during = { from, to } }` (most 1 to 3, after 5 s to 10 m): a rest a night sound ended (the voice listening, never a turn) settles again once the voice has rested `after` and a fresh empty `humans/faces/tracked` says no one is in view, inside `during`, with no run and no daily claim; a turn or a face ends the night's rest (#1672, [bedtime-morning.md](bedtime-morning.md#settling-again-after-a-night-sound)) |
 | `do.sound` | no | A file in `sounds/`, written as its name: `sound = "ding"` plays `sounds/ding.wav` (#938). Checked at load by the voice's own check (`lamp_voice::say::read_sound`), and the skill refused with why: a regular file, not a link, of at most 148,140 bytes; a WAV of 16-bit mono PCM at 24 kHz (the speaker path's rate), 1 frame to 3 s; no 10 ms of it louder than -30 dBFS RMS (well under the lamp's speech) and no sample past -12 dBFS. Played by the voice, through its say service (`LAMP_SAY=on`) as `{"sound": PATH}`, the file's absolute path; the voice reads it again, only from under the skills folder, and plays it as a turn of its own, so it never overlaps speech ([speaking-first.md](speaking-first.md), the say service). A lamp not at rest as a say needs it (paused, muted, speaking, listening, owing an answer, a reminder due, within 15 s of its last turn) does not play it, nor a second sound within 30 s, and the voice refuses it at once, never later; the run's `done` says why (`sound: refused (the lamp is speaking)`). One say or sound a skill: the run's other steps are made when the voice begins it, as with a say. Refused in a skill with a `tool`: a tool is called while the voice answers |
@@ -265,8 +274,8 @@ must not leave a step silently undone)*.
 | `do.requested_audio` | no | A fixed relative `.wav` path, only in a tool-only skill with `permissions.speak = true`: exactly one short plain `say` confirmation, then one `requested_audio` step with `after = "say"`. No other actions, triggers (including daily clock triggers), conditions, choice/flag arguments, output limits, history, search, watch, stop, quiet hours or nudge limits (`most_a_day`, `active`, `budget`, `rest`). The ordinary `again` guard and `still` note remain available and confer no audio authority. Voice plays at most 60 seconds of checked 24 kHz mono PCM16 under the same spoken owner after confirmed confirmation retirement. Advertisement and execution require exact `LAMP_REQUESTED_AUDIO=on`; pack/install may validate while off. See [requested audio](requested-audio.md) for private context, leases, revocation and asset bounds |
 | `do.remind` | no | A timer or reminder set in the lamp's schedule (#6066): `{ at = "HH:MM", words = "..." }` through the actions part's `set_reminder` (the next local `HH:MM` from the run), or `{ in = D, words = "..." }` through its `set_timer` (D from the run, `1m` to `24h`, whole seconds), the same calls the voice makes when a person asks, with `LAMP_SCHEDULE_TOOLS=on` in `lamp-actions`. It needs that function in `[permissions] actions` (`set_reminder` or `set_timer`), checked at load and again at the call. `words` are the skill's own fixed text, never the model's, with a made skill's say limits (`remind::plain_words`): at most 120 characters, one or two sentences, no web address, no quotes, braces or backticks, no control or format character; anything else refuses the skill at load. Only in a skill a trigger starts, never one with a `tool` (a person asking for a reminder asks the voice, which says its time back), and not in a step for some choices. Manners: a skill sets at most 3 in any 24 hours (`remind::MOST_A_DAY`, counted when the set is asked, kept while the program runs as `most_a_day` is), and never stacks one: before a set it reads the schedule's `list_reminders`, and words already set and not yet said (case and spacing aside) mean nothing new; a list it can't read whole sets nothing. The read-back is the schedule's: the run's journal says `set, due HH:MM` only for a `committed` answer, with its `clock`, and never the words. The call names no caller, so the reminder is the room's: said to whoever is at the lamp when it comes due. It reads no memory and writes nothing beyond the schedule's entry. Tests: `tests/it/remind.rs` and `a_remind_step_is_made_through_the_actions_part` |
 | `do.read` | no | A read of one of the owner's linked services (proposal #5288, `LAMP_SKILL_READS=on` in `lamp-skills` and `lamp-services`, on in the product units): `{ service, what, ... }`, any service with a fixed read (not the send-only `gmail-app`, the MCP services or Ahrefs), any of its fixed reads, never one that gives a whole text or a free-form one (a GraphQL `query`, `get` on any path, an MCP `call`; `lamp_services::spoken::skill_read_refused`, held again by `lamp-services` at its door), a calendar's `events` with `day = "today"` or `"tomorrow"` (`service_read::ReadFile`). The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "read" }` and `speak = true`. `lamp-skills` reads it itself through `lamp-services`' tools socket, once a local day, when the owner's known face is alone in view and steady 5 s, no voice was heard in the last minute and the lamp is not private, paused or in quiet hours (waiting up to 60 minutes, then skipping the day unsaid), and says the count and then each item's short line as exact text, judging the gate again before each; someone coming stops it with "I'll tell you the rest later." The journal keeps counts and the gate's outcome only ([services.md](services.md), "A made skill's read"). A read refused because the service isn't linked says nothing, unless `LAMP_SKILL_LINK_NOTE=on` (with `--state-dir`; off): then it says `lamp-services`' "<Service> isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." once, behind the same gate, kept per skill in the state folder's `link-noted` until a read succeeds again ([services.md](services.md), "Not linked at the run") |
-| `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 10 times a skill and 30 across every skill in any 24 hours. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
-| `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 3 a skill and 10 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
+| `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 50 times a skill and 200 across every skill in any 24 hours, and 5 a skill in any hour. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
+| `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 20 a skill and 100 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
 
@@ -608,7 +617,8 @@ skills".)
   its interface as #939 agreed it, before #954 is merged: one line
   `{"skill","note","priority":5,"expires_in_ms":30000}` (or `"from"` and its priority in place of `"note"`; or, from a say table, `"text"` or `"note"` with the table's `priority` and `expires_in_ms`, #1684), then a `begun`
   line when the voice starts the turn, then one outcome (`spoken`,
-  `dropped`, `expired` or `refused`). A run waits for it in a thread of its
+  `dropped`, `expired` or `refused`; or `unsaid`, never begun, for a note
+  sent with `"may_end_unsaid": true`, #6543). A run waits for it in a thread of its
   own, one a skill at a time: a trigger while its run is under way is told
   in `done` as `not made: its last run is still under way`. A run of one
   item of a list (a trigger with `each`) is its own news instead: it waits
@@ -784,7 +794,7 @@ other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
 on, no hello of its own (#2825), and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
-A skill with a tool costs one of the 32 functions a Live session takes (48
+A skill with a tool costs one of the 32 functions a Live session takes (64
 on the second route's chat requests, `second_provider::MAX_TOOLS`), after
 the voice's own and the actions part's: a product lamp's are 31
 (`crates/update/tests/functions.rs`). Past 32 a core skill's function is
@@ -947,6 +957,58 @@ An exact or ranked say accompanying that wake still waits for correlated
 completion and carries the original transition's `start_before_us`. Its
 authored `expires` cannot extend that deadline, and changed definitions or
 an expired permit refuse the request before the Say socket write.
+
+### A number from the reading in a note (#6543, B3)
+
+A say table's `note` may name one field of the topic whose reading fired
+the run, in braces, and the note is said with that reading's value there:
+`say = { note = "They've had {drank_seen} drinks this sitting; suggest a short break." }`
+on a trigger of `humans/doing_more` that tests `drank_seen` reads "They've
+had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
+
+- **Numbers only, checked at load.** The field must be one that every
+  trigger that can run the note tests as a number (`above`, `below` or
+  `rise`, never in `each`), so the number is the same field whichever
+  trigger fired. A choice's step, a field tested by `equals`, by no
+  trigger, or by only some of the triggers running the note, gives no
+  number. No word, name or label from a topic reaches a note this way.
+- **Meant for counts.** A slot is for a count the person would hear said
+  back as a count: lamp-seen's per-sitting counts on `humans/doing_more`
+  (`drank_seen`, `ate_seen`, `tired_seen`). Any number field of a topic the
+  skill reads could be named, but a note never says face, presence or
+  distance numbers (`humans/faces/tracked`, `humans/presence`, a nearness),
+  which only choose a step; a reviewed skill is held to that.
+- **A whole number, 0 to 1,000,000.** The value is filled rounded down, as
+  the topic holds it. A `_s` field stays whole seconds (`tired_s_ago` 1800 is
+  "1800"); the model phrases the note, so it may say "half an hour", but a
+  skill wanting minutes words its note around seconds or reads a minutes
+  field. A negative value, or one above 1,000,000, is a wrong reading:
+  dropped, never said as "-3".
+- **No number, no slot.** With the field missing, `null`, a word, a
+  boolean, out of range, or a run with no reading (a tool's), the note is
+  said without it, the space around the slot closed up: "They've had drinks
+  this sitting; …". A note never carries `{drank_seen}` or `None`.
+- **Read leniently, refused only for a new skill.** A note is a slot only
+  when it has exactly one `{`, one `}` after it, a field name between them
+  (letters, digits, `_` and dots) and words besides, and its field passes
+  the check above. Any other note is said as written, braces and all, as
+  before slots: a lone `}`, `{a short break}`, two slots, `{{`, or a field
+  the triggers do not give. A plain `say = "…"` and exact words (`text`)
+  keep their braces too. So a skill already on a lamp, made by voice, from
+  the Store or pushed, never stops loading for a brace. A new skill is held
+  to the slot at make, pack and install (`Skill::made_refuses`): a note
+  whose braces are no slot is refused ("any other brace is said as
+  written"), and so is a `{field}` in a plain say or exact words ("filled
+  in a note only").
+- **Per sitting.** The number is what the topic holds when the trigger
+  fires. lamp-seen's counts are per sitting, wiped on `room/stood_up`, a
+  forget or a stranger (B4), so a skill words it "this sitting", never
+  "today".
+- **Unchanged without it.** A note with no braces is the same note as
+  before. No shipped skill has a slot yet.
+
+Tests (`crates/skills/src/lib.rs`):
+`a_note_says_one_number_from_the_reading_that_fired_it`.
 
 ### Four additions to V2
 
@@ -1415,8 +1477,9 @@ sitting.
   `all` stops), its snooze still to end, and its `[rest]` (its last nudge,
   whether that is still being judged and what was noticed of it so far,
   the nudges nobody noticed in a row, and until when it rests); by
-  `[budget]` group, its runs within the last hour and the members still
-  waiting for it (first come, first served). Every time in it is on the
+  `[budget]` group, its runs within the last hour, its runs on this local
+  day for `per_day` (with that day, #6543) and the members still waiting
+  for it (first come, first served). Every time in it is on the
   monotonic clock, so it means the same after a restart. Written at once
   when any of it changes, but for when a waiting member was last held back:
   that changes at each message it waits, so it is written only with the
@@ -1635,8 +1698,22 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
-  lamp). With `LAMP_TASK_NET=on` (off, set in no unit) one more, `net`
-  ("reaches the internet"): the run keeps the lamp's network; never one of
+  lamp). With `LAMP_TASK_NET=on` (off in the product until its checks; once on, in lamp-tasks, lamp-skills
+  and its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
+  ("reaches the internet"): the run, held like every run, reaches the
+  public web on ports 80 and 443 through its own egress socket (a proxy
+  and DNS inside the run, every address checked by lamp-tasks: never the
+  lamp's own networks (the router's home address among them) or the
+  lamp's local ports, though the router's public address isn't blocked
+  and a run's DNS questions go to the lamp's resolver; docs/tasks.md,
+  "An agent skill's run and the `net` grant"). With lamp-update's one run
+  path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) the run goes
+  through Harness as every skill's run, and its wrapper finds its egress
+  socket and fresh home by its run id; a run the lamp's agent can't be
+  given its way out (OpenClaw the default, or a wrapper whose round hasn't
+  run) is refused `no_net`, not counted, and the lamp says "I can't run
+  that one: it needs the internet, and this lamp's agent can't reach it
+  yet." (`task::NO_NET_SAID`; docs/tasks.md, "On the one run path"). `net` is never one of
   lamp-control's own, so the yes holds it and the token never names it. An unknown one refuses the skill. A pushed skill is held to its
   computer's own grants for them too (`package::grants_asked`).
 - **First kind only.** A skill with a `do.task` loads only when its script
@@ -1811,8 +1888,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`tool_choice`, `skill_write_yes::approve_force`, given wherever
   `make_skill` is declared, before every other force: with the switch off
   it forces only a made skill's remove's answer, "Removed by voice"),
-  whose `approve_id` form also takes `answer`: `yes`, `no` or `unclear`
-  (left out: `yes` for a voice make's writes or
+  whose `approve_id` form also takes `answer`: `yes`, `no`, `unclear` or
+  `new_ask` (left out: `yes` for a voice make's writes or
   code, as before; `unclear` for a skill's task or an app's make with
   code, so a forced call with no answer never keeps a yes). Code decides when; the model decides what (#6835 gap
   2, the first builder's option (b) on #6811; on lamp-52e6 on 13 Nov the
@@ -1836,12 +1913,21 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   keeps nothing, ends the wait and the lamp says it stays off
   (`skill_write_yes::DECLINED_NEXT`); `unclear` keeps nothing and the lamp
   asks once more (`UNCLEAR_NEXT`), and a second `unclear` ends the wait as
-  a `no` (`skill_write_yes::answered`). The forced round is told only
-  `approve_id` and `answer` of `make_skill`'s form, both required
+  a `no` (`skill_write_yes::answered`); `new_ask`, a line that answers
+  nothing asked but asks something new (another skill named, another
+  thing asked), keeps nothing, ends the wait, and the model is told to say
+  NAME stays as it was, then to do what that line asked
+  (`skill_write_yes::new_ask_next`, for a remove `remove_left_next`), so a
+  new ask is never forced into a yes. A `yes` is bound to its skill
+  (#7545): `named`, the skill the line names or `none`, must be the
+  waiting skill's own name or `none`, else the yes is read as `new_ask`;
+  a forced `yes` with no `named` reads as `unclear` ("Removed by voice",
+  "A yes bound to its skill"). The forced round is told only
+  `approve_id`, `answer` and `named` of `make_skill`'s form, all required
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
   make or edit beside the answer. A `no` or `unclear` is read before the
   owner check, so anyone's (a guest's too) ends or re-asks the owner's
-  wait and never keeps a yes; an `answer` outside these three reads as
+  wait and never keeps a yes; an `answer` outside these four reads as
   `no`; two answers in one line are taken in call order, each as its own.
   The journal: "the line after a
   skill's task said back whole: its first round must call make_skill",
@@ -1861,7 +1947,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   said on the next "desk check" that it was "already approved and is
   running" and called nothing). In a busy room the yes is heard within the
   thread's 45 s from the end of the say-back as played, not from its start
-  (#6749 C, docs/second-voice.md). Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
+  (#6749 C, docs/second-voice.md). With `LAMP_SKILL_YES_CARRY=on` (off by
+  default, #7148), a yes no face was seen saying is carried as the known
+  person's for 45 s from that same end, not from the start of their last
+  exchange, and a short one is read by the short-line rule (#7422);
+  another face or a second face in view still refuses it
+  (docs/second-voice.md). Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
   folder's SHA-256 said aloud is asked again no sooner than a day later; at
   most 3 asks said across every skill in any 24 hours; one the voice did
   not say (refused, dropped, expired, the voice not reached; one played to
@@ -1886,8 +1977,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   asks again"); either way the lamp asks for the yes aloud (below), and the
   journal adds what became of that ask. lamp-control off or not reached
   hands nothing over and asks nothing ("lamp-control, which keeps the
-  owner's yes, can't be asked"). Then one at a time a skill, and at most 3 a skill
-  and 10 across every skill in any 24 hours (`task-runs.json` in
+  owner's yes, can't be asked"). Then one at a time a skill, and at most 20 a skill
+  and 100 across every skill in any 24 hours (`task-runs.json` in
   `--state-dir`; an unreadable ledger or one with a run after now counts as
   full). A run is counted as it is handed over, and taken back off the
   ledger when lamp-tasks refused it before its agent began (the fixed
@@ -1897,19 +1988,68 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
   spent the day's last run, and the skill that came due 4 s later found
   none.
-  With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, in
-  no product unit; `task_sure`), two more things. **A failed run is told**
+  With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, on
+  in the product; `task_sure`), two more things. **A failed run is told**
   (`task_sure::failed_line`): when lamp-tasks answers `ok:false`, or no
-  answer comes, one short fixed line is said to the owner behind a told
-  answer's gate (below: the owner alone, quiet hours, the lamp's one read
-  turn; `LAMP_TOLD_WHEN_ASKED` lifts the quiet as for a told answer), never
-  the task's words nor lamp-tasks' message: `missing_secret` "<Skill>
+  answer comes, one short fixed line is said to the owner, never the
+  task's words nor lamp-tasks' message (`service_read::tell_failed`, the
+  first builder's 21:25 on #7363). **In the conversation that asked for
+  the run** (a run now the owner asked for by voice, or the voice model's
+  call of a skill's own tool whose run has a task, e.g. "run my bitcoin
+  price skill now" calling `btc_price`; the line ready within 45 s of the
+  ask, `task_sure::in_asking_conversation`), it is said then,
+  as that conversation's answer, the way "<skill> is running now" was:
+  exact words to the say service with `"answers": true`, and no read's
+  gate (no face, no minute of quiet). The voice lets such a line through
+  a conversation going on, as the unplug's lines (`Says::exact_answers`),
+  only while its own record says the owner ran that skill now by voice
+  within 45 s (`made_run::answers_now`, `ANSWERS_WITHIN`, the thread's
+  `GOING_ON_FOR`); otherwise it waits as any exact line; `answers` goes
+  only with exact text. That record is kept in the coordinator, where the
+  say service reads it: on the second route the run is made in the
+  worker's process, which tells the coordinator `MadeRunNow` (skill name
+  only, `made_run::ran_of`: a run now's `{"run", "ran": true}`, or the
+  `{"task_run": NAME}` lamp-skills adds to its answer to the voice's call
+  of a skill's tool when it marks that run, `mark_voice_asked`; never
+  another peer's call) over its channel, and the coordinator keeps
+  it (`made_run_now`, trace `made_run_now`); the Live worker tells it
+  the same way (El's P1 on #7363). The record is keyed by the skill's
+  name alone, so any say-socket caller naming that skill within those
+  45 s is let through as its answer: exact words only, the same trust as
+  `prepare-unplug`'s lines. The journal says `do.task: what became of its
+  run: said in the asking conversation`. A line the voice may have said
+  but whose outcome was lost (the say socket timed out or closed with it
+  queued) counts as said and is never said again as news; only one surely
+  never played (`expired`, `refused`, or `dropped` before it began) falls
+  to news (`answer_outcome`). **Otherwise it is news**
+  (`service_read::tell_news`): a trigger's run, a line ready later, or one
+  the voice didn't say as the answer (`not said in the asking conversation
+  (<why>), so as news: …`) waits behind a told answer's gate (below: the
+  owner alone, the lamp's one read turn) and is said once, the next time
+  the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
+  (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
+  quiet hours`), never held through them. A run now asked by voice whose
+  answer, what its agent found or its failure, is ready within five
+  minutes of the ask has its quiet lifted for five minutes more, with
+  `LAMP_TOLD_WHEN_ASKED` or with this switch on (`quiet_ask`,
+  `lift_quiet`): the lift is in the gate's own look (`LampRoom::seen`,
+  `told_when_asked::quiet_holds`), so those minutes are not quiet hours
+  there, and neither a found answer nor news is held or dropped for them.
+  The product sets this switch and not `LAMP_TOLD_WHEN_ASKED`: on
+  lamp-9adf (18 Nov, 00:11) "Lamp, use my bitcoin price skill." had its
+  agent's answer kept and then held unsaid by quiet hours. The answer in
+  the asking conversation (`answers`) is the failure line's alone; what
+  the agent found still goes behind a read's gate, with the quiet lifted.
+  Before, the line waited up to
+  an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
+  "Fig facts is running now." was followed by nothing. Lines:
+  `missing_secret` "<Skill>
   couldn't run: it needs a key added
   in the app, on its page."; any other refusal before its agent began, or
   lamp-tasks not reached, "<Skill> couldn't run this time."; `run_failed`,
-  no answer or anything else "<Skill> didn't finish this time.". The
-  journal says `do.task: what became of its run: told 1` (or the gate's
-  outcome). Before, only the journal had it, even after the voice said
+  no answer or anything else "<Skill> didn't finish this time.". As news,
+  the journal says `do.task: what became of its run: told 1` (or the
+  gate's outcome). Before the switch, only the journal had it, even after the voice said
   "<skill> is running now". **A run refused `busy` waits its turn**
   (`task_sure::Line`, `task_sure::LAMP`): lamp-tasks runs one skill's task
   at a time, so of two due at one minute (a morning's mail and its
@@ -1943,7 +2083,7 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   A run that is only `do.task`s is checked first, read only
   (its folder known, then `task::would_refuse`: the switch, `--state-dir`,
   its last under way, the bounds): refused, nothing is handed over, the run's `Done` says "not
-  made: " and why (say "not made: the skills' 10 runs in 24 hours are
+  made: " and why (say "not made: the skills' 100 runs in 24 hours are
   spent"), and a model's call is answered with an error that nothing is
   running and why (`TASK_NOT_RUN`), never "Done." (lamp-9adf, 15 Nov). A
   run with other steps makes them at once, its task still refused on its
@@ -2014,7 +2154,7 @@ and version and held to the add-on limits, for a judge. Without
 | Music sway (#1669) | core | Once, a slight sway when music has played a while, never while the lamp speaks or listens, at night, or more than twice an hour. On `ears/classes`, which the product's ears say with the YAMNet released with the update (#6232); on in the product since #5770 ([creature.md](creature.md), "Music") |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). From the Skills Store, never the product's install (`NOT_PRODUCT_SKILLS`); its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` (or `LAMP_MESSAGES=on`) in `lamp-cloud`, which the product's unit sets since #5752 ([messages.md](messages.md), "Unasked texts") |
-| A sip of water, Rest your eyes, Stand up, Wind down (#1685) | core (since 25 Oct) | The wellbeing nudges beyond Stretch break, each with one short line the voice words (the owner, 25 Oct: "talk to the user"), only when nothing has been heard or said for 5 s and the lamp itself has been quiet 30 s, beside: a slow blue breath after 90 minutes at the desk (10:00 to 17:00); a small tilt and a shade softer light after 45 (09:00 to 20:00, once an hour); a turn and a tilt after 100 minutes of Stretch break's sitting (08:00 to 20:00); a droop and a shade of dim until they leave, in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes, never from bedtime on, the night then Bedtime and Morning's). Each has `most_a_day`, `[active]`, `[quiet]`, `[rest]`, Stretch break's `[[while]]` on `room/activity` (never while someone reads or writes head down, #1678; nothing without the eyes' `LAMP_ACTIVITY`), a second on its `sitting_s` (above the trigger's `for`, `unknown = "holds"`: the sitting is the sitter's own, since the eyes begin it again when someone else sits down, so a face in the chair for 90 minutes that was two people is no 90-minute sitting; cases `a-sip-when-the-eyes-say-the-same-sitting` and `not-when-someone-else-sat-down`), one shared `[stop]`, `wellbeing_nudges` (the one that came last, or `all`), and `[budget] group = "wellbeing"`, `per_hour = 1`, with Stretch break: one an hour between them. In the product's install (`PRODUCT_SKILLS`) since 25 Oct, on |
+| A sip of water, Rest your eyes, Stand up, Wind down (#1685) | core (since 25 Oct) | The wellbeing nudges beyond Stretch break, each with one short line the voice words (the owner, 25 Oct: "talk to the user"), only when nothing has been heard or said for 5 s and the lamp itself has been quiet 30 s, beside: a slow blue breath after 30 minutes at the desk (10:00 to 17:00); a small tilt and a shade softer light after 45 (09:00 to 20:00, once an hour); a turn and a tilt after 100 minutes of Stretch break's sitting (08:00 to 20:00); a droop and a shade of dim until they leave, in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes, never from bedtime on, the night then Bedtime and Morning's). Each has `most_a_day`, `[active]`, `[quiet]`, `[rest]`, Stretch break's `[[while]]` on `room/activity` (never while someone reads or writes head down, #1678; nothing without the eyes' `LAMP_ACTIVITY`), a second on its `sitting_s` (above the trigger's `for`, `unknown = "holds"`: the sitting is the sitter's own, since the eyes begin it again when someone else sits down, so a face in the chair for 30 minutes that was two people is no 30-minute sitting; cases `a-sip-when-the-eyes-say-the-same-sitting` and `not-when-someone-else-sat-down`), one shared `[stop]`, `wellbeing_nudges` (the one that came last, or `all`), and `[budget] group = "wellbeing"`, `per_hour = 1`, with Stretch break: one an hour between them. In the product's install (`PRODUCT_SKILLS`) since 25 Oct, on |
 | Head pat, Head pat wiggle (#3997, #4133) | core (since 29 Oct) | A pet on the head, the pads taking turns (`controls/pet`, `LAMP_HEAD_PET=on` in the product's lamp-controls): a small wiggle of the base 2 s after every pet, and a short line at most once in 10 s, the design owner's choice at the lamp. #4133's design owner's yes after the lamp check on lamp-06c1 (#3997, 29 Oct) |
 | A comfort break (#3504) | core, on in the product by its `[present]` (#5207) | V1's bathroom-break reminder, which the owner asked to bring back (the lead's list, 27 Oct): after two hours of Stand up's sitting (`near = 0.14`, `gap` 2 minutes, the eyes' `sitting_s` above 7199), 09:00 to 20:00, one short line the voice words, that it's a good moment for a short break. It never names a place or a need (its line, its `SKILL.md` and its name; test `a_comfort_break_never_names_the_bathroom`), and it is held while anyone else is in view (`faces_at_most = 1` for a minute; its `wait` 30 minutes keeps the chance, then lets it go): never said in front of others. Once a sitting, twice a day, `[quiet]` 22:00 to 08:00, `[rest]`, and the wellbeing group's `[budget]` and `[stop]` (`wellbeing_nudges`, whose `about` it carries, since it comes first in folder order). In the product's install since #5207, off by its own `enabled = false`: with `LAMP_NUDGES_PRESENT=on`, which the product's skills units set, its `[present]` puts it on, after 90 minutes (`sitting_s` above 5399), three a day, in the wellbeing group's two an hour 30 minutes apart; its played check on a lamp is still owed (switches.md) |
 | A meal check (#3504) | installable | V1's meal reminder, which the owner asked to bring back (the lead's list, 27 Oct): two named triggers, `lunch` (`during` 11:30 to 13:30) and `dinner` (18:30 to 20:30), each on a face at the desk (`near = 0.14`, `gap` 2 minutes) for 75 minutes of its window, so the question comes from 12:45 or 19:45 and not to someone who went out to eat. One open question the voice words, whether they've had lunch or dinner yet, naming no food, menu or place (test `a_meal_check_names_no_food_and_takes_no_picture`); held while anyone else is in view (`faces_at_most = 1` for a minute, its `wait` 30 minutes, ended by the window's end). Once a window (`cooldown` 120 minutes), twice a day, `[quiet]` 22:00 to 08:00, `[rest]`, and the wellbeing group's `[budget]` and `[stop]`. It does not hear whether they spoke of eating: that would read what was said. Not in the product's install (`NOT_PRODUCT_SKILLS`) until its played check on a lamp |
@@ -3414,6 +3554,22 @@ gone ([switches.md](switches.md)). What happens:
      is held whatever its length, its name or a question, with
      `LAMP_SECOND_OWN_ECHO` on or off and in the private room; its request
      is kept and an approval in it refused.
+   - **The name alone answers nothing** (`skill_write_yes::line_heard`;
+     lamp-9adf, 17 Nov 13:58): a line that is a call with nothing past
+     it, as the second route asks the model it (told it was a call, the
+     coordinator having heard the name alone: "Hi Lamp", "Lamp ơi"; the
+     name alone as the coordinator reads it, `attention::only_the_name`:
+     "Hello Lamp?"; the route's own name alone; or no words at all),
+     carries no answer to any wait here, yes, no or unclear: `make_skill`
+     with the `approve_id` in it is answered
+     `skill_write_yes::NAME_ONLY_NOT_TAKEN`, nothing changes, its round is
+     not forced to answer, its note gives no `approve_id`, and the wait
+     goes on for the next line. The lamp's answer to the call ("Yes? I'm
+     here.") does not stand between the say-back and that next line, so
+     its round is forced and its line awaited as before. State, not words:
+     the route and the coordinator already judged the line a call. On 9adf
+     an app's make with code (Gmail) said back, then a lone "Hello?" heard
+     as the name, was put on by the forced round's yes.
    - **Read back, and agreed to then** (the owner, 11 Nov;
      `make_skill_local::read_back`): a write skill still waiting for its
      yes (its make's turn cut, no answer then, or a "no") is heard again
@@ -3820,7 +3976,21 @@ gone ([switches.md](switches.md)). What happens:
      above 0; every day at 22:00, `clock/local`, `known`, `true`,
      `rearm = "ends"`, `during = { from = "22:00", to = "22:01" }`; beside
      it only `for`, `cooldown`, `rearm`, `during` and `days`. The
-     part named is cut to 110 bytes. On lamp-74ff, 10 Nov 17:39, an app make of "glow green
+     part named is cut to 110 bytes. Before that, a `[trigger]`, its
+     `sooner` or a `[[while]]` reading a topic the lamp doesn't have, or a
+     field its message doesn't carry, is refused and repaired with the
+     topics it has and their fields (`made_skill::unread`, `READABLE`,
+     #7357: lamp-c0a4, 16 Nov, a `device/temperature` trigger nothing
+     sends). A topic the lamp has is one `lamp_msgs` declares
+     (`lamp_msgs::declaration_of`, and the 12 it leaves out, held by a test
+     to every `TOPIC` in `lamp_msgs`) or `clock/local`
+     (`made_skill::lamp_has`), not a second list by hand; the fields are
+     checked only on `READABLE`'s topics, and a declared topic outside
+     them (`body/hand`, `expression/state`) keeps its loosened path, said
+     in general words. The system prompt lists `READABLE`
+     (`readable_named`), and the
+     repairs used up, the person hears "the lamp has nothing that reads
+     that" (`NOTHING_READS`). On lamp-74ff, 10 Nov 17:39, an app make of "glow green
      when I come back to my desk" was written on the faces, as the built-in
      welcome back is, and refused twice, its repair told only the keys a
      trigger may have. The making model's system prompt says the same
@@ -4076,7 +4246,8 @@ gone ([switches.md](switches.md)). What happens:
    - any other refusal: "the lamp's check didn't let it on".
    Never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
    `make_skill` is nobody's. Taking a made skill off (the app's remove, or
-   `{"off": NAME}`) is unchanged; by voice, see "Removed by voice" below.
+   `{"off": NAME}`) is unchanged; by voice, see "Removed by voice" and
+   "Turned off and on by voice" below.
 9. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, with one more try after a failure; repairs after
    a refusal are begun only while one more ask still ends within
@@ -4106,8 +4277,30 @@ gone ([switches.md](switches.md)). What happens:
     `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
     agree before it sends anything. I couldn't tell you just now what it
     sends, so it sends nothing yet." (no word to repeat, no "yes"; test
-    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). While the
-    make is under way, or its line is still to be said
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). A skill
+    with code of its own whose say-back is said so waits as an app's make
+    with code does (`skill_write_yes::said_by_the_say_service`, #7245): no
+    model round saw the make's answer, so the person's next line after the
+    say-back said whole is forced to answer the wait
+    (`skill_write_yes::approve_force`); on c0a4 (17 Nov 19:43) a 116 s
+    OpenClaw make outlived its turn and the "yes" after its say-back called
+    nothing (test
+    `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    Its line there is its say-back word for word, "I made fruit notes. The
+    lamp's model wrote its code, and that code may use … It waits for you
+    to agree before it runs any code." (a task for the lamp's agent: "I can
+    have the lamp's agent do …" and its own say-back), never the cut turn's
+    "ask me for it again", and the say service tells the model to say it
+    word for word as an app's make's (`app_make::say_note`): on c0a4 (17
+    Nov 22:39) that cut line went as a note in the person's words, was said
+    in 136 chars, the say-back was never heard whole, and the "yes" after it
+    was told to hear it again, so nothing was forced or kept (tests
+    `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
+    `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes,
+    a code make that also sends included, keep `made_skill::cut_write_line`:
+    only the cut code line (`made_skill::cut_code_line`) is replaced.
+    While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
     say may wait up to an hour, and the question is not held that long:
@@ -4283,7 +4476,8 @@ and put on. Any other turn claiming a make with no call is still held. Test:
 `a_not_made_notes_made_claim_is_held`.
 
 A made skill with code of its own that is not on is never said to be on
-(`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, in no unit;
+(`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, on in the product's
+lamp-voice;
 `crate::made_not_on`). On lamp-9adf (16 Nov, build 13383) a voice make the
 lamp's agent wrote took about four minutes; its say-back ended "It waits for
 you to agree before it runs any code.", and the person's "Yeah." came over
@@ -4337,8 +4531,9 @@ a read-back that found no "moon-fax", since nothing in `make_skill` named a
 remove and a read-back takes only the exact name). A skill the person made
 is removed through `make_skill` itself, its `remove` alone: the name as
 heard (`made_remove::REMOVE`). It is a parameter of the function the voice
-has, never a function of its own, as the voice is at its 48
-(`lamp_gemini::MAX_TOOLS`). Whether a line asks to remove a skill is the
+has, never a function of its own, as the voice keeps its functions few
+(the second route's bound, `second_provider::MAX_TOOLS`, was full at 48
+when this was built; it is 64 since #7433). Whether a line asks to remove a skill is the
 model's judgment, told in the function's description ("To delete or
 remove a skill, call it with remove alone; to run one they made now,
 run alone; to list those they made, made alone; say nothing first.", the
@@ -4393,8 +4588,40 @@ code (`made_remove::asked`):
   only. The person's next
   line has its round 1 forced to `make_skill`
   (`skill_write_yes::approve_force`, as a skill's task's answer is), with
-  `approve_id` and `answer` (`yes`, `no` or `unclear`, left out read as
-  `unclear`): code decides when, the model what they answered.
+  `approve_id`, `answer` (`yes`, `no`, `unclear` or `new_ask`, left out
+  read as `unclear`) and `named`: code decides when, the model what they
+  answered.
+- **A yes bound to its skill** (#7545, Twelve's and El's HOLDs on #7561).
+  The forced form also takes `named` (`skill_write_yes::NAMED`), the
+  skill the person's line names, its name alone as they said it, or
+  `none`. The model fills it; code reads a `yes` whose `named` is neither
+  `none` nor the waiting skill's own name (`made_remove::same_name`: the
+  whole name, as a made skill's name is written, within a quarter of its
+  letters, never a run inside longer words, so "moon fact" is not "moon")
+  as a `new_ask` (below), so a yes never removes another skill than the
+  one asked about, whatever label the model gave the line. A forced
+  wait's `yes` with no `named` reads as `unclear`. The same holds for a
+  skill's task and an app's make with code, whose forced form is the
+  same. The note of the wait gives the waiting skill's name to copy into
+  `named` ("named \"rain joke\" if their line names this skill") and says
+  a line naming that skill answers the question, never `new_ask`: on
+  lamp-9adf (#7561's row, 17 Nov 23:4x) "Yes, remove rain joke." after
+  "Remove rain joke?" was answered `new_ask` and the wait dropped. The
+  name matches in any case, with hyphens, underscores or spaces alike. The journal: "… was a new ask, not an answer (a yes naming
+  OTHER, not NAME): nothing kept, the wait dropped", or "a yes to NAME's
+  wait named no skill: read as unclear".
+- **Only an answer to that question.** A line that answers nothing asked
+  but asks something new (another skill named, another thing asked) is
+  the model's `new_ask` (`skill_write_yes::NEW_ASK`), told in `answer`'s
+  parameter and in the note of the wait: the remove is dropped, nothing is
+  removed, and the model is told to say it left NAME as it is, then to do
+  what that line asked, as for any line
+  (`skill_write_yes::remove_left_next`); a later yes finds nothing
+  waiting. On lamp-9adf, 17 Nov 18:12, "Remove mail count?", then "Lamp,
+  remove the joke time skill" was forced to a yes, no or unclear, was
+  taken as the yes, and mail count was removed. The journal: "the line
+  after NAME's question was a new ask, not an answer: nothing kept, the
+  wait dropped".
 - **Removed only on the yes.** `yes` takes it off: one that is on, its
   folder in the skills folder gone on as that very package (its
   `.package.json`'s SHA-256 the one kept), through the manage helper's own
@@ -4410,7 +4637,11 @@ code (`made_remove::asked`):
   SHA-256 is said not removed. Taken off but `made.json` not written, the
   lamp says NAME "is off the lamp, but still listed among the skills they
   made", and the journal says so too (`"still_listed"`). The lamp says "NAME is removed."
-  (`skill_write_yes::removed_next`). `no` keeps it and ends the wait ("NAME
+  (`skill_write_yes::removed_next`); if the same line asked for more
+  ("Yes, and remove the joke one too", El's P2 on #7561), the model does
+  that in the same turn, as for any line, so it is never lost: another
+  remove gets its own question and wait, and nothing more is removed
+  without its own yes. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
 - **No extra round trip.** The match reads two local folders and the made
@@ -4440,7 +4671,79 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `second_provider::tests::remove_words`:
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
-`no_force_before_the_question_is_said_whole`.
+`no_force_before_the_question_is_said_whole`,
+`the_forced_round_may_answer_that_the_line_is_a_new_ask`,
+`a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
+`a_yes_naming_another_skill_removes_nothing_and_is_answered`,
+`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; and
+`made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
+`a_yes_naming_another_skill_removes_nothing`,
+`a_yes_is_taken_only_for_the_asked_skill`,
+`skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
+`a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`,
+`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`.
+
+**Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
+alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"
+called `make_skill`'s `remove`, the only verb it had for a made skill, and
+the lamp asked "Remove coffee time?": a yes would have lost the skill for
+good). A skill the person made is turned off, paused or stopped through
+`make_skill` itself, its `turn_off` alone, and back on through its
+`turn_on` alone: the name as heard (`made_turn::TURN_OFF`,
+`made_turn::TURN_ON`), parameters of the function the voice has, as a
+remove's. Which one a line asks is the model's judgment, never a list of
+words: the function's last sentence becomes "To turn off, pause or stop one
+they made: turn_off alone, never remove; back on: turn_on; delete: remove;
+run now: run; list: made; say nothing first."
+(`make_skill_local::TURN_OFF_TOLD`, 151 bytes to the 149 of the sentence
+it replaces, so every switch on still fits the link's 1,024), `turn_off`'s
+parameter says "turn off, pause or stop a skill they made, which keeps it
+to turn back on ... Never remove for this", and `remove`'s says "delete or
+remove a skill for good, never to turn one off, pause or stop it". A call
+that carries a turn-off is read before the remove, so a turn-off never
+becomes a remove. Then, in code (`made_turn::asked`):
+- **The owner's alone, heard.** A turn nobody spoke changes nothing; a line
+  not the owner's (`services::owner_hears`, as a run) changes nothing and
+  names no skill ("only the lamp's owner can turn a skill they made off or
+  on by voice").
+- **Only the person's own.** The name is matched as a remove's is
+  (`made_remove::found`); one they didn't make, several as near, or none
+  near are said so, as for a run. One not on the lamp now, or whose folder
+  there is not the package made, is said not turned, and why.
+- **As the app's switch.** It is turned by the manage helper's own
+  `{"off": NAME}` or `{"on": NAME}` (`made_turn::turned_by_helper`), the
+  very lines the app's switch asks (`lamp-cloud`'s `skills.off` and
+  `skills.on`), kept in lamp-skills' `off` file, which a round and a
+  restart keep. It stays a made skill, on the lamp, and nothing waits: no
+  yes, since nothing is lost and "turn it back on" undoes it. The model is
+  told to say, in a few words, in the conversation's language, that NAME
+  is off and that they can say turn it back on whenever they like ("Coffee
+  time is off. Say turn it back on whenever you like."), never that it is
+  removed; or that NAME is on again. A refusal is said as not turned, and
+  why.
+- **A remove still asks first.** "Remove coffee time?" and the owner's yes,
+  as above (#6960). A turn of that very skill drops its remove still
+  waiting (`skill_write_yes::drop_remove_of`), turned or not: "Remove
+  coffee time?", "no, just turn it off" leaves no waiting note naming it,
+  and a later yes takes nothing. A remove of another skill stays.
+- **No extra round trip.** The match reads two local folders, then one line
+  to the manage helper over its local socket, at most 8 s.
+
+Off (unset, or anything but `on`), `make_skill`'s description and
+parameters, and every answer, are byte for byte as before.
+
+Tests: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing`,
+`turn_on_clears_the_off_state`, `the_helper_is_asked_the_apps_off_and_on`,
+`a_stranger_cant_turn_one_off_or_on`,
+`only_their_own_made_skill_on_the_lamp_is_turned`,
+`a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
+`switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
+`remove_still_waits_for_its_yes`, `a_turn_drops_a_remove_of_the_same_skill`,
+`switch_on_a_turn_call_is_routed_as_a_turn` and
+`switch_on_a_turn_off_with_a_remove_is_a_turn_off` (through
+`make_skill_local::answer`); and lamp-skills'
+`made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch`,
+through the real manage helper.
 
 **Listed by voice** (lamp-9adf, 15 Nov, build 13162: "which skills have you
 made for me?" called nothing and was answered from the last few turns, two
@@ -4472,8 +4775,9 @@ and `make_skill_local::tests::a_made_script_is_offered_to_the_voice_with_its_swi
 (named with every switch on, within the bounds).
 
 **Asked about by voice** (`LAMP_SKILL_STATE_TOLD`, #7335; off unless set,
-in no product unit yet; the owner, 16 Nov: "is my water reminder on or
-off?" was answered "I don't know if it's on or off"). With the switch,
+on in the product's `lamp-voice.service` with `LAMP_NUDGES_PRESENT=on`;
+the owner, 16 Nov: "is my water reminder on or off?" was answered "I
+don't know if it's on or off"). With the switch,
 `use_skill` (`LAMP_USE_SKILL`, "A lamp with many skills") takes `about`,
 the skill as the person said it, its name or what it does, given alone
 (`skill_about::ABOUT`), on both routes: a parameter of the function the
@@ -4514,17 +4818,87 @@ no network:
   one in its description, each weighed by how few skills have it) in full,
   with what it does (its description, cut at 400 bytes), when it last ran
   by itself when that is kept, and, for a skill whose `[[do]]` hands a task
-  over, whether that task waits for the owner's yes (asked of lamp-control
-  through the manage helper once, for the first such skill, with
-  `LAMP_SKILL_TASKS` on); and to answer from these alone, never guess, say
+  over, whether that task waits for the owner's yes (asked of the manage
+  helper and lamp-control once, for the first such skill, with
+  `LAMP_SKILL_TASKS` on, both within 1.5 s together,
+  `skill_about::YES_CHECK_MOST`, so first audio isn't held; a yes itself
+  still waits 8 s for each. Either not there or not answering in time is
+  never a wait: `waits_for_yes` is left out and `waits_for_yes_unchecked`
+  says "the lamp can't check right now whether its task waits for the
+  owner's yes", `skill_about::task_waits`); and to answer from these alone, never guess, say
   what isn't given isn't kept, and say no skill on the lamp is that one when
-  none is (a reminder they set is not a skill). Which skill they mean is the
-  model's. The answer is about 3 to 5 KB with 65 skills on the lamp.
+  none is (a reminder they set is not a skill), and only to answer:
+  "offer to change, turn on or turn off nothing" (on lamp-9adf "is my plant
+  watering skill on?" was answered none, then "say so and I'll turn it
+  off"). Which skill they mean is the model's. The answer is about 3 to 5
+  KB with 65 skills on the lamp, and never past what the link carries
+  (`tools::sendable`, the provider's 4,096 bytes less 16; past it Live gets
+  no answer at all): skills' lines are left out from the end, then the
+  nearest, and how many is said in `skills_left_out`
+  (`skill_about::fit`); one that still doesn't fit is told the lamp can't
+  check its skills right now.
+- **A reminder may be a skill.** On lamp-9adf (#7335's row) "Lamp, is my
+  water reminder on or off?" called `list_reminders`, not `use_skill`, and
+  with no reminder set the lamp said "No water reminder is set", while Sip
+  of water and Drink water reminder were on. With the switch, every
+  `list_reminders` answer through the schedule (`tools::run_call_with_scope`,
+  which both routes' calls reach; `skill_about::with_reminders`) carries,
+  beside the schedule's own words, `skills_on_the_lamp`: every skill's line
+  as above, and `skills_note`: "A reminder they ask about may be one of the
+  lamp's own skills, each listed in skills_on_the_lamp with its state from
+  the lamp's records. When one fits what they asked, answer from its line
+  too, in a few words; never say a skill is off or missing unless its line
+  says so. Only answer: offer to change, turn on or turn off nothing."
+  Whether a skill fits is the model's; nothing in code reads the words. A
+  record there and unreadable gives only `skills_note`: "The lamp can't
+  check its skills right now: if they may mean one of the lamp's skills, say
+  you can't check that right now, and guess nothing."; the names and a turn
+  nobody spoke are as below (nothing is added to that turn's answer). An
+  answer that isn't an object is kept under `result`. A failed answer (not
+  answered, unavailable, or the schedule's uncertain `error`) is kept as it
+  is. The lines fit what the link carries as above, the schedule's own
+  words whole: lines left out from the end and counted in
+  `skills_left_out`, and with no room even for the note, nothing is added.
+  The schedule's route has no settings, so the voice's skills folder is
+  noted as its worker reads `--skills-dir` (`skill_about::note_tools_dir`)
+  for `holds.json`. Off, or any other schedule call, the answer is the
+  schedule's, byte for byte.
+- **A skill asked about may not be one they made.** On lamp-9adf (#7335's
+  row) "Lamp, do I have a skill that reads my calendar when I sit down?
+  Did it last run?" called `make_skill` for the list of the skills they
+  made, and the lamp said it saw no such skill, while
+  read-calendar-when-sitting, added from a file, was on. With the switch,
+  a `make_skill` answer that tells the person about their skills without
+  making or asking anything (`skill_about::tells_their_skills`) carries
+  `skills_on_the_lamp` and `skills_note` the same way, through
+  `make_skill`'s route (`tools::run_call_with_scope`): the list of those
+  they made (`made`), whatever it says, and a run, a remove or a read-back
+  (`run`, `remove`, `read_back`) answered with an `error` (none found by
+  that name, more than one, not theirs, not here) and no `approve_id`
+  awaited. The note: "A skill they ask about may be any skill on the lamp,
+  not only one they made: each is listed in skills_on_the_lamp with its
+  state from the lamp's records, whether made here, added from a file,
+  from the Store or the lamp's own. When one fits what they asked, answer
+  from its line too, in a few words, though the words above name only
+  those they made; never say they have none like it, or that it is off,
+  unless its line says so. Only answer: offer to change, turn on or turn
+  off nothing." With a record unreadable: "The lamp can't check its other
+  skills right now: if they may mean a skill they didn't make, say you
+  can't check that right now, and guess nothing." A make, a clash's
+  choice, a yes, a read-back or remove that waits for a yes, and a turn
+  nobody spoke are untouched, and so is an unavailable `make_skill`; the
+  lines fit what the link carries as for reminders; off, every
+  `make_skill` answer is as before, byte for byte.
 - **Never a guess.** A record there and unreadable (the skills folder, the
   `off` file, `holds.json`, a skill's `SKILL.md` or `skill.toml`) tells the
   model only that the lamp can't check its skills right now. A missing
-  `off`, `holds.json` or pushed folder is nothing turned off, held or
-  pushed.
+  `off` or pushed folder is nothing turned off or pushed. A missing
+  `holds.json` is unknown, not nothing: lamp-skills writes it at its first
+  turn whenever it runs (an empty one too) and removes it when a write
+  fails, so with none a skill on by its files is told "on, its snooze
+  can't be checked right now" in its line and "on, but whether it is
+  snoozed or resting, and when it last ran, can't be checked right now" in
+  full, never plain "on".
 - **Names to the owner.** A skill made here (`made: here`) is named only
   when the owner hears (`services::owner_hears`, asked only when there is
   one), as a list's names are; to anyone else it is left out and counted
@@ -4542,7 +4916,9 @@ call naming no skill. Tests: `skill_about::tests` (on, off, snoozed, resting,
 `[present]`, a skill named by what it does, one not on the lamp, records
 that can't be read, the owner's names, the bounds, `use_skill`'s parameters with the switch and without),
 `tools::tests::a_question_about_a_skill_adds_no_function`,
-`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`, and
+`tools::tests::a_question_about_a_skill_is_answered_through_use_skill`,
+`tools::tests::a_reminders_answer_carries_the_skills_only_with_the_switch`,
+`tools::tests::a_made_skills_list_carries_the_skills_only_with_the_switch`, and
 `process::tests::the_memory_switches_alone_reach_the_started_routes`.
 
 **Run now by voice** (lamp-9adf, 15 Nov at 15:49 and 15:52: "Run my unread
@@ -4597,8 +4973,8 @@ first."). Then, in code (`made_run::asked`):
   lamp-9adf at 21:40 a run now was said to be running while another
   skill's write held lamp-tasks, which then refused it as busy); or a task
   that `task::would_refuse` says the
-  hand-over would refuse (its `PER_SKILL` = 3 runs in 24 hours spent, every
-  skill's `ALL_SKILLS` = 10 spent, its last task still under way, tasks
+  hand-over would refuse (its `PER_SKILL` = 20 runs in 24 hours spent, every
+  skill's `ALL_SKILLS` = 100 spent, its last task still under way, tasks
   off); a read whose switch is off, or that ran on this local day already
   (a read is once a day, as `read_service` holds it); a write whose switch
   is off or whose writes are stopped. What passes starts as a trigger's
@@ -4735,26 +5111,44 @@ task's words given as data. Tests:
 **What the agent found is said to the owner** (the make rules' "comes back
 as the lamp's task news" had no path: on lamp-9adf, 15 Nov, build 13135,
 `morning-unread-mail` read Gmail 19 times, ended idle, and nothing was
-said). A run granted a linked service's read ends with the agent's last
-answer in lamp-tasks' answer (docs/tasks.md, "What its agent found";
-`LAMP_AGENT_SERVICES=on` in lamp-tasks, as in the product), and
+said). Every task's run, whatever its grants (a linked service's read, a
+`net` read of the web, or none; the owner, 17 Nov), ends with the agent's
+last answer in lamp-tasks' answer (docs/tasks.md, "What its agent found"),
+through a runner that keeps it: Harness's, from its chat, or the make's
+runner in a fresh home (an uploaded agent skill's `scripts/SKILL.md` run, a
+keyed run, a `net` run off the one run path), from what the agent was asked
+to write to its own folder's `answer.md` (a run Harness's runner starts
+with no Harness keeps none, so it is never told its answer is said; a
+fixed write's never tells), and
 `lamp-skills` says it to the owner as a `do.read`'s lines are said
 (`service_read::tell`): behind the same gate (the owner's known face alone
-in view and steady 5 s, no voice for a minute, not private, paused or in
-quiet hours, waited for up to 60 minutes, then skipped unsaid), in the
+in view and steady 5 s, no voice for a minute, not private or paused, not
+in the lamp's quiet hours or the skill's own `[quiet]`, as a `do.read`'s
+(`task::TaskStep::quiet`), waited for up to 60 minutes, then skipped
+unsaid), in the
 lamp's one read turn, one sentence a line as exact words (never a turn for
 the model, so what a mail says is never an instruction), the gate judged
 again before each, someone coming stopping it with "I'll tell you the rest
 later." The sentences are `task::told`'s: markdown's marks left out, each
-at most the say service's 900 bytes, at most 11. The skill needs no
+at most the say service's 900 bytes, all of them at most about 400
+characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person
+answers in a sentence or two) and 10 sentences, cut at the last sentence
+end inside (at its words when the first sentence alone is longer), then
+"There's more; ask me if you want it." (`task::MORE_LINE`). The agent is
+asked for a short spoken answer, one to three sentences, and to leave it
+empty (a lone dash, or an empty `answer.md`) when the skill already said
+it aloud, which says nothing (Heron's P3 on #7591). The skill needs no
 `speak`: the owner's yes to its read grant covers it. The journal says
 only how many were said (`do.task: what its agent found: told N`), and
 before it how much of the agent's answer lamp-tasks' answer carried, its
 length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
-begins, a read's or a told answer's, is said once with its reason
+begins, a read's or a told answer's, is said with its reason
 (`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
-answer held in quiet hours leaves a line (#7180). Its end is said as before
+answer held in quiet hours leaves a line (#7180); each change of that reason
+while it waits is said once more, at most one a second
+(`service_read::SAY_WHY_EVERY`), never each look, so a wait that holds on
+shows which condition held (lamp-9adf, 17 Nov). Its end is said as before
 (`told N`, or `skipped: quiet hours` after the hour); while it waits it is
 kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
@@ -4800,7 +5194,10 @@ with no read grant (a send, a script's task) tells nothing, as before.
 Tests: `task::tests::an_ended_runs_answer_is_told_a_sentence_a_line`,
 `service_read::tests::a_tasks_answer_is_told_behind_the_reads_gate`,
 `service_read::tests::a_wait_for_the_gate_says_why_once`,
-`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`.
+`task::tests::a_told_answer_a_restart_dropped_is_found_at_the_next_start`,
+`tests::a_task_step_loads_with_its_skills_own_quiet`, and
+`a_tasks_told_answer_is_held_to_its_skills_own_quiet` in lamp-skills'
+main.
 With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
@@ -4923,6 +5320,39 @@ the same code for both writers.
   lamp-9adf, 12 Nov 18:10, "every morning at eight, check the weather and
   tell me if I need an umbrella" was kept as DeepSeek's, a skill that only
   said "Check the weather now, please."
+- **With `LAMP_TASK_NET=on`, what only the internet tells is a task for the
+  agent** (lamp-9adf, 17 Nov: "when I say bitcoin price, check the Bitcoin
+  price on the web and tell me" was refused by DeepSeek and then by Hermes,
+  65 s, as both were told a price is "anything from the internet" a skill
+  can't find out). With `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`,
+  `LAMP_SKILL_TASKS` and `LAMP_UPLOAD_TO_AGENT` on in lamp-voice
+  (`make_no_cannot::net_by_agent`), the system prompt keeps `cannot:` for
+  a summary of mail or calendar content no read gives, and says instead
+  that what only the internet tells at run time (the weather or a
+  forecast, the news, a web lookup, a price) is looked up by the lamp's
+  agent each time, in a task the lamp sets up and reads back for the yes:
+  such a request, whenever it runs, is answered with one line and no
+  blocks, `internet:` and what it looks up (`make_no_cannot::NEEDS_NET`),
+  never `cannot:`. The model judges what needs the internet; no word list
+  does. That line, DeepSeek's or the agent's (whose rules file is the same
+  prompt), is never repaired and never handed to the agent to write
+  (`make_skill_local::net_made`): the make becomes one task for the lamp's
+  agent through the one more call below (`make_no_cannot::made`), whatever
+  `LAMP_MAKE_NO_CANNOT` says. Asked for by its words ("when I say bitcoin
+  price"), it is kept as an agent skill granted `net` and `speak`, said
+  back "I can have the lamp's agent do that, as bitcoin price: only when
+  you ask for it, it hands one task to the lamp's agent: “…”. The lamp's
+  agent does it, and it reaches the internet and speaks and plays sounds.
+  The first time you ask, I'll read it back and wait for your yes."; its
+  first ask reads it back and waits for the spoken yes, and its run
+  reaches the public web as docs/tasks.md, "An agent skill's run and the
+  `net` grant", has it. On a trigger ("check the Bitcoin price every day
+  at 9 and tell me"), it can have the internet too, by the owner's ruling
+  of 17 Nov: kept as a made agent task on its trigger granted `net` and
+  `speak` (below, "On a trigger"), said back with "it reaches the
+  internet", and waiting for the spoken yes. Its run gets its way out only
+  with that kept yes, as any `net` run (docs/tasks.md). Off, the prompt is
+  as before, byte for byte.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
@@ -4946,7 +5376,10 @@ the same code for both writers.
   line heard; the read-back bounds this, because the owner agrees to
   exactly the words said back. Its
   grants are checked against the ones there are (`make_no_cannot::covered`):
-  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); the camera only
+  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); `net` with
+  `LAMP_TASK_NET=on`, asked for or on a trigger (the owner's ruling of 17
+  Nov), and only beside the lamp's own `scripts/agent.py`
+  (`made_skill::code_held`, `put_on_scripts`); the camera only
   for a task asked for by its phrase, run right then, as a regular made
   skill may have it (`ASKED_CAMERA`; the first builder's ruling on #7261),
   never on a trigger (`WATCHING_GRANTS`: the camera and `look`); never the
@@ -5015,10 +5448,6 @@ the same code for both writers.
     - `net` with `LAMP_TASK_NET` off (`net_off`): "I can't make that one
       yet: it needs the internet, and skills on this lamp can't use the
       internet yet."
-    - `net` on a trigger (`net_made`): "I can't make that one yet: it needs the
-      internet, which a skill that runs on its own can't have yet. Ask me to
-      make it for when you say a few words instead, and the lamp's agent
-      will do it each time you say them."
     - A service with `LAMP_AGENT_SERVICES` off (`services_off`): "I can't
       make that one yet: it needs your linked services, and skills on this
       lamp can't use them yet."
@@ -5090,7 +5519,7 @@ the same code for both writers.
   `admin.sock`. Its terminal and tools work only inside that namespace,
   and no token is minted.
 - **On OpenClaw too, through the one run path
-  (`LAMP_MAKE_AGENT_ONE_PATH=on`, off unless set, in no unit; #7245).**
+  (`LAMP_MAKE_AGENT_ONE_PATH=on`, on in the product's lamp-voice; #7245).**
   With it, the make is handed to the lamp's agent whenever lamp-tasks says
   it takes runs, Hermes or OpenClaw (`make_skill_agent::ONE_PATH_ENGINES`),
   and its line carries `"one_path":true`. lamp-tasks keeps Hermes's
@@ -5102,8 +5531,25 @@ the same code for both writers.
   path"). OpenClaw can run only skill-start, so its run skips the guide's
   `lamp-skills pack`; the voice's checks and repairs are the same. A
   `cannot:` goes on verbatim to #7234's fallback. The journal says "the
-  lamp's agent is OpenClaw: handed over on the one run path". Off, only
-  Hermes is handed a make, as above.
+  lamp's agent is OpenClaw: handed over on the one run path". On a lamp
+  with no agent at all (no `lamp` target; #7375), a make DeepSeek keeps
+  is the make and the brief's own refusals stay as they are, but a make
+  the agent would have taken ends in one sentence, by voice and in the
+  app's `not_kept`: "I couldn't make that one: this lamp has no agent set
+  up to make it." (`AGENT_MISSING`). That is a make asking for a linked
+  service (with `LAMP_AGENT_SERVICES`), told at once with DeepSeek not
+  asked, never kept as a `do.task` no agent runs ("it asks for a linked
+  service (<code>): no agent on the lamp to make it: told so, DeepSeek not
+  asked"); and any other make DeepSeek fails after its repairs ("DeepSeek
+  failed and there is no agent on the lamp to hand it to: told so"). Only
+  lamp-tasks answering its targets with no `lamp` one is no agent
+  (`agent_tasks::surely_no_lamp_target`, one targets ask a make,
+  `Agent::lamp_agent`): a targets read that fails (lamp-tasks down,
+  restarting, slow, or answering `ok:false`) is not known, never
+  `AGENT_MISSING`, and DeepSeek makes it alone with its repairs, as before
+  ("the tasks part didn't say its targets: DeepSeek makes it alone, as
+  before"). Off, only Hermes is handed a make, as above, and a lamp with
+  no agent has DeepSeek make it alone.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
   12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
@@ -5226,6 +5672,30 @@ the same code for both writers.
   second after the lamp's last turn (`app_make::say_waiting_at`, once, not
   begun after 15 s). Never when the hand-over failed at once, nor when the
   turn was cut already. The made line is the same either way.
+- **With `LAMP_MAKE_AGENT_ONE_PATH` on (#7371).** An agent's make takes
+  about a minute (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
+  result), so the waiting line says how long: "This takes about a minute.
+  I'm on it." (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
+  through the say service alike). In the turn, a make still with no answer
+  85 s after its waiting line (`make_skill_agent::LONG_WAIT_AFTER`, about
+  90 s from the ask) says "It's taking a bit longer, but I'm still on it."
+  (`make_skill_agent::LONG_WAIT_LINE`) once, never again; the journal says
+  "the make has no answer 85 s after its waiting line: its one long-wait
+  line is said". No line repeats. Through the say service (no voice turn
+  waiting on the make) only the waiting line is said, never the long-wait
+  line: with no turn there is no thinking look to hold. A make that runs
+  out its time (`make_skill_agent::MAKE_WITHIN`, 120 s) says the long-wait
+  line at about 90 s and its failure line at about 120 s: two lines about
+  30 s apart, as meant, not a fault. The lamp shows thinking between the
+  waiting line and the result: once each waiting line's audio is sent its
+  generation completes (`GenerationComplete`, then `MakeWaiting`), so its
+  playback ends and ring and body show the thinking look
+  (`ring_wire::RingPhase::Waiting`) until the next audio; the answer then
+  plays under a new playback to its end and the turn settles. Off: today's line,
+  and no second. Tests: `the_one_path_waiting_line_says_how_long`,
+  `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
+  `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
+  and `a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer`.
 - **The journal.** "made by DeepSeek", "it asks for a linked service
   (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
   service's code, never the person's words), "the agent (Hermes) made none
@@ -5435,7 +5905,8 @@ today's checks.
    its folder's SHA-256 (`task::folder_sha256`) stay as they were put on:
    - `[budget] group = "wellbeing"` at `per_hour = 1`
      (`made_skill::MANNERS_GROUP`, `MANNERS_PER_HOUR`) with no `gap`, no
-     `give_back_unsaid` and no `[stop]`: it no longer shares the nudges'
+     `give_back_unsaid`, no `per_day`, no `follows_count` and no `[stop]`:
+     it no longer shares the nudges'
      hour and gap;
    - `most_a_day = 3` (`made_skill::MANNERS_MOST_A_DAY`).
 
@@ -5471,8 +5942,8 @@ today's checks.
    (lamp-voice).
 
 Unchanged with it on: a write's read-back and the spoken yes on its
-content's SHA-256; the sends, at most 10 a skill and 30 across all skills
-a day (`lamp-services`, which doesn't read the switch); the privacy
+content's SHA-256; the sends, at most 50 a skill and 200 across all skills
+a day, 5 a skill an hour (`lamp-services`, which doesn't read the switch); the privacy
 refusals; #6071's code grants and yes.
 
 Tests: `made_skill::tests::loosened_*` (the four, on and off,
@@ -5527,7 +5998,15 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    above; the detail journaled) and the lamp says it too,
    `made_skill::not_made_line` (a plain line of its own, or "I couldn't
    make that: " and the model's own reason) as a say note in the conversation's language
-   (`not_made_in_their_language`). Every such note, made or not, begins
+   (`not_made_in_their_language`). That note tells the failure as this one
+   ask's outcome alone, never as making skills not working, and that a later
+   ask to make, remove, or turn a skill off or on calls `make_skill` again:
+   on lamp-9adf (17 Nov 21:37) one make not made was told on as "my
+   skill-making isn't working", kept in the thread as the lamp's words, and
+   later turns answered a made skill's turn-off, turn-on and remove from that
+   belief with no call (test
+   `made_skill::tests::a_make_not_made_is_told_as_that_one_makes_outcome`).
+   Every such note, made or not, begins
    `made_skill::ALREADY_DONE` ("This has happened already and nothing is
    left to do: call no tool, make_skill least of all; only speak"): on
    lamp-74ff, 10 Nov 17:43, the model took a made line's note as an ask
@@ -5740,8 +6219,15 @@ The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
 the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
-`lamp-skills-manage@`; `LAMP_TASK_NET` stays off, so a file that reaches
-the internet is still refused. `lamp_voice::upload_agent`. With
+`lamp-skills-manage@`; with `LAMP_TASK_NET` on (off in the product until its checks), a file
+that reaches the internet is granted `net` (the public web on 80 and 443
+alone), asked the owner's spoken yes at its first run. With lamp-update's
+one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) a run
+granted `net` goes through Harness, its way out and fresh home found by
+its run id, or is refused `no_net` and said aloud; an agent skill's run
+without `net` still goes through the make's runner there and is refused
+(`run_failed`, `NOT_HELD_OFF_ONE_PATH`) (docs/tasks.md, "On the one run
+path"). `lamp_voice::upload_agent`. With
 `LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
 skill instead of a written one (off: a written skill, its note at most 900
@@ -5766,8 +6252,8 @@ bytes, as above):
   selfie) and `net` (an `http://` or `https://` link, a webhook, or a web
   API, URL or endpoint the file says to fetch, call, post, send, get or
   the like: a bare "API" or "URL" is not enough), never
-  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
-  off, such a file is refused ("it reaches the internet, which a skill's
+  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (off
+  in the product until its checks); off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
@@ -6094,7 +6580,8 @@ description beginning with the `when` line).
 
 #### A start by the person's own words (`LAMP_MADE_SKILL_ASKS=on`, off)
 
-Off unless `LAMP_MADE_SKILL_ASKS=on`, and in no product unit yet (#7233;
+Off unless `LAMP_MADE_SKILL_ASKS=on`; on in the product, in lamp-voice,
+lamp-skills, its manage helper, lamp-cloud and lamp-control (#7233;
 the owner, 16 Nov: "Every task must be doable; no 'couldn't' here"). A
 skill made here, by voice or in the app, may be started by words the
 person names for it, for any step a made skill may have: a fixed write
@@ -6110,9 +6597,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    no `[ask]` and no topics; its steps as the rules above give them. The
    prompt says a skill can't yet hear what is said in the room "other than
    the words the person names to start it", and the agent's service rules
-   name them beside the lamp's own triggers. They stand in place of a
-   `[said]` start (`LAMP_MADE_SKILL_SAID`), which is not told with this
-   switch on. The brief says "one [trigger] as listed, or asks as above".
+   name them beside the lamp's own triggers. The brief says "one
+   [trigger] as listed, or asks as above". With `LAMP_MADE_SKILL_SAID=on`
+   too, both starts are told: the `[said]` rules, then these, the prompt
+   saying a skill can't yet hear what is said in the room "other than a
+   request told to the lamp (a [said] start) or the words the person names
+   to start it (asks), both below", and the brief "one [trigger] listed,
+   [said]/asks as above", written short so the longest brief with every
+   switch on stays within 1,160 bytes.
 2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
@@ -6229,6 +6721,48 @@ Tests: `made_skill::tests::a_made_skill_started_by_its_words_carries_its_asks_on
 `upload_skill::tests::a_bare_files_trigger_phrases_are_its_asks_and_the_app_is_told_those_left_out`;
 lamp-skills' `a_skill_started_by_its_own_words_loads_and_runs_now_only_with_its_switch`
 and `an_uploaded_files_trigger_phrases_load_as_its_tools_asks`.
+
+#### A make held to what was heard (`LAMP_MADE_UNRELATED_REFUSED=on`, off)
+
+Off unless `LAMP_MADE_UNRELATED_REFUSED=on`, in no product unit (#7621: on
+c0a4 "every day at four fifteen in the morning, look up the title of the
+example dot com web page and tell me what it says" was made as `moon-time`,
+a say on "moon time", and as `morning-skip`, a dance at 04:15, and each was
+kept and put on). On, and only while the lamp's language is English, a
+voice make's skill is held to the person's own line for it
+(`thread.heard_in_own_line`, never the newest words heard) and the request,
+in `made_skill::keep_asked`, before anything is kept, a said start too:
+
+- A fast pass, of no cost: when the skill's name, asks and step words (its
+  say text, gesture, task words; never a step's kind, trigger, times or
+  permissions) share a content word with the line, it is kept as before.
+  The request counts only when the line has fewer than three content
+  words: a request the voice model filled from an earlier ask would share
+  its words with the skill made of it. Content words are lowercase words of three letters or
+  more, without a trailing `s`, never small words nor words of when it
+  runs (day, morning, every, the numbers, digits) and verbs any ask holds (look, find, get, show, see, keep, want, need), counted once; two are
+  one when the shorter has five letters or more and they share all of it
+  but its last (`stretch` and `stretching`; `good` is not `goodnight`).
+  Fewer than three distinct content words in the line and the request: no
+  check.
+- With no shared word, one short call to the make's own DeepSeek chat,
+  bound to 1.5 seconds and about 300 tokens (`make_skill_local::JUDGE_WITHIN`):
+  "Asked: <line>. Made: <name and step words>. Does the made skill do what
+  was asked? Answer yes or no." A clear no refuses it; a yes or any other
+  answer keeps it; a timeout or an error keeps it too, as
+  `made_skill::on_judge_lost` says (the first builder's ruling: kept when the skill runs only when asked and never moves the body; asked again when it runs on its own, by a trigger or a time, or moves the body), journaled as
+  `judge=yes|no|unclear|timeout|error` with counts only, never words. So a
+  paraphrase ("remind me to drink water" made as `hydration-nudge`) is kept.
+  The 1.5 seconds are added at most, and only on this no-overlap path. The
+  person's own line goes to DeepSeek in this call, which the make's brief
+  (the request alone) does not send.
+- A refusal is not repaired nor handed to the lamp's agent: the voice
+  model is told to say exactly "I didn't catch which skill to make. Could
+  you say it again?", never what was nearly made.
+
+The app's make has no judge and is never refused by it. In another language
+the check is skipped and journaled. `lamp-voice` passes the exact `on` to its
+`provider` and `second` workers. Off, every make is byte for byte as before.
 
 ## V1's moves and emotions: what we take
 
@@ -6449,7 +6983,7 @@ in [Bedtime and Morning](bedtime-morning.md).
 | Guard mode (#1685, the first builder's design, 19 Oct 12:08; installable) | Its tool, `keep_watch(turn)`, when the person asks out loud ("keep an eye on things while I'm out") | A faint blue mark on the ring while on; once the desk is empty, one text on `messages/out` when a visit ends, at most one in 10 minutes ("Someone was at your desk at 14:31, for about 2 minutes."), known or not and never a name; ends on "stop", `guard.off` from the app, or the asker's own face back (saying "I'm off guard"); the privacy switch closed ends it with one text; with #2562's switches, arrivals by a door or footsteps followed by a face or speech, `guard.on` from the owner's app, and one turn of the head to an arrival ([guard-mode.md](guard-mode.md)) | New: the watch (`[watch]`), the `messages` and `known_faces` permissions, `--known-file` and `messages/out` were added for it. Not in the product (`NOT_PRODUCT_SKILLS`). Its cases are written by a script; it has not run on a lamp |
 
 | Not feeling well (#1681) | `lamp/health`'s `level` is `error` for 30 s (`gap` 10 s), or, a second `[[trigger]]`, its `quiet_ms` is above 299999 (a part that said `ok` once this boot and has been unheard for 5 minutes, [health.md](health.md); `gap` 10 s), while the voice rests | Droops once (`sleepy`) and its light goes pale and low (`white` at 2, breathing every 10 s down to 1, steady without the ring's `LAMP_LIGHT_REQUESTS=on`; `no_brighter = true` since #3691, so never brighter than the person's light: over level 1 a steady white 1, over a light that is off no light, only the droop) until what ran it ends (10 s after its last `error`, or the quiet part heard again) or `lamp/health` expires (15 s); once each time (`rearm = "ends"`); talking when the 30 s come, it waits for the talk to end (`wait = "1h"`), and does nothing if the error ended first; never from 22:00 to 08:00 (an error held through the night droops once at 08:00); never speaks of it, never red or blinking. `stale` and `warn` do nothing, nor a part restarting for a few seconds or one never heard from. A part that errs and then stops is one droop (its `error` keeps it out of `quiet_ms`). Each trigger holds its own light: an `error` in one part and a different part stopped, at once, droop twice (the runner holds a light for each trigger; one droop for both is not built) | The error trigger needs no code; `quiet_ms` is `lamp-health`'s; a colour held `until = "ends"` was added to `lamp-skills` for its pale breath. In the product since its lamp check, row 8 on lamp-52e6 with the lead (20 Oct 11:35; `install::PRODUCT_SKILLS`). Its cases are written by a script (`lamp/health` every 5 s). On lamp-52e6 it drooped once, slowly, 301 s after the eyes were stopped by hand, its light went pale and low, and it came back 10.8 s after they started; the lead read it as a little unwell, not broken. Its 30 s, 10 s and 5 minutes are not measured against real failures |
-| A sip of water (#1685, installable) | Someone at the desk 90 minutes (with `LAMP_NUDGES_PRESENT=on`, 50 minutes and again each 50 while they stay, 08:00 to 22:00, six a day; Stretch break's sitting: `near = 0.14`, `gap` 2 minutes), 10:00 to 17:00, while the voice rests | Turns to them and its light breathes once, a slow cool blue for 6 s; once a sitting, three a day; never a word (a spoken one is the person's own reminder) | New |
+| A sip of water (#1685, installable) | Someone at the desk 30 minutes (with `LAMP_NUDGES_PRESENT=on`, 30 minutes and again each 45 while they stay, 08:00 to 22:00, six a day; Stretch break's sitting: `near = 0.14`, `gap` 2 minutes), 10:00 to 17:00, while the voice rests | Turns to them and its light breathes once, a slow cool blue for 6 s; once a sitting, three a day; never a word (a spoken one is the person's own reminder) | New |
 | Rest your eyes (#1685, installable) | Someone at the desk 45 minutes, 09:00 to 20:00, while the voice rests | A small `curious` tilt and its light a shade softer while it tilts; once an hour, four a day; the lamp sees faces, not screens, so screen time is time at the desk | New |
 | A comfort break (#3504; core, off by its own file, on in the product by `LAMP_NUDGES_PRESENT=on`, #5207) | Stand up's sitting held 120 minutes (90, on, with `LAMP_NUDGES_PRESENT=on`, as in the product), 09:00 to 20:00, with nobody else in view for a minute, while the voice rests | Turns to them and says one short line that it's a good moment for a short break, naming no place or reason; held while anyone else is in view, for up to 30 minutes; once a sitting, twice a day | New |
 | A meal check (#3504, installable) | A face at the desk for 75 minutes of lunchtime (11:30 to 13:30) or dinnertime (18:30 to 20:30), with nobody else in view for a minute, while the voice rests | Turns to them and asks once whether they've had lunch or dinner yet, naming no food or menu; held while anyone else is in view, until the window ends; once a window, twice a day | New |

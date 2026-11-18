@@ -63,6 +63,10 @@ Environment=LAMP_OPENCLAW_ON_LAMP=on
 # A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
 # and reopened with `harness resume`, then the work is typed in, never a new session.
 Environment=LAMP_TASKS_RESUME_CLOSED=on
+# One session for the lamp's default agent (#7246, #7507; docs/switches.md).
+Environment=LAMP_TASKS_ONE_SESSION=on
+# The one session as Harness's kept session (openharness#4393, #7507; docs/switches.md).
+Environment=LAMP_TASKS_KEPT_SESSION=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks

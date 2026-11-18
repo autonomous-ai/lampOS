@@ -319,6 +319,8 @@ pub struct Night<M, L, K> {
     /// A reply memory answered `busy` to, to give again: the job's id, the
     /// reply, and the tries so far. Held only between those tries.
     held: Option<(String, Value, u32)>,
+    /// Held replies dropped because the night stopped first, since start.
+    held_dropped: u64,
     runtime: tokio::runtime::Runtime,
     pub log: Arc<dyn Fn(&str) + Send + Sync>,
 }
@@ -341,6 +343,7 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             bytes: 0,
             tokens: 0,
             held: None,
+            held_dropped: 0,
             runtime: tokio::runtime::Builder::new_current_thread()
                 .enable_time()
                 .enable_io()
@@ -362,6 +365,7 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
     pub fn step(&mut self) -> Step {
         let now = (self.clock)();
         if !(NIGHT_FROM_HOUR..NIGHT_UNTIL_HOUR).contains(&self.local.hour_of_day(now)) {
+            self.drop_held("the night is over");
             return Step::Waiting;
         }
         let day = self.local.day(now);
@@ -370,6 +374,7 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             (self.calls, self.bytes, self.tokens) = (0, 0, 0);
         }
         if !self.may_work() {
+            self.drop_held("someone spoke or the slide closed");
             return Step::Waiting;
         }
         if let Some((id, reply, tries)) = self.held.take() {
@@ -478,6 +483,19 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             // Memory drops the job at its lease's end; its records wait
             // for the next night.
             _ => Step::GaveUp,
+        }
+    }
+
+    /// A held reply goes when a call would be dropped: the job's words are
+    /// held only for the call. Memory drops the job at its lease's end; its
+    /// records wait for the next night. Counted, never its words.
+    fn drop_held(&mut self, why: &str) {
+        if self.held.take().is_some() {
+            self.held_dropped += 1;
+            (self.log)(&format!(
+                "tiers night: held reply dropped, {why}; {} dropped since start",
+                self.held_dropped
+            ));
         }
     }
 

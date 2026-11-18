@@ -242,7 +242,7 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         )),
         // Checked again here, whatever lamp-cloud sent (#5500).
         "consent" => {
-            let why = "consent holds one of face_expressions or room_sounds, true or false";
+            let why = "consent holds one of face_expressions, room_sounds or seen_activity, true or false";
             let asked = given
                 .as_object()
                 .filter(|asked| asked.len() == 1)
@@ -476,7 +476,9 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
         }
         // The journal says only how long the words are, never them.
         // The energy is worked out once, here, and kept: it never restarts
-        // the voice, which the words alone shape (#6893).
+        // the voice, which the words alone shape (#6893). A derived level is
+        // the keyword table's; with LAMP_ENERGY_FROM_MODEL=on lamp-cloud says
+        // the model's in its place (#7314).
         Change::Character(text, chosen) => {
             let path = beside_language(config, "character");
             let changed = keep_line(&path, text.as_deref())?;
@@ -518,10 +520,10 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             } else if !*yes {
                 remove(&path)?;
             }
-            let words = if *key == lamp_msgs::consent::ROOM_SOUNDS {
-                "room sounds"
-            } else {
-                "face expressions"
+            let words = match *key {
+                lamp_msgs::consent::ROOM_SOUNDS => "room sounds",
+                lamp_msgs::consent::SEEN_ACTIVITY => "seen activity",
+                _ => "face expressions",
             };
             Ok(Done {
                 data: json!({ key.to_string(): *yes }),

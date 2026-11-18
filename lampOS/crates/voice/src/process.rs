@@ -451,7 +451,10 @@ impl Worker {
         directory: &Path,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
-        let mut deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        // Read right after the spawn, so a timeout can say how long this
+        // worker was waited for (#7224).
+        let began = startup_now();
+        let mut deadline = began + WORKER_STARTUP_TIMEOUT;
         let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
@@ -509,9 +512,12 @@ impl Worker {
                 None => {}
             }
             if startup_now() >= deadline {
+                // The role and the wait are named, so a journal tells which
+                // worker missed its bound (#7224).
+                let waited = (startup_now() - began).as_millis();
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "worker readiness timed out",
+                    format!("worker readiness timed out ({role} after {waited} ms)"),
                 ));
             }
             std::thread::sleep(Duration::from_millis(2));
@@ -791,6 +797,51 @@ mod fixture_tests {
                 .contains("unexpected worker startup message")
         );
         assert!(moved < Duration::from_secs(1), "{moved:?}");
+    }
+
+    /// A worker that never says Ready is named in the timeout with how long
+    /// it was waited for, so a journal tells which role missed its bound
+    /// (#7224: lamp-c0a4's cold boot ended twice on a bare "timed out").
+    #[test]
+    fn a_worker_that_never_says_ready_is_named_with_how_long_it_waited() {
+        let directory = SessionDirectory::create().unwrap();
+        let dir = &directory.path;
+        let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let channels = WorkerChannels::bind(dir, "capture", parent, boot, false).unwrap();
+        let mut peer = WorkerChannels::bind(dir, "capture", parent, boot, true).unwrap();
+        peer.connect(dir, "capture", true).unwrap();
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut worker = Worker {
+            channels,
+            child,
+            boot,
+            role: "capture".into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            on_stop: None,
+            after_terminate: None,
+        };
+        // Each wait moves the startup clock on by 500 ms, as above.
+        let error = worker
+            .wait_until_ready(dir, || {
+                startup_clock::move_on(Duration::from_millis(500));
+                Ok(())
+            })
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        let said = error.to_string();
+        let waited = said
+            .strip_prefix("worker readiness timed out (capture after ")
+            .and_then(|rest| rest.strip_suffix(" ms)"))
+            .and_then(|ms| ms.parse::<u128>().ok())
+            .unwrap_or_else(|| panic!("role and wait not named: {said}"));
+        assert!((3000..4000).contains(&waited), "waited {waited} ms: {said}");
     }
 
     #[test]
@@ -1189,6 +1240,10 @@ fn worker_command(
             role,
             var(crate::told_when_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(named_agent_takes_line_worker_environment(
+            role,
+            var(crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -1204,6 +1259,11 @@ fn worker_command(
         .envs(memory_reopen_quiet_worker_environment(
             role,
             var(crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT).as_deref(),
+        ))
+        .envs(weekly_chapters_worker_environment(
+            role,
+            var(crate::nightly::ENVIRONMENT).as_deref(),
+            var(crate::nightly::CHAPTERS_ENVIRONMENT).as_deref(),
         ))
         .envs(memory_keep_heard_worker_environment(
             role,
@@ -1372,6 +1432,14 @@ fn worker_command(
         .envs(made_asks_worker_environment(
             role,
             var(crate::made_skill::ASKS_ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_off_said_worker_environment(
+            role,
+            var(crate::made_skill::OFF_SAID_ENVIRONMENT).as_deref(),
+        ))
+        .envs(made_unrelated_worker_environment(
+            role,
+            var(crate::made_skill::UNRELATED_ENVIRONMENT).as_deref(),
         ))
         .envs(onboarding_worker_environment(
             role,
@@ -1578,6 +1646,28 @@ fn made_asks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::ASKS_ENVIRONMENT, "on"))
+}
+
+// A made skill turned off and on by voice (#7445,
+// `made_skill::off_said_on`), passed the same narrow way: the exact `on`,
+// to the two routes whose `make_skill` offers and takes it.
+fn made_off_said_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::OFF_SAID_ENVIRONMENT, "on"))
+}
+
+// A make with nothing of what was heard refused (#7621,
+// `made_skill::unrelated_on`), passed the same narrow way: the exact `on`,
+// to the two routes whose `make_skill` makes and keeps it.
+fn made_unrelated_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::UNRELATED_ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -1936,6 +2026,30 @@ fn memory_reopen_quiet_worker_environment(
     ))
 }
 
+// A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`) and the
+// nightly pass's own switch (`LAMP_MEMORY_NIGHTLY`), each the exact `on`, to
+// the two routes whose recall runs in their own worker. The worker's
+// `nightly::chapters_from_environment` needs both, as the coordinator's
+// `nightly::chapters_on` does; no other worker gets either.
+fn weekly_chapters_worker_environment(
+    role: &str,
+    nightly: Option<&std::ffi::OsStr>,
+    chapters: Option<&std::ffi::OsStr>,
+) -> Vec<(&'static str, &'static str)> {
+    if !matches!(role, "provider" | "second") {
+        return Vec::new();
+    }
+    let on = Some(std::ffi::OsStr::new("on"));
+    [
+        (crate::nightly::ENVIRONMENT, nightly),
+        (crate::nightly::CHAPTERS_ENVIRONMENT, chapters),
+    ]
+    .into_iter()
+    .filter(|(_, value)| *value == on)
+    .map(|(name, _)| (name, "on"))
+    .collect()
+}
+
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
 // exact `on`, to the two routes that open the sessions told of them (each
 // through `remember::told_for_session`; twelve-P2).
@@ -2078,6 +2192,17 @@ fn told_when_asked_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::told_when_asked::ENVIRONMENT, "on"))
+}
+
+// A line naming an agent for the work is handed to it in code as round 1
+// (`agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT`, #7269): the exact
+// `on`, to the second route, whose catch of named agents it is.
+fn named_agent_takes_line_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -2316,6 +2441,8 @@ fn second_route_worker_environment(
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::net::CHAT_KEPT_ENVIRONMENT,
+        // The day's thinking counted in this worker (#7347): numbers only.
+        crate::day_tally::SWITCH,
         crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
@@ -2339,6 +2466,8 @@ fn second_route_worker_environment(
         crate::action_claim::WORDED_ENVIRONMENT,
         // A made skill with code not on is never said to be on (#7270).
         crate::made_not_on::ENVIRONMENT,
+        // And a light act told as under way (#7285).
+        crate::action_claim::DOING_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2355,6 +2484,8 @@ fn second_route_worker_environment(
         crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
         // An ask cut by a line let out that only declines is answered (#5961).
         crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
+        // An ask left on its holding line is not told to later turns.
+        crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
@@ -2374,6 +2505,10 @@ fn second_route_worker_environment(
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
+        // A recurring thing for the lamp to do told a skill, and listening
+        // for a make's words (lamp-9adf, 17 Nov).
+        crate::skill_recurring::ENVIRONMENT,
+        crate::second_provider::net::key_terms::SKILL_ENVIRONMENT,
         // A make it didn't make handed to the lamp's agent (#6059's proposal).
         crate::make_skill_agent::ENVIRONMENT,
         // With the lamp's skill-creator guide given to that agent (13 Nov).
@@ -2398,6 +2533,8 @@ fn second_route_worker_environment(
         crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+        // A skill's yes carried from its say-back's end (#7148).
+        crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         // A carried line read and kept as its person's (9 Nov, #5842).
         crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
@@ -2417,6 +2554,8 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
         // A narrowed line named for its reply by the one-face count (5 Nov).
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+        // A quiet keep theirs on their one face in view, no mouth (17 Nov).
+        crate::keep_quietly::ONE_FACE_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
         crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
@@ -2430,8 +2569,15 @@ fn second_route_worker_environment(
         // A line the model declines says nothing and carries no
         // conversation (#3945).
         crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
+        // Inside a live back-and-forth the doubt goes to the person (#7332).
+        crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
+        crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+        // Held desk talk makes a busy room (#7332).
+        crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
+        crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
+        crate::said_to_me::ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
@@ -2444,6 +2590,10 @@ fn second_route_worker_environment(
         crate::known_faces::RENAME_ASKED_ENVIRONMENT,
         // A face rename's yes judged by its guards, and held for (#5485).
         crate::known_faces::RENAME_YES_ENVIRONMENT,
+        // The owner's name kept on the paths that lost it on lamp-74ff (#7331).
+        crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+        // The owner's face linked to the typed name by their own words (#7501).
+        crate::owner_link::ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2654,6 +2804,7 @@ mod tests {
             crate::action_claim::ENVIRONMENT,
             crate::action_claim::WORDED_ENVIRONMENT,
             crate::made_not_on::ENVIRONMENT,
+            crate::action_claim::DOING_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -2663,6 +2814,7 @@ mod tests {
             crate::cut_in_prompt_log::ENVIRONMENT,
             crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
+            crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
@@ -2673,6 +2825,8 @@ mod tests {
             crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
+            crate::skill_recurring::ENVIRONMENT,
+            crate::second_provider::net::key_terms::SKILL_ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
@@ -2701,6 +2855,7 @@ mod tests {
             crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+            crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
             crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT,
@@ -2713,19 +2868,27 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
+            crate::keep_quietly::ONE_FACE_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
             crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
+            crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
+            crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+            crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
+            crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
+            crate::said_to_me::ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
             crate::known_faces::RENAME_ASKED_ENVIRONMENT,
             crate::known_faces::RENAME_YES_ENVIRONMENT,
+            crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+            crate::owner_link::ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -2866,6 +3029,14 @@ mod tests {
             ),
             (
                 crate::made_skill::ASKS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::OFF_SAID_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::UNRELATED_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
@@ -3276,6 +3447,13 @@ mod tests {
                         "LAMP_TOLD_WHEN_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A line naming an agent for the work handed to it in
+                    // code: the second route alone (#7269).
+                    (
+                        named_agent_takes_line_worker_environment,
+                        "LAMP_NAMED_AGENT_TAKES_LINE",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3589,12 +3767,15 @@ mod tests {
                     crate::tools::skill_asked::ENVIRONMENT,
                     crate::skill_named::ENVIRONMENT,
                     crate::told_when_asked::ENVIRONMENT,
+                    crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::conversation_summary::ENVIRONMENT,
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
+                    crate::nightly::ENVIRONMENT,
+                    crate::nightly::CHAPTERS_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::NEWER_FIRST_ENVIRONMENT,
                     crate::remember::STRENGTH_ENVIRONMENT,
@@ -3680,6 +3861,7 @@ mod tests {
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::CHAT_KEPT_ENVIRONMENT
+                    || name == crate::day_tally::SWITCH
                     || name == crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
@@ -3695,6 +3877,7 @@ mod tests {
                     || name == crate::action_claim::ENVIRONMENT
                     || name == crate::action_claim::WORDED_ENVIRONMENT
                     || name == crate::made_not_on::ENVIRONMENT
+                    || name == crate::action_claim::DOING_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -3704,6 +3887,7 @@ mod tests {
                     || name == crate::cut_in_prompt_log::ENVIRONMENT
                     || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
+                    || name == crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
@@ -3715,6 +3899,8 @@ mod tests {
                     || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
+                    || name == crate::skill_recurring::ENVIRONMENT
+                    || name == crate::second_provider::net::key_terms::SKILL_ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
@@ -3743,6 +3929,7 @@ mod tests {
                     || name == crate::second_provider::TWO_FACES_HELD_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
+                    || name == crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT
                     || name == crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT
@@ -3755,19 +3942,27 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
+                    || name == crate::keep_quietly::ONE_FACE_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
                     || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
+                    || name == crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
+                    || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
+                    || name == crate::said_to_me::ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
                     || name == crate::known_faces::RENAME_ASKED_ENVIRONMENT
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
+                    || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
+                    || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -3830,6 +4025,7 @@ mod tests {
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_NEWER_FIRST=on",
+                    "LAMP_MEMORY_NIGHTLY=on",
                     "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
                     "LAMP_MEMORY_PROFILE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
@@ -3841,6 +4037,7 @@ mod tests {
                     "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
+                    "LAMP_MEMORY_WEEKLY_CHAPTERS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
                     "LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/delivery",
@@ -3853,11 +4050,14 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ACTION_CLAIM_CHECKED=on",
+                    "LAMP_ACTION_CLAIM_DOING=on",
                     "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
+                    "LAMP_BUSY_NO_FACE_RENEWS=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
@@ -3885,8 +4085,10 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_QUIETLY=on",
+                    "LAMP_KEEP_QUIETLY_ONE_FACE=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LATE_ANSWER_LET_GO=on",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
@@ -3911,6 +4113,7 @@ mod tests {
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_NEWER_FIRST=on",
+                    "LAMP_MEMORY_NIGHTLY=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
                     "LAMP_MEMORY_PROFILE=on",
@@ -3926,11 +4129,14 @@ mod tests {
                     "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
+                    "LAMP_MEMORY_WEEKLY_CHAPTERS=on",
+                    "LAMP_NAMED_AGENT_TAKES_LINE=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
                     "LAMP_NAMES_RENAME_ASKED=on",
                     "LAMP_NAMES_RENAME_YES=on",
                     "LAMP_NAME_AS_A_SENTENCE=on",
+                    "LAMP_NAME_LEARN_FIX=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
@@ -3943,6 +4149,7 @@ mod tests {
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_OPENS_FURTHER=on",
+                    "LAMP_OWNER_LINK=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -3958,6 +4165,8 @@ mod tests {
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
+                    "LAMP_ROOM_HELD_TALK=on",
+                    "LAMP_SAID_TO_ME=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
@@ -4011,7 +4220,11 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_KEYTERM=on",
                     "LAMP_SKILL_NAMED=on",
+                    "LAMP_SKILL_RECURRING_TOLD=on",
+                    "LAMP_SKILL_YES_CARRY=on",
+                    "LAMP_SPEAKING_READ_LOOKS=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
@@ -4022,6 +4235,7 @@ mod tests {
                     "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_CALLER_SPEAKING=on",
                     "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_VOICE_DAY_TALLY=on",
                     "LAMP_VOICE_LOOPBACK_SERVICES=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
@@ -4070,6 +4284,69 @@ mod tests {
         let written = std::fs::read_to_string(home.path.join("env-provider.txt")).unwrap();
         let got = given(&written);
         assert!(got.is_empty(), "the child got {:?}", names(&got));
+    }
+
+    /// A recall's weekly chapters run in the route's own worker, so both
+    /// switches it needs reach the two routes, each as `on` alone: a unit's
+    /// `LAMP_MEMORY_WEEKLY_CHAPTERS=on` cleared on the way would leave the
+    /// worker's `nightly::chapters_on` false.
+    #[test]
+    fn the_routes_are_given_weekly_chapters_and_the_nightly_switch() {
+        let boot = new_boot().unwrap();
+        let given = |role: &str, nightly: Option<&str>, chapters: Option<&str>| {
+            let command = worker_command(
+                Path::new("/bin/true"),
+                Path::new("/run/lampos-voice"),
+                role,
+                (boot, boot),
+                &[],
+                |name| match name {
+                    crate::nightly::ENVIRONMENT => nightly.map(std::ffi::OsString::from),
+                    crate::nightly::CHAPTERS_ENVIRONMENT => chapters.map(std::ffi::OsString::from),
+                    _ => None,
+                },
+            );
+            let mut got: Vec<String> = command
+                .get_envs()
+                .filter(|(name, _)| {
+                    *name == crate::nightly::ENVIRONMENT
+                        || *name == crate::nightly::CHAPTERS_ENVIRONMENT
+                })
+                .map(|(name, value)| {
+                    format!(
+                        "{}={}",
+                        name.to_string_lossy(),
+                        value
+                            .map(|v| v.to_string_lossy().into_owned())
+                            .unwrap_or_default()
+                    )
+                })
+                .collect();
+            got.sort();
+            got
+        };
+        for role in ["provider", "second"] {
+            assert_eq!(
+                given(role, Some("on"), Some("on")),
+                ["LAMP_MEMORY_NIGHTLY=on", "LAMP_MEMORY_WEEKLY_CHAPTERS=on"],
+                "{role}"
+            );
+            assert_eq!(
+                given(role, Some("off"), Some("on")),
+                ["LAMP_MEMORY_WEEKLY_CHAPTERS=on"],
+                "{role}"
+            );
+            for chapters in [None, Some("off"), Some("On"), Some("1")] {
+                assert_eq!(
+                    given(role, Some("on"), chapters),
+                    ["LAMP_MEMORY_NIGHTLY=on"],
+                    "{role} {chapters:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "privacy", "camera"] {
+            assert!(given(role, Some("on"), Some("on")).is_empty(), "{role}");
+        }
     }
 
     /// The private room reaches the workers that act on it, and only as `on`:

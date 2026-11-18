@@ -218,6 +218,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -333,6 +334,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -494,6 +496,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -620,6 +623,7 @@ fn face_remove_entirely_cancels_the_persons_reminders() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -681,6 +685,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -940,6 +945,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1114,6 +1120,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1191,6 +1198,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1296,6 +1304,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1411,6 +1420,7 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
         control: None,
         consent: None,
         monitor: None,
+        devices: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
@@ -1447,4 +1457,90 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
     lamp_cloud::signed_out::tell_the_app(true);
     assert_eq!(said(&mut real, "system.info")["account"], "signed_out");
     assert_eq!(said(&mut real, "lamp.health")["account"], "signed_out");
+}
+
+/// #7447: `lamp.health` passes `lamp/health`'s `items` and `missing`
+/// through, beside its `level`, `message` and `stale` as before, for the
+/// app's page that lists every part.
+#[test]
+fn health_passes_every_part_and_the_missing_ones_through() {
+    use lamp_msgs::{Health, HealthItem, Level};
+    let root = tempfile::tempdir().unwrap();
+    let places = lamp(&root.path().to_path_buf());
+    let bus_root = root.path().join("bus");
+    let bus = Bus::new(&bus_root).unwrap();
+    let mut health = bus
+        .publisher_declared(Health::TOPIC, &Health::declaration(), "health")
+        .unwrap();
+    health
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &Health {
+                level: Level::Error,
+                message: "body: yaw is hot".into(),
+                items: vec![
+                    HealthItem {
+                        name: "body".into(),
+                        level: Level::Error,
+                        message: "yaw is hot".into(),
+                        age_ms: 1200,
+                    },
+                    HealthItem {
+                        name: "eyes".into(),
+                        level: Level::Ok,
+                        message: String::new(),
+                        age_ms: 300,
+                    },
+                ],
+                missing: vec!["air".into()],
+                quiet_ms: 0,
+            },
+        )
+        .unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        consent: None,
+        monitor: None,
+        devices: None,
+        upload: None,
+        shutdown: None,
+        harness_sign_in: None,
+    };
+    let said = answer(&mut real, "lamp.health", &Value::Null)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        said,
+        json!({
+            "level": "error",
+            "message": "body: yaw is hot",
+            "stale": false,
+            "items": [
+                {"name": "body", "level": "error", "message": "yaw is hot", "age_ms": 1200},
+                {"name": "eyes", "level": "ok", "message": "", "age_ms": 300},
+            ],
+            "missing": ["air"],
+        })
+    );
 }

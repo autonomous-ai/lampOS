@@ -2168,8 +2168,9 @@ fn the_first_tries_switch_is_on_in_the_product() {
 
 /// A known face giving another name is asked, and only their yes renames
 /// it (#5485, 9 of 9 on lamp-52e6, 9 Nov): both rename switches are on in
-/// the product. Only `lamp-voice` reads them, which sets each `on` once,
-/// and no product file sets either to anything else.
+/// the product, and so is the name-learn fix (#7331). Only `lamp-voice`
+/// reads them, which sets each `on` once, and no product file sets any of
+/// them to anything else.
 #[test]
 fn the_rename_switches_are_on_in_the_product() {
     let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
@@ -2187,6 +2188,10 @@ fn the_rename_switches_are_on_in_the_product() {
         (
             lamp_voice::known_faces::RENAME_YES_ENVIRONMENT,
             "LAMP_NAMES_RENAME_YES",
+        ),
+        (
+            lamp_voice::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+            "LAMP_NAME_LEARN_FIX",
         ),
     ] {
         assert_eq!(name, want);
@@ -2259,7 +2264,10 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
     assert!(staged < hidden && hidden < shown && shown < unstaged);
     assert!(unstaged < ro_run && ro_run < hermes);
     assert_eq!(
-        on.matches("LAMP_").count() - on.matches(NET_ENV).count() - on.matches(HOME_ENV).count(),
+        on.matches("LAMP_").count()
+            - on.matches(NET_ENV).count()
+            - on.matches(HOME_ENV).count()
+            - on.matches(EGRESS_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 1,
         "only the comment names the switch"
     );
@@ -2285,15 +2293,21 @@ fn a_net_run_shows_the_bridge_brings_lo_up_and_starts_the_relay() {
         "  I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n",
         "  [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n",
         "  \"$I\" link set lo up || fail \"lo not up\"\n",
-        "  [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n",
-        "unset LAMP_NS_NET\n",
+        "    [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n",
+        "unset LAMP_NS_NET LAMP_NS_EGRESS V Q\n",
     ] {
         assert_eq!(on.matches(line).count(), 1, "{line}");
     }
     assert!(on.contains(&format!(
-        "  M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {RELAY} net-relay \
+        "    M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {RELAY} net-relay \
          --listen {RELAY_LISTEN} --to \"$B\" &)\n"
     )));
+    // A run granted net: the same relay with its egress socket.
+    assert!(on.contains(&format!(
+        "    M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {RELAY} net-relay \
+         --listen {RELAY_LISTEN} --to \"$B\" --egress \"$V\" &)\n"
+    )));
+    assert!(on.contains(&format!("  V={EGRESS_DIR}/${EGRESS_ENV}.sock\n")));
     assert!(on.contains(&format!(" B={MODEL_SOCKET} ")));
     assert_eq!(RELAY_LISTEN, "127.0.0.1:7741");
     // Every step of its own is behind the variable, `run` exactly.
@@ -2651,7 +2665,8 @@ fn both_switches_on_make_both_edits() {
     assert_eq!(
         both.matches("LAMP_").count()
             - both.matches(NET_ENV).count()
-            - both.matches(HOME_ENV).count(),
+            - both.matches(HOME_ENV).count()
+            - both.matches(EGRESS_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 2
     );
 }
@@ -4099,5 +4114,219 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
         assert!(!out.status.success(), "{engine} {home:?}");
         assert!(out.stdout.is_empty());
         assert!(mounted.is_empty(), "{mounted}");
+    }
+}
+
+/// A run granted `net` ([`NET_ENV`] `run` and [`EGRESS_ENV`] its folder's
+/// name, the design note on #7200): [`ns_text`] with [`TASKS_SWITCH`] on
+/// run under `sh`, every mount stubbed. Held as every run, it also shows
+/// its egress socket alone, read-only; lowers the unprivileged port start
+/// to 53 in its own network namespace; binds a `resolv.conf` naming
+/// `127.0.0.1` read-only over the lamp's; starts the relay with
+/// `--egress`; and gives the run the proxy variables. Each step failing
+/// ends it before Hermes runs (never a fallback to the lamp's network). A
+/// held run without the variable, or the variable without `run`, gets
+/// none of it.
+#[test]
+fn a_net_run_shows_its_egress_socket_opens_53_and_names_127_0_0_1() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = folder.path().to_string_lossy().into_owned();
+    let at = |path: &str| format!("{base}/root{path}");
+    let stubs = folder.path().join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let log = folder.path().join("log");
+    let resolv = at("/run/systemd/resolve/stub-resolv.conf");
+    for made in [WORK, SKILLS, "/run/systemd/resolve", "/tmp", EGRESS_DIR] {
+        fs::create_dir_all(at(made)).unwrap();
+    }
+    fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+    fs::create_dir_all(at("/run/lampos-control")).unwrap();
+    let _control = std::os::unix::net::UnixListener::bind(at(CONTROL_SOCKET)).unwrap();
+    let bridge = at(MODEL_SOCKET);
+    let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
+    let egress = at(&format!("{EGRESS_DIR}/make-task-1-2-3.sock"));
+    let _egress = std::os::unix::net::UnixListener::bind(&egress).unwrap();
+    let uid_map = folder.path().join("uid_map");
+    fs::write(&uid_map, "         0        996          1\n").unwrap();
+    let port_start = folder.path().join("ip_unprivileged_port_start");
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
+                unshare) case \"$*\" in *net-relay*) echo ready;; \
+                *) echo \"P=${HTTPS_PROXY-}|${HTTP_PROXY-}|${https_proxy-}|${http_proxy-} N=${NO_PROXY-}|${no_proxy-} \
+                J=${NODE_USE_ENV_PROXY-} E=${LAMP_NS_EGRESS-none}\";; esac;; \
+                ip) [ \"$*\" != \"-o link show\" ] || echo \"1: lo: <LOOPBACK,UP> mtu 65536\";; esac\n";
+    for name in [
+        "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
+    ] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let mut text = ns_text(false, true);
+    let moved = [
+        "/var/tmp",
+        "/var/lib",
+        "/etc/lampOS",
+        "/etc/resolv.conf",
+        "/dev/shm",
+        "/tmp",
+        "/run",
+    ];
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(path, &format!("\u{1}{n}\u{1}"));
+    }
+    for (n, path) in moved.iter().enumerate() {
+        text = text.replace(&format!("\u{1}{n}\u{1}"), &at(path));
+    }
+    let text = text
+        .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
+        .replace(
+            "/proc/sys/net/ipv4/ip_unprivileged_port_start",
+            &port_start.to_string_lossy(),
+        )
+        .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy())
+        .replace("/usr/sbin/ip /sbin/ip", &stubs.join("ip").to_string_lossy());
+    let script = folder.path().join("hermes-ns");
+    fs::write(&script, text).unwrap();
+    let run = |net: &str, name: &str, fail_on: &str| {
+        let _ = fs::remove_file(&log);
+        fs::write(&port_start, "1024\n").unwrap();
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&script)
+            .args(["chat", "-q", "a b"])
+            .current_dir(at(WORK))
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("FAIL_ON", fail_on)
+            .env("RESOLV", &resolv)
+            .env("LAMP_NS_UID", "996")
+            .env("LAMP_NS_GID", "994")
+            .env(NET_ENV, net)
+            .env(EGRESS_ENV, name)
+            .output()
+            .unwrap();
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        (out, lines)
+    };
+    let stage = at("/tmp/.lampos-ns");
+    let dns = at("/tmp/.lampos-dns");
+    let (out, lines) = run("run", "make-task-1-2-3", "");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "P=http://127.0.0.1:3128|http://127.0.0.1:3128|http://127.0.0.1:3128|http://127.0.0.1:3128 \
+         N=127.0.0.1,localhost|127.0.0.1,localhost J=1 E=none\n",
+        "the proxy for the run, the model's relay never through it"
+    );
+    assert_eq!(fs::read_to_string(&port_start).unwrap(), "53\n");
+    assert_eq!(fs::read_to_string(&dns).unwrap(), "nameserver 127.0.0.1\n");
+    let find = |wanted: &str| {
+        lines
+            .iter()
+            .position(|line| line == wanted)
+            .unwrap_or_else(|| panic!("no `{wanted}` in {lines:#?}"))
+    };
+    let order = [
+        format!("touch {stage}/v"),
+        format!("mount --bind {egress} {stage}/v"),
+        format!(
+            "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
+            at("/run")
+        ),
+        format!("mount --move {stage}/v {egress}"),
+        format!("mount -o remount,bind,ro,nosuid,nodev,relatime {egress}"),
+        format!("rm -f {stage}/v"),
+        format!(
+            "mount -o remount,bind,ro,nosuid,nodev,noexec {}",
+            at("/run")
+        ),
+        "ip link set lo up".to_owned(),
+        format!("mount --bind {dns} {resolv}"),
+        format!("mount -o remount,bind,ro,nosuid,nodev,noexec {resolv}"),
+        format!("rm -f {dns}"),
+        format!(
+            "unshare --user --map-user=996 --map-group=994 {RELAY} net-relay \
+             --listen {RELAY_LISTEN} --to {bridge} --egress {egress}"
+        ),
+        format!(
+            "unshare --user --map-user=996 --map-group=994 {} chat -q a b",
+            at(HERMES)
+        ),
+    ];
+    let places: Vec<usize> = order.iter().map(|line| find(line)).collect();
+    assert!(places.windows(2).all(|two| two[0] < two[1]), "{lines:#?}");
+    // Each step failing ends it before Hermes runs.
+    let hermes_ran = |lines: &[String]| lines.iter().any(|line| line.ends_with(" chat -q a b"));
+    for fail_on in [
+        format!("touch {stage}/v"),
+        format!("--bind {egress}"),
+        format!("mount --move {stage}/v"),
+        format!("findmnt -no VFS-OPTIONS -M {egress}"),
+        format!("--bind {dns}"),
+        format!("remount,bind,ro,nosuid,nodev,noexec {resolv}"),
+        "--egress".to_owned(),
+    ] {
+        let (out, lines) = run("run", "make-task-1-2-3", &fail_on);
+        assert!(!out.status.success(), "{fail_on}: {lines:#?}");
+        assert!(!hermes_ran(&lines), "{fail_on}: Hermes ran");
+    }
+    // The port start not lowered (the write refused in the run's own
+    // network): refused, never a fallback.
+    fs::remove_file(&port_start).unwrap();
+    fs::create_dir(&port_start).unwrap();
+    let out = std::process::Command::new("/bin/sh")
+        .arg(&script)
+        .args(["chat", "-q", "a b"])
+        .current_dir(at(WORK))
+        .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+        .env("LOG", &log)
+        .env("RESOLV", &resolv)
+        .env("LAMP_NS_UID", "996")
+        .env("LAMP_NS_GID", "994")
+        .env(NET_ENV, "run")
+        .env(EGRESS_ENV, "make-task-1-2-3")
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("port 53 not opened"));
+    assert!(!fs::read_to_string(&log).unwrap().contains(" chat -q a b"));
+    fs::remove_dir(&port_start).unwrap();
+    // A name that is not a run's folder, or no socket: refused.
+    for name in [
+        "../model",
+        "make-",
+        "make-A",
+        "skill-1",
+        &format!("make-{}", "a".repeat(80)),
+    ] {
+        let (out, lines) = run("run", name, "");
+        assert!(!out.status.success(), "{name}");
+        assert!(!hermes_ran(&lines), "{name}");
+    }
+    let (out, lines) = run("run", "make-task-9", "");
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("make-task-9.sock"));
+    assert!(!hermes_ran(&lines));
+    // A held run without it, and the variable without `run`: none of it,
+    // the port start untouched, no proxy.
+    for (net, name) in [("run", ""), ("", "make-task-1-2-3")] {
+        let (out, lines) = run(net, name, "");
+        assert!(out.status.success(), "{out:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "P=||| N=| J= E=none\n"
+        );
+        assert_eq!(fs::read_to_string(&port_start).unwrap(), "1024\n");
+        assert!(
+            !lines.iter().any(|line| line.contains(&egress)
+                || line.contains(&dns)
+                || line.contains("--egress")),
+            "{lines:#?}"
+        );
     }
 }

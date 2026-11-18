@@ -2,8 +2,9 @@
 
 With `LAMP_HOLDING_ANSWER=on`, a Gemini reply to heard input that ends after
 saying only a short holding phrase can receive one written continuation on the same
-session: “Go on: you said you would, so say it now.” The switch is off by
-default. This repairs the conversation already in progress; it starts no
+session: “Go on: you said you would, so say it now.” The switch is off
+unless set; the product's `lamp-voice.service` sets it (#7458, the “Let me
+check.” dead-end). This repairs the conversation already in progress; it starts no
 independent skill or background conversation.
 
 ## What exists and what is reused
@@ -154,6 +155,15 @@ whole, so the check is made there once the turn's words are out:
 - **Never:** after a call (a timer may be set; a look asked by its call
   counts, so the look is never answered twice), with more words, for the
   lamp's own written turn, or a turn that failed.
+
+A holding line said before a call is not this: the turn goes on to the
+call's round. If that turn ends before any words after the call's round (a
+newer line cuts it while the search runs), it is left on its holding line,
+and with `LAMP_LATE_ANSWER_LET_GO=on` (exactly `on`; off unless set, in no
+product unit) its exchange is told to no later turn, so its ask is never
+answered inside the next ask's turn (lamp-9adf, 17 Nov 18:18). A person
+who still wants it asks again. Off, as before. See
+[second-voice.md](second-voice.md), "Words cut short by the next line".
 
 Tests: `second_provider`'s
 `a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on` (the route),

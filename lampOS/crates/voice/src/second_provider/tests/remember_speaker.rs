@@ -75,6 +75,8 @@ async fn run(
     for (seq, age) in [900_000, 800_000, 700_000, 600_000].into_iter().enumerate() {
         let faces = lamp_msgs::Faces {
             faces: vec![lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: "f1".into(),
                 xmin: 0.2,
                 ymin: 0.2,

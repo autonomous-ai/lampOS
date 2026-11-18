@@ -87,9 +87,21 @@ impl Process {
     }
 
     fn start_with(scratch: &Scratch, dir: &str, socket: &str, log: &str, extra: &[&str]) -> Self {
+        Self::start_env(scratch, dir, socket, log, extra, &[])
+    }
+
+    fn start_env(
+        scratch: &Scratch,
+        dir: &str,
+        socket: &str,
+        log: &str,
+        extra: &[&str],
+        env: &[(&str, &str)],
+    ) -> Self {
         let log_path = scratch.0.join(log);
         let log = fs::File::create(&log_path).unwrap();
         let child = Command::new(BINARY)
+            .envs(env.iter().copied())
             .args([
                 "--dir",
                 &scratch.path(dir),
@@ -618,6 +630,71 @@ fn a_forget_socket_that_cant_be_made_leaves_memory_serving() {
         log.contains("lamp-memory: the forget socket is not open:"),
         "{log}"
     );
+}
+
+/// `LAMP_MEMORY_LINKED_SOCKET` (slice 1b): off unless `on`; `on` without
+/// `--memory-days`, or with a value that is neither, is said and opens
+/// nothing; `on` with Days opens `linked.sock` beside the socket when the
+/// group `lampos-linked` is there, and otherwise is said and memory serves.
+#[test]
+fn the_linked_socket_switch_is_said_and_never_stops_memory() {
+    let has_group = fs::read_to_string("/etc/group")
+        .unwrap_or_default()
+        .lines()
+        .any(|line| line.starts_with("lampos-linked:"));
+    for (name, extra, value, said) in [
+        ("linked-off", &[][..], "off", None),
+        (
+            "linked-legacy",
+            &[][..],
+            "on",
+            Some("LAMP_MEMORY_LINKED_SOCKET needs --memory-days"),
+        ),
+        (
+            "linked-odd",
+            &["--memory-days"][..],
+            "yes",
+            Some("LAMP_MEMORY_LINKED_SOCKET is not on or off"),
+        ),
+        (
+            "linked-on",
+            &["--memory-days"][..],
+            "on",
+            Some(if has_group {
+                "linked socket open at"
+            } else {
+                "the linked socket is not open:"
+            }),
+        ),
+    ] {
+        let scratch = Scratch::new(name);
+        let process = Process::start_env(
+            &scratch,
+            "memory",
+            "memory.sock",
+            "memory.log",
+            extra,
+            &[("LAMP_MEMORY_LINKED_SOCKET", value)],
+        );
+        let status = ask(
+            Path::new(&scratch.path("memory.sock")),
+            json!({"op": "status", "person": null}),
+        );
+        assert_eq!(status["ok"], true, "{name}: {status}");
+        let log = fs::read_to_string(&process.log).unwrap();
+        match said {
+            None => assert!(
+                !log.contains("linked socket") && !log.contains("LINKED"),
+                "{name}: {log}"
+            ),
+            Some(said) => assert!(log.contains(said), "{name}: {log}"),
+        }
+        assert_eq!(
+            Path::new(&scratch.path("linked.sock")).exists(),
+            has_group && name == "linked-on",
+            "{name}"
+        );
+    }
 }
 
 #[test]

@@ -48,12 +48,20 @@ Environment=LAMP_PRIVATE_ROOM=on
 Environment=LAMP_SKILL_TASKS=on
 # Where a `do.task` is handed to lamp-tasks (its skill-task.sock, #6306); without it nothing is handed over.
 Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
+# #7239, docs/skills.md; owner, 16 Nov
+Environment=LAMP_SKILL_TASK_SURE=on
 # A skill made here is the person's own (#6059, docs/skills.md "A made skill loosened"): a made say's cooldown
 # as asked, at least a minute. The same line in lamp-voice and lamp-skills-manage@.
 Environment=LAMP_MADE_SKILL_LOOSE=on
+# #7233, docs/skills.md; owner, 16 Nov
+Environment=LAMP_MADE_SKILL_ASKS=on
 # "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on
+# The character's energy level, 1 to 5, sets how lively the lamp moves: pace, roll, lean, nods, gestures (#6893,
+# body.md "How lively it moves"); set on Body, Expression, Skills and Voice together. lamp-52e6 15 Nov, row-6893h:
+# level 5 PASS (https://github.com/autonomous-ai/lampOS/issues/6893#issuecomment-6885667954).
+Environment=LAMP_BODY_ENERGY=on
 # A confirmed fold turns the lamp off through setup's change helper, as the app's Turn off does, so a running lamp
 # never says it may be unplugged (#5763's P1, shutdown.md): its runner stops every part, syncs and powers off.
 Environment=LAMP_UNPLUG_OFF_SOCKET=/run/lampos-setup-change/change.sock
@@ -90,8 +98,9 @@ SetCredential=owner:\n
 LoadCredential=owner:/etc/lampOS/person/name
 Environment=LAMP_SKILLS_OWNER_FILE=%d/owner
 # Wellbeing nudges at a present spacing and Comfort break (#5207): each skill's [present] values, read at every load;
-# water after 50 minutes and each 50 after (08:00 to 22:00, six a day), Comfort break after 90, two an hour at most,
-# 30 minutes apart. The same line in lamp-skills-manage@.service and lamp-cloud.service, which list the skills.
+# water after 30 minutes and each 45 after (08:00 to 22:00, six a day), Comfort break after 90, two an hour at most,
+# 30 minutes apart. The same line in lamp-skills-manage@.service and lamp-cloud.service, which list the skills, and in
+# lamp-voice.service, which tells a skill's state when asked (LAMP_SKILL_STATE_TOLD).
 Environment=LAMP_NUDGES_PRESENT=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).

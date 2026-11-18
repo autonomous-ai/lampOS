@@ -142,6 +142,10 @@ pub enum Act {
     Remove,
     /// Already the build's now: only recorded.
     Record,
+    /// The lamp's own, merged by key ([`merge_own`]): written with the
+    /// build's keys it lacked, named here, and never recorded, so it stays
+    /// the lamp's own.
+    Merge(String),
     /// The lamp's own: kept, with why.
     Keep(String),
 }
@@ -258,6 +262,88 @@ pub fn plan(
     Ok(steps)
 }
 
+/// The settings a lamp's own copy of is merged by key, not kept whole
+/// (#5984): Controls' two files, which the factory step, a V1 move
+/// (lamp-keeper) and install itself (`install::own_pins_follow_build`)
+/// write the lamp's own values into. Each names the build's top-level keys
+/// a merge may add: none means every key. The pins add only `privacy`, the
+/// one section install adds to a lamp's own pins: a build's other pin
+/// sections, `reset` (a factory-reset line) among them, name lines of the
+/// product's wiring, which a board whose pins were set by hand may not
+/// share (#7123). Every key of `controls.json` is either one a lamp's own
+/// file must already have to be read or an optional one, so a key a build
+/// adds there names no line. Every other setting the lamp changed is kept
+/// whole and said.
+pub const MERGED: &[(&str, Option<&[&str]>)] = &[
+    ("/etc/lampOS/controls/controls.json", None),
+    (
+        "/etc/lampOS/controls/controls-pins.json",
+        Some(&["privacy"]),
+    ),
+];
+
+/// Each [`MERGED`] setting kept as the lamp's own, merged by key: the
+/// lamp's JSON object with each top-level key of the build's it lacks, of
+/// those its [`MERGED`] entry names, added, its own values kept. One with
+/// nothing to add, or either side not a JSON object, stays kept. Run on
+/// [`plan`]'s steps by the round and by `lamp-update-apply` alike, so both
+/// write the same bytes.
+pub fn merge_own(root: &Path, steps: &mut [Step]) -> io::Result<()> {
+    for step in steps.iter_mut() {
+        let Some(&(_, keys)) = MERGED.iter().find(|(path, _)| *path == step.setting.path) else {
+            continue;
+        };
+        if step.act != Act::Keep("this lamp's own".into()) || step.setting.removed {
+            continue;
+        }
+        let Some(Ok(serde_json::Value::Object(build))) = step
+            .setting
+            .text
+            .as_deref()
+            .map(serde_json::from_str::<serde_json::Value>)
+        else {
+            continue;
+        };
+        let at = on_root(root, &step.setting.path);
+        let text = match fs::read_to_string(&at) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!("{}: {error}", step.setting.path),
+                ));
+            }
+        };
+        let Ok(serde_json::Value::Object(mut own)) = serde_json::from_str(&text) else {
+            continue;
+        };
+        let mut added = Vec::new();
+        for (key, value) in build {
+            if keys.is_none_or(|keys| keys.contains(&key.as_str())) && !own.contains_key(&key) {
+                own.insert(key.clone(), value);
+                added.push(key);
+            }
+        }
+        if added.is_empty() {
+            continue;
+        }
+        // Written as install writes a lamp's own object (`write_object`).
+        let mut merged = serde_json::to_string_pretty(&serde_json::Value::Object(own))
+            .map_err(io::Error::other)?;
+        merged.push('\n');
+        step.setting.sha256 = Some(manifest::sha256_hex(merged.as_bytes()));
+        step.setting.text = Some(merged);
+        step.act = Act::Merge(added.join(", "));
+    }
+    Ok(())
+}
+
+/// The journal line of a merged setting.
+pub fn merged_line(path: &str, added: &str) -> String {
+    format!("merged {path}: added the build's {added}; this lamp's own values are kept")
+}
+
 /// What the build's reset plan needs on this lamp (#806): none where the
 /// lamp has no plan; recorded where it is the build's already; written over
 /// any other, the lamp's own or a past build's alike, never kept.
@@ -326,7 +412,7 @@ pub fn keep_reset_plan(
 pub fn writes(steps: &[Step]) -> Vec<String> {
     steps
         .iter()
-        .filter(|step| matches!(step.act, Act::Write | Act::Remove))
+        .filter(|step| matches!(step.act, Act::Write | Act::Merge(_) | Act::Remove))
         .map(|step| step.setting.path.clone())
         .collect()
 }
@@ -611,6 +697,7 @@ fn apply(
         &signed.settings,
         &mut steps,
     )?;
+    merge_own(root, &mut steps).map_err(|error| error.to_string())?;
     crate::head_touch::verify(
         root,
         &root.join("etc/systemd/system"),
@@ -689,7 +776,7 @@ fn apply(
     let mut files = Vec::new();
     for step in &steps {
         let wrote = match step.act {
-            Act::Write => step.setting.sha256.clone(),
+            Act::Write | Act::Merge(_) => step.setting.sha256.clone(),
             Act::Remove => None,
             _ => continue,
         };
@@ -747,6 +834,12 @@ fn apply(
                 remove(&on_root(root, path)).map_err(|error| failed_at(path, error))?;
                 say(&format!("removed {path}"));
                 records_now.insert(path.clone(), None);
+            }
+            // Its record stays as it was: the lamp's own still.
+            Act::Merge(added) => {
+                let text = step.setting.text.as_deref().unwrap_or_default();
+                put(root, path, text.as_bytes(), step.setting.mode_bits())?;
+                say(&merged_line(path, added));
             }
             Act::Record => {
                 records_now.insert(path.clone(), step.setting.sha256.clone());
@@ -1410,6 +1503,75 @@ mod tests {
         assert_eq!(lamp.read(EXPRESSION).as_deref(), Some("expression 1"));
         assert_eq!(lamp.read(CONTROLS).as_deref(), Some("controls 1"));
         assert_eq!(lamp.state(), before);
+    }
+
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+
+    /// #7123: a lamp's own pins gain only the build's `privacy`, never its
+    /// `reset` line; a put-back restores the lamp's own bytes.
+    #[test]
+    fn own_pins_gain_only_privacy_and_a_put_back_restores_them() {
+        let mut lamp = Lamp::new();
+        lamp.installed(&[(PINS, "{\"chip\": \"a\"}\n")]);
+        let own = "{\"chip\": \"b\", \"every_ms\": 5}\n";
+        lamp.write(PINS, own);
+        let build = r#"{"chip":"a","reset":{"line":100},"privacy":{"line":7}}"#;
+        let envelope = lamp.envelope(2, vec![Setting::new(PINS, build)]);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        let merged: serde_json::Value = serde_json::from_str(&lamp.read(PINS).unwrap()).unwrap();
+        assert_eq!(
+            merged,
+            serde_json::json!({"chip": "b", "every_ms": 5, "privacy": {"line": 7}})
+        );
+        assert!(
+            lamp.said.contains(&merged_line(PINS, "privacy")),
+            "{:?}",
+            lamp.said
+        );
+        lamp.run(Op::Back, 2, None).unwrap();
+        assert_eq!(lamp.read(PINS).as_deref(), Some(own));
+    }
+
+    /// Controls' own `controls.json` gains every key of the build's it lacks.
+    #[test]
+    fn own_controls_gain_every_new_key_of_the_builds() {
+        let mut lamp = Lamp::new();
+        lamp.installed(&[(CONTROLS, "{\"enabled\": false}\n")]);
+        lamp.write(CONTROLS, "{\"enabled\": true}\n");
+        let build = r#"{"enabled":false,"base_selected_mask":null}"#;
+        let envelope = lamp.envelope(2, vec![Setting::new(CONTROLS, build)]);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        let merged: serde_json::Value =
+            serde_json::from_str(&lamp.read(CONTROLS).unwrap()).unwrap();
+        assert_eq!(
+            merged,
+            serde_json::json!({"enabled": true, "base_selected_mask": null})
+        );
+    }
+
+    /// An own file that is not a JSON object, and a setting the build
+    /// removed, are kept as they are: no merge, and no error.
+    #[test]
+    fn an_own_file_not_an_object_and_a_removed_setting_are_not_merged() {
+        let lamp = Lamp::new();
+        lamp.write(PINS, "[1]\n");
+        lamp.write(CONTROLS, "{\"enabled\": true}\n");
+        let keep = Act::Keep("this lamp's own".into());
+        let mut removed = Setting::new(CONTROLS, r#"{"base_selected_mask":null}"#);
+        removed.removed = true;
+        let mut steps = vec![
+            Step {
+                setting: Setting::new(PINS, r#"{"privacy":{"line":7}}"#),
+                act: keep.clone(),
+            },
+            Step {
+                setting: removed,
+                act: keep.clone(),
+            },
+        ];
+        merge_own(&lamp.root, &mut steps).unwrap();
+        assert!(steps.iter().all(|step| step.act == keep), "{steps:?}");
+        assert_eq!(lamp.read(PINS).as_deref(), Some("[1]\n"));
     }
 
     #[test]

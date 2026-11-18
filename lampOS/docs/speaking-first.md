@@ -475,6 +475,25 @@ open until then:
   `audio_written_with_playback_gaps_unscored`). Only a cut or a failed say
   is dropped. Never tried again here: the asker decides.
 - `{"outcome":"expired"}`.
+- `{"outcome":"unsaid","why":"…"}` (#6543): a `note` asked with
+  `"may_end_unsaid": true` (refused with anything but a `note`), let go
+  while it waited, never begun, because its moment passed since its line
+  was read (`say::moment_passed`, checked at every pass after the queue is
+  read, `Says::end_unsaid`): `someone started talking` (a frame of speech
+  heard after the ask, the same mark the say's quiet waits on) or `the
+  person turned away` (the eyes' near face gone from view at or after the
+  ask, and gone a second, `speak_up::Presence::left_since`; nobody there
+  when it was asked, or a face that came only after it, is no leaving, and
+  with no presence file, or one gone stale or unreadable, this never holds:
+  the eyes stopped is not a person turning away). The journal says `the skill NAME's note ends unsaid: WHY`. Only
+  while it waits: once begun, it ends as any say does. An ask without the
+  key waits as before. lamp-skills gives the run back
+  ([skills.md](skills.md), `do.say`). Tests:
+  `say::tests::may_end_unsaid_goes_with_a_note_only`,
+  `say::tests::the_moment_passes_on_speech_or_a_face_gone_after_the_ask`,
+  `say::tests::through_the_socket_a_note_that_may_end_unsaid_is_let_go`,
+  `speak_up::tests::a_face_left_since_an_ask_only_once_gone_a_second`. No
+  test runs the whole loop with it.
 
 **The asker's cancel**: while it waits for the outcome, the asker may
 write `{"cancel":true}` on the same connection (`say::CANCEL_LINE`). Still

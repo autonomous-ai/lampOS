@@ -8,7 +8,11 @@
 //! Applied: the pose's speed and acceleration, the stand and fold pace, the
 //! idle waits (`Limits::at`, `crate::idle`), the head's roll standing
 //! (`Limits::at`), the listening lean (`crate::body::mood_lean`) and a spoken
-//! nod's size (`crate::body`).
+//! nod's size (`crate::body`); under `LAMP_BODY_PRESENCE` (#7301) also the
+//! size of a shift's arm sag (`idle_size`), and for a few minutes after an
+//! arrival or talk the shifts' waits and size are a level or two livelier
+//! than the owner's (`crate::body::LIVELY_FOR`), that switch's own, so with
+//! this one off (level 1) those minutes still come.
 //! How often clips start of themselves per level is [`GESTURE`]: read by the
 //! voice (a small fill on an answer with no gesture of its own), Expression
 //! (the pause nod's gap) and lamp-skills (a `lively` trigger's cooldown and
@@ -23,7 +27,10 @@ pub struct Energy {
     /// Seconds a stand or a fold takes.
     pub stand_seconds: f32,
     /// The head's roll reach standing, counts; 0 is none (the unit's reach).
-    /// Only for a body with a stand.
+    /// Only for a body with a stand. Listening tilts 0.85 of it to a side
+    /// that alternates (`gesture::LISTENING_ROLL`), so a standing head
+    /// swings 2 x 0.85 x this, peak to peak: level 3's sits midway between
+    /// levels 1 and 5 as measured (#7314).
     pub stand_roll: u16,
     /// The shoulder and the elbow leant toward a listener, counts.
     pub listen_lean: [i16; 2],
@@ -31,6 +38,9 @@ pub struct Energy {
     pub nod_share: f32,
     /// How much each wait between shifts at rest is scaled.
     pub idle_share: f64,
+    /// How much a shift at rest's arm offsets are scaled under
+    /// `LAMP_BODY_PRESENCE` (#7301, `crate::idle::sag`); the head's never.
+    pub idle_size: f32,
 }
 
 /// Levels 1 to 5. Level 1 says the product unit's values; the body applies
@@ -43,6 +53,7 @@ pub const TABLE: [Energy; 5] = [
         listen_lean: [0, 0],
         nod_share: 1.0,
         idle_share: 1.0,
+        idle_size: 1.0,
     },
     Energy {
         speed: 425,
@@ -51,22 +62,25 @@ pub const TABLE: [Energy; 5] = [
         listen_lean: [0, 0],
         nod_share: 1.1,
         idle_share: 0.85,
+        idle_size: 1.05,
     },
     Energy {
         speed: 550,
         stand_seconds: 5.0,
-        stand_roll: 120,
+        stand_roll: 106,
         listen_lean: [-10, -15],
         nod_share: 1.2,
         idle_share: 0.7,
+        idle_size: 1.1,
     },
     Energy {
         speed: 675,
         stand_seconds: 4.5,
-        stand_roll: 160,
+        stand_roll: 153,
         listen_lean: [-20, -25],
         nod_share: 1.3,
         idle_share: 0.6,
+        idle_size: 1.15,
     },
     Energy {
         speed: 800,
@@ -75,6 +89,7 @@ pub const TABLE: [Energy; 5] = [
         listen_lean: [-25, -30],
         nod_share: 1.4,
         idle_share: 0.5,
+        idle_size: 1.2,
     },
 ];
 
@@ -212,6 +227,25 @@ mod tests {
         words.next().unwrap().parse().unwrap()
     }
 
+    /// Levels 1, 3 and 5 are evenly spaced in the head's standing swing as
+    /// lamp-52e6 measured it (row-7153L2, 16 Nov, peak to peak of any head
+    /// joint while stood: 7.7, 17.9 and 23.9 degrees with level 3 at 120
+    /// counts, its roll then 2 x 0.85 x 120 = 204 counts, 17.9 degrees). The
+    /// swing is linear in `stand_roll`, so level 3 is scaled to the midpoint;
+    /// level 4 stays midway between 3 and 5 (each level's no less than the
+    /// one under it: `levels_only_go_livelier`).
+    #[test]
+    fn level_three_swings_midway_between_one_and_five() {
+        let (one, three_at_120, five) = (7.7_f32, 17.9_f32, 23.9_f32);
+        let midway = (one + five) / 2.0;
+        let roll = |level: usize| f32::from(TABLE[level - 1].stand_roll);
+        let three = three_at_120 * roll(3) / 120.0;
+        assert!((three - midway).abs() < 0.1, "level 3 swings {three} deg");
+        assert!((2.0 * 0.85 * roll(3) * 360.0 / 4096.0 - midway).abs() < 0.1);
+        assert!((roll(4) - (roll(3) + roll(5)) / 2.0).abs() <= 0.5);
+        assert!(TABLE[4].stand_roll == 200 && TABLE[..2].iter().all(|row| row.stand_roll == 0));
+    }
+
     /// Level 1 is what the product unit runs today, and is applied as the
     /// base whatever it is.
     #[test]
@@ -219,6 +253,7 @@ mod tests {
         assert_eq!(f32::from(TABLE[0].speed), unit_value("--speed"));
         assert_eq!(TABLE[0].stand_seconds, unit_value("--stand-seconds"));
         assert_eq!(TABLE[0].idle_share, 1.0);
+        assert_eq!(TABLE[0].idle_size, 1.0);
         for base in [50.0, 120.0, 300.0] {
             assert_eq!(speed(base, 1), base);
             assert_eq!(stand_seconds(base / 10.0, 1), base / 10.0);
@@ -237,10 +272,13 @@ mod tests {
             assert!(pair[1].stand_seconds < pair[0].stand_seconds);
             assert!(pair[1].idle_share < pair[0].idle_share);
             assert!(pair[1].nod_share > pair[0].nod_share);
+            assert!(pair[1].idle_size > pair[0].idle_size);
             assert!(pair[1].stand_roll >= pair[0].stand_roll);
         }
         assert_eq!(speed(300.0, 5), 800.0);
         assert_eq!(stand_seconds(6.0, 5), 4.0);
+        // A shift's arm sag at most a fifth larger (#7301).
+        assert_eq!(TABLE[4].idle_size, 1.2);
         // A unit already livelier than a level keeps its own.
         assert_eq!(speed(500.0, 2), 500.0);
         assert_eq!(stand_seconds(3.0, 5), 3.0);

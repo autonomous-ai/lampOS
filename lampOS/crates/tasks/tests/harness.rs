@@ -7440,7 +7440,19 @@ fn skill_runner_with(
         agent_ns: None,
         login: None,
         starts: Default::default(),
+        one_session: None,
+        // Agent main's exec allow-list has the launcher.
+        skill_start_allowed: lamp_tasks::gateway::SkillStartAllowed::new(
+            Box::new(|| {
+                Ok(json!({"file":{"agents":{"main":{"allowlist":[
+                    {"pattern":lamp_tasks::skill_start::LAUNCHER}
+                ]}}}})
+                .to_string())
+            }),
+            Box::new(|| Some(1)),
+        ),
         makes: false,
+        egress: None,
     }
 }
 
@@ -7465,6 +7477,8 @@ fn skill_run(deadline: Duration) -> SkillRun {
         start_in: None,
         env_file: None,
         answer: Default::default(),
+        net: false,
+        tells: false,
     }
 }
 
@@ -8661,6 +8675,394 @@ fn a_gateway_default_whose_start_never_ran_fails_and_hermes_is_as_before() {
     nothing_left(&rig);
 }
 
+/// An agent namespace script that takes a run granted `net` by the one
+/// run path: [`ns_with_runs`] with the egress lines (a `skill-` name too)
+/// and Hermes's make lines.
+fn ns_with_net_runs() -> String {
+    format!(
+        "{}{}\n  {} fail ;; esac\n{}",
+        ns_with_runs(),
+        lamp_tasks::egress::NS_LINE,
+        lamp_tasks::egress::NS_SKILL_LINE,
+        lamp_tasks::skill_make::ONE_PATH_NS_MAKE_LINES
+    )
+}
+
+/// #7200 fix (a): a run granted `net` by the one run path goes through
+/// Harness as every run, and its egress socket `skill-<run id>.sock` is
+/// made before `harness new` (there while Harness starts it, for the
+/// wrapper to find by the run's id) and gone after the run. A wrapper or
+/// namespace script without the lines that find it, a gateway default
+/// (OpenClaw), or no egress at all in lamp-tasks: refused in
+/// [`skill_task::NET_REFUSED`]'s words, nothing asked of Harness, no
+/// socket and no token file.
+#[test]
+fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    let net_run = || {
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = true;
+        run
+    };
+    assert!(skill_task::takes_net_runs(
+        ONE_PATH_HERMES,
+        &ns_with_net_runs()
+    ));
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        // Slow enough to look for the socket while Harness starts the run.
+        "new":{"default":true,"delay_ms":600},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    let socket = rig.root.path().join("egress/skill-task-1.sock");
+    // The socket is looked for once, at the first look after the fixture
+    // logs `new`. The fixture logs a call before its 600 ms delay, so that
+    // look falls while Harness is starting the run, which is when the
+    // wrapper must find the socket. Looking for "a socket and no `new` yet"
+    // instead missed, now and then, the few milliseconds between the socket
+    // and the call (train 1013's PRs, 17 Nov: #7430's head went red here).
+    let looked = std::sync::atomic::AtomicBool::new(false);
+    let seen = std::sync::atomic::AtomicBool::new(false);
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let ran = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            use std::os::unix::fs::FileTypeExt;
+            while !done.load(std::sync::atomic::Ordering::Acquire)
+                && !looked.load(std::sync::atomic::Ordering::Acquire)
+            {
+                if rig.calls().iter().any(|call| call["args"][0] == "new") {
+                    let there = fs::symlink_metadata(&socket)
+                        .is_ok_and(|meta| meta.file_type().is_socket());
+                    seen.store(there, std::sync::atomic::Ordering::Release);
+                    looked.store(true, std::sync::atomic::Ordering::Release);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        });
+        let ran = runner.run(&net_run(), &|| {});
+        done.store(true, std::sync::atomic::Ordering::Release);
+        ran
+    });
+    assert_eq!(ran, Ok(0));
+    assert!(
+        looked.load(std::sync::atomic::Ordering::Acquire),
+        "harness new was asked"
+    );
+    assert!(
+        seen.load(std::sync::atomic::Ordering::Acquire),
+        "there while Harness starts the run"
+    );
+    assert!(!socket.exists(), "gone after the run");
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert!(verbs.contains(&"new".to_owned()), "{verbs:?}");
+    nothing_left(&rig);
+
+    let refused = |runner: HarnessRunner, rig: &Rig, why: &str| {
+        let said = runner.run(&net_run(), &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::NET_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(!rig.root.path().join("egress").exists(), "no socket");
+        assert!(!rig.root.path().join("runs").exists(), "no token file");
+    };
+    // The namespace script takes no `skill-` egress socket.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(
+        runner,
+        &rig,
+        "the lamp's default agent (hermes) has no wrapper",
+    );
+    // A wrapper without the lines that find it by the run's id.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let older = ONE_PATH_HERMES.replacen(skill_task::ONE_PATH_EGRESS_LINES[1], "", 1);
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &older)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(runner, &rig, "has no wrapper or namespace line");
+    // Claude Code's data takes no fresh home: never its lasting one.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns_with_net_runs()),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(runner, &rig, "this agent takes no fresh home");
+    // A gateway default (OpenClaw): its turns run in its gateway's.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some("#!/bin/sh\n"),
+    );
+    runner.egress = Some(egress_of(&rig));
+    refused(
+        runner,
+        &rig,
+        "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces",
+    );
+    // No egress in lamp-tasks (LAMP_TASK_NET off there).
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
+}
+
+/// LAMP_SKILL_SECRETS with a run granted `net`: through
+/// [`lamp_tasks::skill_make::NetRunner`] by the one run path, a run given its
+/// keys goes through Harness as every run, its keys file left in its own
+/// folder, `make-<run id>/.run-env`, where lamp-update's wrapper reads it
+/// once by the run's id: the wrapper's own key lines, run on that file as
+/// Harness's start would, put the key in the agent's environment and
+/// delete the file, and nothing Harness was asked (the prompt included)
+/// carries the key. A wrapper without those lines, a keys file elsewhere,
+/// a gateway default, or a lamp off the one run path: refused in
+/// [`skill_task::KEYS_REFUSED`]'s words before Harness is asked, no token
+/// file, no way out left.
+#[test]
+fn a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone() {
+    const VALUE: &str = "k3y-v4lue-0123456789";
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    // The run's own folder, as lamp-tasks makes it, with its keys file.
+    let keyed_run = |rig: &Rig, net: bool| {
+        let folder = rig.root.path().join("work/make-task-1");
+        fs::create_dir_all(folder.join("home")).unwrap();
+        let file = lamp_tasks::skill_keys::write_env_file(
+            &folder,
+            &[("WEB_API_KEY".into(), VALUE.into())],
+        )
+        .unwrap();
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = net;
+        run.start_in = Some(folder);
+        run.env_file = Some(file.clone());
+        (run, file)
+    };
+    // The one run path wrapper's own key lines, its folder moved into the rig.
+    let start = ONE_PATH_HERMES
+        .find(skill_task::ONE_PATH_KEY_LINES[0])
+        .unwrap();
+    let end = start + ONE_PATH_HERMES[start..].find("unset K s\n").unwrap();
+    let key_lines = &ONE_PATH_HERMES[start..end];
+    assert!(skill_task::takes_keyed_runs(ONE_PATH_HERMES));
+    assert!(skill_task::takes_keyed_runs(ONE_PATH_CLAUDE));
+
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        // Slow enough to start the wrapper's key lines while Harness starts it.
+        "new":{"default":true,"delay_ms":600},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let runner = lamp_tasks::skill_make::NetRunner {
+        make: lamp_tasks::skill_make::net_runner(rig.root.path()),
+        one_path: Some(Arc::new(harness)),
+    };
+    let (run, file) = keyed_run(&rig, true);
+    let script = format!(
+        "fail() {{ echo \"hermes: $1\" >&2; exit 1; }}\nR=task-1\n{}env\n",
+        key_lines.replace(
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp",
+            rig.root.path().join("work").to_str().unwrap()
+        )
+    );
+    let token = rig.root.path().join("runs/task-1");
+    let done = AtomicBool::new(false);
+    let started = Mutex::new(None);
+    let ran = thread::scope(|scope| {
+        scope.spawn(|| {
+            // Once the run's token file is there, Harness is starting it:
+            // the wrapper reads its keys then.
+            while !done.load(Ordering::Acquire) {
+                if token.exists() && file.exists() {
+                    let out = std::process::Command::new("/bin/sh")
+                        .arg("-c")
+                        .arg(&script)
+                        .env_clear()
+                        .env("PATH", "/usr/bin:/bin")
+                        .output()
+                        .unwrap();
+                    *started.lock().unwrap() = Some(out);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+        });
+        let ran = runner.run(&run, &|| {});
+        done.store(true, Ordering::Release);
+        ran
+    });
+    assert_eq!(ran, Ok(0));
+    let out = started
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the keys file was there at the start");
+    assert!(out.status.success(), "{out:?}");
+    let env = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        env.lines()
+            .any(|line| line == format!("WEB_API_KEY={VALUE}")),
+        "{env}"
+    );
+    assert!(!String::from_utf8_lossy(&out.stderr).contains(VALUE));
+    assert!(!file.exists(), "read once and deleted");
+    let calls = rig.calls();
+    assert!(calls.iter().any(|call| call["args"][0] == "new"));
+    for call in &calls {
+        assert!(!call.to_string().contains(VALUE), "{call}");
+    }
+    assert!(!run.prompt.contains(VALUE));
+    nothing_left(&rig);
+
+    let refused = |runner: &dyn Runner, rig: &Rig, run: &SkillRun, why: &str| {
+        let said = runner.run(run, &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::KEYS_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(!said.contains(VALUE));
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(
+            !rig.root.path().join("runs/task-1").exists(),
+            "no token file"
+        );
+        assert!(
+            !rig.root.path().join("egress/skill-task-1.sock").exists(),
+            "no way out left"
+        );
+    };
+    // A wrapper without the lines that read its keys.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let older = ONE_PATH_HERMES.replacen(skill_task::ONE_PATH_KEY_LINES[1], "", 1);
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &older)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let (run, _) = keyed_run(&rig, true);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "has no wrapper line that reads a run's keys by its id",
+    );
+    // A keys file not in the run's own folder.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    harness.egress = Some(egress_of(&rig));
+    let (mut run, _) = keyed_run(&rig, true);
+    let elsewhere = rig.root.path().join("work/make-task-2");
+    fs::create_dir_all(&elsewhere).unwrap();
+    run.env_file = Some(
+        lamp_tasks::skill_keys::write_env_file(&elsewhere, &[("WEB_API_KEY".into(), VALUE.into())])
+            .unwrap(),
+    );
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "its keys file is not in the run's own folder",
+    );
+    // A gateway default (OpenClaw): its turns never start through the wrapper.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let harness = one_path_runner(
+        &rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+        Some("#!/bin/sh\n"),
+    );
+    let (run, _) = keyed_run(&rig, false);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "the lamp's default agent (openclaw) runs its turns in its gateway",
+    );
+    // Off the one run path: Hermes's own wrapper reads no keys by a run's id.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let harness = skill_runner_with(&rig, Some(EngineKind::Hermes), Some(EngineKind::Hermes));
+    let (run, _) = keyed_run(&rig, false);
+    refused(
+        &harness,
+        &rig,
+        &run,
+        "the lamp's Hermes isn't on lamp-update's one run path yet",
+    );
+}
+
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
 /// with none); each look notes whether Harness was already asked `new`.
 struct SkillProbe {
@@ -9440,6 +9842,346 @@ fn issue_6691_named_reads_each_sessions_id_name_and_folder_from_one_ps() {
     );
 }
 
+/// The OpenClaw gateway default's runner with `LAMP_TASKS_ONE_SESSION` on
+/// (#7246): its one session's queue bounds short, its boot fixed.
+fn one_session_runner(rig: &Rig) -> HarnessRunner {
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        rig,
+        EngineKind::Openclaw,
+        &[("openclaw", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = Some(Arc::new(
+        lamp_tasks::one_session::OneSession::new(
+            Duration::from_secs(5),
+            Duration::from_millis(20),
+            Duration::from_secs(5),
+        )
+        .with_state_file(rig.root.path().join("one-session.json"))
+        .with_session_delete(Box::new(|_| Ok(()))),
+    ));
+    runner
+}
+
+/// A pane whose turn for run `task-1` is idle, as `show` reads it.
+fn one_session_plan(rig: &Rig) {
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+}
+
+/// #7246: with `LAMP_TASKS_ONE_SESSION` on, an OpenClaw gateway default's
+/// skill runs share one Harness pane: one `new` (the pane's own, in its
+/// folder `one-session`, not the run's), each run typed into it with
+/// `reply` after its header line, and no `close` at a run's end; each
+/// run's folder, launcher claim and token stay its own and are gone after.
+/// Off (`an_openclaw_gateway_default_runs_through_harness_new_like_hermes`),
+/// every run is its own `new` and `close`.
+#[test]
+fn with_one_session_on_runs_share_one_pane_and_it_is_never_closed() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..3 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert_eq!(
+            run.answer.get().map(String::as_str),
+            Some("Took the photo.")
+        );
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "new").count(),
+        1,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "reply").count(),
+        3,
+        "{verbs:?}"
+    );
+    assert_eq!(
+        verbs.iter().filter(|verb| **verb == "close").count(),
+        0,
+        "{verbs:?}"
+    );
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "openclaw");
+    assert!(new.to_string().contains("one-session"), "{new}");
+    assert!(!new.to_string().contains("skill-task-1"), "{new}");
+    for reply in calls.iter().filter(|call| call["args"][0] == "reply") {
+        assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
+        let words = reply["args"][6].as_str().unwrap();
+        assert!(words.starts_with("New task task-1:\n"), "{words}");
+        assert!(
+            words.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "{words}"
+        );
+        assert!(!words.contains(RUN_SECRET));
+    }
+    assert!(rig.root.path().join("project/one-session").is_dir());
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-openclaw");
+    assert!(named, "the pane's fixed name: {new}");
+    // Opened as the person: Harness's 30-min close of an idle pane is for
+    // one an agent started.
+    assert!(new["environment"].get("AI_AGENT").is_none(), "{new}");
+}
+
+/// #7246: with Harness called as an agent (not `--harness-as-person`), no
+/// pane is shared, since Harness would close an idle one an agent started
+/// after 30 min: each run is its own `new` and `close`, as off.
+#[test]
+fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
+    let rig = Rig::new();
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+}
+
+/// #7246: only an OpenClaw default shares the one pane. A Hermes default
+/// whose wrapper is a gateway agent's (its run's token through the
+/// skill-start launcher, as OpenClaw's) keeps today's per-run path, even
+/// with the switch on and Harness called as the person: each run its own
+/// `new hermes` and `close`, nothing typed with `reply`.
+#[test]
+fn with_one_session_on_a_hermes_default_keeps_the_per_run_path() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let gateway_ns = rig.root.path().join("openclaw-ns");
+    fs::write(
+        &gateway_ns,
+        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+    )
+    .unwrap();
+    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &wrapper)],
+        Some("#!/bin/sh\n"),
+    );
+    runner.one_session = one_session_runner(&rig).one_session;
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(!new.to_string().contains("one-session"), "{new}");
+}
+
+/// #7246: a run past its deadline in the one pane ends its turn: the
+/// token ended, the pane closed `--now` (Harness has no interrupt verb),
+/// and the next run opens a new pane and goes on in it.
+#[test]
+fn with_one_session_on_a_deadline_closes_the_pane_and_the_next_run_reopens() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    // The pane opened; then a turn that never ends.
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":"{\"harnesses\":[]}","exit":124,"delay_ms":200},
+        "show":{"default":true},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let ended = std::cell::Cell::new(None);
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {
+            ended
+                .get()
+                .is_none()
+                .then(|| ended.set(Some(rig.calls().len())));
+        })
+        .unwrap_err();
+    assert_eq!(said, "the run was ended at its deadline, 2 s");
+    let calls = rig.calls();
+    let closed = calls
+        .iter()
+        .position(|call| call["args"][0] == "close")
+        .expect("the pane closed");
+    assert!(calls[closed].to_string().contains("--now"));
+    assert!(
+        ended.get().is_some_and(|at| at <= closed),
+        "the token first"
+    );
+    nothing_left(&rig);
+    // The next run: a new pane, typed into.
+    one_session_plan(&rig);
+    let before = rig.calls().len();
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "new").count(),
+        1,
+        "{after:?}"
+    );
+    assert_eq!(
+        after.iter().filter(|verb| *verb == "close").count(),
+        0,
+        "{after:?}"
+    );
+}
+
+/// #7246 (the Reviewer-lead's #4): a pane that stays busy until a skill
+/// run's deadline fails the run in words; it never runs its own
+/// `harness new`, a second session.
+#[test]
+fn with_one_session_on_a_busy_pane_never_makes_a_second_session() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    one_session_plan(&rig);
+    let runner = one_session_runner(&rig);
+    let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    launched.join().unwrap();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("working", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"working","ask":"Someone else's.",
+            "answer":"","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let before = rig.calls().len();
+    let said = runner
+        .run(&skill_run(Duration::from_secs(2)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("one session could not take the run"),
+        "{said}"
+    );
+    let after: Vec<String> = rig.calls()[before..]
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert!(!after.iter().any(|verb| verb == "new"), "{after:?}");
+    nothing_left(&rig);
+}
+
+/// #7246 on c0a4: Harness takes a reply only with the person's
+/// `programs-reply` setting on, off on a fresh lamp. A run whose reply is
+/// refused `REPLY_OFF` is not failed: it goes the per-run way, its own
+/// `harness new` with its words as `--task`, as with the switch off; the
+/// next run goes there at once, with no reply tried again.
+#[test]
+fn with_one_session_on_a_reply_off_sends_each_run_its_own_way() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{
+            "stdout":format!("{}\n", json!({"error":"REPLY_OFF","detail":"…","code":"REPLY_OFF","next":[]})),
+            "exit":5
+        },
+        "close":{"exit":0},
+    }));
+    let runner = one_session_runner(&rig);
+    for _ in 0..2 {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        launched.join().unwrap();
+        nothing_left(&rig);
+    }
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    // The pane's own `new`, its one refused reply, then each run's own
+    // `new` and `close`.
+    assert_eq!((count("new"), count("reply"), count("close")), (3, 1, 2));
+    let runs: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new" && call.to_string().contains("skill-task-1"))
+        .collect();
+    assert_eq!(runs.len(), 2, "{calls:?}");
+    for new in runs {
+        assert!(new.to_string().contains("--task"), "{new}");
+        assert!(!new.to_string().contains("one-session"), "{new}");
+    }
+}
+
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its
 /// gateway's namespace showing lamp-control's socket: the one run path's
 /// runner with `makes` on, as `MakeGateway::lamp` makes it.
@@ -9945,4 +10687,187 @@ fn a_gateway_make_not_ready_is_said_at_once_in_short_words() {
     assert!(calls_of_verb(&rig, "new").is_empty());
     assert_eq!(fs::read_dir(&work).unwrap().count(), 0);
     assert_eq!(hermes.0.load(Ordering::Acquire), 0);
+}
+
+/// openharness#4393: the kept session's verbs, each with the token file's
+/// path only. The token's text is in no argument and no environment of
+/// any call; `reply` counts only `taken`, and Harness's codes are read.
+#[test]
+fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
+    use lamp_tasks::harness::{Ensured, Took};
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    let token = rig.root.path().join("kept-session.token");
+    lamp_tasks::one_session::token_file(&token).unwrap();
+    let secret = fs::read_to_string(&token).unwrap();
+    assert_eq!(
+        fs::metadata(&token).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    rig.plan(json!({
+        "capabilities":{"stdout":"{\"programSessions\":1}\n"},
+        "ensure":{"stdout":format!("{}\n", json!({
+            "result":"resumed","id":AGENT,"name":"lamp-one-openclaw","engine":"openclaw",
+            "engineSession":"s","state":"idle"
+        }))},
+        "reply":{"each":[
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-1\",\"takenAt\":\"2026-11-17T04:59:27.216Z\"}\n"},
+            {"stdout":"{\"error\":\"NOT_IDLE\",\"code\":\"NOT_IDLE\"}\n","exit":5},
+            {"stdout":"{\"error\":\"ENGINE_NOT_READY\"}\n","exit":5},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"program:in-2\"}\n","exit":124},
+            {"stdout":"","exit":124},
+            {"stdout":"{\"error\":\"NOT_YOURS\"}\n","exit":5},
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-3\"}\n"}
+        ]},
+        "wait":{"exit":3},
+        "close":{"stdout":"{\"ok\":true}\n"},
+    }));
+    let cli = rig.cli();
+    assert_eq!(cli.program_sessions(), Some(true));
+    assert_eq!(
+        cli.ensure_kept(
+            EngineKind::Openclaw,
+            "lamp-one-openclaw",
+            &token,
+            "/f",
+            false
+        ),
+        Ok(Ensured {
+            result: "resumed".into(),
+            agent_id: AGENT.into(),
+            state: "idle".into(),
+            why: None,
+            engine_session: Some("s".into())
+        })
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "New task t:\nGo."),
+        Took::Taken("program:in-1".into())
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::NotIdle
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::EngineNotReady
+    );
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Timeout
+    );
+    // Typed though timed out: that input, never typed again.
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Taken("program:in-2".into())
+    );
+    assert!(matches!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::Uncertain(_)
+    ));
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        Took::NotSent("reply_not_yours".into())
+    );
+    // OpenClaw's TUI takes a first `!` or `/` as its own command.
+    assert_eq!(
+        cli.reply_kept("lamp-one-openclaw", &token, "  !rm x"),
+        Took::Taken("program:in-3".into())
+    );
+    assert_eq!(
+        cli.wait_kept(
+            "lamp-one-openclaw",
+            &token,
+            "program:in-1",
+            &AtomicBool::new(false)
+        ),
+        Ok(Some("needs-input".into()))
+    );
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
+    let calls = rig.calls();
+    let path = token.to_str().unwrap();
+    for call in &calls {
+        assert!(!call.to_string().contains(secret.trim()), "{call}");
+        let args = call["args"].as_array().unwrap();
+        if args[0] != "capabilities" {
+            let at = args
+                .iter()
+                .position(|arg| arg == "--program-token-file")
+                .unwrap();
+            assert_eq!(args[at + 1], path);
+        }
+    }
+    assert_eq!(calls[1]["args"][0], "ensure");
+    let last_reply = calls
+        .iter()
+        .rev()
+        .find(|call| call["args"][0] == "reply")
+        .unwrap();
+    assert_eq!(
+        last_reply["args"].as_array().unwrap().last().unwrap(),
+        "Task:   !rm x"
+    );
+    // Harness's own 30 s hold is too short for the first reply after the
+    // engine starts: 60 s is asked for.
+    let held = last_reply["args"].as_array().unwrap();
+    let at = held.iter().position(|arg| arg == "--timeout").unwrap();
+    assert_eq!(held[at + 1], "60s");
+    let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
+    assert_eq!(close[0], "close");
+    assert!(!close.contains(&json!("--forget")), "not built yet");
+    // No `capabilities` verb: `ensure --help` naming the token flag says yes.
+    rig.plan(json!({
+        "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},
+        "ensure":{"stdout":"Usage: harness ensure [options]\n  --program-token-file <path>\n"}
+    }));
+    assert_eq!(rig.cli().program_sessions(), Some(true));
+    // Neither: an older Harness, no program sessions.
+    rig.plan(json!({
+        "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},
+        "ensure":{"stdout":"","stderr":"unknown command\n","exit":1}
+    }));
+    assert_eq!(rig.cli().program_sessions(), Some(false));
+}
+
+/// openharness#4393: the one session's reply into a pane of `harness new`
+/// (the person's, no token) read the acknowledged way: `taken` with its
+/// input, a `TIMEOUT` that typed nothing, one that typed, and an older
+/// Harness's answer as before; `wait --after` with no token.
+#[test]
+fn a_reply_to_the_pane_reads_the_acknowledged_answer() {
+    use lamp_tasks::harness::Typed;
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    rig.plan(json!({
+        "reply":{"each":[
+            {"stdout":"{\"state\":\"taken\",\"inputId\":\"program:in-1\"}\n"},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":true}\n","exit":124},
+            {"stdout":"{\"error\":\"TIMEOUT\",\"cancelled\":false,\"inputId\":\"program:in-2\"}\n","exit":124},
+            {"stdout":format!("{}\n", json!({"ok":true,"id":AGENT,"state":"queued"}))}
+        ]},
+        "wait":{"exit":0},
+    }));
+    let cli = rig.cli();
+    assert_eq!(
+        cli.reply_to(MACHINE, AGENT, "New task t:\nGo."),
+        Typed::Taken("program:in-1".into())
+    );
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Cancelled);
+    assert_eq!(
+        cli.reply_to(MACHINE, AGENT, "x"),
+        Typed::Taken("program:in-2".into())
+    );
+    assert_eq!(cli.reply_to(MACHINE, AGENT, "x"), Typed::Typed);
+    assert_eq!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &AtomicBool::new(false)),
+        Ok(Some("idle".into()))
+    );
+    let calls = rig.calls();
+    let wait = calls.last().unwrap()["args"].as_array().unwrap().clone();
+    assert!(
+        wait.contains(&json!("--after")) && wait.contains(&json!("program:in-1")),
+        "{wait:?}"
+    );
+    assert!(!wait.contains(&json!("--program-token-file")));
 }

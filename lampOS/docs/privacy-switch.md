@@ -76,7 +76,14 @@ keeps an old state live longer. A header of another clock has expired. A
 state without `clock`, from a Controls build before it, is still read by
 the wall clock and is said once in the journal (`lamp-voice: privacy: the
 Controls state of publisher … says no clock`), not refused, since an update
-round can mix builds (queue #3997, C; [bus.md](bus.md)).
+round can mix builds (queue #3997, C; [bus.md](bus.md)). The boot id is Linux's
+`/proc/sys/kernel/random/boot_id`, and on a Mac the boot session uuid
+(`kern.bootsessionuuid`, read once through `/usr/sbin/sysctl`): one id, from
+`lamp_bus::kernel_boot_id`, that Controls' stamp (`lamp_controls::runtime::clock_id`)
+and the bus both use, so on a Mac the state is judged by CLOCK_MONOTONIC too, and
+a clock step or a sleep cannot make an old state look fresh. The "says no clock"
+line is said on a Mac only when that read failed (then the wall clock judges, as
+on any build without the id), never with a made-up id.
 Invalid types, publisher or reader changes, future/stale evidence, reordered
 messages, skipped Bus publications and receive overflow end this worker,
 with one allowance: until Controls' publisher finds the worker's new socket
@@ -139,6 +146,10 @@ only closes that gate; the look goes on to the fresher ones queued behind it,
 and only a look that ends its read with no fresh observation ends the wait as
 unreadable (#5224: lamp-06c1's muted boot read one queued since its worker's
 Ready, and its first look ended the wait although fresh ones were behind it).
+A later look held past 50 ms is judged the same way, after its read, not on
+the reading it already holds (lamp-e82d: the muted ring light's start held a
+look that long, and every retry ended `Controls privacy freshness lost while
+waiting` while the slide stayed closed).
 Voice's
 durable software mute remains a separate inhibit. A closed switch cancels the
 active serve cycle; verified cleanup precedes the next observation-only wait
@@ -244,7 +255,8 @@ gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
-With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off by default, only exactly `on`,
+With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off unless set, only exactly `on`,
+on in the product unit (#5611),
 passed to the privacy worker and the second worker in their cleared
 environments) a lapse of a lease that grants the microphones or the camera is
 ridden the same way, so the voice stays up and unmuted through a short stall
@@ -290,7 +302,18 @@ switch on:
   reopen waits for the gate's 60 ms steady time (`REOPEN_STABLE_US`), and
   that wait counts inside the 1.5 s, so a stall under about 1.44 s is
   ridden; a longer one ends the voice as before, failing closed. Its
-  trace's `privacy_gap` `began` row then carries `"stall":true`.
+  trace's `privacy_gap` `began` row then carries `"stall":true`. On
+  lamp-06c1 at 14:32:11 on 12 Nov (12226), with the switch off, a 274 ms
+  coordinator stall as the first session after a five-minute muted wait
+  began ended both workers with exit 1 and the voice on `privacy.c.p:
+  Connection refused; verified cleanup failed` (#5224). A session after
+  the wait is a new one, so its stall lands early in it. In the loop
+  harness a 275 ms stall 60 ms or more into a session ends the voice off
+  and is ridden on; one in its first 40 ms ends nothing either way, as no
+  reading has gone stale yet. Seeding the first pass from the prologue's
+  last keep (`GapRide::last_pass_us`) was proposed and dropped: no stall
+  position (0, 2, 6, 10, 20, 40, 60, 100, 200, 400 ms) was misjudged with
+  the switch on.
 
 Past that bound (a stall over about 1.44 s, whose open reading is not
 steady within 1.5 s of its start) everything ends exactly as without the
@@ -464,7 +487,20 @@ over 4096 bytes or anything else is no: no face is read and nothing goes on
 a face is near, so a removed yes stops the reads within that and the one read
 already running. The journal says once each time the yes comes or goes. The
 eyes still look: the camera, the gaze, presence, who is there and the
-speaking read are unchanged. The voice's
+speaking read are unchanged. With `LAMP_EYES_PITCH_GAZE=on` (#7442) the
+eyes also compute, with no yes, only where the near face is looking, on the
+lamp, for the voice to decide whether a line was said to it: the
+Blendshape V2 model runs on the same 2 s timing, only its eye-look scores
+are kept to give `looking` on `humans/faces/tracked`, and every other score
+is dropped at once. The eyes write it nowhere: it lives only on the
+lamp's bus (its newest message in `/run`, gone at a reboot), and nothing
+of how the face seems is read (eyes.md, "Pitch and gaze"). Skills, which
+can send what they read off the lamp, see neither `looking` nor `pitch`
+without the yes: `lamp-skills` takes both out of `humans/faces/tracked`
+before any skill sees it unless the yes file holds a yes (missing or
+unreadable is no; `Faces::for_skills`, the Reviewer-lead's P2 on #7450).
+The lamp's own parts, such as the voice deciding whether a line was said
+to it, read them on the lamp. The voice's
 onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
 whether the lamp may notice whether people look happy or upset, to
 answer more warmly (never said aloud, no picture of a face kept), and keeps

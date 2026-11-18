@@ -403,6 +403,11 @@ links, replaced_by)`, khóa `(person, key)`, tạo `IF NOT EXISTS`,
   (`person::owner_ids`). Một người quen không phải chủ không gửi lệnh nào
   cho id của chủ (quyết định của chủ ngày 11/11, sau khi lệnh quên tất cả
   của một khách trên lamp-06c1 xóa hết bản ghi và liên hệ của chủ).
+  Trên một đèn được thiết lập trước khi onboarding giữ `owner`, khuôn mặt của
+  chủ được giữ dưới một tên khác tên đã gõ không nằm trong `owner_ids`, nên
+  lệnh quên tất cả của nó không gửi gì cho id của tên đã gõ; sau khi chủ tự
+  liên kết bằng lời của chính họ (`LAMP_OWNER_LINK=on`, #7501,
+  [memory.md](../memory.md), "The owner's face and typed name") thì có.
   `service_contacts_forget` với `all: true` xóa mọi liên hệ
   thư của `person` như vậy.
 - **Bản ghi được hỏi trước một lần quên bị từ chối** `forgotten`: khi
@@ -429,6 +434,185 @@ Chỉ người đã biết (id `p-`) có bản ghi; còn lại bị từ chối 
 Giữ đến khi bị quên: hết hạn theo ngày, hết hạn khi không dùng, tidy và
 nightly không đọc bảng này. `forget_all` và `forget_person` xóa chúng. Tối đa
 10.000 bản ghi một người. Memory cũ trả `unknown_op`.
+
+### Loại nguồn, con trỏ, tóm tắt và thời điểm việc (bản ghi liên kết, lát 1)
+
+Kế hoạch bộ nhớ dịch vụ liên kết (16/11; quyết định của builder đầu tiên lúc
+16:57 trên #6811, theo quyết định bản ghi connector của chủ ngày 11/11) cho
+một bản ghi nêu nơi việc đó nằm, để các lát sau giữ việc Harness, lệnh gọi của
+agent và nhắc nhở thành bản ghi. Lát này chỉ là schema: chưa có ai ghi các
+trường mới, và một lần ghi không nêu trường nào hoạt động như trước.
+
+- **Cột.** Mỗi lần mở, sau `days.sql`, `service_records::migrate` thêm từng
+  cột bảng còn thiếu (đọc bằng `pragma table_info`, nên chạy lại không đổi
+  gì), trong một giao dịch: lệnh `ALTER` đầu tiên trên các bảng này.
+  `user_version` giữ 1.
+
+  | Cột | Kiểu | Mặc định | Giới hạn |
+  |---|---|---|---|
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder` | `'voice'` | một trong bốn |
+  | `source_ref` | `TEXT NOT NULL`, một object JSON | `'{}'` | tối đa 512 byte |
+  | `summary` | `TEXT NOT NULL` | `''` | tối đa 160 byte |
+  | `deed_unix_ms` | `INTEGER`, null ở bản ghi cũ | null | thời điểm tính bằng ms |
+
+  Cùng chỉ mục `service_records_kind(person, source_kind, changed_unix_ms)`.
+- **`service_record`** nhận thêm bốn trường tùy chọn: `source_kind`,
+  `source_ref`, `summary` và `deed_unix_ms`. Không có trường nào (voice cũ)
+  thì bản ghi là `voice`, như mọi bản ghi trước đây. Loại không biết bị từ
+  chối `bad_kind`, lần ghi đổi loại của một bản ghi đã giữ cũng vậy. Loại
+  liên kết (`task`, `agent`, `reminder`) phải gửi `source_ref` ở mọi lần
+  ghi; bản ghi `voice` thì tùy. `source_ref` là
+  `{service, id, session?, computer?}`: object chỉ gồm các trường đó, mỗi
+  trường là chữ không có ký tự điều khiển, `service` và `id` không rỗng, tối
+  đa 512 byte dạng JSON; khác đi bị từ chối `bad_source_ref`. Session chỉ là
+  tham chiếu mờ: phiên agent ở lại trong agent. `summary` được làm gọn (ký
+  tự điều khiển và chuỗi khoảng trắng thành một khoảng trắng) và cắt ở một
+  ký tự trọn vẹn còn 160 byte. Cập nhật tại chỗ bỏ qua `source_ref`,
+  `summary` hay `deed_unix_ms` thì giữ giá trị đang có. Danh sách trả cả
+  bốn trường.
+- **Giới hạn theo loại.** Mỗi loại liên kết giữ tối đa 2.000 bản ghi một
+  người, nằm trong 10.000: quá mức đó, bản ghi đổi lâu nhất của loại đó bị
+  xóa, không đụng loại khác. Bản ghi `voice` chỉ bị giới hạn bởi 10.000.
+- **Lần quên thắng theo thời điểm việc** (điều kiện 2 của builder đầu
+  tiên). Một lần ghi bị từ chối `forgotten` khi thời điểm sớm hơn trong
+  `asked_unix_ms` và `deed_unix_ms` trước lần quên tất cả mới nhất của người
+  đó, trước một lần quên về một việc khớp với nó, hoặc trước lần quên liên
+  hệ của một địa chỉ nó đã gửi tới. Nhờ vậy một việc làm trước lần quên mà
+  ghi sau đó không bao giờ được giữ.
+- **Recall và quên đọc cả tóm tắt.** `about` của recall và
+  `service_records_forget {about}` khớp tóm tắt của bản ghi như khớp dịch
+  vụ, hành động, lý do, id kết quả và chi tiết. Quên tất cả và quên người
+  xóa cả hàng, nên con trỏ và tóm tắt đi cùng. Không có gì ở dịch vụ nguồn
+  bị động tới.
+- **Quay về bản cũ.** Bản build cũ nêu tên cột ở mọi lệnh insert và select,
+  nên bỏ qua bốn cột này: bản ghi nó ghi là `voice`, và lệnh quên tất cả của
+  nó vẫn xóa cả hàng. Lệnh quên về một việc của bản cũ không đọc `summary`.
+  Memory cũ từ chối một `service_record` mang trường mới (trường yêu cầu của
+  nó đóng), nên bên ghi chỉ gửi chúng khi công tắc của mình bật.
+
+### Bản ghi liên kết: `linked.sock` (lát 1b, `LAMP_MEMORY_LINKED_SOCKET`, tắt)
+
+Đường ghi builder đầu tiên chọn trên #6811 (16/11, 17:0x), dạng lai mà người
+dùng chọn: một socket hẹp, có kiểu, tự kiểm tra chủ, nằm cạnh socket chính,
+cho bản ghi đọc của agent từ lamp-services. Voice ghi bản ghi việc, ghi của
+agent và nhắc nhở qua socket của chính nó (các lát sau), vì chỉ voice nêu
+được người. Hiện chưa có ai ghi vào `linked.sock`.
+
+- **Công tắc.** `LAMP_MEMORY_LINKED_SOCKET` trong môi trường của lamp-memory:
+  `on` mở socket, cùng `--memory-days`; không đặt, rỗng hoặc `off` thì đóng
+  và không nói gì. Giá trị khác, hoặc `on` mà không có `--memory-days`, được
+  nói một lần trong journal và socket vẫn đóng (`server::linked_switch`,
+  `open_linked` trong `application.rs`). Tắt ở cả hai unit; không unit nào
+  đặt nó.
+- **Socket.** `linked.sock` cạnh `--socket`
+  (`/run/lampos-memory/linked.sock` trên lamp), quyền 0660, thuộc nhóm
+  `lampos-linked` trong `/etc/group` (điều kiện 4: nhóm nêu ai được ghi).
+  Được tạo như socket quên của app: dưới một tên riêng, đặt quyền và nhóm,
+  rồi mới chuyển vào chỗ. Không tạo được (không có nhóm đó, hoặc user của
+  memory không gán được nhóm) thì nói `the linked socket is not open: …` và
+  memory vẫn phục vụ. Muốn bật cần trước: trình cài đặt tạo nhóm
+  `lampos-linked`, đưa `lampos-memory` vào nhóm
+  (`SupplementaryGroups=lampos-linked` trong `lamp-memory.service`, để memory
+  gán được nhóm đó cho socket), và đặt công tắc trong `lamp-memory.service`.
+  lamp-services hiện chạy bằng root nên kết nối được dù thế nào: socket
+  không kiểm tra thông tin của bên kết nối, nên nhóm không thêm gì với
+  lamp-services và chỉ giữ mọi phần không phải root khác ở ngoài. Các unit chưa có gì trong số đó:
+  `SupplementaryGroups` nêu một nhóm chưa có sẽ làm unit không chạy.
+- **Một lệnh, `linked_record`.** Socket chỉ cho qua một object
+  `{"op":"linked_record",…}` có nêu `source_kind` (dạng chữ) và không có
+  `person` (`protocol::linked`); mọi thứ khác bị từ chối `not_allowed` (hoặc
+  `bad_kind`) và không bao giờ tới kho:
+
+  ```json
+  {"op":"linked_record","source_kind":"agent","task":"t-tasks-7","run":"run-1","n":0,
+   "action":"search_mail","status":"done","deed_unix_ms":1791892800000,
+   "summary":"Searched mail for the dentist",
+   "source_ref":{"service":"gmail","id":"res-1","session":"run-1"}}
+  ```
+
+  Mọi trường đều bắt buộc, và không nhận trường nào khác. `summary` phải
+  nói việc đã làm: thiếu thì `bad_request`, trống sau khi làm gọn thì
+  `empty` (`Days::linked_record_put`), nên hàng của agent luôn có những từ
+  mà lệnh quên một điều khớp được. Socket chính cũng nhận lệnh này. Một bản
+  ghi `agent` đưa thẳng vào kho (`service_record`) không có summary, hỏi
+  trước một lệnh quên một điều của chủ nó, bị từ chối `forgotten`
+  (`refuse_forgotten`): không có từ nào để khớp, kho không biết được nó
+  không phải bản ghi mà lệnh quên đó đã xoá.
+- **Memory tự tìm chủ** (điều kiện 1, `Days::linked_record_put`).
+  `source_kind` phải là `agent` (khác thì `bad_kind`: việc và nhắc nhở là
+  của voice). Chủ là người duy nhất đã biết (id `p-`) giữ một bản ghi `task`
+  có khoá `task` và `source_ref.session` là `run`. Không có hàng đó, hàng
+  của lượt chạy hay loại khác, hoặc hai người cùng giữ khoá đó: từ chối
+  `no_owner`, không giữ gì. Vậy bản ghi việc của voice (lát 3) phải mang id
+  lượt chạy skill trong `source_ref.session`.
+- **Bản ghi.** Được giữ cho chủ đó qua `service_record_put`, khoá
+  `a-<run>-<n>` (`bad_key` khi `run` hay `task` không tạo được khoá bản ghi,
+  hoặc `task` không phải khoá `t-`), `source_kind` là `agent`, dịch vụ là
+  `source_ref.service`, liên kết tới hàng việc (`links`), hỏi và làm lúc
+  `deed_unix_ms`, đổi theo đồng hồ của memory. Nhờ vậy mọi giới hạn của lát 1
+  vẫn giữ (điều kiện 5: tóm tắt 160 byte từ trường dịch vụ đã có, con trỏ
+  512 byte, giới hạn theo loại) và lần quên thắng theo thời điểm việc (điều
+  kiện 2): sau quên tất cả, hàng việc đã mất nên không có chủ; khi hàng đó
+  được ghi lại, việc làm trước lần quên vẫn bị từ chối `forgotten`. Thời
+  điểm việc sớm hơn đồng hồ của memory quá 5 s bị từ chối `bad_time`, để một
+  thời điểm tương lai không vượt qua được lần quên sau đó. Trả lời là
+  `{"ok":true,"status":…,"key":"a-<run>-<n>"}`.
+- **Bên ghi không bao giờ chờ lâu** (điều kiện 3). Một yêu cầu một kết nối,
+  `LINKED_PATIENCE` (250 ms) để gửi và 250 ms để nhận câu trả lời; rồi kết
+  nối kết thúc. Server phục vụ từng client một, nên bên ghi bị kẹt giữ các
+  lệnh gọi memory của voice tối đa 250 ms, không phải 2 s của socket chính.
+  Giới hạn và bỏ của chính bên ghi (cùng hộp chờ của nó) thuộc lát 4.
+- **Đếm bản bị bỏ.** Mỗi bản ghi không được giữ được đếm theo lý do
+  (`LinkedDrops`: `no_owner`, `forgotten`, `refused` cho mọi từ chối khác,
+  `late` khi yêu cầu không gửi hay câu trả lời không được nhận kịp) và nói
+  trong một dòng journal kèm số đếm, ví dụ `linked socket: linked_record
+  person=everyone refused error=no_owner; dropped: no_owner=1 forgotten=0
+  refused=0 late=0`. Không ghi nội dung nào.
+- **Quay về bản cũ.** Bản build cũ không có `linked.sock` và không có
+  `linked_record` (`unknown_op`); bản ghi đã giữ là hàng `agent` bình thường
+  mà bản cũ bỏ qua như lát 1 đã nói. Không quay về trước lát 1 khi công tắc
+  của một bên ghi liên kết đang bật, trừ khi các hàng liên kết đã được xoá
+  hết trước (quên tất cả, hoặc lệnh xoá của chính công tắc đó): lệnh quên
+  một điều của bản cũ không đọc `summary`, nên không xoá được chúng.
+
+### Hộp chờ liên kết của voice (lát 2, dưới `LAMP_SERVICE_RECORDS`)
+
+Phía voice của đường ghi cho những bản ghi chỉ voice mới biết là của ai:
+việc Harness, lệnh ghi của agent và lời nhắc (các lát sau). Voice xếp hàng
+mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
+`summary` và `deed_unix_ms`, qua socket gốc của chính nó
+(`lamp-voice` `service_records::linked`). Hiện chưa có gì đưa vào: mỗi bên
+ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
+`_REMINDERS`), và khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+
+- **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
+  connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
+  của một lần gửi. Mỗi khóa một: thay đổi mới hơn của cùng người và khóa thay
+  cho cái đang chờ. Khi đầy, cái cũ nhất bị bỏ, được đếm từ lúc voice khởi
+  động là `linked_dropped` trong health của voice (một dữ kiện cạnh báo cáo,
+  mức không đổi, hiện khi đã có cái bị bỏ) và nói trong một dòng journal với
+  khóa, loại và số đếm, không một chữ nào của tóm tắt.
+- **Không bao giờ chờ.** Một lần đưa vào chỉ lấy khóa của hàng chờ; một
+  luồng ghi riêng (`linked-records`, tách khỏi luồng ghi bản ghi connector,
+  để không bên nào chờ việc tồn của bên kia) gửi khi khóa đã nhả, 2 s mỗi lần
+  ghi. Memory không trả lời thì thay đổi vẫn đứng đầu và được thử lại sau
+  1 s, gấp đôi tới 30 s, nói một lần; bị từ chối (`forgotten` hay lý do
+  khác) thì bỏ và nói lời từ chối, chỉ khóa và lỗi.
+- **Của ai.** Chỉ của người đã biết (id `p-`). Không có người, hay người
+  chưa biết, thì không giữ và không ghi gì: khác bản ghi connector, không có
+  đường lùi về chủ đèn.
+- **Kiểm trước khi chờ.** Khóa mà memory sẽ từ chối, dịch vụ hay hành động
+  để trống, hay `source_ref` không phải `{service, id, session?, computer?}`
+  (chữ không có ký tự điều khiển, `service` và `id` không trống, tối đa
+  512 byte) thì không bao giờ vào hàng chờ. Tóm tắt được gọn thành một dòng
+  và cắt ở ký tự trọn vẹn tới 160 byte.
+- **Lần quên thắng.** Quên tất cả, quên người, hay quên về một điều đều lấy
+  đi các thay đổi liên kết đang chờ của người đó (hay của mọi người) trước
+  khi gửi lần quên và lần nữa khi có trả lời, quên về một điều thì so với
+  dịch vụ, hành động và tóm tắt của thay đổi; memory từ chối việc làm trước
+  một lần quên (lát 1).
+- **Quay về bản cũ.** Chưa có gì gọi tới, nên voice cũ chỉ khác ở chỗ không
+  có dữ kiện `linked_dropped`.
 
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 

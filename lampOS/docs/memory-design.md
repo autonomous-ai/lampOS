@@ -175,7 +175,7 @@ night.
 The eventual store belongs in the memory process, backed by SQLite. Working
 conversation state belongs in voice. The design uses a session-start owner
 snapshot and cue-driven recall; it does not require new live model tools or
-exceed the second route's current **48-tool limit** (`second_provider.rs`);
+exceed the second route's current **64-tool limit** (`second_provider.rs`);
 the 32-tool limit applies to Gemini Live. Integration must preserve compatibility with
 the previous build on each side of the process interface.
 
@@ -250,7 +250,8 @@ the shape and what it leaves open:
   call cancelled and its job dropped (its prompt already sent); no call
   starts in the night's last 5 minutes. Memory answers each night op
   within 100 ms (`busy` past it, a give then given again and applied
-  once), so the night never holds its one-at-a-time socket near a turn's
+  once, or dropped and counted if speech, the slide or the night's end
+  comes first), so the night never holds its one-at-a-time socket near a turn's
   first read. A job is given out once: a reply that
   fails the checks, one the voice could not read, a timed-out call, a job
   not given back within its 120 s lease, and every job left at 06:00 are

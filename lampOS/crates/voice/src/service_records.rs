@@ -862,6 +862,7 @@ pub fn forgot(person: Option<&str>) {
         }
     });
     kept::outbox(|outbox| outbox.waiting.retain(|record| !theirs(record)));
+    linked::unsent(person);
 }
 
 /// `text` lower case and without accents, its words.
@@ -906,19 +907,27 @@ fn texts(value: &Value, out: &mut String) {
 /// Whether a record is `person`'s and has every key word of a subject of
 /// `about` (each subject's key words), as the memory's forget matches it.
 fn about_matches(person: &str, about: &[Vec<String>]) -> impl Fn(&Record) -> bool {
-    let subjects: Vec<Vec<String>> = about
-        .iter()
-        .map(|words| words.iter().flat_map(|word| words_in(word)).collect())
-        .collect();
+    let matches = text_matches(about);
     let person = person.to_owned();
     move |record: &Record| {
         let mut text = format!("{} {} {} ", record.service, record.action, record.reason);
         texts(&record.detail, &mut text);
-        let words = words_in(&text);
-        record.person == person
-            && subjects.iter().any(|subject| {
-                !subject.is_empty() && subject.iter().all(|word| words.contains(word))
-            })
+        record.person == person && matches(&text)
+    }
+}
+
+/// Whether a text has every key word of a subject of `about`, as the
+/// memory's forget matches it.
+fn text_matches(about: &[Vec<String>]) -> impl Fn(&str) -> bool {
+    let subjects: Vec<Vec<String>> = about
+        .iter()
+        .map(|words| words.iter().flat_map(|word| words_in(word)).collect())
+        .collect();
+    move |text: &str| {
+        let words = words_in(text);
+        subjects
+            .iter()
+            .any(|subject| !subject.is_empty() && subject.iter().all(|word| words.contains(word)))
     }
 }
 
@@ -928,6 +937,7 @@ fn about_matches(person: &str, about: &[Vec<String>]) -> impl Fn(&Record) -> boo
 /// go when the memory answers ([`forgot`]).
 pub fn unsent(person: &str) {
     kept::outbox(|outbox| outbox.waiting.retain(|record| record.person != person));
+    linked::unsent(Some(person));
 }
 
 /// A forget about `about` of `person`'s is about to be sent: the changes
@@ -935,6 +945,7 @@ pub fn unsent(person: &str) {
 pub fn unsent_about(person: &str, about: &[Vec<String>]) {
     let matches = about_matches(person, about);
     kept::outbox(|outbox| outbox.waiting.retain(|record| !matches(record)));
+    linked::unsent_about(person, text_matches(about));
 }
 
 /// The memory answered a forget about `about` (each subject's key words)
@@ -968,6 +979,7 @@ pub fn forgot_about(person: &str, about: &[Vec<String>]) {
             .waiting
             .retain(|record| !gone.contains(&record.key) && !matches(record));
     });
+    linked::unsent_about(person, text_matches(about));
 }
 
 /// The memory answered a forget about a mail contact of `person`'s that
@@ -1157,6 +1169,7 @@ fn start_saver() {
 #[cfg(test)]
 fn start_saver() {}
 
+pub mod linked;
 pub mod redo;
 pub mod told;
 

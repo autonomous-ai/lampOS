@@ -328,6 +328,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     (
+        crate::second_provider::DOWN_LINE_LIMIT,
+        [
+            "Mình hết hạn mức rồi.",
+            "利用上限に達しちゃった。",
+            "我的额度用完了。",
+            "사용 한도를 다 썼어요.",
+        ],
+    ),
+    (
         crate::second_provider::COULD_NOT_LOOK,
         [
             "Mình không nhìn rõ được.",
@@ -490,6 +499,25 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "よし、いくよ。",
             "好，我开始啦。",
             "좋아요, 시작할게요.",
+        ],
+    ),
+    // A seated lamp's one line, sent by lamp-body as exact words (#7281).
+    (
+        lamp_body::seat_say::RESTS,
+        [
+            "Mình hơi nóng, nên mình nghỉ một lúc nhé.",
+            "ちょっと熱くなっちゃった。少し休むね。",
+            "我有点热，先休息一会儿。",
+            "조금 뜨거워져서 잠시 쉴게요.",
+        ],
+    ),
+    (
+        lamp_body::seat_say::WAITS,
+        [
+            "Mình cần nghỉ một chút. Khi nào muốn mình dậy, giữ đầu mình một giây nhé.",
+            "ちょっと休ませてね。起きてほしいときは、頭を1秒おさえてね。",
+            "我需要休息一下。想让我起来的时候，按住我的头一秒钟。",
+            "잠깐 쉬어야 해요. 제가 일어나길 원하면 제 머리를 1초만 잡아 주세요.",
         ],
     ),
     // The prepare-unplug skill's lines, sent as exact words (#5777's P3):
@@ -1028,6 +1056,9 @@ mod tests {
             "The air reads like smoke. If something's burning, please check it."
         ));
         assert!(is_fixed("Hehe, that tickles."));
+        // A seated lamp's lines (#7281).
+        assert!(is_fixed(lamp_body::seat_say::RESTS));
+        assert!(is_fixed(lamp_body::seat_say::WAITS));
         assert!(!is_fixed("My pairing check is 3 F 9 A, 0 B 2 C."));
         assert!(!is_fixed("Two new mails, from the bakery."));
     }
@@ -1036,7 +1067,9 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 48);
+        // Each English key once: a second entry for a key is never said.
+        let keys: std::collections::HashSet<_> = FIXED_LINES.iter().map(|(e, _)| e).collect();
+        assert_eq!(keys.len(), FIXED_LINES.len());
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

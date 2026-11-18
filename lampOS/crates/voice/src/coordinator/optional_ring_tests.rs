@@ -664,6 +664,9 @@ fn optional_ring_incomplete_cleanup_blocks_physical_mute_reopen() {
     assert!(reply.is_none());
 }
 
+// A real fake ring child: off Linux the ring startup starts none
+// (`ring_not_on_this_os`), as in `process::ring_startup_tests` (#7597).
+#[cfg(target_os = "linux")]
 #[test]
 fn mandatory_worker_faults_remain_terminal_during_optional_spawn() {
     use crate::process::ring_startup_tests::ChildFixture;
@@ -876,10 +879,12 @@ fn a_ring_live_at_the_stop_is_not_dated_before_it() {
 /// between ticks. Nor does a tick do file work: the old worker's drop, which
 /// removes its folder, runs on the restart's thread. On the loop it took
 /// 56 to 116 ms on a Mac beside other processes' file churn (#1569, #4658).
+#[cfg(target_os = "linux")]
 const TICK_BOUND: Duration = Duration::from_millis(50);
 
 /// One tick of the ring's restart, held to [`TICK_BOUND`]: it only looks
 /// at the startup thread, never waits on it (#1620).
+#[cfg(target_os = "linux")]
 fn restart_tick_at(rig: &mut Rig, trace: &mut SessionState, at_us: impl FnMut() -> u64) -> bool {
     let started = Instant::now();
     let adopted = rig
@@ -897,6 +902,9 @@ fn restart_tick_at(rig: &mut Rig, trace: &mut SessionState, at_us: impl FnMut() 
 /// #1620: a ring that faults is started again, off the loop, 2 s after the
 /// fault and once its process has gone; it takes the current authority, and
 /// a stop after it is clean, with the restarted ring's black-write receipt.
+// A real fake ring child: off Linux the ring startup starts none
+// (`ring_not_on_this_os`), as in `process::ring_startup_tests` (#7597).
+#[cfg(target_os = "linux")]
 #[test]
 fn a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean() {
     use crate::process::ring_startup_tests::{ChildFixture, await_exit};
@@ -1013,6 +1021,9 @@ fn a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean() {
 /// #1620 (the reviewer's P3 on #1981): a stop that comes while the restart's
 /// startup is still under way waits for it, then stops the ring it started
 /// like any other: Ok, with that ring's black-write receipt.
+// A real fake ring child: off Linux the ring startup starts none
+// (`ring_not_on_this_os`), as in `process::ring_startup_tests` (#7597).
+#[cfg(target_os = "linux")]
 #[test]
 fn a_stop_during_a_restart_waits_for_it_and_ends_clean() {
     use crate::process::ring_startup_tests::{ChildFixture, await_exit};

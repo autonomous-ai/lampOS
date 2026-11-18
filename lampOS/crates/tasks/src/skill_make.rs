@@ -64,7 +64,9 @@
 //!   descriptor, `O_NOFOLLOW` (a regular file, never a link, at most
 //!   [`MOST_ANSWER_BYTES`]) once the run has ended and its whole process
 //!   group is gone, and the folder removed however the make ends. The
-//!   voice puts the answer through the same checks as DeepSeek's.
+//!   voice puts the answer through the same checks as DeepSeek's. A
+//!   gateway make with no answer file takes the agent's final chat answer
+//!   instead, only when it is a make's answer ([`make_answer`], #7427).
 //! - **The answers**: `{"ok":true,"started":true}` once the run is about
 //!   to start (so the voice says its waiting line only then), then
 //!   `{"ok":true,"answer"}`; or one refusal: `off`, `bad_request`,
@@ -78,7 +80,9 @@
 //!   lamp-voice's alone (set in its unit, which the unit census keeps), so
 //!   lamp-tasks can't see it.
 use crate::protocol::refusal;
-use crate::skill_task::{NOT_HELD_OFF, Runner, SkillRun, read_line_within, run_id, write_answer};
+use crate::skill_task::{
+    NOT_HELD_OFF, NOT_HELD_OFF_ONE_PATH, Runner, SkillRun, read_line_within, run_id, write_answer,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::os::unix::net::UnixStream;
@@ -398,6 +402,8 @@ pub fn make_run_with(
         start_in: Some(folder.to_path_buf()),
         env_file: None,
         answer: Default::default(),
+        net: false,
+        tells: false,
     }
 }
 
@@ -579,7 +585,23 @@ pub(crate) fn fresh_home(work: &Path) -> std::io::Result<MadeFolder> {
 /// (`crate::skill_task`, `LAMP_AGENT_SERVICES` on in lamp-tasks), which
 /// reaches it only through lamp-control under the run's one-run token.
 pub(crate) fn fresh_home_for(work: &Path, services: bool) -> std::io::Result<MadeFolder> {
-    let made = fresh_folder(work, FOLDER_HEAD)?;
+    fresh_home_named(work, &format!("{FOLDER_HEAD}{}", run_id()), services)
+}
+
+/// [`fresh_home_for`], its folder named by the task's run id, `make-<run>`:
+/// on the one run path the wrapper finds a run granted `net` its fresh home
+/// by that id (#7200, `lamp_update::agent_ns::wrapper::ONE_PATH_EGRESS_LINES`),
+/// as Harness passes it no variable of lamp-tasks'.
+pub(crate) fn fresh_home_for_run(
+    work: &Path,
+    services: bool,
+    run: &str,
+) -> std::io::Result<MadeFolder> {
+    fresh_home_named(work, &format!("{FOLDER_HEAD}{run}"), services)
+}
+
+fn fresh_home_named(work: &Path, name: &str, services: bool) -> std::io::Result<MadeFolder> {
+    let made = fresh_folder(work, name)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
     file_in(&hermes, CONFIG_FILE, &make_config(services)?)?;
@@ -589,15 +611,15 @@ pub(crate) fn fresh_home_for(work: &Path, services: bool) -> std::io::Result<Mad
     Ok(made)
 }
 
-/// A fresh folder `<head><run id>` in `work`, 0700 before anything is in
-/// it, opened never through a link and removed however its run ends.
-fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
+/// A fresh folder `name` (`make-<run id>`) in `work`, 0700 before anything
+/// is in it, made new (never one there), opened never through a link and
+/// removed however its run ends.
+fn fresh_folder(work: &Path, name: &str) -> std::io::Result<MadeFolder> {
     use rustix::fs::{Mode, open};
-    let name = format!("{head}{}", run_id());
     let at = open(work, DIR_FLAGS, Mode::empty())?;
-    let fd = folder_in(&at, &name)?;
+    let fd = folder_in(&at, name)?;
     Ok(MadeFolder {
-        path: work.join(&name),
+        path: work.join(name),
         fd,
     })
 }
@@ -652,6 +674,12 @@ fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
     file.take(MOST_ANSWER_BYTES + 1)
         .read_to_string(&mut text)
         .ok()?;
+    answer_held(text)
+}
+
+/// An answer as a make holds it, from [`ANSWER_FILE`] or the agent's chat
+/// alike: not empty, and at most [`MOST_ANSWER_BYTES`].
+fn answer_held(text: String) -> Option<String> {
     (!text.trim().is_empty() && text.len() as u64 <= MOST_ANSWER_BYTES).then_some(text)
 }
 
@@ -661,6 +689,253 @@ fn answer_read(folder: &rustix::fd::OwnedFd) -> Option<String> {
 pub(crate) fn answer_in(folder: &Path) -> Option<String> {
     let fd = rustix::fs::open(folder, DIR_FLAGS, rustix::fs::Mode::empty()).ok()?;
     answer_read(&fd)
+}
+
+/// How an answer begins that makes nothing, as the rules ask for it and
+/// the voice reads it (`made_skill::CANNOT`).
+pub const CANNOT: &str = "cannot:";
+
+/// Where a gateway make's answer was taken from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AnswerFrom {
+    /// Its folder's [`ANSWER_FILE`].
+    File,
+    /// The agent's final chat answer, with no [`ANSWER_FILE`] (#7427).
+    Chat,
+}
+
+/// A gateway make's answer (#7245, #7427): its folder's [`ANSWER_FILE`]
+/// ([`answer_in`]) whenever there is one; else the agent's final chat
+/// answer `chat`, only when it is a make's answer ([`chat_answer`]). On
+/// lamp-c0a4 (OpenClaw, deepseek-flash) the agent put every make's answer
+/// in chat and wrote no file: a `cannot:` (13584), and a whole skill
+/// (17 Nov 09:35, `head-pat-next-event`), each dropped as `no_answer`.
+/// Any other chat answer is dropped, as before. `chat` comes with whether
+/// Harness cut it short (`truncated`, its `show`'s `--chars`).
+pub(crate) fn make_answer(
+    folder: &Path,
+    chat: Option<(&str, bool)>,
+) -> Option<(String, AnswerFrom)> {
+    if let Some(text) = answer_in(folder) {
+        return Some((text, AnswerFrom::File));
+    }
+    chat.and_then(|(chat, truncated)| chat_answer(chat, truncated))
+        .map(|text| (text, AnswerFrom::Chat))
+}
+
+/// The agent's chat answer when it is a make's answer: its `cannot:` line
+/// ([`chat_cannot`]), or the whole chat when it holds a skill's files
+/// ([`chat_skill`]), only when Harness didn't cut it short (`truncated`,
+/// Heron on #7441: a cut answer may have lost a file of its code after two
+/// whole blocks); else none.
+pub(crate) fn chat_answer(chat: &str, truncated: bool) -> Option<String> {
+    chat_cannot(chat, truncated).or_else(|| (!truncated).then(|| chat_skill(chat)).flatten())
+}
+
+/// The agent's chat answer's `cannot:` line, held as [`answer_read`] holds
+/// the file: the first line only, beginning with [`CANNOT`] (any case,
+/// after blank space) and with a reason after it, no fenced block, not
+/// empty and at most [`MOST_ANSWER_BYTES`]; else none. With the chat cut
+/// short (`truncated`), only a line that ended before the cut (a line
+/// break follows it in what Harness showed), so a reason is never taken
+/// cut mid-word.
+pub(crate) fn chat_cannot(chat: &str, truncated: bool) -> Option<String> {
+    let chat = chat.trim_start();
+    let line = chat.lines().next()?.trim_end();
+    let head = line.get(..CANNOT.len())?;
+    let reason = line[CANNOT.len()..].trim();
+    (head.eq_ignore_ascii_case(CANNOT)
+        && !reason.is_empty()
+        && !chat.contains("```")
+        && (!truncated || chat.contains('\n'))
+        && line.len() as u64 <= MOST_ANSWER_BYTES)
+        .then(|| line.to_owned())
+}
+
+/// The agent's whole chat answer when it holds a skill as `answer.md`
+/// does: held as the file is ([`answer_held`]: not empty, at most
+/// [`MOST_ANSWER_BYTES`]), with one closed fenced block that is
+/// `skill.toml` and one that is `SKILL.md` ([`skill_blocks`]), and not the
+/// rules' own example skill given back ([`is_example`]); else none. Words
+/// around the blocks are kept: the voice reads the blocks alone
+/// (`made_skill::files`), through the same checks and repairs as a file's.
+pub(crate) fn chat_skill(chat: &str) -> Option<String> {
+    let text = answer_held(chat.to_owned())?;
+    let blocks = skill_blocks(&text);
+    let one = |part: Part| {
+        let mut of = blocks.iter().filter(|(at, _)| *at == part);
+        match (of.next(), of.next()) {
+            (Some((_, body)), None) => Some(body.as_str()),
+            _ => None,
+        }
+    };
+    let (toml, card) = (one(Part::Toml)?, one(Part::Card)?);
+    (!is_example(toml, card)).then_some(text)
+}
+
+/// The example skill the rules show the model whole
+/// (`make_skill_local::EXAMPLE`, lamp-voice's; lamp-voice depends on
+/// lamp-tasks, so it is copied here): its `SKILL.md` name, and its
+/// `skill.toml`.
+const EXAMPLE_NAME: &str = "example-only";
+const EXAMPLE_TOML: &str = "kind = \"installable\"
+version = \"1.0.0\"
+needs = [\"light\"]
+
+[permissions]
+topics = [\"room/presence\"]
+light = true
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"5s\"
+cooldown = \"1h\"
+rearm = \"ends\"
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+light = { colour = \"cyan\", level = 2, for = \"25s\" }
+";
+
+/// Whether a skill's two files are the rules' example given back, as the
+/// voice's own maker tells it (`make_skill_local::is_example`): its
+/// `skill.toml` the example's but for blank space, or its `SKILL.md` named
+/// as the example is.
+fn is_example(toml: &str, card: &str) -> bool {
+    let bare = |text: &str| text.split_whitespace().collect::<String>();
+    let name = card
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("name:"))
+        .map(|name| name.trim().trim_matches('"'));
+    bare(toml) == bare(EXAMPLE_TOML) || name == Some(EXAMPLE_NAME)
+}
+
+/// Which of a skill's two files a fenced block is, read as the voice reads
+/// it (`made_skill::fence_named`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Part {
+    Toml,
+    Card,
+    /// No name: `SKILL.md` when it begins with front matter, else
+    /// `skill.toml` ([`skill_blocks`]).
+    Bare,
+    /// A file of its code (`scripts/…`), or any other.
+    Other,
+}
+
+/// A fence line, indented or not: its mark, how many (three or more), and
+/// its info string, trimmed (`made_skill::fence`).
+fn fence(line: &str) -> Option<(u8, usize, &str)> {
+    let line = line.trim();
+    let mark = *line.as_bytes().first()?;
+    if mark != b'`' && mark != b'~' {
+        return None;
+    }
+    let run = line.bytes().take_while(|&b| b == mark).count();
+    (run >= 3).then(|| (mark, run, line[run..].trim()))
+}
+
+/// A fence's part and whether it names a file whole, from its info
+/// string's last word (`made_skill::fence_named`).
+fn fence_part(info: &str) -> (Part, bool) {
+    let word = info.split_whitespace().last().unwrap_or_default();
+    let word = word.rsplit_once('=').map_or(word, |(_, value)| value);
+    let word = word
+        .trim_matches(|c| matches!(c, '"' | '\'' | '*' | '`'))
+        .trim_end_matches(':');
+    if word.starts_with("scripts/") {
+        return (Part::Other, true);
+    }
+    match word.to_ascii_lowercase().as_str() {
+        "" => (Part::Bare, false),
+        "skill.toml" => (Part::Toml, true),
+        "skill.md" => (Part::Card, true),
+        "toml" => (Part::Toml, false),
+        "md" | "markdown" => (Part::Card, false),
+        _ => (Part::Other, false),
+    }
+}
+
+/// The closed fenced blocks of `answer`, each as the file it is and its
+/// body, found as the voice finds them (`made_skill::fenced`, line for
+/// line): a block closes on a bare fence of its own mark at least as long
+/// (any other bare fence is a line of its body), or at the end of its
+/// line; a fence naming another file whole, or any named fence in
+/// `skill.toml`, closes it and opens that one; in `SKILL.md` another named
+/// fence opens a block within it, closed by the next bare fence. A bare
+/// block is `SKILL.md` when it begins with front matter, else
+/// `skill.toml`. A block left open at the end is not one.
+fn skill_blocks(answer: &str) -> Vec<(Part, String)> {
+    let mut blocks = Vec::new();
+    // The block open now: its part, body, mark, run, and how many blocks
+    // within it are open.
+    let mut open: Option<(Part, String, u8, usize, usize)> = None;
+    let mut lines = answer.lines();
+    let mut again = None;
+    while let Some(line) = again.take().or_else(|| lines.next()) {
+        let Some((part, mut body, mark, run, mut depth)) = open.take() else {
+            if let Some((mark, run, info)) = fence(line) {
+                open = Some((fence_part(info).0, String::new(), mark, run, 0));
+            }
+            continue;
+        };
+        let mut closed = false;
+        match fence(line) {
+            Some((_, _, "")) if depth > 0 => {
+                depth -= 1;
+                body.push_str(line);
+                body.push('\n');
+            }
+            Some((this, length, "")) if this == mark && length >= run => closed = true,
+            Some((_, _, info)) if !info.is_empty() && depth == 0 => {
+                let (named, whole) = fence_part(info);
+                // A file of its code always begins a block of its own.
+                let other_file = whole && (named != part || named == Part::Other);
+                if other_file || part == Part::Toml {
+                    closed = true;
+                    again = Some(line);
+                } else {
+                    depth += 1;
+                    body.push_str(line);
+                    body.push('\n');
+                }
+            }
+            Some((_, _, info)) if !info.is_empty() => {
+                depth += 1;
+                body.push_str(line);
+                body.push('\n');
+            }
+            _ => {
+                let end = String::from_utf8(vec![mark; run]).unwrap_or_default();
+                match line.trim_end().strip_suffix(end.as_str()) {
+                    Some(before) if depth == 0 && !before.trim().is_empty() => {
+                        body.push_str(before);
+                        body.push('\n');
+                        closed = true;
+                    }
+                    _ => {
+                        body.push_str(line);
+                        body.push('\n');
+                    }
+                }
+            }
+        }
+        if closed {
+            let part = match part {
+                Part::Bare if body.trim_start().starts_with("---") => Part::Card,
+                Part::Bare => Part::Toml,
+                part => part,
+            };
+            blocks.push((part, body));
+        } else {
+            open = Some((part, body, mark, run, depth));
+        }
+    }
+    blocks
 }
 
 /// Make folders an earlier lamp-tasks left in `work` (stopped while a make
@@ -686,7 +961,7 @@ pub fn sweep(work: &Path) {
 /// The refusal's code for why a run can't start.
 fn not_started(why: &str) -> &'static str {
     match why {
-        NOT_HELD_OFF => "not_held_off",
+        NOT_HELD_OFF | NOT_HELD_OFF_ONE_PATH => "not_held_off",
         NO_NAMESPACE => "no_namespace",
         _ => "run_failed",
     }
@@ -983,6 +1258,11 @@ pub struct MakeHermes {
     /// The one agent namespace ([`crate::skill_task::AGENT_NS`]), which
     /// the wrapper runs instead with the one run path.
     pub agent_ns: PathBuf,
+    /// A task's run granted `net` ([`net_runner`]): held as every run, and
+    /// given its own egress socket ([`crate::egress::Grant::open`]) while
+    /// it runs, named to the namespace script by
+    /// [`crate::egress::EGRESS_ENV`]. None: no way out but the model's.
+    pub egress: Option<crate::egress::Grant>,
 }
 
 impl Runner for MakeHermes {
@@ -999,12 +1279,89 @@ impl Runner for MakeHermes {
         if self.hermes.folder != self.make_work || !(own || one_path) {
             return Err(NO_NAMESPACE.into());
         }
+        if self.egress.is_some() && !has(&self.ns, crate::egress::NS_LINE) {
+            return Err(crate::egress::NO_EGRESS.into());
+        }
         Ok(())
     }
 
+    /// A task's run that tells ([`SkillRun::tells`]) keeps what its agent
+    /// wrote to its own folder's [`ANSWER_FILE`] ([`Self::tell_words`]), as
+    /// a make's answer is read: Hermes's chat answer goes nowhere here.
+    /// Never a make's: its answer is its own.
+    fn answers(&self) -> bool {
+        true
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        match start_in {
+            Some(folder) => crate::skill_task::tell_file_line(&folder.join(ANSWER_FILE)),
+            None => crate::skill_task::TELL_LINE.to_owned(),
+        }
+    }
+
+    /// With [`MakeHermes::egress`], the run's egress socket is made for its
+    /// own folder (`make-<run id>`) before Hermes starts and removed when
+    /// it ends, whatever the end; nothing piped through it outlives the
+    /// run's deadline. A run that tells and ended well has its agent's
+    /// answer read from that folder, before the folder is removed.
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        let ran = self.run_held(run, end_token);
+        if ran.is_ok() {
+            keep_told_answer(run);
+        }
+        ran
+    }
+}
+
+/// A task's run that tells ([`SkillRun::tells`]) and ended well, through a
+/// make's runner: what its agent wrote to its own folder's [`ANSWER_FILE`]
+/// kept as its answer ([`SkillRun::answer`]), read as a make's answer is
+/// ([`answer_in`]: a regular file, never through a link, not empty, at most
+/// [`MOST_ANSWER_BYTES`]). Nothing for any other run.
+pub(crate) fn keep_told_answer(run: &SkillRun) {
+    let Some(folder) = run.start_in.as_deref().filter(|_| run.tells) else {
+        return;
+    };
+    let answer = answer_in(folder);
+    // Its length only, never its words (#7180).
+    eprintln!(
+        "[lamp-tasks] skill task {}: its agent's answer: {}",
+        run.run,
+        answer.as_ref().map_or_else(
+            || format!("none in its {ANSWER_FILE}"),
+            |answer| format!("{} bytes kept", answer.len())
+        )
+    );
+    if let Some(answer) = answer {
+        let _ = run.answer.set(answer);
+    }
+}
+
+impl MakeHermes {
+    fn run_held(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         self.ready()?;
-        self.hermes.run(run, end_token)
+        let Some(grant) = &self.egress else {
+            return self.hermes.run(run, end_token);
+        };
+        let name = run
+            .start_in
+            .as_deref()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .filter(|name| crate::egress::plain_name(name))
+            .ok_or_else(|| "a run granted net has no folder of its own".to_owned())?;
+        let until = std::time::Instant::now() + run.deadline;
+        let served = grant
+            .open(name, until)
+            .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
+        let mut hermes = self.hermes.clone();
+        hermes
+            .env
+            .push((crate::egress::EGRESS_ENV.into(), name.to_owned()));
+        let ran = hermes.run(run, end_token);
+        drop(served);
+        ran
     }
 }
 
@@ -1018,6 +1375,82 @@ impl Runner for MakeHermes {
 /// keeps the lamp's network, as Harness's own panes do (the model then
 /// reached at lamp-cloud's forwarder, the one `model.sock` pipes to).
 pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
+    lamp_runner_with(home, held, None)
+}
+
+/// The runner a task's run granted `net` goes through (the design note on
+/// #7200): [`lamp_runner`] held, so `--net`, only `lo` and the model
+/// relay as every run, with [`crate::egress::Grant::lamp`]: its own
+/// egress socket, the public web on ports 80 and 443 alone.
+pub fn net_runner(home: &Path) -> MakeHermes {
+    lamp_runner_with(home, true, Some(crate::egress::Grant::lamp()))
+}
+
+/// The runner a task's run granted `net` goes through with
+/// [`NET_SWITCH`](crate::skill_task::NET_SWITCH) on (#7200). With
+/// lamp-update's one run path (`one_path`'s
+/// [`crate::skill_task::HarnessRunner::default_agent`]), the lamp's own
+/// Harness runner, as every skill's run: `harness new` (or the wrapper's
+/// task entry with no Harness) in the run's `skill-<run id>` folder, its
+/// egress socket `skill-<run id>.sock` made first
+/// ([`crate::skill_task::HarnessRunner::egress`]), which the one run path's
+/// wrapper finds by the run's id with its fresh home `make-<run id>/home`,
+/// as Harness passes it no variable of lamp-tasks'; refused in words for an
+/// agent that can't take it. Without the one run path, `make`
+/// ([`net_runner`]): Hermes's own wrapper, started by lamp-tasks with
+/// `LAMP_NS_EGRESS` in its environment.
+pub struct NetRunner {
+    pub make: MakeHermes,
+    pub one_path: Option<Arc<crate::skill_task::HarnessRunner>>,
+}
+
+impl NetRunner {
+    fn by_one_path(&self) -> Option<&crate::skill_task::HarnessRunner> {
+        self.one_path
+            .as_deref()
+            .filter(|harness| harness.default_agent)
+    }
+}
+
+impl Runner for NetRunner {
+    /// By the one run path, what the wrapper and namespace script carry is
+    /// checked at the run's start, with the default agent then known
+    /// ([`crate::skill_task::takes_net_runs`]); else the make's net runner's
+    /// checks.
+    fn ready(&self) -> Result<(), String> {
+        match self.by_one_path() {
+            Some(_) => Ok(()),
+            None => self.make.ready(),
+        }
+    }
+
+    /// As the runner it goes through keeps its agent's last answer, so a
+    /// `net` run tells what it found ([`crate::skill_task::tells_answer`]):
+    /// by the one run path the lamp's Harness runner, from its chat; else
+    /// the make's net runner, from the run's own `answer.md`.
+    fn answers(&self) -> bool {
+        match self.by_one_path() {
+            Some(harness) => harness.answers(),
+            None => self.make.answers(),
+        }
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        match self.by_one_path() {
+            Some(harness) => harness.tell_words(start_in),
+            None => self.make.tell_words(start_in),
+        }
+    }
+
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        match self.by_one_path() {
+            Some(harness) => harness.run(run, end_token),
+            None => self.make.run(run, end_token),
+        }
+    }
+}
+
+fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant>) -> MakeHermes {
     let mut hermes = crate::skill_task::HermesRunner::lamp(home);
     if !held {
         hermes
@@ -1031,6 +1464,7 @@ pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
         wrapper: PathBuf::from(crate::skill_task::HERMES),
         ns: PathBuf::from(NS),
         agent_ns: PathBuf::from(crate::skill_task::AGENT_NS),
+        egress,
     }
 }
 
@@ -1237,6 +1671,118 @@ mod tests {
     use crate::skill_task::{ADMIN_SOCKET, HERMES, NET_ENV, NET_RUN, TOKEN_ENV, WRAPPER_NET_LINES};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::PermissionsExt;
+
+    /// A `net` run's runner keeps its agent's answer either way, so the run
+    /// tells it: by the one run path the lamp's Harness runner, asked for a
+    /// last chat answer fit to say; else the make's net runner, asked to
+    /// write it to the run's own `answer.md`.
+    #[test]
+    fn a_net_runner_keeps_an_answer_by_either_path() {
+        let home = Path::new("/var/lib/lampos-tasks");
+        let folder = Path::new("/w/make-r1");
+        let mut harness = crate::skill_task::HarnessRunner::lamp(home, Default::default());
+        harness.default_agent = true;
+        let by_path = NetRunner {
+            make: net_runner(home),
+            one_path: Some(Arc::new(harness)),
+        };
+        assert!(by_path.answers());
+        assert_eq!(
+            by_path.tell_words(Some(folder)),
+            crate::skill_task::TELL_LINE
+        );
+        let mut off = crate::skill_task::HarnessRunner::lamp(home, Default::default());
+        off.default_agent = false;
+        for runner in [
+            NetRunner {
+                make: net_runner(home),
+                one_path: Some(Arc::new(off)),
+            },
+            NetRunner {
+                make: net_runner(home),
+                one_path: None,
+            },
+        ] {
+            assert!(runner.answers());
+            assert_eq!(
+                runner.tell_words(Some(folder)),
+                crate::skill_task::tell_file_line(&folder.join(ANSWER_FILE))
+            );
+        }
+        assert!(lamp_runner(home, true).answers() && lamp_runner(home, false).answers());
+    }
+
+    /// A make's runner (an agent skill's, a keyed run's, a `net` run's off
+    /// the one run path) keeps what a task's run that tells wrote to its own
+    /// folder's `answer.md` once it ended well; a run that doesn't tell (a
+    /// make's own) keeps nothing, nor one that failed.
+    #[test]
+    fn a_makes_runner_keeps_a_telling_runs_answer_from_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let work = dir.path().join("work");
+        let folder = work.join("make-r1");
+        std::fs::create_dir_all(&folder).unwrap();
+        let net = format!("{}{}", WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]);
+        let marked =
+            format!("#!/bin/sh\n{WRAPPER_HOME_LINE}unset T\n{net}--pid hermes-ns \"$@\"\n");
+        let runner = |end: &str| {
+            let (w, n) = namespace(dir.path(), &marked, NS_HOME_LINE);
+            let mut runner = lamp_runner(dir.path(), false);
+            runner.hermes.program = PathBuf::from("/bin/sh");
+            runner.hermes.args = vec![
+                "-c".into(),
+                format!("printf 'Bitcoin is at 91,204 dollars.' > {ANSWER_FILE}; {end}"),
+                "sh".into(),
+            ];
+            runner.hermes.folder = work.clone();
+            runner.make_work = work.clone();
+            runner.hermes.tick = Duration::from_millis(10);
+            (runner.wrapper, runner.ns) = (w, n);
+            runner
+        };
+        let ran = |tells: bool, end: &str| {
+            let _ = std::fs::remove_file(folder.join(ANSWER_FILE));
+            let mut run = make_run(&folder, Duration::from_secs(5));
+            run.tells = tells;
+            let ended = runner(end).run(&run, &|| {});
+            (ended, run.answer.get().cloned())
+        };
+        assert_eq!(
+            ran(true, "exit 0"),
+            (Ok(0), Some("Bitcoin is at 91,204 dollars.".to_owned()))
+        );
+        assert_eq!(ran(false, "exit 0"), (Ok(0), None));
+        assert!(matches!(ran(true, "exit 3"), (Err(_), None)));
+        // Left empty (the skill already said it aloud): nothing to tell.
+        assert_eq!(ran(true, &format!(": > {ANSWER_FILE}")), (Ok(0), None));
+        // 3,000 bytes are kept whole (lamp-tasks carries at most
+        // `MOST_TOLD_BYTES`, lamp-skills says about 400 characters of it);
+        // past the 20 KiB read, none, as a make's answer.
+        let long = ran(
+            true,
+            &format!("yes 'Bitcoin is at 91,204 dollars.' | head -c 3000 > {ANSWER_FILE}"),
+        );
+        assert_eq!(long.1.map(|answer| answer.len()), Some(3_000));
+        let over = ran(
+            true,
+            &format!(
+                "head -c {} /dev/zero | tr '\\0' a > {ANSWER_FILE}",
+                MOST_ANSWER_BYTES + 1
+            ),
+        );
+        assert_eq!(over, (Ok(0), None));
+        // Through a link: never followed.
+        let elsewhere = dir.path().join("elsewhere.md");
+        std::fs::write(&elsewhere, "Not the run's.").unwrap();
+        let linked = ran(
+            true,
+            &format!(
+                "rm -f {ANSWER_FILE}; ln -s {} {ANSWER_FILE}",
+                elsewhere.display()
+            ),
+        );
+        assert_eq!(linked, (Ok(0), None));
+    }
 
     fn line(rules: &str, within_ms: u64) -> Vec<u8> {
         json!({"op":"skill_make","rules":rules,"within_ms":within_ms})
@@ -1722,6 +2268,222 @@ mod tests {
         std::fs::remove_dir_all(&moved).unwrap();
     }
 
+    /// A whole skill the agent wrote in chat, as answer.md would hold it
+    /// (lamp-c0a4, 17 Nov 09:35, OpenClaw deepseek-flash, 731 bytes).
+    const CHAT_SKILL: &str = "Here is the skill.\n\n\
+        ```toml skill.toml\nname = \"head-pat-next-event\"\n```\n\n\
+        ```markdown SKILL.md\n---\nname: head-pat-next-event\n---\nSays the next event.\n```\n\n\
+        ```python scripts/main.py\nprint(\"next\")\n```\n\nDone!";
+
+    /// The answer's text when it was taken from the agent's chat.
+    fn from_chat(folder: &Path, chat: &str) -> Option<String> {
+        match make_answer(folder, Some((chat, false))) {
+            Some((text, AnswerFrom::Chat)) => Some(text),
+            Some((_, AnswerFrom::File)) => panic!("taken from the file"),
+            None => None,
+        }
+    }
+
+    /// lamp-c0a4, 13584, OpenClaw: a make the agent can't do, said
+    /// `cannot:` in chat with no `answer.md`, is that line, so the person
+    /// hears why, not "try again".
+    #[test]
+    fn a_gateway_make_with_no_answer_file_takes_its_chat_cannot_line() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let chat = "cannot: I can't do that yet: a skill can't read your phone's battery.\n\nAnything else?";
+        assert_eq!(
+            from_chat(&made.path, chat).as_deref(),
+            Some("cannot: I can't do that yet: a skill can't read your phone's battery.")
+        );
+        assert_eq!(
+            from_chat(&made.path, "  \nCANNOT: no light sensor.").as_deref(),
+            Some("CANNOT: no light sensor.")
+        );
+        // Held as the file is: a reason, no fenced block, within the bound.
+        let long = format!("cannot: {}", "x".repeat(MOST_ANSWER_BYTES as usize));
+        for chat in [
+            "cannot:",
+            "cannot:   ",
+            "cannot: no\n```toml\n```",
+            long.as_str(),
+        ] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
+        }
+    }
+
+    /// lamp-c0a4, 17 Nov 09:35: a whole skill the agent wrote in chat,
+    /// with no `answer.md`, is the make's answer, words around it and all
+    /// (the voice reads its blocks), not `no_answer`.
+    #[test]
+    fn a_gateway_make_with_no_answer_file_takes_a_skill_said_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        assert_eq!(
+            from_chat(&made.path, CHAT_SKILL).as_deref(),
+            Some(CHAT_SKILL)
+        );
+        // Fences by language, or bare (front matter is `SKILL.md`).
+        for chat in [
+            "```toml\nname = \"x\"\n```\n```md\n---\nname: x\n---\n```",
+            "```\nname = \"x\"\n```\n\n```\n---\nname: x\n---\nIt says.\n```",
+            "```skill.toml\nname = \"x\"\n```SKILL.md\n---\nname: x\n---\n```",
+        ] {
+            assert_eq!(
+                from_chat(&made.path, chat).as_deref(),
+                Some(chat),
+                "{chat:?}"
+            );
+        }
+        // An empty `answer.md` is none: the chat is taken.
+        std::fs::write(made.path.join(ANSWER_FILE), " \n").unwrap();
+        assert_eq!(
+            from_chat(&made.path, CHAT_SKILL).as_deref(),
+            Some(CHAT_SKILL)
+        );
+    }
+
+    /// Any other chat answer is still dropped: a make with no `answer.md`
+    /// stays `no_answer`.
+    #[test]
+    fn a_gateway_make_with_no_answer_file_drops_any_other_chat_answer() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let big = format!("{CHAT_SKILL}\n{}", "x".repeat(MOST_ANSWER_BYTES as usize));
+        for chat in [
+            "I made it! ```toml\nname = \"x\"\n```",
+            "Done, the skill is ready.",
+            "Sorry, cannot: battery.",
+            "",
+            // One of a skill's two files only.
+            "```toml skill.toml\nname = \"x\"\n```",
+            "```python scripts/main.py\nprint(1)\n```",
+            // One of them twice.
+            "```toml\na = 1\n```\n```toml\nb = 2\n```\n```md\n---\n```",
+            // Cut off: SKILL.md never closed.
+            "```toml\nname = \"x\"\n```\n```md\n---\nname: x\n",
+            // Past the bound.
+            big.as_str(),
+        ] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
+        }
+        assert_eq!(make_answer(&made.path, None), None);
+    }
+
+    /// Heron on #7441: a chat answer Harness says it cut short is never
+    /// taken as a skill, though its two files' blocks are whole (a
+    /// `scripts/…` block cut off after them): `no_answer`. A `cannot:` line
+    /// that ended before the cut is still taken.
+    #[test]
+    fn a_gateway_make_never_takes_a_chat_skill_harness_cut_short() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let cut = "```toml skill.toml\nname = \"x\"\n```\n\
+            ```markdown SKILL.md\n---\nname: x\n---\nSays.\n```\n\
+            ```python scripts/main.py\nprint(\"ne";
+        assert_eq!(make_answer(&made.path, Some((cut, true))), None);
+        assert_eq!(make_answer(&made.path, Some((CHAT_SKILL, true))), None);
+        assert_eq!(
+            make_answer(
+                &made.path,
+                Some(("cannot: no battery here.\nMore wo", true))
+            ),
+            Some(("cannot: no battery here.".to_owned(), AnswerFrom::Chat))
+        );
+    }
+
+    /// The adversarial read on #7441: a `cannot:` line Harness cut short
+    /// (no line break after it in what it showed) is never taken: its
+    /// reason may end mid-word. Whole, it still is.
+    #[test]
+    fn a_gateway_make_never_takes_a_cannot_line_harness_cut_short() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        for chat in ["cannot: a skill can't read your pho", "  cannot: no batt  "] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, true))),
+                None,
+                "{chat:?}"
+            );
+            assert!(
+                make_answer(&made.path, Some((chat, false))).is_some(),
+                "{chat:?}"
+            );
+        }
+    }
+
+    /// The adversarial read on #7441: the rules' own example skill given
+    /// back in chat (`example-only`, or its `skill.toml` as shown) is never
+    /// taken as the make's answer.
+    #[test]
+    fn a_gateway_make_never_takes_the_rules_example_given_back_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let card = "```SKILL.md\n---\nname: glow-back\ndescription: x\n---\n```";
+        let example = format!("```skill.toml\n{EXAMPLE_TOML}```\n\n{card}");
+        let renamed = CHAT_SKILL.replace("name: head-pat-next-event", "name: example-only");
+        assert_ne!(renamed, CHAT_SKILL);
+        for chat in [example.as_str(), renamed.as_str()] {
+            assert_eq!(
+                make_answer(&made.path, Some((chat, false))),
+                None,
+                "{chat:?}"
+            );
+        }
+        // The same form with its own `skill.toml` and name is taken.
+        let own = example.replace("cyan", "amber");
+        assert!(make_answer(&made.path, Some((own.as_str(), false))).is_some());
+    }
+
+    /// The adversarial read on #7441: a bare fence of another mark, or a
+    /// shorter one, inside a block is a line of its body, never its end,
+    /// as the voice reads it.
+    #[test]
+    fn a_bare_fence_closes_only_a_block_of_its_mark_and_length() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        // Closed by its own `~~~~`: the ``` and ~~~ inside are its body.
+        let whole = "~~~~toml\na = 1\n```\n~~~\nb = 2\n~~~~\n```md\n---\nname: x\n---\n```";
+        assert_eq!(skill_blocks(whole).len(), 2);
+        assert!(make_answer(&made.path, Some((whole, false))).is_some());
+        // A bare ``` inside a `~~~~` block is its body, and the bare `~~~~`
+        // ends it: the `md` block after it is the skill's `SKILL.md`.
+        let mixed = "~~~~toml\na = 1\n```\n~~~~\n```md\n---\nname: x\n---\n```";
+        assert!(make_answer(&made.path, Some((mixed, false))).is_some());
+        // Never closed: a ``` is not its end, so all that follows is its
+        // body and no `SKILL.md` was written.
+        let open = "~~~~toml\na = 1\n```\n```\n---\nname: x\n---\n```";
+        assert_eq!(make_answer(&made.path, Some((open, false))), None);
+    }
+
+    /// `answer.md` wins over whatever the agent said in chat.
+    #[test]
+    fn a_gateway_make_with_an_answer_file_takes_the_file_over_its_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        std::fs::write(made.path.join(ANSWER_FILE), "FILE").unwrap();
+        for chat in [
+            Some(("cannot: chat says no", false)),
+            Some((CHAT_SKILL, false)),
+            Some((CHAT_SKILL, true)),
+            None,
+        ] {
+            assert_eq!(
+                make_answer(&made.path, chat),
+                Some(("FILE".to_owned(), AnswerFrom::File)),
+                "{chat:?}"
+            );
+        }
+    }
+
     /// Stand-ins for lamp-update's wrapper and namespace script, with the
     /// lines given.
     fn namespace(dir: &Path, wrapper: &str, ns: &str) -> (PathBuf, PathBuf) {
@@ -2127,8 +2889,10 @@ mod tests {
     /// one agent namespace, which carries Hermes's make lines: a make is
     /// ready, Hermes's own `hermes-ns` gone. Without either line, or with
     /// another agent's wrapper, it is refused [`NO_NAMESPACE`]; held, it
-    /// is refused [`NOT_HELD_OFF`], as the one run path holds only a
-    /// skill's run off the network. The lines are lamp-update's own.
+    /// is refused [`NOT_HELD_OFF_ONE_PATH`], as the one run path holds only
+    /// a run started in its own folder; so is the make's net runner, with
+    /// no egress socket made (a task's run granted `net` goes by the one
+    /// run path, [`NetRunner`]). The lines are lamp-update's own.
     #[test]
     fn with_the_one_run_path_a_make_is_ready() {
         let dir = tempfile::tempdir().unwrap();
@@ -2161,10 +2925,32 @@ mod tests {
                 Err(NO_NAMESPACE.to_owned())
             );
         }
+        // Said as the one run path's, never blaming a switch or a round.
         assert_eq!(
             runner(true, hermes, &with_make).ready(),
-            Err(NOT_HELD_OFF.to_owned())
+            Err(NOT_HELD_OFF_ONE_PATH.to_owned())
         );
+        // The make's net runner is held too, so it is refused the same way
+        // there, before its egress socket is made: the one run path's
+        // wrapper gives `--net` only to a run started in its own
+        // `skill-<run-id>` folder. A task's run granted `net` goes by the
+        // one run path instead (`NetRunner`, #7200).
+        let mut net = runner(true, hermes, &with_make);
+        let egress = dir.path().join("egress");
+        net.egress = Some(crate::egress::Grant {
+            dir: egress.clone(),
+            ..crate::egress::Grant::lamp()
+        });
+        let folder = dir.path().join("make-a");
+        std::fs::create_dir(&folder).unwrap();
+        let run = make_run_with(
+            &folder,
+            Duration::from_secs(1),
+            false,
+            &CheckSwitches::default(),
+        );
+        assert_eq!(net.run(&run, &|| {}), Err(NOT_HELD_OFF_ONE_PATH.to_owned()));
+        assert!(!egress.exists());
         assert_eq!(
             lamp_runner(Path::new("/var/lib/lampos-tasks"), false).agent_ns,
             Path::new(crate::skill_task::AGENT_NS)

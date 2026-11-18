@@ -158,6 +158,18 @@ impl LocalTime {
         }
     }
 
+    /// The zone itself, for a part that says a date or a time in it (a
+    /// calendar read-back, `lamp-services`): a fixed offset as a fixed zone,
+    /// the system's as it is now.
+    pub fn time_zone(&self) -> TimeZone {
+        match self {
+            Self::Offset(minutes) => jiff::tz::Offset::from_seconds(minutes.saturating_mul(60))
+                .map_or(TimeZone::UTC, TimeZone::fixed),
+            Self::Zone(zone) => zone.clone(),
+            Self::System(system) => system.current(),
+        }
+    }
+
     /// The local day of `unix_ms`, in days since 1970-01-01.
     pub fn day(&self, unix_ms: u64) -> i64 {
         self.local_ms(unix_ms).div_euclid(DAY_MS) as i64

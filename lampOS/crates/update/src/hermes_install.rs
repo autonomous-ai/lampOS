@@ -231,6 +231,26 @@ pub const NET_ENV: &str = "LAMP_NS_NET";
 /// runtime folder): with [`NET_ENV`] `run`, the one file under
 /// `/run/lampos-tasks` [`NS`] shows, read-only.
 pub const MODEL_SOCKET: &str = "/run/lampos-tasks/model.sock";
+/// The variable a run granted `net` is started with too (with [`NET_ENV`]
+/// `run`, set by lamp-tasks' `skill_make::net_runner`,
+/// `lamp_tasks::egress::EGRESS_ENV`): its own folder's name, `make-<run
+/// id>`; or, on the one run path, `skill-<run id>`, set by the wrapper
+/// itself for a run whose egress socket lamp-tasks made
+/// ([`agent_ns::wrapper::ONE_PATH_EGRESS_LINES`]), as Harness passes the
+/// wrapper none of lamp-tasks' variables (plain, at most 80 bytes, else
+/// the run ends). [`NS`] then shows
+/// [`EGRESS_DIR`]`/<name>.sock` alone, read-only (missing, the run ends),
+/// lowers `net.ipv4.ip_unprivileged_port_start` to 53 in the run's own
+/// network namespace (refused, the run ends: never a fallback to the
+/// lamp's network), binds a `resolv.conf` naming `127.0.0.1` over the
+/// lamp's, starts [`RELAY`] with `--egress` (its web proxy on
+/// `127.0.0.1:3128` and DNS on `127.0.0.1:53`, both piped to that socket,
+/// where lamp-tasks lets out only the public web on ports 80 and 443) and
+/// gives the run `HTTPS_PROXY`, `HTTP_PROXY` (both cases), `NO_PROXY` and
+/// `NODE_USE_ENV_PROXY=1`. Without it, a held run is as before.
+pub const EGRESS_ENV: &str = "LAMP_NS_EGRESS";
+/// lamp-tasks' egress sockets' folder (`lamp_tasks::egress::EGRESS_DIR`).
+pub const EGRESS_DIR: &str = "/run/lampos-tasks/egress";
 /// What [`NS`] starts inside a skill run's network namespace, in the
 /// background before Hermes, as the caller's own ids in a nested user
 /// namespace of its own: lamp-tasks' `net-relay`, listening on
@@ -733,6 +753,9 @@ const TASKS_EDITS: [(&str, &str); 7] = [
          # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n\
          # With LAMP_NS_NET=run (a skill's run, its own network namespace) it shows lamp-tasks' model.sock alone, read-only,\n\
          # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n\
+         # With LAMP_NS_EGRESS=make-<run> or skill-<run> too (a run granted net), it shows that run's egress socket alone,\n\
+         # read-only, opens port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web\n\
+         # proxy on 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
          # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
     ),
     (
@@ -744,6 +767,14 @@ const TASKS_EDITS: [(&str, &str); 7] = [
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n\
          if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\" || fail \"no $L\"; else L=; fi\n\
          if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n\
+         V=\n\
+         if [ \"${LAMP_NS_NET-}\" = run ] && [ -n \"${LAMP_NS_EGRESS-}\" ]; then\n\
+         \x20 case $LAMP_NS_EGRESS in make-?*|skill-?*) ;; *) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
+         \x20 case $LAMP_NS_EGRESS in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
+         \x20 [ ${#LAMP_NS_EGRESS} -le 80 ] || fail \"LAMP_NS_EGRESS is not a run's folder\"\n\
+         \x20 V=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.sock\n\
+         \x20 [ -S \"$V\" ] && [ ! -L \"$V\" ] && touch \"$S/v\" && mount --bind \"$V\" \"$S/v\" || fail \"no $V\"\n\
+         fi\n\
          if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\" && mount --bind \"$P\" \"$S/p\" || fail \"no $P\"; else P=; fi\n",
     ),
     (
@@ -751,11 +782,12 @@ const TASKS_EDITS: [(&str, &str); 7] = [
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n\
          if [ -n \"$L\" ]; then mkdir -p \"${L%/*}\" && touch \"$L\" && mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
          if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n\
+         if [ -n \"$V\" ]; then mkdir -p \"${V%/*}\" && touch \"$V\" && mount --move \"$S/v\" \"$V\" && ro \"$V\" || fail \"$V not shown\"; fi\n\
          if [ -n \"$P\" ]; then mkdir -p \"$P\" && mount --move \"$S/p\" \"$P\" && ro \"$P\" || fail \"$P not shown\"; fi\n",
     ),
     (
         "rm -f \"$S/r\" &&",
-        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$P\" ] || rmdir \"$S/p\"; } &&",
+        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$P\" ] || rmdir \"$S/p\"; } && { [ -z \"$V\" ] || rm -f \"$S/v\"; } &&",
     ),
     (
         "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n",
@@ -765,10 +797,21 @@ const TASKS_EDITS: [(&str, &str); 7] = [
          \x20 [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n\
          \x20 \"$I\" link set lo up || fail \"lo not up\"\n\
          \x20 [ -z \"$(\"$I\" -o link show | cut -d: -f2 | tr -d ' ' | grep -vx lo | grep -v '@NONE$')\" ] || fail \"a link besides lo: the run is not held off the network\"\n\
-         \x20 M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to \"$B\" &)\n\
-         \x20 [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
+         \x20 if [ -n \"$V\" ]; then\n\
+         \x20   echo 53 > /proc/sys/net/ipv4/ip_unprivileged_port_start || fail \"port 53 not opened in the run's own network: a run granted net is refused\"\n\
+         \x20   Q=$(readlink -f /etc/resolv.conf) || Q=/etc/resolv.conf\n\
+         \x20   [ -f \"$Q\" ] && printf 'nameserver 127.0.0.1\\n' > /tmp/.lampos-dns && mount --bind /tmp/.lampos-dns \"$Q\" && mount -o remount,bind,ro,nosuid,nodev,noexec \"$Q\" && rm -f /tmp/.lampos-dns || fail \"resolv.conf not named 127.0.0.1: a run granted net is refused\"\n\
+         \x20   M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to \"$B\" --egress \"$V\" &)\n\
+         \x20   [ \"$M\" = ready ] || fail \"no relay on 127.0.0.1:7741, 127.0.0.1:3128 and 127.0.0.1:53: a run granted net is refused\"\n\
+         \x20   HTTPS_PROXY=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 http_proxy=http://127.0.0.1:3128\n\
+         \x20   NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost NODE_USE_ENV_PROXY=1\n\
+         \x20   export HTTPS_PROXY HTTP_PROXY https_proxy http_proxy NO_PROXY no_proxy NODE_USE_ENV_PROXY\n\
+         \x20 else\n\
+         \x20   M=$(/usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /opt/lampOS/tasks/current/lamp-tasks net-relay --listen 127.0.0.1:7741 --to \"$B\" &)\n\
+         \x20   [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
+         \x20 fi\n\
          fi\n\
-         unset LAMP_NS_NET\n",
+         unset LAMP_NS_NET LAMP_NS_EGRESS V Q\n",
     ),
     (
         "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
@@ -1076,6 +1119,12 @@ pub fn at_start(root: &Path, records: &Path, switch: bool, shown: Shown, now_uni
     if !present(root, shown) && record(records).is_none() {
         write(records, HermesInstall::new("absent", None, now_unix_ms));
     }
+}
+
+/// An install's ask for `shown`, as a round writes it: the image's
+/// pre-install (crate::preinstall) writes the same one.
+pub fn ask_install(records: &Path, shown: Shown) -> io::Result<()> {
+    ask(records, false, shown)
 }
 
 fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {

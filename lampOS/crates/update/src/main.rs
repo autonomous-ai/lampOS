@@ -27,6 +27,7 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update harness-install
+lamp-update agents-preinstall
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
@@ -78,6 +79,13 @@ harness-install run by lamp-update-harness.service, which a `serve` round starts
         on while the switch is (disabled and stopped with it off); with
         LAMP_OPENCLAW_SKILLS (on by default on a product lamp) its namespace shows
         lamp-skills' socket (#6226).
+agents-preinstall  on an image being built, in its root after install --setup on
+        (#7274): Harness, Hermes and OpenClaw as a round on a product lamp would ask
+        for them (each missing one's ask written as the round writes it, OpenClaw's
+        gateway unit too), installed by harness-install's one-shot; systemctl is
+        skipped (no systemd on an image), so the lamp's first round after setup starts
+        the gateway. Ends with 1 unless every part wanted is there. As root, under
+        pivot_root (not chroot: the installs need a user namespace).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -169,6 +177,7 @@ fn main() -> ExitCode {
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "harness-install" => harness_install(&options),
+        "agents-preinstall" => agents_preinstall(&options),
         "back" => back(&options),
         "apply" => apply(&options),
         "writer-probe" => writer_probe(&options),
@@ -484,6 +493,74 @@ fn harness_install(options: &BTreeMap<String, String>) -> Result<(), String> {
         &mut lamp_update::records::unix_ms,
         &mut say,
     )
+}
+
+/// `lamp-update agents-preinstall` (#7274): on an image being built, in
+/// its root, after `install --setup on`: Harness, Hermes and OpenClaw as
+/// lamp-update's switches on a product lamp want them, each missing one
+/// asked for as a round asks (crate::preinstall) and installed by
+/// `harness-install`'s one-shot. Nothing is started. Ends with 1 unless
+/// every part wanted is there after.
+fn agents_preinstall(options: &BTreeMap<String, String>) -> Result<(), String> {
+    use lamp_update::{harness_install::product, preinstall};
+    known(options, &[])?;
+    let root = Path::new("/");
+    let records = Path::new(lamp_update::install::RECORDS);
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    if !product::product_lamp(root, Path::new(lamp_update::install::UNITS)) {
+        return Err("not a product lamp: run `lamp-update install --setup on` first".into());
+    }
+    // lamp-update's own unit's environment, as a round on this image will
+    // run with it; one set here wins, as for a round started by hand.
+    let unit = preinstall::unit_environment(root);
+    let env = |name: &str| {
+        std::env::var(name).ok().or_else(|| {
+            unit.iter()
+                .find(|(set, _)| set == name)
+                .map(|(_, value)| value.clone())
+        })
+    };
+    let switches = lamp_update::switches::update_switches(root, true, |name| {
+        env(name).map(std::ffi::OsString::from)
+    });
+    let wanted = preinstall::wanted(true, switches, &env);
+    say(&format!(
+        "the agents pre-install: Hermes shows {:?}, OpenClaw {:?}",
+        wanted.hermes.1, wanted.openclaw.1
+    ));
+    if preinstall::write_units(root, &wanted)? {
+        say("the agents pre-install: OpenClaw's gateway unit written, as a round writes it");
+    }
+    let asked = preinstall::ask_missing(root, records, &wanted)?;
+    if asked.is_empty() {
+        say("the agents pre-install: every part wanted is there already");
+    } else {
+        say(&format!(
+            "the agents pre-install: {} asked for",
+            asked.join(", ")
+        ));
+        let mut output_of = install::output_of;
+        let mut skipped = Vec::new();
+        let ended = {
+            let mut run = preinstall::on_image(&mut output_of, &mut skipped);
+            lamp_update::hermes_install::one_shot(
+                root,
+                records,
+                &mut run,
+                &mut lamp_update::records::unix_ms,
+                &mut say,
+            )
+        };
+        for command in &skipped {
+            say(&format!(
+                "the agents pre-install: `{command}` skipped: no systemd on an image"
+            ));
+        }
+        ended?;
+    }
+    preinstall::check(root, &wanted)?;
+    say("the agents pre-install: every part wanted is there");
+    Ok(())
 }
 
 /// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
@@ -967,32 +1044,6 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         .is_some()
         .then(|| lamp_update::first_update::First::new(&config))
         .flatten();
-    // Harness before the sign-in (#5197): only a `serve` that acts, with
-    // its switch on.
-    let harness = {
-        use lamp_update::harness_install::{self as harness, product};
-        let acts = config.apply && command == "serve";
-        // A lamp installed as the product takes this build's own default
-        // and pin when its environment sets none (#5229).
-        let wanted = product::wanted(
-            std::env::var(harness::SWITCH).ok().as_deref(),
-            std::env::var(harness::MANIFEST_URL).ok().as_deref(),
-            std::env::var(harness::MANIFEST_SHA256).ok().as_deref(),
-            acts && product::product_lamp(&config.root, &config.on(&config.units)),
-            product::PRODUCT_DEFAULT,
-        );
-        let on = acts && wanted.on;
-        if acts {
-            harness::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
-            if wanted.source == product::Source::Build {
-                say(&format!(
-                    "Harness before the sign-in: {} by this build's default on a product lamp",
-                    if on { "on" } else { "off" }
-                ));
-            }
-        }
-        on.then_some(wanted.pin)
-    };
     // lamp-update's own switches (#6607): set in its environment, or not set
     // there, from the carried /etc/lampOS/update.env (no round rewrites this
     // unit); skill tasks from the file only on a product lamp. Read here once,
@@ -1008,42 +1059,50 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         })
     };
     let switches = read_switches();
+    // The agents' switches (#5197, #5978, #6226), read in the one place the
+    // image's pre-install reads them too (#7274): only a `serve` that acts
+    // takes a product lamp's defaults.
+    let agents = lamp_update::preinstall::wanted(
+        config.apply
+            && command == "serve"
+            && lamp_update::harness_install::product::product_lamp(
+                &config.root,
+                &config.on(&config.units),
+            ),
+        switches,
+        &|name| std::env::var(name).ok(),
+    );
+    // Harness before the sign-in (#5197): only a `serve` that acts, with
+    // its switch on.
+    let harness = {
+        use lamp_update::harness_install::{self as harness, product};
+        let acts = config.apply && command == "serve";
+        // A lamp installed as the product takes this build's own default
+        // and pin when its environment sets none (#5229).
+        let wanted = agents.harness.clone();
+        let on = acts && wanted.on;
+        if acts {
+            harness::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
+            if wanted.source == product::Source::Build {
+                say(&format!(
+                    "Harness before the sign-in: {} by this build's default on a product lamp",
+                    if on { "on" } else { "off" }
+                ));
+            }
+        }
+        on.then_some(wanted.pin)
+    };
     // Hermes on the lamp (#5978): only with Harness's install on too, as it
     // rides on Harness's one-shot.
     let hermes = {
-        use lamp_update::{harness_install::product, hermes_install as hermes};
+        use lamp_update::hermes_install as hermes;
         let acts = config.apply && command == "serve";
         // On by this build's default on a product lamp (PRODUCT_DEFAULT true, the product owner's
         // decision, 10 Nov, with the first builder's schedule: crate::hermes_schedule);
-        // LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`.
-        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
-        let wanted = hermes::wanted(
-            std::env::var(hermes::SWITCH).ok().as_deref(),
-            product,
-            hermes::PRODUCT_DEFAULT,
-        );
-        // Its own switch (#6128), on by this build's default on a product lamp
-        // (SKILLS_PRODUCT_DEFAULT true): Hermes is shown lamp-skills' socket folder,
-        // read-only; LAMP_HERMES_SKILLS=off turns it off, and another lamp needs `on`.
-        let skills = hermes::wanted(
-            std::env::var(hermes::SKILLS_SWITCH).ok().as_deref(),
-            product,
-            hermes::SKILLS_PRODUCT_DEFAULT,
-        );
-        // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads,
-        // as read above (#6607). On, Hermes is shown lamp-control's control socket
-        // alone, read-only.
-        let tasks = switches.tasks;
-        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT, as read above
-        // (#6607), and only with LAMP_SKILL_TASKS on. On, Hermes's wrapper is
-        // the one every agent has, with Hermes's data, and runs the one agent
-        // namespace.
-        let one_path = switches.one_path;
-        let shown = hermes::Shown {
-            skills,
-            tasks,
-            one_path,
-        };
+        // LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`. Its skills switch
+        // (#6128) the same way; a skill's tasks (#6306) and the one run path (#6685) as
+        // lamp-update's switches read them (#6607). All in crate::preinstall::wanted.
+        let (wanted, shown) = agents.hermes;
         if acts && wanted && harness.is_none() {
             say("Hermes on the lamp: off, as Harness before the sign-in is off");
         }
@@ -1063,28 +1122,13 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     };
     // OpenClaw on the lamp (#6226): as Hermes, beside it, on Harness's one-shot.
     let openclaw = {
-        use lamp_update::{harness_install::product, openclaw_install as openclaw};
+        use lamp_update::openclaw_install as openclaw;
         let acts = config.apply && command == "serve";
         // On by this build's default on a product lamp (PRODUCT_DEFAULT true: beside Hermes,
         // the default engine, under Harness, #6498); LAMP_OPENCLAW_ON_LAMP=off turns it off, and
-        // another lamp needs `on`. Its skills switch is read the same way.
-        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
-        let wanted = openclaw::wanted(
-            std::env::var(openclaw::SWITCH).ok().as_deref(),
-            product,
-            openclaw::PRODUCT_DEFAULT,
-        );
-        let skills = openclaw::wanted(
-            std::env::var(openclaw::SKILLS_SWITCH).ok().as_deref(),
-            product,
-            openclaw::SKILLS_PRODUCT_DEFAULT,
-        );
-        // A skill's run on OpenClaw (#6685): with the one run path on
-        // (LAMP_SKILL_DEFAULT_AGENT=on, read only with LAMP_SKILL_TASKS on), as
-        // Hermes's one run path wrapper, its wrapper carries its gateway data and
-        // its namespace shows lamp-control's socket alone and the pushed skills.
-        // Otherwise, as before: none of these.
-        let shown = openclaw::shown(skills, switches.one_path);
+        // another lamp needs `on`. Its skills switch is read the same way, and the one run path
+        // (#6685) as Hermes's. All in crate::preinstall::wanted.
+        let (wanted, shown) = agents.openclaw;
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }

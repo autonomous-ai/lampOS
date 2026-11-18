@@ -228,6 +228,8 @@ impl Drop for Rig {
 
 fn face(id: &str, xmin: f32, facing: bool) -> Face {
     Face {
+        pitch: None,
+        looking: None,
         id: id.into(),
         xmin,
         ymin: 0.2,

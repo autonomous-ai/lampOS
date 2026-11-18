@@ -35,6 +35,7 @@ pub mod name_in;
 pub mod night_in;
 pub mod pause_in;
 pub mod peaks;
+pub mod presence_in;
 pub mod sleep_in;
 pub mod stand_in;
 #[cfg(unix)]
@@ -57,6 +58,7 @@ pub mod poses;
 pub mod protocol;
 pub mod readback;
 pub mod runtime;
+pub mod seat_say;
 pub mod trajectory;
 pub mod units;
 pub mod unplug;

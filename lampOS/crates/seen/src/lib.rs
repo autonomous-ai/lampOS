@@ -24,7 +24,9 @@
 //! - [`scale`]: the camera's frame scaled down to 320×240 and encoded
 //!   again before it is sent, whatever size the camera serves.
 //! - [`sitting`]: a burst's labels read as drinking, eating or a break,
-//!   and the sitting's timers for `humans/doing`.
+//!   and the sitting's timers for `humans/doing`; with
+//!   `LAMP_SEEN_MORE_DOINGS=on` also tiredness, desk work and celebrating,
+//!   on `humans/doing_more`, a topic of its own.
 //! - [`mark`]: the ring's mark before any frame: a [`frames::Sink`] that
 //!   asks the ring for it and takes no frame until the ring said it drew
 //!   it (fails closed).
@@ -36,9 +38,13 @@
 //!   and activity's retreat after busy bursts and failures.
 //! - [`wire`]: V1's WebSocket messages for activity and pose, as types.
 //! - [`watch`]: the bus readings the gate is built from.
-//! - [`pause`]: a stranger reading on the same tracked face pauses the gate
-//!   (nothing sent, nothing said) instead of ending the sitting; anything
-//!   else, or 5 s, wipes what the pause kept.
+//! - [`keep`]: a short closing (the face lost, a reading gone stale) keeps
+//!   the posture window and the doing timers, unsaid, for up to 120 s;
+//!   standing up, a forget, the opt-in off, the privacy and sleep still
+//!   wipe at once. There is no stranger check (the owner's word on #6543).
+//! - [`hold`]: with `LAMP_SEEN_HOLDS_SITTING=on`, the sitting goes on
+//!   without the face while the newest pose answer sees a close person,
+//!   for at most 10 min since the gate was last open on a face.
 //! - [`pose`]: posture (phase 3): one frame every 30 s to the pose model,
 //!   one socket each, its RULA score kept as this sitting's rolling window
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
@@ -51,14 +57,17 @@ pub mod crypto;
 pub mod endpoint;
 pub mod frames;
 pub mod gate;
+pub mod hold;
+pub mod keep;
 pub mod link;
 pub mod mark;
 pub mod opt_in;
 pub mod outlet;
-pub mod pause;
 pub mod pose;
 pub mod said_back;
 pub mod scale;
+#[cfg(test)]
+pub(crate) mod scene;
 pub mod sitting;
 pub mod watch;
 pub mod wire;
@@ -71,6 +80,14 @@ pub const ENVIRONMENT: &str = "LAMP_SEEN_ACTIVITY";
 pub fn switched_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
+
+/// The journal's diagnostics switch (the Reviewer-lead's P2 on #7251):
+/// `on` exactly and the journal's burst and posture lines name what was
+/// seen (the surest label and its confidence, each kind counted, the RULA
+/// score, its risk, bad or good, the region, the window's bad share);
+/// anything else and they say only counts and outcomes, since a forget or
+/// the opt-in off does not clear the journal.
+pub const JOURNAL_LABELS: &str = "LAMP_SEEN_JOURNAL_LABELS";
 
 /// This part's name on the bus: as a subscriber, a publisher and a ring
 /// mark's asker (one token of `[a-z][a-z0-9_]{0,31}`, docs/bus.md).

@@ -51,8 +51,8 @@
 //! `write` step or a `do.task`'s service grant the voice's own check
 //! accepts, and Hermes would take the asked-for step out.
 //!
-//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, off
-//! unless set; #7245), a make goes to the lamp's agent when it is one the
+//! With [`ONE_PATH_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_ONE_PATH`, on
+//! in the product's lamp-voice; #7245), a make goes to the lamp's agent when it is one the
 //! one run path takes ([`ONE_PATH_ENGINES`]: Hermes or OpenClaw), and its
 //! line carries `"one_path":true` so lamp-tasks' make socket picks its
 //! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a
@@ -108,6 +108,26 @@ pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// silence: in the make's own voice turn when one waits on it
 /// ([`waiting_due`]), else through the say service.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
+/// With the one run path ([`ONE_PATH_ENVIRONMENT`], #7371): the waiting
+/// line says how long, as an agent's make takes about a minute (lamp-c0a4,
+/// 16 Nov: 63 s from the waiting line to the result).
+pub const ONE_PATH_WAITING_LINE: &str = "This takes about a minute. I'm on it.";
+/// With the one run path: said once, never again, when the make still has
+/// no answer [`LONG_WAIT_AFTER`] after its waiting line (#7371).
+pub const LONG_WAIT_LINE: &str = "It's taking a bit longer, but I'm still on it.";
+/// From the waiting line (about 5 s after the ask) to [`LONG_WAIT_LINE`]:
+/// about 90 s from the ask.
+pub const LONG_WAIT_AFTER: Duration = Duration::from_secs(85);
+
+/// The waiting line: [`ONE_PATH_WAITING_LINE`] with the one run path,
+/// else [`WAITING_LINE`], today's.
+pub fn waiting_line(one_path: bool) -> &'static str {
+    if one_path {
+        ONE_PATH_WAITING_LINE
+    } else {
+        WAITING_LINE
+    }
+}
 /// What the lamp says when the agent's own answer is `cannot:`: never the
 /// agent's words.
 pub const CANNOT_LINE: &str = "I couldn't make that one.";
@@ -431,12 +451,25 @@ impl Agent {
     /// Who the lamp's agent is, as the person calls it ("Hermes",
     /// "OpenClaw"), from the tasks part's targets; none without one.
     pub fn engine(&self) -> Option<&'static str> {
-        let answer = agent_tasks::ask(
+        self.lamp_agent().0
+    }
+
+    /// The lamp's agent ([`Agent::engine`]) and whether there is surely
+    /// none, from one targets ask (#7375): `(None, true)` only when the
+    /// tasks part answered its targets with no `lamp` one; down, slow or
+    /// refused, it is `(None, false)`, not known.
+    pub fn lamp_agent(&self) -> (Option<&'static str>, bool) {
+        let Some(answer) = agent_tasks::ask(
             &self.tasks.join("request.sock"),
             &json!({"op":"targets"}),
             Duration::from_millis(1_500),
-        )?;
-        agent_tasks::lamp_target_in(&answer)
+        ) else {
+            return (None, false);
+        };
+        (
+            agent_tasks::lamp_target_in(&answer),
+            agent_tasks::surely_no_lamp_target(&answer),
+        )
     }
 
     /// The lamp's agent when it is Hermes, the one engine a make is handed
@@ -455,7 +488,13 @@ impl Agent {
     }
 
     pub fn hermes(&self) -> Option<&'static str> {
-        let engine = self.engine()?;
+        self.takes(self.engine()?)
+    }
+
+    /// [`Agent::hermes`] for the lamp's agent `engine`, as [`Agent::engine`]
+    /// gave it: so a make asks the tasks part once, and tells a lamp with
+    /// no agent ([`Agent::engine`] none) from one whose agent isn't taken.
+    pub fn takes(&self, engine: &'static str) -> Option<&'static str> {
         if engine == MAKE_ENGINE {
             return Some(engine);
         }
@@ -471,7 +510,7 @@ impl Agent {
         None
     }
 
-    /// Say [`WAITING_LINE`]: in the voice turn waiting on this thread's
+    /// Say the waiting line ([`waiting_line`]): in the voice turn waiting on this thread's
     /// make, when one does ([`waiting_due`]); else through the say service
     /// on a thread of its own, nothing waiting on it.
     pub fn say_waiting(&self) {
@@ -481,10 +520,11 @@ impl Agent {
         let Some(socket) = self.say.clone() else {
             return;
         };
+        let line = waiting_line(self.one_path);
         let _ = std::thread::Builder::new()
             .name("lamp-voice-make-waiting".into())
             .spawn(move || {
-                crate::app_make::say_waiting_at(&socket, WAITING_LINE, WAITING_WITHIN_MS);
+                crate::app_make::say_waiting_at(&socket, line, WAITING_WITHIN_MS);
             });
     }
 
@@ -705,7 +745,8 @@ pub(crate) mod tests {
     /// `engine` (none for no target; "old" for a build with no make
     /// socket; "not_held_off" for one whose run can't be held off;
     /// "no_namespace" for one whose wrapper has no make-home line; "busy"
-    /// for one making another; "run_failed" for a run that failed), and
+    /// for one making another; "run_failed" for a run that failed;
+    /// [`UNANSWERED`] for one that answers its targets `ok:false`), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
@@ -763,6 +804,27 @@ pub(crate) mod tests {
 
     type Answers = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 
+    /// The stub's engine for a tasks part that answers its targets
+    /// `ok:false` (#7375): whether the lamp has an agent is not known.
+    pub(crate) const UNANSWERED: &str = "unanswered";
+
+    /// An agent whose tasks part has no socket at all (down or
+    /// restarting, #7375), in a folder of its own.
+    pub(crate) fn no_socket() -> (Folder, Agent) {
+        let tasks = stub(None, Arc::new(|_: &str| None));
+        let dir = Folder(PathBuf::from(format!(
+            "{}-gone",
+            tasks.dir.path().display()
+        )));
+        let _ = std::fs::remove_dir_all(dir.path());
+        std::fs::create_dir_all(dir.path()).unwrap();
+        let agent = Agent {
+            tasks: dir.path().to_path_buf(),
+            ..tasks.agent()
+        };
+        (dir, agent)
+    }
+
     pub(crate) fn stub(engine: Option<&'static str>, answers: Answers) -> StubTasks {
         static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = Folder(PathBuf::from(format!(
@@ -790,6 +852,10 @@ pub(crate) mod tests {
                     let asked: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
                     sent.lock().unwrap().push(asked.clone());
                     let answer = match asked["op"].as_str().unwrap_or_default() {
+                        // A tasks part that won't say its targets (#7375).
+                        "targets" if engine == Some(UNANSWERED) => {
+                            json!({"ok":false,"error":"busy","message":"busy"})
+                        }
                         "targets" => match engine {
                             Some(engine) => {
                                 let engine = match engine {
@@ -948,6 +1014,34 @@ pub(crate) mod tests {
                     .any(|line| line["op"] == "prepare")
             );
         }
+    }
+
+    /// #7375: one targets ask says the lamp's agent and whether there is
+    /// surely none; only an answered list with no `lamp` target is sure.
+    #[test]
+    fn the_lamp_agent_is_surely_none_only_when_the_targets_say_so() {
+        let none = stub(None, Arc::new(|_: &str| None));
+        assert_eq!(none.agent().lamp_agent(), (None, true));
+        let hermes = stub(Some("hermes"), Arc::new(|_: &str| None));
+        assert_eq!(hermes.agent().lamp_agent(), (Some("Hermes"), false));
+        let refused = stub(Some(UNANSWERED), Arc::new(|_: &str| None));
+        assert_eq!(refused.agent().lamp_agent(), (None, false));
+        assert_eq!(refused.agent().engine(), None);
+        let (_gone, agent) = no_socket();
+        assert_eq!(agent.lamp_agent(), (None, false));
+        assert_eq!(agent.engine(), None);
+        // One round trip per read.
+        let targets = |tasks: &StubTasks| {
+            tasks
+                .sent
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line["op"] == "targets")
+                .count()
+        };
+        assert_eq!(targets(&none), 1);
+        assert_eq!(targets(&refused), 2);
     }
 
     #[test]
@@ -1230,6 +1324,22 @@ pub(crate) mod tests {
     fn the_one_path_switch_is_on_only_when_set_on() {
         assert_eq!(ONE_PATH_ENVIRONMENT, "LAMP_MAKE_AGENT_ONE_PATH");
         assert_eq!(ONE_PATH_ENGINES, ["Hermes", "OpenClaw"]);
+    }
+
+    /// #7371: off, the waiting line is today's, byte for byte; with the one
+    /// run path it says how long, and the long-wait line comes about 90 s
+    /// from the ask, within a make's own limit.
+    #[test]
+    fn the_one_path_waiting_line_says_how_long() {
+        assert_eq!(
+            waiting_line(false),
+            "Let me think about that a little longer."
+        );
+        assert_eq!(waiting_line(true), ONE_PATH_WAITING_LINE);
+        assert!(ONE_PATH_WAITING_LINE.contains("about a minute"));
+        assert_ne!(LONG_WAIT_LINE, ONE_PATH_WAITING_LINE);
+        assert_eq!(LONG_WAIT_AFTER, Duration::from_secs(85));
+        assert!(LONG_WAIT_AFTER < MAKE_WITHIN);
     }
 
     /// The app's MAKE IT (the owner's ask, 13 Nov): its makes go to the

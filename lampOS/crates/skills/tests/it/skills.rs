@@ -1387,6 +1387,8 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 priority: 8,
                 expires_ms: 3_600_000,
                 question: false,
+                may_end_unsaid: false,
+                count: None,
             }),
             "speak",
         ),
@@ -2545,6 +2547,41 @@ fn runs_at(skill: &Path, messages: &[(u64, &str, &str)]) -> Vec<(u64, Vec<Call>)
     runs
 }
 
+/// #7442, the Reviewer-lead's P2 on #7450: a skill that would fire on a
+/// face's `looking` sees it only with the face-expressions yes, as the
+/// program hands it the faces (`Faces::for_skills`).
+#[test]
+fn a_skill_sees_where_a_face_looks_only_with_the_expressions_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = skill_with(
+        dir.path(),
+        "gaze",
+        "[trigger]\ntopic = \"humans/faces/tracked\"\neach = \"faces\"\nkey = \"id\"\n\
+         field = \"looking\"\nequals = false\nwhen = \"appears\"\n\
+         [ask]\npolicy = \"news\"\n[[do]]\nbody = { gesture = \"nod\" }\n",
+    );
+    let yes = dir.path().join("face-expressions.json");
+    let away = r#"{"faces":[{"id":"a","xmin":0.25,"ymin":0.25,"xmax":0.75,"ymax":0.5,"confidence":0.9,"pitch":0.6,"looking":false}]}"#;
+    let toward = away.replace("false", "true");
+    // Looking at the lamp first, then away: what was there at the start is
+    // not news.
+    let seen = |yes: &Path| {
+        let [first, then] = [toward.as_bytes(), away.as_bytes()]
+            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes).into_owned());
+        let text = |payload: &[u8]| String::from_utf8(payload.to_vec()).unwrap();
+        runs_at(
+            &skill,
+            &[
+                (0, Faces::TOPIC, &text(&first)),
+                (1, Faces::TOPIC, &text(&then)),
+            ],
+        )
+    };
+    assert!(seen(&yes).is_empty(), "no yes, no looking");
+    fs::write(&yes, r#"{"version":1,"face_expressions":"yes"}"#).unwrap();
+    assert_eq!(seen(&yes).len(), 1, "with the yes, looking");
+}
+
 /// Someone at the desk each minute from `from` to `to` seconds, gone for
 /// 30 s after each of `away`.
 fn sitting(from: u64, to: u64, away: &[u64]) -> Vec<(u64, &'static str, &'static str)> {
@@ -2777,6 +2814,191 @@ fn a_list_of_sooners_brings_the_trigger_to_the_shortest_holding() {
         ))
         .unwrap_err();
         assert!(error.contains(why), "{sooner}: {error}");
+    }
+}
+
+/// #6543: a `[[while]]`'s `sooner` lowers its own `above` while another
+/// topic's field is past a line, the lowest of those holding; off, or none
+/// holding, its own `above`. The journal says it once as it is lowered and
+/// once as it goes back, and the loader refuses a sooner on anything but an
+/// `above` without `for`, one not lower, an unpermitted topic, an empty list.
+#[test]
+fn a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding() {
+    let dir = tempfile::tempdir().unwrap();
+    let all = r#""room/activity", "humans/doing_more""#;
+    let with = |condition: &str, topics: &str| {
+        format!(
+            "needs = [\"light\"]\ntool = \"break_now\"\n[[while]]\ntopic = \"room/activity\"\n\
+             field = \"sitting_s\"\n{condition}\n[[do]]\nlight = {{ colour = \"warm\" }}\n\
+             [permissions]\ntopics = [{topics}]\nlight = true\n"
+        )
+    };
+    let drank =
+        r#"{ topic = "humans/doing_more", field = "drank_seen", above = 1, above_to = 3599 }"#;
+    let ate = r#"{ topic = "humans/doing_more", field = "ate_seen", above = 0, above_to = 5399 }"#;
+    // The higher first: the lowest holding wins, not the first.
+    let condition = format!("above = 7199\nsooner = [{ate}, {drank}]");
+    let skill = load(&skill_with(
+        &dir.path().join("list"),
+        "comfort",
+        &with(&condition, all),
+    ))
+    .unwrap();
+    let runs = |on: bool, sitting_s: u32, drank_seen: u32, ate_seen: u32| {
+        let engine = Engine::new(vec![skill.clone()], true);
+        let mut engine = if on { engine.sooner() } else { engine };
+        engine.observe(
+            "humans/doing_more",
+            1_000_000,
+            format!(r#"{{"drank_seen":{drank_seen},"ate_seen":{ate_seen}}}"#).as_bytes(),
+            None,
+        );
+        engine.observe(
+            "room/activity",
+            2_000_000,
+            format!(r#"{{"sitting_s":{sitting_s}}}"#).as_bytes(),
+            None,
+        );
+        engine
+            .tool("break_now", &serde_json::json!({}), 3_000_000)
+            .is_ok()
+    };
+    assert!(!runs(true, 4000, 0, 0), "none holding: its own 7199");
+    assert!(runs(true, 7200, 0, 0), "past its own above");
+    assert!(runs(true, 4000, 2, 0), "two drinks: lowered to 3599");
+    assert!(!runs(true, 3500, 2, 0), "lowered, not gone");
+    assert!(!runs(true, 4000, 1, 0), "one drink is not above 1");
+    assert!(runs(true, 5400, 0, 1), "a meal alone: 5399");
+    assert!(!runs(true, 4000, 0, 1), "a meal alone: 5399");
+    assert!(runs(true, 4000, 2, 1), "both: the lowest");
+    assert!(!runs(false, 4000, 2, 1), "switch off: its own above");
+    assert!(runs(false, 7200, 2, 1), "switch off: its own above");
+
+    // The journal: once lowered, nothing on the same, once back.
+    let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+    engine.observe("room/activity", 0, br#"{"sitting_s":100}"#, None);
+    assert!(engine.take_dropped().is_empty());
+    engine.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
+    assert_eq!(
+        engine.take_dropped(),
+        [
+            "comfort while room/activity sitting_s above 7199 lowered to 3599 \
+             (sooner humans/doing_more drank_seen above 1)"
+        ]
+    );
+    engine.observe("room/activity", 2_000_000, br#"{"sitting_s":200}"#, None);
+    engine.observe("humans/doing_more", 3_000_000, br#"{"drank_seen":3}"#, None);
+    engine.tick(4_000_000);
+    assert!(engine.take_dropped().is_empty(), "said once");
+    engine.observe("humans/doing_more", 5_000_000, br#"{"drank_seen":0}"#, None);
+    assert_eq!(
+        engine.take_dropped(),
+        ["comfort while room/activity sitting_s above 7199 again, from 3599: no sooner holds"]
+    );
+    // A value that runs out lets it go back too, on a tick.
+    engine.observe(
+        "humans/doing_more",
+        6_000_000,
+        br#"{"drank_seen":2,"ate_seen":1}"#,
+        Some(10_000),
+    );
+    assert_eq!(engine.take_dropped().len(), 1);
+    engine.tick(17_000_000);
+    assert_eq!(
+        engine.take_dropped(),
+        ["comfort while room/activity sitting_s above 7199 again, from 3599: no sooner holds"]
+    );
+    // Off: no line.
+    let mut off = Engine::new(vec![skill.clone()], true);
+    off.observe("humans/doing_more", 1_000_000, br#"{"drank_seen":2}"#, None);
+    assert!(off.take_dropped().is_empty());
+
+    // One table is a list of that one table.
+    let single = load(&skill_with(
+        &dir.path().join("single"),
+        "comfort",
+        &with(&format!("above = 7199\nsooner = {drank}"), all),
+    ))
+    .unwrap();
+    let one = load(&skill_with(
+        &dir.path().join("one"),
+        "comfort",
+        &with(&format!("above = 7199\nsooner = [{drank}]"), all),
+    ))
+    .unwrap();
+    let allowed = |skill: &lamp_skills::Skill, drank_seen: u32| {
+        let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+        engine.observe(
+            "humans/doing_more",
+            0,
+            format!(r#"{{"drank_seen":{drank_seen}}}"#).as_bytes(),
+            None,
+        );
+        engine.observe("room/activity", 0, br#"{"sitting_s":4000}"#, None);
+        engine.tool("break_now", &serde_json::json!({}), 1).is_ok()
+    };
+    for drank_seen in [0, 2] {
+        assert_eq!(allowed(&single, drank_seen), allowed(&one, drank_seen));
+    }
+    assert!(allowed(&one, 2) && !allowed(&one, 0));
+
+    // Refused when it loads.
+    for (condition, topics, why) in [
+        (
+            format!("equals = 7199\nsooner = {drank}"),
+            all,
+            "give it an above",
+        ),
+        (
+            format!("below = 7199\nsooner = {drank}"),
+            all,
+            "give it an above",
+        ),
+        (
+            format!("above = 7199\nfor = \"1m\"\nsooner = {drank}"),
+            all,
+            "not with its for",
+        ),
+        (
+            format!("above = 3599\nsooner = {drank}"),
+            all,
+            "below the [[while]]'s above",
+        ),
+        (
+            format!("above = 3000\nsooner = {drank}"),
+            all,
+            "below the [[while]]'s above",
+        ),
+        (
+            "above = 7199\nsooner = []".to_owned(),
+            all,
+            "not an empty list",
+        ),
+        (
+            "above = 7199\nsooner = { topic = \"humans/doing_more\", field = \"drank_seen\", above = 1 }"
+                .to_owned(),
+            all,
+            "missing field `above_to`",
+        ),
+        (
+            "above = 7199\nsooner = { topic = \"humans/doing_more\", field = \"drank_seen\", above = 1, above_to = 3599, equals = 2 }"
+                .to_owned(),
+            all,
+            "unknown field `equals`",
+        ),
+        (
+            condition.clone(),
+            r#""room/activity""#,
+            "a [[while]]'s sooner reads humans/doing_more",
+        ),
+    ] {
+        let error = load(&skill_with(
+            &dir.path().join("bad"),
+            "comfort",
+            &with(&condition, topics),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{condition}: {error}");
     }
 }
 
@@ -13158,8 +13380,8 @@ fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
 /// with someone moving now and then (each nudge noticed): one nudge an hour
 /// between them, each in the order it came due, each with one short line
 /// (the owner, 25 Oct: "talk to the user").
-/// Rest your eyes at 45 minutes; Stretch break due at 50, waiting to 105; A
-/// sip of water due at 90, to 165; Stand up due at 100, to 225; then Rest
+/// A sip of water at 30 minutes; Rest your eyes due at 45, waiting to 90;
+/// Stretch break due at 50, to 150; Stand up due at 100, to 210; then Rest
 /// your eyes again. Wind down is outside its hours. The four share one
 /// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
 /// stops the one that came last, or with `all` every one of them.
@@ -13241,6 +13463,49 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     }
 }
 
+/// The lead's call (16 Nov: the owner's lamp reminded no water all day):
+/// with `LAMP_NUDGES_PRESENT=on`, as the product runs, A sip of water comes
+/// at 30 minutes at the desk, not at 29, and again 45 minutes later, not
+/// sooner, with the eyes' `sitting_s` and lamp-seen's `drank_s_ago` (no drink
+/// seen) counting the same sitting.
+#[test]
+fn with_the_switch_a_sip_comes_at_30_minutes_and_again_45_minutes_later() {
+    let sip = lamp_skills::load_with(&skills_root().join("sip-of-water"), true).unwrap();
+    let mut engine = Engine::new(vec![sip], true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut said = Vec::new();
+    for second in 0..=80 * 60u64 {
+        let now = second * 1_000_000;
+        let mut runs = Vec::new();
+        if second % 30 == 0 {
+            let doing = format!(
+                r#"{{"drank_s_ago":{second},"ate_s_ago":{second},"break_s_ago":{second},"last":"none","confidence":0.9}}"#
+            );
+            runs.extend(engine.observe("humans/doing", now, doing.as_bytes(), Some(90_000)));
+            let activity = format!(r#"{{"state":"at_desk","baseline":true,"sitting_s":{second}}}"#);
+            runs.extend(engine.observe("room/activity", now, activity.as_bytes(), None));
+        }
+        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        runs.extend(engine.observe("humans/faces/tracked", now, faces.as_bytes(), None));
+        if runs
+            .iter()
+            .any(|run| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
+        {
+            said.push(second);
+        }
+    }
+    assert_eq!(said.len(), 2, "{said:?}");
+    assert!((30 * 60..31 * 60).contains(&said[0]), "{said:?}");
+    let again = said[1] - said[0];
+    assert!((45 * 60..46 * 60).contains(&again), "{said:?}");
+}
+
 /// With `LAMP_NUDGES_PRESENT=on` (#5207, Fourteen's finding on #5208): a
 /// wellbeing nudge that said nothing (its say expired unheard) gives its
 /// place in the group's hour, and its gap, back, so the next nudge due is
@@ -13278,33 +13543,33 @@ fn with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back() {
         }
         (nudged, given_back)
     };
-    // Heard: Rest your eyes at 45, and Sip of water held to the gap, at 75.
+    // Heard: Sip of water at 30, and Rest your eyes held to the gap, at 60.
     let (heard, _) = sitting(true, false);
     assert_eq!(
         heard[..2],
         [
-            (45, "rest-your-eyes".to_owned()),
-            (75, "sip-of-water".to_owned())
+            (30, "sip-of-water".to_owned()),
+            (60, "rest-your-eyes".to_owned())
         ]
     );
-    // Unheard: its place is given back, and Sip of water comes when due, at 50.
+    // Unheard: its place is given back, and Rest your eyes comes when due, at 45.
     let (unheard, given_back) = sitting(true, true);
     assert_eq!(given_back.as_deref(), Some("wellbeing"));
     assert_eq!(
         unheard[..2],
         [
-            (45, "rest-your-eyes".to_owned()),
-            (50, "sip-of-water".to_owned())
+            (30, "sip-of-water".to_owned()),
+            (45, "rest-your-eyes".to_owned())
         ]
     );
     // Without the switch nothing is given back: one an hour as before.
     let (before, given_back) = sitting(false, true);
     assert_eq!(given_back, None);
-    assert_eq!(before[..1], [(45, "rest-your-eyes".to_owned())]);
+    assert_eq!(before[..1], [(30, "sip-of-water".to_owned())]);
     assert!(
         before
             .iter()
-            .all(|(minute, _)| *minute == 45 || *minute >= 105),
+            .all(|(minute, _)| *minute == 30 || *minute >= 90),
         "{before:?}"
     );
 }
@@ -13408,6 +13673,60 @@ fn a_says_question_needs_a_note_and_who() {
     }
 }
 
+/// #6543: `say.may_end_unsaid` goes with a note only, as true or false;
+/// exact words or a word are refused. No shipped skill opts in, so no lamp
+/// says otherwise than before.
+#[test]
+fn a_says_may_end_unsaid_needs_a_note_and_no_shipped_skill_has_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |say: &str| {
+        format!(
+            "[permissions]\ntopics = [\"room/presence\"]\nspeak = true\n[trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = true\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nsay = {say}\n"
+        )
+    };
+    for (name, say) in [
+        (
+            "fine",
+            r#"{ note = "Ask if they want water.", may_end_unsaid = true }"#,
+        ),
+        (
+            "off",
+            r#"{ note = "Ask if they want water.", may_end_unsaid = false }"#,
+        ),
+        (
+            "lines",
+            r#"{ note = ["Ask.", "Offer."], may_end_unsaid = true }"#,
+        ),
+    ] {
+        load(&skill_with(dir.path(), name, &toml(say))).unwrap();
+    }
+    for (name, say, why) in [
+        (
+            "exact",
+            r#"{ text = "Water?", may_end_unsaid = true }"#,
+            "goes with a note",
+        ),
+        (
+            "word",
+            r#"{ note = "Ask.", may_end_unsaid = "yes" }"#,
+            "true or false",
+        ),
+    ] {
+        let error = load(&skill_with(dir.path(), name, &toml(say))).unwrap_err();
+        assert!(error.contains(why), "{name}: {error}");
+    }
+    for entry in fs::read_dir(skills_root()).unwrap().flatten() {
+        let Ok(file) = fs::read_to_string(entry.path().join("skill.toml")) else {
+            continue;
+        };
+        assert!(
+            !file.contains("may_end_unsaid"),
+            "{} opts in to may_end_unsaid",
+            entry.path().display()
+        );
+    }
+}
+
 #[test]
 fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     let names = [
@@ -13483,11 +13802,11 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     assert_eq!(
         nudged,
         [
-            (45, "rest-your-eyes"),
-            (105, "stretch-break"),
-            (165, "sip-of-water"),
-            (225, "stand-up"),
-            (285, "rest-your-eyes")
+            (30, "sip-of-water"),
+            (90, "rest-your-eyes"),
+            (150, "stretch-break"),
+            (210, "stand-up"),
+            (270, "rest-your-eyes")
         ]
     );
     // "Not today": the one that came last of the four, by its name.

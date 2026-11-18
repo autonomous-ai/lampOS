@@ -170,6 +170,15 @@ fn system_with(reads: bool) -> String {
 /// only with a made skill's code on too ([`made_skill::scripts_on`]), as a
 /// made `task` step is held to that cap; else the prompt is as before.
 fn system_for(reads: bool, agent: bool) -> String {
+    system_net(reads, agent, crate::make_no_cannot::net_by_agent())
+}
+
+/// [`system_for`], with what only the internet tells answered
+/// [`crate::make_no_cannot::NEEDS_NET`] (`net`,
+/// [`crate::make_no_cannot::net_by_agent`]: `LAMP_TASK_NET` on) or the
+/// model's `cannot:` as before. The rules file the lamp's agent makes from
+/// is this same text, so it is told the same.
+fn system_net(reads: bool, agent: bool, net: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     let agent = agent && made_skill::scripts_on();
     let writes = made_skill::writes_on();
@@ -220,6 +229,7 @@ fn system_for(reads: bool, agent: bool) -> String {
         )
     };
     let triggers = made_skill::TRIGGER_MEANINGS;
+    let topics = made_skill::readable_named();
     let gestures = made_skill::gesture_names();
     let (more, cant_yet) = (made_skill::MORE_STEPS, made_skill::CANT_YET);
     // Code of its own (#6307), told only with its switch: off, the model
@@ -237,8 +247,16 @@ fn system_for(reads: bool, agent: bool) -> String {
     // prompt is as before.
     // Its own words (the owner, 16 Nov: "no 'couldn't' here"), told only
     // with their switch, in place of a [said] start: on, a skill may start
-    // when the person says the words they name for it, with any step.
-    let (hear, said) = if made_skill::asks_on() {
+    // when the person says the words they name for it, with any step. With
+    // both switches on, both are told (#6526): a request told to the lamp
+    // as a [said] start, and the words named to start it as asks.
+    let (hear, said) = if made_skill::asks_on() && made_skill::said_on() {
+        (
+            "hear what is said in the room, other than a request told to the lamp (a [said] \
+             start) or the words the person names to start it (asks), both below",
+            format!("\n{}\n{}", made_skill::SAID_RULES, made_skill::ASKS_RULES),
+        )
+    } else if made_skill::asks_on() {
         (
             "hear what is said in the room, other than the words the person names to start it \
              (asks, below)",
@@ -260,6 +278,38 @@ fn system_for(reads: bool, agent: bool) -> String {
         }
         other => other,
     };
+    // What a skill can't find out when it runs (lamp-9adf, 17 Nov: "check
+    // the Bitcoin price ... and tell me" refused by DeepSeek and by Hermes,
+    // each told a price is "anything from the internet" a skill can't
+    // find out). With `LAMP_TASK_NET` on, what only the internet tells is
+    // the lamp's agent's, in a task the lamp sets up itself
+    // (`make_no_cannot::NEEDS_NET`); off, as before, byte for byte.
+    let found_out = if net {
+        format!(
+            "A skill also can't find out anything at the time it runs that no step here or \
+             below gives, like a summary of mail or calendar content no read below gives. A \
+             request that needs it is answered the same way, one line and no blocks: {cannot} \
+             \"{cant_yet}\" and what, in plain words (\"{cant_yet} summing up your mail.\"); \
+             never a say telling the person to check, look up or read it themselves. What only \
+             the internet tells at the time it runs (the weather or a forecast, the news, a web \
+             lookup, a price, anything from the internet) is no step and no code of a skill's \
+             own: the lamp's agent looks it up each time, in a task the lamp sets up itself and \
+             reads back for the person's yes. A request that needs it, whenever it runs, is \
+             answered with one line and no blocks: {needs_net} and what it looks up, in a few \
+             plain words (\"{needs_net} the weather forecast\"); never {cannot} for it, and never \
+             a say telling the person to look it up themselves.",
+            needs_net = crate::make_no_cannot::NEEDS_NET,
+        )
+    } else {
+        format!(
+            "A skill also can't find out anything at the time it runs that no step here or \
+             below gives: the weather or a forecast, the news, a web lookup, a price, a summary \
+             of mail or calendar content no read below gives, anything from the internet. A \
+             request that needs it is answered the same way, one line and no blocks: {cannot} \
+             \"{cant_yet}\" and what, in plain words (\"{cant_yet} checking the weather for \
+             you.\"); never a say telling the person to check, look up or read it themselves."
+        )
+    };
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
@@ -275,7 +325,9 @@ fn system_for(reads: bool, agent: bool) -> String {
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
-         faces): {triggers} A body step is one gesture, one of: {gestures}. Set none of \
+         faces): {triggers} A [trigger], its sooner or a [[while]] reads one of these \
+         topics alone, and only the fields it carries: {topics}; the lamp sends no other. \
+         A body step is one gesture, one of: {gestures}. Set none of \
          most_a_day, [quiet], [budget] or [rest] unless the request asks {limits} A skill can't yet \
          {hear}, know who someone is, {cant_send}: a \
          request that needs one, or anything else no step or trigger here or below does, is \
@@ -284,13 +336,7 @@ fn system_for(reads: bool, agent: bool) -> String {
          {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
-         me every hour to stand up'.\" A skill also can't find out anything at the time it \
-         runs that no step here or below gives: the weather or a forecast, the news, a web \
-         lookup, a price, a summary of mail or calendar content no read below gives, anything \
-         from the internet. A request that needs it is answered the same way, one line and no \
-         blocks: {cannot} \"{cant_yet}\" and what, in plain words (\"{cant_yet} checking the \
-         weather for you.\"); never a say telling the person to check, look up or read it \
-         themselves. Never stand something \
+         me every hour to stand up'.\" {found_out} Never stand something \
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
@@ -652,11 +698,30 @@ pub fn tool() -> lamp_gemini::Tool {
     // and those made listed: the same function, its `remove`, `run` or
     // `made` alone; whether a line asks any, or a read-back, is the
     // model's judgment.
-    description.push_str(REMOVE_TOLD);
+    // With `LAMP_MADE_SKILL_OFF_SAID` on (#7445), the same sentence tells
+    // a turn-off, a pause or a stop from a remove, two bytes longer (151 to
+    // 149), still within the link's 1,024 with every switch on.
+    description.push_str(if made_skill::off_said_on() {
+        TURN_OFF_TOLD
+    } else {
+        REMOVE_TOLD
+    });
+    // A thing for the lamp to do at a time or on a repeat is a skill, never
+    // a reminder (`LAMP_SKILL_RECURRING_TOLD`, lamp-9adf, 17 Nov): told on
+    // the request, since with every switch on the description has no room.
+    let mut parameters = parameters_with(writes, tasks, code);
+    if crate::skill_recurring::on()
+        && let Some(request) = parameters["properties"]["request"]["description"]
+            .as_str()
+            .map(str::to_owned)
+    {
+        parameters["properties"]["request"]["description"] =
+            json!(format!("{request}{}", crate::skill_recurring::REQUEST_TOLD));
+    }
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
-        parameters: Some(parameters_with(writes, tasks, code)),
+        parameters: Some(parameters),
         silent: false,
     }
 }
@@ -688,6 +753,17 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
 /// still fits the link's 1,024 bytes.
 pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove alone; to run \
      one they made now, run alone; to list those they made, made alone; say nothing first.";
+
+/// What [`tool`]'s description says in [`REMOVE_TOLD`]'s place with
+/// `LAMP_MADE_SKILL_OFF_SAID` on (#7445: on lamp-9adf "turn off the coffee
+/// time skill" called the remove, the only verb `make_skill` had for a
+/// made skill, and the lamp asked "Remove coffee time?"): turning one off,
+/// pausing or stopping it is `turn_off`, never a remove, and back on
+/// `turn_on`, beside the remove, the run and the list. The verbs are given
+/// to the model, which judges the meaning; with every switch on the
+/// description still fits the link's 1,024 bytes.
+pub const TURN_OFF_TOLD: &str = " To turn off, pause or stop one they made: turn_off alone, \
+     never remove; back on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -736,6 +812,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
+    // A made skill turned off and back on by voice (#7445,
+    // [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`): never a remove,
+    // which is then told as for good alone.
+    if made_skill::off_said_on() {
+        parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
+            "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, given alone with no request."
+        );
+        parameters["properties"][crate::made_turn::TURN_OFF] = json!({
+            "type": "string",
+            "description": "Only when the person asks to turn off, pause or stop a skill they made, which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this."
+        });
+        parameters["properties"][crate::made_turn::TURN_ON] = json!({
+            "type": "string",
+            "description": "Only when the person asks to turn a skill they made back on, or to resume it: its name as they said it, given alone with no request."
+        });
+    }
     // The skills the person made, listed by voice ([`crate::made_list`]):
     // how many, and the newest by name to the owner.
     parameters["properties"][crate::made_list::LIST] = json!({
@@ -772,7 +864,13 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
             "type": "string",
             "enum": crate::skill_write_yes::ANSWERS,
-            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell, new_ask when their line answers nothing asked but asks something new (another skill named, another thing asked), which you then answer; a line naming the skill asked about answers it, never new_ask. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+        });
+        // The skill the person's line names (#7545): a yes is taken only
+        // for the skill waiting, matched in code.
+        parameters["properties"][crate::skill_write_yes::NAMED] = json!({
+            "type": "string",
+            "description": "With approve_id only: the skill their line names, or none if it names no skill. When it is the skill asked about, copy that skill's name exactly as the note gives it. A yes counts only for the skill asked about."
         });
         parameters["required"] = json!([]);
     }
@@ -806,22 +904,27 @@ pub fn again(error: &net::Error) -> bool {
         // stopped at its cap on tokens, or one with no fenced block at
         // all, is not whole either.
         net::Error::Protocol(what) => [CUT, AT_LENGTH, NO_BLOCK].contains(what),
-        net::Error::Url => false,
+        // A usage limit doesn't pass in a moment (#7346).
+        net::Error::Url | net::Error::UsageLimit(_) => false,
     }
 }
 
-/// The model's answer to `brief`, its text whole, asked once more when
-/// [`again`] says so; each answer that ended whole, the second too, with
-/// a last fence left open at its end closed there ([`whole`]).
-pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
-    match write_once(chat, brief).await.and_then(whole) {
+/// The model's answer to `brief` under the make's `system` prompt, its
+/// text whole, asked once more when [`again`] says so; each answer that
+/// ended whole, the second too, with a last fence left open at its end
+/// closed there ([`whole`], `net` as the prompt was made with it).
+async fn written(chat: &Chat, system: &str, net: bool, brief: &str) -> net::Result<String> {
+    match write_once_with(chat, system, brief)
+        .await
+        .and_then(|text| whole(text, net))
+    {
         Err(error) if again(&error) => {
             eprintln!(
                 "lamp-voice: a skill made here: the model's answer failed ({error}); asked once more"
             );
             // The second answer is not asked again: one with no fenced
             // block goes on to be refused as not a skill's form.
-            match write_once(chat, brief).await {
+            match write_once_with(chat, system, brief).await {
                 Ok(text) => Ok(fence_closed(text)),
                 Err(error) => Err(error),
             }
@@ -837,9 +940,16 @@ pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
 /// lamp on 11798, 11 Nov: two answers that ended whole, about 250 tokens
 /// each, were taken for cut streams because the last fence was never
 /// written, and the make failed as cut off. A stream that really broke
-/// never comes here: the chat client gives it as [`CUT`].
-fn whole(text: String) -> net::Result<String> {
+/// never comes here: the chat client gives it as [`CUT`]. With `net`
+/// ([`crate::make_no_cannot::net_by_agent`], the prompt's), the model's
+/// `internet:` line is whole as it is too.
+fn whole(text: String, net: bool) -> net::Result<String> {
     if text.trim_start().starts_with(made_skill::CANNOT) {
+        return Ok(text);
+    }
+    // What only the internet tells, with `LAMP_TASK_NET` on: one line, no
+    // blocks, made one task for the lamp's agent ([`net_made`]).
+    if net && crate::make_no_cannot::says_needs_net(&text) {
         return Ok(text);
     }
     if !text.contains("```") && !text.contains("~~~") {
@@ -877,10 +987,6 @@ async fn written_with(chat: &Chat, system: &str, brief: &str) -> net::Result<Str
         Err(error) if again(&error) => write_once_with(chat, system, brief).await.map(fence_closed),
         answer => answer.map(fence_closed),
     }
-}
-
-async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
-    write_once_with(chat, &system(), brief).await
 }
 
 async fn write_once_with(chat: &Chat, system: &str, brief: &str) -> net::Result<String> {
@@ -967,6 +1073,17 @@ pub fn make_in(
             .and_then(|thread| thread.heard_for(made_in, std::time::Instant::now()))
             .unwrap_or_default()
     });
+    // The person's own line alone, for the judge of a made skill with no
+    // word of the ask (#7621): never the newest words heard, another
+    // utterance's, since a false refusal is worse than no check (#6537).
+    let _own = (made_in != 0 && made_skill::unrelated_on()).then(|| {
+        OwnLine::set(
+            crate::thread::THREAD
+                .lock()
+                .ok()
+                .and_then(|thread| thread.heard_in_own_line(made_in)),
+        )
+    });
     make_with_by(
         made_in,
         heard.as_deref(),
@@ -1049,6 +1166,20 @@ fn make_with_by(
     // counts: one atomic add here, written later (`crate::made_counts`).
     if made.is_err() {
         crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
+    }
+    // A made skill the judge said isn't what was asked (#7621): the person
+    // is asked again in the lamp's own words alone, never told its name.
+    if let Err(Refused(why, _)) = &made
+        && why == made_skill::UNRELATED
+    {
+        MADE_LINE.with(|kept| kept.replace(Some(made_skill::UNRELATED.to_owned())));
+        return json!({
+            "error": made_skill::UNRELATED,
+            "next": format!(
+                "Say exactly this and nothing else: {}",
+                made_skill::UNRELATED
+            )
+        });
     }
     let needs = made
         .as_ref()
@@ -2209,6 +2340,13 @@ pub fn take_said_line() -> Option<String> {
     MADE_LINE.with(|kept| kept.take())
 }
 
+/// Tests: the line [`take_said_line`] gives next on this thread, as a make
+/// of another kind (one with code, cut) would leave it.
+#[cfg(test)]
+pub fn set_said_line(line: String) {
+    MADE_LINE.with(|kept| kept.replace(Some(line)));
+}
+
 /// The one short line of a make that kept `made`, `on` or not; or not
 /// made and why: the line [`told`] gives the model, as written. One that
 /// sends or writes, made and on, is [`made_skill::cut_write_line`]: this
@@ -2326,16 +2464,41 @@ fn made_and_journaled_by(
     // within one runs at night without quiet hours (Thirteen's HOLD on
     // #6103); and a write's words and recipients (#6066), with what is
     // linked now for their own address.
+    // The judge of a made skill with no word of the ask (#7621): the
+    // person's own line ([`OwnLine`], or the line given for a make called
+    // here directly), asked of the make's own chat in one short call.
+    let own_line = OWN_LINE
+        .with(std::cell::RefCell::take)
+        .unwrap_or_else(|| heard.map(str::to_owned));
+    let judge_ask = |question: &str| judged(Arc::clone(&chat), question.to_owned());
     let asked = made_skill::Asked {
         request,
         own: own_accounts_now(),
         heard,
+        judge: own_line
+            .as_deref()
+            .filter(|_| made_skill::unrelated_on())
+            .map(|line| made_skill::Judge {
+                line,
+                ask: &judge_ask,
+            }),
     };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
     let models_cannot = std::cell::Cell::new(false);
+    // Whether the last answer was the model's word that what was asked
+    // needs the internet when it runs (`LAMP_TASK_NET` on,
+    // [`crate::make_no_cannot::NEEDS_NET`]): made one task for the lamp's
+    // agent ([`net_made`]), never repaired nor handed to the agent to write.
+    let net = crate::make_no_cannot::net_by_agent();
+    let needs_net = std::cell::Cell::new(false);
     let kept = |answer: Result<String, String>| {
         models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
+        needs_net
+            .set(net && matches!(&answer, Ok(text) if crate::make_no_cannot::says_needs_net(text)));
+        if needs_net.get() {
+            return Err(Refused(crate::make_no_cannot::NEEDS_NET_HELD.into(), None));
+        }
         match answer {
             // The maker's own example is never kept: refused as the check
             // refuses, so it goes back to the model once.
@@ -2359,8 +2522,30 @@ fn made_and_journaled_by(
     // repairs. Without either, DeepSeek's repairs stay as they are; for
     // the app's MAKE IT they stay too when the agent doesn't take it.
     // Hermes alone: only it has a namespace runner for a make today.
-    let engine = agent.and_then(|agent| agent.hermes().map(|engine| (agent, engine)));
-    if agent.is_some() && engine.is_none() {
+    // One targets ask per make: the lamp's agent, and whether there is
+    // surely none.
+    let seen = agent.map(|agent| (agent, agent.lamp_agent()));
+    let engine = seen.and_then(|(agent, (seen, _))| Some((agent, agent.takes(seen?)?)));
+    // With the one run path (#7245), a lamp with no agent at all (lamp-tasks
+    // answered its targets with no `lamp` one): a make the agent would have
+    // taken is told so in one sentence ([`made_skill::AGENT_MISSING`], the
+    // first builder's point 3 on #6811 for #7375), never made by DeepSeek
+    // alone as a task for an agent that isn't there. A targets read that
+    // failed (lamp-tasks down, restarting, slow or refusing) is not known
+    // to be no agent: DeepSeek makes it alone, as before. Off, as before.
+    let missing = matches!(seen, Some((agent, (None, true))) if agent.one_path);
+    let unknown = matches!(seen, Some((agent, (None, false))) if agent.one_path);
+    if missing {
+        eprintln!(
+            "lamp-voice: a skill made here: no agent on the lamp (no lamp target): DeepSeek \
+             makes only what it can keep alone"
+        );
+    } else if unknown {
+        eprintln!(
+            "lamp-voice: a skill made here: the tasks part didn't say its targets: DeepSeek \
+             makes it alone, as before"
+        );
+    } else if agent.is_some() && engine.is_none() {
         eprintln!(
             "lamp-voice: a skill made here: no Hermes agent on the lamp: DeepSeek makes it alone"
         );
@@ -2395,12 +2580,24 @@ fn made_and_journaled_by(
     // the model's request are both looked at; what is linked is asked of
     // `lamp-services` only when no plain word is there.
     let agent_services = crate::make_skill_agent::services_through_agent();
-    let service = engine.filter(|_| agent_services).and_then(|_| {
-        let words = format!("{request}\n{}", heard.unwrap_or_default());
-        crate::make_skill_agent::service_asked(&words, || {
-            crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER))
+    // With no agent at all (`missing`) too: such a make is told so.
+    let service = (agent_services && (engine.is_some() || missing))
+        .then(|| {
+            let words = format!("{request}\n{}", heard.unwrap_or_default());
+            crate::make_skill_agent::service_asked(&words, || {
+                crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER))
+            })
         })
-    });
+        .flatten();
+    if missing && let Some(service) = service {
+        eprintln!(
+            "lamp-voice: a skill made here: it asks for a linked service ({service}): no agent \
+             on the lamp to make it: told so, DeepSeek not asked"
+        );
+        let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
+        let line = kept_line(&made, false, began.elapsed().as_millis());
+        return (plain_unless_cannot(made, false), line);
+    }
     if let (Some((agent, engine)), Some(service)) = (engine, service) {
         eprintln!(
             "lamp-voice: a skill made here: it asks for a linked service ({service}): straight \
@@ -2416,6 +2613,20 @@ fn made_and_journaled_by(
             &models_cannot,
             &deepseek_repaired,
         );
+        // Judged not what was asked (#7621): asked again as it stands.
+        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (made, line);
+        }
+        let made = net_made(
+            made,
+            &needs_net,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping),
+        );
         let made = no_cannot(
             made,
             &models_cannot,
@@ -2429,10 +2640,25 @@ fn made_and_journaled_by(
         return (plain_unless_cannot(made, models_cannot.get()), line);
     }
     let mut made = kept(ask(Arc::clone(&chat), brief.clone()));
+    // Judged not what was asked (#7621): no repair, no agent, asked again.
+    if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+        let line = kept_line(&made, false, began.elapsed().as_millis());
+        return (made, line);
+    }
     if engine.is_none() {
         made = deepseek_repaired(made, Duration::ZERO);
     }
     let made = match engine {
+        // What only the internet tells (`LAMP_TASK_NET` on): never handed
+        // to the agent to write, which is told the same rules; made one
+        // task for it below ([`net_made`]).
+        Some(_) if needs_net.get() => {
+            eprintln!(
+                "lamp-voice: a skill made here: DeepSeek said it needs the internet: not handed \
+                 to the agent to write"
+            );
+            made
+        }
         // A `cannot:` the system prompt itself asks for (the brief's own
         // refusals, [`made_skill::BRIEFS_OWN_REFUSALS`]) is said as it is,
         // never handed over (the Reviewer-lead on #6439); one of a send
@@ -2443,10 +2669,7 @@ fn made_and_journaled_by(
         // "Not possible yet: a skill can't" goes to it; the brief's other
         // refusals stay DeepSeek's.
         Some((agent, _))
-            if models_cannot.get()
-                && matches!(&made, Err(Refused(why, _)) if made_skill::briefs_own_refusal(why)
-                    && !(agent_services && made_skill::briefs_send_refusal(why))
-                    && !(agent.one_path && made_skill::briefs_skill_cant(why))) =>
+            if stays_deepseeks(&made, models_cannot.get(), agent_services, agent.one_path) =>
         {
             eprintln!(
                 "lamp-voice: a skill made here: DeepSeek's cannot is one the brief asks for: \
@@ -2482,8 +2705,31 @@ fn made_and_journaled_by(
             eprintln!("lamp-voice: a skill made here: made by DeepSeek");
             made
         }
+        // No agent to hand it to (`missing`): DeepSeek's failure, after its
+        // repairs, is told as the agent missing, but for what would have
+        // stayed DeepSeek's with one.
+        None if missing
+            && made.is_err()
+            && !stays_deepseeks(&made, models_cannot.get(), agent_services, true) =>
+        {
+            eprintln!(
+                "lamp-voice: a skill made here: DeepSeek failed and there is no agent on the \
+                 lamp to hand it to: told so"
+            );
+            models_cannot.set(false);
+            Err(Refused(made_skill::AGENT_MISSING.to_owned(), None))
+        }
         None => made,
     };
+    let made = net_made(
+        made,
+        &needs_net,
+        request,
+        &chat,
+        began,
+        &kept,
+        (from, keeping),
+    );
     let made = no_cannot(
         made,
         &models_cannot,
@@ -2512,6 +2758,24 @@ fn made_and_journaled_by(
         (made, _) => made,
     };
     (plain_unless_cannot(made, models_cannot.get()), line)
+}
+
+/// Whether DeepSeek's failed `made` stays its own, never handed to the
+/// lamp's agent: its `cannot:` (`models_cannot`) one the system prompt
+/// itself asks for ([`made_skill::briefs_own_refusal`], the Reviewer-lead
+/// on #6439), but for a send's when the agent makes service skills
+/// (`agent_services`) and, with the one run path (`one_path`, #7245), the
+/// brief's "Not possible yet: a skill can't".
+fn stays_deepseeks(
+    made: &Result<Made, Refused>,
+    models_cannot: bool,
+    agent_services: bool,
+    one_path: bool,
+) -> bool {
+    models_cannot
+        && matches!(made, Err(Refused(why, _)) if made_skill::briefs_own_refusal(why)
+            && !(agent_services && made_skill::briefs_send_refusal(why))
+            && !(one_path && made_skill::briefs_skill_cant(why)))
 }
 
 /// With `LAMP_MAKE_NO_CANNOT` on, a make whose last answer was the model's
@@ -2575,12 +2839,59 @@ fn no_cannot(
          ({})",
         crate::make_no_cannot::ENVIRONMENT
     );
-    let made = crate::make_no_cannot::made(
+    let made = agent_task(request, chat, began, kept, (from, keeping));
+    models_cannot.set(false);
+    made
+}
+
+/// With `LAMP_TASK_NET` on ([`crate::make_no_cannot::net_by_agent`]), a
+/// make whose last answer was the model's word that it needs the internet
+/// when it runs (`needs_net`, [`crate::make_no_cannot::NEEDS_NET`]) made
+/// one task for the lamp's agent ([`agent_task`]), whatever
+/// `LAMP_MAKE_NO_CANNOT`: asked for by its words, an agent skill granted
+/// `net` that reads back and waits for the yes at its first ask; on a
+/// trigger, a made task for the agent on it, granted `net` (the owner's
+/// ruling, 17 Nov), said back and waiting for the spoken yes. Any other
+/// make, `made` as it is.
+fn net_made(
+    made: Result<Made, Refused>,
+    needs_net: &std::cell::Cell<bool>,
+    request: &str,
+    chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    began: std::time::Instant,
+    kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
+    (from, keeping): (&str, &Keeping),
+) -> Result<Made, Refused> {
+    if !needs_net.replace(false) || made.is_ok() {
+        return made;
+    }
+    eprintln!(
+        "lamp-voice: a skill made here: the model said it needs the internet: one task for the \
+         lamp's agent ({})",
+        crate::skill_task_yes::NET_ENVIRONMENT
+    );
+    agent_task(request, chat, began, kept, (from, keeping))
+}
+
+/// The make of `request` as one task for the lamp's agent
+/// ([`crate::make_no_cannot::made`]): its name, grants and when it runs
+/// asked of the lamp's own model in one more call (`chat`, begun only while
+/// one round still fits [`longest_make`]), kept through the make's own
+/// checks (`kept`), or only asked for, kept from `from` in `keeping` as an
+/// agent skill ([`made_skill::keep_agent_asked`]).
+fn agent_task(
+    request: &str,
+    chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    began: std::time::Instant,
+    kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
+    (from, keeping): (&str, &Keeping),
+) -> Result<Made, Refused> {
+    crate::make_no_cannot::made(
         request,
         |brief| {
             ask_in(
                 Arc::clone(chat),
-                Some(crate::make_no_cannot::system()),
+                crate::make_no_cannot::system(),
                 brief.to_owned(),
             )
         },
@@ -2590,9 +2901,7 @@ fn no_cannot(
         // Only a hint: the model decides by naming the grant (the lead's
         // rule; the first builder on #7261).
         crate::make_skill_agent::service_hint(request),
-    );
-    models_cannot.set(false);
-    made
+    )
 }
 
 /// The person hears the lamp's own reason in everyday words, the
@@ -2737,6 +3046,8 @@ fn handed_to_agent(
     // checks (the Reviewer-lead on #6439).
     let hidden = placeholders(&own_accounts());
     let system = hide(&system(), &hidden);
+    // Its `internet:` line taken as the prompt it was given says.
+    let net = crate::make_no_cannot::net_by_agent();
     // The waiting line with the first hand-over only, and never when the
     // turn was cut already (Twelve's P3 on #6439).
     let waiting = std::cell::Cell::new(!turn_cut());
@@ -2745,7 +3056,7 @@ fn handed_to_agent(
             .write(&system, brief, waiting.replace(false))
             .map(|text| shown(&text, &hidden))
             .map_err(|why| why.to_string())
-            .and_then(|text| whole(text).map_err(|why| why.to_string()))
+            .and_then(|text| whole(text, net).map_err(|why| why.to_string()))
     };
     // Not taken by the agent: DeepSeek's one answer stands for a voice
     // make, and gets its repairs for the app's (Heron's P2 on #6788).
@@ -2902,19 +3213,131 @@ fn kept_line(made: &Result<Made, Refused>, models_cannot: bool, ms: u128) -> Str
     }
 }
 
+/// The longest the judge of a made skill with no word of the ask is waited
+/// for (#7621): only on that path, the overlap's fast pass never waits.
+pub const JUDGE_WITHIN: Duration = Duration::from_millis(1_500);
+
+/// The most bytes of the judge's answer read, about 300 tokens.
+const JUDGE_MOST_BYTES: usize = 1_200;
+
+/// The judge's system prompt.
+const JUDGE_SYSTEM: &str = "You check whether a voice assistant made the skill a person asked \
+                            for. Answer yes or no, one word.";
+
+/// The judge's answer to `question` ([`made_skill::judge_ask`]) from the
+/// make's own chat, on a thread of its own, within [`JUDGE_WITHIN`]: yes,
+/// no, unclear, a timeout or an error, never its words.
+fn judged(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    question: String,
+) -> made_skill::Judged {
+    use made_skill::Judged;
+    // Its answer by a channel, waited on for its bound and a little more:
+    // never a join, which a DNS lookup hung on tokio's blocking pool holds
+    // past the bound (the second adversarial read's P2). A thread past it
+    // ends by itself; its answer is dropped.
+    let (sent, answered) = std::sync::mpsc::sync_channel(1);
+    let answer = std::thread::Builder::new()
+        .name("lamp-voice-make-judge".into())
+        .spawn(move || {
+            let _ = sent.send(judge_once(chat, question));
+        });
+    match answer {
+        Ok(_) => answered
+            .recv_timeout(JUDGE_WITHIN + Duration::from_millis(100))
+            .unwrap_or(Err(Judged::Timeout))
+            .unwrap_or_else(|judged| judged),
+        Err(_) => Judged::Failed,
+    }
+}
+
+/// One judge call within [`JUDGE_WITHIN`], on its own runtime ([`judged`]).
+fn judge_once(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    question: String,
+) -> Result<made_skill::Judged, made_skill::Judged> {
+    use made_skill::Judged;
+    {
+        {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| Judged::Failed)?;
+            let chat = chat().map_err(|_| Judged::Failed)?;
+            runtime.block_on(async {
+                tokio::time::timeout(JUDGE_WITHIN, async {
+                    let mut stream = chat
+                        .send(&[Message::system(JUDGE_SYSTEM), Message::user(&question)])
+                        .await
+                        .map_err(|_| Judged::Failed)?;
+                    let mut text = String::new();
+                    while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
+                        if let ChatEvent::Text(words) = event {
+                            text.push_str(&words);
+                            if text.len() > JUDGE_MOST_BYTES {
+                                break;
+                            }
+                        }
+                    }
+                    Ok(Judged::read(&text))
+                })
+                .await
+                .unwrap_or(Err(Judged::Timeout))
+            })
+        }
+    }
+}
+
+thread_local! {
+    /// The person's own line for the voice's make on this thread
+    /// ([`OwnLine`]): `Some(None)` when it isn't known.
+    static OWN_LINE: std::cell::RefCell<Option<Option<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The person's own line for a voice make, held while it runs, then
+/// cleared, so no later make on this thread is judged by it.
+struct OwnLine;
+
+impl OwnLine {
+    fn set(line: Option<String>) -> Self {
+        OWN_LINE.with(|own| own.replace(Some(line)));
+        Self
+    }
+}
+
+impl Drop for OwnLine {
+    fn drop(&mut self) {
+        OWN_LINE.with(|own| own.replace(None));
+    }
+}
+
 /// The model's answer to `brief`, asked on a thread of its own with a
-/// runtime of its own.
+/// runtime of its own, under the make's [`system`] prompt, made on this
+/// thread with this thread's switches, as is whether its `internet:` line
+/// is taken ([`crate::make_no_cannot::net_by_agent`]).
 fn ask(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     brief: String,
 ) -> Result<String, String> {
-    ask_in(chat, None, brief)
+    let made = (system(), crate::make_no_cannot::net_by_agent());
+    ask_on(chat, Err(made), brief)
 }
 
-/// [`ask`], under `system` when one is given ([`written_with`]).
+/// [`ask`], under `system` ([`written_with`]).
 fn ask_in(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
-    system: Option<String>,
+    system: String,
+    brief: String,
+) -> Result<String, String> {
+    ask_on(chat, Ok(system), brief)
+}
+
+/// The model's answer to `brief` on a thread of its own: under `system`
+/// ([`written_with`]), or the make's own prompt and `net` ([`written`]).
+fn ask_on(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: Result<String, (String, bool)>,
     brief: String,
 ) -> Result<String, String> {
     std::thread::Builder::new()
@@ -2928,8 +3351,8 @@ fn ask_in(
             runtime
                 .block_on(async {
                     match &system {
-                        Some(system) => written_with(&chat, system, &brief).await,
-                        None => written(&chat, &brief).await,
+                        Ok(system) => written_with(&chat, system, &brief).await,
+                        Err((made, net)) => written(&chat, made, *net, &brief).await,
                     }
                 })
                 .map_err(|error| error.to_string())
@@ -3038,11 +3461,13 @@ pub fn answer(
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
-        // A no, or an unclear answer (#6835 gap 2): nothing is kept.
+        // A no, an unclear answer (#6835 gap 2), or a yes that names
+        // another skill than the one waiting (#7545): nothing is kept.
         if let Some(told) = crate::skill_write_yes::answered(
             id,
             request,
             call.args[crate::skill_write_yes::ANSWER].as_str(),
+            call.args[crate::skill_write_yes::NAMED].as_str(),
         ) {
             return told;
         }
@@ -3084,6 +3509,19 @@ pub fn answer(
                 ),
             },
         );
+    }
+    // A skill the person made, turned off or back on by voice (#7445,
+    // `LAMP_MADE_SKILL_OFF_SAID`): read before the remove, so a call that
+    // carries a turn-off is never a remove.
+    if made_skill::off_said_on() {
+        for (key, off) in [
+            (crate::made_turn::TURN_OFF, true),
+            (crate::made_turn::TURN_ON, false),
+        ] {
+            if let Some(name) = call.args[key].as_str() {
+                return crate::made_turn::asked_here(name, off, request, heard, lease);
+            }
+        }
     }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
@@ -3636,7 +4074,12 @@ light = { dim = 1 }
                     };
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
-                    assert!(body.contains(made_skill::BRIEF_HEAD), "{body}");
+                    // A make's brief, or its judge's question (#7621).
+                    assert!(
+                        body.contains(made_skill::BRIEF_HEAD)
+                            || body.contains("Does the made skill do what was asked?"),
+                        "{body}"
+                    );
                     assert!(!body.contains("\"tools\""), "{body}");
                     let reply = if [200, BROKEN, STOPPED_AT_LENGTH].contains(&status) {
                         let (first, rest) = text.split_at(text.len() / 2);
@@ -3847,6 +4290,146 @@ light = { dim = 1 }
     }
 
     const REQUEST: &str = "make me a skill that dims the light at 10 pm";
+
+    /// #7621: the line heard on c0a4, transcribed whole.
+    const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
+                            up the title of the example dot com web page and tell me what it says.";
+    /// The moon-time DeepSeek made from an old ask in `request`.
+    const MOON_TIME: &str = "```skill.toml\nasks = [\"moon time\"]\nkind = \"installable\"\n\
+                             version = \"1.0.0\"\n[permissions]\nspeak = true\n[[do]]\nsay = { \
+                             text = \"The moon is moving away from Earth, a little more each \
+                             year.\" }\n```\n\n```SKILL.md\n---\nname: moon-time\ndescription: \
+                             A moon fact.\n---\n\n# Moon time\n```\n";
+
+    /// What a voice make with Fourteen's line should have asked.
+    const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
+                                example.com web page and tell me what it says";
+
+    /// #7621, its switch on: moon-time, with no word of Fourteen's line, is
+    /// judged in one more call of the make's chat; its no refuses it with
+    /// no repair and no agent, nothing kept or put on, and the voice model
+    /// is told to say exactly the ask-again line, never the skill's name.
+    #[test]
+    fn a_make_judged_not_what_was_asked_is_asked_again_with_no_repair() {
+        made_skill::set_unrelated_here(Some(true));
+        made_skill::set_english_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping) = keeping("unrelated-judged");
+        let (url, served) =
+            service_sent(vec![(200, MOON_TIME.to_owned()), (200, "No.".to_owned())]);
+        let told = make_with(
+            7,
+            Some(FOURTEEN),
+            FOURTEEN_ASK,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "the make and its judge alone: {told}");
+        assert!(sent[1].contains("Does the made skill do what was asked?"));
+        assert_eq!(told["error"], made_skill::UNRELATED, "{told}");
+        assert_eq!(
+            told["next"],
+            format!(
+                "Say exactly this and nothing else: {}",
+                made_skill::UNRELATED
+            )
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(!told.to_string().to_lowercase().contains("moon"), "{told}");
+        assert_eq!(take_said_line().as_deref(), Some(made_skill::UNRELATED));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        made_skill::set_asks_here(None);
+        made_skill::set_english_here(None);
+        made_skill::set_unrelated_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7621: what the judge adds to a make, printed: an answer at once
+    /// costs one short call; one that never comes is cut at
+    /// [`JUDGE_WITHIN`] and read as a timeout. (The overlap's fast pass,
+    /// which never calls it, is timed in `made_skill`'s tests.)
+    #[test]
+    fn the_judges_added_latency_is_bounded() {
+        let question = made_skill::judge_ask("look up the example page's title", "moon-time");
+        let (url, served) = service(vec![(200, "No.".to_owned())]);
+        let began = std::time::Instant::now();
+        let judged_now = judged(Arc::new(chat_at(url)), question.clone());
+        let at_once = began.elapsed();
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(judged_now, made_skill::Judged::No);
+        // A chat that takes the call and never answers.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/v1/", listener.local_addr().unwrap());
+        let held = std::thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            std::thread::sleep(JUDGE_WITHIN + Duration::from_secs(1));
+            drop(socket);
+        });
+        let began = std::time::Instant::now();
+        let judged_late = judged(Arc::new(chat_at(url)), question);
+        let at_bound = began.elapsed();
+        held.join().unwrap();
+        assert_eq!(judged_late, made_skill::Judged::Timeout);
+        println!(
+            "#7621 judge latency: answered at once {} ms, at its bound {} ms (bound {} ms)",
+            at_once.as_millis(),
+            at_bound.as_millis(),
+            JUDGE_WITHIN.as_millis()
+        );
+        assert!(at_once < JUDGE_WITHIN, "{at_once:?}");
+        assert!(
+            at_bound >= JUDGE_WITHIN && at_bound < JUDGE_WITHIN + Duration::from_millis(500),
+            "{at_bound:?}"
+        );
+    }
+
+    /// #7621: the same make with the judge failing (an error answer) is
+    /// kept and put on; with the switch off or the lamp not in English it
+    /// is made with no judge at all, exactly as before.
+    #[test]
+    fn a_failed_judge_or_its_switch_off_makes_as_before() {
+        made_skill::set_asks_here(Some(true));
+        for (index, (on, english, replies)) in [
+            (
+                true,
+                true,
+                vec![(200, MOON_TIME.to_owned()), (500, "busy".to_owned())],
+            ),
+            (false, true, vec![(200, MOON_TIME.to_owned())]),
+            (true, false, vec![(200, MOON_TIME.to_owned())]),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            made_skill::set_unrelated_here(Some(on));
+            made_skill::set_english_here(Some(english));
+            let (root, keeping) = keeping(&format!("unrelated-off-{index}"));
+            let calls = replies.len();
+            let (url, served) = service(replies);
+            let asked = manage_helper(&keeping.manage);
+            let told = make_with(
+                7,
+                Some(FOURTEEN),
+                FOURTEEN_ASK,
+                &keeping,
+                chat_at(url),
+                NOW,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), calls, "{index}: {told}");
+            assert_eq!(told["made"], "moon-time", "{index}: {told}");
+            assert_eq!(told["on"], true, "{index}: {told}");
+            asked.join().unwrap();
+            let _ = take_said_line();
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        made_skill::set_asks_here(None);
+        made_skill::set_english_here(None);
+        made_skill::set_unrelated_here(None);
+    }
     const NOW: u64 = 1_800_000_000_000;
 
     /// Whether any kept skill in `directory` is on.
@@ -4986,6 +5569,7 @@ light = { dim = 1 }
             request: WRITE_EXAMPLE_ASKED,
             own,
             heard: Some(WRITE_EXAMPLE_ASKED),
+            judge: None,
         };
         let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
         assert_eq!(made.uses.writes, ["gmail"]);
@@ -6026,6 +6610,171 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The first builder's point 3 on #6811 for #7375: with the one run
+    /// path on and no agent on the lamp (no `lamp` target), a make DeepSeek
+    /// keeps is the make, the brief's own refusal stays as it is, and one
+    /// DeepSeek fails after its repairs is told in one sentence that the
+    /// lamp has no agent to make it, never the tip to ask for one thing.
+    #[test]
+    fn with_the_one_path_and_no_agent_a_failed_make_says_so() {
+        let (root, keeping) = keeping("one-path-no-agent");
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let on = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..none.agent()
+        };
+        let (url, served) = service(vec![(200, good())]);
+        let told = made_by(&keeping, url, Some(&on), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        let own =
+            "cannot: I can't do that yet: hearing what is said. You could ask for a glow instead.";
+        let (url, served) = service(vec![(200, own.to_owned())]);
+        let told = made_by(&keeping, url, Some(&on), NOW + 1);
+        assert!(
+            told["error"]
+                .as_str()
+                .unwrap()
+                .contains("hearing what is said"),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+        let told = made_by(&keeping, url, Some(&on), NOW + 2);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_MISSING)
+        );
+        assert_eq!(
+            told["next"],
+            made_skill::not_made_in_their_language(made_skill::AGENT_MISSING)
+        );
+        // DeepSeek keeps its repairs, as without the agent.
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert_eq!(none.hand_overs(), 0);
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7375: with the one run path on, a service skill made as a task for
+    /// the agent and no agent on the lamp, a make asking for a linked
+    /// service is told at once that the lamp has no agent to make it,
+    /// DeepSeek never asked: never a kept skill whose task no agent runs.
+    /// With the one run path off, DeepSeek makes it alone, as before.
+    #[test]
+    fn with_the_one_path_and_no_agent_a_service_make_says_so_at_once() {
+        const MAIL: &str = "every morning at eight, read me my new mail";
+        services_through_agent(Some(true));
+        let (root, keeping) = keeping("one-path-no-agent-service");
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let on = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..none.agent()
+        };
+        let (chat, asked) = never_had();
+        let told = make_with_by(0, None, MAIL, &keeping, chat, NOW, || None, Some(&on));
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_MISSING)
+        );
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert_eq!(none.hand_overs(), 0);
+        let (url, served) = service(vec![(200, good())]);
+        let told = make_with_by(
+            0,
+            None,
+            MAIL,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&none.agent()),
+        );
+        assert_eq!(told["made"], "evening-dim", "off: {told}");
+        assert_eq!(served.join().unwrap(), 1);
+        services_through_agent(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7375 (the P2 of an adversarial read): with the one run path on and
+    /// lamp-tasks not saying its targets (refused `ok:false`, or no socket
+    /// as while it restarts), the lamp is not known to have no agent: a
+    /// make DeepSeek fails is told today's failure, as with no agent at
+    /// all, never AGENT_MISSING.
+    #[test]
+    fn with_the_one_path_and_the_targets_unknown_a_failed_make_is_not_told_no_agent() {
+        let (root, keeping) = keeping("one-path-targets-unknown");
+        let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+        let today = made_by(&keeping, url, None, NOW);
+        assert!(today.get("made").is_none(), "{today}");
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        let refused = crate::make_skill_agent::tests::stub(
+            Some(crate::make_skill_agent::tests::UNANSWERED),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let (_gone, gone) = crate::make_skill_agent::tests::no_socket();
+        for (n, base) in [refused.agent(), gone].into_iter().enumerate() {
+            let on = crate::make_skill_agent::Agent {
+                one_path: true,
+                ..base
+            };
+            let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+            let told = made_by(&keeping, url, Some(&on), NOW + 1 + n as u64);
+            assert!(told.get("made").is_none(), "{told}");
+            assert_eq!(told["error"], today["error"], "{n}: {told}");
+            assert!(
+                !told["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains(made_skill::AGENT_MISSING),
+                "{n}: {told}"
+            );
+            assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS, "{n}");
+        }
+        assert_eq!(refused.hand_overs(), 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7375: with the one run path on, a service skill made as a task for
+    /// the agent and lamp-tasks not saying its targets, a make asking for
+    /// a linked service is not refused at once: DeepSeek is asked and
+    /// makes it, as before.
+    #[test]
+    fn with_the_one_path_and_the_targets_unknown_a_service_make_is_not_refused_at_once() {
+        const MAIL: &str = "every morning at eight, read me my new mail";
+        services_through_agent(Some(true));
+        let refused = crate::make_skill_agent::tests::stub(
+            Some(crate::make_skill_agent::tests::UNANSWERED),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let (_gone, gone) = crate::make_skill_agent::tests::no_socket();
+        for (n, base) in [refused.agent(), gone].into_iter().enumerate() {
+            let (root, keeping) = keeping(&format!("one-path-targets-unknown-service-{n}"));
+            let on = crate::make_skill_agent::Agent {
+                one_path: true,
+                ..base
+            };
+            let (url, served) = service(vec![(200, good())]);
+            let told = make_with_by(
+                0,
+                None,
+                MAIL,
+                &keeping,
+                chat_at(url),
+                NOW + n as u64,
+                || None,
+                Some(&on),
+            );
+            assert_eq!(told["made"], "evening-dim", "{n}: {told}");
+            assert_eq!(served.join().unwrap(), 1, "{n}");
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        assert_eq!(refused.hand_overs(), 0);
+        services_through_agent(None);
+    }
+
     /// Each of the brief's own refusals is a sentence the system prompt
     /// asks for, word for word, so the list can't drift from it.
     #[test]
@@ -6186,9 +6935,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(
                 system.contains(&format!(
                     "When it runs is one [trigger] table (never [[trigger]]; coming to the \
-                     desk is room/presence, never the faces): {} A body step is one gesture, \
-                     one of: nod, headshake, ",
-                    made_skill::TRIGGER_MEANINGS
+                     desk is room/presence, never the faces): {} A [trigger], its sooner or a \
+                     [[while]] reads one of these topics alone, and only the fields it carries: \
+                     {}; the lamp sends no other. A body step is one gesture, one of: nod, \
+                     headshake, ",
+                    made_skill::TRIGGER_MEANINGS,
+                    made_skill::readable_named()
                 )),
                 "{system}"
             );
@@ -6809,10 +7561,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(!off.0.contains("asks ="), "{}", off.0);
         made_skill::set_asks_here(Some(true));
-        made_skill::set_said_here(Some(true));
+        made_skill::set_said_here(Some(false));
         let on = system_with(false);
         assert!(on.ends_with(made_skill::ASKS_RULES), "{on}");
         assert!(!on.contains(made_skill::SAID_RULES), "{on}");
+        assert!(!on.contains("[said]"), "{on}");
         assert!(
             on.contains(
                 "A skill can't yet hear what is said in the room, other than the words the \
@@ -6830,6 +7583,101 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(brief.contains("or asks as above"), "{brief}");
         assert!(brief.len() <= made_skill::MOST_BRIEF_BYTES);
         made_skill::set_scripts_here(None);
+        made_skill::set_said_here(None);
+        made_skill::set_asks_here(None);
+    }
+
+    /// #6526 with the person's own words on too: with `LAMP_MADE_SKILL_SAID`
+    /// and `LAMP_MADE_SKILL_ASKS` both on, the making model is told both
+    /// starts (a [said] start's rules, then the asks'), the room's talk
+    /// alone out of reach, and the brief points to both, the longest still
+    /// within [`made_skill::MOST_BRIEF_BYTES`]. Each switch alone tells and
+    /// points to its own start only, as before.
+    #[test]
+    fn a_said_start_and_asks_are_both_told_with_both_switches() {
+        let request = "when I tell you I'm busy, turn red";
+        let longest = "x".repeat(made_skill::MOST_REQUEST_BYTES);
+        let said_alone = "A skill can't yet hear what is said in the room (a request told to the \
+                          lamp is a [said] start, below), know who";
+        let asks_alone = "A skill can't yet hear what is said in the room, other than the words \
+                          the person names to start it (asks, below), know who";
+        // Each alone: its own rules last, its own words, the other's absent.
+        made_skill::set_asks_here(Some(false));
+        made_skill::set_said_here(Some(true));
+        let said = system_with(false);
+        assert!(
+            said.ends_with(&format!("\n{}", made_skill::SAID_RULES)),
+            "{said}"
+        );
+        assert!(said.contains(said_alone), "{said}");
+        assert!(!said.contains(made_skill::ASKS_RULES), "{said}");
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] as listed or [said] as above, with"),
+            "{brief}"
+        );
+        made_skill::set_asks_here(Some(true));
+        made_skill::set_said_here(Some(false));
+        let asks = system_with(false);
+        assert!(
+            asks.ends_with(&format!("\n{}", made_skill::ASKS_RULES)),
+            "{asks}"
+        );
+        assert!(asks.contains(asks_alone), "{asks}");
+        assert!(!asks.contains(made_skill::SAID_RULES), "{asks}");
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] as listed, or asks as above, with"),
+            "{brief}"
+        );
+        // Both: both rules, the said start's first, and both named.
+        made_skill::set_said_here(Some(true));
+        let both = system_with(false);
+        assert!(
+            both.ends_with(&format!(
+                "\n{}\n{}",
+                made_skill::SAID_RULES,
+                made_skill::ASKS_RULES
+            )),
+            "{both}"
+        );
+        assert!(
+            both.contains(
+                "A skill can't yet hear what is said in the room, other than a request told to \
+                 the lamp (a [said] start) or the words the person names to start it (asks), \
+                 both below, know who"
+            ),
+            "{both}"
+        );
+        assert!(
+            !both.contains(said_alone) && !both.contains(asks_alone),
+            "{both}"
+        );
+        let brief = made_skill::brief(request).unwrap();
+        assert!(
+            brief.contains("; one [trigger] listed, [said]/asks as above, with"),
+            "{brief}"
+        );
+        // The longest brief within its bound with everything it may point
+        // to on: reads, writes, code or a task for the lamp's agent.
+        for writes in [false, true] {
+            made_skill::set_writes_here(Some(writes));
+            for scripts in [false, true] {
+                made_skill::set_scripts_here(Some(scripts));
+                for (reads, agent) in [(false, false), (true, false), (true, true)] {
+                    let brief = made_skill::brief_for(&longest, reads, agent).unwrap();
+                    assert!(brief.contains("[said]/asks as above"), "{brief}");
+                    assert!(
+                        brief.len() <= made_skill::MOST_BRIEF_BYTES,
+                        "{} > {}",
+                        brief.len(),
+                        made_skill::MOST_BRIEF_BYTES
+                    );
+                }
+            }
+        }
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
         made_skill::set_said_here(None);
         made_skill::set_asks_here(None);
     }
@@ -6974,6 +7822,48 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "boolean"
         );
         assert!(parameters.to_string().len() <= 4_096);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_writes_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
+    /// `LAMP_SKILL_RECURRING_TOLD` (lamp-9adf, 17 Nov: "every morning at
+    /// nine, read me my new emails" set a reminder and read the mail now):
+    /// with it, the function's request says a thing for the lamp to do at
+    /// a time or on a repeat is a skill, never a reminder, still within the
+    /// link's bounds with every switch on, the description unchanged; off,
+    /// as before.
+    #[test]
+    fn a_repeat_for_the_lamp_to_do_is_told_a_skill_with_its_switch_alone() {
+        crate::skill_recurring::set_on_here(Some(false));
+        let off = tool();
+        let request = |tool: &lamp_gemini::Tool| {
+            tool.parameters.as_ref().unwrap()["properties"]["request"]["description"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        assert!(!request(&off).contains("every morning at nine"));
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::skill_recurring::set_on_here(Some(false));
+        let before = tool();
+        crate::skill_recurring::set_on_here(Some(true));
+        let all = tool();
+        assert_eq!(all.description, before.description);
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        let asked = request(&all);
+        assert!(
+            asked.ends_with(crate::skill_recurring::REQUEST_TOLD),
+            "{asked}"
+        );
+        assert!(
+            asked.contains("checks the processor temperature"),
+            "{asked}"
+        );
+        assert!(all.parameters.unwrap().to_string().len() <= 4_096);
+        crate::skill_recurring::set_on_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);
@@ -8200,5 +9090,270 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(made_skill::entries(&keeping.directory).is_empty());
         no_cannot_here(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `LAMP_TASK_NET` and what a task for the lamp's agent needs, on for
+    /// this test's thread; `LAMP_MAKE_NO_CANNOT` off, as in the product.
+    fn net_make_here(on: Option<bool>) {
+        crate::skill_task_yes::set_net_here(on);
+        made_skill::set_scripts_here(on);
+        crate::skill_task_yes::set_on_here(on);
+        crate::upload_agent::set_on_here(on);
+        crate::make_no_cannot::set_on_here(on.map(|_| false));
+    }
+
+    /// The owner's second make on lamp-9adf, 17 Nov.
+    const BITCOIN: &str =
+        "when I say bitcoin price, check the Bitcoin price on the web and tell me";
+
+    /// The one more call's answer for [`BITCOIN`].
+    const BITCOIN_ASKED: &str = "name: bitcoin-price\ngrants: net, speak\nasks: bitcoin price";
+
+    /// The kept agent skill for [`BITCOIN`]: asked for by its words, granted
+    /// `net`, said back as a task for the lamp's agent that reads back and
+    /// waits for the yes at its first ask; never said as made.
+    fn assert_bitcoin_kept(told: &Value, keeping: &Keeping) {
+        assert_eq!(told["made"], "bitcoin-price", "{told}");
+        let next = told["next"].as_str().unwrap();
+        let uses = crate::skill_task_yes::uses_said(&["net".to_owned(), "speak".to_owned()]);
+        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(
+            next.contains(&format!(
+                "I can have the lamp's agent do that, as bitcoin price: only when you ask for it, \
+                 it hands one task to the lamp's agent: “{BITCOIN}”. The lamp's agent does it, \
+                 and {uses}. The first time you ask, I'll read it back and wait for your yes."
+            )),
+            "{next}"
+        );
+        assert!(!next.contains("I made"), "{next}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["agent"], true, "{entry}");
+        assert_eq!(entry["grants"], json!(["net", "speak"]), "{entry}");
+        assert_eq!(
+            crate::upload_agent::agent_named(&keeping.directory, "bitcoin_price").as_deref(),
+            Some("bitcoin-price")
+        );
+    }
+
+    /// lamp-9adf, 17 Nov: with `LAMP_TASK_NET` on, the make's prompt told
+    /// DeepSeek and Hermes a price is "anything from the internet" a skill
+    /// can't find out, so both answered `cannot:`. Now the model answers
+    /// `internet:` for it, never handed to the agent to write; the lamp's
+    /// own model picks its grants and words in one more call, and a make
+    /// asked for by its words is an agent skill granted `net`, with
+    /// `LAMP_MAKE_NO_CANNOT` off.
+    #[test]
+    fn with_task_net_a_web_make_asked_by_its_words_is_an_agent_skill_granted_net() {
+        net_make_here(Some(true));
+        let (root, keeping) = keeping("net-asked");
+        let helper = manage_helper(&keeping.manage);
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(|_: &str| Some("cannot: never asked.".to_owned())),
+        );
+        let (url, served) = service_sent(vec![
+            (200, "internet: the Bitcoin price".to_owned()),
+            (200, BITCOIN_ASKED.to_owned()),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            BITCOIN,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(
+            sent[0].contains("the lamp's agent looks it up each time"),
+            "{}",
+            sent[0]
+        );
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+            "{}",
+            sent[1]
+        );
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_bitcoin_kept(&told, &keeping);
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The same make when DeepSeek's answer isn't kept and the lamp's agent
+    /// (Hermes, told the same rules) answers `internet:`: made the same
+    /// way, the agent's line never said.
+    #[test]
+    fn with_task_net_the_agents_internet_line_is_made_the_same_way() {
+        net_make_here(Some(true));
+        let (root, keeping) = keeping("net-agent");
+        let helper = manage_helper(&keeping.manage);
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(|rules: &str| {
+                assert!(rules.contains(made_skill::BRIEF_HEAD), "{rules}");
+                Some("internet: PRIVATE-DETAIL-7's Bitcoin price".to_owned())
+            }),
+        );
+        let (url, served) = service(vec![
+            (
+                200,
+                "cannot: I can't do that yet: checking a price.".to_owned(),
+            ),
+            (200, BITCOIN_ASKED.to_owned()),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            BITCOIN,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (2, 1));
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert!(!told.to_string().contains("PRIVATE-DETAIL-7"), "{told}");
+        assert_bitcoin_kept(&told, &keeping);
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's first make (lamp-9adf, 17 Nov), on a time, and the
+    /// owner's ruling of 17 Nov: a skill that runs on its own trigger may
+    /// have `net` with `LAMP_TASK_NET` on. Kept as a made task for the
+    /// lamp's agent on its trigger, granted `net` and `speak`, said back as
+    /// one that reaches the internet, and waiting for the spoken yes. The
+    /// journal names neither the request nor the model's words.
+    #[test]
+    fn with_task_net_a_timed_web_make_is_kept_on_its_trigger_granted_net() {
+        net_make_here(Some(true));
+        let (root, keeping) = keeping("net-timed");
+        let (url, served) = service_sent(vec![
+            (200, "internet: the Bitcoin price".to_owned()),
+            (
+                200,
+                plant_answer("net, speak").replace("plant-check", "bitcoin-daily"),
+            ),
+        ]);
+        let request = "check the Bitcoin price every day at eight in the morning and tell me";
+        let told = make(request, &keeping, chat_at(url), NOW);
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "{told}");
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "bitcoin-daily", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        assert_eq!(told["on"], false, "{told}");
+        let grants = ["net".to_owned(), "speak".to_owned()];
+        let description = told["description"].as_str().unwrap();
+        assert!(
+            description.contains(&format!("hands one task to the lamp's agent: “{request}”")),
+            "{description}"
+        );
+        let uses = crate::skill_task_yes::uses_said(&grants);
+        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(
+            description.ends_with(&format!(
+                "The lamp's agent does it, and {uses}. It runs only once you agree."
+            )),
+            "{description}"
+        );
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("\"I can have the lamp's agent do that, as bitcoin daily: every day"),
+            "{next}"
+        );
+        assert!(!next.contains("I made"), "{next}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["uses"]["grants"], json!(grants), "{entry}");
+        assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
+        assert!(take_said_line().is_some_and(|line| !line.contains("Bitcoin")));
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The switch off: a make whose one more call names `net` on a trigger
+    /// (`LAMP_MAKE_NO_CANNOT` on, the model's `cannot:`) is still refused
+    /// with its reason, and nothing is kept.
+    #[test]
+    fn with_task_net_off_a_timed_net_make_is_still_refused_net_off() {
+        no_cannot_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(false));
+        let (root, keeping) = keeping("net-timed-off");
+        let (url, served) = service(vec![
+            (
+                200,
+                "cannot: I can't do that yet: checking a price.".to_owned(),
+            ),
+            (200, plant_answer("net, speak")),
+        ]);
+        let request = "check the Bitcoin price every day at eight in the morning and tell me";
+        let (made, line) = made_and_journaled(
+            request,
+            None,
+            made_skill::brief(request).unwrap(),
+            &keeping,
+            chat_at(url),
+            "local:1:1",
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        let net_off = crate::make_no_cannot::Uncovered::NetOff.line();
+        assert_eq!(made, Err(Refused(net_off, None)));
+        assert!(!line.contains("Bitcoin"), "{line}");
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        crate::skill_task_yes::set_net_here(None);
+        no_cannot_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// With `LAMP_TASK_NET` off (or what a task for the agent needs off),
+    /// the make's prompt is as before, byte for byte: what only the
+    /// internet tells is the model's `cannot:`, and no `internet:` line is
+    /// asked for. On, the agent's rules are this same prompt.
+    #[test]
+    fn with_task_net_off_the_prompt_is_as_before() {
+        const BEFORE: &str = "A skill also can't find out anything at the time it runs that \
+             no step here or below gives: the weather or a forecast, the news, a web lookup, a \
+             price, a summary of mail or calendar content no read below gives, anything from the \
+             internet. A request that needs it is answered the same way, one line and no blocks: \
+             cannot: \"I can't do that yet:\" and what, in plain words (\"I can't do that yet: \
+             checking the weather for you.\"); never a say telling the person to check, look up \
+             or read it themselves. Never stand something else in for it";
+        for reads in [false, true] {
+            for agent in [false, true] {
+                let off = system_net(reads, agent, false);
+                assert!(off.contains(BEFORE), "{off}");
+                assert!(!off.contains(crate::make_no_cannot::NEEDS_NET), "{off}");
+                let on = system_net(reads, agent, true);
+                assert!(!on.contains(BEFORE), "{on}");
+                assert!(
+                    on.contains("answered with one line and no blocks: internet: and what"),
+                    "{on}"
+                );
+                assert!(on.contains("never cannot: for it"), "{on}");
+            }
+        }
+        net_make_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(false));
+        assert_eq!(system(), system_net(made_skill::reads_on(), false, false));
+        assert!(whole("internet: the price".to_owned(), false).is_err());
+        crate::skill_task_yes::set_net_here(Some(true));
+        assert_eq!(system(), system_net(made_skill::reads_on(), false, true));
+        assert!(whole("internet: the price".to_owned(), true).is_ok());
+        net_make_here(None);
     }
 }

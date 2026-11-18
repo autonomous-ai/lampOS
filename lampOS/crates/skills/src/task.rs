@@ -46,17 +46,20 @@
 //!   its next trigger, never this one's.
 //! - **Limits**: one `do.task` at a time a skill, and at most [`PER_SKILL`]
 //!   a skill and [`ALL_SKILLS`] across every skill in any 24 hours
-//!   ([`Runs`]).
+//!   ([`Runs`]); with `LAMP_SKILL_RUNS_VOICE_SHARE` set, none once what is
+//!   left of the lamp's day on the relay is the voice's share
+//!   ([`crate::relay_share`], #7342).
 //! - **The hand-over** ([`HandOver::line`]): one line to lamp-tasks
 //!   (`--tasks-socket`, #6306), answered when the run ends. The other steps
 //!   of the skill (light, cue, say) run at once beside it.
-//! - **What its agent found** ([`told`]): a run granted a linked service's
-//!   read ends with the agent's last answer in lamp-tasks' answer
-//!   (`lamp_tasks::skill_task::tells_answer`, `LAMP_AGENT_SERVICES` on
-//!   there), which is said to the owner sentence by sentence as exact
-//!   words, behind a read's gate and turn
-//!   (`crate::service_read::tell`). Nothing else of a run is told; the
-//!   journal says only how many sentences were said.
+//! - **What its agent found** ([`told`]): a run whose runner keeps its
+//!   agent's last answer (Harness's or a make's, whatever its grants; never a fixed
+//!   write's) ends with it in lamp-tasks' answer
+//!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
+//!   sentence by sentence as exact words, never a turn for the model,
+//!   behind a read's gate and turn (`crate::service_read::tell`). Nothing
+//!   else of a run is told; the journal says only how many sentences were
+//!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
 //!   says why ([`OFF`]); the skill's other steps still run.
 use crate::package;
@@ -131,10 +134,15 @@ pub const OFF: &str =
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a `do.task`'s `task`.
 pub const MOST_TASK_BYTES: usize = 500;
-/// The most runs a skill hands over in any 24 hours.
-pub const PER_SKILL: usize = 3;
-/// The most runs every skill together hands over in any 24 hours.
-pub const ALL_SKILLS: usize = 10;
+/// The most runs a skill hands over in any 24 hours: 3 from 11 Nov, raised
+/// on the owner's ask (15 Nov), since a presence skill fires each time
+/// someone comes back to the desk and 3 ran out before lunch on lamp-9adf.
+/// One run at a time, 840 s a run and the owner's yes stay the safety.
+pub const PER_SKILL: usize = 20;
+/// The most runs every skill together hands over in any 24 hours: 10 from
+/// 11 Nov, raised with [`PER_SKILL`] (lamp-9adf's 10 were spent by 09:39 on
+/// 15 Nov).
+pub const ALL_SKILLS: usize = 100;
 /// The window the bounds count in, milliseconds.
 pub const DAY_MS: u64 = 86_400_000;
 /// The longest a run is waited for: lamp-tasks answers the hand-over line
@@ -166,17 +174,22 @@ pub struct TaskFile {
     run: String,
 }
 
-/// A `do.task` step as loaded: its words, and its script's path in the
-/// skill's folder.
+/// A `do.task` step as loaded: its words, its script's path in the
+/// skill's folder, and the skill's own `[quiet]`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskStep {
     pub task: String,
     pub run: String,
+    /// The skill's own `[quiet]`, local minutes: what its agent found
+    /// ([`told`]) is held to it beside the lamp's quiet hours, as a
+    /// `do.read`'s is ([`crate::service_read::ReadStep::quiet`]).
+    pub quiet: Option<(u16, u16)>,
 }
 
 impl TaskFile {
-    /// The step of the skill in `dir`, or why the folder's words are not one.
-    pub fn step(self, dir: &Path) -> Result<TaskStep, String> {
+    /// The step of the skill in `dir`, with the skill's `[quiet]`, or why
+    /// the folder's words are not one.
+    pub fn step(self, dir: &Path, quiet: Option<(u16, u16)>) -> Result<TaskStep, String> {
         let task = self.task.trim();
         if task.is_empty() || task.len() > MOST_TASK_BYTES || task.chars().any(char::is_control) {
             return Err(format!(
@@ -187,6 +200,7 @@ impl TaskFile {
         Ok(TaskStep {
             task: task.to_owned(),
             run: self.run,
+            quiet,
         })
     }
 }
@@ -259,7 +273,7 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
     Ok(kept)
 }
 
-/// The task grant that keeps a run's network (`LAMP_TASK_NET`,
+/// The task grant that gives a run the public web (`LAMP_TASK_NET`,
 /// `lamp_voice::skill_task_yes::NET`): a grant here, in the manage helper
 /// and lamp-control while [`net_on`], never one of lamp-control's own.
 pub const NET_GRANT: &str = lamp_voice::skill_task_yes::NET.0;
@@ -749,8 +763,9 @@ fn ledger(state: Option<&Path>) -> Result<Vec<(String, u64)>, String> {
 
 /// Why [`hand`] would refuse `skill`'s task at `now_ms` whatever the
 /// owner's yes: the switch off, no `state` (`--state-dir`), its last still
-/// under way, or past the bounds of [`begin`]'s ledger (one unreadable is
-/// full). Read only: nothing is counted or written, and a run that passes
+/// under way, past the bounds of [`begin`]'s ledger (one unreadable is
+/// full), or past the voice's share of the day ([`crate::relay_share`]).
+/// Read only: nothing is counted or written, and a run that passes
 /// here is still held to [`hand`] and [`begin`], the real gate.
 pub fn would_refuse(skill: &str, state: Option<&Path>, now_ms: u64) -> Option<String> {
     if !on() {
@@ -768,7 +783,18 @@ pub fn would_refuse(skill: &str, state: Option<&Path>, now_ms: u64) -> Option<St
     }
     ledger(Some(state))
         .and_then(|runs| bounded(&runs, skill, now_ms))
+        .and_then(|()| voice_share(now_ms))
         .err()
+}
+
+/// Refused once what is left of the lamp's day on the relay is the voice's
+/// share, with `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342,
+/// [`crate::relay_share`]); off, never.
+fn voice_share(now_ms: u64) -> Result<(), String> {
+    match crate::relay_share::would_refuse(now_ms) {
+        Some(why) => Err(format!("{NOT_HANDED}{why}")),
+        None => Ok(()),
+    }
 }
 
 /// `skill`'s task begun at `now_ms`, if it may be: none of its own under
@@ -784,6 +810,7 @@ pub fn begin(skill: &str, state: Option<&Path>, now_ms: u64) -> Result<Runs, Str
     }
     let mut runs = ledger(state)?;
     bounded(&runs, skill, now_ms)?;
+    voice_share(now_ms)?;
     runs.retain(|(_, at)| now_ms.saturating_sub(*at) < DAY_MS);
     runs.push((skill.to_owned(), now_ms));
     match state {
@@ -1067,16 +1094,51 @@ pub fn answered(answer: &str) -> Result<String, String> {
     }
 }
 
+/// lamp-tasks' code for a run granted `net` (`LAMP_TASK_NET`) it refused
+/// before anything of it ran, because the lamp's agent can't be given its
+/// way out (`lamp_tasks::skill_task::NO_NET`, #7200): a gateway default
+/// such as OpenClaw, or a wrapper whose round hasn't run.
+pub const NO_NET: &str = "no_net";
+
+/// What the lamp says aloud when lamp-tasks refused a run as [`NO_NET`]:
+/// the person asked for something that needs the internet, and hearing
+/// nothing would leave them waiting.
+pub const NO_NET_SAID: &str =
+    "I can't run that one: it needs the internet, and this lamp's agent can't reach it yet.";
+
+/// The plain line to say of lamp-tasks' answer to a hand-over (`answer`)
+/// when it refused the run in a way the person must hear: [`NO_NET_SAID`]
+/// for [`NO_NET`]. None for any other answer.
+pub fn refusal_said(answer: &str) -> Option<&'static str> {
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    (answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true)
+        && answer["error"] == NO_NET)
+        .then_some(NO_NET_SAID)
+}
+
 /// The most sentences of an agent's answer said ([`told`]): as many as a
 /// read's lines, its count and [`crate::service_read::MOST_ITEMS`] items.
 pub const MOST_TOLD_LINES: usize = 11;
+
+/// The most characters of an agent's answer said ([`told`], the first
+/// builder on #7591): a person answers in a sentence or two, and 3,000
+/// bytes aloud is about two minutes of the lamp reading.
+pub const MOST_TOLD_CHARS: usize = 400;
+
+/// Said after an agent's answer cut at [`MOST_TOLD_CHARS`] or
+/// [`MOST_TOLD_LINES`].
+pub const MORE_LINE: &str = "There's more; ask me if you want it.";
 
 /// The sentences to say of lamp-tasks' answer to a hand-over (`answer`),
 /// when the run ended well and its agent's answer is in it
 /// (`lamp_tasks::skill_task::told_answer`): markdown's marks left out, one
 /// sentence a line, a sentence longer than the say service takes
-/// (`lamp_voice::say::MOST_WORDS_BYTES`) cut at its words, at most
-/// [`MOST_TOLD_LINES`]. None for any other answer, or one with no words.
+/// (`lamp_voice::say::MOST_WORDS_BYTES`) cut at its words. A longer answer
+/// is cut at the last sentence end within [`MOST_TOLD_CHARS`] (at its
+/// words, when its first sentence alone is longer) and fewer than
+/// [`MOST_TOLD_LINES`] sentences, and [`MORE_LINE`] said after it. None for
+/// any other answer, or one with no words (a lone dash: one the skill
+/// already said aloud).
 pub fn told(answer: &str) -> Option<Vec<String>> {
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
     if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
@@ -1123,13 +1185,179 @@ pub fn told(answer: &str) -> Option<Vec<String>> {
     if !line.is_empty() {
         lines.push(line);
     }
-    lines.truncate(MOST_TOLD_LINES);
-    (!lines.is_empty()).then_some(lines)
+    if lines.is_empty() {
+        return None;
+    }
+    Some(told_bounded(lines))
+}
+
+/// `lines` as [`told`] says them: whole while within [`MOST_TOLD_CHARS`]
+/// and [`MOST_TOLD_LINES`]; else cut at the last sentence end inside, with
+/// [`MORE_LINE`] after.
+fn told_bounded(lines: Vec<String>) -> Vec<String> {
+    let count = |line: &String| line.chars().count();
+    let all: usize = lines.iter().map(|line| count(line) + 1).sum::<usize>() - 1;
+    if all <= MOST_TOLD_CHARS && lines.len() <= MOST_TOLD_LINES {
+        return lines;
+    }
+    let mut kept: Vec<String> = Vec::new();
+    let mut used = 0;
+    for line in &lines {
+        let more = count(line) + usize::from(!kept.is_empty());
+        if used + more > MOST_TOLD_CHARS || kept.len() + 1 >= MOST_TOLD_LINES {
+            break;
+        }
+        used += more;
+        kept.push(line.clone());
+    }
+    // Cut at a sentence's end: a line its words were cut in goes.
+    while kept
+        .last()
+        .is_some_and(|line| !line.ends_with(['.', '!', '?']))
+    {
+        kept.pop();
+    }
+    if kept.is_empty() {
+        // Its first sentence alone is longer: its words that fit.
+        let mut first = String::new();
+        for word in lines[0].split(' ') {
+            if count(&first) + 1 + word.chars().count() > MOST_TOLD_CHARS {
+                break;
+            }
+            if !first.is_empty() {
+                first.push(' ');
+            }
+            first.push_str(word);
+        }
+        if first.is_empty() {
+            first = lines[0].chars().take(MOST_TOLD_CHARS).collect();
+        }
+        kept.push(first);
+    }
+    kept.push(MORE_LINE.to_owned());
+    kept
+}
+
+/// What lamp-tasks says in its refusal of a run when the lamp is still
+/// getting ready: its OpenClaw Gateway not serving yet
+/// (`lamp_tasks::gateway::NOT_READY`) or Harness not running yet
+/// (`harness_not_running`, #7282). Matched as these exact codes. "No
+/// Harness target of its own yet" is not one of them: it also stands for
+/// Hermes on the lamp being off, which asking again never changes (Heron's
+/// P2 on #7351).
+pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_not_running"];
+
+/// The words the person hears, once, when a run they asked for by voice is
+/// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
+/// lamp-tasks' `answer`; none for any other answer or a run not asked by
+/// voice (a trigger's run says nothing unprompted), or one refused past
+/// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
+/// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
+/// the run's failure is told as before (El's P2 on #7351).
+pub fn not_ready_line(
+    answer: &str,
+    asked_by_voice: bool,
+    since_boot_ms: Option<u64>,
+) -> Option<&'static str> {
+    if !lamp_voice::skill_words::not_ready_told(since_boot_ms) {
+        return None;
+    }
+    let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
+    let refused = answer.get("ok").and_then(serde_json::Value::as_bool) == Some(false);
+    let message = answer.get("message")?.as_str()?;
+    (asked_by_voice && refused && NOT_READY_SAID.iter().any(|said| message.contains(said)))
+        .then_some(lamp_voice::skill_words::NOT_READY_LINE)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    /// A run the person asked for, refused as the lamp is still getting
+    /// ready (its Gateway, Harness not running), is told the not-ready
+    /// sentence; another refusal, a run that went, or a trigger's run says
+    /// nothing. No lamp target of its own, which is also Hermes on the
+    /// lamp being off, is never told as not ready (Heron's P2 on #7351).
+    #[test]
+    fn a_run_refused_as_the_lamp_is_still_getting_ready_is_told_so() {
+        // A minute after the lamp started.
+        const STARTING: Option<u64> = Some(60_000);
+        for message in [
+            "Harness didn't start the run (openclaw_gateway_not_ready)",
+            "Harness didn't start the run (harness_not_running)",
+        ] {
+            let answer = json!({"ok":false,"error":"run_failed","message":message}).to_string();
+            assert_eq!(
+                not_ready_line(&answer, true, STARTING),
+                Some(lamp_voice::skill_words::NOT_READY_LINE),
+                "{message}"
+            );
+            assert_eq!(not_ready_line(&answer, false, STARTING), None, "{message}");
+            // Past the start window, or with no time since the start, the
+            // same refusal is a broken Gateway or Harness: no "give me a
+            // minute" for good (El's P2 on #7351).
+            let window = lamp_voice::skill_words::NOT_READY_WITHIN_MS;
+            assert_eq!(
+                not_ready_line(&answer, true, Some(window)),
+                Some(lamp_voice::skill_words::NOT_READY_LINE),
+                "{message}"
+            );
+            assert_eq!(
+                not_ready_line(&answer, true, Some(window + 1)),
+                None,
+                "{message}"
+            );
+            assert_eq!(
+                not_ready_line(&answer, true, Some(3_600_000)),
+                None,
+                "{message}"
+            );
+            assert_eq!(not_ready_line(&answer, true, None), None, "{message}");
+        }
+        let other = json!({"ok":false,"error":"run_failed","message":"Harness isn't set up on this lamp yet, so a skill's run can't be started"});
+        assert_eq!(not_ready_line(&other.to_string(), true, STARTING), None);
+        let hermes_off = json!({"ok":false,"error":"run_failed","message":"the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started"});
+        assert_eq!(
+            not_ready_line(&hermes_off.to_string(), true, STARTING),
+            None
+        );
+        let went = json!({"ok":true,"id":"r1","message":"openclaw_gateway_not_ready"});
+        assert_eq!(not_ready_line(&went.to_string(), true, STARTING), None);
+        assert_eq!(not_ready_line("not json", true, STARTING), None);
+    }
+
+    /// #7200: a run granted the internet that lamp-tasks can't give its
+    /// way out (OpenClaw the default: its turns run in its gateway's
+    /// namespaces) is said aloud in plain words, never the journal's, and
+    /// not counted against the day's runs (nothing of it ran). Any other
+    /// answer says nothing here.
+    #[test]
+    fn a_net_run_lamp_tasks_refused_is_said_in_plain_words() {
+        assert_eq!(NO_NET, lamp_tasks::skill_task::NO_NET);
+        let openclaw = serde_json::json!({
+            "ok": false,
+            "error": lamp_tasks::skill_task::NO_NET,
+            "message": lamp_tasks::skill_task::net_refused(
+                "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces, which no one run can be held in"
+            ),
+        })
+        .to_string();
+        assert_eq!(refusal_said(&openclaw), Some(NO_NET_SAID));
+        assert!(!NO_NET_SAID.contains("openclaw") && !NO_NET_SAID.contains("LAMP_"));
+        assert!(matches!(
+            crate::service_write::agent_answered(&openclaw),
+            Err(crate::service_write::Unrun::NotTaken(_))
+        ));
+        for other in [
+            r#"{"ok":true,"id":0}"#,
+            r#"{"ok":false,"error":"run_failed","message":"Harness failed"}"#,
+            r#"{"ok":true,"error":"no_net"}"#,
+            "not json",
+        ] {
+            assert_eq!(refusal_said(other), None, "{other}");
+        }
+    }
 
     /// What the agent found comes back in lamp-tasks' answer, and is said
     /// a sentence a line, its markdown left out; an answer without it, a
@@ -1159,14 +1387,51 @@ mod tests {
             "word ".repeat(400)
         );
         let lines = told(&long).unwrap();
-        assert!(lines.len() > 1, "{lines:?}");
-        assert!(
-            lines
-                .iter()
-                .all(|line| line.len() <= lamp_voice::say::MOST_WORDS_BYTES)
-        );
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(lines[0].chars().count() <= MOST_TOLD_CHARS);
+        assert_eq!(lines[1], MORE_LINE);
         let many = format!(r#"{{"ok":true,"id":0,"answer":"{}"}}"#, "One. ".repeat(30));
-        assert_eq!(told(&many).unwrap().len(), MOST_TOLD_LINES);
+        let lines = told(&many).unwrap();
+        assert_eq!(lines.len(), MOST_TOLD_LINES);
+        assert_eq!(lines.last().unwrap(), MORE_LINE);
+    }
+
+    /// The first builder on #7591: what is said of an agent's answer is
+    /// about 400 characters at most. A 3,000-byte answer (`answer.md`'s, as
+    /// lamp-tasks carries at most) is said as its sentences within
+    /// [`MOST_TOLD_CHARS`], ending at a sentence, then [`MORE_LINE`]; a
+    /// short one is said whole with no more line; an empty one, or a lone
+    /// dash (one the skill already said aloud), says nothing.
+    #[test]
+    fn a_long_answer_is_said_as_400_characters_and_theres_more() {
+        let sentence = "Bitcoin traded at 91,204 dollars on Coinbase a minute ago. ";
+        let mut text = String::new();
+        while text.len() + sentence.len() <= 3_000 {
+            text.push_str(sentence);
+        }
+        assert!(text.len() > 2_900);
+        let answer = serde_json::json!({"ok": true, "id": 3, "answer": text}).to_string();
+        let lines = told(&answer).unwrap();
+        let (more, said) = lines.split_last().unwrap();
+        assert_eq!(more, MORE_LINE);
+        let said = said.join(" ");
+        assert!(said.chars().count() <= MOST_TOLD_CHARS, "{said}");
+        assert!(said.chars().count() > MOST_TOLD_CHARS - sentence.len());
+        assert!(said.ends_with('.'), "{said}");
+        let short =
+            r#"{"ok":true,"id":3,"answer":"Bitcoin is at 91,204 dollars. It rose 2% today."}"#;
+        assert_eq!(
+            told(short).unwrap(),
+            ["Bitcoin is at 91,204 dollars.", "It rose 2% today."]
+        );
+        for nothing in [
+            r#"{"ok":true,"id":3,"answer":""}"#,
+            r#"{"ok":true,"id":3,"answer":"  "}"#,
+            r#"{"ok":true,"id":3,"answer":"-"}"#,
+            r#"{"ok":true,"id":3}"#,
+        ] {
+            assert_eq!(told(nothing), None, "{nothing}");
+        }
     }
 
     fn folder(dir: &Path) -> std::path::PathBuf {
@@ -1187,7 +1452,7 @@ mod tests {
             task: "Take a photo".into(),
             run: run.into(),
         }
-        .step(dir)
+        .step(dir, None)
     }
 
     #[test]
@@ -1222,7 +1487,7 @@ mod tests {
                 task: task.into(),
                 run: "scripts/main.py".into(),
             }
-            .step(&folder)
+            .step(&folder, None)
             .unwrap_err();
             assert!(refused.contains("task is 1 to"), "{refused}");
         }
@@ -1685,6 +1950,63 @@ mod tests {
         set_made_here(None);
     }
 
+    /// The owner's ruling (17 Nov): a task for the lamp's agent made by
+    /// voice on its own trigger ("check the Bitcoin price every day at 9
+    /// and tell me"), granted `net` with LAMP_TASK_NET on, loads as a made
+    /// skill with code: its trigger, its one task running the lamp's own
+    /// script, `net` among its grants. The switch off, it doesn't load.
+    #[test]
+    fn a_made_timed_task_granted_net_loads_only_with_its_switch() {
+        use lamp_voice::make_no_cannot as no_cannot;
+        let block = "[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+                     topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                     rearm = \"ends\"\nduring = { from = \"09:00\", to = \"09:01\" }";
+        let words = "check the Bitcoin price every day at 9 and tell me";
+        let grants = ["net".to_owned(), "speak".to_owned()];
+        let text = no_cannot::skill_text("bitcoin-daily", &grants, block, words);
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("bitcoin-daily");
+        fs::create_dir_all(folder.join(SCRIPTS)).unwrap();
+        // Its three fenced blocks, each a file named on its fence's line.
+        for written in text.split("```").skip(1).step_by(2) {
+            let (name, body) = written.split_once('\n').unwrap();
+            let body = if name == "SKILL.md" {
+                body.replacen("\n---\n", "\nmade: here\n---\n", 1)
+            } else {
+                body.to_owned()
+            };
+            fs::write(folder.join(name), body).unwrap();
+        }
+        assert!(folder.join(no_cannot::RUN).is_file());
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "bitcoin-daily".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: false,
+        };
+        fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        set_made_here(Some(true));
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let skill = crate::load(&folder).unwrap();
+        assert_eq!(skill.grants, grants);
+        assert_eq!(skill.triggers.len(), 1);
+        assert_eq!(skill.task_step().unwrap().run, no_cannot::RUN);
+        assert!(made_with_code(&folder, false));
+        assert!(origin_refuses(&folder, false).is_none());
+        lamp_voice::skill_task_yes::set_net_here(Some(false));
+        assert!(crate::load(&folder).is_err());
+        lamp_voice::skill_task_yes::set_net_here(None);
+        set_made_here(None);
+    }
+
     /// lamp-control at `path`, answering each of `answers` in turn, one a
     /// connection: the lines it was asked.
     fn control(
@@ -1746,8 +2068,9 @@ mod tests {
         assert_eq!(refuses(), Some(NO_CONTROL));
     }
 
-    /// One at a time a skill, and at most three a skill a day; an
-    /// unreadable ledger, or one with a run after now, counts as full.
+    /// One at a time a skill, and at most [`PER_SKILL`] a skill a day: the
+    /// last of them goes, the next is refused; an unreadable ledger, or one
+    /// with a run after now, counts as full.
     #[test]
     fn one_task_at_a_time_and_a_daily_cap() {
         let dir = tempfile::tempdir().unwrap();
@@ -1756,10 +2079,14 @@ mod tests {
         let busy = begin("cap-skill", Some(state), 1_001).unwrap_err();
         assert!(busy.contains("still under way"), "{busy}");
         drop(first);
-        drop(begin("cap-skill", Some(state), 2_000).unwrap());
-        drop(begin("cap-skill", Some(state), 3_000).unwrap());
-        let spent = begin("cap-skill", Some(state), 4_000).unwrap_err();
-        assert!(spent.contains("3 runs in 24 hours"), "{spent}");
+        for run in 2..=PER_SKILL as u64 {
+            drop(begin("cap-skill", Some(state), run * 1_000).unwrap());
+        }
+        let spent = begin("cap-skill", Some(state), (PER_SKILL as u64 + 1) * 1_000).unwrap_err();
+        assert!(
+            spent.contains(&format!("{PER_SKILL} runs in 24 hours")),
+            "{spent}"
+        );
         // A day on, it may again.
         drop(begin("cap-skill", Some(state), 1_000 + DAY_MS).unwrap());
         // Set back: full.
@@ -1771,14 +2098,17 @@ mod tests {
                 .unwrap_err()
                 .contains("can't be read")
         );
-        // Across every skill: at most ten.
+        // Across every skill: at most [`ALL_SKILLS`], the last of them let
+        // through and the next refused.
         let runs: Vec<(String, u64)> = (0..ALL_SKILLS)
             .map(|at| (format!("s{at}"), at as u64))
             .collect();
+        let now = ALL_SKILLS as u64 + 1;
+        assert!(bounded(&runs[1..], "another", now).is_ok());
         assert!(
-            bounded(&runs, "another", 100)
+            bounded(&runs, "another", now)
                 .unwrap_err()
-                .contains("10 runs")
+                .contains(&format!("{ALL_SKILLS} runs"))
         );
     }
 
@@ -1830,6 +2160,68 @@ mod tests {
                 .unwrap()
                 .contains("can't be read")
         );
+        set_on_here(None);
+    }
+
+    /// #7342: with `LAMP_SKILL_RUNS_VOICE_SHARE` set, a run is refused
+    /// before it is handed over once the relay's day left is the voice's
+    /// share, in words the lamp can say, and nothing is counted; below it,
+    /// or with the switch off, runs go as before.
+    #[test]
+    fn a_run_is_refused_once_the_voices_share_is_reached() {
+        use crate::relay_share::{self, Reading};
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        let cloud = dir.path().join("cloud");
+        fs::create_dir_all(&state).unwrap();
+        fs::create_dir_all(&cloud).unwrap();
+        // A real day, so the reading's UTC day is the run's.
+        let now = 20_774 * DAY_MS + 3_600_000;
+        let kept = |used: f64| {
+            let reading = Reading {
+                day: relay_share::day_of(now),
+                used: Some(used),
+                at_ms: now - 1_000,
+                ..Reading::default()
+            };
+            relay_share::keep(&cloud, &reading).unwrap();
+        };
+        set_on_here(Some(true));
+        relay_share::set_here(Some(0.5), Some(&cloud));
+        // Below the mark: let through.
+        kept(0.49);
+        assert_eq!(would_refuse("share-skill", Some(&state), now), None);
+        drop(begin("share-skill", Some(&state), now).unwrap());
+        let counted = fs::read(state.join(RUNS_FILE)).unwrap();
+        // At the mark: refused before it starts, said plainly, not counted.
+        kept(0.5);
+        let refused = would_refuse("share-skill", Some(&state), now + 1).unwrap();
+        assert!(refused.starts_with(NOT_HANDED), "{refused}");
+        assert!(
+            refused.ends_with(
+                "the lamp has used 50% of its thinking for today, and the last 50% is kept \
+                 for talking, so skills' runs wait until its day starts again"
+            ),
+            "{refused}"
+        );
+        assert_eq!(
+            begin("share-skill", Some(&state), now + 1).unwrap_err(),
+            refused
+        );
+        assert_eq!(fs::read(state.join(RUNS_FILE)).unwrap(), counted);
+        // The relay's own limit met: refused too.
+        kept(1.0);
+        assert!(begin("share-skill", Some(&state), now + 2).is_err());
+        // Its day turned over: the reading is yesterday's, so it goes.
+        assert_eq!(
+            would_refuse("share-skill", Some(&state), now + DAY_MS),
+            None
+        );
+        // Off: the same reading changes nothing.
+        relay_share::set_here(None, Some(&cloud));
+        assert_eq!(would_refuse("share-skill", Some(&state), now + 3), None);
+        drop(begin("share-skill", Some(&state), now + 3).unwrap());
+        relay_share::set_here(None, None);
         set_on_here(None);
     }
 

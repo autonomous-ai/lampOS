@@ -36,11 +36,13 @@ body's movement only: the voice and what it says do not change with it.
 **Level 1 is how the lamp always moved, and the default**: no level kept,
 one that does not read, or no `lamp-cloud` is level 1.
 
-The owner may pick it (`"energy"` in `character.set`, kept as `chosen`).
-Otherwise root's helper works it out from the words once, when they are
-kept (`lamp_msgs::chosen_voice::energy_of`, kept as `derived`), from a fixed
-table, no model asked: start at 1, add each word's weight found as a whole
-word or phrase (lowercase), hold to 1 to 5.
+The owner may pick it (`"energy"` in `character.set`, kept as `chosen`), and a
+pick always wins. Otherwise root's helper works it out from the words once, when
+they are kept (`lamp_msgs::chosen_voice::energy_of`, kept as `derived`), from a
+fixed table, no model asked: start at 1, add each word's weight found as a whole
+word or phrase (lowercase), hold to 1 to 5. The table is the fallback while
+`LAMP_ENERGY_FROM_MODEL` is off; it is parked only once that switch is on by
+default (#7314).
 
 | Weight | English | Vietnamese |
 |---|---|---|
@@ -55,6 +57,20 @@ line if the table is English only.
 So "energetic, playful and excited" is 5, "cheerful and curious" 3, "calm
 and quiet" or "a wise old owl" 1, and "playful but gentle" 1. "funny" is not
 "fun": whole words only.
+
+With `LAMP_ENERGY_FROM_MODEL=on` in `lamp-cloud` (off unless set), the level
+said on `character/energy` for derived words is the model's instead of the
+table's: `lamp-cloud` asks once per saved words (`crate::energy_rate`), the
+voice's DeepSeek on the company relay with the voice's key (the same relay,
+model and key as `crate::hermes_llm`), one short English prompt ("Rate this
+character's energy from 1 (calm) to 5 (very lively). Answer with one digit
+only.", the words quoted after it), within 10 s with one retry. An answer that
+is not one digit from 1 to 5, or any failure, is level 1. Words already rated
+are not asked again, though a restart of `lamp-cloud` asks once more. A failure
+is not kept: the same words are asked again after 60 s, the wait doubling after
+each failure up to 30 min, and level 1 is said meanwhile.
+`voice.get` still answers the kept file's level (the table's for derived
+words). No word is logged.
 
 It is kept in `/etc/lampOS/setup/energy` (644 root): the level on the first
 line, `chosen` or `derived` on the second; removed when the words are
@@ -116,11 +132,37 @@ chosen voice, the language's, or the default). A voice set in `second.json`
 by id is said as "a voice id from the configuration", never the id. This is
 how a tester tells the chosen voice from the default.
 
+## The voice preview
+
+Issue #7485. The app plays a voice to the owner before they choose it, with
+V1's `tts.preview` over the same data path, and the same switch on
+`lamp-cloud`:
+
+| Kind | Data | `success` data |
+|---|---|---|
+| `tts.preview` | `{"text", "provider"?, "voice"?, "language"?, "speed"?}`. `text` is required: one line, at most 200 characters. `voice` is one of the lamp's names, as `voice.set` takes; absent, `null` or `""` is the voice in use. `provider` absent or `"elevenlabs"`. `speed` is checked as V1 does (0.25 to 4.0) and the line is said at the voice's own; `language` is taken and left alone | none |
+
+`lamp-cloud` answers `starting` at once and hands the line to the voice's
+say service (`/run/lampos-say/say.sock`) as an exact `text` with `voice`,
+skill `voice-preview`. The voice renders that line alone in that voice,
+through the speech service it speaks with, never kept in the speech cache,
+and plays it as any exact line: it waits while someone is talking with the
+lamp and is refused while the lamp is muted or paused. The voice in use,
+the files and the next answer are as they were.
+
+The result is `success` once the line has played whole. Otherwise it is
+`failure` with why:
+- `the lamp is busy; try again in a moment`, when it couldn't begin within
+  15 s, or when a second preview comes while one plays;
+- `not played: …` or `not played whole: …`, with the voice's reason;
+- `the lamp's voice is not running`.
+
+The text is never in the journal or in a failure's reason.
+
 ## Not built yet
 
-`tts.preview` and a preset list (`character.list`) are not in this piece
-(the lead's scope, 5 Nov). A preset is just words the app sends
-as `character.set`.
+A preset list (`character.list`) is not in this piece (the lead's scope,
+5 Nov). A preset is just words the app sends as `character.set`.
 
 ## Lamp check
 

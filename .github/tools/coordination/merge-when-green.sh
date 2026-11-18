@@ -101,7 +101,15 @@ checks() {
      | select(if $mode == "named" then (.n | test("build and test|clippy")) else ((.c == "SKIPPED" or .c == "NEUTRAL") | not) end)]
     | "\(length) \(map(select(.s == "COMPLETED" and .c == "SUCCESS")) | length) \(map(select(.s == "COMPLETED" and .c != "SUCCESS")) | length) \(map(select(.s != "COMPLETED")) | length) \(map("\(.n): \(.s) \(.c)") | join(", "))"' 2>/dev/null
 }
-for i in {1..90}; do
+# 18 Nov 01:1x (first builder, #7604): a look while a check still waits for a runner (QUEUED, WAITING or REQUESTED)
+# doesn't count towards the 90 looks (45 min). Trains 1012, 1014 and 1017 ran out of their 45 min while their macOS
+# virtual lamp waited 25-44 min for one of the five macOS runners; each passed 0-17 min after the bot gave up, and each
+# rebuild went to the back of the same queue (a second in a row stops the bot). Running checks still have their 45 min;
+# a train whose checks never all start ends after 270 looks in all (about 2 h 15 min), as before (exit 5).
+waiting() { [[ ", $1" == *": "(QUEUED|WAITING|REQUESTED)" "* ]]; }
+ran=0 i=0
+while (( ran < 90 && i < 270 )); do
+  (( ++i ))
   head=$(gh pr view $P -R autonomous-ai/lampOS --json headRefOid -q .headRefOid)
   # 27 Oct 15:5x (the reviewer-lead: trains kept running on a tip that had moved): every other look, a lamp-voice that
   # moved past this PR's base ends the wait at once, rather than after a full green run that can't merge.
@@ -126,7 +134,7 @@ for i in {1..90}; do
       echo "$(date +%T) #$P has no ARM64 run (no file it takes): its $passed checks passed"
       green=1
     else
-      last_every=$every; sleep $poll; continue
+      last_every=$every; waiting "$rest" || (( ++ran )); sleep $poll; continue
     fi
   else
     # The ARM64 build and test and clippy: at least two, every one COMPLETED with SUCCESS.
@@ -164,6 +172,7 @@ for i in {1..90}; do
     if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P merge refused; lamp-voice moved meanwhile: rebuilding"; exit 3; fi
     echo "$(date +%T) #$P merge refused"; exit 4
   fi
+  waiting "$erest" || (( ++ran ))
   sleep $poll
 done
-echo "$(date +%T) #$P checks not done in 45 min"; exit 5
+echo "$(date +%T) #$P checks not done in 45 min$( (( i > ran )) && echo " of running, after $(( (i - ran) * poll / 60 )) min more waiting for a runner")"; exit 5

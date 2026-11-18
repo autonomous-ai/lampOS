@@ -17,6 +17,11 @@ EXTRA = r"""  *"actions/runs?head_sha="*) cat "$FAKE_DIR/runs.txt" 2>/dev/null; 
   "pr diff "*) n=$(echo "$*" | sed -E 's/^pr diff ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/files-$n.txt" ]; then cat "$FAKE_DIR/files-$n.txt"; else cat "$FAKE_DIR/files.txt"; fi; exit 0 ;;
 """
 FAKE_GH = test_lanes.FAKE_GH.replace('case "$*" in\n', 'case "$*" in\n' + EXTRA, 1)
+# 18 Nov (Queued below): the first N reads of the checks (N in early-reads) answer checks-early.json, the rest
+# checks.json, so a check can wait for a runner and then run or pass.
+EARLY = r"""  *statusCheckRollup*) r=$(( $(cat "$FAKE_DIR/reads" 2>/dev/null || echo 0) + 1 )); echo $r > "$FAKE_DIR/reads"; if [ $r -le $(cat "$FAKE_DIR/early-reads") ]; then cat "$FAKE_DIR/checks-early.json"; else cat "$FAKE_DIR/checks.json"; fi; exit 0 ;;
+"""
+FAKE_GH_EARLY = FAKE_GH.replace('case "$*" in\n', 'case "$*" in\n' + EARLY, 1)
 CRATE = "lampOS/crates/x/src/lib.rs"
 
 
@@ -58,6 +63,44 @@ class MergeOnEveryCheck(Red):
         _, r = self.mwg(ARM_CHECKS + [check("Local documentation files and anchors", "IN_PROGRESS", None)])
         self.assertEqual(r.returncode, 5, r.stdout + r.stderr)
         self.assertNotIn("pr merge", self.calls())
+        # A running check uses up the 90 looks, two reads each, and nothing is said of a runner.
+        self.assertEqual(self.calls().count("statusCheckRollup"), 180, r.stdout)
+        self.assertIn("checks not done in 45 min\n", r.stdout)
+
+
+class Queued(Red):
+    # 18 Nov (#7604): trains 1012, 1014 and 1017 ran out of their 45 min while their macOS virtual lamp waited 25-44 min
+    # for a runner, and each passed 0-17 min later. A look while a check waits for a runner doesn't count.
+    def setUp(self):
+        super().setUp()
+        with open(os.path.join(self.fake, "gh"), "w") as fh:
+            fh.write(FAKE_GH_EARLY)
+
+    def test_a_check_waiting_for_a_runner_keeps_the_wait_going_and_merges_once_green(self):
+        # QUEUED for 120 looks (240 reads), then it passes: merged at look 121, where 90 looks used to end the wait.
+        self.fakefile("early-reads", "240\n")
+        self.fakefile("checks-early.json", json.dumps({"statusCheckRollup": ARM_CHECKS + [check("lamp-sim", "QUEUED", None)]}))
+        h, r = self.mwg(ARM_CHECKS + [check("lamp-sim")])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("pr merge 7 -R autonomous-ai/lampOS --rebase --match-head-commit " + h, self.calls())
+        self.assertEqual(self.calls().count("statusCheckRollup"), 242, r.stdout)
+
+    def test_waiting_and_running_looks_are_counted_apart(self):
+        # 60 looks QUEUED (WAITING, from a deployment's rule, counts the same), then running: the 90 running looks
+        # still all come after, 150 looks in all.
+        self.fakefile("early-reads", "120\n")
+        self.fakefile("checks-early.json", json.dumps({"statusCheckRollup": ARM_CHECKS + [check("lamp-sim", "WAITING", None)]}))
+        _, r = self.mwg(ARM_CHECKS + [check("lamp-sim", "IN_PROGRESS", None)])
+        self.assertEqual(r.returncode, 5, r.stdout + r.stderr)
+        self.assertEqual(self.calls().count("statusCheckRollup"), 300, r.stdout)
+        self.assertIn("checks not done in 45 min of running, after 0 min more waiting for a runner", r.stdout)
+
+    def test_a_check_that_never_gets_a_runner_ends_after_270_looks(self):
+        _, r = self.mwg(ARM_CHECKS + [check("lamp-sim", "QUEUED", None)])
+        self.assertEqual(r.returncode, 5, r.stdout + r.stderr)
+        self.assertNotIn("pr merge", self.calls())
+        self.assertEqual(self.calls().count("statusCheckRollup"), 540, r.stdout)
+        self.assertIn("more waiting for a runner", r.stdout)
 
 
 class FailureRead(Red):

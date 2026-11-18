@@ -1,6 +1,7 @@
 //! When a lamp standing at rest shifts a little by itself, and how.
 //!
-//! Not on a clock: each wait is drawn at random, from 40 s to 3 min. A lamp
+//! Not on a clock: each wait is drawn at random, from 40 s to 3 min, or
+//! from 20 s to 60 s under `LAMP_BODY_PRESENCE` (#7301). A lamp
 //! left alone folds (`--awake-seconds`) and folded never shifts, which is
 //! how it is still when nobody is near. Each shift is one of a few small
 //! moves, the one made last less likely than each other but not ruled out:
@@ -16,15 +17,22 @@ use std::time::Duration;
 pub const GAP_LEAST: Duration = Duration::from_secs(40);
 pub const GAP_MOST: Duration = Duration::from_secs(180);
 
+/// The same under `LAMP_BODY_PRESENCE` (#7301): someone at the desk sees
+/// a lamp that is alive move at least about once a minute.
+pub const ALIVE_GAP_LEAST: Duration = Duration::from_secs(20);
+pub const ALIVE_GAP_MOST: Duration = Duration::from_secs(60);
+
 /// The small moves a lamp at rest shifts by: the old runtime's idle sway,
 /// and four moves of the head alone inside the reach of a glance at rest
-/// (`body::REST_GLANCE_REACH`): a tilt to either side, a look up and a dip.
-pub const MOVES: [&Clip; 5] = [
+/// (`body::REST_GLANCE_REACH`): a tilt to either side, a look up and a dip;
+/// and under `LAMP_BODY_PRESENCE` only, the arm's settle (#7301).
+pub const MOVES: [&Clip; 6] = [
     &clips::IDLE,
     &clips::TILT_LEFT,
     &clips::TILT_RIGHT,
     &clips::LOOK_UP,
     &clips::DIP,
+    &clips::SETTLE,
 ];
 
 /// How much likelier each other move is than the one made last.
@@ -48,6 +56,10 @@ pub struct Idler {
     /// Each wait drawn is scaled by this: 1 is today, an energy level's
     /// `idle_share` shortens them (`crate::energy`, #6893).
     pub share: f64,
+    /// Under `LAMP_BODY_PRESENCE` (#7301): waits drawn from
+    /// [`ALIVE_GAP_LEAST`] to [`ALIVE_GAP_MOST`], and [`clips::SETTLE`]
+    /// among the moves. Off: as before.
+    pub alive: bool,
 }
 
 impl Idler {
@@ -56,6 +68,7 @@ impl Idler {
             state: seed,
             last: None,
             share: 1.0,
+            alive: false,
         }
     }
 
@@ -71,7 +84,12 @@ impl Idler {
     /// The wait before the next shift.
     pub fn gap(&mut self) -> Duration {
         let share = (self.next() >> 11) as f64 / (1u64 << 53) as f64;
-        let drawn = GAP_LEAST.as_secs_f64() + (GAP_MOST - GAP_LEAST).as_secs_f64() * share;
+        let (least, most) = if self.alive {
+            (ALIVE_GAP_LEAST, ALIVE_GAP_MOST)
+        } else {
+            (GAP_LEAST, GAP_MOST)
+        };
+        let drawn = least.as_secs_f64() + (most - least).as_secs_f64() * share;
         Duration::from_secs_f64(drawn * self.share)
     }
 
@@ -79,11 +97,13 @@ impl Idler {
     /// tilts only for a head that tilts when it stands (`--stand-roll` past
     /// `--reach`'s roll): elsewhere their roll is left out and both are the
     /// same small lift. Moves of the arm only for an arm no hand holds
-    /// (`arm`): one held is not swayed into the hand.
+    /// (`arm`): one held is not swayed into the hand. The settle only while
+    /// [`Idler::alive`].
     pub fn pick(&mut self, tilts: bool, arm: bool) -> &'static Clip {
         let open: Vec<&'static Clip> = MOVES
             .into_iter()
             .filter(|shift| tilts || !is_tilt(shift))
+            .filter(|shift| self.alive || shift.name != clips::SETTLE.name)
             .filter(|shift| arm || shift.frames.iter().all(|frame| frame[3..] == [0; 2]))
             .collect();
         self.pick_from(&open)
@@ -111,6 +131,15 @@ impl Idler {
         self.last = Some(chosen.name);
         chosen
     }
+}
+
+/// Under `LAMP_BODY_PRESENCE` (#7301): a shift's arm `offset` from the
+/// arm's `goal`, scaled by `size` and taken toward the fold whatever its
+/// sign, and cut so the arm stays on its way between `folded` and `stood`,
+/// as the lease's pose is: a shift only ever lowers a standing arm.
+pub fn sag(offset: f32, size: f32, goal: f32, folded: f32, stood: f32) -> f32 {
+    let toward = if folded < stood { -1.0 } else { 1.0 };
+    (goal + offset.abs() * size * toward).clamp(folded.min(stood), folded.max(stood)) - goal
 }
 
 fn is_tilt(clip: &Clip) -> bool {
@@ -153,7 +182,7 @@ mod tests {
         // repeat about one time in 13.
         let repeats = picks.windows(2).filter(|pair| pair[0] == pair[1]).count();
         assert!((50..=150).contains(&repeats), "{repeats}");
-        for shift in MOVES {
+        for shift in &MOVES[..5] {
             let count = picks.iter().filter(|name| **name == shift.name).count();
             assert!((200..=320).contains(&count), "{}: {count}", shift.name);
         }
@@ -209,6 +238,80 @@ mod tests {
                 .unwrap();
             assert!(longest <= 8, "seed {seed}: {longest}");
             assert_ne!(longest, 1, "seed {seed}: strict turns");
+        }
+    }
+
+    /// Under `LAMP_BODY_PRESENCE` (#7301): waits of 20 s to 60 s, spread
+    /// over all of it, and the arm's sag among the moves; off, never.
+    #[test]
+    fn alive_it_shifts_every_twenty_to_sixty_seconds_and_settles() {
+        let mut idler = Idler::new(7);
+        idler.alive = true;
+        let gaps: Vec<Duration> = (0..1_000).map(|_| idler.gap()).collect();
+        assert!(
+            gaps.iter()
+                .all(|gap| (Duration::from_secs(20)..=Duration::from_secs(60)).contains(gap)),
+            "{:?}",
+            &gaps[..5]
+        );
+        for fifth in 0..5 {
+            let hits = gaps
+                .iter()
+                .filter(|gap| ((gap.as_secs_f64() - 20.0) / 40.0 * 5.0) as usize == fifth)
+                .count();
+            assert!((120..=280).contains(&hits), "fifth {fifth}: {hits}");
+        }
+        let picks: Vec<&str> = (0..600).map(|_| idler.pick(false, true).name).collect();
+        let settles = picks
+            .iter()
+            .filter(|name| **name == clips::SETTLE.name)
+            .count();
+        assert!((100..=200).contains(&settles), "{settles}");
+        assert!(is_move(&clips::SETTLE));
+        // An arm a hand holds is never sagged into the hand.
+        assert!((0..100).all(|_| idler.pick(true, false).name != clips::SETTLE.name));
+        let mut today = Idler::new(7);
+        assert!((0..600).all(|_| today.pick(true, true).name != clips::SETTLE.name));
+    }
+
+    /// Every shift's arm offset, at every size, goes only toward the fold
+    /// and keeps the arm on its way, whichever way the fold lies.
+    #[test]
+    fn a_sag_only_lowers_the_arm_and_stays_on_its_way() {
+        let mut idler = Idler::new(19);
+        for (folded, stood) in [(2_050.0, 2_650.0), (2_600.0, 2_047.0)] {
+            let toward = if folded < stood { -1.0 } else { 1.0 };
+            for _ in 0..200 {
+                let clip = idler.pick(true, true);
+                let size = [1.0, 1.05, 1.1, 1.15, 1.2][(idler.next() % 5) as usize];
+                // Anywhere on the way, the stand itself most often.
+                let goal = if idler.next().is_multiple_of(2) {
+                    stood
+                } else {
+                    folded + (stood - folded) * (idler.next() % 100) as f32 / 100.0
+                };
+                for frame in clip.frames {
+                    for offset in &frame[3..] {
+                        let offset = f32::from(*offset);
+                        let sagged = sag(offset, size, goal, folded, stood);
+                        let at = goal + sagged;
+                        assert!(
+                            (folded.min(stood)..=folded.max(stood)).contains(&at),
+                            "{} {offset} {goal}: {at}",
+                            clip.name
+                        );
+                        assert!(sagged * toward >= 0.0, "{} {offset}: {sagged}", clip.name);
+                        assert!(sagged.abs() <= offset.abs() * size + 1e-3);
+                        if (goal - stood).abs() < 1e-3 {
+                            assert!(
+                                (sagged.abs() - offset.abs() * size).abs() < 1e-3,
+                                "{} {offset}: {sagged}",
+                                clip.name
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }

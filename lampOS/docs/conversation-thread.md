@@ -373,7 +373,8 @@ It costs one DeepSeek call per batch, off the turn's path, and up to about
 
 ### Told once: after the note, not again as history (`LAMP_HISTORY_AFTER_NOTE`)
 
-With `LAMP_HISTORY_AFTER_NOTE=on` too (off in the product; #6218), the
+With `LAMP_HISTORY_AFTER_NOTE=on` too (on in the product unit, beside
+`LAMP_HISTORY_SAID_ONCE`; #6218, C131), the
 exchanges a stored note holds are told in it alone, not again as the
 thread's lines and the chat's history. Off, a given exchange stays in both
 until the thread drops it, so a turn is told the same talk twice: in the
@@ -458,6 +459,25 @@ as that conversation's **talk note** (`talk_note`, memory-days.md):
   only the summary supports. The voice also leaves out a proposal none of
   whose words is in what the person said in the records it cites while one
   is in the note, counted in the journal.
+
+## An ask left on its holding line (`LAMP_LATE_ANSWER_LET_GO`)
+
+On the second route, a turn that said its holding line ("Let me search
+that.") and then called a function, and ended before any words after that
+function's round, cut by the next line, stopped or retired, leaves an
+exchange answered only by the holding line. Told to a later turn as it
+stands, the ask reads as a promise not yet kept, and the model keeps it in
+that turn: on lamp-9adf on 17 Nov at 18:18, "How many dong is one US
+dollar?" was answered about 25 s later inside the next ask's make turn.
+With `LAMP_LATE_ANSWER_LET_GO=on` (exactly `on`; off unless set, in no
+product unit) such an exchange is marked (`Thread::left_on_holding_line`,
+never kept in the file) and left out of what any later turn is told: the
+history messages, the thread's text, the running summary and the thread
+file. It stays in the thread for the rest (its line is still journalled
+to memory, and the conversation goes on as before); a person who still
+wants the answer asks again. Off, nothing is marked and the thread is told
+as before. See [second-voice.md](second-voice.md), "Words cut short by the
+next line".
 
 ## What it keeps to itself
 

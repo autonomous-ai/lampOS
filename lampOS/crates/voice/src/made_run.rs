@@ -72,6 +72,66 @@ pub fn speaks_itself(told: &Value) -> bool {
     told["ran"] == true && told["says"] == true
 }
 
+/// How long after its run now a made skill's exact line, asked as the
+/// answer to that conversation (the say service's `answers`), is said as
+/// one: the conversation still going on (`crate::thread::GOING_ON_FOR`).
+/// lamp-skills asks it so only within this of the ask
+/// (`lamp_skills::task_sure`, the first builder's 21:25 on #7363).
+pub const ANSWERS_WITHIN: std::time::Duration = crate::thread::GOING_ON_FOR;
+
+/// The made skills run now by the owner's voice, each with when: the say
+/// service's own record, so no other asker can stand for a run's answer.
+static RAN_NOW: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// The key lamp-skills names a skill's run by in its answer to the voice's
+/// call of that skill's own tool, when the run has a task it marked as
+/// asked by voice (lamp-9adf, 18 Nov: "run my bitcoin price skill now"
+/// called `btc_price`, not a run now): `{"task_run": NAME}` (#7363).
+pub const TASK_RUN: &str = "task_run";
+
+/// The skill a call's answer `told` says was run by voice, if any: a made
+/// skill run now ([`asked`]'s `{"run": NAME, "ran": true}`) or a skill's
+/// own tool whose run has a task (`{"task_run": NAME}`, [`TASK_RUN`]). The
+/// worker tells the coordinator (`ProviderOutput::MadeRunNow`), which keeps
+/// it ([`ran_now`]) where the say service reads it. Never kept in the
+/// worker's own process, which the say service never reads (El's P1 on
+/// #7363). An error is no run.
+pub fn ran_of(told: &Value) -> Option<String> {
+    if told.get("error").is_some() {
+        return None;
+    }
+    (told["ran"] == true)
+        .then(|| told[RUN].as_str())
+        .flatten()
+        .or_else(|| told[TASK_RUN].as_str())
+        .filter(|skill| !skill.is_empty())
+        .map(str::to_owned)
+}
+
+/// `skill` run now by the owner's voice at `at`: the coordinator's alone,
+/// told by the worker ([`ran_of`]).
+pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
+    let mut ran = RAN_NOW.lock().unwrap_or_else(|poison| poison.into_inner());
+    ran.retain(|(name, when)| {
+        name != skill && at.saturating_duration_since(*when) <= ANSWERS_WITHIN
+    });
+    ran.push((skill.to_owned(), at));
+}
+
+/// Whether `skill`'s line may answer the conversation that ran it at `now`:
+/// run now by the owner's voice within [`ANSWERS_WITHIN`]. Keyed by the
+/// skill's name alone: any say-socket caller naming it then is let through
+/// as its answer, with exact words only, the trust `prepare-unplug`'s lines
+/// have (El's P3 on #7363).
+pub fn answers_now(skill: &str, now: std::time::Instant) -> bool {
+    RAN_NOW
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .iter()
+        .any(|(name, at)| name == skill && now.saturating_duration_since(*at) <= ANSWERS_WITHIN)
+}
+
 /// The most of their skills' names said when none is near.
 const NAMED_MOST: usize = 3;
 
@@ -301,6 +361,26 @@ mod tests {
     use crate::make_skill_local::tests::keeping;
     use std::path::PathBuf;
 
+    /// lamp-9adf, 18 Nov: "run my bitcoin price skill now" was the model's
+    /// call of `btc_price`, no run now: lamp-skills names the run with a
+    /// task in its answer ([`TASK_RUN`]), and the worker tells the
+    /// coordinator of it as of a run now, through `use_skill`'s note too;
+    /// a refusal, or an answer naming no run, is none (#7363).
+    #[test]
+    fn a_skill_tools_run_with_a_task_is_told_as_run_by_voice() {
+        let told = json!({"next": "Say you'll get the price.", TASK_RUN: "btc-price"});
+        assert_eq!(ran_of(&told).as_deref(), Some("btc-price"));
+        let mut through = told.clone();
+        crate::use_skill::ran("btc-price", &mut through);
+        assert_eq!(ran_of(&through).as_deref(), Some("btc-price"));
+        assert_eq!(ran_of(&json!({"next": "Say you'll dance."})), None);
+        assert_eq!(ran_of(&json!({TASK_RUN: ""})), None);
+        assert_eq!(
+            ran_of(&json!({"error": "I'm still doing that.", TASK_RUN: "btc-price"})),
+            None
+        );
+    }
+
     /// The owner's lamp-9adf on 15 Nov: unread-mail and
     /// read-newest-email-when-sitting made and on, evening-dim made and off.
     fn nines_lamp(test: &str) -> (PathBuf, Keeping) {
@@ -382,6 +462,8 @@ mod tests {
             assert_eq!(ran, [name], "{heard}: {told}");
             assert_eq!(told[RUN], name, "{told}");
             assert_eq!(told["ran"], true, "{told}");
+            // What the worker tells the coordinator of it (#7363).
+            assert_eq!(ran_of(&told).as_deref(), Some(name), "{told}");
             assert!(!speaks_itself(&told), "{told}");
             let next = told["next"].as_str().unwrap();
             assert!(next.contains("is running now"), "{next}");
@@ -436,6 +518,7 @@ mod tests {
                 |_| Err(why.to_owned()),
             );
             assert_eq!(told["error"], why, "{told}");
+            assert_eq!(ran_of(&told), None, "a refused run is no run");
             let next = told["next"].as_str().unwrap();
             assert!(next.contains("unread mail didn't run now"), "{next}");
             assert!(next.contains(why), "{next}");

@@ -145,6 +145,8 @@ pub struct Speaker {
     last_discard: Option<QueuedRange>,
     underruns: UnderrunBudget,
     underran: Option<UnderranSpeech>,
+    /// See [`Speaker::write_ahead_frames`].
+    write_ahead: usize,
     #[cfg(test)]
     post_write_check_at: Option<MonoTime>,
     // The software null sink never underruns; tests inject ALSA's errno.
@@ -218,7 +220,14 @@ impl Speaker {
             pcm.sw_params(&software)?;
             format
         };
-        Ok(Self::from_parts(Box::new(pcm), format, boot, clock_mode))
+        // ALSA's queue: one block, as it always was.
+        Ok(Self::from_parts(
+            Box::new(pcm),
+            format,
+            boot,
+            clock_mode,
+            RENDER_SAMPLES,
+        ))
     }
 }
 
@@ -245,7 +254,15 @@ impl Speaker {
             ))
             .into());
         }
-        Ok(Self::from_parts(pcm, format, boot, clock_mode))
+        // A software queue never underruns and is looked at by a loop whose ticks a loaded
+        // computer (a Mac runner) delays by up to 20 ms: it is written two blocks ahead (20-30 ms)
+        // where its buffer holds that, so a late tick does not run it dry.
+        let write_ahead = if format.buffer_frames >= (RENDER_SAMPLES * 3) as i64 {
+            RENDER_SAMPLES * 2
+        } else {
+            RENDER_SAMPLES
+        };
+        Ok(Self::from_parts(pcm, format, boot, clock_mode, write_ahead))
     }
 
     fn from_parts(
@@ -253,6 +270,7 @@ impl Speaker {
         format: PcmFormat,
         boot: BootId,
         clock_mode: bool,
+        write_ahead: usize,
     ) -> Self {
         Self {
             pcm,
@@ -268,6 +286,7 @@ impl Speaker {
             last_discard: None,
             underruns: UnderrunBudget::default(),
             underran: None,
+            write_ahead,
             #[cfg(test)]
             post_write_check_at: None,
             #[cfg(test)]
@@ -855,6 +874,19 @@ impl Speaker {
     pub fn last_poll(&self) -> Option<PlaybackStatus> {
         self.last_poll
     }
+
+    /// Frames the speaker's tick lets stay tracked before it writes the next block: one block
+    /// (10 ms) for ALSA, as ever; two for a software queue (`with_pcm`) whose buffer holds three,
+    /// so the tick of a loaded computer that comes up to 20 ms late does not find it empty.
+    pub fn write_ahead_frames(&self) -> usize {
+        self.write_ahead
+    }
+
+    /// The most blocks a speaker pass writes: its write-ahead in blocks, so one for ALSA (as ever)
+    /// and two for a software queue, which then catches up when a pass comes late.
+    pub fn blocks_per_pass(&self) -> usize {
+        (self.write_ahead / RENDER_SAMPLES).max(1)
+    }
 }
 
 impl Drop for Speaker {
@@ -1356,6 +1388,102 @@ mod soft_queue_tests {
         clock.fetch_add(20_000, Ordering::SeqCst);
         speaker.maintain().unwrap();
         assert!(!speaker.pending.has_pending());
+    }
+
+    /// The worker's passes in miniature: each pass, up to `blocks` times, if no more than `ahead`
+    /// frames are tracked one block of silence is written (the queue read anew each time).
+    /// Passes come as a loaded Mac runner's did (C5b-1c: a 2 ms sleep returning after 10-18 ms).
+    /// Returns (passes that found the queue EMPTY before a write, writes in the first pass).
+    fn empty_passes(ahead: usize, blocks: usize) -> (usize, usize) {
+        let clock = Arc::new(AtomicU64::new(5_000_000));
+        let read = clock.clone();
+        let pcm = SoftPcm::with_clock(move || read.load(Ordering::SeqCst), |_| {});
+        let boot = BootId::new([124; 16]).unwrap();
+        let mut speaker = Speaker::with_pcm(Box::new(pcm), soft_pcm::FORMAT, boot, true).unwrap();
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = now().checked_add(500_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        speaker
+            .install(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let token = speaker.zero_authority().unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.start_clock(token).unwrap();
+        let steps = [10_000, 10_700, 11_000, 18_000, 10_300, 10_900, 15_000];
+        let (mut empty, mut first_pass_writes) = (0, 0);
+        for pass in 0..140 {
+            clock.fetch_add(steps[pass % steps.len()], Ordering::SeqCst);
+            speaker.maintain().unwrap();
+            for _ in 0..blocks {
+                let status = speaker.last_poll().unwrap();
+                if status.tracked_authorized_frames > ahead {
+                    break;
+                }
+                if status.queued_frames == 0 {
+                    empty += 1;
+                }
+                speaker.try_write_silence(token, 240).unwrap();
+                if pass == 0 {
+                    first_pass_writes += 1;
+                }
+            }
+        }
+        (empty, first_pass_writes)
+    }
+
+    /// B1/B1b (the Mac start's F1): a software queue is written two blocks ahead and up to two
+    /// blocks a pass; ALSA's rule (the threshold of one block, one write a pass) is what a
+    /// two-block buffer gets, so it keeps its one write a pass.
+    #[test]
+    fn a_software_queue_catches_up_in_a_late_pass_and_a_one_block_speaker_writes_once_a_pass() {
+        let boot = BootId::new([125; 16]).unwrap();
+        let soft = Speaker::with_pcm(
+            Box::new(SoftPcm::with_clock(|| 0, |_| {})),
+            soft_pcm::FORMAT,
+            boot,
+            true,
+        )
+        .unwrap();
+        assert_eq!(soft.write_ahead_frames(), RENDER_SAMPLES * 2);
+        assert_eq!(soft.blocks_per_pass(), 2);
+        // A buffer of two blocks (ALSA's) keeps the one block a pass.
+        let small = Speaker::with_pcm(
+            Box::new(SoftPcm::with_clock(|| 0, |_| {})),
+            PcmFormat {
+                buffer_frames: (RENDER_SAMPLES * 2) as i64,
+                ..soft_pcm::FORMAT
+            },
+            boot,
+            true,
+        )
+        .unwrap();
+        assert_eq!(small.write_ahead_frames(), RENDER_SAMPLES);
+        assert_eq!(small.blocks_per_pass(), 1);
+        // The worker's passes at the Mac's pace: the catching-up soft speaker never finds the
+        // queue empty before a write; one block a pass (the old rule) does.
+        let (empty_catching_up, _) =
+            empty_passes(soft.write_ahead_frames(), soft.blocks_per_pass());
+        assert_eq!(empty_catching_up, 0, "two blocks a pass keeps the queue");
+        let (empty_one, _) = empty_passes(RENDER_SAMPLES, 1);
+        assert!(
+            empty_one > 0,
+            "one block a pass at 10.7 ms cannot keep a 24 frames/ms drain"
+        );
+        // And the one-block speaker takes exactly one write in a pass even when its queue is empty
+        // (after that write 240 are tracked, which is not above its threshold of 240: without the
+        // bound it would write twice).
+        let (_, first_pass_writes) =
+            empty_passes(small.write_ahead_frames(), small.blocks_per_pass());
+        assert_eq!(first_pass_writes, 1);
     }
 
     /// A format the speaker would not take of ALSA is not taken of a queue either.

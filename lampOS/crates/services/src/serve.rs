@@ -362,6 +362,11 @@ pub struct Services<H, M> {
     /// `LAMP_CALENDAR_EDITS=on`: a Google Calendar event may be changed or
     /// cancelled by its id, read back and sent as any write.
     pub calendar_edits: bool,
+    /// `LAMP_CALENDAR_EVENT_SEARCH=on` (tracker row C132), with
+    /// [`Services::calendar_edits`]: a Google Calendar `events` read may
+    /// search by the person's words over a bounded window
+    /// (`reads::plan_with`).
+    pub calendar_event_search: bool,
     /// `LAMP_GMAIL_DRAFT_EDITS=on`: a saved Gmail draft may be changed or
     /// deleted by its id, read back and saved as any draft.
     pub draft_edits: bool,
@@ -485,6 +490,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             skill_write_agent: false,
             fixed_runs: Mutex::new(std::collections::VecDeque::new()),
             calendar_edits: false,
+            calendar_event_search: false,
             draft_edits: false,
             linked_tools: None,
             linked_tools_write: Mutex::new(()),
@@ -799,6 +805,12 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// With `LAMP_CALENDAR_EDITS` as `on` gives it.
     pub fn with_calendar_edits(mut self, on: bool) -> Self {
         self.calendar_edits = on;
+        self
+    }
+
+    /// With `LAMP_CALENDAR_EVENT_SEARCH` as `on` (and calendar edits) gives it.
+    pub fn with_calendar_event_search(mut self, on: bool) -> Self {
+        self.calendar_event_search = on;
         self
     }
 
@@ -1797,12 +1809,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         let asked = match args.get("what").and_then(Value::as_str).map(str::trim) {
             Some("tools") => None,
             Some("call") => Some((mcp::tool_name(args)?.to_owned(), mcp::arguments(args)?)),
-            _ => {
-                return Err(format!(
-                    "{} reads: tools, call {{tool, arguments}}",
-                    service.code
-                ));
-            }
+            _ => return Err(reads::no_such_kind(service.code)),
         };
         let endpoint = Endpoint::new(service, entry)?;
         let name = service.name;
@@ -1876,13 +1883,21 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let (service, entry) = self.linked(args).await.map_err(|why| (Stage::Link, why))?;
         if service.mcp.is_some() {
-            return self
-                .mcp_read(service, &entry, args)
-                .await
-                .map_err(|why| (Stage::Service, why));
+            return self.mcp_read(service, &entry, args).await.map_err(|why| {
+                match reads::is_no_such_kind(&why) {
+                    true => (Stage::Asked, why),
+                    false => (Stage::Service, why),
+                }
+            });
         }
-        let plan = reads::plan(service.code, args, &entry, crate::now_secs())
-            .map_err(|why| (Stage::Asked, why))?;
+        let plan = reads::plan_with(
+            service.code,
+            args,
+            &entry,
+            crate::now_secs(),
+            self.calendar_event_search,
+        )
+        .map_err(|why| (Stage::Asked, why))?;
         self.read_planned(service, &entry, plan, asker)
             .await
             .map(|quoted| reads::drive_none_told(service.code, args, quoted))
@@ -2042,7 +2057,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 // Bound to the account it was read as, as every write.
                 writes::Pending {
                     account: entry.account(),
-                    ..writes::prepare_edit(args, &current)?
+                    ..writes::prepare_edit(args, &current, &writes::Clock::here())?
                 }
             } else {
                 writes::prepare(service.code, args, &entry)?
@@ -2407,18 +2422,38 @@ enum Stage {
     Service,
 }
 
-/// A `what` as the journal names it: a word of the read lists, else
-/// "another": never the model's own text.
-fn what_said(args: &Value) -> &str {
-    args.get("what")
+/// A `what` as the journal names it: one of the service's kinds of read
+/// ([`reads::kinds`]; with the service unknown, any service's), else its
+/// shape alone (#7498): its length, and whether it is another service's
+/// kind. Never the model's own text.
+fn what_said(code: Option<&str>, args: &Value) -> String {
+    let what = args
+        .get("what")
         .and_then(Value::as_str)
         .map(str::trim)
-        .filter(|what| {
-            !what.is_empty()
-                && what.len() <= 24
-                && what.chars().all(|c| c.is_ascii_lowercase() || c == '_')
-        })
-        .unwrap_or("another")
+        .unwrap_or("");
+    if what.is_empty() {
+        return "no what".into();
+    }
+    let any_kind = catalog::SERVICES
+        .iter()
+        .any(|service| reads::kinds(service.code).contains(&what));
+    let its_kind = match code {
+        Some(code) => reads::kinds(code).contains(&what),
+        None => any_kind,
+    };
+    if its_kind {
+        return what.to_owned();
+    }
+    format!(
+        "a what of {} characters, {}",
+        what.chars().count(),
+        if any_kind {
+            "another service's kind"
+        } else {
+            "no service's kind"
+        }
+    )
 }
 
 /// Why a read was refused, in a few fixed words ([`Stage::Link`] and
@@ -2439,7 +2474,7 @@ fn why_said(stage: Stage, why: &str) -> &'static str {
         Stage::Asked if has("is the one a list gave") || has("is not an id") => {
             "refused: an id no list gave"
         }
-        Stage::Asked if has(" reads: ") => "refused: a what it doesn't read",
+        Stage::Asked if reads::is_no_such_kind(why) => "refused: a what it doesn't read",
         Stage::Asked => "refused: its arguments",
         Stage::Service if has("has no such item") => "none: no such item",
         Stage::Service if has("didn't answer in time") => "error: not answered in time",
@@ -2483,7 +2518,7 @@ fn read_said(
             Asker::Skill => "a skill's",
         },
         code.unwrap_or("an unknown service"),
-        what_said(args),
+        what_said(code, args),
     )
 }
 
@@ -3204,17 +3239,17 @@ mod tests {
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
         // The skill's day's sends used up: the next is not sent.
         let ledger = skill_writes::Ledger::new(&services.store.0);
-        for _ in 1..skill_writes::PER_SKILL {
+        for _ in 1..skill_writes::PER_SKILL_HOUR {
             ledger.take("mail-count", crate::now_secs()).unwrap();
         }
         run(services.run_tool(&run_line(tools::WRITE, draft)));
         let id = services.run_held.lock().unwrap().clone().unwrap();
         let refused = run(services.tool(&send(&id.0)));
         assert!(
-            refused["error"]
-                .as_str()
-                .unwrap()
-                .contains(&format!("at most {} times a day", skill_writes::PER_SKILL)),
+            refused["error"].as_str().unwrap().contains(&format!(
+                "at most {} times an hour",
+                skill_writes::PER_SKILL_HOUR
+            )),
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
@@ -4368,8 +4403,8 @@ mod tests {
             skill_writes::WAITING
         );
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
-        // Over its bound: PER_SKILL a day, then refused.
-        for _ in 1..skill_writes::PER_SKILL {
+        // Over its bound: PER_SKILL_HOUR within the hour, then refused.
+        for _ in 1..skill_writes::PER_SKILL_HOUR {
             assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
         }
         let over = run(on.skill_tool(&line));
@@ -4377,10 +4412,13 @@ mod tests {
             over["error"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("at most {} times", skill_writes::PER_SKILL)),
+                .contains(&format!("at most {} times", skill_writes::PER_SKILL_HOUR)),
             "{over}"
         );
-        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
+        assert_eq!(
+            on.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
+        );
         let store = dir.path().join("s");
         for file in [skill_writes::LEDGER_FILE, skill_writes::APPROVED_FILE] {
             let kept = std::fs::read_to_string(store.join(file)).unwrap();
@@ -4389,7 +4427,7 @@ mod tests {
         // The owner's sent-log: who, never what.
         let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
         let sent = log["result"]["sent"].as_array().unwrap();
-        assert_eq!(sent.len(), skill_writes::PER_SKILL, "{log}");
+        assert_eq!(sent.len(), skill_writes::PER_SKILL_HOUR, "{log}");
         assert_eq!(sent[0]["skill"], "arrive-mail");
         assert_eq!(sent[0]["to"], "boss");
         assert!(!log.to_string().contains("desk"));
@@ -4447,26 +4485,29 @@ mod tests {
         ));
         assert_eq!(read["ok"], false, "{read}");
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
-        // The skill's day's bound: the send past it is refused.
-        for n in 1..skill_writes::PER_SKILL {
+        // The skill's hour's bound: the send past it is refused.
+        for n in 1..skill_writes::PER_SKILL_HOUR {
             let id = format!("task-1-1-{}", 3 + n);
             let sent = run(on.run_tool(&fixed_write_line(&id, &arrival_mail())));
             assert_eq!(sent["result"]["sent"], true, "{sent}");
         }
-        let over_id = format!("task-1-1-{}", 3 + skill_writes::PER_SKILL);
+        let over_id = format!("task-1-1-{}", 3 + skill_writes::PER_SKILL_HOUR);
         let over = run(on.run_tool(&fixed_write_line(&over_id, &arrival_mail())));
         assert!(
             over["error"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("at most {}", skill_writes::PER_SKILL)),
+                .contains(&format!("at most {}", skill_writes::PER_SKILL_HOUR)),
             "{over}"
         );
-        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
+        assert_eq!(
+            on.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
+        );
         let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
         assert_eq!(
             log["result"]["sent"].as_array().unwrap().len(),
-            skill_writes::PER_SKILL,
+            skill_writes::PER_SKILL_HOUR,
             "{log}"
         );
         // The switch off here: nothing is sent.
@@ -5339,9 +5380,65 @@ mod tests {
         );
         let (_, said) = read(json!({"service":"gmail","what":"Tell me $$"}));
         assert!(
-            said.contains("gmail another: refused: a what it doesn't read"),
+            said.ends_with(
+                "gmail a what of 10 characters, no service's kind: refused: a what it doesn't read"
+            ),
             "{said}"
         );
+    }
+
+    /// #7498: on lamp-a63e on 17 Nov the second route's model read Gmail
+    /// with a `what` none of Gmail's kinds, four times; each was refused,
+    /// and only its retry with `search` answered. The refusal names each
+    /// kind Gmail reads, so the next call is right, and the journal says
+    /// the refused `what`'s shape alone: its length, and whether it is
+    /// another service's kind, never its words. An MCP service's is
+    /// refused as asked, before its server is.
+    #[test]
+    fn a_what_gmail_doesnt_read_is_told_gmails_kinds_and_journalled_by_its_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = Services::new(
+            Store(dir.path().join("s")),
+            FakeHttp::default(),
+            FakeMail::default(),
+            None,
+            false,
+        );
+        run(services.admin(&app_password_gmail("me@home.test")));
+        let read = |args: Value| {
+            let args = services.gmail_args(&args);
+            let read = run(services.read_staged(&args, Asker::Owner));
+            let said = read_said(Asker::Owner, Some("gmail"), &args, &read);
+            (read.unwrap_err(), said)
+        };
+        for (what, shape) in [
+            ("unread", "a what of 6 characters, no service's kind"),
+            (
+                "my latest emails",
+                "a what of 16 characters, no service's kind",
+            ),
+            ("events", "a what of 6 characters, another service's kind"),
+        ] {
+            let ((stage, why), said) = read(json!({"service":"gmail","what":what}));
+            assert_eq!(stage, Stage::Asked, "{what}");
+            assert!(
+                why.starts_with(
+                    "what is one of gmail's kinds of read, the word alone: recent, search, drafts, message, attachment."
+                ),
+                "{why}"
+            );
+            assert_eq!(
+                said,
+                format!(
+                    "the voice's service_read of gmail {shape}: refused: a what it doesn't read"
+                )
+            );
+            assert!(!said.contains(what), "{said}");
+        }
+        assert!(services.mail.asked.lock().unwrap().is_empty());
+        let ((_, why), said) = read(json!({"service":"gmail"}));
+        assert_eq!(why, "what to read is needed");
+        assert!(said.ends_with("gmail no what: refused: no what"), "{said}");
     }
 
     /// A read that found nothing says so in its journal line.
@@ -6974,11 +7071,16 @@ mod tests {
         let read_back = moved["result"]["read_back"].as_str().unwrap();
         for part in [
             "\"Hamburger party\"",
-            "2026-11-12T18:00:00+07:00",
-            "2026-11-12T20:00:00+07:00 to 2026-11-12T21:00:00+07:00",
+            "now from ",
+            ": move it to ",
             "octavia@b.test",
         ] {
             assert!(read_back.contains(part), "{part}: {read_back}");
+        }
+        // Its times said as the lamp says one, in the lamp's own offset,
+        // never as RFC 3339 (lamp-06c1, 17 Nov).
+        for raw in ["2026-11-12", "T18:00", "T20:00", "+07:00"] {
+            assert!(!read_back.contains(raw), "{raw}: {read_back}");
         }
         assert_eq!(moved["result"]["sent"], false);
         // Only the event was read: nothing changed yet.
@@ -6987,7 +7089,12 @@ mod tests {
         assert_eq!(calls[0].method, Method::Get);
         assert_eq!(
             calls[0].url,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
+            writes::event_read(&json!({"event_id":"evnt1"})).unwrap()
+        );
+        assert!(
+            calls[0].url.starts_with(
+                "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
+            )
         );
         // Anything but "send" cancels it, and nothing is changed.
         let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
@@ -7085,7 +7192,12 @@ mod tests {
         assert_eq!(read.len(), calls + 1);
         assert_eq!(read[calls].method, Method::Get);
         assert!(
-            read[calls].url.ends_with(&format!("/events/{outlook}")),
+            read[calls]
+                .url
+                .split('?')
+                .next()
+                .unwrap()
+                .ends_with(&format!("/events/{outlook}")),
             "{}",
             read[calls].url
         );
@@ -7224,6 +7336,31 @@ mod tests {
         );
         assert_eq!(create["ok"], true, "{create}");
         assert!(services.desk.waiting());
+    }
+
+    /// Tracker row C132: with `LAMP_CALENDAR_EVENT_SEARCH` on, the
+    /// services' calendar read asks Calendar for the person's words over a
+    /// bounded window; off, the same read asks as it always did.
+    #[test]
+    fn a_calendar_read_searches_by_words_only_with_its_switch() {
+        let read = json!({"service":"google_calendar","what":"events","query":"dentist"});
+        for search in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let services =
+                calendar(dir.path(), EVENTS_SCOPE, true).with_calendar_event_search(search);
+            services.http.answer(200, r#"{"items":[]}"#);
+            let answer = run(services.tool(&read_line(read.clone())));
+            assert_eq!(answer["ok"], true, "{answer}");
+            let calls = services.http.calls();
+            assert_eq!(calls.len(), 1, "{calls:?}");
+            let url = &calls[0].url;
+            assert!(
+                url.starts_with("https://www.googleapis.com/calendar/v3/calendars/primary/events?"),
+                "{url}"
+            );
+            assert_eq!(url.contains("&q=dentist"), search, "{url}");
+            assert_eq!(url.contains("&timeMax="), search, "{url}");
+        }
     }
 
     /// Gmail linked with an app password, writes on and its draft edits as

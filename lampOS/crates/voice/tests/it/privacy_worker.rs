@@ -21,7 +21,7 @@ use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use lamp_voice::{
     privacy::REOPEN_STABLE_US,
     privacy_bus::{GAP_RIDE_FLAG, NO_SLIDE_FLAG, ROOT_FLAG, wall_ms},
-    privacy_gap::RIDE_US,
+    privacy_gap::{RIDE_US, STALL_SWITCH},
     process::{Worker, boot_text, new_boot},
     wire::{Control, WorkerEvent},
 };
@@ -547,12 +547,20 @@ impl Rig {
         if gap_ride {
             arguments.push(GAP_RIDE_FLAG);
         }
-        Worker::spawn(
+        // A riding rig runs as the product unit will once #6672's switch is
+        // on: with `LAMP_PRIVACY_RIDES_STALL=on` beside the gap ride, so a runner held
+        // up 250 ms past a granting lease is ridden, closed, not exit 1
+        // (train 976). `Rig::start` keeps it off, so
+        // `a_lapse_of_a_granting_lease_still_ends_the_real_worker` still
+        // guards the off behaviour.
+        Worker::spawn_given(
             Path::new(env!("CARGO_BIN_EXE_lamp-voice")),
             &root.0.join("ipc"),
             "privacy",
-            boot,
+            (boot, new_boot().unwrap()),
             &arguments,
+            || Ok(()),
+            |name| (gap_ride && name == STALL_SWITCH).then(|| "on".into()),
         )
         .unwrap()
     }

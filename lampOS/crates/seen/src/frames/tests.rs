@@ -6,6 +6,7 @@ use lamp_camera::{
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use std::collections::VecDeque;
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 fn boot(n: u8) -> BootId {
     BootId::new([n; 16]).unwrap()
@@ -185,7 +186,7 @@ fn the_gate_closing_with_a_request_out_drops_everything() {
         Closed::PrivacyClosed,
         Closed::PrivacyUnknown,
         Closed::Nobody,
-        Closed::Stranger,
+        Closed::PresenceUnknown,
         Closed::Asleep,
     ] {
         let mut taker = Taker::new(Fake::default());
@@ -294,6 +295,170 @@ fn through_the_cameras_frame_link() {
     assert_eq!(sink.frames, 1);
     drop(server);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The camera's end of a real link on a thread of its own, serviced every
+/// millisecond on the real clock as the eyes service it, offering a fresh
+/// `len`-byte frame to each request; its counts when `stop` is set.
+fn serve_link(
+    socket: std::path::PathBuf,
+    len: usize,
+    stop: Arc<std::sync::atomic::AtomicBool>,
+) -> std::thread::JoinHandle<lamp_camera::frames::LinkCounts> {
+    let mut server =
+        FrameServer::bind(&socket, boot(1), &[(Role::Perception, boot(3))], len).unwrap();
+    std::thread::spawn(move || {
+        let started = std::time::Instant::now();
+        let frame = jpeg(len);
+        let mut sequence = 0;
+        while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+            let now = 1_000_000 + started.elapsed().as_micros() as u64;
+            server.service(now);
+            if server.wants_frame() {
+                sequence += 1;
+                let mut seen = observation(sequence, grant(1));
+                seen.dequeue = CallTiming {
+                    started_at: MonoTime::from_micros(now - 100),
+                    completed_at: MonoTime::from_micros(now),
+                };
+                server.offer(&seen, &frame, now).unwrap();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        server.counts()
+    })
+}
+
+fn link_dir(name: &str) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::path::PathBuf::from(format!("/tmp/lsd-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    dir
+}
+
+/// A sink as slow as a burst's step can be: each frame takes `wait`
+/// (scaled and sent) before the step ends.
+struct Slow {
+    wait: std::time::Duration,
+    frames: usize,
+    bytes: usize,
+}
+
+impl Sink for Slow {
+    fn frame(&mut self, _: u64, _: &FrameMeta, jpeg: &[u8]) {
+        self.frames += 1;
+        self.bytes += jpeg.len();
+        std::thread::sleep(self.wait);
+    }
+}
+
+/// A frame of the eyes' full look, several times the link's kernel buffer.
+const BIG: usize = 400 * 1024;
+/// The serve loop's tick.
+const TICK: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// The cause, kept: read once a 100 ms tick, a big frame stays unread past
+/// the camera's 0.5 s, and the camera closes the link as stalled.
+#[test]
+fn read_once_a_tick_a_big_frame_stalls_the_link() {
+    let dir = link_dir("tick");
+    let socket = dir.join("camera.frames");
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let server = serve_link(socket.clone(), BIG, stop.clone());
+    let client = FrameClient::new(&socket, Role::Perception, boot(3), boot(1), BIG);
+    let mut taker = Taker::with_every(client, 0);
+    let mut sink = Count::default();
+    let started = std::time::Instant::now();
+    let mut lost = false;
+    while started.elapsed() < std::time::Duration::from_secs(5) && !lost {
+        let now = 1_000_000 + started.elapsed().as_micros() as u64;
+        lost = taker.step(Ok(()), now, &mut sink) == Step::Lost;
+        std::thread::sleep(TICK);
+    }
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    let counts = server.join().unwrap();
+    assert!(lost, "the link was lost");
+    assert!(counts.stalled >= 1, "closed as stalled: {counts:?}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The fix: read on its own thread, the link keeps up while each step
+/// spends longer than the camera's 0.5 s sending, and a burst gets its 8
+/// frames with no stall and no loss.
+#[test]
+fn drained_the_link_keeps_up_while_a_slow_burst_sends() {
+    let dir = link_dir("drained");
+    let socket = dir.join("camera.frames");
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let server = serve_link(socket.clone(), BIG, stop.clone());
+    let client = FrameClient::new(&socket, Role::Perception, boot(3), boot(1), BIG);
+    let mut taker = Taker::with_every(Drained::new(client).unwrap(), 0);
+    let mut sink = Slow {
+        wait: std::time::Duration::from_millis(600),
+        frames: 0,
+        bytes: 0,
+    };
+    let started = std::time::Instant::now();
+    let mut lost = 0;
+    while started.elapsed() < std::time::Duration::from_secs(30) && sink.frames < 8 {
+        let now = 1_000_000 + started.elapsed().as_micros() as u64;
+        if taker.step(Ok(()), now, &mut sink) == Step::Lost {
+            lost += 1;
+        }
+        std::thread::sleep(TICK);
+    }
+    assert_eq!((sink.frames, sink.bytes, lost), (8, 8 * BIG, 0));
+    assert!(taker.jpeg.is_empty(), "the copy wiped");
+    // The gate closing drops everything, the reader's slot with it.
+    assert!(matches!(
+        taker.step(Err(Closed::NoOptIn), 0, &mut sink),
+        Step::Dropped(_)
+    ));
+    assert!(!taker.holds_anything());
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    let counts = server.join().unwrap();
+    assert_eq!(counts.stalled, 0, "never closed as stalled: {counts:?}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Through [`Drained`], a failure of the link is said at the next step and
+/// drops everything, and a frame is handed once.
+#[test]
+fn drained_says_a_failure_and_hands_a_frame_once() {
+    let mut taker = Taker::new(Drained::new(Fake::default()).unwrap());
+    let mut sink = Count::default();
+    assert_eq!(taker.step(Ok(()), 0, &mut sink), Step::Requested);
+    taker
+        .source
+        .lock()
+        .source
+        .frames
+        .push_back(Ok(meta(grant(1))));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    let mut step = Step::Idle;
+    while std::time::Instant::now() < deadline && step != Step::Handed {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        step = taker.step(Ok(()), 1, &mut sink);
+    }
+    assert_eq!(step, Step::Handed);
+    assert_eq!((sink.frames, sink.bytes), (1, 64));
+    assert_eq!(taker.step(Ok(()), 1 + EVERY_US, &mut sink), Step::Requested);
+    taker
+        .source
+        .lock()
+        .source
+        .frames
+        .push_back(Err(io::Error::other("gone")));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while std::time::Instant::now() < deadline && step != Step::Lost {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        step = taker.step(Ok(()), EVERY_US + 2, &mut sink);
+    }
+    assert_eq!(step, Step::Lost);
+    assert_eq!(sink.frames, 1);
+    assert!(!taker.holds_anything());
 }
 
 /// The ring's mark at the sink's boundary (phase 1b): what the frames do
@@ -405,8 +570,8 @@ mod marked {
         );
         assert!(sink.holds_mark());
         assert_eq!(
-            taker.step(Err(Closed::Stranger), 10 + FRESH_US + 10, &mut sink),
-            Step::Dropped(Closed::Stranger)
+            taker.step(Err(Closed::Nobody), 10 + FRESH_US + 10, &mut sink),
+            Step::Dropped(Closed::Nobody)
         );
         assert!(!sink.holds_mark(), "let go on the gate's close");
         assert!(!taker.holds_anything());

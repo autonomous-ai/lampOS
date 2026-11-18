@@ -119,6 +119,21 @@ pub trait Lamp {
     fn unasked_sent(&mut self) -> u64 {
         0
     }
+    /// Whether the desk and Hydrate bridge is on (`LAMP_DEVICES=on`, #7470,
+    /// `crate::devices`): the session looks at it each tick only then.
+    fn devices_on(&self) -> bool {
+        false
+    }
+    /// The bridge's tick at `now_ms`: the voice's asks taken off the bus,
+    /// what is due to go up, and the answers put back. Nothing when off.
+    fn devices(&mut self, _now_ms: u64, _connected: bool) -> crate::devices::Polled {
+        crate::devices::Polled::default()
+    }
+    /// One `devices.*` kind from the cloud: whether the bridge took it
+    /// (always `false` when off, so the kind is refused as any unknown one).
+    fn devices_down(&mut self, _kind: &str, _data: &Value, _now_ms: u64) -> bool {
+        false
+    }
     /// Health and crash reports (#1683, `crate::reports`): there only with
     /// `LAMP_CLOUD=on` and `LAMP_REPORTS=on`.
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
@@ -225,6 +240,12 @@ pub trait Lamp {
     /// fourteen-P13, `crate::share`).
     fn share(&self) -> Option<crate::share::Store> {
         None
+    }
+
+    /// The owner's language, as the lines said to them are chosen
+    /// (`system.info`'s `host.language`): `en` unless the lamp knows.
+    fn owner_language(&self) -> &'static str {
+        "en"
     }
 
     /// A skill added from a file in the owner's app
@@ -366,7 +387,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 75] = [
+pub const KINDS: [(&str, Switch); 77] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -410,6 +431,7 @@ pub const KINDS: [(&str, Switch); 75] = [
     (crate::settings::VOICE_KINDS[0], VOICE),
     (crate::settings::VOICE_KINDS[1], VOICE),
     (crate::settings::VOICE_GET_KIND, VOICE),
+    (crate::settings::PREVIEW_KIND, VOICE),
     ("faces.add_photo", |lamp| lamp.photos().is_some()),
     ("face.list", |lamp| lamp.faces().is_some()),
     ("face.remove", |lamp| lamp.faces().is_some()),
@@ -423,6 +445,7 @@ pub const KINDS: [(&str, Switch); 75] = [
     (crate::share::KINDS[0], SHARE),
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
+    (crate::share::KINDS[3], SHARE),
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
     // An uploaded skill's keys from the app (`LAMP_SKILL_SECRETS`): with
     // the skills page, while lamp-services' admin socket is there.
@@ -727,6 +750,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             changes.start(kind, line);
             Ok(None)
         }
+        // The app's voice preview (#7485), with LAMP_CHOSEN_VOICE=on too:
+        // checked here, then said by the voice's say service, nothing kept.
+        crate::settings::PREVIEW_KIND if on(lamp, kind) => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_preview(data)?;
+            Ok(None)
+        }
         // What the lamp keeps now (#5394's follow-up), read where the
         // helper writes it, as the language is: nothing is asked of it.
         crate::settings::VOICE_GET_KIND if on(lamp, kind) => {
@@ -838,7 +868,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 .skills()
                 .zip(lamp.share())
                 .ok_or_else(|| not_here(kind))?;
-            crate::share::share(&store, &places, data, &std::env::temp_dir()).map(Some)
+            crate::share::share(
+                &store,
+                &places,
+                data,
+                &std::env::temp_dir(),
+                lamp.owner_language(),
+            )
+            .map(Some)
         }
         "skills.shared" if on(lamp, kind) => {
             let store = lamp.share().ok_or_else(|| not_here(kind))?;
@@ -847,6 +884,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "skills.unshare" if on(lamp, kind) => {
             let store = lamp.share().ok_or_else(|| not_here(kind))?;
             crate::share::unshare(&store, data).map(Some)
+        }
+        // Who can see a sent skill, changed later (#5209): the mode on its
+        // own, with no new review. It is also the `can` key that says
+        // `skills.share` takes `visibility`.
+        "skills.visibility" if on(lamp, kind) => {
+            let store = lamp.share().ok_or_else(|| not_here(kind))?;
+            crate::share::set_visibility(&store, data).map(Some)
         }
         // A skill added from a file in the owner's app (`LAMP_SKILL_UPLOAD`),
         // `skills.upload.<upload_id>`: no file inline. Taken `starting`; the
@@ -1995,6 +2039,7 @@ pub mod tests {
                     "voice.set",
                     "character.set",
                     "voice.get",
+                    "tts.preview",
                 ],
             ),
             (
@@ -2054,6 +2099,7 @@ pub mod tests {
                     "skills.share",
                     "skills.shared",
                     "skills.unshare",
+                    "skills.visibility",
                 ],
             ),
             (

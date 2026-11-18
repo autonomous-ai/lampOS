@@ -26,6 +26,20 @@ fn named(words: &str) -> Option<String> {
     )
 }
 
+std::thread_local! {
+    /// Whether this thread's turns run with `LAMP_NAMED_AGENT_TAKES_LINE`
+    /// on ([`taking_the_line`], #7269).
+    static TAKES_LINE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// `turn` with `LAMP_NAMED_AGENT_TAKES_LINE` on (#7269).
+fn taking_the_line<T>(turn: impl FnOnce() -> T) -> T {
+    TAKES_LINE.with(|on| on.set(true));
+    let went = turn();
+    TAKES_LINE.with(|on| on.set(false));
+    went
+}
+
 /// One turn as it went.
 #[derive(Debug)]
 struct Went {
@@ -107,6 +121,9 @@ fn went_in(
         .announcing(false)
         .catching_named_agents(Arc::new(named))
         .keeping_named_ask_journal(journal.clone());
+    if TAKES_LINE.with(std::cell::Cell::get) {
+        engine = engine.handing_named_agents_the_line();
+    }
     if let Some(contexts) = audio_contexts {
         let boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
         let scoped_seen = calls.clone();
@@ -740,5 +757,108 @@ fn an_agent_task_tool_with_the_agent_named_runs_as_called() {
         assert_eq!(went.ran, [tool.to_owned()], "{heard}: {went:?}");
         assert!(!went.told, "{heard}: {went:?}");
         assert!(went.journal.is_empty(), "{heard}: {:?}", went.journal);
+    }
+}
+
+/// Round 1 calling the lamp's own `weather` twice, as on lamp-9b34.
+fn weather_twice() -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![
+            call(
+                "w0",
+                "weather",
+                json!({"place": "Hanoi", "day": "Saturday"}),
+            ),
+            call("w1", "weather", json!({"place": "Hanoi", "day": "Sunday"})),
+        ])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// The line lamp-9b34 answered with `weather` on 13373 (#7269).
+const WEATHER_LINE: &str = "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend";
+
+/// OpenClaw's task said back for a yes.
+const OC_READ_BACK: &str =
+    "OpenClaw will look up the weather in Hanoi this weekend. Shall I start it?";
+
+/// #7269 with `LAMP_NAMED_AGENT_TAKES_LINE` on: a line naming the lamp's
+/// agent for the work, as said and as "Open Claw", is handed to it in code
+/// as round 1, before the model is asked: `start_agent_task` with the heard
+/// words alone, and the one chat asked, after it, says the task back. The
+/// voice's own `weather` never runs, whatever a later round would call.
+#[test]
+fn a_named_agent_takes_the_line_before_the_weather_tool() {
+    for heard in [
+        WEATHER_LINE,
+        "Hey Lamp. Open Claw, look up the weather in Hanoi this weekend.",
+    ] {
+        assert_eq!(named(heard).as_deref(), Some("OpenClaw"), "{heard}");
+        let went = taking_the_line(|| {
+            went(
+                heard,
+                saying(OC_READ_BACK),
+                vec![weather_twice(), saying(OC_READ_BACK)],
+                false,
+            )
+        });
+        assert_eq!(
+            went.ran,
+            [crate::agent_tasks::START.to_owned()],
+            "{heard}: {went:?}"
+        );
+        assert_eq!(went.args, [json!({"task": heard})], "{heard}: {went:?}");
+        assert_eq!(went.asked, 1, "{heard}: {went:?}");
+        assert_eq!(
+            went.said,
+            [
+                "said:OpenClaw will look up the weather in Hanoi this weekend.",
+                "said: Shall I start it?",
+            ],
+            "{heard}: {went:?}"
+        );
+        assert!(!went.told, "{heard}: {went:?}");
+    }
+}
+
+/// #7269's switch off: the line goes to the model as before, and a round
+/// 1 of `weather` is caught and asked again once (#6547 (1b)); a second
+/// `weather` answer runs, as on lamp-9b34.
+#[test]
+fn with_the_switch_off_a_named_agent_line_is_asked_of_the_model() {
+    let went = went(
+        WEATHER_LINE,
+        weather_twice(),
+        vec![weather_twice(), saying("Sunny on Saturday.")],
+        false,
+    );
+    assert_eq!(went.ran, ["weather", "weather"], "{went:?}");
+    assert_eq!(
+        went.journal.last().map(String::as_str),
+        Some(
+            "lamp-voice second: request 1: named agent, no start_agent_task: asked again: called weather, weather, not start_agent_task"
+        ),
+        "{went:?}"
+    );
+}
+
+/// #7269's negatives with the switch on: a weather ask naming no agent, and
+/// a question about an agent, are asked of the model as before.
+#[test]
+fn with_the_switch_on_an_unnamed_ask_still_goes_to_the_model() {
+    for heard in [
+        "Hey Lamp, look up the weather in Hanoi this weekend",
+        "What's the weather tomorrow?",
+    ] {
+        assert_eq!(named(heard), None, "{heard}");
+        let went = taking_the_line(|| went(heard, weather_twice(), vec![saying("Sunny.")], false));
+        assert_eq!(went.ran, ["weather", "weather"], "{heard}: {went:?}");
+        assert!(went.journal.is_empty(), "{heard}: {:?}", went.journal);
+    }
+    for heard in ["What is OpenClaw?", "Is Hermes running?"] {
+        assert_eq!(named(heard), None, "{heard}");
+        let went = taking_the_line(|| went(heard, saying("It is an agent."), vec![], false));
+        assert_eq!(went.said, said(&["It is an agent."]), "{heard}");
+        assert!(went.ran.is_empty(), "{heard}: {went:?}");
     }
 }

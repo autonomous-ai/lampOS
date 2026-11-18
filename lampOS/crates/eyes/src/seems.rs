@@ -73,6 +73,10 @@ pub enum Due {
     /// Due, but no yes is kept at the consent file: no read, asked again
     /// after [`READ_EVERY`].
     NoYes,
+    /// Due, no yes, but `LAMP_EYES_PITCH_GAZE=on` and a Blendshape V2
+    /// reader ([`due_gaze`], #7442): the model runs for the eye-look scores
+    /// only, for `looking`, and every other score is dropped at once.
+    GazeOnly,
     /// Due, with the yes: read.
     Now,
 }
@@ -86,6 +90,17 @@ pub fn due(read_at: Option<std::time::Instant>, consent: &Path) -> Due {
         Due::Now
     } else {
         Due::NoYes
+    }
+}
+
+/// [`due`], where `gaze` (`LAMP_EYES_PITCH_GAZE=on`, a Blendshape V2 reader
+/// and the bus to say it on) turns [`Due::NoYes`] into [`Due::GazeOnly`]:
+/// where a face looks is read on every lamp, the yes or not (#7442, the
+/// lead's call); without `gaze`, [`due`] as it was.
+pub fn due_gaze(read_at: Option<std::time::Instant>, consent: &Path, gaze: bool) -> Due {
+    match due(read_at, consent) {
+        Due::NoYes if gaze => Due::GazeOnly,
+        due => due,
     }
 }
 /// A face is read only with its eyes at least this far apart, in the look's
@@ -330,6 +345,25 @@ mod tests {
             assert!(!read(no), "{no}");
             assert_eq!(due(None, &file), Due::NoYes, "{no}");
         }
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    /// #7442: with no yes, the gaze switch on turns a due read gaze-only;
+    /// off, no read as before; with the yes, a full read either way; before
+    /// its time, nothing.
+    #[test]
+    fn with_no_yes_the_gaze_switch_reads_only_where_the_face_looks() {
+        let folder = std::env::temp_dir().join(format!("face-gaze-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("face-expressions.json");
+        let _ = std::fs::remove_file(&file);
+        assert_eq!(due_gaze(None, &file, true), Due::GazeOnly);
+        assert_eq!(due_gaze(None, &file, false), Due::NoYes);
+        let now = Some(std::time::Instant::now());
+        assert_eq!(due_gaze(now, &file, true), Due::NotYet);
+        std::fs::write(&file, r#"{"face_expressions":"yes"}"#).unwrap();
+        assert_eq!(due_gaze(None, &file, true), Due::Now);
+        assert_eq!(due_gaze(None, &file, false), Due::Now);
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

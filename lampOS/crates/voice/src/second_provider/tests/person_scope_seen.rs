@@ -123,6 +123,8 @@ fn feed_faces(
                 faces: in_view
                     .iter()
                     .map(|&(id, speaks)| lamp_msgs::Face {
+                        pitch: None,
+                        looking: None,
                         id: id.to_owned(),
                         xmin: 0.1,
                         ymin: 0.1,
@@ -633,12 +635,14 @@ async fn lines_known(
     let engine = engine.carrying_conversations_by(match &kept_thread {
         Some(kept) => {
             let kept = kept.clone();
-            Some(Arc::new(move |request: u64| {
-                kept.lock().unwrap().going_on_how(request, Instant::now())
+            Some(Arc::new(move |request: u64, asked| {
+                kept.lock()
+                    .unwrap()
+                    .going_on_asked(request, Instant::now(), asked)
             }))
         }
         None => going_on.map(|going_on| -> crate::second_provider::GoingOnWith {
-            Arc::new(move |_| going_on.then(|| (a.clone(), false)))
+            Arc::new(move |_, _| going_on.then(|| (a.clone(), false)))
         }),
     });
     let mut engine = engine
@@ -2394,6 +2398,8 @@ async fn the_carry_window_counts_from_the_lines_start_not_its_end() {
         let t0 = now - span;
         let face = |id: &str| lamp_msgs::Faces {
             faces: vec![lamp_msgs::Face {
+                pitch: None,
+                looking: None,
                 id: id.to_owned(),
                 xmin: 0.1,
                 ymin: 0.1,
@@ -3752,7 +3758,10 @@ async fn their_seen_yes_within_thirty_seconds_runs_that_forget_by_id() {
         false,
     )
     .await;
-    assert_eq!(forgets_ran(&got), [json!({"source_id": UMBRELLA.0})]);
+    assert_eq!(
+        forgets_ran(&got),
+        [json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})]
+    );
     assert_eq!(got.calls, [Some(a)], "in A's scope only");
 }
 
@@ -3773,7 +3782,10 @@ async fn an_unseen_yes_runs_it_only_in_the_private_room() {
         )
         .await;
         if runs {
-            assert_eq!(forgets_ran(&got), [json!({"source_id": UMBRELLA.0})]);
+            assert_eq!(
+                forgets_ran(&got),
+                [json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})]
+            );
             assert_eq!(got.calls, [Some(a.clone())], "in A's scope only");
         } else {
             assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "kept");

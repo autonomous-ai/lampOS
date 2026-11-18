@@ -1267,6 +1267,7 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 lamp-update harness-off
 lamp-update harness-on
 lamp-update harness-install
+lamp-update agents-preinstall
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
@@ -1288,6 +1289,10 @@ it at boot (#1676), `harness-off` undoes install's Harness at boot, and only tha
 `check-units` says whether a lamp runs exactly the product's units: both
 in `docs/install.md` (step 9, and "Checking a lamp runs the product's
 units").
+
+`agents-preinstall` runs only while an image is built, in the image's own
+root after `install --setup on`: it puts Harness, Hermes and OpenClaw on the
+image as a round would (#7274, `docs/install.md`, Phase 4b).
 
 `install` puts lampOS on a blank lamp from the newest build: every product
 part through its `current` link, the product units, users and zone, the
@@ -1529,6 +1534,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | **The switch** (`switch`) | |
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
+| `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
+| `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
 | `lamp-body's start count is not reset: …` | before its one retry, lamp-body's start count (`systemctl reset-failed`) could not be reset; the retry is still made, and may then meet systemd's start limit (#7067) |
@@ -2320,6 +2327,15 @@ for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs
   `/etc/passwd`, so one that runs as a user or a group the lamp lacks is not
   added, and that is said. `lamp-update install` makes them.
 
+A round that switches on a managed updater also writes the exit note
+`install` writes (`UNIT.d/exit-note.conf`, 0644, [install.md](install.md))
+for each of Cloud's fixed services whose unit is on the lamp or written by
+the round and which has none, says `wrote …` for each, and reloads systemd
+with the units; a note already there is the lamp's and never rewritten,
+and a build put back removes the notes it wrote (#7135: before this, a unit a round added, such as `lamp-tasks.service`, had
+none). A note that cannot be written is said (`… is not written: …; the
+round goes on`) and skipped, and the update goes on.
+
 A service of a part already installed here is added beside it, through the
 same link. A unit of lamp-update's own that starts through `update/current`
 (the region's, `lamp-region.service`, #6386) is added beside the folder
@@ -2652,6 +2668,59 @@ carrier default leaves a build's settings unwritten. The round says which
 (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is not
 set`). The rest of the build is taken as today. Users and groups aren't
 carried: a later step, when a build needs a new one.
+
+### Install's settings in a round (#5984)
+
+Every settings file install writes (`install::SETTINGS`, `STORE_SETTINGS`,
+`SETUP_SETTINGS`) has one rule for a round, by who writes it besides
+install. A round brings a file to its build's by that rule; "kept" means
+the round writes nothing there and says `kept PATH: this lamp's own; the
+build's is not written`.
+
+| File | Who writes it | Rule in a round |
+|---|---|---|
+| `/etc/lampOS/expression/expression.json` | install and a build's settings only; no part or the app writes it | **Replace** while it is still the one install or a build wrote (its record in `state.json`'s `settings`); changed on the lamp, **kept and said** |
+| `/etc/lampOS/records.json` | install and a build's settings only | **Replace**, or kept and said, as `expression.json` |
+| `/etc/lampOS/controls/controls-pins.json` | install, the factory step (`discover-head`: `head_pads`, `head_rest`), a V1 move (lamp-keeper's `provision/`), and install's `own_pins_follow_build` | **Replace** while it is install's or a build's; the lamp's own is **merged by key** (below) |
+| `/etc/lampOS/controls/controls.json` | install, a V1 move, and install's `own_pins_follow_build` (its `head_pads` names) | as `controls-pins.json` |
+| `/etc/tmpfiles.d/lampos.conf` | install and a build's settings | **Replace**, or kept and said (`apply::TMPFILES_SHIPPED` counts as install's) |
+| `/etc/lampOS/skills/store.env` | install and a build's settings; a change on the lamp is the lamp's | **Replace**, or kept and said |
+| `store.conf` (`lamp-skills-manage@.service.d/`) | install only | **Install's alone**: not a path a build may write (`manifest::is_setting_path`), so a round leaves it; a change to it needs `lamp-update install` |
+| `/etc/lampOS/setup/serve.json` | `install --setup on` and setup | **Setup's**: never a build's setting; a round leaves it |
+| product skills' files (`/var/lib/lampOS/skills/`) | not settings files | the folder install copies whole is placed by the round from `lamp-product-skills` ("The product's skills", above): a core skill's files put back, one turned on kept on |
+
+**Merged by key** (`apply::MERGED`, `apply::merge_own`): where Controls'
+file is the lamp's own and both it and the build's are JSON objects, a
+top-level key of the build's the lamp's lacks is added, of the keys
+`MERGED` names for that file, and every key the lamp has keeps its value, a
+lamp's head pins and their rest among them. For `controls-pins.json` the
+one key is `privacy`, the section install's `own_pins_follow_build` adds:
+the build's other pin sections, `reset` (the product's factory-reset line
+100) among them, are never added, since they name lines of the product's
+wiring a board whose pins were set by hand may not share (#7123).
+For `controls.json` every key of the build's is added: each of its keys is
+one a lamp's own file must already have to be read, or an optional one;
+none names a line today. The file is written as install writes a lamp's own
+object (pretty JSON, a newline at the end) and said: `merged PATH: added
+the build's KEYS; this lamp's own values are kept`. Its record is not
+changed, so it stays the lamp's own and the next build's file never
+replaces it whole. With nothing to add, or either side not an object, it is
+kept and said. The round and `lamp-update-apply` both merge, so the round
+restarts Controls for it; a put-back restores the file byte for byte, as
+for any setting. A `lamp-update-back` from before this keeps the file whole,
+as before, until a round refreshes it ("The settings writer refreshed").
+Install's own key moves (the privacy section, the old guessed head pads,
+`legacy_head`) stay install's.
+
+Tests (`crates/update/tests/round/install_settings.rs`):
+`a_round_over_an_older_installed_expression_gives_the_builds`,
+`a_lamps_own_pins_survive_a_round_and_gain_the_builds_new_keys`,
+`a_lamps_own_pins_without_a_reset_line_gain_privacy_and_never_the_builds_reset`,
+`an_expression_changed_on_the_lamp_is_kept_whole_and_said`; in
+`crates/update/src/apply.rs`:
+`own_pins_gain_only_privacy_and_a_put_back_restores_them`,
+`own_controls_gain_every_new_key_of_the_builds`,
+`an_own_file_not_an_object_and_a_removed_setting_are_not_merged`.
 
 ### Setup's reset plan (#806)
 

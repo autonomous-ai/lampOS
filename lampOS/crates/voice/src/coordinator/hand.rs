@@ -80,6 +80,7 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
+        | ProviderOutput::MakeWaiting { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::TurnFailed { request, .. }
         | ProviderOutput::ReminderDeferred { request, .. }
@@ -89,6 +90,8 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         // Times only, for the records: never anything to schedule.
         ProviderOutput::Ready { .. }
         | ProviderOutput::Ended { .. }
+        // A run made: kept whatever became of its turn (#7363).
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::Stages { .. } => None,
     };
     through

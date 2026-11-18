@@ -12,6 +12,12 @@ use crate::catalog::{self, FACEBOOK_VERSION, Method};
 use crate::mail::{self, Outgoing};
 use crate::reads::{self, page_id};
 use crate::store::Entry;
+use jiff::{
+    Timestamp, Zoned,
+    civil::Date,
+    fmt::temporal::{Pieces, PiecesOffset},
+    tz::TimeZone,
+};
 use serde_json::{Value, json};
 use std::{
     sync::Mutex,
@@ -470,7 +476,17 @@ fn http(
 /// account it is made as, and the write is bound to it. Its read-back fits
 /// [`READ_BACK_JSON_MOST`].
 pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
-    prepare_unbounded(code, args, entry)
+    prepare_at(code, args, entry, &Clock::here())
+}
+
+/// [`prepare`], an event's time said against `clock`.
+pub fn prepare_at(
+    code: &str,
+    args: &Value,
+    entry: &Entry,
+    clock: &Clock,
+) -> Result<Pending, String> {
+    prepare_unbounded(code, args, entry, clock)
         .map(|pending| Pending {
             account: entry.account(),
             ..pending
@@ -479,7 +495,12 @@ pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, Strin
 }
 
 /// [`prepare`], its account not yet bound and its read-back not yet bounded.
-fn prepare_unbounded(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
+fn prepare_unbounded(
+    code: &str,
+    args: &Value,
+    entry: &Entry,
+    clock: &Clock,
+) -> Result<Pending, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
     let code = service.code;
     let action = text(args, "action").ok_or("the write needs its action")?;
@@ -571,7 +592,8 @@ fn prepare_unbounded(code: &str, args: &Value, entry: &Entry) -> Result<Pending,
                 &query,
                 event,
                 format!(
-                    "Add an event to your Google Calendar ({calendar}): \"{name}\", from {start} to {end}{invited}.{noted} Seen by whoever your calendar is shared with{}.",
+                    "Add an event to your Google Calendar ({calendar}): \"{name}\", from {}{invited}.{noted} Seen by whoever your calendar is shared with{}.",
+                    clock.span(start, end),
                     if attendees.is_empty() {
                         ""
                     } else {
@@ -1016,6 +1038,165 @@ pub fn made(answer: &str) -> Value {
     Value::Object(made)
 }
 
+/// When a read-back is said: now, and the lamp's own zone, in which an
+/// event's time is told. A calendar's times are RFC 3339
+/// (`2026-11-17T22:00:00+07:00`), which the voice read aloud as it was; a
+/// read-back says them as the lamp says a time instead: "today at 10:00
+/// pm", "tomorrow at 9:00 am", "Saturday at 3:00 pm", "Friday 4 December
+/// at 3:00 pm". Each time is told at its own instant's offset in the zone,
+/// so one across a daylight-saving change says its own hour (Fourteen's P2
+/// on #7525). The RFC 3339 time stays in the call itself.
+#[derive(Clone, Debug)]
+pub struct Clock {
+    now: Timestamp,
+    /// The lamp's zone; unknown, a time is told at its own offset and no
+    /// day is told against today on a guess.
+    zone: Option<TimeZone>,
+}
+
+const WEEKDAYS: [&str; 7] = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+];
+const MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+impl Clock {
+    /// Now, in the lamp's own zone as the system has it.
+    pub fn here() -> Self {
+        Self {
+            now: Timestamp::now(),
+            zone: lamp_local_time::LocalTime::zone("system")
+                .ok()
+                .map(|zone| zone.time_zone()),
+        }
+    }
+
+    /// `now_unix_ms` in `zone` (an IANA name, or `system`); unknown, none.
+    pub fn at(now_unix_ms: i64, zone: Option<&str>) -> Self {
+        Self {
+            now: Timestamp::from_millisecond(now_unix_ms).unwrap_or(Timestamp::UNIX_EPOCH),
+            zone: zone
+                .and_then(|name| lamp_local_time::LocalTime::zone(name).ok())
+                .map(|zone| zone.time_zone()),
+        }
+    }
+
+    /// A date as said against `today` (none when the zone is unknown):
+    /// "today", "tomorrow", "yesterday", a weekday within the coming week,
+    /// else its weekday and date (and its year, when not this one's).
+    fn day_said(date: Date, today: Option<Date>) -> String {
+        let weekday = WEEKDAYS[usize::from(date.weekday().to_monday_zero_offset().unsigned_abs())];
+        let month = MONTHS[usize::from(date.month().unsigned_abs()) - 1];
+        let ahead = today.and_then(|today| today.until(date).ok().map(|span| span.get_days()));
+        match ahead {
+            Some(0) => "today".into(),
+            Some(1) => "tomorrow".into(),
+            Some(-1) => "yesterday".into(),
+            Some(2..=6) => weekday.into(),
+            _ if today.is_some_and(|today| today.year() == date.year()) => {
+                format!("{weekday} {} {month}", date.day())
+            }
+            _ => format!("{weekday} {} {month} {}", date.day(), date.year()),
+        }
+    }
+
+    /// An all-day event's start and end dates (`YYYY-MM-DD`, its end the
+    /// day after its last, as Google gives it), said: "all day tomorrow",
+    /// "all day from tomorrow to Friday". As given if it isn't a date.
+    pub fn days(&self, start: &str, end: Option<&str>) -> String {
+        let Ok(first) = start.parse::<Date>() else {
+            return format!("all day {start}");
+        };
+        let today = self
+            .zone
+            .as_ref()
+            .map(|zone| self.now.to_zoned(zone.clone()).date());
+        let last = end
+            .and_then(|end| end.parse::<Date>().ok())
+            .and_then(|end| end.yesterday().ok())
+            .filter(|last| *last > first);
+        match last {
+            Some(last) => format!(
+                "all day from {} to {}",
+                Self::day_said(first, today),
+                Self::day_said(last, today)
+            ),
+            None => format!("all day {}", Self::day_said(first, today)),
+        }
+    }
+
+    /// An RFC 3339 time in the lamp's zone, at its own instant's offset
+    /// (else its own offset), and today there.
+    fn local(&self, time: &str) -> Option<(Zoned, Option<Date>)> {
+        let instant = time.parse::<Timestamp>().ok()?;
+        match &self.zone {
+            Some(zone) => Some((
+                instant.to_zoned(zone.clone()),
+                Some(self.now.to_zoned(zone.clone()).date()),
+            )),
+            None => {
+                let offset = match Pieces::parse(time).ok()?.offset()? {
+                    PiecesOffset::Numeric(numeric) => numeric.offset(),
+                    _ => jiff::tz::Offset::UTC,
+                };
+                Some((instant.to_zoned(TimeZone::fixed(offset)), None))
+            }
+        }
+    }
+
+    /// `HH:MM` on a 12-hour clock, as `spoken_clock` says one: "10:00 pm".
+    fn clock(at: &Zoned) -> String {
+        let half = if at.hour() < 12 { "am" } else { "pm" };
+        let hour = match at.hour() % 12 {
+            0 => 12,
+            hour => hour,
+        };
+        format!("{hour}:{:02} {half}", at.minute())
+    }
+
+    /// One time, said: "today at 10:00 pm". As given if it isn't RFC 3339.
+    pub fn time(&self, time: &str) -> String {
+        match self.local(time) {
+            Some((at, today)) => format!(
+                "{} at {}",
+                Self::day_said(at.date(), today),
+                Self::clock(&at)
+            ),
+            None => time.to_owned(),
+        }
+    }
+
+    /// A start and an end, said: "today at 10:00 pm to 11:00 pm", the end's
+    /// day said only when it is another day.
+    pub fn span(&self, start: &str, end: &str) -> String {
+        let end_said = match (self.local(start), self.local(end)) {
+            (Some((first, _)), Some((last, _))) if first.date() == last.date() => {
+                Self::clock(&last)
+            }
+            _ => self.time(end),
+        };
+        format!("{} to {end_said}", self.time(start))
+    }
+}
+
 /// Whether `args` change or cancel a Google Calendar event
 /// ([`CALENDAR_EDITS`]).
 pub fn is_calendar_edit(code: &str, args: &Value) -> bool {
@@ -1058,10 +1239,18 @@ const EVENT_ID_MOST: usize = 1_024;
 /// for it (the calendar's own `events/<id>` read).
 pub fn event_read(args: &Value) -> Result<String, String> {
     let (calendar, event) = event_named(args)?;
+    // Its times in the lamp's own zone, as a list of events reads them:
+    // without it Calendar answers in the event's stored zone, and on
+    // lamp-06c1 on 12 Nov a move read back "now from 2026-11-13T15:00:00Z"
+    // for a 22:00 +07:00 event.
+    let query: Vec<(&str, String)> = reads::zone_here()
+        .map(|zone| ("timeZone", zone))
+        .into_iter()
+        .collect();
     reads::url(
         base("google_calendar")?,
         &["calendar", "v3", "calendars", calendar, "events", event],
-        &[],
+        &query,
     )
 }
 
@@ -1092,7 +1281,7 @@ fn given(event: &Value, pointer: &str) -> Option<String> {
 /// checked and read back: what it is now, what changes, who is told. An
 /// event Google has cancelled is [`EVENT_GONE`]. Moving it gives both its
 /// start and end; at least one change is asked for.
-pub fn prepare_edit(args: &Value, current: &Value) -> Result<Pending, String> {
+pub fn prepare_edit(args: &Value, current: &Value, clock: &Clock) -> Result<Pending, String> {
     let code = "google_calendar";
     if !is_calendar_edit(code, args) {
         return Err(format!("google_calendar edits: {CALENDAR_EDITS}"));
@@ -1102,13 +1291,20 @@ pub fn prepare_edit(args: &Value, current: &Value) -> Result<Pending, String> {
     }
     let (calendar, event) = event_named(args)?;
     let name = given(current, "/summary").unwrap_or_else(|| "with no title".into());
-    let when = |at: &str| {
-        given(current, &format!("/{at}/dateTime"))
-            .or_else(|| given(current, &format!("/{at}/date")))
-    };
-    let now = match (when("start"), when("end")) {
-        (Some(start), Some(end)) => format!(", now from {start} to {end}"),
-        (Some(start), None) => format!(", now from {start}"),
+    // Said as the lamp says a time, never as Google's RFC 3339: on
+    // lamp-06c1 on 17 Nov (build 13753) five of five move and cancel
+    // read-backs said "2026-11-17T22:00:00+07:00" aloud.
+    let now = match (
+        given(current, "/start/dateTime"),
+        given(current, "/end/dateTime"),
+        given(current, "/start/date"),
+    ) {
+        (Some(start), Some(end), _) => format!(", now from {}", clock.span(&start, &end)),
+        (Some(start), None, _) => format!(", now from {}", clock.time(&start)),
+        (None, _, Some(day)) => format!(
+            ", now {}",
+            clock.days(&day, given(current, "/end/date").as_deref())
+        ),
         _ => String::new(),
     };
     let guests: Vec<String> = current
@@ -1151,7 +1347,7 @@ pub fn prepare_edit(args: &Value, current: &Value) -> Result<Pending, String> {
             let (start, end) = (time(args, "start")?, time(args, "end")?);
             patch.insert("start".into(), json!({"dateTime": start}));
             patch.insert("end".into(), json!({"dateTime": end}));
-            changes.push(format!("move it to {start} to {end}"));
+            changes.push(format!("move it to {}", clock.span(start, end)));
         }
         _ => return Err("a moved event needs both its start and its end".into()),
     }
@@ -1519,6 +1715,235 @@ mod tests {
         }
     }
 
+    /// 17 Nov 2026, 09:45 UTC: lamp-06c1's live 16:45 at +07:00.
+    const NOV_17: i64 = 1_794_908_700_000;
+
+    /// lamp-06c1's live clock on 17 Nov: 16:45 in Asia/Ho_Chi_Minh.
+    fn at_0645() -> Clock {
+        Clock::at(NOV_17, Some("Asia/Ho_Chi_Minh"))
+    }
+
+    /// lamp-06c1, 17 Nov, build 13753: five of five move and cancel
+    /// read-backs said "2026-11-17T22:00:00+07:00" aloud. A read-back says
+    /// the time as the lamp says one, against today, in the lamp's offset.
+    #[test]
+    fn a_move_or_cancel_read_back_says_its_time_as_spoken_never_rfc_3339() {
+        let tonight = json!({"id":"evnt1","status":"confirmed","summary":"Call mom",
+            "start":{"dateTime":"2026-11-17T22:00:00+07:00"},
+            "end":{"dateTime":"2026-11-17T23:00:00+07:00"}});
+        let moved = prepare_edit(
+            &json!({"action":"update_event","event_id":"evnt1",
+                    "start":"2026-11-18T09:00:00+07:00","end":"2026-11-18T09:30:00+07:00"}),
+            &tonight,
+            &at_0645(),
+        )
+        .unwrap();
+        assert_eq!(
+            moved.read_back,
+            "Change the event \"Call mom\" on your Google Calendar (primary), now from today at 10:00 pm to 11:00 pm: move it to tomorrow at 9:00 am to 9:30 am. Seen by whoever your calendar is shared with."
+        );
+        let cancelled = prepare_edit(
+            &json!({"action":"delete_event","event_id":"evnt1"}),
+            &tonight,
+            &at_0645(),
+        )
+        .unwrap();
+        assert!(
+            cancelled.read_back.starts_with(
+                "Delete the event \"Call mom\", now from today at 10:00 pm to 11:00 pm from your Google Calendar"
+            ),
+            "{}",
+            cancelled.read_back
+        );
+        // Moved to a day of the coming week, to one past it, and over midnight.
+        for ((start, end), said) in [
+            (
+                ("2026-11-21T15:00:00+07:00", "2026-11-21T16:00:00+07:00"),
+                "Saturday at 3:00 pm to 4:00 pm",
+            ),
+            (
+                ("2026-12-04T15:00:00+07:00", "2026-12-04T15:30:00+07:00"),
+                "Friday 4 December at 3:00 pm to 3:30 pm",
+            ),
+            (
+                ("2026-11-17T23:30:00+07:00", "2026-11-18T00:30:00+07:00"),
+                "today at 11:30 pm to tomorrow at 12:30 am",
+            ),
+            (
+                ("2027-01-04T12:00:00+07:00", "2027-01-04T13:00:00+07:00"),
+                "Monday 4 January 2027 at 12:00 pm to 1:00 pm",
+            ),
+        ] {
+            let pending = prepare_edit(
+                &json!({"action":"update_event","event_id":"evnt1","start":start,"end":end}),
+                &tonight,
+                &at_0645(),
+            )
+            .unwrap();
+            assert!(
+                pending.read_back.contains(said),
+                "{said}: {}",
+                pending.read_back
+            );
+        }
+        // Google's answer in UTC is said in the lamp's own offset.
+        let mut utc = tonight.clone();
+        utc["start"]["dateTime"] = json!("2026-11-17T15:00:00Z");
+        utc["end"]["dateTime"] = json!("2026-11-17T16:00:00.000Z");
+        let pending = prepare_edit(
+            &json!({"action":"delete_event","event_id":"evnt1"}),
+            &utc,
+            &at_0645(),
+        )
+        .unwrap();
+        assert!(
+            pending
+                .read_back
+                .contains("now from today at 10:00 pm to 11:00 pm"),
+            "{}",
+            pending.read_back
+        );
+        // An all-day event is said as its day.
+        let mut all_day = tonight.clone();
+        all_day["start"] = json!({"date":"2026-11-16"});
+        all_day["end"] = json!({"date":"2026-11-17"});
+        let pending = prepare_edit(
+            &json!({"action":"delete_event","event_id":"evnt1"}),
+            &all_day,
+            &at_0645(),
+        )
+        .unwrap();
+        assert!(
+            pending.read_back.contains("now all day yesterday"),
+            "{}",
+            pending.read_back
+        );
+        for pending in [&moved, &cancelled, &pending] {
+            for raw in ["2026-", "T22:00", "T09:00", "+07:00", ":00:00"] {
+                assert!(
+                    !pending.read_back.contains(raw),
+                    "{raw}: {}",
+                    pending.read_back
+                );
+            }
+        }
+    }
+
+    /// Fourteen's P2 on #7525: a lamp in Europe/Berlin in November
+    /// (+01:00) says an April event (+02:00) at its own hour, on a move's
+    /// "now", its new time, and a create's read-back alike.
+    #[test]
+    fn a_time_across_a_daylight_saving_change_is_said_at_its_own_hour() {
+        let berlin = Clock::at(NOV_17, Some("Europe/Berlin"));
+        let april = json!({"id":"evnt1","status":"confirmed","summary":"Dentist",
+            "start":{"dateTime":"2027-04-15T15:00:00+02:00"},
+            "end":{"dateTime":"2027-04-15T16:00:00+02:00"}});
+        let moved = prepare_edit(
+            &json!({"action":"update_event","event_id":"evnt1",
+                    "start":"2027-04-16T15:00:00+02:00","end":"2027-04-16T16:00:00+02:00"}),
+            &april,
+            &berlin,
+        )
+        .unwrap();
+        assert!(
+            moved.read_back.contains(
+                "now from Thursday 15 April 2027 at 3:00 pm to 4:00 pm: move it to Friday 16 April 2027 at 3:00 pm to 4:00 pm."
+            ),
+            "{}",
+            moved.read_back
+        );
+        // Sent at November's +01:00 for an April 3 pm, it lands at 4 pm,
+        // and the read-back says so.
+        let made = prepare_at(
+            "google_calendar",
+            &json!({"action":"create_event","title":"Dentist",
+                    "start":"2027-04-15T15:00:00+01:00","end":"2027-04-15T16:00:00+01:00"}),
+            &Entry::default(),
+            &berlin,
+        )
+        .unwrap();
+        assert!(
+            made.read_back
+                .contains("\"Dentist\", from Thursday 15 April 2027 at 4:00 pm to 5:00 pm."),
+            "{}",
+            made.read_back
+        );
+        // Now's own hour stays now's: tonight in November is still tonight.
+        let tonight = prepare_at(
+            "google_calendar",
+            &json!({"action":"create_event","title":"Call",
+                    "start":"2026-11-17T22:00:00+01:00","end":"2026-11-17T23:00:00+01:00"}),
+            &Entry::default(),
+            &berlin,
+        )
+        .unwrap();
+        assert!(
+            tonight
+                .read_back
+                .contains("from today at 10:00 pm to 11:00 pm"),
+            "{}",
+            tonight.read_back
+        );
+    }
+
+    /// A create's read-back says its time as spoken too, never RFC 3339.
+    #[test]
+    fn a_create_read_back_says_its_time_as_spoken() {
+        let made = prepare_at(
+            "google_calendar",
+            &json!({"action":"create_event","title":"Call mom",
+                    "start":"2026-11-18T09:00:00+07:00","end":"2026-11-18T09:30:00+07:00"}),
+            &Entry::default(),
+            &at_0645(),
+        )
+        .unwrap();
+        assert_eq!(
+            made.read_back,
+            "Add an event to your Google Calendar (primary): \"Call mom\", from tomorrow at 9:00 am to 9:30 am. Seen by whoever your calendar is shared with."
+        );
+    }
+
+    /// Fourteen's P3s on #7525: an all-day event says every day it spans,
+    /// and with the lamp's zone unknown no day is told against today on a
+    /// guess (in UTC, 01:00 at +07:00 is still yesterday).
+    #[test]
+    fn an_all_day_event_says_its_days_and_never_guesses_today() {
+        let delete = json!({"action":"delete_event","event_id":"evnt1"});
+        let trip = |start: &str, end: &str| {
+            json!({"id":"evnt1","status":"confirmed","summary":"Trip",
+                   "start":{"date":start},"end":{"date":end}})
+        };
+        let said =
+            |event: &Value, clock: &Clock| prepare_edit(&delete, event, clock).unwrap().read_back;
+        let multi = said(&trip("2026-11-18", "2026-11-21"), &at_0645());
+        assert!(
+            multi.contains("now all day from tomorrow to Friday from"),
+            "{multi}"
+        );
+        let one = said(&trip("2026-11-18", "2026-11-19"), &at_0645());
+        assert!(one.contains("now all day tomorrow from"), "{one}");
+        // 17 Nov, 01:00 at +07:00: 16 Nov, 18:00 UTC.
+        let unknown = Clock::at(1_794_852_000_000, None);
+        let today = said(&trip("2026-11-17", "2026-11-18"), &unknown);
+        assert!(
+            today.contains("now all day Tuesday 17 November 2026 from"),
+            "{today}"
+        );
+        assert!(
+            !today.contains("today") && !today.contains("yesterday"),
+            "{today}"
+        );
+        // A timed one, the zone unknown, is said at its own offset.
+        let mut call = trip("x", "y");
+        call["start"] = json!({"dateTime":"2026-11-17T22:00:00+07:00"});
+        call["end"] = json!({"dateTime":"2026-11-17T23:00:00+07:00"});
+        let timed = said(&call, &unknown);
+        assert!(
+            timed.contains("now from Tuesday 17 November 2026 at 10:00 pm to 11:00 pm"),
+            "{timed}"
+        );
+    }
+
     /// The party as Google has it.
     fn party() -> Value {
         json!({"id":"evnt1","status":"confirmed","summary":"Hamburger party",
@@ -1536,6 +1961,7 @@ mod tests {
         let renamed = prepare_edit(
             &json!({"action":"update_event","event_id":"evnt1","title":"Burger night"}),
             &party(),
+            &at_0645(),
         )
         .unwrap();
         assert_eq!(
@@ -1548,13 +1974,14 @@ mod tests {
         );
         assert_eq!(
             renamed.read_back,
-            "Change the event \"Hamburger party\" on your Google Calendar (primary), now from 2026-11-12T18:00:00+07:00 to 2026-11-12T19:00:00+07:00: rename it \"Burger night\". Seen by whoever your calendar is shared with."
+            "Change the event \"Hamburger party\" on your Google Calendar (primary), now from Thursday 12 November at 6:00 pm to 7:00 pm: rename it \"Burger night\". Seen by whoever your calendar is shared with."
         );
         let all = prepare_edit(
             &json!({"action":"update_event","event_id":"evnt1","calendar":"family@group.calendar.google.com",
                     "title":"Burger night","start":"2026-11-12T20:00:00+07:00",
                     "end":"2026-11-12T21:00:00+07:00","text":"Bring buns"}),
             &party(),
+            &at_0645(),
         )
         .unwrap();
         let Action::Http { method, url, body } = &all.action else {
@@ -1574,6 +2001,7 @@ mod tests {
         let deleted = prepare_edit(
             &json!({"action":"delete_event","event_id":"evnt1"}),
             &party(),
+            &at_0645(),
         )
         .unwrap();
         assert_eq!(
@@ -1603,10 +2031,19 @@ mod tests {
         }
         // The event read first is Calendar's own read of it.
         let read = event_read(&json!({"event_id":"evnt1"})).unwrap();
-        assert_eq!(
-            read,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
-        );
+        let bare = "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1";
+        // Its times come in the lamp's own zone, whenever the system names one.
+        match reads::zone_here() {
+            Some(zone) => assert_eq!(
+                reqwest::Url::parse(&read)
+                    .unwrap()
+                    .query_pairs()
+                    .collect::<Vec<_>>(),
+                [("timeZone".into(), zone.into())]
+            ),
+            None => assert_eq!(read, bare),
+        }
+        assert!(read.starts_with(bare), "{read}");
         let (_, path) = crate::net::split(&read).unwrap();
         assert!(catalog::read_allowed("google_calendar", Method::Get, &path, None).is_ok());
         // The calendar's list of events is not one event.
@@ -1622,6 +2059,7 @@ mod tests {
         let told = prepare_edit(
             &json!({"action":"delete_event","event_id":"evnt1"}),
             &guests,
+            &at_0645(),
         )
         .unwrap();
         assert!(
@@ -1651,13 +2089,13 @@ mod tests {
             json!({"action":"update_event","event_id":"evnt1","title":"a\nb"}),
             json!({"action":"create_event","event_id":"evnt1"}),
         ] {
-            assert!(prepare_edit(&args, &party()).is_err(), "{args}");
+            assert!(prepare_edit(&args, &party(), &at_0645()).is_err(), "{args}");
         }
         // A record key, as the voice shows a record's, is told it is one.
         for action in ["update_event", "delete_event"] {
             let args = json!({"action":action,"event_id":"v1794396042163-1","title":"T"});
             assert_eq!(
-                prepare_edit(&args, &party()),
+                prepare_edit(&args, &party(), &at_0645()),
                 Err(RECORD_KEY_NOT_EVENT.into())
             );
             assert_eq!(event_read(&args), Err(RECORD_KEY_NOT_EVENT.into()));
@@ -1681,7 +2119,10 @@ mod tests {
         cancelled["status"] = json!("cancelled");
         for action in ["update_event", "delete_event"] {
             let args = json!({"action":action,"event_id":"evnt1","title":"T"});
-            assert_eq!(prepare_edit(&args, &cancelled), Err(EVENT_GONE.into()));
+            assert_eq!(
+                prepare_edit(&args, &cancelled, &at_0645()),
+                Err(EVENT_GONE.into())
+            );
             assert!(is_calendar_edit("google_calendar", &args));
             assert!(!is_calendar_edit("github", &args));
             assert!(prepare("google_calendar", &args, &Entry::default()).is_err());

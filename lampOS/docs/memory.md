@@ -282,6 +282,58 @@ socket is refused before the eyes forget anything.
   and the room's unchanged; the narrow socket's refusals, modes and bus
   telling), and the protocols' `forget_person` unit tests.
 
+### The owner's face and typed name (#7501, `LAMP_OWNER_LINK`)
+
+On a lamp set up before onboarding kept an `owner` (29 Oct), or whose
+owner's face was saved outside "who you are", the owner is the typed name
+alone (`person::by_default_owner`, `person::owner_ids`). When the owner's
+face is kept under another name (the face name), its memory id is not one
+of the owner's, so the lamp treats one person as two: the name is held back
+("a known face that isn't theirs"), services read nothing in full outside
+the private room, and the owner's own "forget everything" under the face
+name leaves the typed name, place, voice print, tasks and every service
+record and contact under the typed name's id
+(`remember::owner_forgets_rows_of`). Seen on lamp-06c1 (build 13706).
+
+With `LAMP_OWNER_LINK=on` (off unless set, in no product unit; the second
+route only) the owner links the two by their own words. Their "I'm <the
+typed name>", which a known face giving another name already sends as
+`remember_my_face` (`LAMP_NAMES_RENAME_ASKED`), is taken as the link in
+place of a rename (`owner_link::taken`, `tools::run_call_with_scope`'s
+face route): the face name is posted as the owner
+(`onboarding::owner_linked`), and from the next owner refresh (within
+`OWNER_EVERY`, 10 s) `owner_ids` holds both ids. The name is then given, the
+owner's services reach both, and their forget everything clears the rows
+under both ids. Only when all of these hold (`owner_link::judge`), else the
+call goes on to the face paths as before and the journal says why, with no
+name:
+
+- a typed name, and no owner kept: set once, never over one;
+- the typed name in their own words this turn (`known_faces::said_by_them`);
+- the known face seen saying the line, alone in it and not by voice only
+  (`services::seen_saying_owner`); the private room grants nothing here;
+- the line's own scope that face's: never the room's, another person's, a
+  held one, one by the one-face rule, or one carried;
+- the one face in view (`known_faces::most_faces_lately`);
+- in the owner's enrolled voice, when they have a print
+  (`services::owners_voice_now`).
+
+Nothing is ever linked silently: the eyes keep no record of which face "who
+you are" saved, and the only face they know may be a guest's. A face
+forgotten drops the link as any owner (`known_faces::refresh_owner`), and a
+redo or a reset clears it.
+
+Whatever the switch, the voice says once a run, when the eyes first answer
+their names, `lamp-voice: owner: typed name only, no face linked (N known
+faces; LAMP_OWNER_LINK on|off)` when a typed name has no owner kept and no
+known face is kept under it (`owner_link::startup_line`), with no name, so
+the lamps in this state can be counted. Tests: `owner_link::tests`,
+`person::tests::the_owners_face_under_another_name_is_theirs_only_once_linked`,
+`remember::tests::the_owners_face_forgets_the_typed_names_rows_only_once_linked`,
+`onboarding::tests::the_owners_face_linked_is_kept_once_and_never_over_an_owner`.
+Not shown on a lamp yet: the row on lamp-06c1 (link, then a forget
+everything that leaves nothing of either name).
+
 ## On the disk
 
 This layout is the default. Enabling `--memory-days` imports it into one
@@ -784,7 +836,12 @@ Only a plain yes on a later line within 30 s
 with their face seen saying it, or in the private room
 (`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
 exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
-never `forget_last`). The yes may say the forget too
+never `forget_last`). The held forget carries the subject's words
+(`about`); once the by-id forget is confirmed, that person's own exchanges
+about those words go too (`exchanges_forget`,
+`remember::agreed_forget_exchanges`), by the same match as a forget about
+and in their scope alone, never another's or the room's, so recall no longer
+tells the talk about it (C128; lamp-06c1, build 13523). The yes may say the forget too
 (`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
 forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
 said back alone, "Forget it." or "Quên đi.", which is only ever read as the
@@ -1268,7 +1325,11 @@ lamp-memory reads `LAMP_MEMORY_TIERS` at start (#4746/#4747; the design is
 - **Off:** a `--memory-days` start with the switch off, or set to an unknown
   value, removes a `memory-tiers.d` an earlier `shadow` or `on` left, since
   no forget made while off would reach it: `tiers off: a left tiered copy
-  removed stores= files=`, counts only. Days' answers are unchanged.
+  removed stores= files=`, counts only. Days' answers are unchanged. A copy
+  that can't be removed (a permission trouble) is said as `could not be
+  removed` and counted in health for the process's life: the report warns
+  "a left tiered copy could not be removed; a forget does not reach it",
+  with `tiers_left_kept`.
 
 How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
 
@@ -1360,7 +1421,10 @@ How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
     `tiers_night::GIVE_AGAIN_AFTER`, `GIVE_TRIES`), and memory keeps the
     latest gives' outcomes by job id (`tiers::GIVEN_KEPT`, 64; ids and
     outcomes only), so a give again is told the same outcome and nothing
-    is applied twice. An applied pass with more records pending
+    is applied twice. A reply held to give again is dropped, and counted in
+    the voice's journal (`held reply dropped`), when someone speaks, the
+    slide closes or the night's hours end first, as the call itself would
+    be: the job's words stay with the voice no longer than its call. An applied pass with more records pending
     queues the scope's next pass (at most 4 a night).
   - Jobs are bounded: at most 16 (`tiers::NIGHT_JOBS`; a night that finds
     the queue full is not queued, counted `jobs_expired` and
@@ -1730,8 +1794,22 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   ask-first: no note, no limit on offers, and a `remember` it didn't ask
   for, that is no yes to the lamp's offer, writes nothing; the model is told
   `keep_quietly::NOT_SEEN` (nothing was kept, it may be someone else's, ask
-  them first, once), and the journal gets one line with no words. With the
-  switch, in a known person's own scope, on a line seen said by them:
+  them first, once), and the journal gets one line with no words.
+  **With `LAMP_KEEP_QUIETLY_ONE_FACE=on`** (on in the product unit, the
+  memory owner's call of 17 Nov, restating the single-user ruling of 10
+  Nov, "skip the mouth gate for memory": mouth detection blocks only a
+  forget's yes), a line no face was seen speaking counts as seen said by
+  them when their own known face is the only face in view through it (the
+  one-face count) or the line is carried in their conversation going on
+  (`LAMP_CONVERSATION_CARRIES`, no other face in view), and no other voice
+  was heard (`keep_quietly::alone`; the journal says "a quiet keep counts
+  as theirs (LAMP_KEEP_QUIETLY_ONE_FACE)"). The room's scope, an unknown or
+  another face seen speaking it, a second face in view, another voice and a
+  written turn stay ask-first; the heard-words check below still holds; and
+  the one-face forget's yes is unchanged. On lamp-06c1 (build 13706,
+  13:57:56) the owner's face alone in 34 of 34 looks, the line carried, had
+  a quiet keep refused as not seen. With the switch, in a known person's own
+  scope, on a line seen said by them:
   - **Words.** Beside the person's words the turn is told
     `keep_quietly::QUIET_NOTE`: a plain, lasting fact about their own life
     (a plan or a date, where they keep something) is kept by a `remember`
@@ -3487,7 +3565,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `days::forgetting_a_kept_thing_removes_its_day`,
   `days::a_kept_day_is_given_only_to_the_person_who_kept_it`.
 - **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
-  the second route only; off unless set). A Live session asks for the note
+  the second route only; off unless set, on in the product unit since the
+  owner's yes on 16 Nov, C20). A Live session asks for the note
   each time it connects. The second route asked only when the person
   changed or the worker restarted, so someone who talked to it last night
   and is the first known person this morning kept last night's note, and
@@ -3618,7 +3697,8 @@ night away).
   --nightly` runs one pass for a made-up person on a made-up day (12 lines)
   through the relay. With `LAMP_NIGHTLY_MEMORY` naming a lamp-memory binary
   with the nightly ops, it starts that binary on a fresh folder of its own
-  (never the lamp's memory), writes the day and prints Days' accepted and
+  (never the lamp's memory), made 0700 whatever the umask (C108: lamp-memory
+  refuses a store folder others can enter), writes the day and prints Days' accepted and
   dropped counts per kind and the reasons; without it, the model's proposed
   counts per kind.
 - **Tests:** `nightly::tests` (the hours, quiet and slide; people and days;
@@ -4188,7 +4268,19 @@ then use that person's scope:
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
-    lamp, known.
+    lamp, known. With `LAMP_NAME_LEARN_FIX=on` (on in the product unit, second
+    route only, #7331), a `remember` whose text gives the speaker's own name
+    (`known_faces::gives_a_name`, or `named::own_name_in` for the model's
+    "The user's name is Ada.", never "Her name is Linh.", which is someone
+    else's) is told instead to ask them "Shall I
+    remember your face as Ada?" and to call `remember_my_face` with that
+    name only after their yes (a new face is kept only on that yes,
+    `known_faces::ASK_FACE_FIRST`), so the eyes take a fresh look and judge the face
+    (`needs_face::withheld`, journal `TO_FACE_SAVE`, no words): on
+    lamp-74ff the owner's "my name is ..." came back not kept while a
+    recognition flicker held their face as nobody's. Any other personal
+    line is still not kept. Set it only with `LAMP_NAMES=checked` and the
+    eyes' who socket, which give the model that function.
   - **The observation pass keeps only what rests on the person's words**
     (finding M on #3504): `OBSERVE_PROMPT` says `heard` is the person's and
     `said` the lamp's, never to propose what only the lamp said, and to keep

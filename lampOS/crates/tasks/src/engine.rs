@@ -130,7 +130,12 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 ///
 /// 7: a target's engine may be `openclaw` (#6226). Only a state holding an
 /// OpenClaw task is written as 7, by the same rule.
-const SCHEMA: u32 = 7;
+///
+/// 8: a task's close may be `handed_on`, its session given on to a later
+/// task while its answer was untold (#7600): a build before would refuse
+/// two tasks on one agent. Only a state holding such a task is written as
+/// 8, by the same rule.
+const SCHEMA: u32 = 8;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -380,6 +385,11 @@ enum CloseState {
     /// Failed this time; tried again after [`CLOSE_RETRY_MS`], up to
     /// [`CLOSE_TRIES`].
     Failed,
+    /// Its session went on to a later task the router typed into it, while
+    /// its own answer was still untold (#7600, [`untold_on_join`]): kept
+    /// only for the voice to tell, never closed, read or followed here.
+    /// A store holding one is written as schema 8 ([`SCHEMA`]).
+    HandedOn,
 }
 /// The lamp closing the harness it started, once its result was told
 /// (#1390).
@@ -877,6 +887,36 @@ fn handed_on(task: &Task) -> bool {
             .as_ref()
             .is_some_and(|close| close.state == CloseState::Attempting)
 }
+/// Whether `task` gave its session on to a later one while its answer was
+/// untold ([`CloseState::HandedOn`], #7600).
+fn given_on(task: &Task) -> bool {
+    task.close
+        .as_ref()
+        .is_some_and(|close| close.state == CloseState::HandedOn)
+}
+/// Whether an earlier task giving its session to a joining one is kept for
+/// the voice (#7600, `LAMP_TASKS_ONE_SESSION` only): its newest kept answer
+/// is an idle one with words, kept in this boot at most
+/// [`WATCH_AT_MOST_MS`] ago, and untold, as [`Engine::launch_told`] reads
+/// told: no telling claimed or the claimed one still playing, and not told
+/// in the voice's own words. The voice lists only an answer kept in this
+/// boot (lamp-voice `newest_settled`), so one from an earlier boot goes.
+fn untold_on_join(task: &Task, now: &Clock) -> bool {
+    task.observations.last().is_some_and(|newest| {
+        newest.data.state == "idle"
+            && settled(&newest.data)
+            && newest.told.is_none()
+            && newest
+                .speech
+                .as_ref()
+                .is_none_or(|speech| speech.state == SpeechState::Claimed)
+            && newest.observed.boot_id == now.boot_id
+            && now
+                .monotonic_ms
+                .saturating_sub(newest.observed.monotonic_ms)
+                <= WATCH_AT_MOST_MS
+    })
+}
 fn digest(value: &impl Serialize) -> String {
     let bytes = serde_json::to_vec(value).expect("owned serializable data");
     Sha256::digest(bytes)
@@ -896,7 +936,7 @@ fn task_label(store_id: &str, id: u64) -> String {
 
 impl State {
     /// The `schema` this state is written with: the lowest that reads every
-    /// task in it: 7 with an OpenClaw task, 6 with a task joined on another
+    /// task in it: 8 with a task given on untold (#7600), 7 with an OpenClaw task, 6 with a task joined on another
     /// machine, 5 with a task whose launch names a session, 4 with a
     /// Hermes task, 3 with a Devin Cloud one, 2 with a Devin one, else
     /// [`OLDEST_SCHEMA`].
@@ -904,6 +944,9 @@ impl State {
         self.tasks
             .iter()
             .map(|task| {
+                if given_on(task) {
+                    return 8;
+                }
                 if task.launch.target.engine == EngineKind::Openclaw {
                     return 7;
                 }
@@ -972,7 +1015,11 @@ impl State {
             }
             prior_task = task.id;
             let d = &task.dispatch;
-            if d.agent_id.as_ref().is_some_and(|id| !agent_ids.insert(id))
+            // One task an agent, besides those that gave it on untold
+            // (#7600): kept only for the voice.
+            if d.agent_id
+                .as_ref()
+                .is_some_and(|id| !given_on(task) && !agent_ids.insert(id))
                 || d.creation_id
                     .as_ref()
                     .is_some_and(|id| !creation_ids.insert(id))
@@ -1347,10 +1394,19 @@ pub struct Engine<P: Persistence> {
     /// `serve --close-told` (#1390): only a task made while it is on is
     /// marked `closable`, so turning it on later closes no older task.
     close_told: bool,
+    /// `LAMP_TASKS_ONE_SESSION` on (#7600): a task giving its session to a
+    /// joining one is kept while its answer is untold ([`untold_on_join`]).
+    keep_untold: bool,
     /// `LAMP_HERMES_ON_LAMP` with the lamp looked at (#5978): while the
     /// lamp has no Hermes target yet (Hermes still installing), the
     /// targets answer says `"lamp":"installing"`.
     hermes_on_lamp: bool,
+    /// Just after a start or a sign-in, before the first look at the
+    /// targets has settled (`serve --set-up-later`: the targets file not
+    /// read yet, or the machines not read yet): the targets answer says
+    /// `"lamp":"starting"`, so a hand-over refused as no target is told the
+    /// lamp is still getting ready, not that nothing is set up.
+    starting: bool,
     /// The lamp's own engines, the default first, then the others in
     /// Harness's order (#6492, [`crate::runtime::lamp_order`]): a `prepare`
     /// naming an engine for the lamp runs on it only while it is here, and
@@ -1396,10 +1452,23 @@ impl<P: Persistence> Engine<P> {
         self.hermes_on_lamp = on;
     }
 
+    /// Whether the first look at the targets is still to settle
+    /// ([`Self::starting`]): set at a start with `serve --set-up-later`,
+    /// cleared once that look has settled.
+    pub fn starting(&mut self, starting: bool) {
+        self.starting = starting;
+    }
+
     /// Whether tasks made from now on are closed once told
     /// (`serve --close-told`).
     pub fn close_told(&mut self, on: bool) {
         self.close_told = on;
+    }
+
+    /// Whether a task giving its session to a joining one is kept while its
+    /// answer is untold (`LAMP_TASKS_ONE_SESSION`, #7600).
+    pub fn keep_untold(&mut self, on: bool) {
+        self.keep_untold = on;
     }
 
     /// The targets hand-overs use now (#5978: the machines a named
@@ -1572,7 +1641,9 @@ impl<P: Persistence> Engine<P> {
             failed: false,
             last_handover: None,
             close_told: false,
+            keep_untold: false,
             hermes_on_lamp: false,
+            starting: false,
             lamp_order: Vec::new(),
             lamp_default: None,
             kept_aside,
@@ -1805,6 +1876,11 @@ impl<P: Persistence> Engine<P> {
                     })
                 {
                     told["lamp"] = "installing".into();
+                }
+                // Before the first look settled, no target says nothing
+                // yet: the lamp is still starting.
+                if self.starting {
+                    told["lamp"] = "starting".into();
                 }
                 Some(told)
             }
@@ -2097,7 +2173,8 @@ impl<P: Persistence> Engine<P> {
             Request::Observe { id, .. } => {
                 let index = find(&self.state, *id)?;
                 let task = &next.tasks[index];
-                if task.dispatch.state != DispatchState::Accepted {
+                // One given on (#7600): its session is the later task's.
+                if task.dispatch.state != DispatchState::Accepted || given_on(task) {
                     return Err(err(
                         "unresolved",
                         "Only a task with an exact accepted agent ID can be observed.",
@@ -2245,6 +2322,114 @@ impl<P: Persistence> Engine<P> {
         })
     }
 
+    /// The queued tasks' launches, the next first (#7246's one session).
+    pub fn queued_launches(&self) -> Vec<&Launch> {
+        self.state
+            .tasks
+            .iter()
+            .filter(|task| task.dispatch.state == DispatchState::Queued)
+            .map(|task| &task.launch)
+            .collect()
+    }
+
+    /// Whether the task launched as `name` is done with its session: spent
+    /// (its answer read), not accepted, or no longer kept (#7246).
+    pub fn launch_answer(&self, name: &str) -> Option<&str> {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)?
+            .observations
+            .last()
+            .map(|seen| seen.data.answer.as_str())
+    }
+
+    /// Whether the launch `name` ended with its answer: its agent's last
+    /// read idle with words (#7246: else the lamp's pane is closed).
+    pub fn launch_answered(&self, name: &str) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .and_then(|task| task.observations.last())
+            .is_some_and(|seen| seen.data.state == "idle" && !seen.data.answer.trim().is_empty())
+    }
+
+    /// Whether the spoken task launched as `name` may give the lamp's one
+    /// pane (#7246) to the next turn: [`Engine::launch_done`], and its
+    /// answer told by the voice, or kept [`UNTOLD_CLOSE_MS`] ago (or in an
+    /// earlier boot) and still untold. #7258's P1-a: the next turn joined
+    /// to the pane takes over its agent id, and the store keeps one task an
+    /// agent, so a pane given on as soon as the answer was read lost that
+    /// answer before it was told.
+    pub fn launch_told(&self, name: &str, now: &Clock) -> bool {
+        let Some(task) = self
+            .state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+        else {
+            return true;
+        };
+        if !matches!(
+            task.dispatch.state,
+            DispatchState::Attempting | DispatchState::Accepted
+        ) {
+            return true;
+        }
+        if !spent(task) {
+            return false;
+        }
+        task.observations.last().is_none_or(|newest| {
+            newest.observed.boot_id != now.boot_id
+                || now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    >= UNTOLD_CLOSE_MS
+                || match &newest.speech {
+                    // A playout under way is not told yet.
+                    Some(speech) => speech.state != SpeechState::Claimed,
+                    None => newest.told.is_some(),
+                }
+        })
+    }
+
+    /// Whether the spoken task launched as `name` asks something (its
+    /// newest read `needs-input`) since at least [`UNTOLD_CLOSE_MS`] ago,
+    /// or since an earlier boot: it would hold the lamp's one pane for
+    /// good, since an accepted task is never cancelled and a question is
+    /// never spent (Heron's P1 on #7258).
+    pub fn launch_asking_past(&self, name: &str, now: &Clock) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .filter(|task| task.dispatch.state == DispatchState::Accepted)
+            .and_then(|task| task.observations.last())
+            .is_some_and(|newest| {
+                newest.data.state == "needs-input"
+                    && (newest.observed.boot_id != now.boot_id
+                        || now
+                            .monotonic_ms
+                            .saturating_sub(newest.observed.monotonic_ms)
+                            >= UNTOLD_CLOSE_MS)
+            })
+    }
+
+    pub fn launch_done(&self, name: &str) -> bool {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .is_none_or(|task| {
+                spent(task)
+                    || !matches!(
+                        task.dispatch.state,
+                        DispatchState::Attempting | DispatchState::Accepted
+                    )
+            })
+    }
+
     /// The returned job is permission for one invocation only. A caller that
     /// loses the return must reopen as uncertain, never obtain the job again.
     pub fn begin_launch(&mut self, now: &Clock) -> Result<Option<LaunchJob>, Error> {
@@ -2295,6 +2480,14 @@ impl<P: Persistence> Engine<P> {
         task.dispatch.attempted = None;
         task.updated = at;
         self.save(next)
+    }
+
+    /// The launch `task_id` put back in the queue, in its place, with
+    /// nothing sent (#7246): a spoken task the lamp's one pane could not
+    /// take within its short wait on the worker, tried again later. The
+    /// same move as [`Self::launch_again`].
+    pub fn put_back_launch(&mut self, task_id: u64, now: &Clock) -> Result<(), Error> {
+        self.launch_again(task_id, now)
     }
 
     pub fn finish_launch(
@@ -2354,13 +2547,64 @@ impl<P: Persistence> Engine<P> {
         // store keeps one task a session and this one watches and tells it.
         if let LaunchOutcome::Joined { agent_id: id, .. } = &outcome {
             let before = next.tasks.len();
-            next.tasks
-                .retain(|task| task.id == task_id || task.dispatch.agent_id.as_ref() != Some(id));
+            // `LAMP_TASKS_ONE_SESSION` (#7600): one whose answer is still
+            // untold is kept, given on, so the voice still tells it once;
+            // told, it goes at the next join, as any.
+            let keep = |task: &Task| self.keep_untold && untold_on_join(task, now);
+            next.tasks.retain(|task| {
+                task.id == task_id || task.dispatch.agent_id.as_ref() != Some(id) || keep(task)
+            });
+            let mut kept = 0;
+            for task in next.tasks.iter_mut().filter(|task| {
+                task.id != task_id && task.dispatch.agent_id.as_ref() == Some(id) && !given_on(task)
+            }) {
+                task.close = Some(Close {
+                    state: CloseState::HandedOn,
+                    tries: 0,
+                    attempted: at.clone(),
+                    finished: Some(at.clone()),
+                    code: None,
+                });
+                // A read not yet begun would read the session's new turn.
+                if let Some(read) = &mut task.read
+                    && read.state == ReadState::Requested
+                {
+                    read.state = ReadState::Failed;
+                    read.finished = Some(at.clone());
+                    read.code = Some("handed_on".into());
+                }
+                task.watch_idle = None;
+                task.background_since = None;
+                task.updated = at.clone();
+                kept += 1;
+            }
+            if kept > 0 {
+                eprintln!(
+                    "tasks: task {task_id} joins the session of {kept} earlier one(s) whose answer is still untold: kept for the voice"
+                );
+            }
             if next.tasks.len() < before {
                 eprintln!(
                     "tasks: task {task_id} takes over the session of {} earlier one(s)",
                     before - next.tasks.len()
                 );
+            }
+            if next.tasks.len() < before || kept > 0 {
+                // A receipt for a task given away here (the voice told its
+                // answer while this one was being typed) no longer
+                // describes the store: dropped, as a replaced read's is
+                // (`watch_read`), never a store that fails its own check.
+                // So is one whose answer a task kept here changed (#7600).
+                if next.last_receipt.as_ref().is_some_and(|receipt| {
+                    receipt_effect(&next, &receipt.request).is_err()
+                        || receipt_body(&next, &receipt.request)
+                            .map(|body| identity(body, &next.store_id, receipt.at.revision))
+                            .ok()
+                            .as_ref()
+                            != Some(&receipt.response)
+                }) {
+                    next.last_receipt = None;
+                }
             }
         }
         let index = find(&next, task_id)?;
@@ -2625,7 +2869,7 @@ impl<P: Persistence> Engine<P> {
                         .or(task
                             .close
                             .as_ref()
-                            .filter(|_| !closes_untold(task, now))
+                            .filter(|_| !closes_untold(task, now) && !given_on(task))
                             .map(|close| &close.attempted))
                 });
                 Some(Recent {
@@ -2942,7 +3186,7 @@ fn following(task: &Task, now: &Clock) -> bool {
     if task
         .close
         .as_ref()
-        .is_some_and(|close| close.state == CloseState::Closed)
+        .is_some_and(|close| matches!(close.state, CloseState::Closed | CloseState::HandedOn))
     {
         return false;
     }
@@ -2998,8 +3242,18 @@ fn identity(mut body: Value, store_id: &str, revision: u64) -> Value {
     body
 }
 fn task_metadata(task: &Task) -> Value {
-    json!({"id":task.id,"target_alias":task.target_alias,"prepare_request_id":task.prepare_request_id,"dispatch":task.dispatch,
-        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"close":task.close,"completion":"unverified"})
+    let mut metadata = json!({"id":task.id,"target_alias":task.target_alias,"prepare_request_id":task.prepare_request_id,"dispatch":task.dispatch,
+        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"close":task.close,"completion":"unverified"});
+    // Waiting for the lamp's one session (#7246): its place, 1 the next,
+    // so the voice can say the earlier task is being finished.
+    if task.dispatch.state == DispatchState::Queued
+        && let Some(position) = crate::one_session::LAMP
+            .get()
+            .and_then(|one| one.queued_place(&task.launch.name))
+    {
+        metadata["queued"] = json!({"position": position});
+    }
+    metadata
 }
 fn observation_metadata(observed: &Observed) -> Value {
     json!({"id":observed.id,"digest":observed.digest,"state":observed.data.state,"observed":observed.observed,
@@ -4096,6 +4350,79 @@ mod tests {
     /// session over once it is spent, so the follow-up watches and tells
     /// it, and is never closed. One the store still sees working (the router
     /// saw it idle) keeps it, and the follow-up is uncertain.
+    /// #7258's P1-a: a spoken task holds the lamp's one pane until its
+    /// answer is told, not only read: the next turn joined to the pane
+    /// would take its place in the store before it was told. Untold, it
+    /// gives the pane on after [`UNTOLD_CLOSE_MS`] (or a restart).
+    /// Heron's P1 on #7258: a spoken task whose agent asks something is
+    /// never spent, so it lets the lamp's pane go once its newest read has
+    /// asked for [`UNTOLD_CLOSE_MS`] (or since an earlier boot).
+    #[test]
+    fn a_pane_turn_asking_past_the_bound_lets_the_pane_go() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let name = engine.state.tasks[0].launch.name.clone();
+        assert!(!engine.launch_asking_past(&name, &clock(5)), "no read");
+        let job = request_read(&mut engine, id, 10);
+        let mut asking = data("");
+        asking.state = "needs-input".into();
+        asking.ask = Some("Allow the command?".into());
+        engine.finish_observation(&job, asking, &clock(10)).unwrap();
+        assert!(!engine.launch_told(&name, &clock(10 + UNTOLD_CLOSE_MS)));
+        assert!(!engine.launch_asking_past(&name, &clock(11)), "just asked");
+        assert!(engine.launch_asking_past(&name, &clock(10 + UNTOLD_CLOSE_MS)));
+        let mut other_boot = clock(11);
+        other_boot.boot_id = "another-boot".into();
+        assert!(engine.launch_asking_past(&name, &other_boot), "a restart");
+    }
+
+    #[test]
+    fn a_pane_turn_is_held_until_its_answer_is_told() {
+        let (mut engine, _) = opened();
+        let id = queued(&mut engine, 0);
+        let name = engine.state.tasks[0].launch.name.clone();
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert!(!engine.launch_told(&name, &clock(5)), "working");
+        let job = request_read(&mut engine, id, 10);
+        engine
+            .finish_observation(&job, data("It is 21 degrees outside."), &clock(10))
+            .unwrap();
+        assert!(engine.launch_done(&name));
+        assert!(!engine.launch_told(&name, &clock(11)), "read, not told");
+        assert!(
+            engine.launch_told(&name, &clock(10 + UNTOLD_CLOSE_MS)),
+            "bounded"
+        );
+        let mut other_boot = clock(11);
+        other_boot.boot_id = "another-boot".into();
+        assert!(engine.launch_told(&name, &other_boot), "a restart");
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, id, observation), &clock(12), true)
+            .unwrap();
+        assert!(!engine.launch_told(&name, &clock(13)), "being spoken");
+        engine
+            .handle(&acknowledgement(&engine, id, observation), &clock(14), true)
+            .unwrap();
+        assert!(engine.launch_told(&name, &clock(15)), "told");
+        assert!(engine.launch_told("gone", &clock(15)), "no longer kept");
+    }
+
     #[test]
     fn a_follow_up_takes_over_a_spent_tasks_session_and_never_a_working_one() {
         let join = |engine: &mut Engine<Memory>, at: u64| {
@@ -4176,6 +4503,227 @@ mod tests {
         engine.begin_close(&clock(13)).unwrap().unwrap();
         queued(&mut engine, 20);
         assert!(engine.begin_launch(&clock(20)).unwrap().is_none());
+    }
+
+    /// Seen on lamp-c0a4 (openharness#4393): the voice told the first
+    /// task's answer while the follow-up was being typed into its session.
+    /// The receipt then named the task the follow-up took over; the store
+    /// failed its own check and lamp-tasks exited. The receipt is dropped.
+    #[test]
+    fn a_follow_up_takes_over_a_session_told_while_it_was_typed() {
+        let (mut engine, memory) = opened();
+        let first = accepted(&mut engine, 0);
+        let job = request_read(&mut engine, first, 10);
+        let mut answer = data("A poem about coffee, in poem.txt.");
+        answer.ask = Some("Write a two-line poem about coffee.".into());
+        engine.finish_observation(&job, answer, &clock(10)).unwrap();
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, first, observation), &clock(11), true)
+            .unwrap();
+        let second = queued(&mut engine, 20);
+        engine.begin_launch(&clock(20)).unwrap().unwrap();
+        engine
+            .handle(
+                &acknowledgement(&engine, first, observation),
+                &clock(21),
+                true,
+            )
+            .unwrap();
+        engine
+            .finish_launch(
+                second,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(22),
+            )
+            .unwrap();
+        assert!(engine.state.tasks.iter().all(|task| task.id != first));
+        assert!(engine.state.last_receipt.is_none());
+        assert_eq!(stored(&memory).tasks.len(), 1);
+        assert!(engine.state.check().is_ok());
+    }
+
+    /// #7600 (lamp-c0a4, 18 Nov): in one session every spoken task joins
+    /// the same agent. A's idle answer waited untold (nobody seen, nothing
+    /// heard within 120 s), its pane was let go after [`UNTOLD_CLOSE_MS`],
+    /// and B's join took the session: A must stay listed with its answer,
+    /// no longer watched or read, until the voice tells it; told, the next
+    /// join drops it as before.
+    #[test]
+    fn a_joining_turn_keeps_an_earlier_answer_still_untold() {
+        let (mut engine, memory) = opened();
+        engine.keep_untold(true);
+        let first = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, first, "Purple.", 10);
+        let late = 10 + UNTOLD_CLOSE_MS + 1;
+        let name = engine.state.tasks[0].launch.name.clone();
+        assert!(engine.launch_told(&name, &clock(late)), "the pane let go");
+        let second = queued(&mut engine, late);
+        engine.begin_launch(&clock(late)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                second,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(late),
+            )
+            .unwrap();
+        let listed = engine
+            .handle(&Request::GetTask { id: first }, &clock(late + 1), false)
+            .expect("A is still listed");
+        assert_eq!(listed["observations"][0]["id"], observation);
+        let got = engine
+            .handle(
+                &Request::GetObservation {
+                    id: first,
+                    observation_id: observation,
+                },
+                &clock(late + 1),
+                false,
+            )
+            .unwrap();
+        assert_eq!(got["data"]["answer"], "Purple.");
+        assert_eq!(dispatch(&engine, second), DispatchState::Accepted);
+        let kept = &engine.state.tasks[find(&engine.state, first).unwrap()];
+        assert_eq!(kept.close.as_ref().unwrap().state, CloseState::HandedOn);
+        assert!(!following(kept, &clock(late + 1)), "no longer followed");
+        assert!(
+            engine
+                .watched(&clock(late + 1))
+                .iter()
+                .all(|watched| watched.task_id != first)
+        );
+        assert!(
+            engine
+                .handle(
+                    &Request::Observe {
+                        guard: guard(&engine, "observe"),
+                        id: first,
+                    },
+                    &clock(late + 1),
+                    false,
+                )
+                .is_err(),
+            "never read again: its session is B's"
+        );
+        assert!(engine.begin_close(&clock(late + 2)).unwrap().is_none());
+        assert_eq!(stored(&memory).tasks.len(), 2);
+        assert_eq!(stored(&memory).schema, 8, "a build before can't read it");
+        assert!(engine.state.check().is_ok());
+
+        // Told by the voice, then the next join drops it as any told one.
+        engine
+            .handle(
+                &Request::Told {
+                    guard: guard(&engine, "told"),
+                    id: first,
+                    observation_id: observation,
+                    session_id: engine.session_id().into(),
+                },
+                &clock(late + 3),
+                true,
+            )
+            .unwrap();
+        observe(&mut engine, second, "Green.", late + 4);
+        let third = queued(&mut engine, late + 5);
+        engine.begin_launch(&clock(late + 5)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                third,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(late + 5),
+            )
+            .unwrap();
+        assert!(engine.state.tasks.iter().all(|task| task.id != first));
+        // B's "Green." is untold in turn: kept, given on, for the voice.
+        assert_eq!(
+            engine
+                .state
+                .tasks
+                .iter()
+                .map(|task| task.id)
+                .collect::<Vec<_>>(),
+            [second, third]
+        );
+        assert!(engine.state.check().is_ok());
+    }
+
+    /// #7600: an earlier answer told by the voice is dropped at the join as
+    /// before, and with the switch off (a task each) an untold one is too.
+    #[test]
+    fn a_joining_turn_drops_an_earlier_told_answer() {
+        let join = |engine: &mut Engine<Memory>, at: u64| {
+            let next = queued(engine, at);
+            engine.begin_launch(&clock(at)).unwrap().unwrap();
+            engine
+                .finish_launch(
+                    next,
+                    LaunchOutcome::Joined {
+                        agent_id: AGENT.into(),
+                        session: None,
+                    },
+                    &clock(at),
+                )
+                .unwrap();
+            next
+        };
+        let late = 10 + UNTOLD_CLOSE_MS + 1;
+        // Told in the voice's own words.
+        let (mut engine, memory) = opened();
+        engine.keep_untold(true);
+        let first = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, first, "Purple.", 10);
+        engine
+            .handle(
+                &Request::Told {
+                    guard: guard(&engine, "told"),
+                    id: first,
+                    observation_id: observation,
+                    session_id: engine.session_id().into(),
+                },
+                &clock(11),
+                true,
+            )
+            .unwrap();
+        let second = join(&mut engine, late);
+        assert_eq!(
+            engine
+                .state
+                .tasks
+                .iter()
+                .map(|task| task.id)
+                .collect::<Vec<_>>(),
+            [second]
+        );
+        assert_eq!(stored(&memory).tasks.len(), 1);
+        // Its telling played.
+        let (mut engine, _) = opened();
+        engine.keep_untold(true);
+        told(&mut engine, "idle", 10);
+        let second = join(&mut engine, late);
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(engine.state.tasks[0].id, second);
+        // Switch off: untold, and still dropped, as before #7600.
+        let (mut engine, _) = opened();
+        let first = accepted(&mut engine, 0);
+        observe(&mut engine, first, "Purple.", 10);
+        let second = join(&mut engine, late);
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(engine.state.tasks[0].id, second);
+        assert!(engine.state.check().is_ok());
     }
 
     /// #1390: the harness this lamp started is closed once its answer is told,
@@ -5410,6 +5958,37 @@ mod tests {
             true,
         );
         assert!(installed.get("lamp").is_none());
+    }
+
+    /// Just after a start, before the first targets look settled, the
+    /// targets answer says the lamp is starting, and not once it settled:
+    /// then an empty list is "not set up" (or "installing") as before.
+    #[test]
+    fn the_targets_say_the_lamp_is_starting_before_the_first_look_only() {
+        let mut engine = Engine::open(
+            Memory::default(),
+            BTreeMap::new(),
+            STORE,
+            SESSION,
+            &clock(0),
+        )
+        .unwrap();
+        engine.hermes_on_lamp(true);
+        engine.starting(true);
+        let before = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert_eq!(before["lamp"], "starting", "{before}");
+        engine.starting(false);
+        let after = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert_eq!(after["lamp"], "installing", "{after}");
+        engine.hermes_on_lamp(false);
+        let after = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(after.get("lamp").is_none(), "{after}");
     }
 
     #[test]
@@ -7179,6 +7758,7 @@ mod tests {
             CloseState::Refused,
             CloseState::Left,
             CloseState::Failed,
+            CloseState::HandedOn,
         ];
         for value in close {
             match value {
@@ -7186,7 +7766,8 @@ mod tests {
                 | CloseState::Closed
                 | CloseState::Refused
                 | CloseState::Left
-                | CloseState::Failed => {}
+                | CloseState::Failed
+                | CloseState::HandedOn => {}
             }
         }
         let engine = [
@@ -7220,12 +7801,34 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                7,
+                8,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
-                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes openclaw"
+                 close: attempting closed refused left failed handed_on; engine: codex claude opencode devin devin-cloud hermes openclaw"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
+        );
+    }
+
+    /// #7246: a launch put back is queued again in its place, with nothing
+    /// sent: it is the next launch again, before a later task, and a launch
+    /// not attempted can't be put back.
+    #[test]
+    fn a_launch_put_back_is_queued_again_first_with_nothing_sent() {
+        let (mut engine, _) = opened();
+        let first = queued(&mut engine, 1);
+        let second = queued(&mut engine, 2);
+        let job = engine.begin_launch(&clock(3)).unwrap().unwrap();
+        assert_eq!(job.task_id, first);
+        assert_eq!(engine.queued_launches().len(), 1);
+        engine.put_back_launch(first, &clock(4)).unwrap();
+        assert_eq!(engine.queued_launches().len(), 2);
+        let again = engine.begin_launch(&clock(5)).unwrap().unwrap();
+        assert_eq!(again.task_id, first);
+        assert_eq!(again.launch, job.launch);
+        assert_eq!(
+            engine.put_back_launch(second, &clock(6)).unwrap_err().code,
+            "stale_job"
         );
     }
 }

@@ -51,6 +51,7 @@
     "/etc/lampOS/policy/jev.key",
     "/etc/lampOS/setup/backend.json",
     "/etc/lampOS/setup/reports.json",
+    "/etc/lampOS/setup/wifi-setup.json",
     "/etc/lampOS/setup/display-name",
     "/etc/lampOS/setup/voice",
     "/etc/lampOS/setup/character",

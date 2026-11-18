@@ -165,6 +165,16 @@ pub fn worded_on() -> bool {
     std::env::var(WORDED_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Where the second worker reads the switch for a light act told as under
+/// way ([`doing_claim`], #7285). `on` only, off by default, and it does
+/// nothing without [`ENVIRONMENT`].
+pub const DOING_ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_DOING";
+
+/// Whether [`DOING_ENVIRONMENT`] is on in this process's environment.
+pub fn doing_on() -> bool {
+    std::env::var(DOING_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// The executive's own lines after a light or volume call
 /// (`lamp_actions::short_say` and `already_say`): a test holds this equal
 /// to `lamp_actions::SAID_LINES` (the voice links lamp-actions only in its
@@ -511,6 +521,169 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     if undecided { None } else { Some(None) }
 }
 
+/// The most words a sentence telling the lamp's own act in progress has
+/// ([`doing_claim`]): "Warming that up." is 3 (13417), a story's
+/// "Warming his paws by the fire, the fox slept." is talk.
+const DOING_WORDS: usize = 6;
+
+/// The light's acts in its own words: each step function's name past
+/// `light_`, its comparative ending off ("warmer" is "warm", "dimmer" is
+/// "dimm"), and every colour `light_colour` takes, as the actions part
+/// declares them (`lamp_actions::catalog`). The lamp's own vocabulary for
+/// what it does, read from its functions, not a list of the model's
+/// phrasings.
+fn light_acts() -> &'static [String] {
+    static ACTS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    ACTS.get_or_init(|| {
+        let mut acts = Vec::new();
+        for function in lamp_actions::catalog(false, true) {
+            let Some(act) = function.name.strip_prefix("light_") else {
+                continue;
+            };
+            // "on" and "off" say nothing of a change on their own.
+            if act.len() > 3 {
+                acts.push(act.strip_suffix("er").unwrap_or(act).to_owned());
+            }
+            let colours = function
+                .parameters
+                .as_ref()
+                .and_then(|parameters| parameters.pointer("/properties/colour/enum"))
+                .and_then(serde_json::Value::as_array);
+            acts.extend(
+                colours
+                    .into_iter()
+                    .flatten()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(str::to_owned),
+            );
+        }
+        acts
+    })
+}
+
+/// The verbs that act on the light, as its functions say them
+/// (`lamp_actions::catalog`: "Make your own light a step warmer", "Switch
+/// your own light off", "set your own light to one of its colours", "can
+/// change colour", "turn"; and the steps themselves, warm, cool, dim,
+/// brighten): a test holds each to the catalog's own text. A reply's
+/// "-ing" opener counts only as one of these ([`doing_claim`]), so
+/// "Thinking about blue whales." and "Imagining a red sunset." are talk
+/// (the Reviewer-lead's P2 on #7352).
+// ponytail: "Making a red sunset." still reads as a light act; tie the
+// generic verbs (make, set, turn, switch, change) to an object if a
+// journal shows one.
+const LIGHT_VERBS: [&str; 9] = [
+    "warm", "cool", "dim", "brighten", "switch", "turn", "change", "make", "set",
+];
+
+/// Whether `word` is one of [`LIGHT_VERBS`] in "-ing": "warming",
+/// "making" (its 'e' off), "dimming", "setting" (its last letter doubled).
+fn is_light_verb(word: &str) -> bool {
+    let Some(stem) = word.strip_suffix("ing") else {
+        return false;
+    };
+    LIGHT_VERBS.iter().any(|verb| {
+        stem == *verb
+            || verb.strip_suffix('e') == Some(stem)
+            || stem
+                .strip_prefix(verb)
+                .is_some_and(|doubled| doubled.len() == 1 && verb.ends_with(doubled))
+    })
+}
+
+/// Whether `word` names one of the light's acts ([`light_acts`]), bare or
+/// inflected ("warming", "warmed", "brightening", "dimming").
+fn names_a_light_act(word: &str) -> bool {
+    light_acts().iter().any(|act| {
+        word.strip_prefix(act.as_str()).is_some_and(|rest| {
+            matches!(
+                rest,
+                "" | "er" | "ing" | "ed" | "s" | "en" | "ening" | "ened"
+            )
+        })
+    })
+}
+
+/// Whether `reply` tells the lamp's own light act as under way (#7285:
+/// lamp-52e6 core w2 on 13333, 13417 and 13495, "Hold on, hey Lamp, make
+/// the light a little warmer." answered in three words, 16 characters,
+/// with `calls=none`, said, and nothing warmed): its first sentence past
+/// lead words ([`LEAD_WORDS`], "Sure,") opens with a verb acting on the
+/// light in "-ing" ([`is_light_verb`]), bare or after "I'm", has at most
+/// [`DOING_WORDS`] words, names one of the
+/// light's acts ([`names_a_light_act`]: "Warming that up.", "Switching to
+/// blue."), is no '?' and says no "not" or "n't". Only the lamp's reply
+/// is read, never the person's line, so a story or talk that names a
+/// colour or a warmth ("A red fox lived alone.", "Cool, glad you like it.")
+/// is none: it opens with no act under way. `None` until that is known.
+pub fn doing_claim(reply: &str, ended: bool) -> Option<bool> {
+    let mut text = normalised(reply);
+    if ended {
+        text.truncate(text.trim_end().len());
+    }
+    let text = text.as_str();
+    let mut words = text
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .skip_while(|word| LEAD_WORDS.contains(word))
+        .peekable();
+    // The opening word whole: what follows it in the text.
+    let first = match words.peek() {
+        Some(word) => *word,
+        None => return if ended { Some(false) } else { None },
+    };
+    let after_first = |word: &str| {
+        let at = word.as_ptr() as usize - text.as_ptr() as usize + word.len();
+        ended || at < text.len()
+    };
+    if !after_first(first) {
+        return None;
+    }
+    let verb = if first == "i'm" {
+        words.next();
+        match words.peek() {
+            Some(word) if after_first(word) => *word,
+            Some(_) => return None,
+            None => return if ended { Some(false) } else { None },
+        }
+    } else {
+        first
+    };
+    if !is_light_verb(verb) {
+        return Some(false);
+    }
+    // The sentence the verb opens, to its mark.
+    let from = verb.as_ptr() as usize - text.as_ptr() as usize;
+    let rest = &text[from..];
+    let (sentence, mark) = match rest.find(['.', '!', '?']) {
+        Some(at) => (&rest[..at], rest[at..].chars().next()),
+        None if ended => (rest, None),
+        None => {
+            let so_far = rest
+                .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                .filter(|word| !word.is_empty())
+                .count();
+            return if so_far > DOING_WORDS {
+                Some(false)
+            } else {
+                None
+            };
+        }
+    };
+    let said: Vec<&str> = sentence
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .collect();
+    Some(
+        mark != Some('?')
+            && said.len() <= DOING_WORDS
+            && !said
+                .iter()
+                .any(|word| *word == "not" || word.ends_with("n't"))
+            && said.iter().any(|word| names_a_light_act(word)),
+    )
+}
+
 /// How `make_skill`'s own lines open (`made_skill::on_line`, its made but
 /// not on line).
 const MADE_OPENS: &str = "i made ";
@@ -607,16 +780,31 @@ pub fn claim_as(reply: &str, ended: bool, worded: bool) -> Option<Option<Claim>>
     }
 }
 
-/// [`claim_as`], and with `forget` (the line asks to forget) a forget said
-/// done ([`forget_claim`], [`Claim::Forgot`]) too. Without `forget` this is
-/// [`claim_as`] exactly.
-pub fn claim_on(reply: &str, ended: bool, worded: bool, forget: bool) -> Option<Option<Claim>> {
-    let found = claim_as(reply, ended, worded);
-    if !forget || matches!(found, Some(Some(_))) {
+/// [`claim_as`], with `forget` (the line asks to forget) a forget said
+/// done ([`forget_claim`], [`Claim::Forgot`]) too, and with `doing`
+/// ([`DOING_ENVIRONMENT`]) a light act told as under way ([`doing_claim`],
+/// [`Claim::LightOrVolume`]). Only the reply is read. Without either this
+/// is [`claim_as`] exactly.
+pub fn claim_on(
+    reply: &str,
+    ended: bool,
+    worded: bool,
+    forget: bool,
+    doing: bool,
+) -> Option<Option<Claim>> {
+    let mut found = claim_as(reply, ended, worded);
+    if forget && !matches!(found, Some(Some(_))) {
+        found = match (found, forget_claim(reply, ended)) {
+            (_, Some(true)) => Some(Some(Claim::Forgot)),
+            (Some(None), Some(false)) => Some(None),
+            _ => None,
+        };
+    }
+    if !doing || matches!(found, Some(Some(_))) {
         return found;
     }
-    match (found, forget_claim(reply, ended)) {
-        (_, Some(true)) => Some(Some(Claim::Forgot)),
+    match (found, doing_claim(reply, ended)) {
+        (_, Some(true)) => Some(Some(Claim::LightOrVolume)),
         (Some(None), Some(false)) => Some(None),
         _ => None,
     }
@@ -2567,6 +2755,87 @@ pub(crate) mod tests {
     }
 
     /// C88: a forget said done, and what says nothing went.
+    /// #7285: a light act told as under way, from the reply alone; decided
+    /// at its first word when that is no act, and at its sentence's end
+    /// otherwise.
+    #[test]
+    fn a_light_act_told_as_under_way_is_a_claim() {
+        for reply in [
+            "Warming that up.",
+            "Sure, warming it up.",
+            "Okay. I'm dimming the light!",
+            "Switching to blue",
+            "Brightening it up.",
+        ] {
+            assert_eq!(doing_claim(reply, true), Some(true), "{reply}");
+            assert_eq!(
+                claim_on(reply, true, false, false, true),
+                Some(Some(Claim::LightOrVolume)),
+                "{reply}"
+            );
+            assert_eq!(claim_on(reply, true, false, false, false), Some(None));
+        }
+        assert_eq!(doing_claim("Warming", false), None);
+        assert_eq!(doing_claim("Warming that", false), None);
+        assert_eq!(doing_claim("A red", false), Some(false));
+        assert_eq!(doing_claim("Okay", false), None);
+        for reply in [
+            "A red fox lived alone.",
+            "Cool, glad you like it.",
+            "Blue skies are lovely.",
+            "Continuing the story.",
+            "Warming his paws by the fire, the fox slept.",
+            "Warming it isn't possible.",
+            "Warming it up?",
+            "Okay.",
+            // The Reviewer-lead's P2 on #7352: no verb acting on the light.
+            "Thinking about blue whales.",
+            "Imagining a red sunset.",
+            "Thinking of something warm.",
+            "Wondering about green hills.",
+            "Picturing a warm beach.",
+        ] {
+            assert_eq!(doing_claim(reply, true), Some(false), "{reply}");
+        }
+        assert_eq!(doing_claim("Thinking", false), None);
+        assert_eq!(doing_claim("Thinking about", false), Some(false));
+        for word in [
+            "warming",
+            "cooling",
+            "dimming",
+            "brightening",
+            "making",
+            "setting",
+        ] {
+            assert!(is_light_verb(word), "{word}");
+        }
+        for word in [
+            "thinking",
+            "imagining",
+            "wondering",
+            "picturing",
+            "sing",
+            "settling",
+        ] {
+            assert!(!is_light_verb(word), "{word}");
+        }
+    }
+
+    /// Each of [`LIGHT_VERBS`] is said by the light's own functions, in a
+    /// name or a description ("brighten" as `light_brighter`'s "brighter").
+    #[test]
+    fn every_light_verb_is_in_the_light_catalog() {
+        let text: String = lamp_actions::catalog(false, true)
+            .iter()
+            .map(|function| format!("{} {} ", function.name, function.description))
+            .collect::<String>()
+            .to_lowercase();
+        for verb in LIGHT_VERBS {
+            let root = verb.strip_suffix("en").unwrap_or(verb);
+            assert!(text.contains(root), "{verb}");
+        }
+    }
+
     #[test]
     fn a_forget_said_done_is_read_from_its_first_sentence() {
         for reply in [
@@ -2579,13 +2848,13 @@ pub(crate) mod tests {
         ] {
             assert_eq!(forget_claim(reply, true), Some(true), "{reply}");
             assert_eq!(
-                claim_on(reply, true, false, true),
+                claim_on(reply, true, false, true, false),
                 Some(Some(Claim::Forgot)),
                 "{reply}"
             );
             // Not on a line that does not ask to forget.
             assert_ne!(
-                claim_on(reply, true, false, false),
+                claim_on(reply, true, false, false, false),
                 Some(Some(Claim::Forgot))
             );
         }

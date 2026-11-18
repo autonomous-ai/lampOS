@@ -143,8 +143,7 @@ struct OwnMemory {
 impl OwnMemory {
     fn start(binary: &Path) -> io::Result<(Self, PathBuf)> {
         let dir = std::env::temp_dir().join(format!("lamp-nightly-probe-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(dir.join("store"))?;
+        private_folder(&dir)?;
         let socket = dir.join("memory.sock");
         let child = std::process::Command::new(binary)
             .args(["--dir"])
@@ -169,6 +168,25 @@ impl OwnMemory {
         ))
     }
 }
+/// `dir` made afresh with its `store`, each 0700 whatever the umask:
+/// lamp-memory refuses a store folder its group or everyone can enter
+/// (`store::private_dir`). Under the default umask the probe's was 755 and
+/// its own lamp-memory never answered (C108, lamp-06c1, 10 Nov: it ran only
+/// under `umask 077`).
+fn private_folder(dir: &Path) -> io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    let _ = std::fs::remove_dir_all(dir);
+    let store = dir.join("store");
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&store)?;
+    for folder in [dir, store.as_path()] {
+        std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
 impl Drop for OwnMemory {
     fn drop(&mut self) {
         let _ = self.child.kill();
@@ -310,6 +328,25 @@ mod tests {
             LINES.len()
         );
         assert_eq!(prepared.input["person"], PERSON);
+    }
+
+    /// C108: the probe's folder and its store are its owner's alone, even
+    /// made afresh over a folder others could enter, so its own lamp-memory
+    /// takes the store under the default umask.
+    #[test]
+    fn the_probes_own_folder_is_its_owners_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("c108-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("store")).unwrap();
+        for folder in [dir.clone(), dir.join("store")] {
+            std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        private_folder(&dir).unwrap();
+        for folder in [dir.clone(), dir.join("store")] {
+            let mode = std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o700, "{}", folder.display());
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

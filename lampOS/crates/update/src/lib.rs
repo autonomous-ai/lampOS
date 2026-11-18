@@ -32,6 +32,7 @@ pub mod manifest;
 pub mod models;
 pub mod openclaw_install;
 pub mod own;
+pub mod preinstall;
 pub mod product_skills;
 pub mod publish;
 pub mod quiet;

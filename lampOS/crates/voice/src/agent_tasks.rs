@@ -181,6 +181,12 @@ const LOOK_AGAIN: Duration = Duration::from_millis(250);
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
 /// only.
 pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
+/// Where the second route reads whether a spoken line whose own words name
+/// an agent for the work ([`named_for_work`]: "Hey Lamp, OpenClaw, look up
+/// the weather in Hanoi this weekend") is handed to that agent in code as
+/// round 1, before the model may answer it with the voice's own tools
+/// (#7269). `on` only; off unless set.
+pub const NAMED_AGENT_TAKES_LINE_ENVIRONMENT: &str = "LAMP_NAMED_AGENT_TAKES_LINE";
 /// Signing the lamp's Harness in by voice (#1676, [`crate::sign_in`]):
 /// `on`, and nothing else. Needs `lamp-tasks serve --sign-in-by-code`.
 pub const SIGN_IN_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN";
@@ -292,6 +298,17 @@ const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that 
 /// the lamp is switched on but not installed yet) and no target of the
 /// engine asked for is there: never that a computer needs setting up.
 const LAMP_INSTALLING: &str = "The lamp's own helper is still being installed (it sets itself up in a quiet moment), so nothing was handed over. Say so plainly in a few words.";
+
+/// What the model is told when the tasks part answers `"lamp":"starting"`
+/// (just after a start or a sign-in, before its first targets look
+/// settled) and no target of the engine asked for is there yet: the lamp is
+/// still getting ready, never that something needs setting up.
+fn lamp_starting() -> Value {
+    json!({"error": format!(
+        "The lamp is still getting ready, so nothing was handed over. Tell them in these words, and nothing more: \"{}\"",
+        crate::skill_words::NOT_READY_LINE
+    )})
+}
 
 /// The task prepared and not yet started.
 #[derive(Clone, Debug)]
@@ -1408,6 +1425,18 @@ pub(crate) fn lamp_engines_in(answer: &Value) -> Option<Vec<String>> {
     Some(engines)
 }
 
+/// Whether the targets answer says for sure there is no agent on the lamp
+/// (#7375): the tasks part answered `ok` with its targets, and none is the
+/// lamp's own. A tasks part that is down, slow or refused (`ok:false`), or
+/// an answer with no targets list, says nothing either way: `false`. A
+/// `lamp` target with an engine that is no plain id is not sure either.
+pub(crate) fn surely_no_lamp_target(answer: &Value) -> bool {
+    answer.get("ok") == Some(&json!(true))
+        && answer["targets"]
+            .as_array()
+            .is_some_and(|targets| !targets.iter().any(|target| target["alias"] == LAMP_TARGET))
+}
+
 /// The lamp's own target in the targets answer (#5978, #6226): the name
 /// the person calls its default engine by, or `None` without it.
 pub(crate) fn lamp_target_in(answer: &Value) -> Option<&'static str> {
@@ -1445,6 +1474,11 @@ fn staff_now(place: &Place) -> Vec<Member> {
 /// Whether [`NAMED_ASK_ENVIRONMENT`] is `on`.
 pub fn named_ask_on() -> bool {
     std::env::var(NAMED_ASK_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// Whether [`NAMED_AGENT_TAKES_LINE_ENVIRONMENT`] is `on`.
+pub fn named_agent_takes_line_on() -> bool {
+    std::env::var(NAMED_AGENT_TAKES_LINE_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
 /// The asking words that need no "to" after the name when the person asks
@@ -2541,6 +2575,9 @@ enum Missing {
     /// None of that engine, and the lamp's own Hermes still installing
     /// (`"lamp":"installing"`, #5978).
     LampInstalling,
+    /// None of that engine yet, as the tasks part is still starting
+    /// (`"lamp":"starting"`): its first targets look hasn't settled.
+    Starting,
     /// Who is there couldn't be read: answered as any other refusal.
     Unread,
 }
@@ -2561,7 +2598,7 @@ fn missing_target(
     engine: &str,
     deadline: Duration,
 ) -> Missing {
-    let mut installing = false;
+    let (mut installing, mut starting) = (false, false);
     let Some(there) = ask(
         &place.directory.join("request.sock"),
         &json!({"op":"targets"}),
@@ -2570,6 +2607,7 @@ fn missing_target(
     .as_ref()
     .and_then(|answer| {
         installing = answer.get("lamp") == Some(&json!("installing"));
+        starting = answer.get("lamp") == Some(&json!("starting"));
         // Kept as the staff only where the staff are used ([`WHO_FLAG`]).
         if place.machine_names
             && let Some(names) = names_from(answer)
@@ -2602,6 +2640,7 @@ fn missing_target(
             );
             Missing::Use((*one).clone())
         }
+        [] if starting => Missing::Starting,
         [] if installing => Missing::LampInstalling,
         _ => Missing::NotSetUp,
     }
@@ -4660,6 +4699,7 @@ fn run_for_asked(
                     }
                     Missing::NotSetUp => return (not_set_up(who), true),
                     Missing::LampInstalling => return (json!({"error": LAMP_INSTALLING}), true),
+                    Missing::Starting => return (lamp_starting(), true),
                     Missing::Unread => {}
                 }
             }
@@ -12770,6 +12810,41 @@ pub(crate) mod tests {
         assert_eq!(rest.as_deref(), Some("make a file"));
     }
 
+    /// #7269 (lamp-9b34, 13373): a lamp engine named first in the line for
+    /// something the voice has its own function for (the weather) is the
+    /// doer, as said and as "Open Claw"; the lamp's name alone, an unnamed
+    /// ask and a question about an agent name none.
+    #[test]
+    fn a_named_agent_asked_about_the_weather_is_the_doer() {
+        let engines = ["openclaw".to_owned(), "hermes".to_owned()];
+        let staff = ["Claude Code"];
+        let mut wrong: Vec<String> = Vec::new();
+        for (heard, agent) in [
+            (
+                "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend",
+                Some("OpenClaw"),
+            ),
+            (
+                "Hey Lamp. Hey Lamp, Open Claw, look up the weather in Hanoi this weekend.",
+                Some("OpenClaw"),
+            ),
+            ("Ask OpenClaw to look up the weather", Some("OpenClaw")),
+            // Named none.
+            ("Hey Lamp, what's the weather tomorrow?", None),
+            ("Look up the weather in Hanoi this weekend", None),
+            ("What is OpenClaw?", None),
+            ("Is Hermes running?", None),
+            ("Hermes, what time is it?", None),
+            ("Hey Lamp, how are you?", None),
+        ] {
+            let got = named_for_work_in(heard, &engines, &staff);
+            if got.as_deref() != agent {
+                wrong.push(format!("{heard}: {got:?}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     /// #6492: the lamp's engines are whatever the tasks part reports there,
     /// the default first, each once; an older tasks part with no `engines`
     /// gives the default alone; an engine that is no plain id is not kept;
@@ -12798,6 +12873,29 @@ pub(crate) mod tests {
             lamp_engines_in(&json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})),
             None
         );
+    }
+
+    /// #7375: only a tasks part that answered its targets with no `lamp`
+    /// one says there is surely no agent; a refused, empty or odd answer
+    /// says nothing, nor does a `lamp` target with a bad engine.
+    #[test]
+    fn no_lamp_target_is_sure_only_from_an_answered_targets_list() {
+        assert!(surely_no_lamp_target(&json!({"ok":true,"targets":[]})));
+        assert!(surely_no_lamp_target(
+            &json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]})
+        ));
+        for unsure in [
+            json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]}),
+            json!({"ok":true,"targets":[{"alias":"lamp","engine":""}]}),
+            json!({"ok":false,"error":"busy"}),
+            json!({"ok":false,"targets":[]}),
+            json!({"ok":true}),
+            json!({"ok":true,"targets":"lamp"}),
+            json!({"ok":"true","targets":[]}),
+            Value::Null,
+        ] {
+            assert!(!surely_no_lamp_target(&unsure), "{unsure}");
+        }
     }
 
     /// #6492: an engine is said by its known name, else its id with a
@@ -13610,6 +13708,19 @@ pub(crate) mod tests {
         );
         assert_ne!(used, json!({"error": LAMP_INSTALLING}), "{used}");
         assert_eq!(prepares.last(), Some(&json!("office-claude")), "{used}");
+        // Just after a start, before the tasks part's first targets look:
+        // the lamp is still getting ready, never "not set up".
+        let (starting, prepares) = told(json!({"ok":true,"targets":[],"lamp":"starting"}), false);
+        assert_eq!(starting, lamp_starting());
+        assert!(
+            starting["error"]
+                .as_str()
+                .unwrap()
+                .contains(crate::skill_words::NOT_READY_LINE),
+            "{starting}"
+        );
+        assert_ne!(starting, not_set_up("Claude Code"));
+        assert_eq!(prepares.len(), 1, "nothing prepared after: {prepares:?}");
         let _ = std::fs::remove_dir_all(&directory);
     }
 

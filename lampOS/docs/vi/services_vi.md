@@ -90,6 +90,14 @@ một kỹ năng hay của chính đèn, một tin nhắn văn bản) được b
 cũng không gì được gọi, nên khi ở chế độ riêng tư, micro tắt, không dịch vụ
 nào được lấy dữ liệu.
 
+Một đèn được thiết lập trước khi onboarding giữ `owner` chỉ có tên gõ lúc
+setup làm chủ: khi khuôn mặt của chủ đèn được giữ dưới một tên khác, câu nói
+của chính họ bị coi là «của khách» ở đây, và ngoài phòng riêng không gì được
+đọc hay ghi cho họ. Với `LAMP_OWNER_LINK=on` (tắt trừ khi được bật, #7501),
+câu «I'm <tên đã gõ>» của chính họ, khi chỉ có một mình trong khung và được
+thấy đang nói, liên kết khuôn mặt đó làm chủ đèn, và `person::owner_ids` giữ
+cả hai id ([memory.md](../memory.md), "The owner's face and typed name").
+
 Khuôn mặt trong tầm nhìn cho biết ai đang ở tại đèn; nó không cho biết ai đã
 nói (một người thân nói ngoài khung hình vẫn nằm trong lease của chủ đèn). Vì
 vậy một câu chỉ được tính là của chủ đèn cho một lần ghi hay một lần đọc đầy
@@ -143,14 +151,15 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
-| `LAMP_CALENDAR_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
+| `LAMP_CALENDAR_EDITS=on` (bật trong `lamp-services.service` của sản phẩm từ 11/11) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
+| `LAMP_CALENDAR_EVENT_SEARCH=on` (dòng C132 của bảng theo dõi; tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_CALENDAR_EDITS=on` | Một lần đọc `events` của Calendar không nhận từ nào: `query` bị bỏ qua, và lần đọc liệt kê các sự kiện kế tiếp từ lúc bắt đầu, nên một sự kiện cách vài tuần hay nằm sau một ngày bận không bao giờ được tìm thấy để dời hay huỷ ("Tìm một sự kiện để dời hay huỷ", bên dưới) |
 | `LAMP_GMAIL_DRAFT_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_draft` và `delete_draft` của `service_write` là action không biết, được trả lời bằng danh sách lệnh ghi của Gmail như mọi action khác ("gmail writes: send_mail …, save_draft …") trước khi bất cứ gì được đọc, giữ hay lưu, và `tools.json` chỉ liệt kê `send_mail` và `save_draft` cho Gmail ("Đổi hoặc xoá một bản nháp Gmail đã lưu", bên dưới) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, tắt trong sản phẩm cho đến khi chạy các hàng kiểm tra) | `lamp-services` | `tools.json` nêu mọi dịch vụ đèn có thể liên kết, dù đã liên kết hay chưa, cùng mọi trường của mọi lệnh đọc và ghi (khoảng 7,8 KB của yêu cầu gửi mô hình). Bật thì chỉ nêu các dịch vụ đã liên kết: mã của chúng trong enum `service`, dòng của chúng trong danh sách đọc và ghi, và chỉ các trường những dòng đó nêu (luôn có `service`, `what`, `action`, `send_id`, `said`). Hàm đọc hay ghi mà không dịch vụ đã liên kết nào có thì bị bỏ, nên khi chưa liên kết gì giọng nói chỉ được đưa `services_connected`, hàm này vẫn nói đèn có thể liên kết những gì. File được ghi lúc khởi động và ghi lại sau mỗi lần liên kết, huỷ liên kết và xoá hết trên socket quản trị, mỗi lần một lượt ghi dưới một khoá (danh sách mới nhất luôn thắng, file không bao giờ bị ghi dở); giọng nói đọc nó cho mỗi yêu cầu, nên liên kết có hiệu lực từ lượt sau. Đo offline trên lượt nói của sản phẩm: 49.064 B với mọi dịch vụ, 46.522 B với Gmail và Lịch, 45.539 B chỉ với Gmail, 43.249 B khi chưa liên kết gì. **Tắt trong mọi máy sản phẩm cho đến khi đạt một điều kiện riêng tư (bài đọc #6476):** file được khai báo cho mọi yêu cầu, dù ai nói, nên khi bật, dòng của khách, của phòng, dòng bị giữ, tin nhắn từ ứng dụng và lượt theo lịch đều thấy mã các dịch vụ đã liên kết, trong khi "Giọng nói được cho biết những gì đã liên kết" chỉ cho dòng của chủ biết. Chỉ bật sau khi các dòng không phải của chủ được đưa toàn bộ danh mục (hoặc chỉ `services_connected`), hoặc sau khi người phụ trách bộ nhớ và riêng tư chấp nhận bằng văn bản rằng tên dịch vụ đã liên kết đến mọi dòng, và dòng này nói rõ điều đó |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
-| `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; tắt trong mọi unit của sản phẩm) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; bật trong unit lamp-voice của sản phẩm, cùng #6410) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -336,6 +345,26 @@ kiện 15:00 +07:00 trả về là 15:00 +07:00. Thiếu nó, Calendar trả l�
 giờ của chính lịch, và trên lamp-9adf ngày 5/11 lúc 00:27 một sự kiện như vậy
 trả về là 08:00Z và bị nói thành "8 to 9 AM your time". Khi múi giờ không có
 tên, không hỏi gì, như trước.
+
+Lần đọc một sự kiện mà một lần sửa làm trước khi đọc lại (`writes::event_read`)
+cũng hỏi như vậy, nên một lần dời hay hủy đọc lại giờ của sự kiện là
+22:00 +07:00. Thiếu nó, trên lamp-06c1 ngày 12/11, một lần dời đã đọc lại "now
+from 2026-11-13T15:00:00Z" cho một sự kiện 22:00 +07:00.
+
+**Lời đọc lại nói giờ như đèn nói một giờ** (`writes::Clock`): lời đọc lại
+khi tạo, dời hay hủy một sự kiện không bao giờ mang RFC 3339. Mỗi giờ được
+nói theo múi giờ của chính đèn (múi giờ hệ thống, `lamp_local_time`) ở độ lệch
+của chính thời điểm đó, nên một sự kiện tháng Tư đọc vào tháng Mười Một nói
+đúng giờ của nó qua một lần đổi giờ mùa hè, theo đồng hồ 12 giờ, so với hôm nay: "today at
+10:00 pm", "tomorrow at 9:00 am", "yesterday at …", một thứ trong sáu ngày
+tới ("Saturday at 3:00 pm"), còn lại là thứ và ngày ("Friday 4 December at
+3:00 pm", kèm năm khi là năm khác). Giờ kết thúc cùng ngày chỉ nói giờ
+("today at 10:00 pm to 11:00 pm"); sự kiện cả ngày nói "all day" và ngày của
+nó, hoặc "all day from <ngày đầu> to <ngày cuối>" khi kéo dài nhiều ngày. Khi
+không biết múi giờ, một giờ được nói theo độ lệch của chính nó và mọi ngày nói
+bằng ngày tháng ("Tuesday 17 November 2026"), không bao giờ đoán là "today". Giờ RFC 3339 vẫn nằm trong lệnh gửi cho Google. Trên lamp-06c1 ngày 17/11
+(bản 13753), năm trên năm lời đọc lại khi dời và hủy đã nói to
+"2026-11-17T22:00:00+07:00", vì giọng nói được bảo đọc `read_back` nguyên văn.
 
 Một lệnh gọi có thể gọi tên mã Gmail nào cũng được: `gmail` hay `gmail-app`
 đều đến liên kết Gmail mà đèn đang có, vì mô hình của giọng nói dùng lẫn hai
@@ -857,7 +886,11 @@ mọi câu trả lời (mọi cách viết, thuần hay mã hoá URL).
 Mỗi `service_read` có một dòng nhật ký (`serve::read_said`, #5826): ai hỏi,
 mã dịch vụ và loại đọc, và kết quả ra sao, như
 "lamp-services: the voice's service_read of gmail search: found 2". Loại
-đọc là một `what` chỉ gồm chữ thường và `_`, nếu không thì "another"; kết
+đọc là chính `what` khi nó là một trong các loại đọc của dịch vụ
+(`reads::kinds`; khi không biết dịch vụ, của bất kỳ dịch vụ nào), "no what"
+khi không có, nếu không thì chỉ hình dạng của nó (#7498): "a what of 16
+characters, no service's kind" hoặc "a what of 6 characters, another
+service's kind", không bao giờ là chữ của nó; kết
 quả là "found N" (số mục được trích dẫn và bị bỏ ra), "none", "answered"
 (của một công cụ MCP), "refused: <lý do>" bằng các chữ cố định (a send-only
 link, not linked, its link has expired, a service the lamp can't link, no
@@ -1232,7 +1265,8 @@ this change"). Mọi 401 hoặc 403 khác giữ lời của nó.
 ### Đổi hoặc huỷ một sự kiện lịch (`LAMP_CALENDAR_EDITS`)
 
 Tắt trừ khi `LAMP_CALENDAR_EDITS=on` và `LAMP_SERVICES_WRITE=on` trong
-`lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn). Khi bật,
+`lamp-services` (cả hai bật trong `lamp-services.service` của sản phẩm từ
+11/11; một drop-in đặt `LAMP_CALENDAR_EDITS=off` sẽ tắt nó). Khi bật,
 các action của Google Calendar trong `tools.json` thêm `update_event
 {event_id, title, start, end, text, calendar}` và `delete_event {event_id,
 calendar}` (`writes::CALENDAR_EDITS`), và `service_write` nhận một
@@ -1254,7 +1288,8 @@ ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nh�
   đọc đúng sự kiện đó (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
   trong danh sách đọc của Calendar), rồi đọc lại tiêu đề và giờ hiện tại, điều
   gì thay đổi và ai được báo: "Change the event "Hamburger party" on your
-  Google Calendar (primary), now from … to …: move it to … to …. Its guests,
+  Google Calendar (primary), now from today at 10:00 pm to 11:00 pm: move it
+  to tomorrow at 9:00 am to 9:30 am. Its guests,
   …, are told by email. Seen by whoever your calendar is shared with." hoặc
   "Delete the event "Hamburger party", now from … to …, from your Google
   Calendar (primary). … The lamp can't bring it back." Chữ của chính sự kiện
@@ -1294,6 +1329,45 @@ ghi không còn chỗ cho chúng trong 1.024 byte mà liên kết của nó nh�
   Calendar: it was deleted or changed there, and nothing was changed. Say
   it's no longer there, and offer to create it again with create_event."
   (sau "not sent: " ở một lần gửi). Không gì được giữ.
+
+### Tìm một sự kiện để dời hay huỷ (`LAMP_CALENDAR_EVENT_SEARCH`)
+
+Dòng C132 của bảng theo dõi. Một sự kiện được tạo trong một cuộc nói chuyện
+trước không có `event_id` trong cuộc nói chuyện, nên "huỷ lịch nha sĩ của
+tôi" phải đọc lịch trước, mà một lần đọc `events` của Calendar không nhận từ
+nào: nó liệt kê các sự kiện kế tiếp từ lúc bắt đầu, nhiều nhất 10, và
+`LAMP_SERVICE_READ_IDS_KEPT` chỉ giữ 5 cái đầu. Một sự kiện cách vài tuần,
+hay nằm sau một ngày bận, không bao giờ có trong danh sách.
+
+Tắt trừ khi `LAMP_CALENDAR_EVENT_SEARCH=on` và `LAMP_CALENDAR_EDITS=on`
+trong `lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn).
+Khi bật, một lần đọc `events` của Google Calendar có thể mang `query`, lời
+của người đó (một dòng, nhiều nhất 300 ký tự, như tìm kiếm của Gmail và
+Drive), được hỏi bằng `q` của chính Calendar (`reads::plan_with`):
+
+- **Một khoảng thời gian có giới hạn.** Từ `from` được hỏi, hoặc bây giờ,
+  không sớm hơn một ngày trước (`reads::EVENT_SEARCH_BACK_SECS`), đến `to`
+  được hỏi, hoặc 90 ngày sau lúc bắt đầu đó, không muộn hơn
+  (`reads::EVENT_SEARCH_AHEAD_SECS`); cả hai gửi theo UTC, câu trả lời vẫn
+  theo múi giờ của đèn. Một lúc kết thúc trước lúc bắt đầu bị từ chối trước
+  khi hỏi Calendar (`reads::EVENT_SEARCH_WINDOW`).
+- **Không có từ nào** thì lần đọc như trước, dù công tắc bật hay tắt. Khi
+  tắt, `query` không đổi gì.
+- **Điều mô hình được cho biết.** Trường `query` của `tools.json` nói rằng,
+  với `events` của `google_calendar`, đó là lời của người đó cho đúng một
+  sự kiện cần dời hay huỷ (`reads::CALENDAR_SEARCH_QUERY`); mô tả của chính
+  lần đọc, ở mức 1.024 byte, không đổi. Khi bật `LAMP_SERVICES_LINKED_TOOLS`
+  và chỉ liên kết lịch, lần đọc vẫn giữ trường `query`.
+- **Mọi thứ khác giữ nguyên.** Lần đọc là một lần đọc: chỉ của chủ đèn như
+  mọi lần đọc dịch vụ, được trích như dữ liệu, và quy tắc sau khi đọc ("Sau
+  một lần đọc", bên dưới) vẫn từ chối một lần ghi trong chính yêu cầu đó.
+  Khi bật `LAMP_SERVICE_READ_IDS_KEPT`, các sự kiện nó tìm thấy được giữ cho
+  yêu cầu kế tiếp của người hỏi (id, lịch, tiêu đề, thời gian, 5 cái đầu),
+  nên "ừ, huỷ đi" nêu sự kiện bằng id của nó, và thay đổi được đọc từ
+  Google, đọc lại và gửi khi nghe đồng ý như ở trên. `q` của Calendar cũng
+  khớp với mô tả, địa điểm hay khách mời của sự kiện, nhưng chỉ id, tiêu đề
+  và thời gian được giữ hay được nói. Lời đó chỉ đến lịch đã liên kết của
+  chính chủ đèn, và không có gì mới được lưu.
 
 ### Đổi hoặc xoá một bản nháp Gmail đã lưu (`LAMP_GMAIL_DRAFT_EDITS`)
 
@@ -1794,8 +1868,9 @@ bị bỏ cùng `says_send`), và nó được lưu, không bao giờ được g
   của phiên Live đó, mà mô hình giữ đến hết phiên; chỉ luồng hội thoại và
   những gì dựng từ nó là không có nó.
 - **Mã sự kiện của một lần đọc lịch, giữ cho yêu cầu kế tiếp
-  (`LAMP_SERVICE_READ_IDS_KEPT`, tắt trừ khi bật; tắt trong sản phẩm cho
-  đến khi qua kiểm tra trên đèn; dòng C132 của bảng theo dõi).** Trên
+  (`LAMP_SERVICE_READ_IDS_KEPT`, tắt trừ khi bật; bật trong sản phẩm từ
+  khi qua kiểm tra trên đèn, lần huỷ 2/2 của Fourteen trên #6410; dòng C132
+  của bảng theo dõi).** Trên
   lamp-06c1 ngày 12/11 (dòng X1) một sự kiện tạo từ cuộc nói chuyện trước
   không huỷ được: mô hình không có `event_id`, nên đọc trước; quy tắc ở trên
   từ chối lệnh ghi trong yêu cầu đó, và yêu cầu sau lại đọc lần nữa và lại
@@ -2261,8 +2336,10 @@ người nhận hay nội dung:
    từ chối như với giọng nói. Repository GitHub được duyệt là riêng tư mà
    giờ công khai thì chờ, như ở trên.
 6. **Giới hạn** (`skill_writes::Ledger`, `skill-writes.json` trong thư mục
-   kho): tối đa 10 lần gửi mỗi kỹ năng và 30 lần cho mọi kỹ năng trong bất
-   kỳ 24 giờ nào. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
+   kho): tối đa 50 lần gửi mỗi kỹ năng và 200 lần cho mọi kỹ năng trong bất
+   kỳ 24 giờ nào, và tối đa 5 lần mỗi kỹ năng trong bất kỳ một giờ nào
+   (`PER_SKILL_HOUR`), để một trigger bật tắt liên tục không bao giờ tiêu
+   hết lượt cả ngày của kỹ năng trong vài phút. Mỗi lần gửi được đếm trước khi gửi, từng lần một, nên hai
    lần cùng lúc không bao giờ cùng vượt giới hạn. Lần gửi thất bại sau đó
    vẫn được đếm. Sổ chỉ giữ tên kỹ năng và thời điểm, nên khởi động lại
    không quên các lần gửi trong ngày. Nó đóng khi lỗi: sổ không đọc được,
@@ -2410,8 +2487,8 @@ bởi một lượt chạy của kỹ năng trên Hermes của đèn, không ph�
   (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
   nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
   is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
-  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (10 mỗi kỹ năng, 30 cho
-  tất cả) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
+  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (50 mỗi kỹ năng, 200 cho
+  tất cả, 5 mỗi kỹ năng một giờ) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
   dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
   a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
   gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
@@ -2542,7 +2619,7 @@ lẫn lượt chạy đều không giữ token nào.
   nói là quá dài, và lượt chạy kết thúc mà không gửi gì. Lần ghi chỉ được
   gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
   cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
-  của kỹ năng tự tạo (10 lần một ngày mỗi kỹ năng, 30 lần cho mọi kỹ năng,
+  của kỹ năng tự tạo (50 lần một ngày mỗi kỹ năng, 200 lần cho mọi kỹ năng,
   `skill_writes::Ledger`): vượt quá thì "not sent".
 - **Giọng nói đọc lại nó** (`crates/voice/src/run_write_yes.rs`, với
   `LAMP_SKILL_TASKS=on` cả trong `lamp-voice`). Bộ điều phối hỏi chương
@@ -2684,7 +2761,7 @@ qua một socket mở.
   owner's yes: nothing is sent". Giọng nói đọc lại lệnh ghi đang giữ
   (`run_write_yes`, "Your <skill> skill wants to send: …") và chờ lời đồng ý
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
-  tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
+  tính vào giới hạn của kỹ năng (20 lần một ngày mỗi kỹ năng, 100 cho tất cả).
   Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
   (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được
   gửi theo lệnh gọi của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ,
@@ -2822,7 +2899,25 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   reason." Nó tối đa 600 byte, để quy tắc riêng của giọng nói vừa trước nó
   trong 1,024 byte mà liên kết nhà cung cấp nhận.
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
-  trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
+  trong bảng ở trên. Các loại đọc của mỗi dịch vụ (`reads::kinds`: chữ đầu
+  của mỗi lần đọc của nó trong bảng, `tools` và `call` của một dịch vụ MCP,
+  và `get` cho một dịch vụ đọc qua HTTP API có một GET trong danh sách cho
+  phép, không bao giờ cho Gmail) được nêu ngay trên `what`, dù phần mô tả bị
+  cắt giữ lại gì: một `enum` gồm mọi loại được đưa ra, và mô tả của nó "One
+  kind of read, the word alone, of the named service's own, never other
+  words: gmail: recent, search, drafts, message, attachment;
+  google_calendar: events, get; …" (#7498: trên lamp-a63e ngày 17 Nov các
+  lần đọc Gmail với một `what` không thuộc loại nào của Gmail bị từ chối bốn
+  lần, và chỉ mỗi lần thử lại với `search` mới có trả lời). Khi không có
+  loại nào được đưa ra (chỉ `gmail-app` chỉ-gửi được liên kết, với
+  `LAMP_SERVICES_LINKED_TOOLS=on`), `what` không có `enum` rỗng, và lần đọc
+  của nó nghe cách liên kết Gmail để đọc. Một `what` không thuộc loại nào
+  của dịch vụ bị từ chối trước khi hỏi dịch vụ, với cùng các loại đó, để
+  lần gọi sau đúng: "what is one of gmail's kinds of read, the word alone:
+  recent, search, drafts, message, attachment. gmail reads: recent {count},
+  …" (`reads::no_such_kind`; của một dịch vụ MCP cũng vậy). Lời của mô hình
+  không bao giờ được so với một danh sách: chỉ `what` được kiểm tra, như
+  một trong các loại. Câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
   nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.55 trở
   lên), từ các mẫu giọng mà sản phẩm chỉ tạo cho các dịch vụ

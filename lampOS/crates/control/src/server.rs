@@ -204,6 +204,12 @@ pub struct Shared {
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
+    /// Whether a new pairing glows once on the ring (`LAMP_CONTROL_PAIR_CUE`):
+    /// off unless the owner's unit sets it.
+    pair_cue: std::sync::atomic::AtomicBool,
+    /// Whether a cue is being shown right now: the one slot a cue takes, so a
+    /// second pairing while one runs drops its cue and never queues it.
+    cue_busy: std::sync::atomic::AtomicBool,
     /// Whether the door listens on the network: false while lamp-control serves only the owner's side
     /// and skill runs (`LAMP_CONTROL` not on, #6059). What `{"clients": true}` says as `listening`, so
     /// the app does not show "On" for a socket with no door behind it (#5299, the App Only E2E).
@@ -347,6 +353,8 @@ impl Shared {
             task_yes: Mutex::new(None),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
+            pair_cue: std::sync::atomic::AtomicBool::new(false),
+            cue_busy: std::sync::atomic::AtomicBool::new(false),
             listening: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
             features: Mutex::new(Features::default()),
@@ -358,6 +366,25 @@ impl Shared {
     /// on`), never to the camera or the microphone.
     pub fn set_remote(&self, remote: bool) {
         self.remote.store(remote, Ordering::Relaxed);
+    }
+
+    /// Lets a new pairing glow once on the ring (`LAMP_CONTROL_PAIR_CUE=on`).
+    pub fn set_pair_cue(&self, on: bool) {
+        self.pair_cue.store(on, Ordering::Relaxed);
+    }
+
+    /// Shows the pairing cue, off the connection's task: never waited for, so a
+    /// pairing's reply and the next frame never depend on the ring. One cue
+    /// at a time: a pairing that comes while one is shown drops its own.
+    fn show_pair_cue(self: &Arc<Self>) {
+        if !self.pair_cue.load(Ordering::Relaxed) || self.cue_busy.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let shared = Arc::clone(self);
+        tokio::task::spawn_blocking(move || {
+            shared.parts.lock().expect("parts").pair_cue();
+            shared.cue_busy.store(false, Ordering::Release);
+        });
     }
 
     /// That the door listens on the network (said once at start, when it is bound).
@@ -572,6 +599,8 @@ impl Shared {
                 task_yes: Mutex::new(None),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
+                pair_cue: std::sync::atomic::AtomicBool::new(false),
+                cue_busy: std::sync::atomic::AtomicBool::new(false),
                 listening: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
                 features: Mutex::new(Features::default()),
@@ -1447,8 +1476,13 @@ async fn connection<S>(
                     // A pairing that changed a computer's grants.
                     shared.tell_helper();
                     let mut gone = false;
+                    let cue = outcome.cue;
                     for reply in outcome.send {
                         gone |= socket.send(Message::text(reply.to_string())).await.is_err();
+                    }
+                    // After the reply has gone, never before it.
+                    if cue {
+                        shared.show_pair_cue();
                     }
                     if gone || outcome.close {
                         break;
@@ -2313,5 +2347,83 @@ mod tests {
             rfc3339_utc(std::time::UNIX_EPOCH + Duration::from_secs(951_782_400)),
             "2000-02-29T00:00:00Z"
         );
+    }
+
+    /// The pairing cue (#7471): never shown with its switch off; with it on,
+    /// shown off the caller's thread; and one at a time: a second asked while
+    /// one is being shown is dropped, never queued.
+    #[tokio::test]
+    async fn the_pairing_cue_is_off_by_default_and_one_at_a_time() {
+        struct Counting {
+            shown: Arc<std::sync::atomic::AtomicUsize>,
+            // Each cue waits here for a token, so the test holds one open.
+            release: std::sync::mpsc::Receiver<()>,
+        }
+        impl crate::session::Parts for Counting {
+            fn act(
+                &mut self,
+                _: &str,
+                _: u64,
+                _: &crate::protocol::Op,
+                _: u64,
+            ) -> Result<Value, crate::protocol::Error> {
+                Ok(Value::Null)
+            }
+            fn state(&self, _: crate::protocol::StateKind) -> Value {
+                Value::Null
+            }
+            fn stop(&mut self, _: &str, _: u64) {}
+            fn pair_cue(&mut self) {
+                let _ = self.release.recv_timeout(Duration::from_secs(5));
+                self.shown.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        );
+        let shown = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (release, wait) = std::sync::mpsc::channel();
+        let shared = Shared::new(
+            door,
+            Box::new(Counting {
+                shown: shown.clone(),
+                release: wait,
+            }),
+            String::new(),
+        );
+        // Off by default: nothing is shown, and no slot is taken.
+        shared.show_pair_cue();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(shown.load(Ordering::SeqCst), 0);
+        assert!(!shared.cue_busy.load(Ordering::SeqCst));
+        // On: the first cue is shown, and held open (it waits for a token).
+        shared.set_pair_cue(true);
+        shared.show_pair_cue();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            shared.cue_busy.load(Ordering::SeqCst),
+            "the first is still being shown"
+        );
+        // A second, asked meanwhile, is dropped and never queued.
+        shared.show_pair_cue();
+        release.send(()).unwrap();
+        release.send(()).unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(
+            shown.load(Ordering::SeqCst),
+            1,
+            "the second was dropped, not queued"
+        );
+        assert!(
+            !shared.cue_busy.load(Ordering::SeqCst),
+            "the slot is free again"
+        );
+        shared.show_pair_cue();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(shown.load(Ordering::SeqCst), 2, "and the next is shown");
     }
 }

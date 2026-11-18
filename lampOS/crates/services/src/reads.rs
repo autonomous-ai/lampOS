@@ -23,6 +23,18 @@ pub const COUNT_MOST: usize = 10;
 pub const QUERY_MOST: usize = 300;
 /// The longest GraphQL query taken.
 pub const GRAPHQL_MOST: usize = 4_000;
+/// How far back a calendar search by words looks
+/// (`LAMP_CALENDAR_EVENT_SEARCH`, tracker row C132): a day, so an event
+/// earlier today, or last night's, can still be moved or cancelled.
+pub const EVENT_SEARCH_BACK_SECS: i64 = 86_400;
+/// How far on from its start a calendar search by words looks: 90 days,
+/// where an event made in an earlier conversation is (a dentist next month,
+/// a trip in the new year), and no further, so the words never sweep the
+/// whole calendar.
+pub const EVENT_SEARCH_AHEAD_SECS: i64 = 90 * 86_400;
+/// What a calendar search is told when its end comes before its start.
+pub const EVENT_SEARCH_WINDOW: &str =
+    "with a query, from and to are a window from a day ago to at most 90 days on, to after from";
 
 /// How one read is made.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,6 +163,81 @@ pub fn calendar_time(time: &str) -> bool {
     })
 }
 
+/// The Unix time of an RFC 3339 date-time with its zone, as
+/// [`calendar_time`] takes it (`2026-11-20T09:00:00+07:00`, a fraction of a
+/// second dropped); nothing for any other text.
+pub fn rfc3339_secs(time: &str) -> Option<i64> {
+    let number = |part: &str, most: i64| -> Option<i64> {
+        (!part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| part.parse::<i64>().ok())
+            .flatten()
+            .filter(|n| *n <= most)
+    };
+    if !time.is_ascii() {
+        return None;
+    }
+    let (date, clock) = time.split_once('T')?;
+    let mut parts = date.split('-');
+    let year = number(parts.next()?, 9_999)?;
+    let month = number(parts.next()?, 12)?;
+    let day = number(parts.next()?, 31)?;
+    if parts.next().is_some() || month == 0 || day == 0 {
+        return None;
+    }
+    let (clock, east) = match clock.strip_suffix('Z') {
+        Some(clock) => (clock, 0),
+        None => {
+            let (clock, zone) = clock.split_at(clock.len().checked_sub(6)?);
+            let sign = match zone.as_bytes()[0] {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let (hours, minutes) = zone[1..].split_once(':')?;
+            (
+                clock,
+                sign * (number(hours, 23)? * 3_600 + number(minutes, 59)? * 60),
+            )
+        }
+    };
+    let mut parts = clock.split('.').next()?.split(':');
+    let hour = number(parts.next()?, 23)?;
+    let minute = number(parts.next()?, 59)?;
+    let second = number(parts.next()?, 60)?;
+    if parts.next().is_some() {
+        return None;
+    }
+    // Howard Hinnant's days-from-civil, the inverse of `mail::rfc5322_date`'s.
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let yoe = year - era * 400;
+    let doy = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(days * 86_400 + hour * 3_600 + minute * 60 + second - east)
+}
+
+/// A calendar search's window (`LAMP_CALENDAR_EVENT_SEARCH`): from the
+/// asked start, or now, never more than [`EVENT_SEARCH_BACK_SECS`] ago, to
+/// the asked end, at most [`EVENT_SEARCH_AHEAD_SECS`] after that start.
+fn event_search_window(
+    from: Option<&str>,
+    to: Option<&str>,
+    now: i64,
+) -> Result<(i64, i64), String> {
+    let at = |time: Option<&str>| {
+        time.map(|time| rfc3339_secs(time).ok_or_else(|| EVENT_SEARCH_WINDOW.to_owned()))
+            .transpose()
+    };
+    let from = at(from)?.unwrap_or(now).max(now - EVENT_SEARCH_BACK_SECS);
+    let most = from + EVENT_SEARCH_AHEAD_SECS;
+    let to = at(to)?.map_or(most, |to| to.min(most));
+    if to <= from {
+        return Err(EVENT_SEARCH_WINDOW.into());
+    }
+    Ok((from, to))
+}
+
 /// RFC 3339 for a Unix time, in UTC.
 pub fn rfc3339(secs: i64) -> String {
     let date = mail::rfc5322_date(secs);
@@ -257,6 +344,11 @@ pub const WHATS: &[(&str, &str)] = &[
     ("facebook", "page, posts {count}"),
 ];
 
+/// `service_read`'s `query` field with a calendar search by words
+/// (`LAMP_CALENDAR_EVENT_SEARCH`): the read's own description has no room
+/// for it within its 1,024 bytes, so Calendar's [`WHATS`] line stays.
+pub const CALENDAR_SEARCH_QUERY: &str = "Search words, or a number to find; for gmail as its own search takes them. For google_calendar events, the person's words for the one event to move or cancel, found a day back to 90 days on.";
+
 /// What the lamp says to a read of `gmail-app`, a Google sign-in that
 /// may only send (its scopes hold no `gmail.readonly`).
 pub const GMAIL_APP_NO_READS: &str = "This Gmail link, made with Google sign-in, can only send mail. To read mail, link Gmail with an app password in the app: open this lamp, then Settings, then Linked accounts.";
@@ -267,9 +359,95 @@ pub fn never_read(code: &str) -> Option<&'static str> {
     (code == "gmail-app").then_some(GMAIL_APP_NO_READS)
 }
 
+/// What an MCP service reads, by `what`: its read tools, then one of them.
+pub const MCP_WHATS: &str = "tools, call {tool, arguments}";
+
+/// Each entry of a list of reads such as [`WHATS`]' (`attachment {id,
+/// name|index}` one entry), split at the commas outside braces.
+fn entries(listed: &str) -> impl Iterator<Item = &str> {
+    let mut depth = 0usize;
+    listed
+        .split(move |c: char| {
+            match c {
+                '{' => depth += 1,
+                '}' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            c == ',' && depth == 0
+        })
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+}
+
+/// What `code` reads, by `what`, as the tools' description lists it.
+fn whats_of(code: &str) -> &'static str {
+    match catalog::service(code) {
+        Some(service) if service.mcp.is_some() => MCP_WHATS,
+        _ => WHATS
+            .iter()
+            .find(|(service, _)| *service == code)
+            .map_or("", |(_, whats)| *whats),
+    }
+}
+
+/// The kinds of read `code` takes as `what`, the one source the tools'
+/// schema and a refusal both name (#7498): the first word of each entry in
+/// [`WHATS`] (an MCP service's [`MCP_WHATS`]), and `get` for any service
+/// read over its HTTP API with a GET on its allow-list, but Gmail. None
+/// for a service the lamp never
+/// reads, or one it doesn't know.
+pub fn kinds(code: &str) -> Vec<&'static str> {
+    let Some(service) = catalog::service(code) else {
+        return Vec::new();
+    };
+    if never_read(code).is_some() {
+        return Vec::new();
+    }
+    let mut kinds: Vec<&'static str> = entries(whats_of(code))
+        .filter_map(|entry| entry.split([' ', '{']).next())
+        .filter(|kind| !kind.is_empty())
+        .collect();
+    let gets = service
+        .reads
+        .iter()
+        .any(|(method, _)| *method == Method::Get);
+    if service.mcp.is_none()
+        && service.api.is_some()
+        && gets
+        && code != "gmail"
+        && !kinds.contains(&"get")
+    {
+        kinds.push("get");
+    }
+    kinds
+}
+
+/// What a read whose `what` is none of `code`'s kinds is told: each kind
+/// it takes, the word alone, then what each needs, so the model's next
+/// call is a right one (#7498: on lamp-a63e on 17 Nov Gmail reads were
+/// refused four times, and only each retry with `search` answered).
+pub fn no_such_kind(code: &str) -> String {
+    let listed = whats_of(code);
+    let kinds = kinds(code);
+    let get = if kinds.contains(&"get") && !entries(listed).any(|entry| entry.starts_with("get")) {
+        "; or get {path, params}"
+    } else {
+        ""
+    };
+    format!(
+        "what is one of {code}'s kinds of read, the word alone: {}. {code} reads: {listed}{get}",
+        kinds.join(", ")
+    )
+}
+
+/// Whether `why` is [`no_such_kind`]'s refusal.
+pub fn is_no_such_kind(why: &str) -> bool {
+    why.starts_with("what is one of ") && why.contains("'s kinds of read, the word alone: ")
+}
+
 /// The lamp's own zone's IANA name, as the system has it now; nothing when
 /// it names none.
-fn zone_here() -> Option<String> {
+pub(crate) fn zone_here() -> Option<String> {
     lamp_local_time::LocalTime::zone("system").ok()?.name()
 }
 
@@ -300,8 +478,23 @@ fn mail_id<'a>(args: &'a Value, what: &str, entry: &Entry) -> Result<&'a str, St
     Ok(id)
 }
 
-/// How `what` is read from `code`, for `entry`'s account, at `now`.
+/// How `what` is read from `code`, for `entry`'s account, at `now`, with
+/// no calendar search by words ([`plan_with`]).
 pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, String> {
+    plan_with(code, args, entry, now, false)
+}
+
+/// [`plan`], a Google Calendar `events` read with a `query` searching by
+/// the person's words over a bounded window when `event_search`
+/// (`LAMP_CALENDAR_EVENT_SEARCH`, tracker row C132); without it a `query`
+/// changes nothing.
+pub fn plan_with(
+    code: &str,
+    args: &Value,
+    entry: &Entry,
+    now: i64,
+    event_search: bool,
+) -> Result<Plan, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
     if let Some(why) = never_read(code) {
         return Err(why.into());
@@ -363,17 +556,36 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
             if calendar.len() > 256 || calendar.contains(['/', '\\']) {
                 return Err("calendar is a calendar's id".into());
             }
-            let from = time(args, "from")?
-                .map(str::to_owned)
-                .unwrap_or_else(|| rfc3339(now));
+            let (from, to) = (time(args, "from")?, time(args, "to")?);
+            // The person's words (tracker row C132): an event from an
+            // earlier conversation, weeks away or behind a busy day, is
+            // found by them, within a bounded window, where the next events
+            // from now would never list it.
+            let searched = match text(args, "query") {
+                Some(_) if event_search => Some(words(args, "query", what)?),
+                _ => None,
+            };
+            let (from, to) = match searched {
+                Some(_) => {
+                    let (from, to) = event_search_window(from, to, now)?;
+                    (rfc3339(from), Some(rfc3339(to)))
+                }
+                None => (
+                    from.map_or_else(|| rfc3339(now), str::to_owned),
+                    to.map(str::to_owned),
+                ),
+            };
             let mut query = vec![
                 ("timeMin", from),
                 ("singleEvents", "true".into()),
                 ("orderBy", "startTime".into()),
                 ("maxResults", n),
             ];
-            if let Some(to) = time(args, "to")? {
-                query.push(("timeMax", to.to_owned()));
+            if let Some(to) = to {
+                query.push(("timeMax", to));
+            }
+            if let Some(searched) = searched {
+                query.push(("q", searched.to_owned()));
             }
             // Its times in the lamp's own zone: without it Calendar answers
             // in the calendar's zone, and on lamp-9adf on 5 Nov at 00:27 a
@@ -515,11 +727,7 @@ pub fn page_id(entry: &Entry) -> &str {
 }
 
 fn unknown(code: &str) -> String {
-    let whats = WHATS
-        .iter()
-        .find(|(service, _)| *service == code)
-        .map_or("", |(_, whats)| *whats);
-    format!("{code} reads: {whats}; or get {{path, params}}")
+    no_such_kind(code)
 }
 
 /// Keys that are noise to a person: dropped from what is quoted.
@@ -1063,6 +1271,53 @@ mod tests {
         Entry::default()
     }
 
+    /// #7498: on lamp-a63e on 17 Nov a Gmail read with a `what` that is
+    /// none of Gmail's kinds was refused, and only each retry with
+    /// `search` answered. The refusal names each kind Gmail reads, the
+    /// word alone, and never `get`, which Gmail has not; every service's
+    /// refusal names its own kinds, and each kind it names is one its read
+    /// takes.
+    #[test]
+    fn a_what_none_of_a_services_kinds_is_told_its_kinds() {
+        assert_eq!(
+            kinds("gmail"),
+            ["recent", "search", "drafts", "message", "attachment"]
+        );
+        assert_eq!(kinds("google_calendar"), ["events", "get"]);
+        assert_eq!(kinds("ahrefs"), ["get"]);
+        assert!(kinds("gmail-app").is_empty() && kinds("no_such_service").is_empty());
+        let refused = plan("gmail", &json!({"what":"unread emails"}), &entry(), 0).unwrap_err();
+        assert!(
+            refused.starts_with(
+                "what is one of gmail's kinds of read, the word alone: recent, search, drafts, message, attachment. "
+            ),
+            "{refused}"
+        );
+        assert!(!refused.contains("get"), "{refused}");
+        assert!(is_no_such_kind(&refused));
+        for service in catalog::SERVICES {
+            let code = service.code;
+            if service.mcp.is_some() {
+                assert_eq!(kinds(code), ["tools", "call"], "{code}");
+                continue;
+            }
+            if kinds(code).is_empty() {
+                continue;
+            }
+            let refused = plan(code, &json!({"what":"unread"}), &entry(), 0).unwrap_err();
+            assert!(is_no_such_kind(&refused), "{code}: {refused}");
+            assert!(
+                refused.contains(&format!("the word alone: {}.", kinds(code).join(", "))),
+                "{code}: {refused}"
+            );
+            for kind in kinds(code) {
+                if let Err(why) = plan(code, &json!({"what": kind}), &entry(), 0) {
+                    assert!(!is_no_such_kind(&why), "{code} {kind}: {why}");
+                }
+            }
+        }
+    }
+
     /// lamp-9adf, 4 Nov: Calendar refused an event at
     /// `2026-11-05T09:00:00`, confirmed by the owner; a time needs its zone.
     #[test]
@@ -1126,7 +1381,7 @@ mod tests {
         assert_eq!(refused, unknown("google_calendar"));
         assert_eq!(
             refused,
-            "google_calendar reads: events {from, to, calendar, count}; or get {path, params}"
+            "what is one of google_calendar's kinds of read, the word alone: events, get. google_calendar reads: events {from, to, calendar, count}; or get {path, params}"
         );
         let (method, url, body) = http(
             plan(
@@ -1145,6 +1400,128 @@ mod tests {
         match plan {
             Plan::Http { method, url, body } => (method, url, body),
             Plan::Mail(_) | Plan::Attachment(..) => panic!("mail"),
+        }
+    }
+
+    /// Tracker row C132: with `LAMP_CALENDAR_EVENT_SEARCH` on, a calendar
+    /// read may carry the person's words, so an event from an earlier
+    /// conversation is found among weeks of others; its window is bounded,
+    /// a day back and at most 90 days on. Off, the words change nothing.
+    #[test]
+    fn a_calendar_search_by_words_reads_a_bounded_window_only_with_its_switch() {
+        const DAY: i64 = 86_400;
+        let now = 1_794_000_000;
+        let pairs = |args: Value, search: bool| -> Vec<(String, String)> {
+            let (_, url, _) =
+                http(plan_with("google_calendar", &args, &entry(), now, search).unwrap());
+            reqwest::Url::parse(&url)
+                .unwrap()
+                .query_pairs()
+                .map(|(key, value)| (key.into_owned(), value.into_owned()))
+                .collect()
+        };
+        let value = |pairs: &[(String, String)], key: &str| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, value)| value.clone())
+        };
+        // On: the words as Calendar's own search, from now, 90 days on.
+        let searched = pairs(json!({"what":"events","query":"dentist"}), true);
+        assert_eq!(value(&searched, "q").as_deref(), Some("dentist"));
+        assert_eq!(value(&searched, "timeMin"), Some(rfc3339(now)));
+        assert_eq!(
+            value(&searched, "timeMax"),
+            Some(rfc3339(now + EVENT_SEARCH_AHEAD_SECS))
+        );
+        assert_eq!(EVENT_SEARCH_AHEAD_SECS, 90 * DAY);
+        assert_eq!(EVENT_SEARCH_BACK_SECS, DAY);
+        // A wider window is cut: its start to a day ago, its end to 90 days
+        // after that start.
+        let wide = pairs(
+            json!({"what":"events","query":"dentist",
+                "from": rfc3339(now - 30 * DAY), "to": rfc3339(now + 400 * DAY)}),
+            true,
+        );
+        assert_eq!(value(&wide, "timeMin"), Some(rfc3339(now - DAY)));
+        assert_eq!(
+            value(&wide, "timeMax"),
+            Some(rfc3339(now - DAY + EVENT_SEARCH_AHEAD_SECS))
+        );
+        // One inside it is kept, as the lamp's own offset gives it.
+        let inside = pairs(
+            json!({"what":"events","query":"dentist",
+                "from":"2026-11-20T09:00:00+07:00","to":"2026-11-21T09:00:00+07:00"}),
+            true,
+        );
+        assert_eq!(
+            value(&inside, "timeMin").as_deref(),
+            Some("2026-11-20T02:00:00Z")
+        );
+        assert_eq!(
+            value(&inside, "timeMax").as_deref(),
+            Some("2026-11-21T02:00:00Z")
+        );
+        // Words too long, or more than a line, and an end before the start,
+        // are refused before Calendar is asked.
+        let refused = |args: Value| plan_with("google_calendar", &args, &entry(), now, true);
+        assert!(refused(json!({"what":"events","query":"a".repeat(QUERY_MOST + 1)})).is_err());
+        assert!(refused(json!({"what":"events","query":"den\ntist"})).is_err());
+        assert!(
+            refused(json!({"what":"events","query":"dentist",
+                "from": rfc3339(now + DAY), "to": rfc3339(now)}))
+            .is_err()
+        );
+        // With no words, the read is as it always was, switch on or off.
+        for search in [true, false] {
+            let listed = pairs(json!({"what":"events"}), search);
+            assert_eq!(value(&listed, "q"), None);
+            assert_eq!(value(&listed, "timeMax"), None);
+        }
+        // Off, the words change nothing: today's read, and `plan` is off.
+        let off = pairs(json!({"what":"events","query":"dentist"}), false);
+        assert_eq!(value(&off, "q"), None, "{off:?}");
+        assert_eq!(value(&off, "timeMax"), None);
+        assert_eq!(value(&off, "timeMin"), Some(rfc3339(now)));
+        assert_eq!(
+            plan(
+                "google_calendar",
+                &json!({"what":"events","query":"dentist"}),
+                &entry(),
+                now
+            ),
+            plan_with(
+                "google_calendar",
+                &json!({"what":"events","query":"dentist"}),
+                &entry(),
+                now,
+                false
+            )
+        );
+    }
+
+    #[test]
+    fn an_rfc3339_time_is_read_as_its_unix_time() {
+        for secs in [0, 1_794_000_000, 951_782_400, 4_102_444_800] {
+            assert_eq!(rfc3339_secs(&rfc3339(secs)), Some(secs), "{secs}");
+        }
+        assert_eq!(
+            rfc3339_secs("2026-11-17T09:00:00+07:00"),
+            rfc3339_secs("2026-11-17T02:00:00Z")
+        );
+        assert_eq!(
+            rfc3339_secs("2026-11-16T21:30:00-04:30"),
+            rfc3339_secs("2026-11-17T02:00:00.750Z")
+        );
+        for bad in [
+            "2026-11-17",
+            "2026-13-01T00:00:00Z",
+            "2026-11-17T24:00:00Z",
+            "2026-11-17T09:00:00",
+            "2026-+1-17T09:00:00Z",
+            "2026-11-17T09:00Z",
+        ] {
+            assert_eq!(rfc3339_secs(bad), None, "{bad}");
         }
     }
 

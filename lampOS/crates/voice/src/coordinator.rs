@@ -1311,6 +1311,12 @@ struct Reply {
     /// `turn_lost`. Not `had_audio`: an answer cut off mid-sentence still
     /// owes it.
     down_line_said: bool,
+    /// With the make's one run path (`ProviderOutput::MakeWaiting`, #7371):
+    /// the make's waiting line was said whole and the turn waits on the
+    /// make. The body then shows speaking only while audio is queued or
+    /// playing, so it thinks between that line and the make's answer.
+    /// Never set with the switch off.
+    make_waiting: bool,
 }
 impl Reply {
     /// Whether a mark for this turn can still be sent: its input still
@@ -2779,8 +2785,11 @@ impl Rig {
                             // closes before that exit can be read, so the
                             // receive error alone is no failure (lamp-52e6's
                             // reboot, 27 Oct 16:37: `Transport endpoint is
-                            // not connected`, #3697).
-                            let ends_itself = privacy_controls && worker.role == "privacy";
+                            // not connected`, #3697). Off Linux any worker's
+                            // closed socket reads as ECONNRESET (`os error 54`,
+                            // run 4 of the Mac start): the same, never on Linux.
+                            let ends_itself = (privacy_controls && worker.role == "privacy")
+                                || crate::peer_stop::control_receive_of_ended_worker(error.kind());
                             if !ends_itself {
                                 failure.push(CleanupStage::ControlReceive, &worker.role, error);
                             }
@@ -4290,6 +4299,7 @@ fn observe_provider_output(
         ProviderOutput::Unclear { .. }
         | ProviderOutput::LookAsked { .. }
         | ProviderOutput::SleepAsked { .. }
+        | ProviderOutput::MadeRunNow { .. }
         | ProviderOutput::ServiceCalled { .. }
         | ProviderOutput::StepCallHeard { .. }
         | ProviderOutput::StopAnswered { .. }
@@ -4315,6 +4325,13 @@ fn observe_provider_output(
         ProviderOutput::DownLineSaid { request } => {
             if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == *request) {
                 current.down_line_said = true;
+            }
+        }
+        // The make's waiting line was said whole (#7371): thinking until
+        // audio comes again.
+        ProviderOutput::MakeWaiting { request } => {
+            if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == *request) {
+                current.make_waiting = true;
             }
         }
         ProviderOutput::HoldingAnswer { request, session } => {
@@ -4380,6 +4397,19 @@ fn observe_provider_output(
         }
     }
     Ok(())
+}
+
+/// The answer has arrived and is about to be spoken: the body's head comes
+/// back to the person before the first word, not during it. While a make
+/// waits on the one run path (`Reply::make_waiting`, #7371), its waiting
+/// line played out, that is only once audio is queued again: the body
+/// thinks meanwhile, as the ring does. Without it, as before.
+fn about_to_speak(reply: Option<&Reply>) -> bool {
+    reply.is_some_and(|current| {
+        current.had_audio
+            && current.local_input_ended
+            && (!current.make_waiting || !current.pcm.is_empty())
+    })
 }
 
 /// Sending is bounded independently of answer delivery. No queued Audio/End
@@ -5184,10 +5214,25 @@ fn released_restored_on_stop(
     trace: &mut SessionState,
     controls: &mut Option<HandControls>,
 ) -> io::Result<()> {
-    let (true, Some(signal), Some(controls)) = (clean, signal, controls.as_mut()) else {
+    let Some(controls) = controls.as_mut() else {
         return Ok(());
     };
-    if controls.release_restored_on_stop()? {
+    let signal = match (clean, signal) {
+        (true, Some(signal)) => signal,
+        // Kept, and the journal says which gate (#7368).
+        (false, _) => {
+            guard_mute_kept(controls, "the run did not end clean");
+            return Ok(());
+        }
+        (true, None) => {
+            guard_mute_kept(controls, "no stop was asked for");
+            return Ok(());
+        }
+    };
+    let restored = controls.restored_after_fault();
+    let why = controls.kept_on_stop_why();
+    let released = controls.release_restored_on_stop()?;
+    if released {
         eprintln!(
             "lamp-voice: {signal} ended the mute the restart guard restored; the next start listens"
         );
@@ -5196,8 +5241,24 @@ fn released_restored_on_stop(
             trace,
             json!({"kind":"guard_mute_ended_on_stop","at_us":monotonic_us(),"signal":signal}),
         );
+    } else if let Some(why) = HandControls::kept_after_release(restored, why, released) {
+        eprintln!("{}", guard_mute_kept_line(why));
     }
     Ok(())
+}
+
+/// The one journal line for a stop that keeps a mute the restart guard
+/// restored (#7368): which gate kept it, so a lamp left deaf after a clean
+/// restart says why. Said only for the guard's mute, never a person's.
+fn guard_mute_kept(controls: &HandControls, why: &str) {
+    if controls.restored_after_fault() {
+        eprintln!("{}", guard_mute_kept_line(why));
+    }
+}
+
+/// [`guard_mute_kept`]'s words.
+fn guard_mute_kept_line(why: &str) -> String {
+    format!("lamp-voice: the mute the restart guard restored is kept at this stop: {why}")
 }
 
 /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
@@ -6691,6 +6752,8 @@ fn conversation_with_gate_inner(
     // audio is what follows them, a wait cue or the down line before them
     // being no answer (`AnswerAudio`).
     let mut answer_audio = AnswerAudio::default();
+    // Each answer's wait, for the opt-in report counters (#6256 F8).
+    let mut turn_time_out = crate::turn_time_out::TurnTimeOut::from_environment();
     leases.keep(rig, owner, &mut stalls)?;
     // A face added from a photo, asked about once at the lamp
     // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
@@ -6833,6 +6896,9 @@ fn conversation_with_gate_inner(
         // The memory's night through the relay, with LAMP_MEMORY_TIERS
         // (`tiers_night`): idle, at night, with the slide open; never said.
         crate::tiers_night::start_from_environment();
+        // What those two cost is counted for the day, with
+        // LAMP_VOICE_DAY_TALLY=on (`day_tally`, #7347): numbers only.
+        crate::day_tally::start_from_environment();
     }
     leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;
@@ -8742,6 +8808,9 @@ fn conversation_with_gate_inner(
                                 json!({"kind":"answer_first_audio","turn":request,"at_us":now_us,
                                 "after_decision_ms":after}),
                             )?;
+                            if let Some(after_ms) = after {
+                                turn_time_out.told(after_ms);
+                            }
                         }
                         let received_frames = samples.len();
                         current.append_provider_packet(samples, received_at_us, spoken);
@@ -8778,7 +8847,9 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. }
+                | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::MakeWaiting { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
                 // its try is the provider's, never the person's miss.
@@ -8950,6 +9021,11 @@ fn conversation_with_gate_inner(
                         request,
                         trace,
                     )?;
+                }
+                // A made skill run now by the owner's voice, in the worker's
+                // process: kept here, where the say service reads it (#7363).
+                ProviderOutput::MadeRunNow { request, skill } => {
+                    made_run_now(request, &skill, trace)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
                     // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
@@ -12157,11 +12233,7 @@ fn conversation_with_gate_inner(
         if let Some(body) = body_link.as_mut() {
             use crate::ring_wire::RingPhase;
             let phase = RingPhase::from_snapshot(snapshot).filter(|_| !sound_now);
-            // The answer has arrived and is about to be spoken: the head
-            // comes back to the person before the first word, not during it.
-            let about_to_speak = reply
-                .as_ref()
-                .is_some_and(|current| current.had_audio && current.local_input_ended);
+            let about_to_speak = about_to_speak(reply.as_ref());
             attention.observe(
                 reply
                     .as_ref()
@@ -12883,6 +12955,19 @@ fn conversation_with_gate_inner(
         };
         if let Some(says) = says.as_mut() {
             says.poll(say_now_us);
+            // A note that may end unsaid (#6543) is let go, never begun,
+            // once someone was heard or the face left since it was asked.
+            for (skill, why) in says.end_unsaid(|asked_us| {
+                crate::say::moment_passed(
+                    asked_us,
+                    last_speech_us,
+                    presence
+                        .as_ref()
+                        .is_some_and(|presence| presence.left_since(asked_us, clock)),
+                )
+            }) {
+                eprintln!("lamp-voice: the skill {skill}'s note ends unsaid: {why}");
+            }
         }
         // The shutdown's last words (#3697) wait for none of it: the lamp's
         // own speech is cut for them. A muted lamp stays silent.
@@ -14723,6 +14808,19 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
     }
 }
 
+/// A made skill the worker ran now for `request`, as its owner asked by
+/// voice (`ProviderOutput::MadeRunNow`): kept in this process, where the say
+/// service reads it (`made_run::answers_now`), so its failure line may
+/// answer that conversation (#7363, El's P1: the worker's own record is
+/// never read here). The trace has the skill's name only.
+fn made_run_now(request: u64, skill: &str, trace: &mut SessionState) -> Result<()> {
+    crate::made_run::ran_now(skill, std::time::Instant::now());
+    record(
+        trace,
+        json!({"kind":"made_run_now","request":request,"skill":skill}),
+    )
+}
+
 /// What the ring is told of the turn in hand, from what plays in it. The
 /// head tap's "hm?" (#711), the same hum after an empty "Sorry?" (#1417)
 /// and as the person wakes a hand's sleep (#1362), show the listening face,
@@ -15947,6 +16045,7 @@ fn commit_written_turn(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16192,6 +16291,7 @@ fn commit_admitted_input(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16305,6 +16405,7 @@ fn commit_offline_input(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16483,6 +16584,7 @@ fn commit_own_line(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -16597,6 +16699,7 @@ fn continue_after_early_end(
         news: Vec::new(),
         news_not_heard: None,
         down_line_said: false,
+        make_waiting: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -19007,6 +19110,7 @@ mod tests {
                 news: Vec::new(),
                 news_not_heard: None,
                 down_line_said: false,
+                make_waiting: false,
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
@@ -19100,6 +19204,164 @@ mod tests {
             source_offset: 0,
             samples,
         }
+    }
+
+    /// What the ring shows for `owner`'s turn, and the body's mood for it as
+    /// the loop tells the body, the waiting arm alone (nothing attended, no
+    /// walk, no sound), read back from the body's socket.
+    fn shown(
+        owner: &mut Controller,
+        reply: &Option<Reply>,
+        body: &mut crate::body_link::BodyLink,
+        socket: &std::os::unix::net::UnixDatagram,
+        at_us: u64,
+    ) -> (Option<crate::ring_wire::RingPhase>, String) {
+        use crate::ring_wire::RingPhase;
+        let ring = RingPhase::from_snapshot(owner.snapshot(now()).unwrap());
+        let told = match ring {
+            Some(RingPhase::Waiting) if about_to_speak(reply.as_ref()) => Some(RingPhase::Speaking),
+            phase => phase,
+        };
+        body.tell(told, 0, at_us);
+        let mut message = [0; 128];
+        let read = socket.recv(&mut message).unwrap();
+        let told: serde_json::Value = serde_json::from_slice(&message[..read]).unwrap();
+        (ring, told["mood"].as_str().unwrap().to_owned())
+    }
+
+    /// lamp-c0a4, 16 Nov (#7371): with the make's one run path its waiting
+    /// line ("This takes about a minute. I'm on it.") was followed by about
+    /// 80 s of an open turn, and ring and body showed speaking throughout:
+    /// the line's generation never completed, so its playback never
+    /// retired, and the body took audio once heard for audio to come. With
+    /// the one path's `GenerationComplete` and `MakeWaiting` after the
+    /// line's audio, its last block retires, and ring and body think
+    /// through the quiet until the answer's audio comes; with neither (the
+    /// switch off), all of it shows speaking, as before.
+    #[test]
+    fn a_one_path_makes_wait_shows_thinking_between_its_waiting_line_and_the_answer() {
+        use crate::ring_wire::RingPhase::{Speaking, Waiting};
+        let run = |one_path: bool| {
+            let dir = SessionDirectory::create().unwrap();
+            let at = dir.path.join("body.sock");
+            let socket = std::os::unix::net::UnixDatagram::bind(&at).unwrap();
+            let mut body = crate::body_link::BodyLink::to(at).unwrap();
+            let (mut owner, current, _) = active_reply();
+            let turn = current.owner;
+            let mut reply = Some(current);
+            let mut cloud = CloudAvailability::default();
+            cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+            let mut seen = Vec::new();
+            // The waiting line's audio, in play.
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 1_000_000));
+            if one_path {
+                for event in [
+                    ProviderOutput::GenerationComplete {
+                        request: turn.turn(),
+                    },
+                    ProviderOutput::MakeWaiting {
+                        request: turn.turn(),
+                    },
+                ] {
+                    observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+                }
+            }
+            // The speaker takes what it is given; a final block retires.
+            let current = reply.as_mut().unwrap();
+            let mut sequence = 40;
+            let mut waiting_token = None;
+            while let Some((_, last)) = current.next_speaker_chunk() {
+                sequence += 1;
+                if last {
+                    current.final_chunk = Some(sequence);
+                    let token = current.retire_playback(sequence, 240).unwrap();
+                    owner.playback_ended(now(), token).unwrap();
+                    waiting_token = Some(token);
+                }
+            }
+            // The quiet while the make goes on.
+            for second in 2..=3 {
+                seen.push(shown(
+                    &mut owner,
+                    &reply,
+                    &mut body,
+                    &socket,
+                    second * 1_000_000,
+                ));
+            }
+            // The make's answer comes.
+            reply
+                .as_mut()
+                .unwrap()
+                .append_provider_packet(vec![22; 480], monotonic_us(), true);
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 4_000_000));
+            // The answer is its own generation: it plays to its end under a
+            // new playback, and then the turn settles (Thirteen on #7395).
+            for event in [
+                ProviderOutput::GenerationComplete {
+                    request: turn.turn(),
+                },
+                ProviderOutput::TurnComplete {
+                    request: turn.turn(),
+                    idle: true,
+                },
+            ] {
+                observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+            }
+            let current = reply.as_mut().unwrap();
+            // Off the one path the waiting line never retired: the answer
+            // continues its playback.
+            let answer_token = match current.playback {
+                Some(token) => token,
+                None => {
+                    let permit = owner.issue_output(now(), current.plan, 100_000).unwrap();
+                    owner.playback_started(now(), permit).unwrap()
+                }
+            };
+            current.playback = Some(answer_token);
+            assert_eq!(waiting_token.is_some(), one_path);
+            assert_ne!(Some(answer_token), waiting_token);
+            seen.push(shown(&mut owner, &reply, &mut body, &socket, 5_000_000));
+            let current = reply.as_mut().unwrap();
+            let mut played = 0;
+            while let Some((samples, last)) = current.next_speaker_chunk() {
+                played += samples.len();
+                sequence += 1;
+                if last {
+                    current.final_chunk = Some(sequence);
+                    let token = current.retire_playback(sequence, 240).unwrap();
+                    assert_eq!(token, answer_token);
+                    owner.playback_ended(now(), token).unwrap();
+                }
+            }
+            assert!(played >= 480, "the whole answer was handed to the speaker");
+            assert!(
+                reply.as_ref().unwrap().settled(&None),
+                "the turn settles after its answer"
+            );
+            seen
+        };
+        let phases = |seen: Vec<(Option<crate::ring_wire::RingPhase>, String)>| {
+            seen.into_iter()
+                .map(|(ring, mood)| (ring.unwrap(), mood))
+                .collect::<Vec<_>>()
+        };
+        let speaking = || (Speaking, "speaking".to_owned());
+        let thinking = || (Waiting, "thinking".to_owned());
+        assert_eq!(
+            phases(run(true)),
+            [
+                speaking(),
+                thinking(),
+                thinking(),
+                (Waiting, "speaking".into()),
+                speaking()
+            ]
+        );
+        assert_eq!(
+            phases(run(false)),
+            [speaking(), speaking(), speaking(), speaking(), speaking()]
+        );
     }
 
     #[test]
@@ -20245,6 +20507,7 @@ mod tests {
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,
+            make_waiting: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
@@ -20596,6 +20859,7 @@ mod tests {
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,
+            make_waiting: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),

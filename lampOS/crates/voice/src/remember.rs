@@ -4600,6 +4600,77 @@ fn nothing_in_scope() {
     NOTHING_IN_SCOPE.with(|nothing| nothing.set(true));
 }
 
+/// `exchanges_forget` in the memory at `socket`: a known person's own
+/// exchanges with every key word of a subject of `about` (what was said,
+/// never kept), in their scope alone, never the room's
+/// (`DaysClient::forget_exchanges_about`). How many went; `None` with no
+/// known person, no words, no time left or no answer.
+fn exchanges_forget_about(
+    socket: &Path,
+    about: &Value,
+    person: Option<&str>,
+    until: Instant,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<u64> {
+    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+        .into_iter()
+        .map(|(_, words)| words)
+        .collect();
+    if words.is_empty() {
+        return None;
+    }
+    let left = until
+        .checked_duration_since(Instant::now())
+        .filter(|left| !left.is_zero())?;
+    let answer = bounded_exchange_scoped(
+        socket,
+        &json!({"op":"exchanges_forget","person":person,"about":words}),
+        left,
+        lease,
+    )?;
+    let removed = answer["removed"]
+        .as_u64()
+        .filter(|_| answer["ok"] == true)?;
+    eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
+    Some(removed)
+}
+
+/// The one-face forget their yes agreed to (#5627), held with the words it
+/// was about (`about`), after its forget by id `told`: that person's own
+/// exchanges about those words go too, as a forget about takes them
+/// ([`exchanges_forget_about`], C128), so recall no longer tells the talk
+/// about it (lamp-06c1, build 13523). Only after a by-id forget the memory
+/// confirmed, only in `person`'s scope, never the room's. Some gone,
+/// nothing of this conversation is journalled after it.
+pub fn agreed_forget_exchanges(
+    socket: &Path,
+    told: (Value, bool),
+    about: &Value,
+    person: &str,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !told.1 || told.0["forgotten"] != true || !lease.is_current() {
+        return told;
+    }
+    let until = Instant::now() + deadline;
+    let removed = exchanges_forget_about(socket, about, Some(person), until, Some(lease));
+    if removed.is_some_and(|removed| removed > 0)
+        && let Some(client) = DAYS
+            .get()
+            .and_then(Option::as_ref)
+            .filter(|client| client.socket == socket)
+    {
+        let said = match client.context.try_lock() {
+            Ok(mut context) => client.forgotten(&mut context),
+            Err(_) => None,
+        };
+        say(said);
+    }
+    exchanges_forgotten(told, removed)
+}
+
 /// `theirs`, a forget in the one known face's scope, and then `room`, the
 /// room's, only when `theirs` answered and found nothing about it there
 /// ([`nothing_in_scope`]). The room's is told when it forgot, or when its
@@ -5324,7 +5395,12 @@ fn run_for_guarded(
     }
     // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
     // while nobody is known, on either memory client.
-    if let Some(told) = needs_face::withheld(call, person, needs_face::on()) {
+    if let Some(told) = needs_face::withheld(
+        call,
+        person,
+        needs_face::on(),
+        crate::known_faces::name_learn_fix_on(),
+    ) {
         return (told, true);
     }
     if DAYS_MODE.get() == Some(&true) {
@@ -7377,7 +7453,8 @@ pub struct DaysClient {
     known: Mutex<Option<PathBuf>>,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
     /// removed by any forget of everything (#2110), and the face expressions
-    /// yes beside it.
+    /// yes beside it; and the owner's seen activity yes beside them, removed
+    /// by any forget (#6543).
     room_sounds: PathBuf,
     /// [`JOURNAL_RESUMES_ENVIRONMENT`], read when the client is made.
     resumes: AtomicBool,
@@ -10424,6 +10501,12 @@ impl DaysClient {
             // it is written after it, and what the writer has in hand is
             // let finish first, within a little of the call's time.
             if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+                // Any forget, whoever asked, takes back the owner's yes to
+                // seen activity (#6543), the app's too, before the memory
+                // is asked; with none kept, nothing changes.
+                crate::seen_yes::forgotten(&crate::onboarding::seen_activity_beside(
+                    &self.room_sounds,
+                ));
                 // Their service record changes still waiting go before
                 // forget everything is sent (`LAMP_SERVICE_RECORDS`,
                 // Jarvis's P2 on #6073); the memory refuses one asked
@@ -10914,26 +10997,7 @@ impl DaysClient {
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<u64> {
-        let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
-        let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
-            .into_iter()
-            .map(|(_, words)| words)
-            .collect();
-        if words.is_empty() {
-            return None;
-        }
-        let left = until
-            .checked_duration_since(Instant::now())
-            .filter(|left| !left.is_zero())?;
-        let answer = bounded_exchange_scoped(
-            &self.socket,
-            &json!({"op":"exchanges_forget","person":person,"about":words}),
-            left,
-            lease,
-        )?;
-        let removed = answer["removed"]
-            .as_u64()
-            .filter(|_| answer["ok"] == true)?;
+        let removed = exchanges_forget_about(&self.socket, about, person, until, lease)?;
         if removed > 0 {
             let said = match self.context.try_lock() {
                 Ok(mut context) => self.forgotten(&mut context),
@@ -10941,7 +11005,6 @@ impl DaysClient {
             };
             say(said);
         }
-        eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
         Some(removed)
     }
 
@@ -18397,8 +18460,12 @@ mod tests {
         assert_eq!(told["forgotten"], false, "{told}");
         // The household's room sounds yes goes with it (#2110), and the
         // face expressions yes beside it, the owner's from the app as well
-        // (`"by":"app"`, #5500): whoever gave it.
-        let consent = socket.with_extension("room-sounds.json");
+        // (`"by":"app"`, #5500): whoever gave it. In a folder of this
+        // test's own, so no other test's files are beside them.
+        let folder = socket.with_extension("consent");
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir(&folder).unwrap();
+        let consent = folder.join("room-sounds.json");
         std::fs::write(
             &consent,
             lamp_msgs::consent::bytes("room_sounds", 9, lamp_msgs::consent::BY_APP),
@@ -18408,6 +18475,14 @@ mod tests {
         std::fs::write(
             &face,
             lamp_msgs::consent::bytes("face_expressions", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        // And the owner's seen activity yes beside them (#6543), told to
+        // nobody: lamp-seen says its own off line.
+        let seen = crate::onboarding::seen_activity_beside(&consent);
+        std::fs::write(
+            &seen,
+            lamp_msgs::consent::bytes("seen_activity", 9, lamp_msgs::consent::BY_VOICE),
         )
         .unwrap();
         let mut client = client;
@@ -18422,6 +18497,9 @@ mod tests {
         assert_eq!(told["forgotten"], false, "{told}");
         assert!(!consent.exists());
         assert!(!face.exists());
+        assert!(!seen.exists());
+        assert!(told.get("seen_activity_consent_result").is_none(), "{told}");
+        std::fs::remove_dir_all(&folder).unwrap();
         let read = served.join().unwrap();
         assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
         drop(client);
@@ -18430,8 +18508,26 @@ mod tests {
         // Off: an id is passed over and the last kept thing goes, as before;
         // forget_everything isn't the memory's.
         let (socket, served) = memory("forget-all-off", 1, |_| json!({"ok":true,"removed":null}));
-        let client = DaysClient::new(socket.clone()).unwrap();
+        let mut client = DaysClient::new(socket.clone()).unwrap();
         assert!(!client.forget_all.load(Ordering::Acquire));
+        // Any forget, not only of everything, takes the seen activity yes
+        // (#6543), the app's too; the two other yeses stay.
+        let folder = socket.with_extension("consent");
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir(&folder).unwrap();
+        let consent = folder.join("room-sounds.json");
+        std::fs::write(
+            &consent,
+            lamp_msgs::consent::bytes("room_sounds", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        let seen = crate::onboarding::seen_activity_beside(&consent);
+        std::fs::write(
+            &seen,
+            lamp_msgs::consent::bytes("seen_activity", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        client.room_sounds = consent.clone();
         client.run_at(
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
@@ -18443,6 +18539,9 @@ mod tests {
             served.join().unwrap()[0],
             json!({"op":"forget_last","kind":"kept"})
         );
+        assert!(!seen.exists());
+        assert!(consent.exists());
+        std::fs::remove_dir_all(&folder).unwrap();
         assert!(!is_tool(FORGET_EVERYTHING));
         drop(client);
         std::fs::remove_file(&socket).unwrap();
@@ -19145,6 +19244,18 @@ mod tests {
         room: bool,
         speaker: &str,
     ) -> Vec<Value> {
+        services_forgotten_on_forget_everything_kept(name, room, speaker, Some("Owner"))
+    }
+
+    /// [`services_forgotten_on_forget_everything`] with the owner kept with
+    /// their face `kept` (`known_faces::owner_now`), none on a lamp set up
+    /// before onboarding kept one (#7501).
+    fn services_forgotten_on_forget_everything_kept(
+        name: &str,
+        room: bool,
+        speaker: &str,
+        kept: Option<&str>,
+    ) -> Vec<Value> {
         let dir = std::env::temp_dir().join(format!("lamp-remember-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -19152,7 +19263,7 @@ mod tests {
         std::fs::write(&file, "Owner Example\n").unwrap();
         crate::person::set_for_test(Some(file));
         crate::person::set_private_room_for_test(Some(room));
-        crate::known_faces::owner_for_test(Some(Some("Owner".to_owned())));
+        crate::known_faces::owner_for_test(Some(kept.map(str::to_owned)));
         crate::service_records::on_for_test(true);
         crate::service_contacts::on_for_test(true);
         crate::service_records::forgot(None);
@@ -19217,6 +19328,36 @@ mod tests {
                 first.as_str(),
                 "{op} under the first owner id"
             );
+            assert_eq!(sent["all"], true, "{op} takes every row");
+        }
+    }
+
+    /// #7501, lamp-06c1 (17 Nov): set up before onboarding kept an owner,
+    /// the owner's face is kept under the face name, their records and
+    /// contacts under the typed name's id. With no owner kept, their face's
+    /// forget everything leaves every row of the typed name's; once their
+    /// face is linked as the owner (`onboarding::owner_linked`), it removes
+    /// every record and contact under the typed name's id too.
+    #[test]
+    fn the_owners_face_forgets_the_typed_names_rows_only_once_linked() {
+        let face = crate::known_faces::memory_person("Face Name");
+        let typed = crate::known_faces::memory_person("Owner Example");
+        assert_ne!(face, typed);
+        let before =
+            services_forgotten_on_forget_everything_kept("forget-all-unlinked", true, &face, None);
+        assert!(before.is_empty(), "the split leaves the rows: {before:?}");
+        let after = services_forgotten_on_forget_everything_kept(
+            "forget-all-linked",
+            true,
+            &face,
+            Some("Face Name"),
+        );
+        for op in ["service_records_forget", "service_contacts_forget"] {
+            let sent = after
+                .iter()
+                .find(|request| request["op"] == op)
+                .unwrap_or_else(|| panic!("no {op}: {after:?}"));
+            assert_eq!(sent["person"], typed.as_str(), "{op} under the typed id");
             assert_eq!(sent["all"], true, "{op} takes every row");
         }
     }

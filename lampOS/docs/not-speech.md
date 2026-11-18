@@ -562,7 +562,10 @@ one is chosen) and kept in the thread as the lamp's:
   asked for by voice is still being made or its line is still to be said,
   for at most 2 minutes after the make's call (lamp-9adf, 11 Nov: the lamp's own echo cut "I'll make it", and the
   question came in place of the made line; skills.md, "A cut while it is
-  made"). Asked at most once a minute
+  made"), nor, with `LAMP_SAID_TO_ME` (#7442), one no face was seen
+  speaking through: then the lamp stays quiet and the cut is not counted
+  (lamp-74ff, 17 Nov: a lip smack over the answer was asked). Asked at most
+  once a minute
   (`cut_in_wordless::AGAIN_AFTER`): a second knock that cuts the question
   itself leaves the lamp quiet, never asking again and again. On in the
   product by the memory owner's call (4 Nov), with a known gap accepted

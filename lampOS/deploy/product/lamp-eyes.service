@@ -46,6 +46,9 @@ Environment=LAMP_PRESENCE_VOICE=addressed
 # The head's own moves left out of the speaking read, and a meshed face read from 16 px (#4558): the
 # memory owner's yes (#4710, 4 Nov), after Sixth's lamp-52e6 check.
 Environment=LAMP_EYES_SPEAKING_STEADY=on
+# Each face's head pitch and, from the Blendshape V2 read, whether its eyes look away, on humans/faces/tracked, for the
+# voice's LAMP_SAID_TO_ME (#7442): a head down to a phone is not said to the lamp. Row-7442b on lamp-52e6, 17 Nov.
+Environment=LAMP_EYES_PITCH_GAZE=on
 # The one known held through a missed check for 4 s (#4493, both arms passed on lamp-52e6, 30 Oct): without it
 # each miss removed the known file with their face still in view, the voice went cold and named nobody, and
 # their line went to the room (#5522: lamp-29e7, 122 cold lines in 1.5 days).

@@ -313,6 +313,25 @@ pub const FACE_EXPRESSIONS_PATH: &str = "/var/lib/lampOS/consent/face-expression
 pub fn face_expressions_beside(room_sounds: &Path) -> PathBuf {
     room_sounds.with_file_name("face-expressions.json")
 }
+/// The owner's yes to seen activity for lamp-seen (#6543,
+/// `lamp_msgs::consent::SEEN_ACTIVITY`) beside `room_sounds`: kept the same
+/// way, but given by voice at any time ([`crate::seen_yes`]), never asked
+/// at onboarding.
+pub fn seen_activity_beside(room_sounds: &Path) -> PathBuf {
+    room_sounds.with_file_name("seen-activity.json")
+}
+/// [`ROOM_SOUNDS_GROUP`]'s id, from `/etc/group`. Not known: a yes kept is
+/// root's alone (0600), which its reader takes as no, said once here.
+pub(crate) fn consent_group() -> Option<u32> {
+    let name = ROOM_SOUNDS_GROUP;
+    let id = std::fs::read_to_string("/etc/group")
+        .ok()
+        .and_then(|groups| crate::say::group_id(&groups, name));
+    if id.is_none() {
+        eprintln!("lamp-voice: the group {name:?} is not known; a room sounds yes is root's alone");
+    }
+    id
+}
 /// `on` offers the face expressions step; anything else passes it over.
 pub const FACE_EXPRESSIONS_ASK_ENVIRONMENT: &str = "LAMP_FACE_EXPRESSIONS_ASK";
 
@@ -4896,6 +4915,25 @@ impl Onboarding {
                 }
                 continue;
             }
+            // The owner's face linked to the typed name by their own words
+            // ([`owner_linked`], #7501): kept as the owner only while none
+            // is kept, never over one, bounded as a saved name is.
+            if let Some(linked) = told.get("owner_linked") {
+                let name = linked
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty() && name.len() <= 64);
+                if let Some(name) = name
+                    && self.desired.owner.is_none()
+                {
+                    self.desired.owner = Some(name.to_owned());
+                    self.save();
+                    eprintln!(
+                        "lamp-voice: onboarding: the owner's face linked to the typed name, kept as the owner"
+                    );
+                }
+                continue;
+            }
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
                 self.storage_failed = false;
                 self.invalidate_privacy(privacy::Invalidation::Redo);
@@ -6439,6 +6477,16 @@ pub fn owner_gone(file: &Path, owner: &str) {
 pub fn owner_renamed(file: &Path, from: &str, to: &str) {
     if let Err(error) = post(file, &json!({"owner_renamed": {"from": from, "to": to}})) {
         eprintln!("lamp-voice: onboarding: the owner's face renamed, not noted: {error}");
+    }
+}
+
+/// The owner's face, kept by the eyes under the name `name`, linked to the
+/// name typed at setup by the owner's own words (`owner_link::taken`,
+/// #7501): the walk keeps `name` as the owner only while it keeps none, so
+/// it is set once and never over one. The rest of the file is kept as it is.
+pub fn owner_linked(file: &Path, name: &str) {
+    if let Err(error) = post(file, &json!({"owner_linked": name})) {
+        eprintln!("lamp-voice: onboarding: the owner's face linked, not noted: {error}");
     }
 }
 
@@ -8192,6 +8240,49 @@ mod tests {
         korean.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(korean.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(korean.walk.desired.owner.as_deref(), Some("민수"));
+    }
+
+    /// #7501: the owner's face linked to the typed name (`owner_linked`) is
+    /// kept as the owner only while none is kept: set once, never over one,
+    /// an empty or overlong name never; a forget drops it as any owner, and
+    /// a redo clears it.
+    #[test]
+    fn the_owners_face_linked_is_kept_once_and_never_over_an_owner() {
+        let mut room = Room::new("owner-linked");
+        room.wait(7 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file), None);
+        owner_linked(&room.walk.file, "  ");
+        owner_linked(&room.walk.file, &"x".repeat(65));
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file), None);
+        owner_linked(&room.walk.file, "Face Name");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Face Name"));
+        // A second link: never over the one kept.
+        owner_linked(&room.walk.file, "Other Face");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Face Name"));
+        // The face forgotten: dropped as any owner.
+        owner_gone(&room.walk.file, "face name");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file), None);
+        // Linked again, then a redo: cleared.
+        owner_linked(&room.walk.file, "Face Name");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Face Name"));
+        room.walk.apply_mailbox("{\"redo\":true}\n", room.at);
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.desired.owner, None);
+        // Kept at setup: a link never moves it.
+        let mut setup = Room::new("owner-linked-setup");
+        setup.wait(7 * S, Some(NEAR_MIDDLE));
+        setup.wait(20 * S, Some(NEAR_MIDDLE));
+        face_saved(&setup.walk.file, Some("Setup Face"));
+        setup.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&setup.walk.file).as_deref(), Some("Setup Face"));
+        owner_linked(&setup.walk.file, "Face Name");
+        setup.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&setup.walk.file).as_deref(), Some("Setup Face"));
     }
 
     /// A tester's lamp, 3 Nov: the owner's face renamed from a misheard name
@@ -13477,6 +13568,8 @@ mod tests {
     #[test]
     fn the_nearest_face_is_its_framing() {
         let face = |xmin: f32, ymin: f32, side: f32| lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             speaking: None,
             id: "f".into(),
             xmin,

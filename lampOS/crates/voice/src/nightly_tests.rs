@@ -810,3 +810,52 @@ fn a_dropped_chapter_logs_only_known_reasons_and_nothing_or_refused_lets_go() {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 }
+
+/// Set in the child [`a_workers_recall_is_told_chapters_only_as_its_environment_says`]
+/// runs: the values of [`ENVIRONMENT`] and [`CHAPTERS_ENVIRONMENT`] it was
+/// started with, `-` for unset.
+const CHAPTERS_CHILD: &str = "LAMP_TEST_NIGHTLY_CHAPTERS_CHILD";
+
+/// A route's worker runs the recall, in a cleared environment where no
+/// night starts: its [`chapters_on`] follows [`ENVIRONMENT`] and
+/// [`CHAPTERS_ENVIRONMENT`] as `worker_command` passes them, both `on`
+/// alone. Each case runs in a child, as the static is the process's.
+#[test]
+fn a_workers_recall_is_told_chapters_only_as_its_environment_says() {
+    const NAME: &str =
+        "nightly::tests::a_workers_recall_is_told_chapters_only_as_its_environment_says";
+    if let Ok(given) = std::env::var(CHAPTERS_CHILD) {
+        assert!(!chapters_on());
+        chapters_from_environment();
+        assert_eq!(chapters_on(), given == "on on", "{given:?}");
+        return;
+    }
+    for (nightly, chapters) in [
+        ("on", "on"),
+        ("on", "-"),
+        ("-", "on"),
+        ("off", "on"),
+        ("on", "off"),
+        ("on", "On"),
+    ] {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+        child
+            .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+            .env(CHAPTERS_CHILD, format!("{nightly} {chapters}"));
+        for (name, value) in [(ENVIRONMENT, nightly), (CHAPTERS_ENVIRONMENT, chapters)] {
+            if value == "-" {
+                child.env_remove(name);
+            } else {
+                child.env(name, value);
+            }
+        }
+        let output = child.output().unwrap();
+        let said = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.status.success(), "{nightly} {chapters}: {said}");
+        assert!(said.contains("1 passed"), "the child ran no test: {said}");
+    }
+}

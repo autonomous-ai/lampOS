@@ -120,8 +120,18 @@ What is known and what is not:
 
 | Slice | Parts | Weight | Why |
 |---|---|---|---|
-| `lampos-voice.slice` | voice | `CPUWeight=1000`, `IOWeight=1000` | A late word is worse than anything else late. The voice's microphone and speaker threads are also round-robin real-time at 20 (lamp-4ace, 2026-10-13: with every core busy the voice ended four times at ordinary priority) |
+| `lampos-voice.slice` | voice | `CPUWeight=1000`, `IOWeight=1000`, `MemoryMin=256M` | A late word is worse than anything else late. The voice's microphone and speaker threads are also round-robin real-time at 20 (lamp-4ace, 2026-10-13: with every core busy the voice ended four times at ordinary priority) |
 | `lampos-parts.slice` | every other part | `CPUWeight=100` | Together no more than one ordinary service. Within it: eyes `Nice=10` (looking is never worth a late word); name, Expression, policy, health `Nice=5`; body and memory ordinary; controls `Nice=5` in these units, and in the product unit (`deploy/product/lamp-controls.service`) its main loop and strip child round-robin real-time at 30, above the voice, so the switch and hand can be read while speech is busy. Each loop rests for at least its thread CPU work; reset-on-fork stays unset (#2602, [controls.md](controls.md)) |
+
+The voice's memory is kept from reclaim (#7383): `MemoryMin=256M` on
+`lamp-voice.service`, `lampos-voice.slice` and `lampos.slice`, the voice's
+cgroup `/lampos.slice/lampos-voice.slice/lamp-voice.service` at every level
+but the root, as systemd needs for the protection to hold. `lampos.slice`
+is otherwise implicit; install writes it only for this. Under an agent's
+work the board swaps; protected, the voice's pages are reclaimed last.
+Measured: lamp-voice `MemoryCurrent` 105-119 MB on lamp-c0a4 (17 Nov). The
+OpenClaw gateway (`lamp-openclaw-gateway.service`, in `system.slice`) keeps
+only `MemoryMax=2500M` and no `MemoryHigh` (#6226).
 
 The name also keeps to the board's fast processors (`CPUAffinity=`), as on
 lamp-4ace.
@@ -156,10 +166,16 @@ Through the keeper's helper (`crates/keeper`), each part:
 Without `NOTIFY_SOCKET` (a part run by hand) the helper does nothing.
 A part's unit becomes `Type=notify` with a `WatchdogSec=` only once the
 part calls the helper; a `Type=notify` unit whose process never says ready
-fails its start after `TimeoutStartSec` (90 s). Today only the body does:
-`WatchdogSec=5`. A body whose loop is silent for five seconds is ended and
-started again after 15 s, within its limit. Its servos hold their last goal
-meanwhile, with torque on; it does not fold.
+fails its start after `TimeoutStartSec` (90 s by default). Today only the
+body does: `WatchdogSec=5`. A body whose loop is silent for five seconds is
+ended and started again after 15 s, within its limit. Its servos hold their
+last goal meanwhile, with torque on; it does not fold.
+
+A part still starting that knows it needs longer says so with
+`extend_timeout` (`EXTEND_TIMEOUT_USEC`): systemd then waits at least that
+long from then. The body does before each move of a fold and wake at
+power-up, which come before it says ready (#5693), and its product unit
+sets `TimeoutStartSec=180` as a backstop.
 
 ## Named states and the pause
 

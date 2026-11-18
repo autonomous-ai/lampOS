@@ -9,6 +9,8 @@ pub mod beat;
 pub mod chat;
 pub mod consent;
 pub mod control;
+pub mod devices;
+pub mod energy_rate;
 pub mod engine_default;
 pub mod face_remove;
 pub mod faces;

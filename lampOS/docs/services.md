@@ -69,6 +69,14 @@ can see who is asking.", and nothing is called, for reads and writes alike. A re
 lamp's own, a text) is told `NOT_HEARD` and nothing is called either, so
 under privacy, with the microphone off, no service is fetched.
 
+A lamp set up before onboarding kept an `owner` has the typed name as its
+only owner: when the owner's face is kept under another name, their own
+line is "a guest's" here and nothing is read or written for them outside
+the private room. With `LAMP_OWNER_LINK=on` (off unless set, #7501) their
+own "I'm <the typed name>", alone in view and seen saying it, links that
+face as the owner, and `person::owner_ids` holds both ids
+([memory.md](memory.md), "The owner's face and typed name").
+
 The face in view says who is at the lamp; it doesn't say who spoke (a
 partner off camera speaks in the owner's lease). So a line counts as the
 owner's for a write or a full read only on positive evidence: the owner's
@@ -121,14 +129,15 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
-| `LAMP_CALENDAR_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
+| `LAMP_CALENDAR_EDITS=on` (on in the product's `lamp-services.service` since 11 Nov) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
+| `LAMP_CALENDAR_EVENT_SEARCH=on` (tracker row C132; off in the product until its lamp check) | `lamp-services`, with `LAMP_CALENDAR_EDITS=on` | A Calendar `events` read takes no words: a `query` is ignored, and the read lists the next events from its start, so an event weeks away or behind a busy day is never found to move or cancel ("Finding an event to move or cancel", below) |
 | `LAMP_GMAIL_DRAFT_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, off in the product until its rows) | `lamp-services` | `tools.json` names every service the lamp can link, linked or not, with every read's and write's fields (about 7.8 KB of the voice's request). On, it names only the linked ones: their codes in the `service` enums, their lines in what each reads and writes, and only the fields those lines name (`service`, `what`, `action`, `send_id`, `said` always). A read or a write no linked service has is left out, so with nothing linked the voice is offered `services_connected` alone, which still says what the lamp can link. It is written at start and again after each link, unlink and wipe on the admin socket, one write at a time under a lock (the newest list always wins, and the file is never torn), and the voice reads it for each request, so a link counts from the next turn. Measured offline on the product's spoken turn: 49,064 B with every service, 46,522 B with Gmail and Calendar, 45,539 B with Gmail alone, 43,249 B with nothing linked. **Off in every product unit until a privacy condition is met (#6476 read):** the file is declared on every request, whoever speaks, so with the switch on a guest's line, the room's, a held one, an app text and a scheduled turn would see the linked codes, where "The voice is told what is linked" keeps them to the owner's line. It is turned on only after non-owner lines are given the whole catalog (or `services_connected` alone), or after the memory and privacy owner accepts in writing that linked names reach every line, with this row saying so |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
-| `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; off in every product unit) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; on in the product's lamp-voice unit, beside #6410) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -308,6 +317,28 @@ A Calendar `events` read asks for its times in the lamp's own zone
 in the calendar's own zone, and on lamp-9adf on 5 Nov at 00:27 such an
 event came back as 08:00Z and was said as "8 to 9 AM your time". With the
 zone unnamed, nothing is asked, as before.
+
+The one-event read an edit makes before its read-back (`writes::event_read`)
+asks the same, so a move or a cancel reads the event's time back as
+22:00 +07:00. Without it, on lamp-06c1 on 12 Nov, a move read back "now from
+2026-11-13T15:00:00Z" for a 22:00 +07:00 event.
+
+**A read-back says a time as the lamp says one** (`writes::Clock`): an
+event's create, move and cancel read-backs never carry RFC 3339. Each time
+is told in the lamp's own zone (the system zone, `lamp_local_time`) at that
+time's own instant's offset, so an April event read in November says its own
+hour across a daylight-saving change, on a 12-hour clock, against today: "today at
+10:00 pm", "tomorrow at 9:00 am", "yesterday at …", a weekday within the
+coming six days ("Saturday at 3:00 pm"), else its weekday and date
+("Friday 4 December at 3:00 pm", with the year when it is another one). An
+end on the same day says its clock alone ("today at 10:00 pm to 11:00 pm");
+an all-day event says "all day" and its day, or "all day from <first> to
+<last>" for several. With the zone unknown, a time is told at its own offset
+and every day as its date ("Tuesday 17 November 2026"), never as "today" on
+a guess. The RFC 3339 time stays in the
+call sent to Google. On lamp-06c1 on 17 Nov (build 13753) five of five move
+and cancel read-backs said "2026-11-17T22:00:00+07:00" aloud, because the
+voice is told to say `read_back` word for word.
 
 A call may name either Gmail code: `gmail` or `gmail-app` reaches whichever
 Gmail link the lamp has, because the voice's model mixes the two (on
@@ -801,7 +832,11 @@ scrubbed from any answer (each spelling, plain or URL-encoded).
 Each `service_read` has one journal line (`serve::read_said`, #5826): who
 asked, the service's code and the read's kind, and what became of it, as
 "lamp-services: the voice's service_read of gmail search: found 2". The
-kind is a `what` of lowercase letters and `_` only, else "another"; the
+kind is the `what` when it is one of the service's kinds of read
+(`reads::kinds`; with the service unknown, any service's), "no what" when
+there is none, else its shape alone (#7498): "a what of 16 characters, no
+service's kind" or "a what of 6 characters, another service's kind",
+never its words; the
 outcome is "found N" (the items quoted and left out), "none", "answered"
 (an MCP tool's), "refused: <why>" in fixed words (a send-only link, not
 linked, its link has expired, a service the lamp can't link, no id, no
@@ -1163,7 +1198,8 @@ change"). Any other 401 or 403 keeps its words.
 ### Changing or cancelling a calendar event (`LAMP_CALENDAR_EDITS`)
 
 Off unless `LAMP_CALENDAR_EDITS=on` and `LAMP_SERVICES_WRITE=on` in
-`lamp-services` (off in the product until its lamp check). On, Google
+`lamp-services` (both on in the product's `lamp-services.service` since
+11 Nov; a drop-in with `LAMP_CALENDAR_EDITS=off` turns it off). On, Google
 Calendar's actions in `tools.json` add `update_event {event_id, title, start,
 end, text, calendar}` and `delete_event {event_id, calendar}`
 (`writes::CALENDAR_EDITS`), and `service_write` takes an `event_id`: the id a
@@ -1184,7 +1220,8 @@ them within the 1,024 bytes its link takes.
   first reads that one event (`GET /calendar/v3/calendars/<calendar>/events/<id>`,
   on Calendar's read list), and reads back its title and time now, what
   changes and who is told: "Change the event "Hamburger party" on your Google
-  Calendar (primary), now from … to …: move it to … to …. Its guests, …, are
+  Calendar (primary), now from today at 10:00 pm to 11:00 pm: move it to
+  tomorrow at 9:00 am to 9:30 am. Its guests, …, are
   told by email. Seen by whoever your calendar is shared with." or "Delete
   the event "Hamburger party", now from … to …, from your Google Calendar
   (primary). … The lamp can't bring it back." The event's own text is the
@@ -1224,6 +1261,43 @@ them within the 1,024 bytes its link takes.
   was deleted or changed there, and nothing was changed. Say it's no longer
   there, and offer to create it again with create_event." (after "not sent:
   " on a send). Nothing is held.
+
+### Finding an event to move or cancel (`LAMP_CALENDAR_EVENT_SEARCH`)
+
+Tracker row C132. An event made in an earlier conversation has no
+`event_id` in the talk, so "cancel my dentist" reads the calendar first,
+and a Calendar `events` read took no words: it listed the next events from
+its start, at most 10, and `LAMP_SERVICE_READ_IDS_KEPT` keeps only the
+first 5. An event weeks away, or behind a busy day, was never in the list.
+
+Off unless `LAMP_CALENDAR_EVENT_SEARCH=on` and `LAMP_CALENDAR_EDITS=on` in
+`lamp-services` (off in the product until its lamp check). On, a Google
+Calendar `events` read may carry `query`, the person's words (one line, at
+most 300 characters, as Gmail's and Drive's searches take them), asked as
+Calendar's own `q` (`reads::plan_with`):
+
+- **A bounded window.** From the asked `from`, or now, never more than a day
+  ago (`reads::EVENT_SEARCH_BACK_SECS`), to the asked `to`, or 90 days after
+  that start, never later (`reads::EVENT_SEARCH_AHEAD_SECS`); both sent in
+  UTC, the answer still in the lamp's own zone. An end before its start is
+  refused before Calendar is asked (`reads::EVENT_SEARCH_WINDOW`).
+- **Without words** a read is as before, switch on or off. Off, a `query`
+  changes nothing.
+- **What the model is told.** `tools.json`'s `query` field says it, for
+  `google_calendar` events, is the person's words for the one event to move
+  or cancel (`reads::CALENDAR_SEARCH_QUERY`); the read's own description,
+  at its 1,024 bytes, is unchanged. With `LAMP_SERVICES_LINKED_TOOLS` on and
+  only the calendar linked, the read keeps its `query` field.
+- **Everything else stays.** The read is a read: owner-only as every
+  service read, quoted as data, and the after-read rule ("After a read",
+  below) still refuses a write in its own request. With
+  `LAMP_SERVICE_READ_IDS_KEPT` on, the events it finds are kept for the
+  asker's next request (id, calendar, title, time, the first 5), so "yes,
+  cancel it" names the event by its id, and the edit is read from Google,
+  read back and sent on a yes as above. Calendar's `q` also matches an
+  event's description, place or guests, but only id, title and time are
+  kept or told. The words reach only the owner's own linked calendar, and
+  nothing new is stored.
 
 ### Changing or deleting a saved Gmail draft (`LAMP_GMAIL_DRAFT_EDITS`)
 
@@ -1708,9 +1782,10 @@ it is saved, never sent, whatever words agreed to it.
   the rest of the session; only the thread and what is built from it are
   kept clear of it.
 - **A calendar read's event ids, kept for the next request
-  (`LAMP_SERVICE_READ_IDS_KEPT`, off unless set; off in the product until
-  its lamp check; tracker row C132).** On lamp-06c1 on 12 Nov (row X1) an
-  event made in an earlier conversation could not be cancelled: the model
+  (`LAMP_SERVICE_READ_IDS_KEPT`, off unless set; on in the product since
+  its lamp check, Fourteen's cancel 2/2 on #6410; tracker row C132).** On
+  lamp-06c1 on 12 Nov (row X1) an event made in an earlier conversation
+  could not be cancelled: the model
   had no `event_id`, so it read first; the rule above refused the write in
   that request, and the next request read again and was refused again. With
   the switch on (`crate::service_read_ids`), a Google Calendar `events` read
@@ -2169,8 +2244,9 @@ and no text:
    (`writes::scope_missing`), is refused as for the voice. A GitHub
    repository approved as private and public now waits, as above.
 6. **The bounds** (`skill_writes::Ledger`, `skill-writes.json` in the store
-   folder): at most 10 sends a skill and 30 across every skill in any 24
-   hours. Each send is counted before it goes, one at a time, so two at
+   folder): at most 50 sends a skill and 200 across every skill in any 24
+   hours, and at most 5 a skill in any hour (`PER_SKILL_HOUR`), so a
+   trigger that flaps never spends a skill's day in minutes. Each send is counted before it goes, one at a time, so two at
    once never pass a bound together. A send that then fails still counts.
    The ledger keeps a skill's name and a time, nothing else, so a restart
    doesn't forget the day's sends. It fails closed: a ledger that can't
@@ -2309,7 +2385,7 @@ is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
   the owner's kept yes matched on that exact content (a run that changes a
   field is refused "not sent: this write is not the one the owner said yes
   to", never held for a spoken yes), the link it was said under, the day's
-  bounds (10 a skill, 30 in all) and the sent-log, and **once a run**: a
+  bounds (50 a skill, 200 in all, 5 a skill an hour) and the sent-log, and **once a run**: a
   second try, whatever it sends, is refused ("not sent: a skill's fixed
   write is sent once a run …"). The agent is told "Sent, as the owner said
   yes to it." Any other call of that run is refused, and with the switch
@@ -2431,8 +2507,8 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   mail of 10 unread subjects was held, then only said too long, and the
   run ended with nothing sent. The write is sent only by the
   existing send, the spoken yes through the voice's gate, and then counts
-  against the skills' bounds as a made skill's write does (10 a day a skill,
-  30 across every skill, `skill_writes::Ledger`): over them it is "not sent".
+  against the skills' bounds as a made skill's write does (50 a day a skill,
+  200 across every skill, `skill_writes::Ledger`): over them it is "not sent".
 - **The voice reads it back** (`crates/voice/src/run_write_yes.rs`, with
   `LAMP_SKILL_TASKS=on` in `lamp-voice` too). The coordinator asks this
   program for the run's held write, the voice's own call on the tools
@@ -2571,7 +2647,7 @@ never through an open socket.
   owner's yes: nothing is sent". The voice reads the held write back
   (`run_write_yes`, "Your <skill> skill wants to send: …") and waits for the
   owner's plain spoken yes (#6558's wait); only then does this program send
-  it, counted in the skills' bounds (3 a day a skill, 10 across them). A
+  it, counted in the skills' bounds (20 a day a skill, 100 across them). A
   made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
   on in the product) is the one write sent on a run's call, and only as the
   owner's kept yes has it, once ("A made skill's write", "Through the
@@ -2709,7 +2785,25 @@ and never taken from the executive's or a skill's folder.
   reason." It is at most 600 bytes, so the voice's own rule fits before it
   within the 1,024 its provider link takes.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
-  table above; the answer quoted, cut to who and what about when the owner
+  table above. Each service's kinds of read (`reads::kinds`: the first word
+  of each of its reads in the table, an MCP service's `tools` and `call`,
+  and `get` for a service read over its HTTP API with a GET on its
+  allow-list, never Gmail) are named on `what` itself, whatever the
+  description's cut keeps: an `enum` of every kind offered, and its
+  description "One kind of read, the word alone, of the named service's
+  own, never other words: gmail: recent, search, drafts, message,
+  attachment; google_calendar: events, get; …" (#7498: on lamp-a63e on 17
+  Nov Gmail reads with a `what` none of Gmail's kinds were refused four
+  times, and only each retry with `search` answered). With no kind offered
+  (only a send-only `gmail-app` linked, under
+  `LAMP_SERVICES_LINKED_TOOLS=on`), `what` names no empty `enum`, and its
+  read hears how to link Gmail for reading. A `what` none of the
+  service's kinds is refused before anything is asked of it, with the same
+  kinds, so the next call is right: "what is one of gmail's kinds of read,
+  the word alone: recent, search, drafts, message, attachment. gmail reads:
+  recent {count}, …" (`reads::no_such_kind`; an MCP service's alike). The
+  model's words are never matched against a list: only `what` is checked,
+  as one of the kinds. The answer is quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
   conversation's voice (`read_in_full`, a likeness of 0.55 or more), from
   the prints the product makes for the services alone

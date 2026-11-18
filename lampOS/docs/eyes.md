@@ -1473,7 +1473,9 @@ With the switch:
   first letter capital ("Jane"; `known_faces::letters_as_word`), so the
   eyes keep, and the lamp says back and greets them by, a name, never its
   letters (lamp-3e83, #5564: "Jane or J-A-N-E?"). Two letters ("A J",
-  "T.J.") may be initials and stay as given. The model's words say a
+  "T.J.") may be initials and stay as given, except on a rename right
+  after the lamp asked for a spelling with `LAMP_NAME_LEARN_FIX=on` (#7331),
+  where "A l" is "Al". The model's words say a
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
   `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
@@ -1603,13 +1605,62 @@ With the switch:
     There must be as many spelled runs as the model's name has words.
     Letters said without that ask ("I work at I B M", "I'm from the U S")
     are no name, and the name goes through the read-back above (El's HOLD
-    on #5159). Letters that disagree with a count
+    on #5159). With `LAMP_NAME_LEARN_FIX=on` (on in the product unit, #7331) a
+    rename (`replace`) takes the letters the same way: spelled in the turn
+    in hand right after the lamp asked for a spelling, they are the name
+    and its yes, two letters joined as a word ("A d a", "A, d, a" and
+    "A l" send `{"remember":"Ada","replace":true}` and "Al"); on lamp-74ff
+    such a rename was refused as not heard or not agreed
+    (`known_faces::tests::a_spelled_short_name_is_heard_on_a_rename`).
+    With the same switch, a name that sounds like a letter is one name
+    however it was heard (`known_faces::as_said`, V2 on lamp-74ff): speech
+    to text writes such a name as the letter, so for the name checks and a
+    rename's yes (here and in the held rename) a lone letter not in a
+    spelled run is read as the word it is said as when that is the name's
+    ("J" is "Jay", "B" "Bee", "L" "El"), and a name that is a lone letter
+    is judged as that word. Heard "J", said "Jay" and spelled "J a y" agree;
+    the eyes still get the model's name, and an alias the eyes keep is left
+    as it is (`a_name_heard_as_its_letter_is_the_same_name`).
+    With the same switch, a name kept from letters spelled to it, at the
+    first save at setup and on a rename alike (spelled in the turn in hand
+    after a spell ask, or a correction below), is said back as a
+    statement, not a question: the eyes' answer gets `say_back`, the word
+    and its letters ("Ama: A, M, A. Got it.", `known_faces::spelled_back`),
+    and the model is told to say exactly that and ask nothing more
+    (`SPELLED_KEPT`). A misheard letter (B/D, M/N) is then the person's to
+    hear. The line right after that read-back may correct it, though the
+    lamp's last words were no spell ask: the read-back is found in the
+    lamp's last answer as a word right before its own letters
+    (`spelled_back_in`), and the turn in hand either spells the new name
+    (`spelled_by_them`) or names letters by a word ("No, N as in nose.",
+    "N for nose", `letters_named`) and the new name is the read-back's
+    with only those letters changed, at most as many as it names
+    (`corrects_spelled_back`). Such a line is the rename's yes and passes
+    the name checks and setup's read-back gate; any other name, another
+    letter changed, or no such line is refused as before, and
+    `rename_agreed`'s guards still judge every other yes
+    (`a_spelled_name_kept_is_said_back_and_one_line_corrects_it`). The
+    walk's own read-back of a spelled name before the face question
+    (`onboarding::spelled_name_note`, "…, did I get that right?") is
+    unchanged. Letters that disagree with a count
     they gave ("four letters", five spelled) are refused, as above.
 
   Past setup, and on the speaker's own line (`LAMP_REMEMBER_SPEAKER`), the
   check is as before. Nobody is known yet at setup, so the line is the
   room's: another voice's "Yes." or spelling counts the same as theirs
   ([onboarding.md](onboarding.md), step 2).
+- **A new face only on a yes to keeping it** (`LAMP_NAME_LEARN_FIX=on`,
+  on in the product unit, #7331). Past setup, a `remember_my_face` with no
+  `replace` is sent to the eyes only when the turn in hand asks for their
+  own face ("remember my face") or agrees to the lamp's face question in
+  its last answer ("Shall I remember your face as Ada?"; both
+  `known_faces::speaker_gave_face_leave`). Anything else, a name alone, a
+  no or another answer, sends nothing, before the name's own checks, and
+  the model is told to ask that question (`ASK_FACE_FIRST`). A name is no
+  yes to keeping a face (the first builder on #7331). Setup asks its own
+  face question, and a rename takes its own yes. Off, a new face is kept
+  on the call as before
+  (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a
@@ -1706,7 +1757,17 @@ With the switch:
     model call, so every name and owner check still applies, and the
     model is told the result. Any other turn drops it: a no, another name,
     another face seen saying the yes (told), a carried line not read as
-    the asker's, another session, a new save call. A line carried into the
+    the asker's, another session, a new save call. With
+    `LAMP_NAME_LEARN_FIX=on` (on in the product unit, #7331), one turn that is no
+    yes only because the question was cut before its name was heard (the
+    thread holds the question's answer as the one cut last, and what played
+    of it does not say A, `LAMP_SAID_AS_HEARD`; `Thread::cut_played`) keeps
+    the hold instead, once, and the model is told the question was not
+    heard and to ask it again (`held_rename::ask_again_note`); the 60 s and
+    every other guard stand, and nothing is renamed without the yes to the
+    question asked again. On lamp-74ff a line began over the question,
+    none of it played, and the rename was dropped in silence
+    (`a_rename_question_cut_before_its_name_keeps_the_hold`). A line carried into the
     asker's conversation going on and read as theirs
     (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
     own face the one face in view, none seen saying it, no other voice
@@ -2101,7 +2162,63 @@ process, shows there before any trial waits for it. For each face:
   60 degrees in the middle of the picture, more toward its edges, where
   the lens shows a straight face turned). A face narrower than 7.5% of
   the picture, or with an eye or the nose outside it, has neither: it
-  counts for nothing either way.
+  counts for nothing either way;
+- with `LAMP_EYES_PITCH_GAZE=on` (#7442, off unless set), **how far the
+  head is tipped** (`pitch`, radians, positive down as ROS has it) and,
+  for one face, **whether its eyes look toward the lamp** (`looking`).
+  Off, both are left out and the message is as before.
+
+#### Pitch and gaze (`LAMP_EYES_PITCH_GAZE=on`, #7442)
+
+**Pitch** ([`facing::pitch_deg`](../crates/eyes/src/facing.rs)) comes from
+the same five marks as the turn: the nose's drop `r` and the mouth
+corners' midpoint's drop `m` below the point between the eyes, square to
+the eye line (a head tilted over reads the same). A head tipped by `t`
+gives `r = 0.64 cos t + 0.5 sin t` and `m = 1.15 cos t + 0.2 sin t`; the
+two are solved for `cos t` and `sin t`, and `t` is their angle. That has
+one answer for every bow, so a phone's deep bow (60, 75 degrees) reads
+deeper, never back inside the window as the nose alone did past about 41
+degrees (the Reviewer-lead's P3 on #7450). Only the ratio counts, so the
+face's size and a turn's narrowing fall out. On a level face the nose sits
+0.64 eye distances below the eyes and the mouth corners 1.15
+(`LEVEL_NOSE_DROP`, `LEVEL_MOUTH_DROP`). The mouth's is InsightFace's
+ArcFace five-point template, the mean frontal face recognisers align to;
+the nose's was that template's 0.57 until row-7442a (lamp-52e6, 17 Nov):
+a person facing the lamp level read Q1-Q5 medians 7.8-17.6 degrees down
+(pooled median 10.75 over 234 looks), since YuNet puts the nose lower. The
+nose drop the model gives a face tipped 10.75 degrees, against the mouth's
+level, is `1.15 (0.57 + 0.5 tan 10.75) / (1.15 + 0.2 tan 10.75)` = 0.644,
+so 0.64: that face now reads within a degree of 0, and the template itself
+about 10 degrees up. The nose's tip stands 0.5 in front of the eyes and
+the mouth 0.2 (`NOSE_DEPTH`, `MOUTH_DEPTH`, guesses). A face
+too small for a turn, or turned past 60 degrees, has no pitch (not
+measured). Marks no head could make (a mark not a number, the eyes on one
+another, the mouth above the eyes with the nose below) read `LOST_DEG`,
+90 degrees down (`pitch` π/2 radians on the bus; `pitch_deg` works in
+degrees, the message in radians): outside the window, so a lost pitch never counts as
+facing. The window the voice may use is `MAX_PITCH_UP_DEG` 20 to
+`MAX_PITCH_DOWN_DEG` 25 (`facing::pitch_within`); authored, to be set on
+the row.
+
+**Looking** ([`blendshapes::looking`](../crates/eyes/src/blendshapes.rs))
+is read from the Blendshape V2 scores the seems read already makes (no new
+model): false when either eye's `eyeLookDown`, `eyeLookIn` or `eyeLookOut`
+is 0.5 or more (MediaPipe's order of the 52, 11-16), true otherwise;
+`eyeLookUp` is not read. It is said only for the face that read ran on,
+for 2.5 s after its frame (`LOOKING_LASTS_US`: one read every 2 s and its
+thread's time), so it needs `--seems-blendshapes`. It works on every lamp,
+the face-expressions yes or not (the lead's call on #7442): with no yes,
+the Blendshape V2 read still runs on the near face on the same timing, but
+gaze-only (`seems::Due::GazeOnly`, `blendshapes::from_scores`): only the
+eye-look scores are read, for `looking`, and every other score is dropped
+at once, with no kind: nothing on `humans/seems`, nothing in
+`--seems-log`, no count in the minute's journal line, and the yawn's own
+read and count (`LAMP_EYES_YAWN`) still need the yes. `looking` goes only
+on `humans/faces/tracked`, on the lamp's bus; no product reader stores or
+sends it. With the yes, the read is
+the full seems read as before. With the switch off and no yes, no read
+runs, as before. Every other face, or no read, leaves it out: unknown,
+not away.
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
@@ -2453,7 +2570,10 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   (`seems::face_expressions_yes`). Missing, unreadable, over 4096 bytes or
   anything else is no: no face is read, by either reader, nothing goes on
   `humans/seems` or into `--seems-log`, and the ask comes again 2 s later.
-  The journal says once each time the yes comes or goes. The eyes still
+  With `LAMP_EYES_PITCH_GAZE=on`, Blendshape V2 still reads where the near
+  face looks, and only that, for `looking` ("Pitch and gaze" above).
+  The journal says once each time the yes comes or goes, and with that
+  switch that only where the face looks is read. The eyes still
   look, follow faces and say who is there. Who writes the file:
   privacy-switch.md, "Face reads stay off without a yes".
 - **The journal** says only how many reads there were in the last minute,
@@ -2782,7 +2902,7 @@ apart is its scripted sitting.
 `sitting_s` is counted in the eyes' memory from the sitting's first face,
 so before this every restart of lamp-eyes (an update restarts it, several
 times a day) began it at 0, and every nudge that waits on it (a sip of
-water after 50 minutes, rest your eyes after 45, stand up after 100, a
+water after 30 minutes, rest your eyes after 45, stand up after 100, a
 comfort break after 90) waited its whole time again. Now, while activity is
 said, the eyes keep the sitting in `/run/lampos-eyes-kept/sitting.json`
 (`crates/eyes/src/sitting.rs`): written at once when a sitting begins, ends
@@ -3356,9 +3476,9 @@ link, as before. The file is never an `EnvironmentFile=`: the boots are
 in neither the eyes' environment nor their command line. Beside it,
 `lamp-seen frame-link` keeps `/run/lampos-seen/eyes-visits.env`, only
 `LAMP_EYES_VISITS=--visits on`, which the unit loads (`EnvironmentFile=-`)
-and puts on the line: `humans/familiar` for `lamp-seen`'s stranger check
-only, a level with no name, face or picture (the first builder's yes on
-#6543); with the switch off it is removed and the eyes run without it. The
+and puts on the line: `humans/familiar`, a level with no name, face or
+picture (the first builder's yes on #6543), once for `lamp-seen`'s
+stranger check, which is gone (seen.md, "No stranger check"); with the switch off it is removed and the eyes run without it. The
 folder `/run/lampos-eyes-frames` is made 0700 `lampos` by `lampos.conf`;
 `lamp-seen` runs as `lampos` too, so it may connect. The eyes take a new
 link only at their next start.

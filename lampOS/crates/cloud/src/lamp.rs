@@ -137,6 +137,9 @@ pub struct Real {
     /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
     /// `crate::monitor`).
     pub monitor: Option<crate::monitor::Place>,
+    /// The owner's desk and Hydrate bottles through the cloud, with
+    /// `LAMP_DEVICES=on` (#7470, `crate::devices`).
+    pub devices: Option<crate::devices::Link>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -705,6 +708,10 @@ impl Lamp for Real {
             "level": health.level,
             "message": health.message,
             "stale": message.expired,
+            // Every part, worst first, and the parts never heard from, for
+            // the app's Lamp health page (#7447).
+            "items": health.items,
+            "missing": health.missing,
         }))
     }
 
@@ -871,6 +878,10 @@ impl Lamp for Real {
         self.share.clone()
     }
 
+    fn owner_language(&self) -> &'static str {
+        self.language()
+    }
+
     fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
         self.upload.clone()
     }
@@ -1024,6 +1035,27 @@ impl Lamp for Real {
         self.texts.outbox.sent()
     }
 
+    fn devices_on(&self) -> bool {
+        self.devices.is_some()
+    }
+
+    fn devices(&mut self, now_ms: u64, connected: bool) -> crate::devices::Polled {
+        match (self.devices.as_mut(), self.bus.as_ref()) {
+            (Some(link), Some(bus)) => link.poll(bus, now_ms, connected),
+            _ => crate::devices::Polled::default(),
+        }
+    }
+
+    fn devices_down(&mut self, kind: &str, data: &Value, now_ms: u64) -> bool {
+        match (self.devices.as_mut(), self.bus.as_ref()) {
+            (Some(link), Some(bus)) => {
+                link.down(bus, kind, data, now_ms);
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn chat_events(&mut self, now_ms: u64) -> Vec<Value> {
         // Skills' lines alone (#1685): `chat/out`, the answers and the
         // voice's task news, is never listened for.
@@ -1131,6 +1163,7 @@ mod tests {
             control: None,
             consent: None,
             monitor: None,
+            devices: None,
             upload: None,
             shutdown: None,
         };
@@ -1217,6 +1250,7 @@ mod tests {
             control: None,
             consent: None,
             monitor: None,
+            devices: None,
             upload: None,
             shutdown: None,
         };
@@ -1312,6 +1346,7 @@ mod tests {
             control: None,
             consent: None,
             monitor: None,
+            devices: None,
             upload: None,
             shutdown: None,
         };
@@ -1420,6 +1455,7 @@ mod tests {
             control: None,
             consent: None,
             monitor: None,
+            devices: None,
             upload: None,
             shutdown: None,
         };

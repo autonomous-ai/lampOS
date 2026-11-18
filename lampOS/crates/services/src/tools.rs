@@ -18,6 +18,10 @@ pub const CALL_SOCKET: &str = "call.sock";
 pub const CONNECTED: &str = "services_connected";
 pub const READ: &str = "service_read";
 pub const WRITE: &str = "service_write";
+/// How `service_read`'s `what` opens: then each service's kinds of read
+/// ([`reads::kinds`]), as `gmail: recent, search, …`.
+pub const KINDS_OPEN: &str =
+    "One kind of read, the word alone, of the named service's own, never other words: ";
 
 fn codes() -> Vec<&'static str> {
     catalog::SERVICES
@@ -75,6 +79,9 @@ pub struct Edits {
     /// Gmail's `update_draft` and `delete_draft`
     /// (`LAMP_GMAIL_DRAFT_EDITS=on`).
     pub drafts: bool,
+    /// Google Calendar's `events` read takes `query`, the person's words
+    /// (`LAMP_CALENDAR_EVENT_SEARCH=on`, tracker row C132).
+    pub event_search: bool,
 }
 
 /// The three functions, with the lamp's own offset now.
@@ -138,11 +145,44 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
         })
         .collect();
     if !mcp.is_empty() {
-        let call = "tools, call {tool, arguments}";
-        fields_named(call, &mut read_fields);
+        fields_named(reads::MCP_WHATS, &mut read_fields);
         fields_named(writes::MCP_ACTIONS, &mut write_fields);
-        whats.push(format!("{mcp}: {call}"));
+        whats.push(format!("{mcp}: {}", reads::MCP_WHATS));
     }
+    // Each service's kinds of read, the words a refusal names (#7498), on
+    // `what` itself: the description's list may be cut for its bound.
+    let mut kinds_by_service: Vec<String> = Vec::new();
+    let mut every_kind: Vec<&str> = Vec::new();
+    let mut mcp_kinds: Option<Vec<&str>> = None;
+    for code in &codes {
+        let kinds = reads::kinds(code);
+        if kinds.is_empty() {
+            continue;
+        }
+        for kind in &kinds {
+            if !every_kind.contains(kind) {
+                every_kind.push(kind);
+            }
+        }
+        match catalog::service(code).and_then(|service| service.mcp) {
+            Some(_) => mcp_kinds = Some(kinds),
+            None => kinds_by_service.push(format!("{code}: {}", kinds.join(", "))),
+        }
+    }
+    if let Some(kinds) = mcp_kinds {
+        kinds_by_service.push(format!("{mcp}: {}", kinds.join(", ")));
+    }
+    // None offered (only a send-only `gmail-app` linked): no empty enum,
+    // which no call meets; its read is answered with how to link Gmail.
+    let what = if every_kind.is_empty() {
+        string("What to read, as listed for the service.")
+    } else {
+        json!({
+            "type": "string",
+            "enum": every_kind,
+            "description": format!("{KINDS_OPEN}{}.", kinds_by_service.join("; ")),
+        })
+    };
     let mut actions: Vec<String> = writes::ACTIONS
         .iter()
         .filter(|(code, _)| shown(code))
@@ -195,7 +235,7 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
                 "type": "object",
                 "properties": {
                     "service": {"type": "string", "enum": codes},
-                    "what": string("What to read, as listed for the service."),
+                    "what": what,
                     "query": string("Search words, or a number to find; for gmail as its own search takes them."),
                     "id": string("An id a search or a list gave; to read a mail or its attachment, search first for its id."),
                     "name": string("For attachment: its name, as message listed it."),
@@ -279,6 +319,15 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
         ));
         if shown("google_calendar") {
             tools["tools"][2]["parameters"]["properties"]["event_id"] = event_id;
+        }
+    }
+    if edits.event_search && shown("google_calendar") {
+        // The calendar's read by words (tracker row C132), told in the
+        // field: the read's description has no room for it.
+        tools["tools"][1]["parameters"]["properties"]["query"] =
+            string(reads::CALENDAR_SEARCH_QUERY);
+        if !read_fields.iter().any(|field| field == "query") {
+            read_fields.push("query".into());
         }
     }
     if linked.is_some() {
@@ -450,6 +499,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
             None,
         );
@@ -479,6 +529,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -500,6 +551,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: false,
+                ..Default::default()
             },
             None,
         )
@@ -510,6 +562,7 @@ mod tests {
             Edits {
                 calendar: true,
                 drafts: true,
+                ..Default::default()
             },
             None,
         );
@@ -599,10 +652,21 @@ mod tests {
                 "action", "cc", "said", "send_id", "service", "subject", "text", "to"
             ]
         );
-        // The fields kept are the ones every service has, unchanged.
+        // `what` names its kinds alone (#7498).
+        assert_eq!(
+            read["parameters"]["properties"]["what"],
+            json!({
+                "type": "string",
+                "enum": ["recent", "search", "drafts", "message", "attachment"],
+                "description": format!(
+                    "{KINDS_OPEN}gmail: recent, search, drafts, message, attachment."
+                ),
+            })
+        );
+        // The other fields kept are the ones every service has, unchanged.
         for (at, tool) in gmail["tools"].as_array().unwrap().iter().enumerate() {
             for (field, about) in tool["parameters"]["properties"].as_object().unwrap() {
-                if field != "service" {
+                if field != "service" && field != "what" {
                     assert_eq!(&all["tools"][at]["parameters"]["properties"][field], about);
                 }
             }
@@ -620,6 +684,7 @@ mod tests {
         let edits = Edits {
             calendar: true,
             drafts: true,
+            ..Default::default()
         };
         let github = catalog_for(Some(420), edits, Some(&linked(&["github"]))).to_string();
         for never in ["event_id", "draft_id", "update_event", "update_draft"] {
@@ -636,6 +701,67 @@ mod tests {
         assert!(!notion.contains("slack"));
     }
 
+    /// With only a send-only Gmail sign-in linked (`gmail-app`, no kinds
+    /// of read), the read is still offered so its call hears how to link
+    /// Gmail for reading, and `what` names no empty `enum`, which no call
+    /// can meet and a strict provider refuses the tools for (El's P2 on
+    /// #7540).
+    #[test]
+    fn a_read_with_no_kind_linked_names_no_empty_enum() {
+        let app = catalog_for(Some(420), Edits::default(), Some(&linked(&["gmail-app"])));
+        assert_eq!(names(&app), [CONNECTED, READ, WRITE]);
+        let what = &app["tools"][1]["parameters"]["properties"]["what"];
+        assert!(what.get("enum").is_none(), "{what}");
+        let about = what["description"].as_str().unwrap();
+        assert!(
+            !about.contains(KINDS_OPEN) && !about.ends_with(": ."),
+            "{about}"
+        );
+        // One kind linked names it.
+        let both = catalog_for(
+            Some(420),
+            Edits::default(),
+            Some(&linked(&["gmail-app", "google_calendar"])),
+        );
+        assert_eq!(
+            both["tools"][1]["parameters"]["properties"]["what"]["enum"],
+            json!(["events", "get"])
+        );
+    }
+
+    /// Tracker row C132: the read's `query` tells of the calendar's search
+    /// only with `LAMP_CALENDAR_EVENT_SEARCH` on, and with only the calendar
+    /// linked the read keeps its `query` field then alone. The read's
+    /// description is the same, switch on or off.
+    #[test]
+    fn a_calendar_search_is_offered_only_with_its_switch() {
+        let read = |edits: Edits, linked: Option<&[String]>| {
+            catalog_for(Some(420), edits, linked)["tools"][1].clone()
+        };
+        let query = |read: &Value| read["parameters"]["properties"]["query"]["description"].clone();
+        let on = Edits {
+            event_search: true,
+            ..Default::default()
+        };
+        let off = read(Edits::default(), None);
+        let searched = read(on, None);
+        assert_eq!(off["description"], searched["description"]);
+        assert!(!query(&off).to_string().contains("google_calendar"));
+        assert_eq!(query(&searched), reads::CALENDAR_SEARCH_QUERY);
+        let calendar = [String::from("google_calendar")];
+        let alone = read(Edits::default(), Some(&calendar));
+        assert!(alone["parameters"]["properties"].get("query").is_none());
+        let alone = read(on, Some(&calendar));
+        assert_eq!(query(&alone), reads::CALENDAR_SEARCH_QUERY);
+        // Gmail alone is not told of it.
+        let gmail = [String::from("gmail")];
+        assert!(
+            !query(&read(on, Some(&gmail)))
+                .to_string()
+                .contains("google_calendar")
+        );
+    }
+
     /// Every service linked names what the switch off names.
     #[test]
     fn every_service_linked_is_the_whole_catalog() {
@@ -643,6 +769,7 @@ mod tests {
         let edits = Edits {
             calendar: true,
             drafts: true,
+            ..Default::default()
         };
         assert_eq!(
             catalog_for(Some(420), edits, Some(&every)),

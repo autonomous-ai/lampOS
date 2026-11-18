@@ -7,6 +7,7 @@ mod agent_tasks_named;
 mod chat_second_try;
 mod checking_line;
 mod clash_note;
+mod code_yes_name_only;
 mod cut_to_a_person;
 mod decline_silent;
 mod dont_know;
@@ -34,6 +35,7 @@ mod remove_words;
 mod sent_write;
 mod short_done;
 mod skill_named_words;
+mod skill_yes_carry;
 mod task_yes_in_code;
 mod task_yes_words;
 mod unplayed_join;
@@ -535,6 +537,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
+            ProviderOutput::MakeWaiting { request } => (format!("make_waiting:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -883,6 +886,176 @@ async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
         ]
     );
     assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
+}
+
+/// lamp-c0a4, 16 Nov (#7371): a make on the one run path waited about 63 s
+/// after its waiting line in silence. With the one run path the waiting
+/// line says how long, and a make still with no answer past its wait says
+/// one long-wait line, once; a make that answers first says none.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more() {
+    let said = |after: Duration| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_on_one_path(Some(after));
+        engine.submit(written(
+            7_371_000 + after.as_millis() as u64 % 1_000,
+            "Make me x.",
+        ));
+        turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>()
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    assert_eq!(
+        said(Duration::from_millis(30)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting.clone(),
+            long,
+            "said:Made.".into()
+        ]
+    );
+    assert_eq!(
+        said(Duration::from_secs(60)).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting,
+            "said:Made.".into()
+        ]
+    );
+}
+
+/// lamp-c0a4, 16 Nov (#7371): after the one run path's waiting line the
+/// turn stays open for the make, about 80 s, and its generation never
+/// completed, so the lamp's playback never ended and it showed speaking
+/// all along. On the one path the line's generation completes once its
+/// last audio is sent, then `MakeWaiting`, before anything more; the
+/// long-wait line's too. With the switch off, no generation completes
+/// before the answer's, as before.
+#[tokio::test]
+async fn a_one_path_makes_waiting_line_completes_its_generation_after_its_audio() {
+    let labels = |after: Option<Duration>, request: u64| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        );
+        if after.is_some() {
+            engine = engine.waiting_on_one_path(after);
+        }
+        engine.submit(written(request, "Make me x."));
+        let mut labels: Vec<String> = Vec::new();
+        for label in turn(&mut engine).await {
+            let label = if label.starts_with("audio:") {
+                "audio".to_owned()
+            } else {
+                label.replacen("said: ", "said:", 1)
+            };
+            if labels.last() != Some(&label) {
+                labels.push(label);
+            }
+        }
+        // From the waiting line on.
+        let from = labels
+            .iter()
+            .position(|label| {
+                label.ends_with(crate::make_skill_agent::waiting_line(after.is_some()))
+            })
+            .unwrap();
+        labels.split_off(from)
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    let answer = ["said:Made.", "audio", "generated", "complete"];
+    let waited = |request: u64| {
+        [
+            "audio".to_owned(),
+            "generated".into(),
+            format!("make_waiting:{request}"),
+        ]
+    };
+    let mut expected = vec![waiting.clone()];
+    expected.extend(waited(7_372_001));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_secs(60)), 7_372_001).await,
+        expected
+    );
+    let mut expected = vec![waiting];
+    expected.extend(waited(7_372_002));
+    expected.push(long);
+    expected.extend(waited(7_372_002));
+    expected.extend(answer.map(String::from));
+    assert_eq!(
+        labels(Some(Duration::from_millis(30)), 7_372_002).await,
+        expected
+    );
+    let mut expected = vec![
+        format!("said:{}", crate::make_skill_agent::WAITING_LINE),
+        "audio".into(),
+    ];
+    expected.extend(answer.map(String::from));
+    assert_eq!(labels(None, 7_372_003).await, expected);
 }
 
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
@@ -4351,6 +4524,134 @@ async fn the_wait_sound_comes_when_it_is_told() {
     );
 }
 
+/// #7332 (c): on lamp-74ff tool turns took 4 to 5 s in silence
+/// (`remember_my_face`, `web_search`); people talked on, and the answer was
+/// cut by the newer line. The wait sound came only during a connected
+/// service's call and before round 1. With `LAMP_BUSY_FOLLOW_UP_RENEWS`,
+/// any tool past the wait sound's time makes one sound, and so does the
+/// chat round after a call; one a round, never after a newer line began.
+/// The first audio of a slow tool turn comes at 1.5 s, not with its answer.
+#[tokio::test(start_paused = true)]
+async fn tool_round_past_cue_after_makes_one_sound() {
+    /// The wait sounds a tool turn made, and its first audio from the
+    /// line's end: its tool runs `tool_ms`, the round after it begins
+    /// `round_ms` after it is asked; a newer line begins `newer_ms` after
+    /// the words, if one does.
+    async fn sounds(
+        every: bool,
+        tool_ms: u64,
+        round_ms: u64,
+        newer_ms: Option<u64>,
+    ) -> (usize, Duration) {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's in the news today?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            "get_news",
+                            json!({}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Here is the news."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            round_after: Mutex::new([Duration::ZERO, Duration::from_millis(round_ms)].into()),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            Box::pin(async move {
+                tokio::time::sleep(Duration::from_millis(tool_ms)).await;
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_with_a_sound(true)
+        .announcing(false);
+        if every {
+            engine = engine.cueing_every_tool();
+        }
+        wait_clip_ready(&engine, true);
+        spoken_turn(&mut engine);
+        let from = tokio::time::Instant::now();
+        let mut cues = 0;
+        let mut first = None;
+        let mut newer = newer_ms.map(|ms| from + Duration::from_millis(ms));
+        loop {
+            let next = match newer {
+                Some(at) => match tokio::time::timeout_at(at, engine.next()).await {
+                    Ok(next) => next,
+                    Err(_) => {
+                        newer = None;
+                        engine.submit(start(2));
+                        engine.submit(audio(2, 1));
+                        continue;
+                    }
+                },
+                // A turn cut by the newer line ends with no word of its own.
+                None => match tokio::time::timeout(Duration::from_secs(20), engine.next()).await {
+                    Ok(next) => next,
+                    Err(_) => return (cues, first.unwrap_or_else(|| from.elapsed())),
+                },
+            };
+            match next {
+                ProviderOutput::Audio {
+                    request: 1, spoken, ..
+                } => {
+                    first.get_or_insert_with(|| from.elapsed());
+                    cues += usize::from(!spoken);
+                }
+                ProviderOutput::TurnComplete { request: 1, .. }
+                | ProviderOutput::TurnFailed { request: 1, .. } => {
+                    return (cues, first.unwrap_or_else(|| from.elapsed()));
+                }
+                _ => {}
+            }
+        }
+    }
+    let s = Duration::from_secs;
+    // Off: no sound for a tool that is no connected service, nor for the
+    // round after it; the first audio is the answer's.
+    let (off, first_off) = sounds(false, 3_000, 0, None).await;
+    assert_eq!(off, 0, "off: a slow tool");
+    assert!(first_off >= s(3), "off: {first_off:?}");
+    assert_eq!(
+        sounds(false, 0, 3_000, None).await.0,
+        0,
+        "off: a slow round"
+    );
+    // On: one sound for a slow tool, at the wait sound's time.
+    let (on, first_on) = sounds(true, 3_000, 0, None).await;
+    assert_eq!(on, 1, "on: a slow tool");
+    assert!(first_on < s(2), "on: {first_on:?}");
+    assert_eq!(sounds(true, 0, 3_000, None).await.0, 1, "on: a slow round");
+    assert_eq!(
+        sounds(true, 3_000, 3_000, None).await.0,
+        1,
+        "on: one a round"
+    );
+    assert_eq!(sounds(true, 500, 500, None).await.0, 0, "on: quick");
+    // Never over the person's own words.
+    assert_eq!(
+        sounds(true, 3_000, 0, Some(1_000)).await.0,
+        0,
+        "on: a newer line began"
+    );
+    eprintln!(
+        "#7332: a slow tool turn's first audio, off {} ms, on {} ms",
+        first_off.as_millis(),
+        first_on.as_millis()
+    );
+}
+
 /// Keep rendering out of the timing tests: either a sound is already in
 /// memory, or its background render has not produced one yet.
 fn wait_clip_ready(engine: &Engine, ready: bool) {
@@ -6574,6 +6875,336 @@ async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one(
             .all(|turn| !turn.contains(&line) && !turn.contains(&again) && !turn.contains(&cannot)),
         "{off:?}"
     );
+}
+
+/// #7346 (lamp-74ff, 16 Nov 18:00-19:07): the relay out of its usage limit
+/// answered 429 for over an hour and the lamp kept promising "a moment".
+/// 429s with no answer between, spanning [`LIMIT_AFTER`], say
+/// [`DOWN_LINE_LIMIT`] instead of the slow line: once a run of 429s,
+/// then nothing; an answered turn ends the
+/// streak; 503s that last as long keep the slow line; a written turn never
+/// says it; with the down line off, nothing.
+#[tokio::test(start_paused = true)]
+async fn a_429_that_lasts_says_the_usage_limit_line_not_the_slow_one() {
+    async fn turns(on: bool, status: u16) -> Vec<Vec<String>> {
+        let refused = || vec![Err(net::Error::Status(status))];
+        let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                    .take(9)
+                    .collect(),
+            ),
+            chats: Mutex::new(
+                [
+                    answered(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    refused(),
+                    answered(),
+                    refused(),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        let mut heard = Vec::new();
+        // One chat each, the written turn's too.
+        for (request, wait, spoken) in [
+            (1, 0, true),
+            (2, 1, true),
+            (3, 1, true),
+            (4, 130, true),
+            (5, 1, true),
+            (6, 1, false),
+            (7, 61, true),
+            (8, 1, true),
+            (9, 1, true),
+        ] {
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            if spoken {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+            } else {
+                engine.submit(written(request, "Say hello."));
+            }
+            heard.push(sent(&mut engine).await);
+        }
+        heard
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let slow = |turn: &Vec<String>| turn.contains(&line) || turn.contains(&again);
+    let on = turns(true, 429).await;
+    assert!(
+        on[1].contains(&line) && !on[1].contains(&limit),
+        "a first 429: {on:?}"
+    );
+    assert!(on[2].contains(&again) && !on[2].contains(&limit), "{on:?}");
+    assert!(
+        on[3].contains(&limit) && !slow(&on[3]),
+        "429s past the bound: {on:?}"
+    );
+    assert!(
+        on[3].iter().any(|event| event == "failed"),
+        "still a failed turn: {on:?}"
+    );
+    assert!(
+        !on[4].contains(&limit) && !slow(&on[4]),
+        "never twice in a run, nor the slow line: {on:?}"
+    );
+    assert!(
+        !on[5].contains(&limit) && !slow(&on[5]),
+        "a written turn: {on:?}"
+    );
+    assert!(
+        !on[6].contains(&limit) && !slow(&on[6]),
+        "once a run, past the minute too: {on:?}"
+    );
+    assert!(!on[7].contains(&limit), "answered: {on:?}");
+    assert!(
+        on[8].contains(&line) && !on[8].contains(&limit),
+        "an answer ends the streak: {on:?}"
+    );
+    let busy = turns(true, 503).await;
+    assert!(
+        busy.iter().all(|turn| !turn.contains(&limit)),
+        "a 5xx keeps the slow line: {busy:?}"
+    );
+    assert!(slow(&busy[3]) && slow(&busy[6]), "{busy:?}");
+    let off = turns(false, 429).await;
+    assert!(off.iter().all(|turn| !turn.contains(&limit)), "{off:?}");
+}
+
+/// #7346's row on lamp-52e6 (23:21, then 23:24): the limit line came again
+/// 3.5 min later with no answer between. V2's ruling: it is said once a
+/// run of 429s, however long the run; only an answered round ends the run,
+/// and a later run says it once again.
+#[tokio::test(start_paused = true)]
+async fn the_usage_limit_line_is_said_once_a_run_until_an_answer() {
+    let refused = || vec![Err(net::Error::Status(429))];
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    // Two runs of 429s, each spanning more than LIMIT_AFTER and two
+    // DOWN_LINE_EVERY, an answer between them.
+    let run = [1, 1, 130, 61, 61];
+    let chats: Vec<_> = std::iter::once(answered())
+        .chain(run.iter().map(|_| refused()))
+        .chain(std::iter::once(answered()))
+        .chain(run.iter().map(|_| refused()))
+        .collect();
+    let waits: Vec<u64> = std::iter::once(0)
+        .chain(run)
+        .chain(std::iter::once(1))
+        .chain(run)
+        .collect();
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(waits.len())
+                .collect(),
+        ),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for (request, wait) in (1..).zip(waits) {
+        tokio::time::sleep(Duration::from_secs(wait)).await;
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        heard.push(sent(&mut engine).await);
+    }
+    assert!(LIMIT_AFTER + 2 * DOWN_LINE_EVERY < Duration::from_secs(run.iter().skip(1).sum()));
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let said = |turns: &[Vec<String>]| turns.iter().filter(|t| t.contains(&limit)).count();
+    assert_eq!(said(&heard[1..6]), 1, "once in the first run: {heard:?}");
+    assert!(heard[3].contains(&limit), "{heard:?}");
+    assert_eq!(said(&heard[6..7]), 0, "answered: {heard:?}");
+    assert_eq!(
+        said(&heard[7..]),
+        1,
+        "once again after an answer: {heard:?}"
+    );
+    assert!(heard[9].contains(&limit), "{heard:?}");
+}
+
+/// One spoken turn's audio, `down` for its `DownLineSaid`, and how it ended.
+async fn sent_with_down(engine: &mut Engine, request: u64) -> Vec<String> {
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    engine.submit(end(request));
+    let mut sent = Vec::new();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Audio { samples, .. } => sent.push(format!("audio:{}", samples[0])),
+            ProviderOutput::DownLineSaid { request: of } if of == request => {
+                sent.push("down".into());
+            }
+            ProviderOutput::TurnFailed { .. } => {
+                sent.push("failed".into());
+                return sent;
+            }
+            ProviderOutput::TurnComplete { .. } => {
+                sent.push("complete".into());
+                return sent;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// #7346, Backend's relay (#1711): a 429 whose body names `usage_limit`
+/// is a usage limit at once, by the relay's own word, not after 2 min; the
+/// line says when it comes back, in the lamp's local time, rendered then.
+/// Without a time it is the plain line. Later asks in the same run hear
+/// nothing, and still send `DownLineSaid`, so the coordinator says no
+/// `turn_lost` over them (the Reviewer-lead's question on #7362).
+#[tokio::test(start_paused = true)]
+async fn a_usage_limit_in_the_relays_word_says_the_line_at_once_with_the_time() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let reset = now + 3 * 3_600;
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = |reset| vec![Err(net::Error::UsageLimit(reset))];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(3)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(Some(reset)), limited(Some(reset))].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let first = sent_with_down(&mut engine, 1).await;
+    assert!(first.contains(&"complete".to_owned()), "{first:?}");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let timed = crate::local_time::offset_here()
+        .and_then(|offset| usage_limit::line_at(None, reset, now, offset))
+        .unwrap_or_else(|| DOWN_LINE_LIMIT.to_owned());
+    let said = sent_with_down(&mut engine, 2).await;
+    assert!(
+        said.contains(&format!("audio:{}", timed.len()))
+            && said.ends_with(&["down".to_owned(), "failed".to_owned()])
+            && !said.contains(&format!("audio:{}", DOWN_LINE.len())),
+        "at once, with the time ({timed}): {said:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let again = sent_with_down(&mut engine, 3).await;
+    assert_eq!(
+        again,
+        ["down", "failed"],
+        "quiet, and no turn_lost: {again:?}"
+    );
+
+    // No time in the refusal: the plain line, at once.
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([answered(), limited(None)].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    sent_with_down(&mut engine, 1).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let plain = sent_with_down(&mut engine, 2).await;
+    assert!(
+        plain.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "{plain:?}"
+    );
+}
+
+/// The first builder's ruling on #7362 (23:56): after the first limit line
+/// of a run, only a line that names the lamp hears it again, at most once
+/// in [`LIMIT_AGAIN_NAMED`]; every other line hears no words at all, and
+/// still tells the coordinator, so no other line takes its place. A round
+/// that begins ends the run, and the next run's first line hears it.
+#[tokio::test(start_paused = true)]
+async fn after_the_first_limit_line_only_a_line_naming_the_lamp_hears_it_again() {
+    const NAMED: &str = "Lamp, what time is it?";
+    const UNNAMED: &str = "What time is it?";
+    let answered = || vec![text("It is noon."), Ok(ChatEvent::Done)];
+    let limited = || vec![Err(net::Error::UsageLimit(None))];
+    // (words, wait before it in s, its chat)
+    let turns = [
+        (UNNAMED, 0, answered()),
+        (UNNAMED, 1, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 301, limited()),
+        (NAMED, 60, limited()),
+        (UNNAMED, 1, limited()),
+        (NAMED, 300, limited()),
+        (NAMED, 1, answered()),
+        (NAMED, 1, limited()),
+    ];
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            turns
+                .iter()
+                .map(|(words, _, _)| Ok((*words).to_owned()))
+                .collect(),
+        ),
+        chats: Mutex::new(turns.iter().map(|(_, _, chat)| chat.clone()).collect()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let mut heard = Vec::new();
+    for ((_, wait, _), request) in turns.iter().zip(1..) {
+        tokio::time::sleep(Duration::from_secs(*wait)).await;
+        heard.push(sent_with_down(&mut engine, request).await);
+    }
+    let limit = format!("audio:{}", DOWN_LINE_LIMIT.len());
+    let quiet = ["down".to_owned(), "failed".to_owned()];
+    assert!(heard[1].contains(&limit), "the run's first line: {heard:?}");
+    assert_eq!(heard[2], quiet, "unnamed: {heard:?}");
+    assert!(heard[3].contains(&limit), "named, 5 min on: {heard:?}");
+    assert_eq!(heard[4], quiet, "named again within 5 min: {heard:?}");
+    assert_eq!(heard[5], quiet, "unnamed: {heard:?}");
+    assert!(
+        heard[6].contains(&limit),
+        "named, 5 min on again: {heard:?}"
+    );
+    assert!(heard[7].contains(&"complete".to_owned()), "{heard:?}");
+    assert!(
+        heard[8].contains(&limit),
+        "a new run's first line: {heard:?}"
+    );
+}
+
+/// #7346: the usage-limit line is said in each of the owner's languages,
+/// as the other down lines are.
+#[test]
+fn the_usage_limit_line_has_each_language() {
+    use crate::language::{Language, fixed_in};
+    for language in [
+        Language::Vietnamese,
+        Language::Japanese,
+        Language::Chinese,
+        Language::Korean,
+    ] {
+        assert_ne!(
+            fixed_in(Some(language), DOWN_LINE_LIMIT),
+            DOWN_LINE_LIMIT,
+            "{language:?}"
+        );
+    }
 }
 
 /// #4332 (lamp-e82d): a 503 that says the slow line tells the coordinator
@@ -9274,6 +9905,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 at_setup: false,
                 record: false,
                 rename_yes: false,
+                name_learn_fix: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -11521,6 +12153,196 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
         script.asked.lock().unwrap()[1].last().unwrap(),
         &Message::user("Lamp, what time is it?")
     );
+}
+
+/// The ask, holding line and make line of the lamp-9adf rig (path B).
+const LATE_ASK: &str = "How many dong is one US dollar?";
+const LATE_HOLDING: &str = "Let me search that.";
+const LATE_ANSWER: &str = "One US dollar is about 25,000 dong.";
+const LATE_MAKE: &str = "Make a skill that tells me a joke every morning.";
+
+/// lamp-9adf (path B), 17 Nov 18:18: "How many dong is one US dollar?" is
+/// answered with a holding line, "Let me search that.", and a `web_search`;
+/// a make line from the same person, begun once the holding line has
+/// played, cuts it (no `heard_of_cut`). With `answered`, the search answers
+/// at once and its answer is said to the turn's end before the make line;
+/// without, the search outlasts the gap and is let go. Request 1's output
+/// is kept in the thread as the worker keeps it, and the make's chat is
+/// given the history as the worker gives it (`worker::system_message`).
+/// `let_go`: `LAMP_LATE_ANSWER_LET_GO` (`Engine::letting_go_late_answers`).
+/// The product unit's switches otherwise: `LAMP_HISTORY_KEEPS_CALLS`,
+/// `LAMP_SAID_AS_HEARD`, `LAMP_CUT_IN_TOLD`, `LAMP_JOIN_CUT_WORDS` (judged
+/// not joined: path A, the ask joined into the make line, is not this rig's)
+/// and `LAMP_CUT_ASK_ANSWERED`, all on. Gives the make's chat, as asked,
+/// and what the make's turn said.
+async fn holding_line_rig(let_go: bool, answered: bool) -> (Vec<Message>, Vec<String>) {
+    let _one = crate::provider_worker::tests::one_thread();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    // Set as the worker sets it at start (`serve`), and put back.
+    let keeps_calls_was =
+        super::worker::HISTORY_KEEPS_CALLS.swap(true, std::sync::atomic::Ordering::AcqRel);
+    let mut chats = vec![vec![
+        text(LATE_HOLDING),
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "web_search",
+            json!({"query": "USD to VND"}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]];
+    if answered {
+        chats.push(vec![text(LATE_ANSWER), Ok(ChatEvent::Done)]);
+    }
+    chats.push(vec![
+        text("Okay, I'll make a morning joke skill."),
+        Ok(ChatEvent::Done),
+    ]);
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(LATE_ASK.to_owned()), Ok(LATE_MAKE.to_owned())].into()),
+        chats: Mutex::new(chats.into()),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            // Longer than the gap before the make line: never answered.
+            if !answered {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| super::worker::system_message("SYSTEM", None, "", None, None)),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .keeping_calls(true)
+    .holding_hand_on(true)
+    .telling_cut_ins(true)
+    // Not joined (path A is not what this rig is about): with `Same`, the
+    // rig (no playback reported) joins the ask into the make line too.
+    .joining_cut_words(Arc::new(|_, _| {
+        Joined::Not("path B alone: not joined".to_owned())
+    }))
+    .answering_cut_words_a_decline_leaves(true)
+    .letting_go_late_answers(let_go);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Request 1's output is kept in the thread as the worker keeps it:
+    // until its holding line has played and its search is running, or,
+    // answered, until its turn is complete.
+    let mut held_said = false;
+    let mut search_running = false;
+    let mut complete = false;
+    while !(held_said && search_running && (complete || !answered)) {
+        search_running |= searched.try_recv().is_ok();
+        if let Ok(event) = tokio::time::timeout(Duration::from_millis(20), engine.next()).await {
+            match &event {
+                ProviderOutput::Transcript {
+                    request: Some(1),
+                    text,
+                    ..
+                } => held_said |= text.contains("search"),
+                ProviderOutput::TurnComplete { request: 1, .. } => complete = true,
+                _ => {}
+            }
+            super::worker::keep(&event, None);
+        }
+    }
+    // The make line, begun after the holding line played (no `heard_of_cut`).
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        super::worker::keep(&event, None);
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    super::worker::HISTORY_KEEPS_CALLS.store(keeps_calls_was, std::sync::atomic::Ordering::Release);
+    let asked = script.asked.lock().unwrap().clone();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    assert_eq!(asked.len(), if answered { 3 } else { 2 }, "{asked:#?}");
+    let make = asked.last().unwrap().clone();
+    // Not path A: the make line is asked alone, not joined with the ask.
+    assert_eq!(make.last().unwrap(), &Message::user(LATE_MAKE), "{make:#?}");
+    (make, said)
+}
+
+/// Whether any of `messages` but the last (the line asked) tells `words`,
+/// in the system message's thread text or as a message.
+fn told_before_the_line(messages: &[Message], words: &str) -> bool {
+    messages[..messages.len() - 1]
+        .iter()
+        .any(|message| format!("{message:?}").contains(words))
+}
+
+/// lamp-9adf (path B, Fourteen's edge run, 17 Nov 18:18): the ask cut on
+/// its holding line stayed in the thread with only "Let me search that."
+/// for its answer, so the make's chat was given it, in the system
+/// message's thread text and as an exchange, with no mark it was never
+/// answered, and the model answered it about 25 s later inside the make's
+/// turn. With `LAMP_LATE_ANSWER_LET_GO=on` the exchange is left out of the
+/// make's history entirely: neither the ask nor the holding line reaches
+/// its model.
+#[tokio::test]
+async fn an_ask_left_on_its_holding_line_is_not_given_to_the_next_turn_as_unanswered() {
+    let (make, said) = holding_line_rig(true, false).await;
+    assert!(
+        !told_before_the_line(&make, LATE_ASK),
+        "request 1's ask, left on its holding line, is given to request 2: {make:#?}"
+    );
+    assert!(!told_before_the_line(&make, LATE_HOLDING), "{make:#?}");
+    assert_eq!(said, ["Okay, I'll make a morning joke skill."]);
+}
+
+/// The switch off: byte for byte as before, the ask left on its holding
+/// line is given to the next turn as an exchange answered by the holding
+/// line (what lamp-9adf did on 17 Nov).
+#[tokio::test]
+async fn with_the_switch_off_an_ask_left_on_its_holding_line_is_still_given_to_the_next_turn() {
+    let (make, _) = holding_line_rig(false, false).await;
+    let at = make
+        .iter()
+        .position(|message| message == &Message::user(LATE_ASK))
+        .unwrap_or_else(|| panic!("{make:#?}"));
+    assert_eq!(make[at + 1], Message::assistant(LATE_HOLDING), "{make:#?}");
+    assert!(format!("{:?}", make[0]).contains(LATE_ASK), "{make:#?}");
+}
+
+/// The switch on, an ask whose search answered and whose answer was said
+/// to its turn's end keeps its exchange: the next turn is given it whole.
+#[tokio::test]
+async fn an_ask_answered_after_its_search_is_still_given_to_the_next_turn() {
+    let (make, said) = holding_line_rig(true, true).await;
+    let at = make
+        .iter()
+        .position(|message| message == &Message::user(LATE_ASK))
+        .unwrap_or_else(|| panic!("{make:#?}"));
+    assert!(
+        make[at + 1..]
+            .iter()
+            .any(|message| format!("{message:?}").contains(LATE_ANSWER)),
+        "{make:#?}"
+    );
+    assert_eq!(said, ["Okay, I'll make a morning joke skill."]);
 }
 
 /// #5961 (lamp-52e6, 10 Nov 09:5x, core w3): an 8-word ask still being
@@ -13846,6 +14668,73 @@ async fn a_wordless_cut_in_that_ended_the_answer_asks_one_short_question() {
     assert_eq!(asked.len(), 1);
 }
 
+/// #7442 (`LAMP_SAID_TO_ME`, lamp-74ff, 17 Nov: a lip smack over
+/// the lamp's answer ended it and was asked "did anyone say something?"):
+/// with no face seen speaking through a wordless cut-in (its mouth read
+/// still or never read), it is not asked and not counted, so a cut a face
+/// is seen speaking right after is still asked; a face seen speaking, or the
+/// switch off, asks as before.
+#[tokio::test]
+async fn a_wordless_cut_in_no_face_was_seen_speaking_is_not_asked() {
+    use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+    let said = format!("said:{}", crate::cut_in_wordless::LINE);
+    async fn wordless(
+        engine: &mut Engine,
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        request: u64,
+        mouth: lamp_msgs::SpeakingState,
+    ) -> Vec<String> {
+        engine.submit(start_marked(request, true, false, false));
+        engine.submit(audio(request, 1));
+        // The line's task begins, then the eyes look once through it.
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        let faces = lamp_msgs::Faces {
+            faces: vec![lamp_msgs::Face {
+                id: "f1".into(),
+                xmin: 0.4,
+                ymin: 0.3,
+                xmax: 0.5,
+                ymax: 0.45,
+                confidence: 1.0,
+                yaw: Some(0.1),
+                facing: Some(true),
+                pitch: None,
+                looking: None,
+                speaking: Some(lamp_msgs::Speaking {
+                    state: mouth,
+                    score: 0.0,
+                    from: None,
+                }),
+                follows: None,
+            }],
+        };
+        eyes.look(Instant::now(), Some((("b", request), &faces)));
+        engine.submit(end(request));
+        turn(engine).await
+    }
+    for (on, mouth, asked) in [
+        (true, No, false),
+        (true, Yes, true),
+        (true, Unknown, false),
+        (false, No, true),
+    ] {
+        let (built, _, _) = scripted(Arc::new(Script::default()));
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        let mut engine = built
+            .asking_after_wordless_cut_ins(true)
+            .asking_wordless_only_seen_speaking(on.then(|| eyes.clone()));
+        let out = wordless(&mut engine, &eyes, 1, mouth).await;
+        assert_eq!(out.contains(&said), asked, "{on} {mouth:?}: {out:?}");
+        if !asked {
+            // Not counted: the next cut, a face seen speaking it, is asked.
+            let out = wordless(&mut engine, &eyes, 2, Yes).await;
+            assert!(out.contains(&said), "{out:?}");
+        }
+    }
+}
+
 /// A second knock that cuts the question, or one within the minute, leaves
 /// the lamp quiet: asked at most once in `cut_in_wordless::AGAIN_AFTER`.
 #[tokio::test]
@@ -15264,6 +16153,8 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
                     let faces = lamp_msgs::Faces {
                         faces: ["f1", "f2"]
                             .map(|id| lamp_msgs::Face {
+                                pitch: None,
+                                looking: None,
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,
@@ -15380,6 +16271,8 @@ async fn without_the_switch_a_line_another_face_spoke_stays_the_known_persons() 
     let eyes = SpeakingFaces::default();
     let speaking = lamp_msgs::Faces {
         faces: vec![lamp_msgs::Face {
+            pitch: None,
+            looking: None,
             id: "f2".into(),
             xmin: 0.1,
             ymin: 0.1,
@@ -20135,6 +21028,8 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
                             .into_iter()
                             .filter(|id| in_view || *id != "f1")
                             .map(|id| lamp_msgs::Face {
+                                pitch: None,
+                                looking: None,
                                 id: id.to_owned(),
                                 xmin: 0.1,
                                 ymin: 0.1,

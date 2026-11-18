@@ -137,9 +137,10 @@ once per computer".
 
    The SDK checks the lamp's certificate against the pin after the TLS and
    WebSocket handshakes and before any protocol frame or pairing proof, so
-   the code's proof never goes to another host. The lamp gives a small
-   nod. The pairing is kept in `~/.config/lampos/`; later connections need no
-   code.
+   the code's proof never goes to another host. With the lamp's pairing cue
+   on (`LAMP_CONTROL_PAIR_CUE`), the ring glows once the first time a computer
+   pairs; otherwise it shows nothing. The pairing is kept in `~/.config/lampos/`;
+   later connections need no code.
 5. **Say hello from your program** (`speak` grant):
 
    ```python

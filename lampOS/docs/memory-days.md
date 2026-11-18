@@ -659,8 +659,8 @@ The voice's `LAMP_SERVICE_RECORDS` (off by default, on in the product by the own
 plan, PR 1a, 10 Nov) keeps one record for each thing a known person asked of
 a linked service, in `service_records(person, key, service, action, status,
 reason, detail, result_id, asked_unix_ms, changed_unix_ms, links,
-replaced_by)`, keyed `(person, key)`, created `IF NOT EXISTS`, `user_version`
-unchanged.
+replaced_by)`, plus the linked columns below, keyed `(person, key)`,
+created `IF NOT EXISTS`, `user_version` unchanged.
 
 - `service_record {person, key, service, action, status, reason?, detail?,
   result_id?, asked_unix_ms, changed_unix_ms, links?, replaced_by?}` puts
@@ -693,6 +693,11 @@ unchanged.
   not the owner sends none for the owner's id (the owner's call of 11 Nov,
   after a guest's forget everything on lamp-06c1 removed every record and
   contact of the owner's).
+  On a lamp set up before onboarding kept an `owner`, the owner's face kept
+  under another name than the typed one is not one of `owner_ids`, so its
+  forget everything sends none for the typed name's id; once linked by the
+  owner's own words (`LAMP_OWNER_LINK=on`, #7501, [memory.md](memory.md),
+  "The owner's face and typed name") it does.
 - **A put asked before a forget is refused** `forgotten`: one whose
   `asked_unix_ms` is before the person's latest `forget_all` or
   `forget_person` (or everyone's `forget_all`), kept in
@@ -713,6 +718,189 @@ person; past it the record changed longest ago goes. What a read found is
 stored by the voice as metadata and a masked excerpt only; the store keeps
 what it is given. An older memory answers `unknown_op` to the three
 operations, so the voice sends them only with its switch on.
+
+### Source kinds, pointers, summaries and deed times (linked records, slice 1)
+
+The linked-service memory plan (16 Nov; the first builder's call of 16:57 on
+#6811, under the owner's connector-records call of 11 Nov) lets a record name
+where its thing lives, so later slices can keep Harness tasks, agent calls
+and reminders as records. This slice is the schema only: no writer sends the
+new fields yet, and a put that names none of them behaves as before.
+
+- **Columns.** At each open, after `days.sql`, `service_records::migrate`
+  adds each of these the table lacks (read by `pragma table_info`, so it is
+  idempotent), in one transaction: the first `ALTER` of these tables.
+  `user_version` stays 1.
+
+  | Column | Type | Default | Bound |
+  |---|---|---|---|
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder` | `'voice'` | one of the four |
+  | `source_ref` | `TEXT NOT NULL`, a JSON object | `'{}'` | at most 512 bytes |
+  | `summary` | `TEXT NOT NULL` | `''` | at most 160 bytes |
+  | `deed_unix_ms` | `INTEGER`, null on an older row | null | a time in ms |
+
+  Plus the index `service_records_kind(person, source_kind, changed_unix_ms)`.
+- **`service_record`** takes four more optional fields: `source_kind`,
+  `source_ref`, `summary` and `deed_unix_ms`. With none of them (an older
+  voice), the record is `voice`, as every record before. An unknown kind is
+  refused `bad_kind`, and so is a put that would change a kept record's
+  kind. A linked kind (`task`, `agent`, `reminder`) must give `source_ref`
+  on every put; a `voice` record may. `source_ref` is
+  `{service, id, session?, computer?}`: an object of those fields only,
+  each a text without control characters, `service` and `id` not empty, at
+  most 512 bytes as JSON; anything else is refused `bad_source_ref`. The
+  session is an opaque reference: agent sessions stay in the agent.
+  `summary` is tidied (control characters and runs of spaces become one
+  space) and cut at a whole character to 160 bytes. An update in place
+  that leaves out `source_ref`, `summary` or `deed_unix_ms` keeps what is
+  held. Lists give all four fields.
+- **Per-kind cap.** Each linked kind keeps at most 2,000 records a person,
+  inside the 10,000: past it, that kind's record changed longest ago goes,
+  and no other kind's. A `voice` record is bounded by the 10,000 alone.
+- **A forget wins by the deed's time** (the first builder's condition 2). A
+  put is refused `forgotten` when the earlier of its `asked_unix_ms` and
+  its `deed_unix_ms` is before the person's latest forget everything, or
+  before a forget about a thing it matches, or before a contact forget of
+  an address it was sent to. So a deed done before a forget, written after
+  it, is never kept.
+- **Recall and forget read the summary.** A recall's `about` and
+  `service_records_forget {about}` match a record's summary as they match
+  its service, action, reason, result id and detail. Forget everything and
+  forgetting the person delete whole rows, so a record's pointer and
+  summary go with it. Nothing at the source service is touched.
+- **Rollback.** An older build names its columns on every insert and
+  select, so it passes the four over: a record it writes is `voice`, and its
+  forget everything still deletes whole rows. An older build's forget about
+  a thing does not read `summary`. An older memory refuses a `service_record`
+  that carries the new fields (its request fields are closed), so a writer
+  sends them only with its own switch on.
+
+### Linked records: `linked.sock` (slice 1b, `LAMP_MEMORY_LINKED_SOCKET`, off)
+
+The write path the first builder chose on #6811 (16 Nov, 17:0x), the
+person's hybrid: a narrow, typed, owner-checked socket beside the main one,
+for lamp-services' agent-read records. The voice writes task, agent-write
+and reminder records over its own socket (later slices), because only it can
+name the person. Nothing writes to `linked.sock` yet.
+
+- **The switch.** `LAMP_MEMORY_LINKED_SOCKET` in lamp-memory's environment:
+  `on` opens it, with `--memory-days`; unset, empty or `off` leaves it
+  closed and says nothing. Any other value, or `on` without
+  `--memory-days`, is said once in the journal and the socket stays closed
+  (`server::linked_switch`, `application.rs` `open_linked`). Off in both
+  units; neither sets it.
+- **The socket.** `linked.sock` beside `--socket`
+  (`/run/lampos-memory/linked.sock` on a lamp), mode 0660, owned by the
+  group `lampos-linked` from `/etc/group` (condition 4: the group names who
+  may write). It is made as the app's forget socket is: under a private
+  name, given its mode and group, then moved into place. One it can't make
+  (no such group, or a group memory's user can't give) is said, `the linked
+  socket is not open: …`, and memory serves on. Turning it on needs, first:
+  the group `lampos-linked` created by the installer, `lampos-memory` in it
+  (`SupplementaryGroups=lampos-linked` in `lamp-memory.service`, so memory
+  may give the socket that group), and the switch in `lamp-memory.service`.
+  lamp-services runs as root today, so it can connect either way: the
+  socket checks no peer credentials, so the group adds nothing for
+  lamp-services and only keeps every other non-root part out. None of that is in the units yet: a
+  `SupplementaryGroups` naming a group that isn't there stops the unit.
+- **One op, `linked_record`.** The socket lets through only a
+  `{"op":"linked_record",…}` object that names its `source_kind` (a text)
+  and no `person` (`protocol::linked`); anything else is refused
+  `not_allowed` (or `bad_kind`) and never reaches the store:
+
+  ```json
+  {"op":"linked_record","source_kind":"agent","task":"t-tasks-7","run":"run-1","n":0,
+   "action":"search_mail","status":"done","deed_unix_ms":1791892800000,
+   "summary":"Searched mail for the dentist",
+   "source_ref":{"service":"gmail","id":"res-1","session":"run-1"}}
+  ```
+
+  Every field is required, and no other is taken. `summary` must say what
+  was done: one missing is `bad_request`, one blank once tidied is `empty`
+  (`Days::linked_record_put`), so an agent's row always carries the words a
+  forget about a thing matches. The main socket takes the same op too. An
+  `agent` record put straight to the store (`service_record`) with no
+  summary, asked before a forget about a thing of its owner, is refused
+  `forgotten` (`refuse_forgotten`): with no words to match, the store can't
+  tell it isn't the record that forget took.
+- **Memory finds the owner itself** (condition 1,
+  `Days::linked_record_put`). `source_kind` must be `agent` (`bad_kind`
+  otherwise: tasks and reminders are the voice's). The owner is the one
+  known person (`p-` id) holding a `task` record keyed `task` whose
+  `source_ref.session` is `run`. No such row, a row of another run or kind,
+  or two people holding that key: refused `no_owner`, nothing kept. So the
+  voice's task row (slice 3) must carry the skill run's id as its
+  `source_ref.session`.
+- **The record.** Kept under that owner through `service_record_put`, keyed
+  `a-<run>-<n>` (`bad_key` when `run` or `task` would not make a record
+  key, or `task` is not a `t-` key), `source_kind` `agent`, its service
+  `source_ref.service`, linked to the task row (`links`), asked and done at
+  `deed_unix_ms`, changed at memory's clock. So every bound of slice 1
+  holds (condition 5: a 160-byte summary of what the service already holds,
+  a 512-byte pointer, the per-kind cap) and a forget wins by the deed
+  (condition 2): after a forget everything the task row is gone, so nothing
+  has an owner; with it written again, a deed from before the forget is
+  still refused `forgotten`. A deed more than 5 s ahead of memory's clock is
+  refused `bad_time`, so a future deed can't pass a later forget.
+  The answer is `{"ok":true,"status":…,"key":"a-<run>-<n>"}`.
+- **The writer never waits long** (condition 3). One request a connection,
+  `LINKED_PATIENCE` (250 ms) to send it and 250 ms to take the answer; then
+  the connection ends. The server serves one client at a time, so a stuck
+  writer holds the voice's memory calls 250 ms at most, not the main
+  socket's 2 s. The writer's own bound and drop (and its outbox) are its
+  side, in slice 4.
+- **Drops are counted.** Each record not kept is counted by why
+  (`LinkedDrops`: `no_owner`, `forgotten`, `refused` for any other refusal,
+  `late` for a request not sent or an answer not taken in time) and said in
+  one journal line with the counts, e.g. `linked socket: linked_record
+  person=everyone refused error=no_owner; dropped: no_owner=1 forgotten=0
+  refused=0 late=0`. No content is logged.
+- **Rollback.** An older build has no `linked.sock` and no `linked_record`
+  (`unknown_op`); the records it kept are ordinary `agent` rows that an
+  older build passes over as slice 1 says. No rollback past slice 1 while a
+  linked writer's switch is on, unless the linked rows are emptied first
+  (forget-all, or the switch's own clear): an older build's forget about a
+  thing doesn't read `summary`, so it can't take them.
+
+### The voice's linked outbox (slice 2, under `LAMP_SERVICE_RECORDS`)
+
+The voice's side of the write path for the records only it can name the
+person of: Harness tasks, agent writes and reminders (later slices). It
+queues each change as a `service_record` with `source_kind`, `source_ref`,
+`summary` and `deed_unix_ms`, over its own root socket
+(`lamp-voice` `service_records::linked`). Nothing puts to it yet: each
+writer comes with its own switch (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
+`_REMINDERS`), and with `LAMP_SERVICE_RECORDS` off nothing is kept.
+
+- **Its own bound.** At most 16 changes wait, apart from the connector
+  records' 32, so a burst of task or reminder news never pushes out a
+  send's record. One a key: a newer change of the same person and key
+  replaces the one waiting. Full, the oldest goes, counted since the voice
+  started as `linked_dropped` in the voice's health (a fact beside its
+  report, its level unchanged, shown once any went) and said in one
+  journal line with its key, kind and the count, never a word of the
+  summary.
+- **Never waits.** A put takes only the queue's lock; a writer thread of
+  its own (`linked-records`, apart from the connector records' writer, so
+  neither waits on the other's backlog) sends with the lock free, 2 s a
+  write. Memory down, the change stays first and is tried again after 1 s,
+  doubling to 30 s, said once; refused (`forgotten` or any other), it goes
+  and the refusal is said, its key and error only.
+- **Whose.** Only a known person's (`p-` ids). With no person, or one not
+  known, nothing is kept or written: unlike a connector record there is no
+  fallback to the lamp's owner.
+- **Checked before it waits.** A key the memory would refuse, a service or
+  action left empty, or a `source_ref` that is not
+  `{service, id, session?, computer?}` (texts without control characters,
+  `service` and `id` not empty, at most 512 bytes) is never queued. The
+  summary is tidied to one line and cut at a whole character to 160 bytes.
+- **Forgets win.** A forget everything, of the person, or about a thing,
+  takes that person's (or everyone's) waiting linked changes before it is
+  sent and again when answered, matching a forget about a thing on the
+  change's service, action and summary; the memory refuses a deed from
+  before a forget (slice 1).
+- **Rollback.** Nothing calls it, so an older voice differs only in having
+  no `linked_dropped` fact.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 

@@ -58,6 +58,8 @@ pub struct State {
     answered: AtomicU64,
     /// The database a newer build wrote, set aside at start (#1680).
     set_aside: Mutex<Option<String>>,
+    /// Left tiered copies an off start could not remove (#4988).
+    tiers_left: AtomicU64,
     buckets: [Bucket; WINDOW],
 }
 
@@ -79,6 +81,7 @@ struct Snapshot {
     note_us: u64,
     call_us: u64,
     set_aside: Option<String>,
+    tiers_left: u64,
 }
 
 impl Default for State {
@@ -98,6 +101,7 @@ impl Default for State {
             active_budget: AtomicU64::new(0),
             answered: AtomicU64::new(0),
             set_aside: Mutex::new(None),
+            tiers_left: AtomicU64::new(0),
             buckets: std::array::from_fn(|_| Bucket::default()),
         }
     }
@@ -120,6 +124,13 @@ impl State {
         if held.as_deref() != name {
             *held = name.map(str::to_owned);
         }
+    }
+
+    /// Said on every report from then on: a start with the tiers off found
+    /// a tiered copy an earlier run left and could not remove it, so a
+    /// forget made while off does not reach it (#4988).
+    pub fn tiers_left_kept(&self) {
+        self.tiers_left.fetch_add(1, SeqCst);
     }
 
     pub fn counts(&self, counts: io::Result<Counts>) {
@@ -246,6 +257,7 @@ impl State {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .clone(),
+                tiers_left: self.tiers_left.load(SeqCst),
                 ..Snapshot::default()
             };
             let second = now / 1_000_000 + 1;
@@ -295,6 +307,9 @@ fn diagnostic(snapshot: &Snapshot, now: u64) -> Diagnostic {
         _ if snapshot.set_aside.is_some() => {
             "memory set aside a database from a newer build; its records are not read"
         }
+        _ if snapshot.tiers_left > 0 => {
+            "a left tiered copy could not be removed; a forget does not reach it"
+        }
         _ => "",
     };
     let report = if why.is_empty() {
@@ -315,6 +330,10 @@ fn diagnostic(snapshot: &Snapshot, now: u64) -> Diagnostic {
     let report = match &snapshot.set_aside {
         Some(name) => report.with("set_aside", name.as_str()),
         None => report,
+    };
+    let report = match snapshot.tiers_left {
+        0 => report,
+        kept => report.with("tiers_left_kept", kept),
     };
     report
         .with("answered", snapshot.answered)
@@ -1033,5 +1052,42 @@ mod tests {
         reporter.finish(false);
         release.send(()).unwrap();
         reporter.done.recv_timeout(Duration::from_secs(5)).unwrap();
+    }
+
+    #[test]
+    fn a_left_tiered_copy_that_cannot_be_removed_is_counted_in_health() {
+        let dir = std::env::temp_dir().join(format!("mh-{}-tiers-left", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let root = dir.join(crate::tiers::DIR);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("p-left.sqlite3"), b"left").unwrap();
+        // A removal that fails on every host, root included: a read-only
+        // folder does not stop root, and the real removal takes a file or a
+        // folder alike.
+        let state = State::default();
+        state.serving();
+        let line = crate::tiers::clear_left_by(&dir, Some(&state), |_| {
+            Err(io::Error::from(io::ErrorKind::PermissionDenied))
+        })
+        .unwrap();
+        assert!(line.contains("could not be removed"), "{line}");
+        assert!(root.exists());
+        let seen = report(&state, 1);
+        assert_eq!(seen.level, Level::Warn);
+        assert_eq!(
+            seen.message,
+            "a left tiered copy could not be removed; a forget does not reach it"
+        );
+        assert_eq!(value(&seen, "tiers_left_kept"), "1");
+        // Removed by the real removal, nothing is counted.
+        let state = State::default();
+        state.serving();
+        let line = crate::tiers::clear_left(&dir, Some(&state)).unwrap();
+        assert!(line.contains("a left tiered copy removed"), "{line}");
+        assert!(!root.exists());
+        let seen = report(&state, 1);
+        assert_eq!(seen.level, Level::Ok);
+        assert!(seen.values.iter().all(|v| v.key != "tiers_left_kept"));
+        let _ = fs::remove_dir_all(&dir);
     }
 }
