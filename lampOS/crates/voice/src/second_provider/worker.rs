@@ -4387,6 +4387,21 @@ pub fn serve(
         );
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
+    // A made skill said removed, turned off or on in the lamp's own result
+    // words with no `make_skill` that did it is held the same way (#7683),
+    // with a voice make offered: its names read from `made.json` as each
+    // turn begins.
+    let made_names =
+        action_claims && std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on");
+    engine = engine.reading_made_names(made_names.then(|| {
+        let read: crate::second_provider::MadeNames = Arc::new(|| {
+            crate::made_skill::entries(std::path::Path::new(crate::made_skill::DIRECTORY))
+                .iter()
+                .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+                .collect()
+        });
+        read
+    }));
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );

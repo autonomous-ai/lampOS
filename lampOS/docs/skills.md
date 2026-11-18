@@ -4737,6 +4737,53 @@ code (`made_remove::asked`):
   it is never lost: another remove gets its own question and wait. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
+- **Never said removed, off or on with no call that did it** (#7683,
+  `LAMP_ACTION_CLAIM_CHECKED`, on in the product, beside `LAMP_MAKE_SKILL`).
+  On lamp-9adf (18 Nov 14:38, request 72) "Lamp, remove planet fact." was
+  answered just "planet fact" with `calls=none`, and "Yes." (request 73)
+  "planet fact is removed." with `calls=none`: nothing was asked or
+  removed, and the skill stayed on the lamp. The history had shown every
+  earlier remove as words alone, the lamp's "Remove moon fact?" and "moon
+  fact is removed.", since no `make_skill` call with arguments was kept for
+  it (`second_provider::kept_args`), so the model answered from those
+  words. Two changes:
+  - **The calls are kept.** With `LAMP_HISTORY_KEEPS_CALLS` (on in the
+    product), a `make_skill` that asked a remove's question, removed a
+    skill on the yes, or turned one off or on is kept for a later turn's
+    history (`second_provider::kept_made`): its one argument (`remove`,
+    `turn_off` or `turn_on`) by the made skill's own name from its answer,
+    never the words heard, and its result as a fixed line
+    (`MADE_REMOVE_ASKED`: nothing removed yet, the question came from this
+    call; `MADE_REMOVED`; `MADE_TURNED`), each saying a new one needs its
+    own `make_skill` call. A make's call is not kept: its arguments are the
+    person's request.
+  - **A claim is held.** The names of the skills they made are read from
+    `made.json` as each turn begins (one small local file,
+    `Engine::reading_made_names`). A reply that opens, bare or after a
+    lead-in ("Okay,"), with one of those names (as its words or as written,
+    "the" before or "skill" after it or not), then one of the lamp's own
+    result words for it (`action_claim::SKILL_REMOVED`: "is removed", from
+    `removed_next`; `SKILL_TURNED`: "is off", "is on again", from
+    `made_turn`, and "is on", a clash's), or with a clash's "I removed"
+    before the name, closing at its sentence's end and never on a '?', is a
+    claim (`action_claim::skill_claim`). Structure only, never a list of
+    words for meaning: the names are the lamp's records, the words its own
+    lines'. "Planet fact is still there.", "Is planet fact removed?", and a
+    skill no longer listed ("moon fact is removed." once it is gone) are
+    none. On a line asked as a question only the removed forms are judged
+    ("Planet fact is on." may answer "is planet fact on?"). Only an outcome
+    backs one (the turn's kept call statuses, `after_forget::status`): a
+    removal a `make_skill` that removed a skill (`skill_removed`, a yes or
+    a clash's replace), never a remove that only asked its question; off or
+    on a `make_skill` that ran with no error (a turn, a make, or a list).
+    Held, it is not said, and the model is asked again once with
+    `action_claim::SKILL_NOTE` (nothing changed; a `make_skill` that ran is
+    not to be called again; call `make_skill` for the remove or the turn,
+    or say plainly it wasn't done); a second claim, or one in the last
+    round, is said as "Sorry, I didn't do that. Could you ask me again?".
+    The journal: "its reply claims a skill removed action no call made …
+    (LAMP_ACTION_CLAIM_CHECKED, a made skill's change in the lamp's own
+    result words)", never the words.
 - **No extra round trip.** The match reads two local folders and the made
   skills' index; only the yes asks the manage helper, over its local
   socket. The journal names what was found by kind only ("one made skill
@@ -4787,7 +4834,18 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `only_a_plain_yes_the_code_reads_confirms_a_remove`,
 `a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line`,
 `a_yes_over_the_question_is_asked_again_and_the_next_yes_removes`;
-`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`.
+`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`; and for a
+change said with no call (#7683),
+`action_claim::tests::a_made_skill_said_changed_is_a_claim_by_its_listed_name`,
+`a_made_skill_change_stands_only_by_its_outcome`,
+`the_skill_result_words_are_the_producers_own`, and
+`second_provider::tests::skill_claim`:
+`a_remove_said_done_with_no_call_is_asked_again_and_never_said`,
+`a_remove_said_done_twice_with_no_call_is_said_not_done`,
+`a_turn_off_said_done_with_no_call_is_asked_again`,
+`a_turn_on_said_done_twice_with_no_call_is_said_not_done`,
+`a_remove_said_done_beside_its_question_is_held`,
+`a_real_remove_on_the_yes_is_said`, `a_skill_named_in_passing_is_said`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

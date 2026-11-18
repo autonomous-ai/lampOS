@@ -484,6 +484,52 @@ pub(crate) const WRITE_PREPARED: &str = "(done earlier: prepared, nothing sent; 
 pub(crate) const WRITE_DONE: &str = "(done earlier: done by the service. The rest of its result was not kept. A new write needs its own call.)";
 pub(crate) const WRITE_NOT_DONE: &str = "(done earlier: not done. The rest of its result was not kept. A new write needs its own call.)";
 
+/// A `make_skill` call that removed a skill the person made, asked a
+/// remove's question, or turned one off or on, as kept for a later turn's
+/// history (`LAMP_HISTORY_KEEPS_CALLS`, #7683): its one argument by the
+/// made skill's own name from its answer (`made.json`'s, never the words
+/// heard), and its result as one of these fixed lines. Before, no
+/// `make_skill` with arguments was kept ([`kept_args`]), so each earlier
+/// remove was told as words alone, the lamp's "Remove moon fact?" and
+/// "moon fact is removed.", and on lamp-9adf (18 Nov 14:38) "remove
+/// planet fact" then "Yes." were answered in words with `calls=none`, and
+/// nothing was removed. A make's call is not kept: its arguments are the
+/// person's request.
+pub(crate) fn kept_made(
+    name: &str,
+    told: &serde_json::Value,
+) -> Option<(serde_json::Value, Option<&'static str>)> {
+    if name != crate::made_skill::MAKE || told.get("error").is_some() {
+        return None;
+    }
+    let named = |field: &str| {
+        told[field]
+            .as_str()
+            .filter(|made| !made.is_empty() && made.len() <= crate::thread::KEPT_ARGS_BYTES / 2)
+    };
+    let (field, made, result) = if let Some(made) = named("removed") {
+        (crate::made_remove::REMOVE, made, MADE_REMOVED)
+    } else if let Some(made) = named(crate::made_remove::REMOVE)
+        && told[crate::skill_write_yes::APPROVE_ID].is_string()
+    {
+        (crate::made_remove::REMOVE, made, MADE_REMOVE_ASKED)
+    } else if let Some(made) = named(crate::made_turn::TURN_OFF) {
+        (crate::made_turn::TURN_OFF, made, MADE_TURNED)
+    } else if let Some(made) = named(crate::made_turn::TURN_ON) {
+        (crate::made_turn::TURN_ON, made, MADE_TURNED)
+    } else {
+        return None;
+    };
+    Some((serde_json::json!({ field: made }), Some(result)))
+}
+
+/// A kept remove's yes ([`kept_made`]).
+pub(crate) const MADE_REMOVED: &str = "(done earlier: removed on their yes to the lamp's question; what the lamp said next came from this call. The rest of its result was not kept. A new remove needs its own make_skill call, which asks them first.)";
+/// A kept remove that asked its question ([`kept_made`]).
+pub(crate) const MADE_REMOVE_ASKED: &str = "(done earlier: nothing removed yet; the question the lamp asked next came from this call, and waited for their yes. The rest of its result was not kept. A new remove needs its own make_skill call.)";
+/// A kept turn off or on ([`kept_made`]).
+pub(crate) const MADE_TURNED: &str = "(done earlier: done; what the lamp said next came from this call. The rest of its result was not kept. A new turn off or on needs its own make_skill call.)";
+
 /// What a call answered with an error is kept as, bare, for a later turn's
 /// history (`LAMP_HISTORY_KEEPS_CALLS`): never told as a call, only as the
 /// note after its turn's words, [`failed_then_note`]
@@ -1570,6 +1616,9 @@ pub type Asked = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 pub type Look = Arc<dyn Fn() -> Result<Vec<u8>, &'static str> + Send + Sync>;
 /// The engine's clock, for the announcement's spell.
 pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
+/// The names of the skills the person made, as `made.json` keeps them
+/// ([`Engine::reading_made_names`], #7683).
+pub type MadeNames = Arc<dyn Fn() -> Vec<String> + Send + Sync>;
 /// The note a spoken request's words earn when they name one of the staff
 /// (`worker::staff_noting`, `crate::staff_note`): `(request, heard)` to the
 /// note, or nothing.
@@ -1808,6 +1857,8 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// [`Engine::reading_made_names`] (#7683).
+    made_names: Option<MadeNames>,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
     /// #7371): how long after its waiting line a make with no answer yet
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
@@ -4875,6 +4926,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                made_names: None,
                 one_path_wait: None,
                 no_words_again: false,
                 answer_again: false,
@@ -6199,6 +6251,21 @@ impl Engine {
     pub fn checking_doing_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.doing_claims = on;
+        }
+        self
+    }
+
+    /// With [`Engine::checking_action_claims`] and a voice make offered
+    /// (`LAMP_MAKE_SKILL=on`): the names of the skills the person made,
+    /// read once as each turn begins (`made`: `made.json`'s, one small local
+    /// file), so a reply that says one removed, turned off or on in the
+    /// lamp's own result words ("Planet fact is removed.") with no
+    /// `make_skill` that did it is held and asked again once, then said not
+    /// done ([`crate::action_claim::skill_claim`], #7683). None: no such
+    /// claim is read. Before any turn only.
+    pub fn reading_made_names(mut self, made: Option<MadeNames>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_names = made;
         }
         self
     }
@@ -16414,6 +16481,16 @@ async fn answer(
     // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
     // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
+    // The skills the person made, as the turn begins, for a reply that says
+    // one removed, turned off or on with no `make_skill` that did it (#7683,
+    // lamp-9adf, 18 Nov 14:38: "planet fact is removed." with
+    // `calls=none`). A line asked as a question has only its removed forms
+    // judged: "Planet fact is on." may answer "is planet fact on?".
+    let made_names: Vec<String> = match &shared.made_names {
+        Some(read) if shared.action_claims && !quoted && asked != Asker::Reminder => read(),
+        _ => Vec::new(),
+    };
+    let made_asked = crate::action_claim::asked_as_a_question(&said);
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -17105,6 +17182,8 @@ async fn answer(
         // I didn't do that." after the app's MAKE IT, three of three).
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
+            // Its outcome too: a made skill said on stands (#7683).
+            call_statuses.push(serde_json::json!({"tool": crate::made_skill::MAKE, "outcome": {}}));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -17718,12 +17797,12 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_on(
+                                match crate::action_claim::claim_made_on(
                                     held,
                                     false,
-                                    worded_turn,
-                                    forget_turn,
-                                    doing_turn,
+                                    (worded_turn, forget_turn, doing_turn),
+                                    &made_names,
+                                    made_asked,
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
@@ -18424,12 +18503,12 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let unmade = crate::action_claim::claim_on(
+                let unmade = crate::action_claim::claim_made_on(
                     &held,
                     true,
-                    worded_turn,
-                    forget_turn,
-                    doing_turn,
+                    (worded_turn, forget_turn, doing_turn),
+                    &made_names,
+                    made_asked,
                 )
                 .flatten()
                 .filter(|kind| {
@@ -18464,6 +18543,14 @@ async fn answer(
                     });
                 // A forget said done is told its own note (C88).
                 let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
+                // So is a made skill's change said done (#7683).
+                let skill_said = matches!(
+                    unmade,
+                    Some(
+                        crate::action_claim::Claim::SkillRemoved
+                            | crate::action_claim::Claim::SkillTurned
+                    )
+                );
                 // Said in the round that calls a forget, the words ran ahead
                 // of it: not said, and no note, so the next round speaks from
                 // its answer (Thirteen's P2-2 on #5942).
@@ -18476,6 +18563,7 @@ async fn answer(
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
                 let limited = !forget_said
+                    && !skill_said
                     && unmade.is_some_and(|kind| {
                         kind == crate::action_claim::Claim::LightKept
                             || crate::action_claim::worded_limit(&held).is_some()
@@ -18484,6 +18572,8 @@ async fn answer(
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
+                } else if skill_said {
+                    ", a made skill's change in the lamp's own result words"
                 } else if doing_turn
                     && !forget_said
                     && crate::action_claim::claim_as(&held, true, worded_turn)
@@ -18543,6 +18633,8 @@ async fn answer(
                         action_claim_asked = true;
                         action_claim_note = Some(if forget_said {
                             crate::action_claim::FORGET_NOTE.to_owned()
+                        } else if skill_said {
+                            crate::action_claim::SKILL_NOTE.to_owned()
                         } else if limited {
                             crate::action_claim::LIMIT_NOTE.to_owned()
                         } else {
@@ -18561,6 +18653,8 @@ async fn answer(
                         );
                         messages.push(Message::system(if forget_said {
                             crate::action_claim::FORGET_NOTE
+                        } else if skill_said {
+                            crate::action_claim::SKILL_NOTE
                         } else if limited {
                             crate::action_claim::LIMIT_NOTE
                         } else {
@@ -19613,14 +19707,13 @@ async fn answer(
                 if did
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
-                    && let Some(args) = kept_args(&call.name, &call.args)
+                    && let Some((args, result)) =
+                        kept_made(&call.name, &answer.told).or_else(|| {
+                            kept_args(&call.name, &call.args)
+                                .map(|args| (args, kept_result(&call.name, &answer.told)))
+                        })
                 {
-                    keep(
-                        request,
-                        &call.name,
-                        &args,
-                        kept_result(&call.name, &answer.told),
-                    );
+                    keep(request, &call.name, &args, result);
                 }
                 // A call answered with an error is kept bare as failed
                 // then ([`FAILED_THEN`]), told later only as a note after
