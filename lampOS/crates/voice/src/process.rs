@@ -2485,6 +2485,8 @@ fn second_route_worker_environment(
         crate::second_provider::net::weather::ENVIRONMENT,
         // The weather's second lookup of a name that won't open (#7593).
         crate::second_provider::net::DOH_ENVIRONMENT,
+        // The weather's backup forecast, off unless `on` (#7593).
+        crate::second_provider::net::weather::met::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
         // A line cut at a thinking pause keeps its answer back (#4449).
         crate::pause_join::ENVIRONMENT,
@@ -3963,6 +3965,7 @@ mod tests {
                     "Hanoi, Vietnam"
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::net::DOH_ENVIRONMENT
+                    || name == crate::second_provider::net::weather::met::ENVIRONMENT
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
@@ -4370,6 +4373,7 @@ mod tests {
                     "LAMP_UNTIED_GOING_ON=on",
                     "LAMP_VOICE_DAY_TALLY=on",
                     "LAMP_VOICE_LOOPBACK_SERVICES=on",
+                    "LAMP_WEATHER_BACKUP=on",
                     "LAMP_WEATHER_DOH=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],

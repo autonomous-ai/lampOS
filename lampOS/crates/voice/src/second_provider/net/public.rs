@@ -159,6 +159,21 @@ pub(crate) async fn get_public_json_within(
     raced(url, open_within, Ways::lamps()).await
 }
 
+/// [`get_public_json_within`], each try sent with `agent` as its
+/// `User-Agent`: MET Norway's terms ask every client to name itself (the
+/// weather's backup, #7593).
+pub(crate) async fn get_public_json_as(
+    url: &str,
+    open_within: Duration,
+    agent: &'static str,
+) -> Result<serde_json::Value> {
+    let ways = Ways {
+        shape: Arc::new(move |builder, _| builder.user_agent(agent)),
+        ..Ways::lamps()
+    };
+    raced(url, open_within, ways).await
+}
+
 /// When the try after one begun at `previous` begins while none has
 /// opened, `index` the try's own: [`GAPS`] after it, but not past
 /// [`TRY_OPENS_IN`] before `deadline`, and never sooner than [`STAGGER`].

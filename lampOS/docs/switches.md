@@ -359,6 +359,8 @@ and so are `LAMP_TASKS_WHO` and `LAMP_SPOKEN_TO`, so each is counted `on`.
 
 `LAMP_WEATHER_DOH`: `on` only, off in the product; weather asks Google DNS if a host won't open.
 
+`LAMP_WEATHER_BACKUP`: off unless `on`; MET Norway's forecast when Open-Meteo's is down or 5xx (#7593).
+
 ## The voice: tasks, memory, schedule, skills and looks
 
 | Switch | Values and default | lamp-4ace (repo unit) | Product unit | Added by | Lamp check it named | Proposed product default | Why (one line) | Counted as |
