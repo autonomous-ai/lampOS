@@ -3487,7 +3487,8 @@ cả hai người viết.
     (`run_write_yes::quiet_hours_now`), có người ở đèn; phòng không bận,
     không nợ câu nào. Hôm nay họ không quay lại thì chờ lần sau, bao lâu
     cũng được. Mỗi tin được đưa ra nhiều nhất ba lần
-    (`long_make::MOST_OFFERS`, cách nhau ít nhất hai phút); sau đó để lại
+    (`long_make::MOST_OFFERS`, cách nhau ít nhất hai phút, đếm trong
+    `long-make-offers.json` nên khởi động lại không đếm lại từ đầu); sau đó để lại
     cho `ready_untold` trong danh sách của app và câu "Skill của tôi xong
     chưa?", skill vẫn tắt. Worker xử lý ghi chú của lượt đó
     (`long_make::told_here`): một câu, "Your <name> skill is ready and on.
@@ -3496,15 +3497,21 @@ cả hai người viết.
     18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
     câu của lần tạo xong. Skill có code khi đèn không chạy code của skill
     (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
-    bao giờ nói là bật; skill trùng với một skill trên đèn được nói là xong
-    và hỏi câu hỏi trùng (`made_clash::asked`), như lần tạo xong; skill đã
-    bật rồi được nói là bật, không hỏi lại gì. Worker không bật và không
-    xóa gì: chỉ khi coordinator thấy chính lượt đó được phát trọn (mọi từ
-    được phát, không ai chen lượt, `long_make::heard_through`) thì
-    `long_make::heard` mới bỏ dấu đó (giữ các dấu khác) và bật skill: skill
-    thường như lần tạo xong được bật, skill có code theo đường mà câu đồng ý
-    của nó sẽ đi (`make_skill_local::code_on_at_once`, không hỏi đồng ý).
-    Đã bật thì bỏ `ready_untold`. Không bật được (giới hạn số skill, bước
+    bao giờ nói là bật. Skill có code vẫn cần câu đồng ý như lần tạo xong
+    (`made_skill::code_goes_on_at_once` sai: nó gửi đi, hoặc dùng camera,
+    micro hay nghe, hoặc `LAMP_MADE_CODE_ON_AT_ONCE` tắt) được nói là xong
+    và lý do nó tắt (`made_skill::CODE_BY_VOICE`), không bao giờ nói là bật,
+    không bật, và không ghi câu đồng ý cho task khi không ai đồng ý (P2 lúc
+    19:40 của Twelve trên #7774). Skill trùng với một skill trên đèn được
+    nói là xong và hỏi câu hỏi trùng (`made_clash::asked`), như lần tạo
+    xong; skill đã bật rồi được nói là bật, không hỏi lại gì. Worker không
+    bật và không xóa gì: chỉ khi coordinator thấy chính lượt đó được phát
+    trọn (mọi từ được phát, không ai chen lượt, `long_make::heard_through`)
+    thì `long_make::heard` mới bật skill, rồi mới bỏ dấu đó (giữ các dấu
+    khác), nên nếu sập giữa chừng thì được báo lại, không bao giờ mất: skill
+    thường như lần tạo xong được bật, skill có code được bật ngay theo đường
+    đó (`make_skill_local::code_on_at_once`, không hỏi đồng ý). Đã bật thì
+    bỏ `ready_untold`. Không bật được (giới hạn số skill, bước
     kiểm tra), skill vẫn tắt và giữ `ready_untold`, và người dùng được báo
     "I couldn't turn your <name> skill on: <why>." ở lúc phù hợp kế tiếp
     (`long_make::NotOn`), không bao giờ để họ tưởng nó đang bật. Bị cắt
@@ -3519,7 +3526,8 @@ cả hai người viết.
     lúc phù hợp kế tiếp, "I couldn't finish your <name> skill.", và không
     giữ gì. Không bao giờ dùng bản nháp của DeepSeek: lần chạy tiếp mà agent
     không tạo được được nói là lỗi của agent. Skill đã xong mà bị xóa trong
-    app trước khi báo thì dấu của nó được bỏ lặng lẽ, không bao giờ nói
+    app trước khi báo (đã xong, hoặc không bật được) thì dấu của nó được bỏ
+    lặng lẽ, không bao giờ nói
     "couldn't finish".
   - **"Skill của tôi xong chưa?"** Danh sách skill của người dùng trong
     `make_skill` (`made: true`, mô tả của nó nêu câu hỏi này) mang

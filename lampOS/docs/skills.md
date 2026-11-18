@@ -6732,7 +6732,8 @@ the same code for both writers.
     (`run_write_yes::quiet_hours_now`), someone at the lamp; and the room
     not busy, nothing owed. Not back today, it waits for the next time,
     however long. Each telling is offered at most three times
-    (`long_make::MOST_OFFERS`, two minutes apart at the soonest); then it is
+    (`long_make::MOST_OFFERS`, two minutes apart at the soonest, counted in
+    `long-make-offers.json` so a restart doesn't begin it again); then it is
     left to `ready_untold` in the app's list and to "Is my skill ready?",
     the skill off. The worker acts on that turn's note
     (`long_make::told_here`): one line, "Your <name> skill is ready and on.
@@ -6741,16 +6742,22 @@ the same code for both writers.
     18:41), with the link ask for a service it reads that isn't linked yet,
     as a finished make's line has it. One with code while the lamp runs no
     skill's code (`LAMP_MADE_SCRIPTS` off) is said ready and off, why
-    plainly, never on; one that clashes with a skill on the lamp is said
-    ready and asked the clash's question (`made_clash::asked`), as a
-    finished make is; one on already is said on, nothing asked again.
-    Nothing goes on and nothing is cleared in the worker: only when the
-    coordinator saw that very turn played through (every word played,
-    nobody's turn taken over it, `long_make::heard_through`) does
-    `long_make::heard` take its mark off (every other kept) and put it on:
-    a plain one as a finished make goes on, one with code by the path its
-    yes would (`make_skill_local::code_on_at_once`, no yes asked). On, it
-    loses `ready_untold`. Not put on (the skill cap, the check), it stays
+    plainly, never on. One with code that keeps its yes as a finished
+    make's does (`made_skill::code_goes_on_at_once` false: it sends, or the
+    camera, the microphone or hearing, or `LAMP_MADE_CODE_ON_AT_ONCE` off)
+    is said ready and why it's off (`made_skill::CODE_BY_VOICE`), never on,
+    never put on, and no task yes recorded with nobody's yes (Twelve's 19:40
+    P2 on #7774). One that clashes with a skill on the lamp is said ready
+    and asked the clash's question (`made_clash::asked`), as a finished
+    make is; one on already is said on, nothing asked again. Nothing goes
+    on and nothing is cleared in the worker: only when the coordinator saw
+    that very turn played through (every word played, nobody's turn taken
+    over it, `long_make::heard_through`) does `long_make::heard` put it on,
+    and only then take its mark off (every other kept), so a crash between
+    leaves it told again, never lost: a plain one as a finished make goes
+    on, one with code that may go on at once by that path
+    (`make_skill_local::code_on_at_once`, no yes asked). On, it loses
+    `ready_untold`. Not put on (the skill cap, the check), it stays
     off and `ready_untold`, and its person is told "I couldn't turn your
     <name> skill on: <why>." at the next such moment (`long_make::NotOn`),
     never left thinking it is on. Cut or talked over, it stays off and
@@ -6765,7 +6772,8 @@ the same code for both writers.
     cleared): one plain line at the next such moment, "I couldn't finish
     your <name> skill.", and nothing kept. Never DeepSeek's draft: a make
     let run on that the agent made none of is said as the agent's failure.
-    A finished skill removed in the app before it was told has its mark
+    A finished skill removed in the app before it was told (made, or not
+    put on) has its mark
     dropped quietly, never told "couldn't finish".
   - **"Is my skill ready?"** `make_skill`'s list of the person's skills
     (`made: true`, its description naming that ask) carries `long_make`:
@@ -6786,7 +6794,9 @@ the same code for both writers.
   `a_second_long_make_never_takes_an_untold_firsts_place`,
   `a_long_make_with_code_is_said_on_in_one_line_with_no_yes_and_never_on_while_off`,
   `a_long_make_not_put_on_once_heard_is_told_why`,
-  `a_long_make_on_already_is_told_with_nothing_asked_again` and
+  `a_long_make_on_already_is_told_with_nothing_asked_again`,
+  `a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded`,
+  `a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly` and
   `long_make`'s own;
   lamp-tasks' `only_a_make_marked_may_run_on_is_given_past_two_minutes`.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
