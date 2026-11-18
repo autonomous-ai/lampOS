@@ -980,6 +980,12 @@ fn made_outcomes(statuses: &[serde_json::Value]) -> Vec<(&str, &'static str)> {
         if status["tool"] != crate::made_skill::MAKE || outcome.get("error").is_some() {
             continue;
         }
+        // A remove asked with a yes answers a list; one done at once with
+        // nothing asked (`make_no_asks`: a remove, a make's undo, a
+        // replace's undo) answers the one name (Heron's P2 on #7828).
+        if let Some(name) = outcome["removed"].as_str() {
+            done.push((name, "removed"));
+        }
         for name in outcome["removed"].as_array().into_iter().flatten() {
             if let Some(name) = name.as_str() {
                 done.push((name, "removed"));
@@ -3166,6 +3172,18 @@ pub(crate) mod tests {
         assert!(stands_here(Claim::SkillRemoved, removed, &planet));
         assert!(!stands_here(Claim::SkillRemoved, removed, &evening));
         assert!(!stands_here(Claim::SkillRemoved, removed, &failed));
+        // A remove done at once with nothing asked (`make_no_asks`) answers
+        // the one name, not a list: it backs its own removal the same, and
+        // never another's (Heron's P2 on #7828).
+        let at_once = [status(serde_json::json!({"removed": "planet-fact"}))];
+        let other_at_once = [status(serde_json::json!({"removed": "evening-dim"}))];
+        assert!(stands_here(Claim::SkillRemoved, removed, &at_once));
+        assert!(stands_here(
+            Claim::SkillRemoved,
+            "Done, I removed planet fact.",
+            &at_once
+        ));
+        assert!(!stands_here(Claim::SkillRemoved, removed, &other_at_once));
         // Its own turn off backs an off; a turn on never does, nor a turn
         // of another skill.
         let turned_off = [status(serde_json::json!({"turned_off": "planet-fact"}))];
