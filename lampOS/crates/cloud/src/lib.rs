@@ -6,6 +6,7 @@
 pub mod account;
 pub mod answer;
 pub mod apps;
+pub mod attach;
 pub mod beat;
 pub mod chat;
 pub mod consent;

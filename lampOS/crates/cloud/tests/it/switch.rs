@@ -196,6 +196,42 @@ fn the_photo_folder_the_unit_may_write_is_the_one_made_at_boot() {
     assert!(!UNIT.contains("RuntimeDirectory=lampos-photos"));
 }
 
+/// #7659: the attachments folder lamp-cloud's unit may write is the one the
+/// product's tmpfiles makes at boot (tmpfs, `lampos`'s at 0700), the one
+/// `lamp_msgs::AttachRef::DIR` names, and no unit's own runtime folder.
+#[test]
+fn the_attachments_folder_the_unit_may_write_is_the_one_made_at_boot() {
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert_eq!(lamp_msgs::AttachRef::DIR, "/run/lampos-attachments");
+    assert!(
+        writable.contains(&"-/run/lampos-attachments"),
+        "{writable:?}"
+    );
+    let made: Vec<Vec<&str>> = TMPFILES
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>())
+        .filter(|fields| fields.get(1) == Some(&"/run/lampos-attachments"))
+        .collect();
+    assert_eq!(
+        made,
+        [[
+            "d",
+            "/run/lampos-attachments",
+            "0700",
+            "lampos",
+            "lampos",
+            "-"
+        ]]
+    );
+    assert!(!UNIT.contains("RuntimeDirectory=lampos-attachments"));
+    // Off unless set: the product's unit doesn't turn it on.
+    assert!(!UNIT.contains("LAMP_ATTACHMENTS"));
+}
+
 /// #2562: lamp-cloud's unit may reach lamp-skills' call socket, for guard
 /// mode from the app, where lamp-skills' unit makes it (its runtime folder,
 /// given as its `--tools-dir`); a lamp without it still starts (`-`).

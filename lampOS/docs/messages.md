@@ -27,6 +27,15 @@ app ◀── SSE ── backend ◀── fd: chat.event × N ── lamp-cloud
   aloud, even when the app sets it (the reviewer on #1713). A photo or a file is refused
   for now ("photos and files aren't read on this lamp yet"): a bus message
   is at most 60,000 bytes, so they will go through a file.
+- **A photo or a text for the spoken turn** (`LAMP_ATTACHMENTS=on`, off
+  unless set, #7659) goes another way, never through `chat.send`: the app
+  uploads it to the backend, the backend sends `attach.<id>`, and
+  `lamp-cloud` fetches it into `/run/lampos-attachments` and tells the
+  voice on `attachments/arrived` (cloud.md, "A photo or a text from the
+  app"). The owner's next spoken line within 120 s carries a photo once
+  (second-voice.md, "A photo from the app"); the text conversation never
+  sees it. With the switch off, `chat.send` refuses photos and files as
+  above.
 - **Nothing to answer:** with nothing on the lamp listening on `chat/in`, the
   text is refused at once ("nothing on this lamp answers texts right now"),
   not after a minute.

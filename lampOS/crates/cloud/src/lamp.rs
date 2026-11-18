@@ -128,6 +128,9 @@ pub struct Real {
     /// A skill added from a file in the owner's app, with
     /// `LAMP_SKILL_UPLOAD=on` and the skills page (`crate::upload`).
     pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
+    /// A photo or a text from the owner's app for the spoken turn, with
+    /// `LAMP_ATTACHMENTS=on` (#7659, `crate::attach`).
+    pub attachments: Option<std::sync::Arc<crate::attach::Attachments>>,
     /// lamp-control's admin socket, for the developer door from the owner's
     /// app, with `--control-admin-socket` (#5299, `crate::control`).
     pub control: Option<crate::control::Door>,
@@ -891,6 +894,10 @@ impl Lamp for Real {
         self.upload.clone()
     }
 
+    fn attachments(&self) -> Option<std::sync::Arc<crate::attach::Attachments>> {
+        self.attachments.clone()
+    }
+
     fn control(&self) -> Option<crate::control::Door> {
         self.control.clone()
     }
@@ -1202,6 +1209,7 @@ mod tests {
             devices: None,
             apps: None,
             upload: None,
+            attachments: None,
             shutdown: None,
         };
         assert!(!lamp.recovery());
@@ -1291,6 +1299,7 @@ mod tests {
             devices: None,
             apps: None,
             upload: None,
+            attachments: None,
             shutdown: None,
         };
         let level = Volume {
@@ -1389,6 +1398,7 @@ mod tests {
             devices: None,
             apps: None,
             upload: None,
+            attachments: None,
             shutdown: None,
         };
         let info = crate::answer::answer(&mut lamp, "system.info", &Value::Null)
@@ -1500,6 +1510,7 @@ mod tests {
             devices: None,
             apps: None,
             upload: None,
+            attachments: None,
             shutdown: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
