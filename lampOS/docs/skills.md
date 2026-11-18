@@ -1976,24 +1976,36 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   too (#7634, lamp-9adf 18 Nov 07:20:43: "Lamp, use my look title skill."
   was taken as the yes to `page-title`'s waiting task): a line that names
   a skill other than the waiting one is never its yes, whatever skill the
-  model named. At each "skill" or "skills" in a clause, code first matches
-  every run of up to six words ending right before it, or starting right
-  after it, against the waiting skill's own name by the same match
-  (`made_remove::same_name`), no word left out, so "yes, use my lamp test
-  email two skill" is `lamp-test-email-2`'s and "Có, dùng skill page
-  title" page title's. Only when none matches does the line name another
-  skill: the words right before "skill", back to a word that comes before
-  a name ("my", "the", "use", "run", "yes", "and", …,
-  `skill_write_yes::BEFORE_A_NAME`) or the clause's start, or with none
-  there the words right after it ("run skill look title", "use the skill
-  look title"), at most six (`skill_write_yes::other_skill_named`, marked
-  per request by `line_heard`). Its `yes` is read as `new_ask`: nothing
-  kept, the wait let go, and the line answered as its own ask (the named
-  skill used or asked). "yes, use my page title", "Yes, use my page title
-  skill." and a plain "Yes." are still page title's yes; "Yes, and use my
-  weather skill." is not. Accepted limits: a line without the word
-  "skill" is not read (its `named` alone binds it, #7545); "kỹ năng" is
-  not read; an adjective before "skill" ("Yes, great skill.") fails
+  model named. At each "skill" or "skills" in a clause, code reads the
+  runs of up to six words right before it or right after it whose both
+  ends sit at the clause's edge, a bounding word ("my", "the", "use",
+  "run", "yes", "and", "please", …, `skill_write_yes::BEFORE_A_NAME`,
+  `AFTER_A_NAME`) or "skill", and matches each by the same match
+  (`made_remove::same_name`) against the waiting skill and the skills on
+  the lamp (`made_remove::names_on`: the made ones and the skills and
+  pushed folders', read only for a line said with "skill" while a task
+  waits). The longest match wins: a run naming another installed skill,
+  longer than any naming the waiting one, names that skill ("yes, use
+  skill page title backup" with `page-title-backup` on the lamp is not
+  page title's yes); else a run naming the waiting skill is its own name
+  ("yes, use my lamp test email two skill", "Có, dùng skill page title").
+  With neither, words after "skill" are ignored ("yes, run the skill
+  again", "Có, chạy skill đi" are still the yes), and the words before
+  it, back to a word that comes before a name or the clause's start, name
+  another skill when they are two words or more, or one that is not a
+  filler ("great", "nice", "same", "new", "old", "chạy", "dùng", "mở",
+  "bật", …, `skill_write_yes::FILLERS`): "use my look title skill" names
+  look title even when it was refused at load and is not listed
+  (`skill_write_yes::other_skill_named`, marked per request by
+  `line_heard`). Its `yes` is read as `new_ask`: nothing kept, the wait
+  let go, and the line answered as its own ask (the named skill used or
+  asked). "yes, use my page title", "Yes, use my page title skill." and a
+  plain "Yes." are still page title's yes; "Yes, and use my weather
+  skill." is not. Accepted limits: a line without the word "skill" is not
+  read (its `named` alone binds it, #7545); "kỹ năng" is not read; a name
+  after "skill" counts only as an installed skill's, so "run skill look
+  title" with look title not on the lamp is left to `named`; one word
+  before "skill" that is not a filler ("Yes, awesome skill.") fails
   closed, read as another skill's name; and a remove's wait is not read
   on purpose, so "Yes, and remove the joke time skill too." still removes
   the one asked about (El's P2 on #7561). The

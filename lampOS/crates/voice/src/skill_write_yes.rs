@@ -856,6 +856,18 @@ fn name_only_line(waiting: &Waiting, request: u64) -> bool {
 /// ([`other_skill_named`], #7634) is kept by its request, so a yes in it
 /// is never this wait's ([`answered`]).
 pub fn line_heard(request: u64, name_only: bool, line: &str) {
+    // The skills on the lamp are read only for a line said with "skill"
+    // while a skill's task waits, before the wait's lock is taken.
+    let task = kept::waiting(|waiting| {
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| request > waiting.request && task_wait(waiting))
+    });
+    let installed = if task && line.to_lowercase().contains("skill") {
+        installed_names()
+    } else {
+        Vec::new()
+    };
     kept::waiting(|kept| {
         let Some(waiting) = kept.as_mut().filter(|waiting| request > waiting.request) else {
             return;
@@ -872,7 +884,7 @@ pub fn line_heard(request: u64, name_only: bool, line: &str) {
         }
         if task_wait(waiting)
             && !waiting.other_named.iter().any(|(kept, _)| *kept == request)
-            && let Some(other) = other_skill_named(line, &waiting.asks.skill)
+            && let Some(other) = other_skill_named(line, &waiting.asks.skill, &installed)
         {
             if waiting.other_named.len() == SAID_KEPT {
                 waiting.other_named.remove(0);
@@ -1081,71 +1093,140 @@ fn not_a_plain_yes(waiting: &Waiting, request: u64) -> Option<&'static str> {
     }
 }
 
+thread_local! {
+    /// The skills on the lamp as a test of this thread sets them
+    /// ([`set_installed_here`]); read only in a test build.
+    static INSTALLED_HERE: std::cell::RefCell<Option<Vec<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The skills on the lamp, by name ([`crate::made_remove::names_on`]: the
+/// person's made ones, and the skills and pushed folders'), for
+/// [`other_skill_named`]. A test build reads only [`set_installed_here`]'s,
+/// none when unset.
+fn installed_names() -> Vec<String> {
+    if cfg!(test) {
+        return INSTALLED_HERE
+            .with(|here| here.borrow().clone())
+            .unwrap_or_default();
+    }
+    crate::made_skill::Keeping::when(true)
+        .map(|keeping| crate::made_remove::names_on(&keeping))
+        .unwrap_or_default()
+}
+
+/// The skills on the lamp for this test's thread alone.
+#[cfg(test)]
+pub fn set_installed_here(names: Option<Vec<String>>) {
+    INSTALLED_HERE.with(|here| *here.borrow_mut() = names);
+}
+
 /// Whether `waiting` is a skill's task's (#6305): grants said back, not a
 /// made skill's code or a remove.
 fn task_wait(waiting: &Waiting) -> bool {
     waiting.asks.grants.is_some() && !waiting.asks.code && !waiting.asks.remove
 }
 
-/// Words that end another skill's name as it is cut from a line
-/// ([`other_skill_named`]): going back from "skill", what comes before a
-/// name ("my look title skill", "use look title skill"); going on after
-/// it, what comes after one too ([`AFTER_A_NAME`]). Never used to find
-/// the waiting skill's own name, which may hold any of them
-/// (`lamp-test-email-2`, `play-time`).
+/// Words that bound a skill's name said with "skill" ([`other_skill_named`]):
+/// what comes before a name ("my look title skill", "use page title
+/// skill"). A name may hold any of them inside it (`start-the-day`); only
+/// its ends are bounded by one.
 const BEFORE_A_NAME: &[&str] = &[
     "my", "the", "your", "our", "this", "that", "a", "an", "use", "run", "open", "try", "launch",
     "start", "play", "what", "which", "yes", "and", "then", "lamp",
 ];
 
-/// Words that end another skill's name said after "skill", besides
-/// [`BEFORE_A_NAME`]'s ("use the skill look title please").
+/// Words that bound a name said after "skill", besides [`BEFORE_A_NAME`]'s
+/// ("use skill page title please").
 const AFTER_A_NAME: &[&str] = &["please", "now", "too", "for", "to", "is", "instead"];
 
-/// Words before "skill" after which no name follows it: "What skill is
-/// that?" names none.
-const ASKS_WHICH: &[&str] = &["what", "which"];
+/// One word before "skill" that is never a skill's name when it names no
+/// skill on the lamp: "great skill", "the same skill", and the Vietnamese
+/// verbs said before it ("Có, chạy skill đi").
+const FILLERS: &[&str] = &[
+    "great", "nice", "the", "that", "this", "same", "new", "old", "chạy", "dùng", "mở", "bật",
+];
 
 /// The most words a skill's name is said in, before or after "skill".
 const NAME_WORDS: usize = 6;
 
+/// Whether `word` is "skill" or "skills".
+fn skill_word(word: &str) -> bool {
+    word == "skill" || word == "skills"
+}
+
+/// Whether `word` bounds a name's end ([`BEFORE_A_NAME`], [`AFTER_A_NAME`],
+/// or "skill" itself).
+fn bounds(word: &str) -> bool {
+    BEFORE_A_NAME.contains(&word) || AFTER_A_NAME.contains(&word) || skill_word(word)
+}
+
 /// The skill other than `skill` that a heard line names (#7634, lamp-9adf
 /// 18 Nov 07:20:43: "Lamp, use my look title skill." was taken as the yes
-/// to `page-title`'s task). Within a clause, at each "skill" or "skills":
+/// to `page-title`'s task), with `installed` the skills on the lamp by
+/// name. Within a clause, at each "skill" or "skills":
 ///
-/// - **Its own name first.** Every run of at most [`NAME_WORDS`] words
-///   ending right before "skill", or starting right after it ("dùng skill
-///   page title"), is matched against `skill` by the made-skill name match
-///   #7545 binds a yes with ([`crate::made_remove::same_name`]), no word
-///   left out: "yes, use my lamp test email two skill" names
-///   `lamp-test-email-2`. One that matches names its own skill.
-/// - **Else another's.** The words right before "skill", back to a word
-///   that comes before a name ([`BEFORE_A_NAME`]) or the clause's start;
-///   with none, the words right after it ("run skill look title", "use the
-///   skill look title"), up to a word that ends one ([`BEFORE_A_NAME`],
-///   [`AFTER_A_NAME`]), unless "skill" follows "what" or "which"
-///   ([`ASKS_WHICH`]). At most [`NAME_WORDS`] either way.
+/// - **Bounded runs.** The runs of at most [`NAME_WORDS`] words right
+///   before "skill" or right after it whose both ends sit at the clause's
+///   edge, a bounding word ([`bounds`]) or "skill": "page title backup" in
+///   "use skill page title backup", never "page title" inside it. Each is
+///   matched by the made-skill name match #7545 binds a yes with
+///   ([`crate::made_remove::same_name`]).
+/// - **The longest match wins.** A run naming an installed skill other
+///   than `skill`, longer than any naming `skill`, names that other skill
+///   (`page-title-backup`, not `page-title`). Else a run naming `skill`
+///   names its own: "yes, use my lamp test email two skill",
+///   "Có, dùng skill page title".
+/// - **Else, after "skill":** nothing. Words that name no installed skill
+///   never form another's name ("yes, run the skill again", "Có, chạy
+///   skill đi").
+/// - **Else, before "skill":** the words back to a word that comes before
+///   a name ([`BEFORE_A_NAME`]) or the clause's start, at most
+///   [`NAME_WORDS`], name another skill when they are two words or more,
+///   or one that is not a filler ([`FILLERS`]): "my look title skill"
+///   (look title may be refused at load, so not installed), "my weather
+///   skill"; never "great skill" or "chạy skill".
 ///
-/// "that skill", "What skill is that?" and a line with no "skill" name
-/// none. Fails closed: an adjective before "skill" ("great skill") is read
-/// as another skill's name. "kỹ năng" is not read. Spelling only: no word
-/// is judged by what it means.
-pub fn other_skill_named(heard: &str, skill: &str) -> Option<String> {
-    let own = |words: &[String]| crate::made_remove::same_name(&words.join(" "), skill);
+/// A line with no "skill" names none, nor does "kỹ năng". Spelling only:
+/// no word is judged by what it means.
+pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Option<String> {
+    let own = |run: &[String]| crate::made_remove::same_name(&run.join(" "), skill);
+    let another = |run: &[String]| {
+        let said = run.join(" ");
+        installed
+            .iter()
+            .any(|name| name != skill && crate::made_remove::same_name(&said, name))
+    };
     for clause in heard.split([',', ';', '.', '?', '!']) {
         let words: Vec<String> = clause
             .split(|c: char| !c.is_alphanumeric())
             .filter(|word| !word.is_empty())
             .map(str::to_lowercase)
             .collect();
-        for (at, word) in words.iter().enumerate() {
-            if word != "skill" && word != "skills" {
-                continue;
+        for at in (0..words.len()).filter(|&at| skill_word(&words[at])) {
+            let before = (at.saturating_sub(NAME_WORDS)..at)
+                .filter(|&from| from == 0 || bounds(&words[from - 1]))
+                .map(|from| &words[from..at]);
+            let after = (at + 2..=words.len().min(at + 1 + NAME_WORDS))
+                .filter(|&to| to == words.len() || bounds(&words[to]))
+                .map(|to| &words[at + 1..to]);
+            let runs: Vec<&[String]> = before.chain(after).collect();
+            let own_most = runs
+                .iter()
+                .filter(|run| own(run))
+                .map(|run| run.len())
+                .max()
+                .unwrap_or(0);
+            let other = runs
+                .iter()
+                .filter(|run| !own(run) && another(run))
+                .max_by_key(|run| run.len());
+            if let Some(other) = other
+                && other.len() > own_most
+            {
+                return Some(other.join(" "));
             }
-            let before = (at.saturating_sub(NAME_WORDS)..at).any(|from| own(&words[from..at]));
-            let after =
-                (at + 2..=words.len().min(at + 1 + NAME_WORDS)).any(|to| own(&words[at + 1..to]));
-            if before || after {
+            if own_most > 0 {
                 continue;
             }
             let start = (0..at)
@@ -1154,20 +1235,10 @@ pub fn other_skill_named(heard: &str, skill: &str) -> Option<String> {
                 .take_while(|&before| !BEFORE_A_NAME.contains(&words[before].as_str()))
                 .last();
             if let Some(start) = start {
-                return Some(words[start..at].join(" "));
-            }
-            if at > 0 && ASKS_WHICH.contains(&words[at - 1].as_str()) {
-                continue;
-            }
-            let end = (at + 1..words.len())
-                .take(NAME_WORDS)
-                .take_while(|&after| {
-                    let word = words[after].as_str();
-                    !BEFORE_A_NAME.contains(&word) && !AFTER_A_NAME.contains(&word)
-                })
-                .last();
-            if let Some(end) = end {
-                return Some(words[at + 1..=end].join(" "));
+                let name = &words[start..at];
+                if name.len() > 1 || !FILLERS.contains(&name[0].as_str()) {
+                    return Some(name.join(" "));
+                }
             }
         }
     }
@@ -2791,7 +2862,11 @@ mod tests {
     /// waiting skill by the made-skill name match.
     #[test]
     fn a_line_names_another_skill_only_by_a_name_said_with_skill() {
-        let other = |heard| other_skill_named(heard, "page-title");
+        let other = |heard| other_skill_named(heard, "page-title", &[]);
+        let on_lamp = |heard, installed: &[&str]| {
+            let installed: Vec<String> = installed.iter().map(|name| name.to_string()).collect();
+            other_skill_named(heard, "page-title", &installed)
+        };
         assert_eq!(
             other("Lamp, use my look title skill."),
             Some("look title".into())
@@ -2805,14 +2880,28 @@ mod tests {
             other("Yes, and use my weather skills."),
             Some("weather".into())
         );
-        // The name after "skill" is another's too.
-        assert_eq!(other("run skill look title"), Some("look title".into()));
+        // A name after "skill" is another's only as an installed skill's.
+        let look = ["look-title", "page-title"];
         assert_eq!(
-            other("use the skill look title please"),
+            on_lamp("run skill look title", &look),
             Some("look title".into())
         );
-        // Fails closed: an adjective before "skill" is read as a name.
-        assert_eq!(other("Yes, great skill."), Some("great".into()));
+        assert_eq!(
+            on_lamp("use the skill look title please", &look),
+            Some("look title".into())
+        );
+        // The longest installed name wins over the waiting one inside it
+        // (the re-read's P1 on #7634).
+        let backup = ["page-title", "page-title-backup"];
+        assert_eq!(
+            on_lamp("yes, use skill page title backup", &backup),
+            Some("page title backup".into())
+        );
+        assert_eq!(
+            on_lamp("yes, use my backup page title skill", &backup),
+            Some("backup page title".into())
+        );
+        assert_eq!(on_lamp("yes, use my page title skill", &backup), None);
         for own in [
             "yes, use my page title",
             "Yes, use my page title skill.",
@@ -2824,15 +2913,22 @@ mod tests {
             "Yes.",
             "Yes, that skill.",
             "What skill is that?",
+            // A word after "skill" that names no installed skill, and a
+            // filler before it (the re-read's P2 on #7634).
+            "yes the skill thanks",
+            "yes, run the skill again",
+            "Có, chạy skill đi",
+            "Yes, great skill.",
+            "run skill look title",
             // Not read (accepted limits): no "skill", or "kỹ năng".
             "Yes, and use my weather.",
             "Có, dùng kỹ năng thời tiết",
         ] {
             assert_eq!(other(own), None, "{own}");
+            assert_eq!(on_lamp(own, &backup), None, "{own}");
         }
-        // A waiting skill's own name may hold the words that cut another's
-        // (the pre-push read's P2 on #7634): every run is matched for its
-        // own name first, the cut never applied to it.
+        // A waiting skill's own name may hold the words that bound
+        // another's: only a run's ends are bounded.
         for (heard, skill) in [
             ("yes, use my lamp test email two skill", "lamp-test-email-2"),
             ("yes, run the play time skill", "play-time"),
@@ -2840,8 +2936,11 @@ mod tests {
             ("yes, the what now skill", "what-now"),
             ("yes, use my my diary skill", "my-diary"),
             ("yes, use skill lamp test email two", "lamp-test-email-2"),
+            ("yes, use my page title backup skill", "page-title-backup"),
         ] {
-            assert_eq!(other_skill_named(heard, skill), None, "{heard}");
+            assert_eq!(other_skill_named(heard, skill, &[]), None, "{heard}");
+            let installed = vec![skill.to_owned(), "page-title".to_owned()];
+            assert_eq!(other_skill_named(heard, skill, &installed), None, "{heard}");
         }
     }
 

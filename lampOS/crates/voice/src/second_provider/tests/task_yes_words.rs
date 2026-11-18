@@ -393,9 +393,17 @@ fn a_line_naming_another_skill_is_never_the_yes_to_a_tasks_wait() {
             went.ran
         );
         assert!(!yes::awaited(Instant::now()), "{named}");
-        assert!(!yes::waits(&id), "{named}");
+        assert!(!yes::waits(&id), "{heard} {named}");
     }
+    yes::set_installed_here(None);
     task_yes::set_on_here(None);
+}
+
+/// The skills on the lamp beside page-title, for #7634's lines.
+fn on_the_lamp() -> Vec<String> {
+    ["page-title", "page-title-backup", "look-title", "weather"]
+        .map(String::from)
+        .to_vec()
 }
 
 /// #7634: "yes" with another skill's name after it ("Yes, and use my
@@ -411,8 +419,12 @@ fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
         ("Yes, and use my weather skills.", "page-title"),
         ("yes, run skill look title", "page-title"),
         ("yes, use the skill look title", yes::NAMED_NONE),
+        // The longest installed name wins (the re-read's P1 on #7634).
+        ("yes, use skill page title backup", "page-title"),
+        ("yes, use my backup page title skill", "page-title"),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+        yes::set_installed_here(Some(on_the_lamp()));
         let went = went(
             heard,
             vec![
@@ -428,7 +440,9 @@ fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
 }
 
 /// #7634: a yes that names its own skill, or none, is still the yes:
-/// "yes, use my page title", "Yes, use my page title skill." and "Yes.".
+/// "yes, use my page title", "Yes, use my page title skill." and "Yes.",
+/// and so is one with a word after "skill" that names no skill on the
+/// lamp ("yes, run the skill again").
 #[test]
 fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
     for (heard, named) in [
@@ -438,8 +452,14 @@ fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
         ("Yes.", "page-title"),
         ("Có, dùng skill page title", "page title"),
         ("yes, use my page title skills", "page title"),
+        // A word after "skill" naming no installed skill, or a filler
+        // before it, is no other skill (the re-read's P2 on #7634).
+        ("yes the skill thanks", "page-title"),
+        ("yes, run the skill again", yes::NAMED_NONE),
+        ("Có, chạy skill đi", yes::NAMED_NONE),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+        yes::set_installed_here(Some(on_the_lamp()));
         assert_eq!(forced(heard), make_skill_forced(), "{heard}");
         let went = went(
             heard,
@@ -453,5 +473,6 @@ fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
         assert_eq!(went.approved, 1, "{heard}");
         assert!(!yes::awaited(Instant::now()), "{heard}");
     }
+    yes::set_installed_here(None);
     task_yes::set_on_here(None);
 }

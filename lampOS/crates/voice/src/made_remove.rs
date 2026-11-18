@@ -288,6 +288,17 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
     others
 }
 
+/// The skills on the lamp by name: the person's made ones ([`made`]) and
+/// the skills and pushed folders' ([`others`]), as a remove finds them. A
+/// skill's task's wait reads a line said with "skill" against them
+/// (`skill_write_yes::other_skill_named`, #7634).
+pub(crate) fn names_on(keeping: &Keeping) -> Vec<String> {
+    let made = made(keeping);
+    let mut names: Vec<String> = made.iter().map(|(name, _)| name.clone()).collect();
+    names.extend(others(keeping, &made));
+    names
+}
+
 /// Whether every word of `short` lies inside `long`'s words, in a row
 /// ("moon" in "moon fact"), and `long` has more.
 fn inside(short: &str, long: &str) -> bool {
