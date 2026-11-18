@@ -248,7 +248,10 @@ before, with a whole fetch's waits and asks again: for a lamp in China the
 CDN is the only way. Only the sequence-free copy put in front of a GitHub
 URL is asked once, given 5 s (`MIRROR_QUICK`) to connect and begin
 answering. On a missing file, no answer or a file that does not match its
-size and SHA-256 (never taken) the next URL is asked. The journal
+size and SHA-256 (never taken) the next URL is asked. When GitHub fails
+too and the quick CDN try was cut short (out of reach, a timeout, a server
+error; not "not there"), the CDN is asked once more with a whole fetch: a
+lamp that can't reach GitHub gets its waits there. The journal
 says which URL served each model. A lamp in a home gets a build only
 once it is promoted here, never each lamp-voice publish, and a lamp the image
 makes starts on the promoted build. Until a first promotion the feed is absent
