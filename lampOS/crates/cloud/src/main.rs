@@ -360,6 +360,7 @@ fn main() -> ExitCode {
         monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
         // The owner's desk and Hydrate bottles (#7470): only with LAMP_DEVICES=on.
         devices: lamp_cloud::devices::on_from_environment().then(Default::default),
+        apps: lamp_cloud::apps::Apps::from_environment().map(std::sync::Arc::new),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -415,6 +416,7 @@ fn main() -> ExitCode {
         consent: None,
         monitor: None,
         devices: None,
+        apps: None,
         upload: None,
         shutdown: None,
     };

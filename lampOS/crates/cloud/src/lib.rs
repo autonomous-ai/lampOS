@@ -5,6 +5,7 @@
 //! See `docs/cloud.md`.
 pub mod account;
 pub mod answer;
+pub mod apps;
 pub mod beat;
 pub mod chat;
 pub mod consent;

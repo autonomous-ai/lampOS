@@ -140,6 +140,8 @@ pub struct Real {
     /// The owner's desk and Hydrate bottles through the cloud, with
     /// `LAMP_DEVICES=on` (#7470, `crate::devices`).
     pub devices: Option<crate::devices::Link>,
+    /// The owner's installed apps, with `LAMP_STORE_APPS=on` (#7415 piece 4, `crate::apps`).
+    pub apps: Option<std::sync::Arc<crate::apps::Apps>>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -898,6 +900,10 @@ impl Lamp for Real {
         self.monitor.clone()
     }
 
+    fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+        self.apps.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -1170,6 +1176,7 @@ mod tests {
             consent: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1257,6 +1264,7 @@ mod tests {
             consent: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1353,6 +1361,7 @@ mod tests {
             consent: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1462,6 +1471,7 @@ mod tests {
             consent: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
