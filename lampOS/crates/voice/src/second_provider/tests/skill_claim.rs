@@ -112,12 +112,35 @@ fn went(
             )
             .unwrap_or_else(|| {
                 yes::approve(id, request, heard, true, Instant::now(), |asks| {
+                    // A code make's yes: its package put on, no task kept.
+                    if asks.code {
+                        return Ok(json!({ "task": false }));
+                    }
                     crate::made_remove::removed(&lamp, asks, |name| {
                         asked.lock().unwrap().push(name.to_owned());
                         Ok(())
                     })
                 })
             })
+        } else if let Some(id) = args[crate::made_clash::CLASH_ID].as_str() {
+            // A clash's choice, its package put on and each other removed
+            // by a helper that always does.
+            crate::made_clash::chosen(
+                crate::made_clash::Answer {
+                    id,
+                    choice: args[crate::made_clash::CHOICE].as_str(),
+                    request,
+                    heard,
+                    here: true,
+                },
+                || true,
+                Instant::now(),
+                &crate::made_clash::Hands {
+                    remove: &|_, _| Ok(()),
+                    put_on: &|_, _| Ok(String::new()),
+                    clock: &Instant::now,
+                },
+            )
         } else if let Some(name) = args[crate::made_remove::REMOVE].as_str() {
             crate::made_remove::asked(
                 crate::made_remove::Ask {
@@ -493,8 +516,7 @@ fn a_skill_named_in_passing_is_said() {
 /// and the Reviewer-lead's P2 on #7730): "Okay, planet fact is removed."
 /// beside `{approve_id, answer: "yes"}`. The words ran ahead of their own
 /// call: not said, no note, the call removes it, and the next round says
-/// the lamp's result. Never "Sorry, I didn't do that". ("Done, …" is any
-/// call's own line, which stands beside any call, as before.)
+/// the lamp's result. Never "Sorry, I didn't do that".
 #[test]
 fn words_beside_their_own_remove_call_are_never_told_not_done() {
     let (root, keeping) = lamp("skill-claim-one-round");
@@ -641,6 +663,198 @@ fn a_true_state_told_with_no_call_is_said() {
         vec![saying("Planet fact is off.")],
     );
     assert_eq!(went.said, said(&["Planet fact is off."]), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Twelve's P2 at c881d48f19 on #7730: a code make's yes puts the skill on,
+/// and its answer names it. "Okay, planet fact is on now." after it is
+/// true and said as it is, with no note. Before the yes, made.json kept it
+/// not on.
+#[test]
+fn a_code_makes_yes_backs_its_on() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-code-yes",
+        &[("planet-fact", false), ("evening-dim", true)],
+        &[],
+    );
+    let say_back = "It runs code of its own on the lamp.";
+    let id = yes::wait_for_yes(
+        yes::Asks {
+            skill: "planet-fact".into(),
+            sha256: "cd".repeat(32),
+            writes: Vec::new(),
+            say_back: say_back.into(),
+            grants: None,
+            code: true,
+            remove: false,
+        },
+        0,
+        Instant::now(),
+    );
+    let asked = format!("I made planet fact. {say_back} Shall I turn it on?");
+    yes::lamp_said(0, &asked);
+    let went = went(
+        &keeping,
+        "Yes.",
+        vec![
+            Message::user("Lamp, make a skill that tells me a planet fact."),
+            Message::assistant(asked.as_str()),
+        ],
+        vec![
+            making(json!({ yes::APPROVE_ID: id, yes::ANSWER: "yes", yes::NAMED: yes::NAMED_NONE })),
+            saying("Okay, planet fact is on now."),
+        ],
+    );
+    assert_eq!(went.told[0]["approved"], true, "{went:?}");
+    assert_eq!(went.told[0]["made"], "planet-fact", "{went:?}");
+    assert_eq!(
+        went.said,
+        said(&["Okay, planet fact is on now."]),
+        "{went:?}"
+    );
+    assert!(
+        !went.notes.iter().any(|note| note == SKILL_NOTE),
+        "{went:?}"
+    );
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// The same for a clash's keep, reworded with no "Done:": moon fact, made
+/// and not on as it clashes with planet fact, is put on beside it, and
+/// "Moon fact is on." is said as it is.
+#[test]
+fn a_clash_keep_backs_its_on() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-clash-keep",
+        &[("planet-fact", true), ("moon-fact", false)],
+        &[],
+    );
+    let told = crate::made_clash::asked(
+        &keeping,
+        &crate::made_skill::Made {
+            name: "moon-fact".into(),
+            version: "1.0.0".into(),
+            sha256: "ab".repeat(32),
+            description: String::new(),
+            uses: Default::default(),
+            package: std::path::PathBuf::from("/nonexistent"),
+        },
+        &[crate::made_clash::Clash {
+            name: "planet-fact".into(),
+            shares: "the light",
+        }],
+        0,
+        Instant::now(),
+    );
+    let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+    crate::made_clash::lamp_said(0, question);
+    let id = told[crate::made_clash::CLASH_ID].as_str().unwrap();
+    let went = went(
+        &keeping,
+        "Keep both.",
+        Vec::new(),
+        vec![
+            making(json!({ crate::made_clash::CLASH_ID: id, crate::made_clash::CHOICE: "keep" })),
+            saying("Moon fact is on."),
+        ],
+    );
+    assert_eq!(went.told[0]["on"], true, "{went:?}");
+    assert_eq!(went.said, said(&["Moon fact is on."]), "{went:?}");
+    assert!(
+        !went.notes.iter().any(|note| note == SKILL_NOTE),
+        "{went:?}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Twelve's P3s at c881d48f19 on #7730: words beside a call that changed
+/// nothing are held with the note, never let go unnoted: a `make_skill`
+/// that only asked its question, with "Okay, planet fact is removed." in
+/// its own round, and "Done, planet fact is removed." beside it, in its
+/// round or after it, as "Done" opens any call's own line.
+#[test]
+fn a_remove_said_done_beside_an_ask_only_call_is_noted() {
+    for (test, words) in [
+        ("skill-claim-ask-one-round", "Okay, planet fact is removed."),
+        ("skill-claim-ask-done", "Done, planet fact is removed."),
+    ] {
+        let (root, keeping) = lamp(test);
+        let went = went(
+            &keeping,
+            "Lamp, remove planet fact.",
+            Vec::new(),
+            vec![
+                vec![
+                    text(words),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::made_skill::MAKE,
+                        json!({ crate::made_remove::REMOVE: "planet fact" }),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                saying("Remove planet fact?"),
+            ],
+        );
+        assert_eq!(
+            went.said,
+            said(&["Remove planet fact?"]),
+            "{words}: {went:?}"
+        );
+        assert_eq!(went.notes, [SKILL_NOTE], "{words}: {went:?}");
+        assert!(went.removed.is_empty(), "{words}: {went:?}");
+        yes::clear_for_test();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    let (root, keeping) = lamp("skill-claim-ask-done-apart");
+    let went = went(
+        &keeping,
+        "Lamp, remove planet fact.",
+        Vec::new(),
+        vec![
+            making(json!({ crate::made_remove::REMOVE: "planet fact" })),
+            saying("Done, planet fact is removed."),
+            saying("Remove planet fact?"),
+        ],
+    );
+    assert_eq!(went.said, said(&["Remove planet fact?"]), "{went:?}");
+    assert_eq!(went.notes, [SKILL_NOTE], "{went:?}");
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Twelve's P3 at c881d48f19 on #7730: a one-word made skill said removed
+/// ("Pomodoro is removed.") with no call is held as a two-word one is; a
+/// one-word skill said off is still never judged ("Music is off.").
+#[test]
+fn a_one_word_skill_said_removed_is_held() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-one-word",
+        &[("pomodoro", true), ("music", true)],
+        &[],
+    );
+    let removed = went(
+        &keeping,
+        "Lamp, remove pomodoro.",
+        Vec::new(),
+        vec![
+            saying("Pomodoro is removed."),
+            making(json!({ crate::made_remove::REMOVE: "pomodoro" })),
+            saying("Remove pomodoro?"),
+        ],
+    );
+    assert_eq!(removed.said, said(&["Remove pomodoro?"]), "{removed:?}");
+    assert_eq!(removed.notes, [SKILL_NOTE], "{removed:?}");
+    yes::clear_for_test();
+    let went = went(
+        &keeping,
+        "Lamp, turn the music down.",
+        Vec::new(),
+        vec![saying("Music is off.")],
+    );
+    assert_eq!(went.said, said(&["Music is off."]), "{went:?}");
     assert!(went.notes.is_empty(), "{went:?}");
     let _ = std::fs::remove_dir_all(&root);
 }

@@ -68,9 +68,10 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
     }
     // What `make_skill` did to a skill the person made (#7683): removed (a
     // remove's yes, or a clash's replace that took others off), turned off
-    // or turned on, each by the made skill's own name from `made.json` as
-    // its answer gives it, never the words heard, so a claim is bound to
-    // its own skill and kind (`action_claim::skill_stands`).
+    // or turned on (put on included), each by the made skill's own name
+    // from `made.json` as its answer gives it, never the words heard, so a
+    // claim is bound to its own skill and kind
+    // (`action_claim::skill_stands`).
     if name == crate::made_skill::MAKE {
         // A skill's name as lamp-skills writes one, nothing else.
         fn made(value: &Value) -> Option<&str> {
@@ -104,6 +105,14 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
             {
                 outcome.insert(kept.into(), json!(turned));
             }
+        }
+        // Put on: a make or a clash's keep or replace (`{"made", "on":
+        // true}`), or a code make's yes, whose answer names the skill it put
+        // on the same way (Twelve's P2 at c881d48f19 on #7730).
+        if let Some(on) = made(&result["made"])
+            && result["on"] == true
+        {
+            outcome.insert("turned_on".into(), json!(on));
         }
     }
     if result.get("face").is_some() {

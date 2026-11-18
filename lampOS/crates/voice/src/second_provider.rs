@@ -18639,10 +18639,22 @@ async fn answer(
                 // `approve_id`), the words ran ahead of the call: not said,
                 // and no note, so the next round speaks from its answer, as
                 // a forget's (Twelve's and the Reviewer-lead's P2 on #7730).
+                // Only a call that can change a made skill: a yes, a turn or
+                // a clash's choice; a list or a remove that only asks its
+                // question changes nothing, so words beside it get the note
+                // (Twelve's P3 at c881d48f19).
                 let skill_calling = skill_said
-                    && calls
-                        .iter()
-                        .any(|call| call.name == crate::made_skill::MAKE);
+                    && calls.iter().any(|call| {
+                        call.name == crate::made_skill::MAKE
+                            && [
+                                crate::skill_write_yes::APPROVE_ID,
+                                crate::made_turn::TURN_OFF,
+                                crate::made_turn::TURN_ON,
+                                crate::made_clash::CLASH_ID,
+                            ]
+                            .iter()
+                            .any(|field| call.args[*field].is_string())
+                    });
                 // Said in the round that calls a forget, the words ran ahead
                 // of it: not said, and no note, so the next round speaks from
                 // its answer (Thirteen's P2-2 on #5942).
