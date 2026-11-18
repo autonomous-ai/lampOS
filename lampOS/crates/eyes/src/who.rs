@@ -1916,6 +1916,20 @@ pub fn known_unsure_on() -> bool {
     std::env::var(KNOWN_UNSURE_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Off unless `LAMP_FACE_KNOWN_ON_ID=on` on lamp-eyes, and only with the
+/// hold on: within [`KNOWN_HOLD`], a print of the near face that matched
+/// nobody and is under [`HOLD_LIKENESS`] still keeps the one known while it
+/// is on their passing id, unbroken in every look since the match
+/// ([`Held::looked`], [`Held::printed`]), as a check with no print on that
+/// id does ([`Held::keeps_unprinted`]). A seated person's print from the
+/// working picture scored 0.71 then 0.12 within seconds (#7331, lamp-74ff,
+/// 16 Nov), and each low one let go of a face never out of view (#7424).
+pub const KNOWN_ON_ID_ENVIRONMENT: &str = "LAMP_FACE_KNOWN_ON_ID";
+
+pub fn known_on_id_on() -> bool {
+    std::env::var(KNOWN_ON_ID_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Off unless `LAMP_FACE_REFOUND=on` on lamp-eyes: a near face whose passing
 /// id has no print read for it yet is recognised at once, and again at most
 /// every [`REFOUND_RETRY`] while its alignment or print fails
@@ -1987,6 +2001,8 @@ pub struct Held {
     last_print: Option<Vec<f32>>,
     /// `LAMP_FACE_KNOWN_UNSURE=on` ([`Held::unsure_holds`]).
     unsure_on: bool,
+    /// `LAMP_FACE_KNOWN_ON_ID=on` ([`Held::holds_on_id`]).
+    on_id: bool,
     /// Held unsure since a check with no print ([`Unprinted::Unsure`]),
     /// until a print decides: a match, a held print, or a let-go.
     unsure: bool,
@@ -2027,7 +2043,16 @@ impl Held {
             last_print: None,
             unsure_on: false,
             unsure: false,
+            on_id: false,
         }
+    }
+
+    /// With `on` (`LAMP_FACE_KNOWN_ON_ID`), a print under [`HOLD_LIKENESS`]
+    /// on the match's unbroken passing id keeps the hold
+    /// ([`Held::keeps_print`], #7424).
+    pub fn holds_on_id(mut self, on: bool) -> Self {
+        self.on_id = on;
+        self
     }
 
     /// With `on` (`LAMP_FACE_KNOWN_UNSURE`), a check with no print holds
@@ -2219,9 +2244,22 @@ impl Held {
     /// it, the Reviewer-lead's HOLD at 180cc84ebb) or a print has read the
     /// same face since ([`Held::printed`]), or the one that follows
     /// it ([`Held::follow`]). A stranger sitting down is let go at once.
+    ///
+    /// With [`Held::holds_on_id`], a print under [`HOLD_LIKENESS`] keeps
+    /// them too while it is on the match's own id, unbroken: a poor print
+    /// of a face never out of view, not a stranger, who comes on another id
+    /// or after a gap (#7424). Never a followed id, never a person no longer
+    /// kept.
     pub fn keeps_print(&self, now: Instant, likeness: Option<f32>, id: Option<&str>) -> bool {
+        let on_their_id = self.on_id
+            && self.unbroken
+            && self
+                .matched_id
+                .as_deref()
+                .is_some_and(|matched| id == Some(matched));
+        let holds = |likeness: f32| likeness >= HOLD_LIKENESS || on_their_id;
         self.keeps(now)
-            && likeness.is_some_and(|likeness| likeness >= HOLD_LIKENESS)
+            && likeness.is_some_and(holds)
             && self.matched_id.as_deref().is_none_or(|matched| {
                 (id == Some(matched) && self.unbroken)
                     || (id.is_some() && id == self.pending.as_deref())
@@ -3268,6 +3306,63 @@ mod tests {
         held.matched(start, None);
         assert!(held.keeps_print(then, Some(0.35), Some("f9")));
         assert!(!held.keeps_print(then, Some(0.12), None));
+    }
+
+    /// #7424: a seated person's print flickers under `HOLD_LIKENESS` (0.12
+    /// after 0.71, lamp-74ff 16 Nov) on their own unbroken passing id. With
+    /// `LAMP_FACE_KNOWN_ON_ID` on, held; off, let go as before. Another id, a
+    /// broken id, a person no longer kept or the hold's end still let go.
+    #[test]
+    fn a_low_print_on_their_unbroken_id_keeps_the_held_name_with_the_switch() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        off.looked(|id| id == "f3", true);
+        assert!(!off.keeps_print(then, Some(0.12), Some("f3")));
+        let mut held = Held::new(true).holds_on_id(true);
+        held.matched(start, Some("f3".to_owned()));
+        // Their face in every look since the match.
+        held.looked(|id| id == "f3", true);
+        assert!(held.keeps_print(then, Some(0.12), Some("f3")));
+        assert!(held.keeps_print(then, Some(0.0), Some("f3")));
+        // Another id, no id, or the person no longer kept: let go.
+        assert!(!held.keeps_print(then, Some(0.12), Some("f4")));
+        assert!(!held.keeps_print(then, Some(0.12), None));
+        assert!(!held.keeps_print(then, None, Some("f3")));
+        // Past the hold from the last real match: let go.
+        assert!(!held.keeps_print(start + KNOWN_HOLD, Some(0.12), Some("f3")));
+        // A look with a near face and not theirs ends it unbroken.
+        held.looked(|_| false, true);
+        assert!(!held.keeps_print(then, Some(0.12), Some("f3")));
+        // A match with no passing id: nothing to hold on, likeness alone.
+        let mut no_id = Held::new(true).holds_on_id(true);
+        no_id.matched(start, None);
+        assert!(!no_id.keeps_print(then, Some(0.12), Some("f3")));
+    }
+
+    /// #7424: after a gap, a print of another face on their id is not read
+    /// as theirs (`Held::printed`), so the switch holds nothing there: the
+    /// gap's rule (the Reviewer-lead's HOLD on #5546) stands.
+    #[test]
+    fn a_low_print_after_a_gap_lets_go_even_with_the_switch() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut theirs = vec![0.0; PRINT];
+        theirs[0] = 1.0;
+        let mut other = vec![0.0; PRINT];
+        other[1] = 1.0;
+        let mut held = Held::new(true).holds_on_id(true);
+        held.matched_print(start, Some("f3".to_owned()), &theirs);
+        // Past `UNBROKEN_MISSES` looks with no face.
+        for _ in 0..=UNBROKEN_MISSES {
+            held.looked(|_| false, false);
+        }
+        assert_eq!(
+            held.printed(&other, Some("f3")).map(|(_, same)| same),
+            Some(false)
+        );
+        assert!(!held.keeps_print(then, Some(0.12), Some("f3")));
     }
 
     /// #5738: their face back near after a gap, not printed (turned, too
