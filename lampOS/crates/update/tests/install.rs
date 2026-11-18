@@ -4763,6 +4763,22 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     assert_eq!(on("Environment=LAMP_OPENCLAW_V1_TOOLS=on"), 1);
 }
 
+/// #7245: the product's lamp-voice makes a skill on the lamp's agent with
+/// the guide, on the one run path (named on #7737, El's P2).
+#[test]
+fn the_product_makes_with_the_agents_guide_on_the_one_path() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    let on = |line: &str| service.iter().filter(|said| **said == line).count();
+    assert_eq!(on("Environment=LAMP_MAKE_SKILL_AGENT=on"), 1);
+    assert_eq!(on("Environment=LAMP_MAKE_AGENT_ONE_PATH=on"), 1);
+    assert_eq!(on("Environment=LAMP_MAKE_AGENT_GUIDE=on"), 1);
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.
