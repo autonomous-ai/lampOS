@@ -1397,12 +1397,28 @@ impl Thread {
     /// Whether the lamp's newest line before `request` ended in a question:
     /// then a bare answer ("23") is an answer to it (#926).
     pub fn lamp_asked(&self, request: u64) -> bool {
+        self.lamp_question(request).is_some()
+    }
+
+    /// [`Self::lamp_asked`], its exchange begun no more than `within` before
+    /// `now` (the clock [`Self::said_last_ago_but`] reads): a question the
+    /// lamp still waits on. Exchanges drop by count, not age, so
+    /// [`Self::lamp_asked`] alone holds an "Anything else?" for hours
+    /// (`said_to_me`'s bare yes or no out of the window, the Reviewer-lead's
+    /// HOLD on #7705).
+    pub fn lamp_asked_within(&self, request: u64, now: Instant, within: Duration) -> bool {
+        self.lamp_question(request)
+            .is_some_and(|exchange| now.saturating_duration_since(exchange.at) <= within)
+    }
+
+    /// The lamp's newest line before `request`, when it ended in a question.
+    fn lamp_question(&self, request: u64) -> Option<&Exchange> {
         self.exchanges
             .iter()
             .rev()
             .filter(|exchange| exchange.request != request)
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
-            .is_some_and(|exchange| exchange.lamp.trim_end().ends_with('?'))
+            .filter(|exchange| exchange.lamp.trim_end().ends_with('?'))
     }
 
     /// [`Self::lamp_asked`], or with `by_its_end` (`LAMP_REMARKS`)
@@ -3395,6 +3411,26 @@ mod tests {
     /// kept as those words, and what it still sends adds none. Its end is
     /// the heard end, so a question it never played isn't taken as asked. One
     /// cut before any word is passed over, as an answer with no word is.
+    #[test]
+    fn the_lamps_question_waits_only_within_its_bound() {
+        // The Reviewer-lead's HOLD on #7705: `lamp_asked` has no clock;
+        // `lamp_asked_within` holds the question only within its bound.
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(120);
+        thread.person("Call me Jay.", true, at(0));
+        thread.lamp(1, "Your name is Jay. Is that right?", at(1));
+        assert!(thread.lamp_asked_within(2, at(30), within), "fresh");
+        // The exchange begins with the lamp's first words, at 1 s.
+        assert!(thread.lamp_asked_within(2, at(121), within), "at the bound");
+        assert!(!thread.lamp_asked_within(2, at(122), within), "stale");
+        assert!(thread.lamp_asked(2), "lamp_asked alone has no clock");
+        thread.person("Thanks.", true, at(5));
+        thread.lamp(2, "You're welcome.", at(6));
+        assert!(!thread.lamp_asked_within(3, at(7), within), "no question");
+    }
+
     #[test]
     fn an_answer_cut_is_kept_as_what_was_heard_of_it() {
         let mut thread = Thread::new();

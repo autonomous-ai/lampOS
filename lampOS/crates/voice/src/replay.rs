@@ -46,6 +46,12 @@ struct Case {
     /// `signs.lamp_asked`, #7698).
     #[serde(default)]
     lamp_asked: bool,
+    /// Seconds from the start of the lamp's words that asked to the line,
+    /// when the journal gives them: with `lamp_asked`, the question still
+    /// waits within `said_to_me::QUESTION_WAITS` (the Reviewer-lead's HOLD
+    /// on #7705). Not given, it waits no more.
+    #[serde(default)]
+    asked_s: Option<f32>,
     /// Another voice in the conversation (the worker's `another_voice`,
     /// #7726): the lone face's pose then gives none.
     #[serde(default)]
@@ -132,6 +138,11 @@ fn verdict(case: &Case) -> String {
         name_heard: case.named,
         going_on: case.going_on,
         lamp_asked: case.lamp_asked || crate::services::answer_awaited(&heard),
+        question_waits: crate::services::answer_awaited(&heard)
+            || case.lamp_asked
+                && case.asked_s.is_some_and(|seconds| {
+                    Duration::from_secs_f32(seconds) <= crate::said_to_me::QUESTION_WAITS
+                }),
         turned: case.turned,
         ..Line::default()
     }

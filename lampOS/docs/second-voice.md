@@ -5943,13 +5943,21 @@ after a take-over, but now for every turn:
   speaking it (one `yes` in a look of the line,
   `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
   speaking), with 3 words or more, a question or an ask; or, out of the
-  window, when the lamp's own question waits (`said_to_me::Line::lamp_asked`)
-  and the line is 2 words or fewer and a plain yes or a plain no
-  (`services::plain_yes`, `services::plain_no`), whatever its face or pose
-  (the first builder's ruling on #7698: lamp-06c1, 18 Nov, request 99, a
-  one-word yes after a rename's read-back, held out of the window; let
+  window, when the lamp still waits on its question
+  (`said_to_me::Line::question_waits`: the thread's question asked no more
+  than 120 s before, `said_to_me::QUESTION_WAITS`, the lamp's own wait for
+  a read-back's answer, `services::PENDING_FOR`, measured from the start of
+  the exchange as `Thread::lamp_asked_within` reads it; or a read-back or a
+  skill's yes within its own wait) and the line is 2 words or fewer and a
+  plain yes or a plain no (`services::plain_yes`, `services::plain_no`),
+  whatever its face or pose (the first builder's ruling on #7698, "while
+  the lamp is still waiting for the answer": lamp-06c1, 18 Nov, request 99,
+  a one-word yes after a rename's read-back, held out of the window; let
   through as `said to the lamp, in a conversation`, `out of the window`; a
-  bare yes with no question pending is held as before). Otherwise the face
+  bare yes with no question pending, or to a question asked longer ago
+  than that, is held as before: the thread drops exchanges by count, not
+  age, so an "Anything else?" would otherwise wait for hours, the
+  Reviewer-lead's HOLD on #7705). Otherwise the face
   and the conversation are no sign, for every use of them in `attention`,
   and the journal says `request N: not said to the lamp, held: <reason>`
   (`not facing (pitch)`, `looking away`, `not facing in a conversation
