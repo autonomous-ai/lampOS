@@ -22,6 +22,13 @@
   .joint b { font-weight: 600; }
   .joint .now { font-variant-numeric: tabular-nums; }
   .joint .facts { color: var(--soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+  /* What the real body will do (reach.js): the lamp's reach as a band under the slider, amber past it, and the lamp's own word after a move. */
+  .joint .track { position: relative; }
+  .joint .band { position: absolute; top: 50%; height: 6px; margin-top: -3px; min-width: 3px; border-radius: 3px; background: #4caf50; opacity: .55; pointer-events: none; display: none; }
+  .joint .servo-reach { color: var(--soft); font-size: 12px; min-height: 1.2em; }
+  .joint.past .servo-reach { color: #c77700; font-weight: 600; }
+  .joint.past input[type=range] { accent-color: #e08a00; }
+  .joint .servo-reach.said { color: var(--accent); }
   .moving { color: var(--accent); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -203,9 +210,29 @@ for (let i = 0; i < RING.pixels; i++) {
 if (head) { head.add(glow); glow.position.set(RING.centre[0], RING.y - 0.01, RING.centre[1]); for (const dot of pixelDots) head.add(dot); }
 status.textContent = `the lamp: ${model.hardware}, ${model.chain.join(' → ')}; origins ${model.measured.origins}`;
 
+// The ghost: a second, faint copy of the lamp posed as the slider ASKED, shown only while the body will cut an ask (reach.js). The same
+// file loaded again, so its bones are its own; if it cannot be loaded the page has no ghost and works as before.
+const ghost = await new GLTFLoader().loadAsync(withToken('/lamp.glb')).catch(() => null);
+const ghostBones = {};
+if (ghost) {
+  ghost.scene.visible = false;
+  ghost.scene.traverse((node) => {
+    for (const joint of model.joints) if (node.name === joint.bone) ghostBones[joint.name] = node;
+    if (node.isMesh) {
+      const faint = (material) => { const copy = material.clone(); copy.transparent = true; copy.opacity = 0.25; copy.depthWrite = false; return copy; };
+      node.material = Array.isArray(node.material) ? node.material.map(faint) : faint(node.material);
+    }
+  });
+  scene.add(ghost.scene);
+}
 // Each joint turns its bone about its axis by sign × (deg − zero), after rest.
 const shown = Object.fromEntries(model.joints.map((j) => [j.name, 0]));
 const wanted = { ...shown };
+const ghostShown = { ...shown };
+// (declared here, before the animation loop can run: reach.js is loaded below, and until it is there is nothing to warn about)
+let bodyReach = null;
+const limits = {};
+const asked = { ...shown };
 function pose() {
   for (const joint of model.joints) {
     const bone = bones[joint.name];
@@ -214,10 +241,36 @@ function pose() {
     const { zero_deg, sign } = cal[joint.name];
     const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...joint.axis), THREE.MathUtils.degToRad(sign * (shown[joint.name] - zero_deg)));
     bone.quaternion.copy(rest[joint.name]).multiply(turn);
+    // The ghost goes to what was asked (the same turn about the same bone, from the same rest).
+    if (ghost && ghostBones[joint.name]) {
+      ghostShown[joint.name] += (asked[joint.name] - ghostShown[joint.name]) * 0.35;
+      const gturn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...joint.axis), THREE.MathUtils.degToRad(sign * (ghostShown[joint.name] - zero_deg)));
+      ghostBones[joint.name].quaternion.copy(rest[joint.name]).multiply(gturn);
+    }
   }
+  if (ghost) ghost.scene.visible = Boolean(bodyReach) && model.joints.some((joint) => bodyReach.pastReach(limits[joint.name], asked[joint.name]));
 }
 renderer.setAnimationLoop(() => { pose(); controls.update(); renderer.render(scene, camera); });
 
+// What the real body will do (reach.js, from `get body`'s min_deg and max_deg, sent by the server): the solid lamp takes the pose the body will
+// take (the slider held inside its reach), a faint ghost shows what was asked, and a joint past its reach is marked in amber. The page only
+// warns: every slider value is still sent as asked, and a lamp that says no limits is drawn as it always was.
+bodyReach = await import(withToken('/reach.js')).catch(() => null);
+const body = (name, deg) => (bodyReach ? bodyReach.clampTo(limits[name], deg) : deg);
+const showServoReach = (name) => {
+  const row = rows[name];
+  if (!row || !bodyReach) return;
+  const limit = limits[name];
+  const past = bodyReach.pastReach(limit, asked[name]);
+  row.row.classList.toggle('past', past);
+  if (!row.saying) row.servoReach.textContent = bodyReach.reachText(limit, asked[name]);
+  row.band.style.display = limit ? 'block' : 'none';
+  if (limit) {
+    const at = (deg) => `${((Math.max(-180, Math.min(180, deg)) + 180) / 360) * 100}%`;
+    row.band.style.left = at(limit.min);
+    row.band.style.width = `calc(${at(limit.max)} - ${at(limit.min)})`;
+  }
+};
 // The panel: one row per joint, from the base out.
 const rows = {};
 const panel = document.getElementById('joints');
@@ -226,10 +279,11 @@ for (const name of model.chain) {
   const row = document.createElement('div');
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
-    <div class="track"><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
+    <div class="track"><div class="band"></div><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
     <div class="reach"></div>
     <div class="load" title="load the body reads on this joint"><i></i></div>
-    <div class="facts">servo ${joint.servo} · ${joint.bus}</div>`;
+    <div class="facts">servo ${joint.servo} · ${joint.bus}</div>
+    <div class="servo-reach" aria-live="polite"></div>`;
   const slider = row.querySelector('input');
   let dragging = false;
   let sentAt = 0;
@@ -244,14 +298,16 @@ for (const name of model.chain) {
   };
   slider.addEventListener('input', () => {
     const deg = held();
-    wanted[name] = deg;
+    asked[name] = deg;
+    wanted[name] = body(name, deg);
+    showServoReach(name);
     const now = performance.now();
     if (now - sentAt < 40) return; // 25 a second at most
     sentAt = now;
     send({ type: 'drag', joint: name, deg });
   });
-  slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: held() }));
-  rows[name] = { row, slider, reach: row.querySelector('.reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
+  slider.addEventListener('change', () => { const deg = held(); asked[name] = deg; wanted[name] = body(name, deg); showServoReach(name); send({ type: 'drag', joint: name, deg, final: true }); });
+  rows[name] = { row, slider, band: row.querySelector('.band'), reach: row.querySelector('.reach'), servoReach: row.querySelector('.servo-reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -465,6 +521,24 @@ function connect() {
       return log(data.text);
     }
     if (data.type === 'result' || data.type === 'event' || data.type === 'picture' || data.type === 'audio' || data.type === 'hear') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
+    // The lamp's reach (from `get body`), said again when it changes; and its word on the last move of a joint (its `done`), for 3 s.
+    if (data.type === 'limits') {
+      for (const name of Object.keys(limits)) delete limits[name];
+      Object.assign(limits, data.joints);
+      for (const name of Object.keys(rows)) showServoReach(name);
+      return;
+    }
+    if (data.type === 'joint_done') {
+      const row = rows[data.joint];
+      const words = row && bodyReach ? bodyReach.doneWords(data, data.joint) : '';
+      if (!words) return;
+      row.saying = true;
+      row.servoReach.textContent = words;
+      row.servoReach.classList.add('said');
+      clearTimeout(row.sayTimer);
+      row.sayTimer = setTimeout(() => { row.saying = false; row.servoReach.classList.remove('said'); showServoReach(data.joint); }, 3000);
+      return;
+    }
     if (data.type !== 'state') return;
     const { joints = {}, lamp = {} } = data.state;
     reachNow = data.state.reach ?? null;
@@ -490,7 +564,7 @@ function connect() {
       // `deg` is null until the body has said its limits (its homes): the
       // twin keeps the joint where it was and says so.
       const known = typeof joint.deg === 'number';
-      if (known && !row.dragging()) { wanted[name] = joint.deg; row.slider.value = joint.deg; }
+      if (known && !row.dragging()) { wanted[name] = joint.deg; asked[name] = joint.deg; row.slider.value = joint.deg; if (!row.saying) showReach(name); }
       row.now.textContent = known ? `${joint.deg.toFixed(1)}°` : 'no home yet';
       row.now.classList.toggle('moving', joint.moving);
       const temp = joint.temp_c === undefined ? '' : ` · ${joint.temp_c} °C`;
