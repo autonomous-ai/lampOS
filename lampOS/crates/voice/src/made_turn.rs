@@ -432,45 +432,70 @@ pub fn turned_by_helper(socket: &Path, name: &str, off: bool) -> Result<(), Stri
 }
 
 /// What the model is told in a heard turn while any skill the person made
-/// or added is turned off, with the switch on: how many, never which (a
-/// name can carry a person's, and the line may not be the owner's), and
+/// or added is turned off, with the switch on: how many, and
 /// [`BACK_ON_BY_CALL`]. None when none is off, or the `off` file in `state`
 /// can't be read. A structural guard, no words matched: on lamp-9adf, 18
 /// Nov 03:2x, "turn my bitcoin price skill back on" made no call and was
 /// answered "back on" while btc price stayed off; whether a line asks to
 /// turn one back on stays the model's to judge.
-pub fn off_note(keeping: &Keeping, state: &Path) -> Option<String> {
+///
+/// With `named` (the private room, where every line is the owner's), each
+/// off one too, by its said name, marked off, at most [`OFFERED_MOST`],
+/// and never said missing (#7562's rows on lamp-9adf, 18 Nov: "Lamp, run
+/// space facts" while it was off was answered "There's no space facts
+/// skill on the lamp" with no call: told how many alone, the model knew
+/// none by name, and a skill started by its words has no function of its
+/// own). Without, how many, never which: a name can carry a person's, and
+/// the line may not be the owner's.
+pub fn off_note(keeping: &Keeping, state: &Path, named: bool) -> Option<String> {
     let turned_off = crate::skill_about::turned_off(state).ok()?;
     let mut theirs = made_skill::kept_on_names(&keeping.directory);
     theirs.sort();
     theirs.dedup();
-    let count = theirs
-        .iter()
-        .filter(|name| turned_off.contains(*name))
-        .count();
-    let (count, are) = match count {
+    theirs.retain(|name| turned_off.contains(name));
+    let (count, are) = match theirs.len() {
         0 => return None,
         1 => ("One skill".to_owned(), "is"),
         count => (format!("{count} skills"), "are"),
     };
+    let which = if named {
+        let lines: Vec<String> = theirs
+            .iter()
+            .take(OFFERED_MOST)
+            .map(|name| format!("{}: off", made_skill::spoken_name(name)))
+            .collect();
+        format!(
+            ": {}. Each is still theirs on the lamp, only turned off: never say there is no \
+             such skill",
+            lines.join("; ")
+        )
+    } else {
+        String::new()
+    };
     Some(format!(
-        "(For you to know, not to answer: {count} they made or added {are} turned off now. A \
-         line that asks to use or run one: call it as for any skill, by its function, by \
-         use_skill with its name, or by make_skill with run and its name, never turn_on alone; \
-         the lamp turns it on for the owner's ask and runs it, and its answer says what to say. \
-         {BACK_ON_BY_CALL})"
+        "(For you to know, not to answer: {count} they made or added {are} turned off \
+         now{which}. A line that asks to use or run one: call it as for any skill, by its \
+         function, by use_skill with its name, or by make_skill with run and its name, never \
+         turn_on alone; the lamp turns it on for the owner's ask and runs it, and its answer \
+         says what to say. {BACK_ON_BY_CALL})"
     ))
 }
 
 /// [`off_note`] on the lamp, in the voice's request `request` (`heard`:
-/// someone spoke it): with the switch on and a heard line only.
+/// someone spoke it): with the switch on and a heard line only; each off
+/// one named in the private room alone (`person::private_room`, read with
+/// no wait: the owner's voice is never waited for here, before round 1).
 pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
     if !heard || !made_skill::off_said_on() {
         return None;
     }
     let keeping = Keeping::when(true)?;
-    let note = off_note(&keeping, Path::new(crate::skill_about::STATE_DIR))?;
-    eprintln!("lamp-voice: request {request}: told that a skill they made or added is turned off");
+    let named = crate::person::private_room();
+    let note = off_note(&keeping, Path::new(crate::skill_about::STATE_DIR), named)?;
+    eprintln!(
+        "lamp-voice: request {request}: told that a skill they made or added is turned off{}",
+        if named { ", each by its name" } else { "" }
+    );
     Some(note)
 }
 
@@ -1169,6 +1194,54 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #7562's rows on lamp-9adf, 18 Nov: "Lamp, run space facts" while it
+    /// was off was answered "There's no space facts skill on the lamp" with
+    /// no call: told only how many were off, the model knew none by name,
+    /// and space facts, started by its words, has no function of its own.
+    /// In the private room, where every line is the owner's, each of theirs
+    /// that is off is told by its name, marked off, and never said missing;
+    /// one that is on is not listed. Outside it, how many alone, as before.
+    #[test]
+    fn an_off_made_skill_is_told_by_name_and_marked_off_in_the_private_room() {
+        let (root, keeping) = keeping("off-note-named");
+        made_remove::tests::made_here(
+            &keeping,
+            &[
+                ("space-facts", true),
+                ("moon-fact", true),
+                ("good-morning-3", true),
+            ],
+        );
+        let state = root.join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(
+            state.join(crate::skill_about::OFF_FILE),
+            "space-facts\ngood-morning-3\n",
+        )
+        .unwrap();
+        let named = off_note(&keeping, &state, true).unwrap();
+        for told in [
+            "2 skills they made or added are turned off now",
+            "good morning 3: off",
+            "space facts: off",
+            "never say there is no such skill",
+            "make_skill with run and its name",
+        ] {
+            assert!(named.contains(told), "{told}: {named}");
+        }
+        assert!(!named.contains("moon"), "{named}");
+        let counted = off_note(&keeping, &state, false).unwrap();
+        assert!(
+            counted.contains("2 skills they made or added are turned off now"),
+            "{counted}"
+        );
+        assert!(
+            !counted.contains("space") && !counted.contains("morning"),
+            "{counted}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #7562's row on lamp-9adf, 18 Nov 03:2x: btc price turned off by
     /// voice, then "turn my bitcoin price skill back on" made no call and
     /// was answered "Bitcoin price is back on" while it stayed off. While
@@ -1184,12 +1257,12 @@ mod tests {
         let (root, keeping, places) = uploaded_btc("turn-off-note");
         let off_file = places.state.join(skill_about::OFF_FILE);
         let helper = kept_in(&off_file);
-        assert_eq!(off_note(&keeping, &places.state), None);
+        assert_eq!(off_note(&keeping, &places.state, false), None);
         let mut off = ask("btc price", true);
         off.state = Some(&places.state);
         let told = asked(off, &keeping, owner, helper);
         assert_eq!(told[LATER], BACK_ON_BY_CALL, "{told}");
-        let note = off_note(&keeping, &places.state).unwrap();
+        let note = off_note(&keeping, &places.state, false).unwrap();
         assert!(
             note.contains("One skill they made or added is turned off"),
             "{note}"
@@ -1212,7 +1285,7 @@ mod tests {
         let mut on = ask("btc price", false);
         on.state = Some(&places.state);
         assert_eq!(asked(on, &keeping, owner, helper)["off"], false);
-        assert_eq!(off_note(&keeping, &places.state), None);
+        assert_eq!(off_note(&keeping, &places.state, false), None);
         made_skill::set_off_said_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -1234,7 +1307,7 @@ mod tests {
         let mut off = ask("btc price", true);
         off.state = Some(&places.state);
         asked(off, &keeping, owner, helper);
-        let note = off_note(&keeping, &places.state).unwrap();
+        let note = off_note(&keeping, &places.state, false).unwrap();
         assert!(note.contains("by its function"), "{note}");
         // #7562's row on lamp-9adf, 18 Nov: a made skill has no function,
         // and the model's `use_skill` for one turned off runs it too.
