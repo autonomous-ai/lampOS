@@ -15057,6 +15057,9 @@ fn play_exact_line(
             }
             return Ok(None);
         }
+        // An app page's line goes after a say of its own already waiting
+        // (#7718: the last page's line never before a made skill's line).
+        crate::say::ExactNow::Play if says.page_line_behind_a_say() => return Ok(None),
         crate::say::ExactNow::Play => {}
     }
     let Some((samples, ticket)) = says.take_exact(at_us) else {

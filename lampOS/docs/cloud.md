@@ -2904,8 +2904,12 @@ says `onboarding_page_supported: true` then, and `onboarding_page_version:
   `/run/lampos-say/say.sock`), skill `onboarding-app`, let go after 30 s:
   as written (`exact`, no chat) for an English owner; as a note said in the
   person's language otherwise, these lines having no translation. Only
-  once nobody is talking and no other line is playing (the say service's
-  gates), never waited for here.
+  once the lamp's own speech is over and nobody is heard (the say
+  service's gates), never waited for here. The voice takes `onboarding-app`'s
+  lines as the page's answer: no say's 15 s quiet after the last turn and
+  no conversation going on hold them (#7718, [speaking-first.md](speaking-first.md),
+  "The app's onboarding pages' lines"), but a say of its own already
+  waiting goes first.
 - **The push.** One unasked `data` reply on `fd_channel`, kind
   `onboarding.page_done`, data `{"page", "how"?, "walk_id"?}`, once per page
   opened, as its first line is handed out (a nudge pushes nothing), on the

@@ -29,7 +29,8 @@
 //! Each line goes to the voice's say socket: as written (`exact`, no chat)
 //! for an English owner; as a note in the person's language otherwise,
 //! these lines having no translation (`crate::say` in lamp-voice: said only
-//! once nobody is talking and the lamp's own line has ended). Behind
+//! once nobody is talking and the lamp's own line has ended; as the page's
+//! answer, with no say's 15 s quiet after the last turn, #7718). Behind
 //! `onboarding.done`'s switch (`LAMP_APP_ONBOARDING_DONE`), with
 //! `onboarding_page_supported: true` and [`VERSION`] in `system.info`. No
 //! words heard.
