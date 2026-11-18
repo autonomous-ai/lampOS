@@ -5352,27 +5352,38 @@ becomes a remove. Then, in code (`made_turn::asked`):
   (`just_made::note`): "(For you to know, not to answer: in this
   conversation with them, newest first, the lamp turned water reminder off
   (just now); made daily stretch reminder (4 minutes ago). When their line
-  means a skill of theirs without saying its name, it means the newest of
-  these that fits what they ask, as if they had said that name: to turn it
-  off, turn it on or remove it, call make_skill with turn_off, turn_on or
-  remove and that name; to use or run it, call it as for any skill, by its
-  own function, by use_skill with that name, or by make_skill with run and
-  that name, never a second make of it. Never list their skills for it. ... When their line means a skill of theirs and none of these fits,
-  ask which skill they mean. A line about anything else, the light, music
-  or a timer, is answered as it is: no question about skills, and no skill
-  turned on for it.)", at most 3 skills, each by the last done with it.
-  With more than one made in the conversation, it adds "ask once which they
-  mean, naming them (A or B), and call nothing" for a line that means one
-  made without saying which. In the per-turn notes, never in
-  `make_skill`'s description, which keeps its bytes. A turn whose name
-  finds none and offers `candidates` gives those made or turned in this
-  conversation first, each marked `in_this_conversation` ("made just now",
-  "turned off 2 minutes ago"), and tells the model to choose the newest
-  that fits (and to ask which when more than one made fits); with nothing
-  made or turned in the conversation, it is told "None of theirs was made,
-  turned off or turned on in this conversation: ... ask which skill they
-  mean and call nothing; never choose one for them."
-  (`just_made::candidates`). The turn itself is as before: the owner's
+  means a skill of theirs without saying its name, judge which of these
+  fits what they ask. If only one fits, it means that one, as if they had
+  said its name: act on it and never ask. To turn it off, turn it on or
+  remove it, call make_skill with turn_off, turn_on or remove and that
+  name; to use or run it, call it as for any skill, by its own function, by
+  use_skill with that name, or by make_skill with run and that name, never
+  a second make of it. Never list their skills for it. If more than one
+  fits and their line doesn't say which, ask once, short, naming only those
+  that fit so one word answers it, as in "The water one or the stretch
+  one?", and call nothing. If none fits, say plainly, in a few words, that
+  they have no skill like that, and ask nothing: never which one they mean.
+  A line about anything else, the light, music or a timer, is answered as
+  it is: no question about skills, and no skill turned on for it.)", at
+  most 3 skills, each by the last done with it. The "more than one"
+  sentence (`just_made::ASK_WHICH`) is told only when the note names more
+  than one skill; the "none" sentence (`just_made::NONE_FITS`) always. This
+  is the first builder's ruling on #7715 (23:14, "keep the one question,
+  worded to be quick"): one candidate is acted on, never asked; several
+  are asked once by name, so one word answers; none is said plainly, never
+  "which". The model judges which fit: no word lists. In the per-turn
+  notes, never in `make_skill`'s description, which keeps its bytes. A
+  turn whose name finds none and offers `candidates` gives those made or
+  turned in this conversation first, each marked `in_this_conversation`
+  ("made just now", "turned off 2 minutes ago"), and tells the model that
+  when their line means one of those without its name, the one that fits
+  is called again by its name, never asked; `ASK_WHICH` when more than one
+  is marked; and `NONE_FITS`. With nothing made or turned in the
+  conversation, it is told "None of theirs was made, turned off or turned
+  on in this conversation: when their line means one made or changed just
+  now without saying its name, they have none like that: say so plainly,
+  in a few words, ask nothing and call nothing; never choose one for
+  them." (`just_made::candidates`). The turn itself is as before: the owner's
   alone, its own answer, no yes. The note adds no gate of its own: the
   model's `turn_on` of the skill it names runs on its judgment, so "turn it
   back on" turns it on, and "use the one you just made" while it is off
@@ -5397,6 +5408,9 @@ becomes a remove. Then, in code (`made_turn::asked`):
   `turn_it_back_on_right_after_means_the_one_just_turned_off`,
   `two_makes_in_the_conversation_ask_which_naming_both`,
   `no_make_in_the_conversation_asks_and_never_guesses`,
+  `more_than_one_fitting_is_asked_once_naming_them_for_a_one_word_answer`,
+  `one_candidate_is_acted_on_never_asked`,
+  `none_fitting_says_no_skill_like_that_never_which`,
   `another_persons_make_doesnt_count`,
   `a_make_is_told_for_ten_minutes_after_it_never_carried_on_by_lines`,
   `a_failed_make_keeps_nothing_and_the_switch_off_tells_nothing`,
