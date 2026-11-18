@@ -134,6 +134,8 @@ const PARTS: &[&str] = &[
     "lamp-addons",
     "lamp-air",
     "lamp-air-clock",
+    "lamp-apps-manage",
+    "lamp-apps-start",
     "lamp-body",
     "lamp-cloud",
     "lamp-control",
@@ -168,6 +170,8 @@ const PARTS: &[&str] = &[
     "lamp-update-back",
     "lamp-voice",
     "lamp-waking",
+    "lampapp",
+    "lampapp-net",
 ];
 
 /// How far a session's last event may be from its files' modification time

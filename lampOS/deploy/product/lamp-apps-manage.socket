@@ -1,0 +1,18 @@
+# The Store apps' manage helper (#7415, docs/apps.md): the one way a part other than root changes /opt/lampOS/apps.
+# lamp-cloud's apps.* kinds and the voice's spoken yes ask here; the helper checks the peer's cgroup itself (only those
+# two). systemd holds the socket and starts lamp-apps-manage@.service as root for each connection.
+# In lamp-update's install list (install::PRODUCT): the socket enabled, the template never.
+[Unit]
+Description=lampOS apps' manage helper socket
+
+[Socket]
+ListenStream=/run/lampos-apps-manage/manage.sock
+Accept=yes
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+MaxConnections=4
+
+[Install]
+WantedBy=sockets.target

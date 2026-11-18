@@ -1,0 +1,54 @@
+# One Store app (#7415, docs/apps.md): lampapp@<name>.service, static, shipped by lamp-update; the app's
+# files are root's under /opt/lampOS/apps/<name>/current and read-only to it. No unit is written per app:
+# the manifest's only text here is entry.env (ENTRY=<module>), read by the fixed launcher, which is given the instance name as its argument. systemd makes the
+# user (DynamicUser) and the data folder (StateDirectory=lampapp-<name>: /var/lib/private/lampapp-<name>, behind the
+# link /var/lib/lampapp-<name>; one path component, so systemd links it and no other part's state is shared); nothing stores a uid. The app is known to lamp-control by this unit's cgroup.
+# Started by lamp-apps-manage and the boot's lamp-apps-start, never enabled; an app with `net` runs as
+# lampapp-net@ instead, and the two never run together. Exit 78 is the launcher refusing, not a crash.
+# A crashing app comes back after 5 s, at most 5 starts in 10 min as every part here: the unit then stays failed (Result=start-limit-hit), which
+# lamp-cloud reads as "stopped after repeated failures"; the owner's start or the next boot's start-all tries it again.
+[Unit]
+Description=lampOS app %i
+Conflicts=lampapp-net@%i.service
+StopWhenUnneeded=no
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Slice=lampos-apps.slice
+DynamicUser=yes
+StateDirectory=lampapp-%i
+StateDirectoryMode=0700
+EnvironmentFile=/opt/lampOS/apps/%i/current/entry.env
+ExecStart=/usr/bin/python3 -I /opt/lampOS/apps/.run.py %i
+WorkingDirectory=/var/lib/lampapp-%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=78
+Delegate=no
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProcSubset=pid
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+UMask=0077
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=
+# An app sees its own door and nothing else under /run: a tmpfs over it, with the apps' socket folder (the folder, not the socket file, so a
+# unit that starts before lamp-control still finds the door when it binds) bound in read-only.
+TemporaryFileSystem=/run
+BindReadOnlyPaths=/run/lampos-apps
+TimeoutStopSec=10
