@@ -371,6 +371,39 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    /// The app asks for a link the moment `monitor.set` said on, before
+    /// lamp-peek has bound its admin socket (#6401: 43 ms early on
+    /// lamp-0c89): the socket appears 300 ms later and the link still comes.
+    #[test]
+    fn a_link_asked_as_lamp_peek_starts_waits_for_its_socket() {
+        let dir = folder("late");
+        let admin = dir.join("admin.sock");
+        let place = Place {
+            dropin: dir.join("monitor.conf"),
+            admin: admin.clone(),
+            device_id: "d-42".into(),
+            wait: WAIT,
+        };
+        std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
+        let late = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let listener = UnixListener::bind(&admin).unwrap();
+            let (mut stream, _) = listener.accept().unwrap();
+            writeln!(stream, "{CODE}").unwrap();
+        });
+        let mut lines = Vec::new();
+        let answered = link_saying(&place, "lamp-ab12", &asked("r-2"), 0, &mut |line| {
+            lines.push(line.to_owned())
+        });
+        assert!(answered.is_ok(), "{answered:?} {lines:?}");
+        assert_eq!(
+            lines,
+            ["monitor.link from the app: a one-time link, sealed"]
+        );
+        late.join().unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn no_code_from_lamp_peek_is_refused_plainly() {
         let dir = folder("bad");
