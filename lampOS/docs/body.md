@@ -966,24 +966,31 @@ of an arm that did lift is as before: nothing let go, no count.
 
 Always on. Fully stood up (`stand` 1.0) and asked its stand goal and nothing
 else, a shoulder or elbow held more than 20 counts short of that goal
-(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s
-(`STAND_EASE_STEPS`, 3,000 steps) has its stand goal eased to where it
+(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s of
+strain (`STAND_EASE_STEPS`, 3,000 steps, counted leakily as below) has its
+stand goal eased to where it
 holds plus 5 counts toward the goal (`STAND_EASE_MARGIN`), for the rest of
 the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
 (13373) the elbow held 41 to 47 short of its measured 2,562 at loads of
 176 to 200, reached 62 °C in about 40 min and sat down hot; lamp-52e6's
 elbow holds 3 short at 24 and is left as it is.
 
-- A gesture, a lean, a hold, a cut by the anti-tip rule or a sit-down
-  writes another goal; while it does, the count pauses. A step at its goal
-  or unloaded (load 150 or under) pauses it too; it resets only after 50
-  such steps in a row, 1 s (`STAND_EASE_SETTLED`, #7281): a joint that has
-  truly settled. lamp-52e6 (14083) held its shoulder 52 short at 220 on
-  every 10 s line, but read 176, 144 and 64 just after moves; when one such
-  step zeroed the count, a lamp that leant and gestured every 10 to 25 s
-  was never eased and heated. The same rule counts the 60 s after an ease
-  below: a stray dip doesn't save an ease that leaves it loaded, and a
-  load that settles keeps the ease.
+- The count is leaky (#7281). At its stand goal, a step short and loaded
+  adds one; every 3 steps that are not (at its goal, or load 150 or under)
+  take one off (`STAND_EASE_DECAY`), down to 0. A minute settled undoes
+  20 s of strain, and no single settle zeroes it. A gesture, a lean, a
+  hold, a cut by the anti-tip rule or a sit-down writes another goal;
+  while it does, the count pauses.
+  - lamp-52e6's 15:06 ROW: the shoulder spent 20 to 40 s at 38 short and
+    load 164 between landings at its stand (load 20) and heated to 52-53
+    °C. A count that each landing zeroed never reached 60 s; the leaky
+    count gains about 20 s a minute on 30 s spells and eases it within
+    3 min.
+  - The other bound: 5 s spells among 25 s settled stay at 0 and are
+    never eased, nor is a joint short but settled.
+  - The same rule counts the 60 s after an ease below: spells of load
+    still undo an ease that leaves it loaded, and a load that settles
+    keeps the ease. The rate 3 is tuned on one lamp's day (`ponytail:`).
 - Never above the measured stand (the eased goal lies between where the
   joint holds and the goal), and never more than 80 counts under it
   (`STAND_EASE_FLOOR`): a joint held farther short is a hand pushing it
@@ -994,7 +1001,7 @@ elbow holds 3 short at 24 and is left as it is.
   2600 eased to 2560, held at 2555, load 190`. A start begins from the
   measured stand again.
 - An ease is kept only if the load comes under 150 (`STAND_EASE_LOAD`).
-  Still over it for another 60 s at the eased goal, the joint goes back to
+  Over it for another 60 s of strain at the eased goal (leaky, as above), the joint goes back to
   its measured stand and is not eased again that run, said once: `elbow_pitch
   eased stand did not lower its load: goal 2565, held at 2525, load 172
   (over 150); back to its stand goal 2600, not eased again this run`.
@@ -1013,7 +1020,11 @@ more arms' journals. Shown by tests only
 `a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more`,
 `a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`,
 `a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased`,
-`a_standing_elbow_whose_load_settles_for_2_s_starts_its_count_again`); not yet on a lamp.
+`a_standing_elbow_loaded_in_30_s_spells_between_landings_is_eased_within_3_min`,
+`a_standing_elbow_held_short_at_a_steady_220_is_eased_at_60_s`,
+`a_standing_elbow_short_but_settled_for_10_min_is_never_eased`,
+`a_standing_elbow_loaded_in_5_s_spells_among_25_s_settled_is_never_eased`,
+`a_standing_elbow_loaded_in_spells_after_its_ease_has_the_ease_undone`); not yet on a lamp.
 
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
