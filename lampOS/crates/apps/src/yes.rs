@@ -33,6 +33,11 @@ pub struct YesKey {
     /// An install: every grant. An update: only the grants it newly asks
     /// (none if it asks no more).
     pub grants: Vec<String>,
+    /// An install: the manifest's `net`. An update: only if it newly turns
+    /// the network on. A remove: false.
+    pub net: bool,
+    /// The same for the manifest's `logs`.
+    pub logs: bool,
 }
 
 pub trait Yes {
@@ -51,6 +56,8 @@ pub fn request_line(key: &YesKey) -> String {
         "version": key.version,
         "sha256": key.sha256,
         "grants": grants,
+        "net": key.net,
+        "logs": key.logs,
     }})
     .to_string()
 }

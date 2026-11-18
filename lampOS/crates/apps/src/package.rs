@@ -20,6 +20,8 @@ pub struct AppSpec {
     pub version: String,
     pub min_build: u64,
     pub net: bool,
+    /// The manifest's top-level `logs`: who may read the app's journal.
+    pub logs: bool,
     pub grants: Vec<String>,
     pub entry: String,
 }
