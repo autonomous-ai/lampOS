@@ -36,8 +36,24 @@ pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 pub const MOST_FILES: usize = 64;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
-/// The longest one rendering may take.
+/// The longest one rendering of a short line may take: a line of up to
+/// [`RENDER_SHORT_CHARS`] characters, every cached line ([`WARM`], the fixed
+/// lines) and most exact ones.
 pub const RENDER_WITHIN: Duration = Duration::from_secs(5);
+/// A line up to this many characters (about 8 s of speech at ~15 a second)
+/// is given [`RENDER_WITHIN`], as before (#7742).
+pub const RENDER_SHORT_CHARS: usize = 120;
+/// Past [`RENDER_SHORT_CHARS`], each started this many characters (about
+/// 2 s of speech) adds 1 s: a render at twice the speed it plays, the pace
+/// the first 120 characters' 5 s already asks, connection included. A
+/// skill's agent's two-sentence answer (363 bytes on lamp-c0a4, #7742) was
+/// refused whole at 5 s and nothing was said.
+pub const RENDER_MORE_CHARS: usize = 30;
+/// The longest any render may take: as long as the longest line kept or
+/// played ([`MOST_FRAMES`], 20 s) plays, so a render slower than the line
+/// itself is still refused. Reached at 570 characters, past what fits in
+/// [`MOST_FRAMES`] at the voice's pace.
+pub const RENDER_MOST: Duration = Duration::from_secs((MOST_FRAMES / SOUND_RATE) as u64);
 /// Rendered at start, after the speech service is configured, until each is
 /// kept: the safe shutdown's line, one source with the shutdown, then the
 /// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`],
@@ -382,8 +398,31 @@ pub fn from_environment() -> Option<Arc<TtsCache>> {
     SHARED.get_or_init(made_from_environment).clone()
 }
 
+/// How long rendering `text` whole may take: [`RENDER_WITHIN`] for a short
+/// line, 1 s more for each started [`RENDER_MORE_CHARS`] past
+/// [`RENDER_SHORT_CHARS`], at most [`RENDER_MOST`]. Counted in characters,
+/// not bytes, so a line in Vietnamese is given the time its English would.
+pub fn render_within(text: &str) -> Duration {
+    let past = text.chars().count().saturating_sub(RENDER_SHORT_CHARS);
+    let more = Duration::from_secs(past.div_ceil(RENDER_MORE_CHARS) as u64);
+    (RENDER_WITHIN + more).min(RENDER_MOST)
+}
+
+/// `render`, `text`'s whole rendering, awaited at most
+/// [`render_within`]`(text)`, or why not.
+async fn whole_within<E: std::fmt::Display>(
+    text: &str,
+    render: impl std::future::Future<Output = Result<Vec<i16>, E>>,
+) -> Result<Vec<i16>, String> {
+    let within = render_within(text);
+    match tokio::time::timeout(within, render).await {
+        Ok(samples) => samples.map_err(|why| why.to_string()),
+        Err(_) => Err(format!("not within {} s", within.as_secs())),
+    }
+}
+
 /// `text` rendered through the speech service `config` names, whole, within
-/// [`RENDER_WITHIN`], on a runtime of its own.
+/// [`render_within`], on a runtime of its own.
 fn render_with(
     config: &crate::second_config::SecondConfig,
     text: &str,
@@ -403,10 +442,7 @@ fn render_with(
             }
             Ok::<_, crate::second_provider::net::Error>(samples)
         };
-        match tokio::time::timeout(RENDER_WITHIN, whole).await {
-            Ok(samples) => samples.map_err(|why| why.to_string()),
-            Err(_) => Err(format!("not within {} s", RENDER_WITHIN.as_secs())),
-        }
+        whole_within(text, whole).await
     })
 }
 
@@ -752,11 +788,9 @@ mod tests {
         }
         assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
         assert!(lines.iter().all(|line| cache.kept(line).is_some()));
-        assert!(
-            cache
-                .kept(&format!("asked {}", MOST_FILES * 2 - 1))
-                .is_some()
-        );
+        assert!(cache
+            .kept(&format!("asked {}", MOST_FILES * 2 - 1))
+            .is_some());
         assert!(cache.kept("asked 0").is_none());
     }
 
@@ -773,5 +807,42 @@ mod tests {
         assert!(!cache.path("line 0").exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
         assert_eq!(calls.load(Ordering::SeqCst), MOST_FILES + 1);
+    }
+
+    /// A renderer taking `secs` (paused time) to give `text`'s samples.
+    async fn slow(secs: u64) -> Result<Vec<i16>, String> {
+        tokio::time::sleep(Duration::from_secs(secs)).await;
+        Ok(vec![1; 2_400])
+    }
+
+    /// A skill's agent's two-sentence answer (#7742, 363 bytes on c0a4) is
+    /// rendered whole in 7 s and said; a short line keeps the 5 s.
+    #[tokio::test(start_paused = true)]
+    async fn a_long_exact_line_is_given_time_by_its_length_and_a_short_one_keeps_5_s() {
+        let long = "Bitcoin is trading at about sixty-one thousand two hundred dollars \
+            right now, up one point eight percent over the last twenty-four hours on the \
+            major exchanges I checked. It has stayed between sixty thousand and sixty-two \
+            thousand dollars all week, so nothing unusual yet, and I will check again in \
+            three minutes and tell you if it moves by much at all today.";
+        assert_eq!(long.chars().count(), 359);
+        assert_eq!(whole_within(long, slow(7)).await.unwrap().len(), 2_400);
+        assert_eq!(render_within(long), Duration::from_secs(13));
+
+        let short = "Build passed.";
+        assert_eq!(render_within(short), RENDER_WITHIN);
+        assert_eq!(
+            render_within(&"a".repeat(RENDER_SHORT_CHARS)),
+            RENDER_WITHIN
+        );
+        assert_eq!(
+            render_within(&"a".repeat(RENDER_SHORT_CHARS + 1)),
+            RENDER_WITHIN + Duration::from_secs(1)
+        );
+        assert_eq!(
+            whole_within(short, slow(6)).await.unwrap_err(),
+            "not within 5 s"
+        );
+        assert!(whole_within(short, slow(4)).await.is_ok());
+        assert_eq!(render_within(&"a".repeat(10_000)), RENDER_MOST);
     }
 }
