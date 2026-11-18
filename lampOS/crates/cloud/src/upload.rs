@@ -762,23 +762,38 @@ fn get(
 /// "data": {"kind", "data": {...}}}`, its inner `data` given back. At most
 /// [`MOST_MESSAGE_BYTES`], for this kind only.
 pub fn fetch_message(uploads: &Uploads, id: &str) -> Result<Value, String> {
-    let kind = format!("{KIND_PREFIX}{id}");
-    let url = format!("{}{FETCH_PATH}?kind={kind}", uploads.base);
+    fetch_kind(
+        (&uploads.base, &uploads.key, &uploads.device_id),
+        uploads.https_only,
+        &format!("{KIND_PREFIX}{id}"),
+        MOST_MESSAGE_BYTES,
+    )
+}
+
+/// [`fetch_message`] for any `kind` the backend keeps a message for
+/// (`crate::attach` too), from `(base, key, device_id)`, at most `most`
+/// bytes: its inner `data`, or [`TOO_BIG`] or [`NO_MESSAGE`].
+pub(crate) fn fetch_kind(
+    (base, key, device_id): (&str, &str, &str),
+    https_only: bool,
+    kind: &str,
+    most: u64,
+) -> Result<Value, String> {
+    let url = format!("{base}{FETCH_PATH}?kind={kind}");
     let mut headers = vec![
-        ("authorization", format!("Bearer {}", uploads.key)),
+        ("authorization", format!("Bearer {key}")),
         ("accept", "application/json".to_owned()),
     ];
-    if !uploads.device_id.is_empty() {
-        headers.push(("x-device-id", uploads.device_id.clone()));
+    if !device_id.is_empty() {
+        headers.push(("x-device-id", device_id.to_owned()));
     }
-    let (status, body) =
-        get(&url, headers, uploads.https_only, MOST_MESSAGE_BYTES).map_err(|why| {
-            if why == TOO_BIG {
-                why
-            } else {
-                NO_MESSAGE.to_owned()
-            }
-        })?;
+    let (status, body) = get(&url, headers, https_only, most).map_err(|why| {
+        if why == TOO_BIG {
+            why
+        } else {
+            NO_MESSAGE.to_owned()
+        }
+    })?;
     if status != 200 {
         return Err(NO_MESSAGE.into());
     }

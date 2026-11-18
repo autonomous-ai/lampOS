@@ -350,7 +350,9 @@ lamp-setup reset-now`). That unit, in this order:
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
    messages, which can say a person's name or words),
-   `/run/lampos-apps` (the apps' socket folder), `/run/lampos-photos`, `/run/lampos-eyes-kept` (the eyes' sitting kept
+   `/run/lampos-apps` (the apps' socket folder), `/run/lampos-photos`,
+   `/run/lampos-attachments` (a photo or a text from the app for the voice,
+   cloud.md), `/run/lampos-eyes-kept` (the eyes' sitting kept
    across a restart, eyes.md) and `/run/lampos-eyes-frames` (the frame
    link's socket for lamp-seen), and the voice's, the records' and
    lamp-seen's own folders (`RuntimeDirectoryPreserve=yes`: the thread's

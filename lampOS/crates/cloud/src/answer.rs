@@ -257,6 +257,12 @@ pub trait Lamp {
         None
     }
 
+    /// A photo or a text from the owner's app for the spoken turn
+    /// (`LAMP_ATTACHMENTS=on`, #7659, `crate::attach`).
+    fn attachments(&self) -> Option<std::sync::Arc<crate::attach::Attachments>> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -490,6 +496,9 @@ pub const KINDS: [(&str, Switch); 89] = [
     (crate::share::KINDS[2], SHARE),
     (crate::share::KINDS[3], SHARE),
     (crate::upload::KIND, |lamp| lamp.upload().is_some()),
+    // A photo or a text from the app for the spoken turn (#7659): the word
+    // only, since the kind is `attach.<id>`, with `LAMP_ATTACHMENTS`.
+    (crate::attach::CAN, |lamp| lamp.attachments().is_some()),
     // An uploaded skill's keys from the app (`LAMP_SKILL_SECRETS`): with
     // the skills page, while lamp-services' admin socket is there.
     (crate::skill_secrets::KINDS[0], SKILL_SECRETS),
@@ -986,6 +995,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             uploads.start(kind)?;
             Ok(None)
         }
+        // A photo or a text from the app for the spoken turn
+        // (`LAMP_ATTACHMENTS`, #7659), `attach.<id>`: nothing inline. Taken
+        // `starting`; fetched, checked, kept and told on a thread of its
+        // own; `success` or `failure` follows. Off, refused as any kind
+        // this lamp doesn't take.
+        kind if crate::attach::id_of(kind).is_some() && on(lamp, crate::attach::CAN) => {
+            let attachments = lamp.attachments().ok_or_else(|| not_here(kind))?;
+            attachments.start(kind)?;
+            Ok(None)
+        }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
         // installs it only signed with the Store's key.
@@ -1164,6 +1183,7 @@ pub mod tests {
         pub write_skill: Option<std::path::PathBuf>,
         pub share: Option<crate::share::Store>,
         pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
+        pub attachments: Option<std::sync::Arc<crate::attach::Attachments>>,
         pub update_page: bool,
         /// The bus lamp-update's `update/status` is read from (#2194) and
         /// `update.check` asks on, and the checks asked (#4153).
@@ -1315,6 +1335,9 @@ pub mod tests {
         }
         fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
             self.upload.clone()
+        }
+        fn attachments(&self) -> Option<std::sync::Arc<crate::attach::Attachments>> {
+            self.attachments.clone()
         }
         fn update_page(&self) -> bool {
             self.update_page
@@ -2400,6 +2423,20 @@ pub mod tests {
                 &["skills.upload"],
             ),
             (
+                // A photo or a text from the app (`LAMP_ATTACHMENTS`, #7659):
+                // `attach` named only with the switch.
+                "attachments",
+                |f| {
+                    f.attachments = Some(std::sync::Arc::new(crate::attach::Attachments::new(
+                        "https://api.test",
+                        "k",
+                        "d",
+                        std::path::Path::new("/nowhere/attachments"),
+                    )))
+                },
+                &["attach"],
+            ),
+            (
                 // A skill written in the app: its switch alone, no
                 // computer needed; `skills.made` tells what became of it.
                 "write skill",
@@ -2979,6 +3016,32 @@ pub mod tests {
             wifi.then(|| (std::path::PathBuf::from("/nowhere/wifi.sock"), wait)),
             keys.then(|| (std::path::PathBuf::from("/nowhere/keys.sock"), wait)),
         ))
+    }
+
+    /// #7659: `attach.<id>` is taken, and `can` names `attach`, only with
+    /// `LAMP_ATTACHMENTS`; off, the kind is refused as any kind this lamp
+    /// doesn't take, and `chat.send` refuses a photo as before.
+    #[test]
+    fn an_attachment_is_taken_and_named_only_with_the_switch() {
+        let kind = "attach.0123456789abcdef";
+        let mut off = Fake::default();
+        assert!(!can(&off).contains(&crate::attach::CAN));
+        assert_eq!(answer(&mut off, kind, &Value::Null), Err(not_here(kind)));
+        let mut on = Fake {
+            attachments: Some(std::sync::Arc::new(crate::attach::Attachments::new(
+                "https://api.test",
+                "k",
+                "d",
+                std::path::Path::new("/nowhere/attachments"),
+            ))),
+            ..Fake::default()
+        };
+        assert!(can(&on).contains(&crate::attach::CAN));
+        // Not an id: refused before anything is fetched.
+        assert_eq!(
+            answer(&mut on, "attach.NOT-AN-ID", &Value::Null),
+            Err(not_here("attach.NOT-AN-ID"))
+        );
     }
 
     /// The apps' kinds (#7415 piece 4) are answered, and in `can`, only with

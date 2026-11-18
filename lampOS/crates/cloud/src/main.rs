@@ -282,6 +282,11 @@ fn main() -> ExitCode {
     if let Some(upload) = &upload {
         upload.resume();
     }
+    // A photo or a text from the owner's app for the spoken turn (#7659):
+    // only with LAMP_ATTACHMENTS=on, told on the lamp's bus.
+    let attachments = lamp_cloud::attach::on_from_environment()
+        .then(|| lamp_cloud::attach::Attachments::product(&account, &key, bus.clone()))
+        .flatten();
     let mut lamp = Real {
         places: Places::default(),
         bus,
@@ -355,6 +360,7 @@ fn main() -> ExitCode {
         share,
         services,
         upload,
+        attachments,
         // The developer door from the owner's app (#5299): only with
         // --control-admin-socket, each code sealed to this lamp's device id.
         control: control_socket.map(|socket| lamp_cloud::control::Door {
@@ -431,6 +437,7 @@ fn main() -> ExitCode {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
     };
     runtime.block_on(async move {
