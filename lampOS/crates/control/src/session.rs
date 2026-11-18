@@ -867,6 +867,21 @@ impl Door {
         }
     }
 
+    /// What the door kept for `client` beyond its record (its notes, clips
+    /// and recorded moves), gone: an app that was removed, whose client id is
+    /// its name's ([`crate::app_socket::app_client`]).
+    pub fn forget_data(&mut self, client: &str) {
+        if let Some(sounds) = &mut self.sounds {
+            sounds.forget(client);
+        }
+        if let Some(notes) = &mut self.notes {
+            notes.forget(client);
+        }
+        if let Some(moves) = &self.moves {
+            moves.forget(client);
+        }
+    }
+
     /// Revokes taken but not yet written to the file.
     pub fn unsaved_revokes(&self) -> &BTreeSet<String> {
         &self.unsaved_revokes

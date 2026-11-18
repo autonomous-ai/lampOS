@@ -77,6 +77,8 @@ StateDirectoryMode=0700
 # running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
 # made at lamp-control's first start, and a part started before it is not refused.
 InaccessiblePaths=-/var/lib/lampos-control
+# lamp-control's apps socket folder hidden (#7793): no ProtectSystem=strict here, so it could replace apps.sock. "-": made by the tmpfiles.
+InaccessiblePaths=-/run/lampos-apps
 # --progress puts how each task goes on the bus (tasks/status), which the voice's news reads (#1156);
 # --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
 # On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of

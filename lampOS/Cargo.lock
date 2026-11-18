@@ -2110,6 +2110,7 @@ dependencies = [
  "libc",
  "rcgen",
  "ring",
+ "rustix",
  "rustls",
  "serde",
  "serde_json",
