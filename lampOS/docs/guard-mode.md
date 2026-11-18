@@ -9,8 +9,8 @@ skill (19 Oct, 07:1x). Items 2 to 6 of [#2562](https://github.com/autonomous-ai/
 design add arrivals by sound, turning it on from the app, one turn of the
 head to an arrival, "I'm off guard", and the privacy switch ending it.
 Naming a known person (its item 1, the first builder's ruling of 22 Oct)
-is behind its own switch, `LAMP_GUARD_NAMES`, off unless set: without it
-nobody is named.
+is behind its own switch, `LAMP_GUARD_NAMES`, off unless set and on in the
+product's `lamp-skills.service` (#6855): without it nobody is named.
 
 **Status:** built, with tests; played on lamp-9adf (6 and 7 Nov, #1685) from a
 drop-in. An installable skill: its owner puts it on from the Skills Store,
@@ -21,9 +21,12 @@ the phone only with `LAMP_SKILL_MESSAGES=on`** (or `LAMP_MESSAGES=on`) in
 backend's unasked news, which it keeps for the owner and pushes to their
 phones ([messages.md](messages.md), "Unasked texts"). Off unless set; the
 product's `lamp-cloud.service` sets it since 9 Nov (#5752), and its
-`lamp-skills.service` sets `LAMP_GUARD_WORDS_V2=on`. Names, arrivals by sound
-and turning it on from the app stay off in the product until their own lamp
-checks.
+`lamp-skills.service` sets `LAMP_GUARD_WORDS_V2=on`. Turning it on from the
+app (`LAMP_GUARD_FROM_APP`, in `lamp-cloud.service` and `lamp-skills.service`)
+and names (`LAMP_GUARD_NAMES`, in `lamp-skills.service`) are on in the product
+(#6855); names need a person's yes, which the voice asks only with
+`LAMP_WHO_WAS_HERE_NAMES=on`, off in the product, so a product lamp names
+nobody yet. Arrivals by sound stay off until their own lamp check.
 
 ## What it does
 
@@ -173,7 +176,7 @@ checks.
   presence but no face near. Never a name: in a shared home, a name would
   tell you whom another person visited.
 - **By name, only with a yes** (#2562 item 1, `LAMP_GUARD_NAMES=on` in
-  `lamp-skills`, off unless set). A face the eyes know is named only when
+  `lamp-skills`, off unless set, on in the product, #6855). A face the eyes know is named only when
   its person said yes to being named: the eyes' `tellable` file beside
   their known file, the same yes Who was here reads
   (`lamp_skills::known::tellable_in`). "Minh came in at 18:10 and was here
