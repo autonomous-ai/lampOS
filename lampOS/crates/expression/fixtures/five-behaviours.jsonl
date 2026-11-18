@@ -34,7 +34,7 @@
 {"at_us":1600000,"input":{"kind":"voice","stamp":{"clock_id":"written-scenario","at_us":1600000,"sequence":17},"session_id":"voice-one","turn":1,"request":1,"state":"listening","accepting_input":true,"event":"interrupted"}}
 {"at_us":1600000,"input":{"kind":"joints","stamp":{"clock_id":"written-scenario","at_us":1600000,"sequence":9},"value":{"name":["base_yaw","shoulder","elbow","head_roll","head_pitch"],"position":[0,0,0,0,0],"velocity":[],"effort":[],"commanded":[]}}}
 {"at_us":1700000,"input":{"kind":"voice","stamp":{"clock_id":"written-scenario","at_us":1700000,"sequence":18},"session_id":"voice-one","turn":1,"request":1,"state":"listening","accepting_input":true,"event":"interrupted"}}
-{"at_us":1700000,"input":{"kind":"concentration","stamp":{"clock_id":"written-scenario","at_us":1700000,"sequence":1},"concentrating":true}}
+{"at_us":1700000,"input":{"kind":"head_down","stamp":{"clock_id":"written-scenario","at_us":1700000,"sequence":1},"down":true}}
 {"at_us":1800000,"input":{"kind":"voice","stamp":{"clock_id":"written-scenario","at_us":1800000,"sequence":19},"session_id":"voice-one","turn":1,"request":1,"state":"listening","accepting_input":true,"event":"interrupted"}}
 {"at_us":1800000,"input":{"kind":"joints","stamp":{"clock_id":"written-scenario","at_us":1800000,"sequence":10},"value":{"name":["base_yaw","shoulder","elbow","head_roll","head_pitch"],"position":[0,0,0,0,0],"velocity":[],"effort":[],"commanded":[]}}}
 {"at_us":1900000,"input":{"kind":"voice","stamp":{"clock_id":"written-scenario","at_us":1900000,"sequence":20},"session_id":"voice-one","turn":1,"request":1,"state":"listening","accepting_input":true,"event":"interrupted"}}

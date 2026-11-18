@@ -2,9 +2,9 @@ use crate::alive::{self, Life};
 use crate::catalogue::{add, blend, clamp, ease};
 use crate::{Catalogue, Error, LEASE_US, Trigger};
 use lamp_msgs::{
-    BodyOffsets, ClockStamp, Concentration, ControlGesture, ExpressionBody, ExpressionFace,
-    ExpressionGaze, ExpressionLease, ExpressionLight, ExpressionState, Faces, JointState, Light,
-    NameHeard, PersonActivity, Room, RoomState, ScheduleDue, Speech, SuddenSound, TouchEvent,
+    BodyOffsets, ClockStamp, ControlGesture, ExpressionBody, ExpressionFace, ExpressionGaze,
+    ExpressionLease, ExpressionLight, ExpressionState, Faces, JointState, Light, NameHeard,
+    PersonActivity, Room, RoomActivity, RoomState, ScheduleDue, Speech, SuddenSound, TouchEvent,
     TouchState, Voice, VoiceEvent, VoiceMute, VoicePlayout, VoiceProgress, VoiceRemarked,
     VoiceSound, VoiceState, VoiceTiming,
 };
@@ -38,7 +38,14 @@ pub enum Input {
     Activity(PersonActivity),
     Playout(VoicePlayout),
     Sound(VoiceSound),
-    Concentration(Concentration),
+    /// The person at the desk has their head down, fresh from `room/activity`
+    /// (`LAMP_EXPRESSION_HEAD_DOWN=on`): `down` once the state has held a few
+    /// seconds, false for any other state. The only thing that stops
+    /// expressive motion for a person reading or writing.
+    HeadDown {
+        stamp: ClockStamp,
+        down: bool,
+    },
     VoiceState {
         stamp: ClockStamp,
         value: VoiceState,
@@ -134,11 +141,11 @@ impl Input {
             Self::Activity(v) => &v.stamp,
             Self::Playout(v) => &v.stamp,
             Self::Sound(v) => &v.playout.stamp,
-            Self::Concentration(v) => &v.stamp,
             Self::VoiceState { stamp, .. }
             | Self::Joints { stamp, .. }
             | Self::Faces { stamp, .. }
             | Self::Room { stamp, .. }
+            | Self::HeadDown { stamp, .. }
             | Self::Light { stamp, .. }
             | Self::Heard { stamp, .. }
             | Self::Said { stamp, .. }
@@ -161,7 +168,7 @@ impl Input {
             Self::Activity(_) => PersonActivity::TOPIC,
             Self::Playout(_) => VoicePlayout::TOPIC,
             Self::Sound(_) => VoiceSound::TOPIC,
-            Self::Concentration(_) => Concentration::TOPIC,
+            Self::HeadDown { .. } => RoomActivity::TOPIC,
             Self::VoiceState { .. } => VoiceState::TOPIC,
             Self::Joints { .. } => JointState::TOPIC,
             Self::Faces { .. } => Faces::TOPIC,
@@ -186,7 +193,7 @@ impl Input {
             Self::Voice(_) => 0,
             Self::Activity(_) => 1,
             Self::Playout(_) => 2,
-            Self::Concentration(_) => 3,
+            Self::HeadDown { .. } => 3,
             Self::VoiceState { .. } => 4,
             Self::Joints { .. } => 5,
             Self::Faces { .. } => 6,
@@ -217,7 +224,7 @@ impl Input {
             Self::Activity(v) => v.check()?,
             Self::Playout(v) => v.check()?,
             Self::Sound(v) => v.check()?,
-            Self::Concentration(v) => v.check()?,
+            Self::HeadDown { stamp, .. } => stamp.check()?,
             Self::Joints { value, .. } => {
                 value.check()?;
                 let names: BTreeSet<_> = value.name.iter().collect();
@@ -366,7 +373,9 @@ pub struct Engine {
     faces: Option<(ClockStamp, Faces)>,
     room: Option<(u64, Room)>,
     light: Option<Light>,
-    concentration: Option<Concentration>,
+    /// When the last `room/activity` was observed, and whether it said head
+    /// down (held a few seconds); stale after `context_stale_us`.
+    head_down: Option<(u64, bool)>,
     rest_since: Option<u64>,
     legacy_voice: Option<VoiceState>,
     rejected: u64,
@@ -469,7 +478,7 @@ impl Engine {
             faces: None,
             room: None,
             light: None,
-            concentration: None,
+            head_down: None,
             rest_since: None,
             legacy_voice: None,
             rejected: 0,
@@ -571,12 +580,7 @@ impl Engine {
             voice.stamp.at_us <= now_us
                 && now_us - voice.stamp.at_us < self.catalogue.timing.voice_stale_us
         });
-        let free = !self.held()
-            && self.joints_fresh(now_us)
-            && !self
-                .concentration
-                .as_ref()
-                .is_some_and(|value| value.concentrating);
+        let free = !self.held() && self.joints_fresh(now_us) && !self.concentrating(now_us);
         // The first gate that is shut, said in the journal when it ends a
         // rest (row 7 on lamp-06c1 had a rest end without a line, #1672).
         let why_not = if !self.enabled || self.fault.is_some() || self.cancelled {
@@ -849,6 +853,17 @@ impl Engine {
             .is_some_and(|at| now_us.saturating_sub(at) < self.catalogue.timing.joints_stale_us)
     }
 
+    /// Whether the person at the desk has their head down, as `room/activity`
+    /// said it within the last `context_stale_us` (`LAMP_EXPRESSION_HEAD_DOWN`):
+    /// reading or writing, so no expressive move (no nod, look or tilt) while
+    /// it lasts; the breath and the idle light stay. A stale or missing
+    /// reading is not concentrating, never a quiet room alone.
+    fn concentrating(&self, now_us: u64) -> bool {
+        self.head_down.is_some_and(|(at, down)| {
+            down && now_us.saturating_sub(at) < self.catalogue.timing.context_stale_us
+        })
+    }
+
     fn room_at(&self, now_us: u64) -> Room {
         self.room
             .filter(|(at, _)| now_us.saturating_sub(*at) < self.catalogue.timing.context_stale_us)
@@ -876,7 +891,7 @@ impl Engine {
             })
             && self.joints_fresh(now_us)
             && self.room_at(now_us) == Room::Quiet
-            && !self.concentration.as_ref().is_some_and(|v| v.concentrating);
+            && !self.concentrating(now_us);
         if eligible {
             self.rest_since.get_or_insert(now_us);
         } else {
@@ -964,7 +979,7 @@ impl Engine {
             return Err(Error("input clock_id differs from this boot".into()));
         }
         let age_limit = match &input {
-            Input::Concentration(_) | Input::Light { .. } => u64::MAX,
+            Input::Light { .. } => u64::MAX,
             Input::Voice(_) | Input::Progress(_) | Input::VoiceState { .. } => {
                 self.catalogue.timing.voice_stale_us
             }
@@ -992,9 +1007,7 @@ impl Engine {
             _ => false,
         };
         if let Some((at, sequence)) = self.marks[stream] {
-            // Concentration's setting publisher may restart; an actually newer
-            // monotonic observation is its authority, not a reset counter.
-            let can_reset = changed_session || matches!(input, Input::Concentration(_));
+            let can_reset = changed_session;
             if stamp.at_us < at
                 || (stamp.sequence <= sequence && (!can_reset || stamp.at_us == at))
                 || (changed_session && stamp.at_us == at)
@@ -1073,15 +1086,15 @@ impl Engine {
                 }
                 self.accept_playout(now_us, sound.playout)?;
             }
-            Input::Concentration(value) => {
-                if value.concentrating {
+            Input::HeadDown { stamp, down } => {
+                if down {
                     self.reset_rest(now_us);
                     self.pause_since = None;
                     for clip in &mut self.clips {
                         clip.started = None;
                     }
                 }
-                self.concentration = Some(value);
+                self.head_down = Some((stamp.at_us, down));
             }
             Input::VoiceState { value, .. } => self.legacy_voice = Some(value),
             Input::Joints { stamp, value } => {
@@ -1566,7 +1579,7 @@ impl Engine {
         if room == Room::Unknown {
             state.missing.push("fresh room state".into());
         }
-        let concentrating = self.concentration.as_ref().is_some_and(|v| v.concentrating);
+        let concentrating = self.concentrating(now_us);
         let held = self.held();
         let playout = self
             .playout
