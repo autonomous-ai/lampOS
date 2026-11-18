@@ -122,3 +122,18 @@ không có truy cập servo trực tiếp. Tốc độ cho mỗi máy khách: `j
 một giây, `gesture`/`move`/`play`/`look` một lần mỗi 2 giây, `light` 5 lần
 một giây, `say`/`sound` 6 lần một phút và 60 lần một giờ, `express` một lần
 một phút, tối đa 16 cụm từ, mỗi cụm tối đa 64 ký tự.
+
+**Giờ yên lặng cho skill run (#7625, `LAMP_CONTROL_QUIET_RUNS`, bật trừ khi
+đúng `off`):** `say`, `sound` và `turn.start` của một skill run trên run
+socket bị từ chối `quiet_hours` ("quiet hours: 22:00 to 07:00 local, a
+skill's run") trong đúng khung giờ yên lặng mà lamp-skills và đường "told"
+đọc (`lamp_local_time::quiet_hours`, hiện là `QuietWindow::DEFAULT`; chưa có
+cài đặt của chủ), không bao giờ là khung riêng của lamp-control, và cả khi
+chưa biết giờ địa phương của đèn. Một run do trigger hay lịch hẹn không thể
+nói lúc nửa đêm, và `say` của chính run ngay sau một yêu cầu bằng giọng nói
+ban đêm cũng không: cổng của run không có khoảng mở. Câu trả lời ban đêm cho
+một yêu cầu bằng giọng nói chỉ đến qua đường "told" (một run trả câu trả lời
+về, với quyền `-read` qua Harness), nơi giữ giờ yên lặng và mở nó 5 phút sau
+lúc hỏi ([tasks.md](../tasks.md)). Lời `hello` của run nói khung giờ trong
+`limits` (`quiet_hours`: `{"from": "22:00", "to": "07:00"}`). Máy tính đã ghép đôi vẫn theo
+`--quiet-hours` (mặc định tắt). Ghi vào journal lúc khởi động.
