@@ -384,16 +384,20 @@ impl Serve<'_> {
             });
             self.unread = unread;
         }
-        if let Some(state) = reading.state() {
-            // The self-test's heat fail of the board, cleared once these
-            // same zones have read cool for half a minute (#7718 item 5).
-            if let Some(hottest) = self.selftest.cooled(
-                &state.temperature_c,
-                Instant::now(),
-                self.options.times.heat_clears_after,
-            ) {
-                (self.say)(Note::SelfTestBoardCooled { hottest });
-            }
+        let state = reading.state();
+        // The self-test's heat fail of the board, cleared once these same
+        // zones have read cool for half a minute (#7718 item 5). A board
+        // that could not be read, or readings more than two periods apart,
+        // begin that half minute again (the reviewers on #7740, P3).
+        if let Some(hottest) = self.selftest.cooled(
+            state.as_ref().map(|state| &state.temperature_c),
+            Instant::now(),
+            self.options.times.heat_clears_after,
+            self.options.times.board_every * 2,
+        ) {
+            (self.say)(Note::SelfTestBoardCooled { hottest });
+        }
+        if let Some(state) = state {
             let at_us = self.at_us();
             if self.board_out.publish(at_us, &state, self.say) {
                 self.totals.boards += 1;

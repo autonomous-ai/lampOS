@@ -267,12 +267,17 @@ the health is worked out it gets one more item, `selftest`
   limit (`hot_zone`, `hot_c`, `hot_limit_c`). `serve` reads those same
   zones itself every 5 s (`board/state` is what the self-test's board check
   reads). Once every reading for 30 s (`parts::HEAT_CLEARS_AFTER`,
-  `Times::heat_clears_after`) has had the hottest zone 5 °C or more under
-  that limit (`parts::HEAT_CLEARS_BELOW_C`: under 80 °C for the self-test's
-  85), the board's fail is dropped (`SelfTests::cooled`), said once ("the
+  `Times::heat_clears_after`) has been cool, the board's fail is dropped (`SelfTests::cooled`), said once ("the
   self-test's heat fail of the board is cleared: …"), and the ok item reads
   "passed; the computer was hot during the run and has cooled (ZONE C)"
-  until the next run. A reading at or over that line, or with no zone,
+  until the next run. A reading is cool when the zone the run failed on is
+  in it at a plausible temperature (over 0 °C) and the hottest zone is 5 °C
+  or more under that limit (`parts::HEAT_CLEARS_BELOW_C`: under 80 °C for
+  the self-test's 85). A hot zone whose sensor stops answering is dropped
+  from `board/state`, and the board's own item is blind to it too, so the
+  other zones reading cool never clear its fail (the reviewers on #7740).
+  A reading that is not cool, a board that could not be read, or a gap of
+  more than two reading periods (`2 × board_every`) since the last reading
   begins the 30 s again, so a board that stays hot keeps its `error`. Only a
   heat fail clears so: a full disk, a stale `board/state`, or a heat fail
   from a self-test before these values stands until a run passes the board,
