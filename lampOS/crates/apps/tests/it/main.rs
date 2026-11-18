@@ -1,3 +1,4 @@
+mod ask;
 mod crate_rules;
 mod effects;
 mod entry;
@@ -8,6 +9,7 @@ mod lock;
 mod manage;
 mod name;
 mod remove;
+mod skills_reader;
 mod staging;
 mod sweep;
 mod yes;

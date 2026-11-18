@@ -36,6 +36,25 @@ pub fn argv(verb: Verb, unit: &str) -> Vec<String> {
     ]
 }
 
+/// What `systemctl`'s exit status means for a verb. `systemctl` says 5 when
+/// the unit is not loaded: for a stop or a reset of the failed state, a
+/// unit that is already gone IS the wanted end, not an
+/// error (a remove cut at `reset-failed` because the unit had unloaded left
+/// the app half removed, 18 Nov, on 0c89). A start or a restart of a unit that
+/// is not loaded is an error, as is every other exit.
+pub fn judge_status(verb: Verb, unit: &str, code: Option<i32>) -> Result<(), String> {
+    let gone_is_done = matches!(verb, Verb::Stop | Verb::ResetFailed);
+    match code {
+        Some(0) => Ok(()),
+        Some(5) if gone_is_done => Ok(()),
+        other => Err(format!(
+            "{SYSTEMCTL} {} {unit}: {}",
+            verb.word(),
+            other.map_or_else(|| "killed by a signal".to_owned(), |c| format!("exit {c}"))
+        )),
+    }
+}
+
 pub trait Effects {
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String>;
     /// Whether the unit's cgroup has no process left (or has none at all).
@@ -90,13 +109,11 @@ impl Effects for RealEffects {
         let status = Command::new(&line[0])
             .args(&line[1..])
             .env_clear()
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
             .status()
             .map_err(|error| format!("{}: {error}", line[0]))?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(format!("{} {} {unit}: {status}", line[0], verb.word()))
-        }
+        judge_status(verb, unit, status.code())
     }
 
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String> {

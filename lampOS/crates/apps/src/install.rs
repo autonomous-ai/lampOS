@@ -257,6 +257,11 @@ pub fn install(
     // and nothing is written before it.
     {
         let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
+        // An app being installed or removed is refused before the yes is spent.
+        if has(&layout.state, &name, Mark::Removing) || has(&layout.state, &name, Mark::Installing)
+        {
+            return Err(BUSY_APP.to_owned());
+        }
         yes.take(&key).map_err(|why| format!("no yes: {why}"))?;
         if before.is_none() {
             // A stopped mark left by an earlier remove must not make a fresh install start stopped.

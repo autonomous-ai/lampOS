@@ -21,6 +21,9 @@ pub struct FakeEffects {
     pub busy_polls: u32,
     /// `unit_empty` never says yes.
     pub never_empty: bool,
+    /// The exit status `systemctl` gives a command line (default 0): the
+    /// fake judges it as the real one does ([`crate::effects::judge_status`]).
+    pub exits: Vec<(String, i32)>,
 }
 
 impl FakeEffects {
@@ -35,7 +38,14 @@ impl FakeEffects {
 
 impl Effects for FakeEffects {
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String> {
-        self.record(argv(verb, unit).join(" "))
+        let line = argv(verb, unit).join(" ");
+        self.record(line.clone())?;
+        let code = self
+            .exits
+            .iter()
+            .find(|(l, _)| *l == line)
+            .map_or(0, |(_, c)| *c);
+        crate::effects::judge_status(verb, unit, Some(code))
     }
 
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String> {

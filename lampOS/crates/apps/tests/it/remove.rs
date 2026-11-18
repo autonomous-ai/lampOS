@@ -296,3 +296,67 @@ fn argv_is_absolute_with_the_double_dash_before_the_name() {
         std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/effects.rs")).unwrap();
     assert!(source.contains(".env_clear()"), "a cleared environment");
 }
+
+#[test]
+fn a_unit_that_is_already_gone_is_done_not_an_error() {
+    use lamp_apps::effects::{Verb, judge_status};
+    // 5 is systemctl's "not loaded".
+    for verb in [Verb::Stop, Verb::ResetFailed] {
+        assert_eq!(judge_status(verb, "lampapp@x.service", Some(5)), Ok(()));
+    }
+    for verb in [Verb::Start, Verb::Restart] {
+        assert!(judge_status(verb, "lampapp@x.service", Some(5)).is_err());
+    }
+    assert!(judge_status(Verb::Stop, "u", Some(1)).is_err());
+    assert!(judge_status(Verb::Stop, "u", None).is_err());
+    assert_eq!(judge_status(Verb::Stop, "u", Some(0)), Ok(()));
+}
+
+/// 0c89, 18 Nov: lampapp@store-test had exited and unloaded, `reset-failed`
+/// said "not loaded", and the remove stopped halfway.
+#[test]
+fn a_remove_of_an_app_whose_units_are_already_unloaded_runs_to_the_end() {
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    set(&layout.state, "x", Mark::Stopped).unwrap();
+    let mut fx = FakeEffects::default();
+    for unit in ["lampapp@x.service", "lampapp-net@x.service"] {
+        for verb in ["stop", "reset-failed"] {
+            fx.exits
+                .push((format!("/usr/bin/systemctl {verb} -- {unit}"), 5));
+        }
+    }
+    let mut skills = FakeCompanions::default();
+    assert_eq!(
+        remove(&layout, &mut fx, &mut skills, "x"),
+        Ok(Removed::Done)
+    );
+    gone(&layout, "x");
+    assert_eq!(skills.removed, ["x"]);
+}
+
+/// A remove cut after its marks and before its code: the next start-up's
+/// sweep finishes it (and so does the owner asking again, with no second yes).
+#[test]
+fn a_cut_remove_is_finished_by_the_next_start_up_sweep() {
+    use lamp_apps::sweep::sweep;
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    let mut cut = FakeEffects::default();
+    cut.exits.push((
+        "/usr/bin/systemctl reset-failed -- lampapp@x.service".into(),
+        1,
+    ));
+    let mut skills = FakeCompanions::default();
+    assert!(remove(&layout, &mut cut, &mut skills, "x").is_err());
+    assert!(has(&layout.state, "x", Mark::Removing));
+    assert!(
+        layout.code.join("x/1.0.0").exists(),
+        "the code is still there"
+    );
+    let mut fx = FakeEffects::default();
+    let report = sweep(&layout, &mut fx, &mut skills);
+    assert_eq!(report.resumed_removes, ["x"]);
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+    gone(&layout, "x");
+}
