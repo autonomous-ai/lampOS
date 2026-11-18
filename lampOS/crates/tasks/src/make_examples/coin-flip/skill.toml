@@ -1,0 +1,7 @@
+asks = ["flip a coin"]
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+
+[[do]]
+task = { task = "flip a coin and say heads or tails", run = "scripts/main.py" }

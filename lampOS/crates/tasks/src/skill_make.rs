@@ -105,7 +105,9 @@ pub const MOST_LINE_BYTES: usize = 2 * MOST_RULES_BYTES + 256;
 pub const MOST_ANSWER_BYTES: u64 = 20 * 1024;
 /// The least and most a run may be given (`within_ms`).
 pub const LEAST_WITHIN: Duration = Duration::from_secs(1);
-pub const MOST_WITHIN: Duration = Duration::from_secs(120);
+// #7245: a gateway agent's make may take up to 10 minutes (the first
+// builder's call on #6811, 18 Nov 17:23, the owner's yes).
+pub const MOST_WITHIN: Duration = Duration::from_secs(10 * 60);
 /// The rules' file in a make's folder.
 pub const RULES_FILE: &str = "rules.md";
 /// The one file the run writes in a make's folder.
@@ -168,6 +170,10 @@ fn given<'de, D: serde::Deserializer<'de>>(switches: D) -> Result<Option<CheckSw
 /// `LAMP_SKILL_READS`, `LAMP_MADE_SCRIPTS`). lamp-skills' and lamp-voice's
 /// tests hold this list to their own names.
 pub const CHECK_SWITCHES: [&str; 2] = ["LAMP_AGENT_SERVICES", "LAMP_SKILL_WRITES"];
+
+/// The asks switch the agent's check is given when lamp-tasks has it on
+/// ([`gateway_checked_prompt`], #7245).
+pub const ASKS_ENVIRONMENT: &str = "LAMP_MADE_SKILL_ASKS";
 
 /// One of the check's switches as the line gives it: `"on"` or `"off"`,
 /// nothing else.
@@ -268,6 +274,125 @@ pub const GUIDE_FILE: &str = "guide.md";
 /// line names that origin and license), without V1's evals, benchmarks and
 /// viewer.
 pub const GUIDE: &str = include_str!("skill_make_guide.md");
+
+/// #7245: the skill format's whole reference, as a gateway agent's make
+/// folder holds it ([`FORMAT`]): everything a skill can do, read with the
+/// agent's own read tool, so it costs nothing against Harness's task
+/// bound.
+pub const FORMAT_FILE: &str = "format.md";
+/// `docs/skill-format.md` as this build has it: always the build's own.
+pub const FORMAT: &str = include_str!("../../../docs/skill-format.md");
+/// #7245: the lamp's Python SDK reference in a gateway agent's make folder,
+/// so a skill's code may use any of its calls, not only the few the rules
+/// name.
+pub const SDK_FILE: &str = "sdk.md";
+/// `sdk/python/README.md` as this build has it.
+pub const SDK: &str = include_str!("../../../sdk/python/README.md");
+/// #7245: the folder of complete example skills in a gateway agent's make
+/// folder ([`MAKE_EXAMPLES`]).
+pub const EXAMPLES_FOLDER: &str = "examples";
+/// #7245: complete example skills, each file's path under
+/// [`EXAMPLES_FOLDER`] and its text: a light and a say on its own words, a
+/// light show of three colours in turn, a task with a script that
+/// keeps a note, a say again every 30 minutes while someone stays, and a
+/// reminder set in the lamp's schedule, and a script that leads breaths
+/// with the light and the voice, and a reminder every 30 minutes started
+/// by words. lamp-skills' `tests/it/make_check.rs` packs each with the
+/// real `lamp-skills pack`, so none can be one the check refuses.
+pub const MAKE_EXAMPLES: [(&str, &str); 16] = [
+    (
+        "desk-light/skill.toml",
+        include_str!("make_examples/desk-light/skill.toml"),
+    ),
+    (
+        "desk-light/SKILL.md",
+        include_str!("make_examples/desk-light/SKILL.md"),
+    ),
+    (
+        "stretch-break/skill.toml",
+        include_str!("make_examples/stretch-break/skill.toml"),
+    ),
+    (
+        "stretch-break/SKILL.md",
+        include_str!("make_examples/stretch-break/SKILL.md"),
+    ),
+    (
+        "coin-flip/skill.toml",
+        include_str!("make_examples/coin-flip/skill.toml"),
+    ),
+    (
+        "coin-flip/scripts/main.py",
+        include_str!("make_examples/coin-flip/scripts/main.py"),
+    ),
+    (
+        "coin-flip/SKILL.md",
+        include_str!("make_examples/coin-flip/SKILL.md"),
+    ),
+    (
+        "water-while-here/skill.toml",
+        include_str!("make_examples/water-while-here/skill.toml"),
+    ),
+    (
+        "water-while-here/SKILL.md",
+        include_str!("make_examples/water-while-here/SKILL.md"),
+    ),
+    (
+        "break-timer/skill.toml",
+        include_str!("make_examples/break-timer/skill.toml"),
+    ),
+    (
+        "break-timer/SKILL.md",
+        include_str!("make_examples/break-timer/SKILL.md"),
+    ),
+    (
+        "breathing-coach/skill.toml",
+        include_str!("make_examples/breathing-coach/skill.toml"),
+    ),
+    (
+        "breathing-coach/SKILL.md",
+        include_str!("make_examples/breathing-coach/SKILL.md"),
+    ),
+    (
+        "breathing-coach/scripts/main.py",
+        include_str!("make_examples/breathing-coach/scripts/main.py"),
+    ),
+    (
+        "water-breaks/skill.toml",
+        include_str!("make_examples/water-breaks/skill.toml"),
+    ),
+    (
+        "water-breaks/SKILL.md",
+        include_str!("make_examples/water-breaks/SKILL.md"),
+    ),
+];
+
+/// [`MAKE_EXAMPLES`] written under [`EXAMPLES_FOLDER`] in `at`, each folder
+/// 0700 and each file 0600, never through a link.
+fn examples_in(at: &rustix::fd::OwnedFd) -> std::io::Result<()> {
+    let examples = folder_in(at, EXAMPLES_FOLDER)?;
+    let mut made: Vec<(String, rustix::fd::OwnedFd)> = Vec::new();
+    for (path, text) in MAKE_EXAMPLES {
+        let (folder, name) = path.rsplit_once('/').unwrap_or(("", path));
+        let mut fd = None;
+        let mut so_far = String::new();
+        for part in folder.split('/').filter(|part| !part.is_empty()) {
+            so_far.push_str(part);
+            so_far.push('/');
+            let parent = fd.as_ref().unwrap_or(&examples);
+            let next = match made.iter().position(|(done, _)| *done == so_far) {
+                Some(at) => made[at].1.try_clone()?,
+                None => {
+                    let opened = folder_in(parent, part)?;
+                    made.push((so_far.clone(), opened.try_clone()?));
+                    opened
+                }
+            };
+            fd = Some(next);
+        }
+        file_in(fd.as_ref().unwrap_or(&examples), name, text)?;
+    }
+    Ok(())
+}
 /// The lamp's own check of a skill's folder the guide names: the skills
 /// part's `pack`, the very check the voice packs a made skill with
 /// (`lamp_voice::made_skill::PROGRAM`), seen inside the make's namespace
@@ -283,12 +408,19 @@ pub const CHECK_OUT: &str = "/tmp/lamp-check";
 /// [`CHECK_PROGRAM`] alone and fixed at most twice, then the answer
 /// written as the rules say, to [`ANSWER_FILE`] alone.
 pub fn guided_prompt(folder: &Path) -> String {
+    guided_prompt_with(folder, "")
+}
+
+/// [`guided_prompt`], the check's command after `before` (empty for
+/// Hermes's make, byte for byte; a gateway make's `cd` and switches,
+/// [`gateway_checked_prompt`]).
+fn guided_prompt_with(folder: &Path, before: &str) -> String {
     format!(
         "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
          lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
          then {rules}, and follow both; {rules} wins where they differ. Draft the skill in \
          {folder}/draft/NAME and check it with the lamp's own check, run from this folder as \
-         {check} pack --out {out} draft/NAME, fixing what it says at most twice. Then write the \
+         {before}{check} pack --out {out} draft/NAME, fixing what it says at most twice. Then write the \
          answer exactly as {rules} says (the fenced blocks, or its one line when the skill can't \
          be made), and nothing else, to the file {answer} in this folder. Write no file outside \
          this folder but the check's own under {out}, install nothing and run no other command.",
@@ -301,11 +433,39 @@ pub fn guided_prompt(folder: &Path) -> String {
     )
 }
 
-/// #7245: the guide as a gateway agent's make is given it ([`GUIDE`]
-/// without its check, section 3): a gateway agent's exec allow-list
-/// (OpenClaw's) holds only the skill-start launcher, so the guide's
-/// `lamp-skills pack` ([`CHECK_PROGRAM`]) can't run there. The voice's
-/// own checks and repairs of the answer still apply.
+/// #7245: a gateway make's words with the check, V1's tools on
+/// ([`MakeGateway::checked`]): [`guided_prompt`]'s, the check's command
+/// run as `cd <folder> && [switches] lamp-skills pack ...`, since an
+/// OpenClaw exec starts in the agent's workspace, not the make's folder,
+/// and the line's check switches ([`CheckSwitches::env`]) can't reach the
+/// gateway's environment otherwise. In OpenClaw's namespace `/opt` is not
+/// hidden, so [`CHECK_PROGRAM`] runs as in Hermes's; its package goes to
+/// the namespace's own writable `/tmp` ([`CHECK_OUT`]).
+pub fn gateway_checked_prompt(folder: &Path, switches: &CheckSwitches) -> String {
+    let mut before = format!("cd {} && ", folder.display());
+    for (name, value) in switches.env() {
+        before.push_str(&format!("{name}={value} "));
+    }
+    // #7245 (lamp-c0a4, 18 Nov): the agent's own check must take a skill
+    // started by its own words (`asks`) as the voice's keep does, which
+    // lamp-skills allows only with LAMP_MADE_SKILL_ASKS on; lamp-tasks
+    // carries it in its unit when the product has asks on.
+    if std::env::var(ASKS_ENVIRONMENT).is_ok_and(|value| value == "on") {
+        before.push_str(&format!("{ASKS_ENVIRONMENT}=on "));
+    }
+    // The skill.toml form inline too, as in [`gateway_prompt`].
+    // #7245 (lamp-c0a4, 18 Nov 13:27): Harness's `new` refused the checked
+    // words at ~2,030 bytes (its own task cap is 2,000), so the form is
+    // left to guide.md and examples/, which this make's folder holds.
+    format!("{GATEWAY_CAN}\n\n{}", guided_prompt_with(folder, &before))
+}
+
+/// #7245: the guide as a gateway agent's make is given it without V1's
+/// tools ([`MakeGateway::checked`] off): [`GUIDE`] without its check,
+/// section 3: with only the skill-start launcher in OpenClaw's exec
+/// allow-list, the guide's `lamp-skills pack` ([`CHECK_PROGRAM`]) can't
+/// run there. The voice's own checks and repairs of the answer still
+/// apply.
 pub fn gateway_guide() -> String {
     match (GUIDE.find("## 3. "), GUIDE.find("## 4. ")) {
         (Some(check), Some(answer)) if check < answer => format!(
@@ -327,13 +487,89 @@ pub fn without_check(text: &str) -> String {
         .collect()
 }
 
+/// #7245: the most bytes of [`gateway_form`], the form a gateway make's
+/// words carry inline: a short block, so the words stay well within
+/// Harness's task bound (`harness::MAX_PROMPT_BYTES`, 3,000 since #7245).
+pub const MOST_FORM_BYTES: usize = 1024;
+
+/// #7245: the one minimal `skill.toml` a gateway make's words show
+/// ([`gateway_form`]): `asks` on the first line, then `kind`, `version`,
+/// `[permissions]` and one `[[do]]` step, a skill started by the person's
+/// own words alone. lamp-skills' `tests/it/make_check.rs` packs it with the
+/// real `lamp-skills pack`. Given back in chat, it is refused as the rules'
+/// example is ([`is_example`]).
+pub const FORM_TOML: &str = "asks = [\"desk glow on\"]
+kind = \"installable\"
+version = \"1.0.0\"
+
+[permissions]
+light = true
+
+[[do]]
+light = { colour = \"warm\" }
+";
+
+/// #7245: skill.toml's order, in one line, by its real key names: `asks`
+/// first, then `kind`, `version`, `[permissions]`, then the trigger,
+/// `[ask]` and `[[do]]`. The rest (grants, triggers, steps, limits) stays
+/// in the rules alone.
+pub const FORM_ORDER: &str = "The skill.toml form in short; rules.md has the rest (grants, \
+     triggers, steps, limits). Its order: asks = [...] first, at the very top (only when \
+     rules.md offers asks); then kind, version, grants = [...] (only for its own code) and any other \
+     top-level key rules.md gives; then [permissions] (only for its steps); then [trigger], [ask] and [[do]], each as rules.md says.";
+
+/// #7245: the one rule a gateway make's words state (lamp-c0a4, 18 Nov
+/// 04:35 and 04:40: OpenClaw wrote `asks` after `[permissions]`, and the
+/// skill was refused on "unknown field").
+pub const FORM_RULE: &str = "Never write asks under [permissions] or any other table: a key \
+     after a table's header belongs to that table, so every top-level key goes before the first \
+     table.";
+
+/// #7245: the skill.toml form a gateway agent's make carries in its own
+/// words, so OpenClaw has it even if it never opens the rules: the order
+/// ([`FORM_ORDER`]), the rule ([`FORM_RULE`]) and one minimal skill.toml
+/// ([`FORM_TOML`]), at most [`MOST_FORM_BYTES`].
+/// #7245: the gateway make's first words, before what to read: the lamp's
+/// own OpenClaw answered `cannot:` on 4 of 5 makes on lamp-c0a4 (18 Nov,
+/// deepseek-flash), each with a reason of its own ("knowing facts about
+/// apples on my own", "writing notes and reading them back"), while the
+/// same rules.md sent to the same model alone made the skill 10 of 10. So
+/// the words say first that the skill can be made, what a made skill can
+/// do, and that `cannot` is only for a limit rules.md names. And its
+/// bounds (the owner, 18 Nov, on #7737: the kept session keeps V1's full
+/// grants, so the make's own words name them): only its folder, and no
+/// command but the pack check.
+pub const GATEWAY_CAN: &str = "You are making a skill for this lamp, and it can be made. Read \
+     guide.md when it is here, then format.md for every step a skill can do, sdk.md for its code, examples/ \
+     (whole skills the check takes), then follow rules.md. Words you know now need no lookup. \
+     Answer cannot only for a limit rules.md names; if unsure, make it. Each make is new: \
+     read these files again, format.md before any cannot, and write no tool key. Use only this \
+     make's folder below; run nothing but the check it names.";
+
+pub fn gateway_form() -> String {
+    format!(
+        "{FORM_ORDER} {FORM_RULE} A minimal skill.toml the lamp's check takes, the form only \
+         and never the answer:\n\n```skill.toml\n{FORM_TOML}```"
+    )
+}
+
 /// #7245: a gateway agent's make's words, with the guide when `guide`
 /// ([`gateway_guide`]): as [`prompt`] and [`guided_prompt`], but no check
-/// is run and no command at all.
+/// is run and no command at all; and either way the skill.toml form
+/// inline after them ([`gateway_form`]). The person's request stays in the
+/// rules alone. Hermes's make's words ([`prompt`], [`guided_prompt`]) are
+/// as before.
 pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
-    if !guide {
-        return prompt(folder);
-    }
+    let words = if guide {
+        gateway_guided_words(folder)
+    } else {
+        prompt(folder)
+    };
+    format!("{GATEWAY_CAN}\n\n{words}\n\n{}", gateway_form())
+}
+
+/// [`gateway_prompt`]'s words with the guide, before the form.
+fn gateway_guided_words(folder: &Path) -> String {
     format!(
         "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
          lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
@@ -352,8 +588,25 @@ pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
 /// most `within`, started in its folder: no home, no switches, no token,
 /// no script (nothing for the skill-start launcher to claim).
 pub fn gateway_run(folder: &Path, within: Duration, guide: bool) -> SkillRun {
+    gateway_run_with(folder, within, guide, false, &CheckSwitches::default())
+}
+
+/// [`gateway_run`], with the guide's check in its words when `checked`
+/// and `guide` ([`gateway_checked_prompt`], V1's tools on), the line's
+/// `switches` on its command; the run's own environment stays empty.
+pub fn gateway_run_with(
+    folder: &Path,
+    within: Duration,
+    guide: bool,
+    checked: bool,
+    switches: &CheckSwitches,
+) -> SkillRun {
     let mut run = make_run(folder, within);
-    run.prompt = gateway_prompt(folder, guide);
+    run.prompt = if guide && checked {
+        gateway_checked_prompt(folder, switches)
+    } else {
+        gateway_prompt(folder, guide)
+    };
     run.env = Vec::new();
     run
 }
@@ -575,15 +828,32 @@ pub(crate) fn put_ask_on_gateway(work: &Path, rules: &str) -> std::io::Result<Ma
 }
 
 /// #7245: a gateway agent's make's folder in `work`, `make-<run id>`,
-/// 0700, with the rules ([`without_check`]) and, when `guide`, the
-/// gateway's guide ([`gateway_guide`]), each 0600: no home, as the gateway
-/// agent runs in its own.
-fn put_for_gateway(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder> {
+/// 0700, with the rules and, when `guide`, the guide, each 0600: no home,
+/// as the gateway agent runs in its own. With V1's tools (`checked`) the
+/// rules and [`GUIDE`] whole, the check in both, as Hermes's make has
+/// them; without, the rules [`without_check`] and [`gateway_guide`].
+fn put_for_gateway(
+    work: &Path,
+    rules: &str,
+    guide: bool,
+    checked: bool,
+) -> std::io::Result<MadeFolder> {
     let made = fresh_folder(work, FOLDER_HEAD)?;
-    file_in(&made.fd, RULES_FILE, &without_check(rules))?;
-    if guide {
-        file_in(&made.fd, GUIDE_FILE, &gateway_guide())?;
+    if checked {
+        file_in(&made.fd, RULES_FILE, rules)?;
+    } else {
+        file_in(&made.fd, RULES_FILE, &without_check(rules))?;
     }
+    if guide {
+        if checked {
+            file_in(&made.fd, GUIDE_FILE, GUIDE)?;
+        } else {
+            file_in(&made.fd, GUIDE_FILE, &gateway_guide())?;
+        }
+    }
+    file_in(&made.fd, FORMAT_FILE, FORMAT)?;
+    file_in(&made.fd, SDK_FILE, SDK)?;
+    examples_in(&made.fd)?;
     Ok(made)
 }
 
@@ -823,14 +1093,15 @@ light = { colour = \"cyan\", level = 2, for = \"25s\" }
 /// Whether a skill's two files are the rules' example given back, as the
 /// voice's own maker tells it (`make_skill_local::is_example`): its
 /// `skill.toml` the example's but for blank space, or its `SKILL.md` named
-/// as the example is.
+/// as the example is; or the gateway words' own minimal one
+/// ([`FORM_TOML`], #7245) given back.
 fn is_example(toml: &str, card: &str) -> bool {
     let bare = |text: &str| text.split_whitespace().collect::<String>();
     let name = card
         .lines()
         .find_map(|line| line.trim().strip_prefix("name:"))
         .map(|name| name.trim().trim_matches('"'));
-    bare(toml) == bare(EXAMPLE_TOML) || name == Some(EXAMPLE_NAME)
+    bare(toml) == bare(EXAMPLE_TOML) || bare(toml) == bare(FORM_TOML) || name == Some(EXAMPLE_NAME)
 }
 
 /// Which of a skill's two files a fenced block is, read as the voice reads
@@ -842,7 +1113,8 @@ enum Part {
     /// No name: `SKILL.md` when it begins with front matter, else
     /// `skill.toml` ([`skill_blocks`]).
     Bare,
-    /// A file of its code (`scripts/…`), or any other.
+    /// A file of its code (`scripts/…`), a light show's (`shows/…`), or
+    /// any other.
     Other,
 }
 
@@ -866,7 +1138,8 @@ fn fence_part(info: &str) -> (Part, bool) {
     let word = word
         .trim_matches(|c| matches!(c, '"' | '\'' | '*' | '`'))
         .trim_end_matches(':');
-    if word.starts_with("scripts/") {
+    // A file of its code, or a light show's (#7245): a block of its own.
+    if word.starts_with("scripts/") || word.starts_with("shows/") {
         return (Part::Other, true);
     }
     match word.to_ascii_lowercase().as_str() {
@@ -1080,7 +1353,7 @@ fn answer_on_gateway(
     if let Err(why) = gateway.ready() {
         return refusal(not_started(&why), &why);
     }
-    let folder = match put_for_gateway(work, &make.rules, make.guide) {
+    let folder = match put_for_gateway(work, &make.rules, make.guide, gateway.checked) {
         Ok(folder) => folder,
         Err(error) => {
             return refusal(
@@ -1090,9 +1363,27 @@ fn answer_on_gateway(
         }
     };
     started();
-    let run = gateway_run(&folder.path, make.within(), make.guide);
+    let switches = make.switches.clone().unwrap_or_default();
+    let run = gateway_run_with(
+        &folder.path,
+        make.within(),
+        make.guide,
+        gateway.checked,
+        &switches,
+    );
     let ran = gateway.run(&run, &|| {});
+    // A make cut at its deadline (or its turn ended badly) that had written
+    // its whole answer.md is still its answer (First's P3 on #7737), read
+    // before the folder goes; the voice still checks it whole.
+    let late = match &ran {
+        Err(why) if !not_ready(why) => answer_in(&folder.path),
+        _ => None,
+    };
     drop(folder);
+    if let Some(text) = late.filter(|text| !text.trim().is_empty()) {
+        eprintln!("[lamp-tasks] skill make: its turn ended badly, its written answer read");
+        return json!({"ok": true, "answer": text});
+    }
     match ran {
         // Harness or the gateway not ready yet: said to the person at
         // once in the lamp's short words, never a silent failure; the
@@ -1187,6 +1478,11 @@ pub struct MakeGateway {
     pub pick: Box<dyn Fn() -> Result<MakeAgent, String> + Send + Sync>,
     /// The make's one turn ([`MakeTurn`], the seam).
     pub turn: Arc<dyn MakeTurn + Send + Sync>,
+    /// Whether the make gets the guide's `lamp-skills pack` check (#7245):
+    /// with V1's tools on in OpenClaw's config
+    /// (`crate::openclaw_config::V1_TOOLS_SWITCH`, read from lamp-tasks'
+    /// environment), the gateway runs it as Hermes's make does.
+    pub checked: bool,
 }
 
 impl MakeGateway {
@@ -1217,6 +1513,11 @@ impl MakeGateway {
                 )),
             }),
             turn: runner,
+            checked: crate::openclaw_config::v1_tools_on(
+                std::env::var(crate::openclaw_config::V1_TOOLS_SWITCH)
+                    .ok()
+                    .as_deref(),
+            ),
         }
     }
 }
@@ -1645,9 +1946,15 @@ impl MakeHandOvers {
         // A live ask has its own one place, beside a make's.
         if crate::voice_ask::is_ask(&line) {
             let answered = match &self.asks {
-                Some(asks) => crate::voice_ask::answer(&line, asks, &self.work, &mut || {
-                    write_answer(stream, &json!({"ok": true, "started": true}));
-                }),
+                Some(asks) => crate::voice_ask::answer_beside_make(
+                    &line,
+                    asks,
+                    running.load(Ordering::Acquire),
+                    &self.work,
+                    &mut || {
+                        write_answer(stream, &json!({"ok": true, "started": true}));
+                    },
+                ),
                 None => refusal(
                     "off",
                     "an ask for the lamp's agent is off on this lamp (LAMP_HARD_ASKS_TO_AGENT, LAMP_SERVICES_TO_AGENT)",
@@ -2311,7 +2618,7 @@ mod tests {
         for bad in [
             line("", 2_000),
             line("R", 10),
-            line("R", 600_000),
+            line("R", 600_001),
             line(&"x".repeat(MOST_RULES_BYTES + 1), 2_000),
             br#"{"op":"skill_make","rules":"R","within_ms":2000,"net":"host"}"#.to_vec(),
             br#"{"op":"skill_task","rules":"R","within_ms":2000}"#.to_vec(),
@@ -2354,6 +2661,55 @@ mod tests {
             Some((_, AnswerFrom::File)) => panic!("taken from the file"),
             None => None,
         }
+    }
+
+    /// A gateway make turn that writes `answer` to its folder, then ends
+    /// with `ended`.
+    struct CutTurn {
+        answer: &'static str,
+        ended: Result<u64, String>,
+    }
+
+    impl MakeTurn for CutTurn {
+        fn make_turn(&self, run: &SkillRun) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            std::fs::write(folder.join(ANSWER_FILE), self.answer).unwrap();
+            self.ended.clone()
+        }
+    }
+
+    /// #7245 (First's P3 on #7737): a make cut at its deadline that had
+    /// written answer.md gives that answer, not a failure; one not ready
+    /// still says so; the folder goes either way.
+    #[test]
+    fn a_gateway_make_cut_at_its_deadline_still_gives_its_written_answer() {
+        let work = tempfile::tempdir().unwrap();
+        let line = br#"{"op":"skill_make","rules":"R","within_ms":2000}"#;
+        let make = MakeLine::parse(line).unwrap();
+        let gateway = |ended: Result<u64, String>| MakeGateway {
+            pick: Box::new(|| Ok(MakeAgent::Gateway(crate::harness::EngineKind::Openclaw))),
+            turn: Arc::new(CutTurn {
+                answer: "```skill.toml\nkind = \"installable\"\n```",
+                ended,
+            }),
+            checked: false,
+        };
+        let cut = answer_on_gateway(
+            &make,
+            work.path(),
+            &gateway(Err("deadline".into())),
+            &mut || {},
+        );
+        assert_eq!(cut["ok"], true, "{cut}");
+        assert!(cut["answer"].as_str().unwrap().contains("skill.toml"));
+        let not_ready = answer_on_gateway(
+            &make,
+            work.path(),
+            &gateway(Err(crate::gateway::NOT_READY.into())),
+            &mut || {},
+        );
+        assert_eq!(not_ready["error"], NOT_READY, "{not_ready}");
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
     }
 
     /// lamp-c0a4, 13584, OpenClaw: a make the agent can't do, said
@@ -3046,6 +3402,61 @@ mod tests {
         }
     }
 
+    /// #7245, V1's tools on (`MakeGateway::checked`): a gateway make's
+    /// folder holds the rules and the guide whole, the check in both, as
+    /// Hermes's make has them; its words run that check, from its folder
+    /// and with the line's switches, and nothing else; off, as before.
+    #[test]
+    fn a_gateway_make_with_v1s_tools_gets_the_check() {
+        let rules = format!("a\n  {CHECK_PROGRAM} pack --out x draft/A\nb\n");
+        let work = tempfile::tempdir().unwrap();
+        let made = put_for_gateway(work.path(), &rules, true, true).unwrap();
+        let read = |name: &str| std::fs::read_to_string(made.path.join(name)).unwrap();
+        assert_eq!(read(RULES_FILE), rules);
+        assert_eq!(read(GUIDE_FILE), GUIDE);
+        assert!(read(GUIDE_FILE).contains("lamp-skills pack --out /tmp/lamp-check draft/NAME"));
+        let other = tempfile::tempdir().unwrap();
+        let plain = put_for_gateway(other.path(), &rules, true, false).unwrap();
+        let read = |name: &str| std::fs::read_to_string(plain.path.join(name)).unwrap();
+        assert_eq!(read(RULES_FILE), "a\nb\n");
+        assert_eq!(read(GUIDE_FILE), gateway_guide());
+
+        let folder = Path::new("/w/make-1");
+        let none = CheckSwitches::default();
+        let words = gateway_checked_prompt(folder, &none);
+        assert!(
+            words.contains(&format!(
+                "run from this folder as cd /w/make-1 && {CHECK_PROGRAM} pack --out {CHECK_OUT} draft/NAME,"
+            )),
+            "{words}"
+        );
+        assert!(words.contains("run no other command"), "{words}");
+        assert!(!words.contains("run no command"), "{words}");
+        assert_eq!(
+            words
+                .replace("cd /w/make-1 && ", "")
+                .replace(&format!("{GATEWAY_CAN}\n\n"), "")
+                .replace(&format!("\n\n{}", gateway_form()), ""),
+            guided_prompt(folder),
+            "Hermes's words, the check run from the folder"
+        );
+        let both = CheckSwitches {
+            agent_services: Switch::On,
+            skill_writes: Switch::On,
+        };
+        assert!(gateway_checked_prompt(folder, &both).contains(&format!(
+            "cd /w/make-1 && LAMP_AGENT_SERVICES=on LAMP_SKILL_WRITES=on {CHECK_PROGRAM} pack"
+        )));
+        let run = gateway_run_with(folder, Duration::from_secs(5), true, true, &both);
+        assert_eq!(run.prompt, gateway_checked_prompt(folder, &both));
+        assert!(run.env.is_empty() && run.script.as_os_str().is_empty());
+        // Off, or with no guide: today's words.
+        let off = gateway_run_with(folder, Duration::from_secs(5), true, false, &both);
+        assert_eq!(off.prompt, gateway_prompt(folder, true));
+        let unguided = gateway_run_with(folder, Duration::from_secs(5), false, true, &none);
+        assert_eq!(unguided.prompt, gateway_prompt(folder, false));
+    }
+
     /// #7245: a gateway agent's make never gets the guide's check, which
     /// its exec allow-list can't run: the guide without its section 3, the
     /// rules without a line naming the check, and words that run nothing;
@@ -3073,7 +3484,18 @@ mod tests {
             assert_eq!(run.start_in.as_deref(), Some(folder));
             assert_eq!(run.run, "1");
         }
-        assert_eq!(gateway_prompt(folder, false), prompt(folder));
+        assert_eq!(
+            gateway_prompt(folder, false),
+            format!("{GATEWAY_CAN}\n\n{}\n\n{}", prompt(folder), gateway_form())
+        );
+        // lamp-c0a4, 18 Nov: the words say first that the skill can be
+        // made, and that cannot is only for a limit rules.md names.
+        for guided in [false, true] {
+            let words = gateway_prompt(folder, guided);
+            assert!(words.starts_with("You are making a skill for this lamp, and it can be made."));
+            assert!(words.contains("if unsure, make it"), "{words}");
+            assert!(words.contains("no lookup"), "{words}");
+        }
         let parsed = |extra: &str| {
             MakeLine::parse(
                 format!(r#"{{"op":"skill_make","rules":"R","within_ms":2000{extra}}}"#).as_bytes(),
@@ -3084,5 +3506,183 @@ mod tests {
         assert_eq!(parsed(r#","one_path":false"#), Ok(false));
         assert_eq!(parsed(r#","one_path":true"#), Ok(true));
         assert!(parsed(r#","one_path":"yes""#).is_err());
+    }
+
+    /// #7245: a gateway make's words carry the skill.toml form inline,
+    /// guided or not: the order, the one rule on asks and the minimal
+    /// skill.toml, after the words that still point to the rules for the
+    /// rest and the request; within Harness's task bound for the lamp's
+    /// make folder. Without the form inline (the words alone, as before),
+    /// this fails.
+    #[test]
+    fn a_gateway_makes_words_carry_the_skill_toml_form_inline() {
+        let folder = Path::new(MAKE_WORK).join(FOLDER_HEAD);
+        let form = gateway_form();
+        for guided in [false, true] {
+            let words = gateway_prompt(&folder, guided);
+            assert!(words.ends_with(&format!("\n\n{form}")), "{words}");
+            for part in [FORM_ORDER, FORM_RULE, FORM_TOML] {
+                assert!(words.contains(part), "{guided}: {part}");
+            }
+            assert!(words.contains("```skill.toml\nasks = [\"desk glow on\"]\n"));
+            assert!(words.contains("then [permissions]"), "{words}");
+            assert!(words.contains("Never write asks under [permissions]"));
+            assert!(crate::harness::prompt_fits(&words), "{}", words.len());
+            assert_eq!(
+                gateway_run(&folder, Duration::from_secs(5), guided).prompt,
+                words
+            );
+        }
+    }
+
+    /// #7245: the inline form is a short block, at most
+    /// [`MOST_FORM_BYTES`], its skill.toml 12 lines at most with `asks` on
+    /// its first line and before any table.
+    #[test]
+    fn the_inline_form_stays_within_its_cap() {
+        let form = gateway_form();
+        assert!(form.len() <= MOST_FORM_BYTES, "{}", form.len());
+        assert!(FORM_TOML.lines().count() <= 12);
+        assert!(FORM_TOML.starts_with("asks = ["));
+        let first_table = FORM_TOML.find("\n[").unwrap();
+        assert!(
+            ["kind = ", "version = "]
+                .iter()
+                .all(|key| FORM_TOML.find(key).is_some_and(|at| at < first_table))
+        );
+        assert!(FORM_TOML.find("[permissions]") < FORM_TOML.find("[[do]]"));
+    }
+
+    /// #7245: the gateway words still name the rules, for the rest of the
+    /// form and the person's request, and the guide when guided; the
+    /// request itself is never inlined.
+    #[test]
+    fn a_gateway_makes_words_still_name_the_rules() {
+        let folder = Path::new("/w/make-1");
+        for guided in [false, true] {
+            let words = gateway_prompt(folder, guided);
+            // After the first words, which name every file the folder may hold.
+            let words = words.strip_prefix(GATEWAY_CAN).unwrap();
+            let before = &words[..words.find(FORM_ORDER).unwrap()];
+            assert!(before.contains(RULES_FILE), "{before}");
+            assert_eq!(before.contains(GUIDE_FILE), guided, "{before}");
+            assert!(gateway_form().contains("rules.md has the rest"));
+        }
+    }
+
+    /// #7245: Hermes's make's words (the harness make's, [`make_run_with`])
+    /// are as before: no inline form, guided or not.
+    #[test]
+    fn a_hermes_makes_words_are_unchanged() {
+        let folder = Path::new("/w/make-1");
+        for guided in [false, true] {
+            let words = make_run_with(
+                folder,
+                Duration::from_secs(5),
+                guided,
+                &CheckSwitches::default(),
+            )
+            .prompt;
+            let before = if guided {
+                guided_prompt(folder)
+            } else {
+                prompt(folder)
+            };
+            assert_eq!(words, before);
+            assert!(!words.contains(FORM_TOML) && !words.contains(FORM_RULE));
+        }
+        assert!(prompt(folder).ends_with("install nothing and run nothing else."));
+        assert!(guided_prompt(folder).ends_with("install nothing and run no other command."));
+    }
+
+    /// #7245: the inline skill.toml given back in chat is refused as the
+    /// rules' example is; with another ask it is taken.
+    #[test]
+    fn a_gateway_make_never_takes_the_inline_form_given_back_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let card = "```SKILL.md\n---\nname: desk-glow\ndescription: x\n---\n```";
+        let given = format!("```skill.toml\n{FORM_TOML}```\n\n{card}");
+        assert_eq!(make_answer(&made.path, Some((given.as_str(), false))), None);
+        let own = given.replace("desk glow on", "reading glow please");
+        assert!(make_answer(&made.path, Some((own.as_str(), false))).is_some());
+    }
+
+    /// #7245: a gateway agent's make folder, guided or not, holds the
+    /// format's whole reference and the example skills beside the rules,
+    /// each file 0600 and each folder 0700; its words name them within
+    /// Harness's task bound. Hermes's make folder holds neither.
+    /// #7245: the checked words stay within Harness's 2,000-byte task cap
+    /// with a real make folder's path and every switch on.
+    #[test]
+    fn the_checked_prompt_fits_harness_cap() {
+        let folder = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-4294967295");
+        let switches = CheckSwitches {
+            agent_services: Switch::On,
+            skill_writes: Switch::On,
+        };
+        let words = gateway_checked_prompt(folder, &switches);
+        // With lamp-tasks' LAMP_MADE_SKILL_ASKS on (the product's unit),
+        // its prefix too (Twelve's P3 on #7737).
+        let asks = format!("{ASKS_ENVIRONMENT}=on ");
+        assert!(words.len() + asks.len() <= 2_000, "{} bytes", words.len());
+        assert!(words.contains("Use only this make's folder below"));
+        assert!(words.contains("run nothing but the check it names"));
+    }
+
+    #[test]
+    fn a_gateway_make_folder_holds_the_format_and_the_examples() {
+        use std::os::unix::fs::PermissionsExt;
+        let work = tempfile::tempdir().unwrap();
+        for guide in [false, true] {
+            let made = put_for_gateway(work.path(), "R", guide, false).unwrap();
+            let format = made.path.join(FORMAT_FILE);
+            assert_eq!(std::fs::read_to_string(&format).unwrap(), FORMAT);
+            assert!(FORMAT.contains("show = \"NAME\""));
+            assert_eq!(
+                std::fs::read_to_string(made.path.join(SDK_FILE)).unwrap(),
+                SDK
+            );
+            let mode = |path: &Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode(&format), 0o600);
+            for (path, text) in MAKE_EXAMPLES {
+                let file = made.path.join(EXAMPLES_FOLDER).join(path);
+                assert_eq!(std::fs::read_to_string(&file).unwrap(), text, "{path}");
+                assert_eq!(mode(&file), 0o600, "{path}");
+                assert_eq!(mode(file.parent().unwrap()), 0o700, "{path}");
+            }
+            assert_eq!(made.path.join(GUIDE_FILE).exists(), guide);
+            let words = gateway_prompt(&made.path, guide);
+            for named in [FORMAT_FILE, "examples/", GUIDE_FILE, RULES_FILE] {
+                assert!(words.contains(named), "{named}: {words}");
+            }
+        }
+        let hermes = put_with(work.path(), "R", true).unwrap();
+        assert!(!hermes.path.join(FORMAT_FILE).exists());
+        assert!(!hermes.path.join(EXAMPLES_FOLDER).exists());
+    }
+
+    /// #7245: every gateway make's words, unguided and guided, for the
+    /// longest make folder a run has (its whole run id), fit Harness's task
+    /// bound with room to spare: within 2,000 bytes, the bound before it was
+    /// raised to 3,000, so the margin stays.
+    #[test]
+    fn every_gateway_makes_words_fit_the_task_bound_with_room() {
+        let folder = Path::new(MAKE_WORK).join(format!("{FOLDER_HEAD}{}", "f".repeat(64)));
+        for guide in [false, true] {
+            let words = gateway_prompt(&folder, guide);
+            assert!(
+                crate::harness::prompt_fits(&words),
+                "{guide}: {}",
+                words.len()
+            );
+            assert!(words.len() <= crate::harness::MAX_PROMPT_BYTES);
+            assert!(words.len() <= 2000, "{guide}: {}", words.len());
+            assert_eq!(
+                gateway_run(&folder, Duration::from_secs(5), guide).prompt,
+                words
+            );
+        }
+        assert!(GATEWAY_CAN.len() <= 540, "{}", GATEWAY_CAN.len());
     }
 }

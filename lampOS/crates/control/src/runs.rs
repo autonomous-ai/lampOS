@@ -118,6 +118,30 @@ pub fn run_client(run: &str) -> String {
     format!("c_{hex}")
 }
 
+/// The switch for a made skill's notes (#7245, lamp-voice's
+/// `LAMP_MADE_NOTES`): `on` exactly, off unless set. On, a run's notes are
+/// kept under its skill's notes client ([`skill_notes_client`]), so the
+/// next run of the same skill reads them back; off, under the run's own
+/// client ([`run_client`]) as before.
+pub const SKILL_NOTES_ENVIRONMENT: &str = "LAMP_MADE_NOTES";
+
+/// Whether a run's notes are its skill's ([`SKILL_NOTES_ENVIRONMENT`]).
+pub fn skill_notes_on() -> bool {
+    std::env::var(SKILL_NOTES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The notes client of a skill's runs: `n_` and 16 hex of its name's
+/// digest, one for every run of that skill and never a paired computer's
+/// or a run's own (`c_`).
+pub fn skill_notes_client(skill: &str) -> String {
+    let sum = digest(&SHA256, format!("skill-notes:{skill}").as_bytes());
+    let hex: String = sum.as_ref()[..8]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    format!("n_{hex}")
+}
+
 fn token_key(token: &str) -> [u8; 32] {
     let mut key = [0u8; 32];
     key.copy_from_slice(digest(&SHA256, token.as_bytes()).as_ref());
@@ -377,6 +401,19 @@ mod tests {
             runs.mint(&"y".repeat(43), "r", "s", light(), None, 0)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn a_skills_runs_share_one_notes_client_no_run_has() {
+        let skill = skill_notes_client("apple-facts");
+        assert_eq!(skill, skill_notes_client("apple-facts"));
+        assert_ne!(skill, skill_notes_client("other"));
+        assert_ne!(skill, run_client("apple-facts"));
+        assert!(skill.starts_with("n_") && skill.len() == 18);
+        // A plain name, so its notes file stays in the notes folder.
+        assert!(skill[2..].bytes().all(|b| b.is_ascii_hexdigit()));
+        assert!(skill_notes_client("../../etc/passwd").starts_with("n_"));
+        assert!(!skill_notes_client("../x").contains('/'));
     }
 
     #[test]

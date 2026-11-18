@@ -1461,6 +1461,10 @@ fn worker_command(
             role,
             var(crate::made_skill::UNRELATED_ENVIRONMENT).as_deref(),
         ))
+        .envs(made_notes_worker_environment(
+            role,
+            var(crate::made_skill::NOTES_ENVIRONMENT).as_deref(),
+        ))
         .envs(make_no_asks_worker_environment(
             role,
             var(crate::make_no_asks::ENVIRONMENT).as_deref(),
@@ -1670,6 +1674,19 @@ fn made_asks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::ASKS_ENVIRONMENT, "on"))
+}
+
+// A made skill's notes (#7245, `made_skill::notes_on`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` tells
+// the model the notes calls and takes a notes grant. Unpassed, lamp-c0a4's
+// makes on 18 Nov had no notes calls in their prompt and kept OpenClaw's
+// `notes-write` as it came.
+fn made_notes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::NOTES_ENVIRONMENT, "on"))
 }
 
 // A made skill turned off and on by voice (#7445,
@@ -2618,6 +2635,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::GUIDE_ENVIRONMENT,
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+        // Every make straight to that agent (#7245).
+        crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
         // What a skill on the lamp already does offered, not made (#7747).
         crate::make_core_offer::ENVIRONMENT,
@@ -3157,6 +3176,10 @@ mod tests {
             ),
             (
                 crate::made_skill::UNRELATED_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::NOTES_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
@@ -4069,6 +4092,7 @@ mod tests {
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
+                    || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::make_core_offer::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
@@ -4268,6 +4292,7 @@ mod tests {
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_LIMIT_LOCAL_ASKS=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
+                    "LAMP_MAKE_AGENT_FIRST=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_CORE_OFFER=on",

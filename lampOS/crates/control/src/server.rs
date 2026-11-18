@@ -1987,6 +1987,11 @@ fn forget_app_op(
     json!({"ok": true})
 }
 
+/// The voice's "forget everything" to lamp-control (#7245):
+/// `{"notes_forget_skills": true}`, answered `{"forgot": N}`, every made
+/// skill's notes deleted.
+pub const NOTES_FORGET_SKILLS: &str = "notes_forget_skills";
+
 fn admin_answer(
     shared: &Shared,
     line: &str,
@@ -1996,6 +2001,21 @@ fn admin_answer(
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
+    // A made skill's notes (#7245): its remove (`task_yes_forget`, sent
+    // by lamp-skills' remove) takes its notes too, before its yes below;
+    // "forget everything" (`notes_forget_skills`) takes every made
+    // skill's. Forgetting grants nothing: any peer.
+    if let Some(Value::String(name)) = asked.get(crate::task_yes::FORGET) {
+        shared
+            .door
+            .lock()
+            .expect("door")
+            .forget_skill_notes(Some(name));
+    }
+    if asked.get(NOTES_FORGET_SKILLS) == Some(&json!(true)) {
+        let forgot = shared.door.lock().expect("door").forget_skill_notes(None);
+        return json!({"forgot": forgot});
+    }
     // The owner's yes to a skill's task (#6305): recorded by the voice
     // alone, checked by lamp-skills, taken back by a remove.
     let folder = shared.task_yes.lock().expect("task_yes").clone();
@@ -2218,7 +2238,7 @@ fn admin_answer(
             "listening": shared.listening.load(Ordering::Relaxed),
         });
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state or app_settings_set"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state, app_settings_set or notes_forget_skills"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
@@ -2587,6 +2607,49 @@ mod tests {
     /// The Reviewer-lead's P2 on #4564: a stalled computer holds the newest
     /// `body.state` only, however many the body sent, and none in its
     /// outbox.
+    // #7245: a skill's remove (`task_yes_forget`) takes its notes, and
+    // "forget everything" (`notes_forget_skills`) every made skill's, never
+    // a paired computer's.
+    #[test]
+    fn a_remove_and_forget_everything_take_made_skills_notes() {
+        let folder = std::env::temp_dir().join(format!("lamp-control-7245-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_notes_folder(folder.clone());
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let notes = crate::notes::Notes::new(folder.clone());
+        let apple = crate::runs::skill_notes_client("apple-facts");
+        let plant = crate::runs::skill_notes_client("plant-log");
+        for (client, key) in [
+            (&apple, "facts"),
+            (&plant, "days"),
+            (&"c_1".to_owned(), "mood"),
+        ] {
+            notes.set(client, key, &json!(1)).unwrap().wait().unwrap();
+        }
+        let file = |client: &str| crate::notes::Notes::path(&folder, client).unwrap();
+        let other = crate::app_yes::Peer::Other;
+        admin_answer(
+            &shared,
+            r#"{"task_yes_forget":"apple-facts"}"#,
+            false,
+            other,
+        );
+        assert!(!file(&apple).exists());
+        assert!(file(&plant).exists());
+        let forgot = admin_answer(&shared, r#"{"notes_forget_skills":true}"#, false, other);
+        assert_eq!(forgot, json!({"forgot": 1}));
+        assert!(!file(&plant).exists());
+        assert!(file("c_1").exists());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
     #[test]
     fn a_stalled_computer_holds_one_body_state_the_newest() {
         let (shared, _, mut inbox, newest) = stalled();

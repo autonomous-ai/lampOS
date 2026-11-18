@@ -389,9 +389,12 @@ fn bad_words_or_times_are_refused_at_load() {
         ),
         (
             r#"remind = { at = "22:00", in = "1h", words = "Drink water." }"#,
-            "one of at or in",
+            "one of at, in or every",
         ),
-        (r#"remind = { words = "Drink water." }"#, "one of at or in"),
+        (
+            r#"remind = { words = "Drink water." }"#,
+            "one of at, in or every",
+        ),
         (
             r#"remind = { at = "22:00", note = "Drink water." }"#,
             "unknown field",

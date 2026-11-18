@@ -286,7 +286,7 @@ must not leave a step silently undone)*.
 | `do.stand` | no | A percent of the lamp's own stand, 1 to 100 (#4135): one `lamp_msgs::StandAsked { share }` published on `body/stand_asked` as publisher `skills`, which the bus keeps as latest and lamp-body takes in place of `--stand-share` until the next ask or power-up ([body.md](body.md), "A stand asked by voice"). Out of range, the skill is refused as it loads (`stand = 0: a percent of the lamp's own stand, 1 to 100`). Only in a skill its `tool` alone starts: the stand is kept, so only a person asks it. Needs `body`. Published only with `LAMP_BODY_POSE_ASK=on` in lamp-skills' environment, the body's own switch; off, the run says `stand 60%: not acted on, LAMP_BODY_POSE_ASK is not on` and nothing is published. A call again while the run is under way publishes again. May go with `if_choice` (Pose: `normal` 100, `lower` 60, `sit` 30) |
 | `do.look` | no | `true`: the voice's full look (#836). Only in a skill with a `tool` and no trigger: the call's answer carries `"look": true` and tells the model to say "Let me take a look."; lamp-skills makes the run's body and light before it answers, and the voice takes its full look for that turn itself as the answer's first audio plays, whatever the model says, its still in the model's next turn, or a note that it could not see if none comes (#941) |
 | `do.requested_audio` | no | A fixed relative `.wav` path, only in a tool-only skill with `permissions.speak = true`: exactly one short plain `say` confirmation, then one `requested_audio` step with `after = "say"`. No other actions, triggers (including daily clock triggers), conditions, choice/flag arguments, output limits, history, search, watch, stop, quiet hours or nudge limits (`most_a_day`, `active`, `budget`, `rest`). The ordinary `again` guard and `still` note remain available and confer no audio authority. Voice plays at most 60 seconds of checked 24 kHz mono PCM16 under the same spoken owner after confirmed confirmation retirement. Advertisement and execution require exact `LAMP_REQUESTED_AUDIO=on`; pack/install may validate while off. See [requested audio](requested-audio.md) for private context, leases, revocation and asset bounds |
-| `do.remind` | no | A timer or reminder set in the lamp's schedule (#6066): `{ at = "HH:MM", words = "..." }` through the actions part's `set_reminder` (the next local `HH:MM` from the run), or `{ in = D, words = "..." }` through its `set_timer` (D from the run, `1m` to `24h`, whole seconds), the same calls the voice makes when a person asks, with `LAMP_SCHEDULE_TOOLS=on` in `lamp-actions`. It needs that function in `[permissions] actions` (`set_reminder` or `set_timer`), checked at load and again at the call. `words` are the skill's own fixed text, never the model's, with a made skill's say limits (`remind::plain_words`): at most 120 characters, one or two sentences, no web address, no quotes, braces or backticks, no control or format character; anything else refuses the skill at load. Only in a skill a trigger starts, never one with a `tool` (a person asking for a reminder asks the voice, which says its time back), and not in a step for some choices. Manners: a skill sets at most 3 in any 24 hours (`remind::MOST_A_DAY`, counted when the set is asked, kept while the program runs as `most_a_day` is), and never stacks one: before a set it reads the schedule's `list_reminders`, and words already set and not yet said (case and spacing aside) mean nothing new; a list it can't read whole sets nothing. The read-back is the schedule's: the run's journal says `set, due HH:MM` only for a `committed` answer, with its `clock`, and never the words. The call names no caller, so the reminder is the room's: said to whoever is at the lamp when it comes due. It reads no memory and writes nothing beyond the schedule's entry. Tests: `tests/it/remind.rs` and `a_remind_step_is_made_through_the_actions_part` |
+| `do.remind` | no | A timer or reminder set in the lamp's schedule (#6066): `{ at = "HH:MM", words = "..." }` through the actions part's `set_reminder` (the next local `HH:MM` from the run), or `{ in = D, words = "..." }` through its `set_timer` (D from the run, `1m` to `24h`, whole seconds), or `{ every = D, words = "..." }` through its `repeat_reminder` with `every = "interval"` (#7245: D whole minutes, `15m` to `24h`, the schedule's `MIN_EVERY_MINUTES` and `MAX_EVERY_MINUTES`; said every D until cancelled by voice; needs `LAMP_SCHEDULE_EVERY=on` in `lamp-actions` and `lamp-schedule`), the same calls the voice makes when a person asks, with `LAMP_SCHEDULE_TOOLS=on` in `lamp-actions`. It needs that function in `[permissions] actions` (`set_reminder`, `set_timer` or `repeat_reminder`), checked at load and again at the call. `words` are the skill's own fixed text, never the model's, with a made skill's say limits (`remind::plain_words`): at most 120 characters, one or two sentences, no web address, no quotes, braces or backticks, no control or format character; anything else refuses the skill at load. Only in a skill a trigger or its own words (`asks`) start, never one with a `tool` (a person asking for a reminder asks the voice, which says its time back), and not in a step for some choices. Manners: a skill sets at most 3 in any 24 hours (`remind::MOST_A_DAY`, counted when the set is asked, kept while the program runs as `most_a_day` is), and never stacks one: before a set it reads the schedule's `list_reminders`, and words already set and not yet said (case and spacing aside) mean nothing new; a list it can't read whole sets nothing. The read-back is the schedule's: the run's journal says `set, due HH:MM` only for a `committed` answer, with its `clock`, and never the words. The call names no caller, so the reminder is the room's: said to whoever is at the lamp when it comes due. It reads no memory and writes nothing beyond the schedule's entry. The agent that makes a skill is taught only its `every` (#7245: its `guide.md`, `format.md` and the example `water-breaks`; a one-off `in` or `at` stays with the lamp's Schedule, never taught as a skill), and the voice's brief says `every` only with `LAMP_MAKE_AGENT_GUIDE` on (`made_skill::remind_told`), so DeepSeek's makes keep today's brief. The guide teaches a nudge sip-of-water's guards (`[[while]]` voice/state not speaking and resting, room/activity not head_down, once a sitting), as the examples `break-timer` and `water-while-here` hold them. Tests: `tests/it/remind.rs`, `remind::tests::every_is_one_repeating_reminder` and `a_remind_step_is_made_through_the_actions_part` |
 | `do.read` | no | A read of one of the owner's linked services (proposal #5288, `LAMP_SKILL_READS=on` in `lamp-skills` and `lamp-services`, on in the product units): `{ service, what, ... }`, any service with a fixed read (not the send-only `gmail-app`, the MCP services or Ahrefs), any of its fixed reads, never one that gives a whole text or a free-form one (a GraphQL `query`, `get` on any path, an MCP `call`; `lamp_services::spoken::skill_read_refused`, held again by `lamp-services` at its door), a calendar's `events` with `day = "today"` or `"tomorrow"` (`service_read::ReadFile`). The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "read" }` and `speak = true`. `lamp-skills` reads it itself through `lamp-services`' tools socket, once a local day, when the owner's known face is alone in view and steady 5 s, no voice was heard in the last minute and the lamp is not private, paused or in quiet hours (waiting up to 60 minutes, then skipping the day unsaid), and says the count and then each item's short line as exact text, judging the gate again before each; someone coming stops it with "I'll tell you the rest later." The journal keeps counts and the gate's outcome only ([services.md](services.md), "A made skill's read"). A read refused because the service isn't linked says nothing, unless `LAMP_SKILL_LINK_NOTE=on` (with `--state-dir`; off): then it says `lamp-services`' "<Service> isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." once, behind the same gate, kept per skill in the state folder's `link-noted` until a read succeeds again ([services.md](services.md), "Not linked at the run") |
 | `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 50 times a skill and 200 across every skill in any 24 hours, and 5 a skill in any hour. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
 | `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 20 a skill and 100 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
@@ -3107,15 +3107,18 @@ gone ([switches.md](switches.md)). What happens:
      (coming to the desk is room/presence)" and `body = { gesture }`: the
      system prompt lists each (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). So the brief's own words are at most
-     680 bytes, the longest brief 2,680 with a 2,000-byte request
-     (`MOST_BRIEF_BYTES`; 1,160 with 480, 1,340 before that) and a
+     960 bytes, the longest brief 2,960 with a 2,000-byte request
+     (`MOST_BRIEF_BYTES`; 1,160 with 480, 1,440 once the brief told the
+     remind step and its `every` in #7245, 1,340 before that) and a
      repair's check lines 735 (`MOST_REPAIR_BYTES`, 560 before), the six
      triggers' meanings whole in it. A brief goes only to a maker: the
      lamp's own chat, or the lamp's agent's make run, whose rules (the
      system prompt and the brief) lamp-tasks takes up to 48 KiB
      (`lamp_tasks::skill_make::MOST_RULES_BYTES`; a test holds the longest
-     repair with the longest system prompt within it). It is no longer held
-     to the tasks part's 2,000 bytes: no brief has gone there since 3 Nov.
+     repair with the longest system prompt within it); a gateway make's
+     words name the rules file and never inline the request. It is no
+     longer held to the tasks part's bound (3,000 bytes since #7245): no
+     brief has gone there since 3 Nov.
 3. **Written by the lamp's own model.** The brief goes to the second
    route's chat (`llm_*`, the relay or the person's own DeepSeek), with no
    tools, streamed, on a thread and runtime of its own, at most 30 s
@@ -3550,7 +3553,7 @@ gone ([switches.md](switches.md)). What happens:
      another kind goes back for repair (`made_skill::WRITE_NOT_FIXED`).
      The system prompt lists the kinds and their keys
      (`make_skill_local::write_rules`); the brief adds "Or one write, as
-     above." (or "Or a read/write as above."), still within 2,680
+     above." (or "Or a read/write as above."), still within 2,960
      bytes.
    - **Its words are the request's own** (`made_skill::write_from_request`,
      at `keep_asked`, which now takes the request, `made_skill::Asked`):
@@ -3753,7 +3756,7 @@ gone ([switches.md](switches.md)). What happens:
      the grants, that the code reaches the lamp only through the lamp's
      SDK with those grants and has no other network, and that the lamp
      says it back and waits for the yes; the brief adds "Or code, as
-     above." (still within 2,680 bytes), and an answer may be up to 37 KiB.
+     above." (still within 2,960 bytes), and an answer may be up to 37 KiB.
      It names the SDK's real calls (`made_skill::SCRIPT_SDK`, #6749 E):
      `import asyncio`, `from lampos import Lamp`, `lamp = await
      Lamp.local()` in `async def main()`, then only `lamp.device()` (its
@@ -3762,6 +3765,28 @@ gone ([switches.md](switches.md)). What happens:
      `lamp.gesture(name)` and `lamp.close()`, and `asyncio.run(main())`;
      there is no other lamp module (on lamp-9adf, 13 Nov, the model wrote
      `from lamp import light` and `light.set_light(…, for="59s")`).
+     With `LAMP_MADE_NOTES=on` (#7245) it also names
+     `lamp.notes.set(key, value)` and `lamp.notes.get(key)` (grant `notes`,
+     `made_skill::SCRIPT_NOTES_SDK`): a small note kept in lamp-control's
+     notes store under the skill's own client (`runs::skill_notes_client`),
+     which its next run reads back; never a file the person opens. The
+     prompt says that the SDK has those two calls, so such a skill can be
+     made, and, with `LAMP_MADE_SKILL_ASKS` on too, that a skill started
+     by the person's own words is started by its asks, not by hearing the
+     room (`NOTES_ASKS_RULES`; on lamp-c0a4, 18 Nov, OpenClaw refused
+     "when I say fruit notes ..." with "the SDK has no notes call"). A say
+     that claims a file or a note with no `lamp.notes.set` in its code is
+     refused for a repair (`made_skill::CLAIMS_A_FILE`), as is a say or a
+     task's words promising a file the person can open: the say-back says
+     what it keeps and when it reads it back. A skill's remove
+     (`task_yes_forget`) deletes its notes; a heard "forget everything"
+     sends lamp-control `notes_forget_skills`, deleting every made skill's
+     notes. A notes grant written under another name (`note`, or `notes`
+     or `note` then `-`, `_` or `:` and a word, any case, as `notes-write`;
+     the list on one line or several, comments allowed) is written as
+     `notes` on one line before the check (`made_skill::notes_granted`; c0a4, 18 Nov:
+     OpenClaw asked for `notes-write`); no other grant is renamed or
+     added. Off, byte for byte as before.
    - **Offered to the voice** (#6749 B): with the switch on, the
      `make_skill` function's description (`make_skill_local::CODE_TOLD`)
      says a made skill may carry its own Python script, run by its task
@@ -5855,7 +5880,7 @@ Tests:
   `own_echo::yes_tests::the_say_backs_own_words_in_its_tail_are_held`;
   `skill_writes_told::tests` (each send told once after the mark, said
   with its time).
-- `made_skill::tests`: the brief within 2,680 bytes with a 2,000-byte
+- `made_skill::tests`: the brief within 2,960 bytes with a 2,000-byte
   request (`MOST_BRIEF_BYTES`, its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
   word list), `the_read_steps_are_the_catalogues_readable_services`,
@@ -6333,9 +6358,21 @@ the same code for both writers.
   path), reads `answer.md` back, mints no token and opens no skill-start
   run, and removes the session and the folder however the make ends
   ([tasks.md](tasks.md), "A voice make on OpenClaw, through the one run
-  path"). OpenClaw can run only skill-start, so its run skips the guide's
-  `lamp-skills pack`; the voice's checks and repairs are the same. A
-  `cannot:` goes on verbatim to #7234's fallback. The journal says "the
+  path"). With V1's tools on (`LAMP_OPENCLAW_V1_TOOLS`, on in the
+  product) OpenClaw has V1's full exec (on the gateway, security full,
+  ask off, elevated), so its run gets the guide's `lamp-skills pack` check
+  as Hermes's does (`skill_make::gateway_checked_prompt`); with that switch `off`
+  OpenClaw can run only skill-start, so its run skips the check
+  (`gateway_guide`). Either way the voice's checks and repairs are the
+  same. A
+  first `cannot:` naming none of the lamp's real limits
+  (`made_skill::real_limit`) is asked once more, its reason quoted back
+  with what a skill can do (`make_skill_local::cannot_asked_again`,
+  `CANNOT_AGAIN_CAN`), only while at least 40 s of the agent's time is left
+  (`CANNOT_AGAIN_LEAST`), that round given no more than what is left; the
+  reason is never journaled (#7245: OpenClaw's cheap model answered
+  `cannot:` on 4 of 5 makes on lamp-c0a4, 18 Nov). A second `cannot:`
+  goes on verbatim to #7234's fallback. The journal says "the
   lamp's agent is OpenClaw: handed over on the one run path". On a lamp
   with no agent at all (no `lamp` target; #7375), a make DeepSeek keeps
   is the make and the brief's own refusals stay as they are, but a make
@@ -6386,6 +6423,40 @@ the same code for both writers.
   go in the rules: each is a placeholder there
   (`own1.lamp@example.invalid`), put back in the agent's answer before the
   checks.
+- **A light show in a made skill (#7245, with `LAMP_MADE_SKILL_ASKS`
+  on).** The making rules tell the model a skill started by its asks alone
+  may play a light show (`make_skill_local::SHOWS_RULES`): one
+  `[[do]]` step `show = "NAME"`, `light = true`, and one more fenced block
+  named ```` ```shows/NAME.toml ```` of 2 to 30 `[[light]]` frames (level
+  1 to 5, 2 s to 20 s each, a minute in all), colours in turn or repeated
+  written out frame by frame. A blink or a flash in such a skill is a show
+  of its colour alternating level 5 and level 1 at 2 s frames, the faster
+  flashing said as left out (`BLINK_SHOWS`); elsewhere, and with the
+  switch off, `BLINK` as before, byte for byte. The voice takes at most
+  `made_skill::MOST_SHOWS` (2) show blocks, each at most
+  `MOST_SHOW_BYTES` (4 KiB) of plain text named `shows/NAME.toml`, each
+  played by a step and each step's file written, at most 30 frames
+  (`shows_held`, refused for a repair with `SHOWS_NOT_HELD`); it writes
+  them into the skill's folder beside `skill.toml`, so `lamp-skills pack`
+  reads every frame with its own show check and the package's SHA-256
+  covers them, and the manage helper holds them again as it puts the
+  skill on (`put_on_scripts`). lamp-skills plays a show in a skill its
+  own words alone start (no trigger), as in one its tool starts. With the
+  switch off a `shows/` block is a file a made skill can't have, as
+  before. A gateway agent's make folder (OpenClaw, `put_for_gateway`) also
+  holds `format.md`, this build's whole `docs/skill-format.md`
+  (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, the lamp's whole Python
+  SDK reference (`skill_make::SDK`, `sdk/python/README.md`, so a skill's
+  code may use any of its calls), and `examples/`, seven complete skills
+  (`MAKE_EXAMPLES`, from `crates/tasks/src/make_examples/`: a light and a
+  say on its asks, a gesture and a say on a sitting, a coin flip in code,
+  a say again every 30 minutes while someone stays, a break timer set with
+  `remind`, a water reminder every 30 minutes with `remind every`, and a
+  breathing script that leads three breaths with the light and the voice),
+  each packed by the real `lamp-skills pack` in a test; its words
+  name both (`GATEWAY_CAN`, about 300 bytes, now only what to read and do) and that a show is a
+  ```` ```shows/NAME.toml ```` block of the answer, within Harness's
+  3,000-byte task bound (`MAX_PROMPT_BYTES`, 2,000 before #7245). Hermes's make folder and words are unchanged.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
   off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's
@@ -6402,13 +6473,15 @@ the same code for both writers.
   draft/NAME` (the same `pack` the voice keeps a made skill with; `/opt`
   is shown in the make's namespace, and the package goes to the run's own
   `/tmp`), fix it by the check's words at most twice, then write
-  `answer.md` as the rules say. Each answer is given 90 s
-  (`make_skill_agent::GUIDED_WRITE_WITHIN`), the same as without the guide
-  (`WRITE_WITHIN`), within the agent's 120 s. The voice still puts the answer through its whole check;
+  `answer.md` as the rules say. Each answer is given 10 minutes
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`, #7245, the first builder's call
+  on #6811; 90 s without the guide, `WRITE_WITHIN`), within the agent's
+  10 minutes 30 s (`MAKE_WITHIN`, 30 s over lamp-tasks', `TASKS_MARGIN`). The voice still puts the answer through its whole check;
   one it refuses goes back with the check's words (`REPAIR_MARK`) at most
   2 more times (`GUIDED_MOST_REPAIRS`), each begun only while one more
-  answer fits the 120 s, and one still refused is said as not made, as
-  today. Off, the line, the run's words and the make's folder are today's,
+  answer fits the agent's time (so with the guide, whose one run already
+  drafts, checks and fixes twice, the voice's own repair rarely begins),
+  and one still refused is said as not made, as today. Off, the line, the run's words and the make's folder are today's,
   byte for byte. Read by the second route's worker (passed by
   `process::second_route_worker_environment`), and for the app's MAKE IT
   by the coordinator (below).
@@ -6428,38 +6501,46 @@ the same code for both writers.
     as lamp-tasks says the first hand-over's run started (never after a
     cut turn, and dropped if it can't be said within 15 s), then nothing
     until the lamp says the skill back or that it couldn't make it. With
-    the guide one answer may take up to 90 s, plus up to 5 s of lamp-tasks'
-    grace, and the agent's part up to 120 s with a repair. A voice repair
-    begins only while one more 90 s answer still ends within the 120 s, so
-    only after an answer that came within 30 s: after an answer of 60 s or
-    more no voice repair fits and the voice's check of that answer stands,
-    and both repairs happen only when the first answer and the first
-    repair together took 30 s or less. The fixes that usually fit are the
-    guide's own, inside the run.
+    the guide one answer may take up to 10 minutes, plus up to 5 s of
+    lamp-tasks' grace, and the agent's part up to 10 minutes 30 s with a
+    repair. A voice repair begins only while one more 10-minute answer
+    still ends within the 10 minutes 30 s, so only after an answer that
+    came within 30 s: after an answer of more than 30 s no voice repair
+    fits and the voice's check of that answer stands, and both repairs
+    happen only when the first answer and the first repair together took
+    30 s or less. The fixes that usually fit are the guide's own, inside
+    the run.
 - **No make run, no hand-over.** When lamp-tasks can't give that run (an
   older build with no make socket, `LAMP_SKILL_TASKS` off, or held and a
   Hermes wrapper without the network lines), the make is not handed over
   (`NotWritten::NoMakeRun`). DeepSeek's one answer's failure stands and is
   said plainly. The journal says "can't be run in a skill run's namespace
   here".
-- **A silent agent.** lamp-tasks kills the run's whole process group at
-  its 90 s. The voice waits that long and a little more (at most 5 s), and
-  its failure stands.
-- **Bounds.** Each of the agent's answers within 90 s
-  (`make_skill_agent::WRITE_WITHIN`, within lamp-tasks' most of 120 s,
-  `lamp_tasks::skill_make::MOST_WITHIN`). It was 45 s: on lamp-9adf, 14 Nov
+- **A silent agent.** lamp-tasks ends the run at the line's `within_ms`:
+  10 minutes with the guide (on in the product), 90 s without; a Hermes
+  run's whole process group is killed. The voice waits that long and a
+  little more (at most 5 s; on the one run path, where lamp-tasks counts
+  from the hand-over, up to twice the run's time and that grace,
+  `Agent::read_within`), and its failure stands.
+- **Bounds.** Each of the agent's answers within 10 minutes with the
+  guide (`make_skill_agent::GUIDED_WRITE_WITHIN`) and 90 s without
+  (`make_skill_agent::WRITE_WITHIN`), within lamp-tasks' most of 10
+  minutes (`lamp_tasks::skill_make::MOST_WITHIN`, #7245; 120 s before).
+  The 90 s was 45 s: on lamp-9adf, 14 Nov
   (build 12958), a make with code ran out at 45 s 2 of 2, where `hermes
   chat -q "Say OK."` alone takes about 24.5 s on that Orange Pi, about 13 s
   of it before Hermes's own session starts, and a gmail make with no
   script took 30 s on another lamp; 90 s leaves about a minute for the
   work once Hermes is up. A repair is begun only while one more answer
-  fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`, unchanged), so
-  a repair is asked only after a first answer within 30 s.
-  No answer from it in 90 s, an error, or its first answer not given: the
+  fits the agent's 10 minutes 30 s (`make_skill_agent::MAKE_WITHIN`,
+  #7245; 120 s before), so without the guide repairs have room.
+  No answer from it in its time (10 minutes with the guide, 90 s
+  without), an error, or its first answer not given: the
   make is not made, and what is said is DeepSeek's one answer's failure,
   which had no repairs (with an agent on the lamp DeepSeek gets none), so
   this is not today's failure after 3 repairs. A make can go on up to
-  240 s, which the second route's wait for a make's line follows
+  12 minutes 30 s (DeepSeek's 120 s and the agent's 10 minutes 30 s),
+  which the second route's wait for a make's line follows
   (`make_skill_local::longest_make`).
 - **What is heard.** "I'll make it now" is said at once, unchanged. Once
   lamp-tasks says the agent's first make run starts (it says so as it
@@ -6489,9 +6570,10 @@ the same code for both writers.
   line is said". No line repeats. Through the say service (no voice turn
   waiting on the make) only the waiting line is said, never the long-wait
   line: with no turn there is no thinking look to hold. A make that runs
-  out its time (`make_skill_agent::MAKE_WITHIN`, 120 s) says the long-wait
-  line at about 90 s and its failure line at about 120 s: two lines about
-  30 s apart, as meant, not a fault. The lamp shows thinking between the
+  out its time (`make_skill_agent::MAKE_WITHIN`, 10 minutes 30 s since
+  #7245) says the long-wait line at about 90 s and its failure line at the
+  end; between them only the thinking look (releasing the turn after the
+  long-wait line is #7774's, one way, not added here). The lamp shows thinking between the
   waiting line and the result: once each waiting line's audio is sent its
   generation completes (`GenerationComplete`, then `MakeWaiting`), so its
   playback ends and ring and body show the thinking look
@@ -7336,7 +7418,7 @@ made skill is refused at install.
    no `[trigger]` and no `[ask]`. The model is told a skill can't yet hear
    what is said in the room, and the brief says "one [trigger] as listed or
    [said] as above" where it otherwise names the desk's presence (the
-   system prompt names it too), so the longest brief stays within 2,680
+   system prompt names it too), so the longest brief stays within 2,960
    bytes. Anything else beside `[said]` is refused with lines for a repair
    (`made_skill::said_asked`), and the person hears "I couldn't make that
    one." if the repairs are used up.
@@ -7484,7 +7566,7 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    request told to the lamp (a [said] start) or the words the person names
    to start it (asks), both below", and the brief "one [trigger] listed,
    [said]/asks as above", written short so the longest brief with every
-   switch on stays within 2,680 bytes.
+   switch on stays within 2,960 bytes.
 2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
@@ -7496,7 +7578,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    (`capped_added`) may give them only beside its tool, at most 8
    (`made_skill::MOST_ADDED_ASKS`, its trigger phrases, item 7), held to
    the same shape; without a tool, or with the switch off, they are
-   refused. The tidy keeps them.
+   refused. The tidy keeps them. The making model is shown the form
+   (`asks = ["apple file"]` as the file's first line, then `kind`,
+   `version`, then `[permissions]`). An `asks` it still writes under a
+   table (on lamp-c0a4, 18 Nov, OpenClaw wrote it after `[permissions]`
+   and `lamp-skills` refused the skill on "unknown field") is lifted to
+   the file's first line before the check (`made_skill::asks_lifted`, one
+   journal line), only when the top has none and the skill then reads the
+   same with its asks at the top; otherwise it is given back as it came.
 3. **Never another skill's** (`made_skill::asks_taken`, at the make, after
    its name is free): a phrase that is another skill's ask, or holds
    another skill's name or function, installed, pushed or in the tools

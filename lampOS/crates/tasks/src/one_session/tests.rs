@@ -284,8 +284,16 @@ impl PaneHarness for Fake {
             .unwrap_or_else(|| "idle".into());
         Ok((state != "none").then_some(state))
     }
-    fn close_kept(&self, name: &str, _: &Path) -> Result<(), String> {
-        self.call(format!("close-kept {name}"));
+    fn close_kept(&self, name: &str, _: &Path, now: bool) -> Result<(), String> {
+        self.call(format!(
+            "close-kept {name}{}",
+            if now { " --now" } else { "" }
+        ));
+        let mut failing = self.failing_closes.lock().unwrap();
+        if *failing > 0 {
+            *failing -= 1;
+            return Err("busy".into());
+        }
         *self.kept.lock().unwrap() = None;
         Ok(())
     }
@@ -1122,8 +1130,8 @@ impl PaneHarness for &Fake {
     ) -> Result<Option<String>, String> {
         (**self).wait_after(machine, agent, input, cancel)
     }
-    fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
-        (**self).close_kept(name, token)
+    fn close_kept(&self, name: &str, token: &Path, now: bool) -> Result<(), String> {
+        (**self).close_kept(name, token, now)
     }
 }
 
@@ -1978,6 +1986,77 @@ fn a_kept_session_whose_engine_died_after_a_start_is_resumed_not_removed() {
     again.open_if_due(&fake, &place());
     assert_eq!(again.agent(), Some(agent_of(1)), "the same session");
     assert_eq!(fake.count("ensure"), 3);
+}
+
+/// #7245, seen on a lamp: a make's turn cancelled (or at its deadline)
+/// while the kept session still works closes it `--now`, since Harness
+/// refuses a plain close of a working session; without it the session was
+/// resumed still working and every later make was told `NOT_IDLE`.
+#[test]
+fn a_cancelled_turn_closes_the_kept_session_now() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(|_| Ok(())));
+    one.open_if_due(&fake, &place());
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Make the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(true), &|| {});
+    drop(turn);
+    assert_eq!(ended, Ended::Cancelled);
+    let calls = fake.calls();
+    let closes: Vec<&String> = calls
+        .iter()
+        .filter(|call| call.starts_with("close-kept"))
+        .collect();
+    assert_eq!(
+        closes,
+        vec![&"close-kept lamp-one-openclaw --now".to_owned()],
+        "{calls:?}"
+    );
+}
+
+/// #7245 (First's and El's P2 on #7737): a cancelled turn's `--now` close
+/// that fails (Harness busy) keeps the kept record and its conversation,
+/// and the next look closes it `--now` again, never a plain close a
+/// working session refuses.
+#[test]
+fn a_failed_cancel_close_is_tried_again_now_with_its_record_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let deleted = Arc::new(Mutex::new(0));
+    let seen = deleted.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(move |_| {
+        *seen.lock().unwrap() += 1;
+        Ok(())
+    }));
+    one.open_if_due(&fake, &place());
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Make the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    *fake.failing_closes.lock().unwrap() = 1;
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(true), &|| {});
+    drop(turn);
+    assert_eq!(ended, Ended::Cancelled);
+    assert_eq!(*deleted.lock().unwrap(), 0, "its conversation kept");
+    assert!(one.drop_if_due(&fake));
+    let closes: Vec<String> = fake
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("close-kept"))
+        .collect();
+    assert_eq!(
+        closes,
+        [
+            "close-kept lamp-one-openclaw --now",
+            "close-kept lamp-one-openclaw --now"
+        ]
+    );
+    assert_eq!(*deleted.lock().unwrap(), 1, "deleted once closed");
 }
 
 /// OpenClaw's kept session is not rotated by count; a sign-out closes it,

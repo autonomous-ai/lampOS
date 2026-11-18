@@ -34,9 +34,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const MAX_PROMPT_BYTES: usize = 2000;
+/// A task's text, at most (`engine::MAX_PROMPT_BYTES`): #7245, 18 Nov:
+/// 3,000, the user's call, room for the make's reading list (2,000 before).
+pub const MAX_PROMPT_BYTES: usize = 3000;
 /// The most a task takes in a request line once JSON-escaped (P3 on #3239):
-/// a control character escapes to 6 bytes, so 2,000 of them would overflow
+/// a control character escapes to 6 bytes, so 3,000 of them would overflow
 /// the 8,192-byte line. Twice the raw bound, so that quotes, backslashes,
 /// newlines and tabs, at 2 bytes each, still fit.
 pub const MAX_ENCODED_PROMPT_BYTES: usize = 2 * MAX_PROMPT_BYTES;
@@ -2333,23 +2335,28 @@ impl Cli {
     /// (openharness#4393): the kept session closed. Its conversation stays
     /// in the engine's own store (`--forget` is not built yet), so the
     /// caller deletes it. One Harness no longer has (`UNKNOWN_HARNESS`,
-    /// `GONE`) is closed already.
-    pub fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
+    /// `GONE`) is closed already. `now` adds `--now`: Harness refuses a
+    /// plain close while the session is working, so a turn cancelled or at
+    /// its deadline closes it `--now` (#7245: seen on a lamp, a cancelled
+    /// make's close refused `working`, the same session resumed still
+    /// working and every later make told `NOT_IDLE`).
+    pub fn close_kept(&self, name: &str, token: &Path, now: bool) -> Result<(), String> {
         if !self::token(name, 64) {
             return Err("invalid_name".into());
         }
+        let mut args: Vec<OsString> = vec![
+            "close".into(),
+            name.into(),
+            "--program-token-file".into(),
+            token.into(),
+        ];
+        if now {
+            args.push("--now".into());
+        }
+        args.push("--json".into());
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
-            .run(
-                &[
-                    "close".into(),
-                    name.into(),
-                    "--program-token-file".into(),
-                    token.into(),
-                    "--json".into(),
-                ],
-                CLOSE_BUDGET,
-            )
+            .run(&args, CLOSE_BUDGET)
             .map_err(|error| format!("close_{}", error.code))?;
         if reply.success || gone(&reply.stdout) {
             return Ok(());
