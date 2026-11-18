@@ -6609,9 +6609,12 @@ made skill is refused at install.
    about 35 s after a said line, was let out only as the conversation
    going on and turned the busy light on. So, on the second route, a line
    let out only as the conversation going on (no name, no words calling
-   the lamp, no face turned to it, not said close to it, no answer to its
-   question; `Attention::played_only_as_going_on`) with no face seen
-   speaking it (`Heeding::going_on_unseen`) starts no said start unless a
+   the lamp, no face turned to it, not said close to it;
+   `Attention::played_only_as_going_on`), an answer to the lamp's question
+   among them (`Attention::played_as_going_on_to_its_question`; lamp-9adf,
+   18 Nov at 07:37, request 10: "Honestly, I'm so busy this week, it never
+   stops.", with nobody in view, after the lamp's question, turned the busy
+   light on), with no face seen speaking it (`Heeding::going_on_unseen`) starts no said start unless a
    face is in the eyes' newest look as the call comes
    (`Heeding::holds_said_start`, `bus_out::faces_in_view`; no eyes, or the
    camera closed, is no face). So too a line let out as a short word said
@@ -6625,12 +6628,13 @@ made skill is refused at install.
    question about a skill), is then held as a call the rule holds
    (`Engine::holding_said_starts`): not run, and the model is told it was
    not done (`policy_holds::HELD`); it may still answer in words. A line
-   let out for its own sign (its name, a face turned to the lamp, an
-   answer to the lamp's question or its news) is not held, so "Lamp,
+   let out for its own sign (its name, a face turned to the lamp, a reply
+   to its news) is not held, so "Lamp,
    I'm busy." from across the room still starts it. Structural only: no
    word of the line is matched. With the switch off nothing is installed
    and nothing changes. Tests:
    `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_said_start_is_held_on_an_answer_to_the_lamps_question_with_no_face`,
    `a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name`,
    `a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news`,
    `a_held_said_start_is_not_run_and_the_model_is_told_so`,
