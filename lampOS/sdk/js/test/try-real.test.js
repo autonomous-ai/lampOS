@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { Keyring, Lamp } from '../src/index.js';
 import { FakeLamp } from '../src/testing.js';
-import { credentials, parseReal } from '../examples/twin/real.js';
+import { credentials, parseReal, twinArguments } from '../examples/twin/real.js';
 import { run, raw, secretsOf } from './try-real-helper.js';
 
 const tryJs = new URL('../examples/twin/try.js', import.meta.url).pathname;
@@ -24,6 +24,20 @@ test('the code and the pin are refused on the command line, with the way to give
   assert.deepEqual([...parseReal(['--real', '--host', 'h', '--camera']).flags].sort(), ['camera', 'real']);
   assert.deepEqual([...parseReal(['--real', '--keyring', 'd', '--local']).flags].sort(), ['local', 'real']);
   assert.throws(() => parseReal(['--real', '--keyring', 'd', '--local', '--lan-address', '10.0.0.5']), /--local and --lan-address/);
+});
+
+test('a real run passes --reach-map and --reach-shrink on to the twin, and only when given', () => {
+  const given = parseReal(['--real', '--keyring', 'd', '--reach-map', 'a.json,b.json', '--reach-shrink', '48']);
+  assert.equal(given['reach-map'], 'a.json,b.json');
+  const args = twinArguments(given, '9999');
+  assert.deepEqual(args.slice(args.indexOf('--reach-map'), args.indexOf('--reach-map') + 2), ['--reach-map', 'a.json,b.json']);
+  assert.deepEqual(args.slice(args.indexOf('--reach-shrink'), args.indexOf('--reach-shrink') + 2), ['--reach-shrink', '48']);
+  const plain = twinArguments(parseReal(['--real', '--keyring', 'd']), '9999');
+  assert.ok(!plain.includes('--reach-map') && !plain.includes('--reach-shrink'));
+  assert.throws(() => parseReal(['--real', '--keyring', 'd', '--reach-map']), /unknown argument --reach-map/);
+  // With --local (127.0.0.1 only) the map still goes on, and the twin is not started with --lan.
+  const local = twinArguments(parseReal(['--real', '--keyring', 'd', '--local', '--reach-map', 'a.json']), '9999');
+  assert.ok(!local.includes('--lan') && local.includes('--reach-map'));
 });
 
 test('the code and pin come from the environment first, then a prompt that is asked in order', async () => {
@@ -77,6 +91,17 @@ test('a code run pairs as try-controller into a private folder, serves a real-la
   assert.match(real.out.text, /revoke it in the app, or on the lamp: lamp-control revoke c_0001/);
   assert.match(real.out.text, /client try-controller \(c_0001\)/);
   for (const secret of [...secretsOf(fake), join(home, folders[0]), folders[0]]) assert.equal(real.out.text.includes(secret), false, `printed: ${secret.slice(0, 6)}...`);
+});
+
+test('a real run given --reach-map hands it to the twin: the run starts with the map loaded and ends as usual', async (t) => {
+  const mapPath = new URL('../examples/twin/reach-map-4ace.json', import.meta.url).pathname;
+  const fake = await FakeLamp.start({ name: 'Desk lamp', grants: ['body'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const env = { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin };
+  const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port), '--reach-map', mapPath, '--reach-shrink', '48'], env, fake, home });
+  real.child.kill('SIGTERM');
+  assert.equal(await real.ended, 0);
 });
 
 test('SIGTERM ends a code run the same way, and a wrong code says the lamp\'s words and leaves no folder', async (t) => {
