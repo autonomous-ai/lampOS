@@ -28,13 +28,16 @@ use crate::rate::{Class, Rates};
 /// What the lamp's parts do for the door: each action, each piece of state,
 /// and a client's `stop`.
 /// A client's `say` lines ([`Parts::said`]): `asked`, those the voice took
-/// (began saying, or spoke whole; never one it refused or one stopped
-/// while queued); `spoken`, of those, spoken whole. Counts only, never
-/// words.
+/// (any it answered but refused: begun, spoken, or dropped, expired or let
+/// go before it began; never one it refused, one it was never reached
+/// for, or one stopped before it was sent); `spoken`, of those, spoken
+/// whole. A run's end adds `acts`, every act the lamp took for it
+/// ([`crate::runs::Run::acts`]). Counts only, never words.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Said {
     pub asked: u64,
     pub spoken: u64,
+    pub acts: u64,
 }
 
 pub trait Parts {
@@ -1143,6 +1146,9 @@ impl Door {
             if let Some((run, _)) = fixed_write {
                 line = crate::services::Services::fixed_write(&line, &run);
             }
+            if write {
+                self.runs.count_act(&client, now_us);
+            }
             return Outcome {
                 later: Some(Later {
                     re,
@@ -1468,6 +1474,9 @@ impl Door {
                 .as_mut()
                 .and_then(|quiet| quiet.refuses(&client, wall_s))
         {
+            // A run's say or sound the lamp kept quiet is still one it
+            // asked: no "nothing to say" after it (#6071).
+            self.runs.count_act(&client, now_us);
             return refuse(ErrorCode::QuietHours, why);
         }
         let class = Class::of(&op);
@@ -1505,6 +1514,9 @@ impl Door {
                 // Counted only once the part took it.
                 if let Some(class) = class {
                     self.rates.count(&client, class, now_us);
+                }
+                if op.is_act() {
+                    self.runs.count_act(&client, now_us);
                 }
                 match reply {
                     Reply::Now(with) => ok(re, with),
@@ -4203,6 +4215,39 @@ mod tests {
         json!({"id": 4, "op": "service.write", "service": service,
             "args": {"action": "send", "to": ["ann@example.com"], "text": "hi"}})
         .to_string()
+    }
+
+    /// #6071, Heron's P2 on #7841: a run's acts the lamp took are counted
+    /// for its end, so a sound-only or light-only run that answers a lone
+    /// dash is not told it had nothing to say: a sound, a light, a say the
+    /// quiet hours kept quiet. A read or a refusal is no act.
+    #[test]
+    fn a_runs_acts_the_lamp_took_are_counted_for_its_end() {
+        let acts_of = |frames: &[&str], quiet: bool| {
+            let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Light], None);
+            let mut door = if quiet {
+                door.with_quiet_hours(
+                    Quiet::new(None).with_window(Some(lamp_local_time::QuietWindow::DEFAULT)),
+                )
+            } else {
+                door
+            };
+            for frame in frames {
+                door.handle(&mut session, frame, &mut fake, S, 1);
+            }
+            door.end_run("r1", None).expect("its run").acts
+        };
+        let sound = r#"{"id":3,"op":"sound","name":"rain"}"#;
+        let light = r#"{"id":4,"op":"light","colour":"warm","level":2,"for_ms":1000}"#;
+        let say = r#"{"id":5,"op":"say","text":"Raining."}"#;
+        let get = r#"{"id":6,"op":"get","state":["light"]}"#;
+        let camera = r#"{"id":7,"op":"camera.snapshot"}"#;
+        assert_eq!(acts_of(&[sound], false), 1, "a sound-only run");
+        assert_eq!(acts_of(&[light], false), 1, "a light-only run");
+        assert_eq!(acts_of(&[sound, light, say], false), 3);
+        assert_eq!(acts_of(&[say], true), 1, "a say the quiet hours kept");
+        assert_eq!(acts_of(&[get, camera], false), 0, "no act at all");
+        assert_eq!(acts_of(&[], false), 0);
     }
 
     #[test]

@@ -2897,7 +2897,8 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
     let ended = admin(&lamp, json!({"end": {"run": "r2"}})).await;
     assert_eq!(ended["ended"], true, "{ended}");
-    // Its says taken and spoken whole (#6071): none here.
+    // Its acts, its says taken and spoken whole (#6071): none here.
+    assert_eq!(ended["acts"], 0, "{ended}");
     assert_eq!(ended["said"], 0, "{ended}");
     assert_eq!(ended["says"], 0, "{ended}");
     assert!(
@@ -2916,7 +2917,10 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     let minted = mint(&lamp, "booth", "r3").await;
     let token = minted["token"].as_str().unwrap().to_owned();
     let settled = admin(&lamp, json!({"end": {"run": "r3", "settle": true}})).await;
-    assert_eq!(settled, json!({"ended": true, "said": 0, "says": 0}));
+    assert_eq!(
+        settled,
+        json!({"ended": true, "acts": 0, "said": 0, "says": 0})
+    );
     let mut late = agent_connect(&path).await.unwrap();
     let hello = run_hello(&mut late, Some(&token)).await;
     assert_eq!(hello["error"]["code"], "no_grant", "{hello}");
@@ -3863,14 +3867,88 @@ async fn a_settled_end_lets_a_still_connected_runs_say_finish_and_counts_it() {
             .await
             .unwrap();
     };
-    let (settled, ()) = tokio::join!(
+    // A second settled end while the first waits is no end of a run
+    // going, and leaves the first's says to finish (Heron's P3 5 on #7841).
+    let again = async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        admin(&lamp, json!({"end": {"run": "r9", "settle": true}})).await
+    };
+    let (settled, again, ()) = tokio::join!(
         admin(&lamp, json!({"end": {"run": "r9", "settle": true}})),
+        again,
         speaks
     );
-    assert_eq!(settled, json!({"ended": true, "said": 1, "says": 1}));
+    assert_eq!(again, json!({"ended": false}));
+    assert_eq!(
+        settled,
+        json!({"ended": true, "acts": 1, "said": 1, "says": 1})
+    );
     assert!(
         agent_next(&mut socket).await.is_none(),
         "its connection closed"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #6071, Heron's P3 4 on #7841: a run's script that said a line and closed
+/// its last connection while its run goes on: the say the voice began is
+/// never cancelled, it is spoken whole, and the run's end counts it.
+#[tokio::test]
+async fn a_runs_say_outlives_its_scripts_last_connection_mid_run() {
+    let dir = std::env::temp_dir().join(format!(
+        "lamp-control-door-run-exit-voice-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let say = dir.join("say.sock");
+    let voice = tokio::net::UnixListener::bind(&say).unwrap();
+    let parts =
+        lamp_control::parts::Lamp::new(None, None, Some(say), "boot".into(), Arc::new(|_, _| {}));
+    let lamp = lamp_with("run-exit", Box::new(parts)).await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "talker", "r8").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "say", "text": "Heads."}).to_string(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(agent_next(&mut socket).await.unwrap()["ok"], true);
+    let (stream, _) = tokio::time::timeout(Duration::from_secs(5), voice.accept())
+        .await
+        .expect("the door asks the voice")
+        .unwrap();
+    let mut stream = tokio::io::BufReader::new(stream);
+    let mut line = String::new();
+    stream.read_line(&mut line).await.unwrap();
+    stream
+        .get_mut()
+        .write_all(b"{\"event\":\"begun\",\"at_us\":1}\n")
+        .await
+        .unwrap();
+    // The script exits: its only connection closes, its run still going.
+    drop(socket);
+    let mut next = String::new();
+    let cancel =
+        tokio::time::timeout(Duration::from_millis(500), stream.read_line(&mut next)).await;
+    assert!(
+        cancel.is_err() || next.is_empty(),
+        "the say was cut: {next}"
+    );
+    stream
+        .get_mut()
+        .write_all(b"{\"outcome\":\"spoken\"}\n")
+        .await
+        .unwrap();
+    // Its end lets what is left finish, so it reads the say once spoken.
+    let ended = admin(&lamp, json!({"end": {"run": "r8", "settle": true}})).await;
+    assert_eq!(
+        ended,
+        json!({"ended": true, "acts": 1, "said": 1, "says": 1})
     );
     let _ = std::fs::remove_dir_all(&dir);
 }

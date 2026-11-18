@@ -5799,12 +5799,16 @@ asked for a short spoken answer, one to three sentences, and to leave it
 empty (a lone dash, or an empty `answer.md`) when the skill already said
 it aloud, which says nothing (Heron's P3 on #7591). A lone dash (or an
 empty `answer.md`) is held to the run's says as lamp-tasks' answer counts
-them (lamp-control's `says`, those the voice took, began or spoke whole,
+them (lamp-control's `says`, those the voice took, any it answered but refused,
 and `said`, spoken whole; `task::told_of_run`, #6071; docs/tasks.md, "What its agent
 found"): after one spoken it says nothing (`skill:<name>: a dash after N
-says: nothing told`); after says taken but cut, nothing more (`a dash with
-a cut say`); with none taken, or none known, it tells "<Skill name> ran,
-but had nothing to say." (`a dash with no say: told a fallback`). A run
+says: nothing told`); after says taken but dropped before they began or cut,
+nothing more (`a dash with a cut say`); after no say but an act the lamp
+took (lamp-control's `acts`: a sound or clip, a light, a move, a say the
+quiet hours kept quiet), nothing either (`a dash after N acts: nothing
+told`; Heron's P2 on #7841: a rain-sounds skill is never followed by an
+apology); with no act and no say, or none known, it tells "<Skill name>
+ran, but had nothing to say." (`a dash with no say: told a fallback`). A run
 whose end tells nothing and said no refusal leaves `do.task: nothing
 told`. The skill needs no
 `speak`: the owner's yes to its read grant covers it. The journal says

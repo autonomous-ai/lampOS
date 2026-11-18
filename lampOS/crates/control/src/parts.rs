@@ -103,11 +103,13 @@ const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
 type Says = Arc<std::sync::Mutex<HashMap<String, HashMap<u64, Option<UnixStream>>>>>;
 
 /// Each client's `say` lines the voice took (it began saying it, its
-/// `begun`, or spoke it whole), and how many of them it spoke whole (its
+/// `begun`, or gave any outcome but `refused`: spoken, or dropped, expired
+/// or let go, a cut included), and how many of them it spoke whole (its
 /// outcome `spoken`, a `done` `finished`), read once and let go when a
-/// skill run ends ([`Parts::said`]): a run's dash-only answer is trusted
-/// only when its run said something (#6071). A say the voice refused or
-/// never began, or one stopped while queued, is never taken. A client's
+/// skill run ends ([`Parts::said`]): a run's dash-only answer after a say
+/// taken is a cut say, never "nothing to say" (#6071). A say the voice
+/// refused, one it was never reached for, or one stopped before it was
+/// sent, is never taken. A client's
 /// entry is made as it asks a say, and a count comes only into an entry
 /// still there: a say whose run's end already read it counts nowhere.
 /// Counts only, never words.
@@ -1172,7 +1174,8 @@ impl Lamp {
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
-            // Taken once: when the voice began it, or spoke it whole.
+            // Taken once: when the voice began it, or answered it any way
+            // but a refusal.
             let taken = std::sync::atomic::AtomicBool::new(false);
             let take = || {
                 if let Some(said) = &said
@@ -1185,11 +1188,15 @@ impl Lamp {
                 |line: &Value| match ask_voice_for_say(&path, line, &says, &client, number) {
                     Ok(Some(stream)) => {
                         let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
-                        outcome_with(BufReader::new(stream), |event| {
+                        let answered = outcome_with(BufReader::new(stream), |event| {
                             if event["event"] == "begun" {
                                 take();
                             }
-                        })
+                        });
+                        if was_taken(answered.1.as_deref()) {
+                            take();
+                        }
+                        answered
                     }
                     Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
                     Err(error) => (
@@ -1247,6 +1254,13 @@ fn end_say(
         }
     }
     forget_say(says, client, number);
+}
+
+/// Whether the voice took a say it answered with `why` ([`outcome_with`]):
+/// spoken (no why), or dropped, expired, let go or cut, yes; refused, or
+/// no outcome at all, no.
+fn was_taken(why: Option<&str>) -> bool {
+    why.is_none_or(|why| !why.starts_with("refused") && why != NO_OUTCOME)
 }
 
 /// Counts a say of `client` into its entry, only while it is there
@@ -1359,8 +1373,11 @@ fn outcome_with(
         };
         return ("dropped", Some(why));
     }
-    ("dropped", Some("the voice gave no outcome".to_owned()))
+    ("dropped", Some(NO_OUTCOME.to_owned()))
 }
+
+/// The why of a say the voice gave no outcome for ([`outcome_with`]).
+const NO_OUTCOME: &str = "the voice gave no outcome";
 
 /// `line` on a new say socket connection, and the voice's first outcome on
 /// it (past any event): the connection kept, to read on or hold.
@@ -2524,7 +2541,7 @@ mod tests {
             for answer in [
                 "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"spoken\"}",
                 r#"{"outcome":"refused","why":"quiet hours"}"#,
-                r#"{"outcome":"dropped","why":"expired"}"#,
+                r#"{"outcome":"expired"}"#,
                 "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"dropped\",\"why\":\"stopped by its asker\"}",
                 r#"{"outcome":"spoken"}"#,
                 r#"{"outcome":"spoken"}"#,
@@ -2562,8 +2579,14 @@ mod tests {
             wait_for(n + 1);
         }
         voice.join().unwrap();
-        let said = |asked, spoken| crate::session::Said { asked, spoken };
-        assert_eq!(lamp.said("c_run"), said(2, 1));
+        let said = |asked, spoken| crate::session::Said {
+            asked,
+            spoken,
+            acts: 0,
+        };
+        // Taken: spoken, expired before it began, begun and cut; the one
+        // refused, never; the sound is no say.
+        assert_eq!(lamp.said("c_run"), said(3, 1));
         assert_eq!(lamp.said("c_run"), said(0, 0), "read once");
         assert_eq!(lamp.said("c_other"), said(1, 1));
         assert_eq!(lamp.said("c_nobody"), said(0, 0));
@@ -2606,7 +2629,8 @@ mod tests {
             said.lock().unwrap()["c_run"],
             crate::session::Said {
                 asked: 1,
-                spoken: 1
+                spoken: 1,
+                acts: 0
             }
         );
     }
@@ -2712,10 +2736,14 @@ mod tests {
         wait_for(2);
         assert_eq!(told.lock().unwrap()[1].1["how"], "dropped");
         assert_eq!(voice.join().unwrap(), [false, true]);
-        let said = |asked, spoken| crate::session::Said { asked, spoken };
+        let said = |asked, spoken| crate::session::Said {
+            asked,
+            spoken,
+            acts: 0,
+        };
         assert_eq!(lamp.said("c_run"), said(1, 1));
-        // Stopped while queued, before the voice began it: never taken.
-        assert_eq!(lamp.said("c_app"), said(0, 0));
+        // Cut once the voice had it: taken, never spoken.
+        assert_eq!(lamp.said("c_app"), said(1, 0));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

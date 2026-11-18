@@ -620,12 +620,15 @@ pub struct Minted {
 }
 
 /// A run's `say` lines as lamp-control counted them at its end
-/// ([`Tokens::end_said`], #6071): `asked`, taken for the voice; `spoken`,
-/// of those, spoken whole. Counts only, never words.
+/// ([`Tokens::end_said`], #6071): `asked`, taken by the voice; `spoken`,
+/// of those, spoken whole; `acts`, every act the lamp took for the run (a
+/// say, a sound, a light, a move, ...), none when lamp-control is from
+/// before it counted them. Counts only, never words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RunSays {
     pub asked: u64,
     pub spoken: u64,
+    pub acts: Option<u64>,
 }
 
 /// The longest lamp-tasks waits for an end that lets the run's says finish
@@ -640,7 +643,7 @@ pub trait Tokens {
     /// The run ended: its token is refused from now on.
     fn end(&self, run: &str);
     /// [`Self::end`], and the run's `say` lines as lamp-control counted
-    /// them (its admin `end`'s `says` and `said`, #6071): what a run's
+    /// them (its admin `end`'s `says`, `said` and `acts`, #6071): what a run's
     /// dash-only answer is held to in lamp-skills. `settle`: a run that
     /// ended well, whose says already asked are let finish first, a
     /// bounded wait (lamp-control's `SETTLE_SAYS`); never at its deadline
@@ -810,7 +813,7 @@ impl ControlTokens {
     }
 
     /// `{"end": {"run", "settle"?}}`: the run's says (`says` taken,
-    /// `said` spoken whole), when lamp-control answered it for a run
+    /// `said` spoken whole) and `acts`, when lamp-control answered it for a run
     /// going. With `settle`, lamp-control first lets the says already
     /// asked finish, so its answer is waited for up to [`SETTLE_WAIT`].
     fn end_asked(&self, run: &str, settle: bool) -> Option<RunSays> {
@@ -823,6 +826,7 @@ impl ControlTokens {
             Ok(answer) => Some(RunSays {
                 asked: answer["says"].as_u64()?,
                 spoken: answer["said"].as_u64()?,
+                acts: answer["acts"].as_u64(),
             }),
             Err(why) => {
                 // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
@@ -1635,13 +1639,19 @@ fn run_on_token(
     let said = ending.said.get();
     drop(ending);
     match ran {
-        // With the run's says, when known: a dash-only (or empty) answer
-        // is trusted only after one spoken (#6071).
+        // With the run's acts and says, when known: a dash-only (or empty)
+        // answer is told a fallback only after none (#6071).
         Ok(id) => match (kept, said) {
-            (Some(answer), Some(said)) => json!({
-                "ok": true, "id": id, "answer": answer,
-                "says": said.asked, "said": said.spoken,
-            }),
+            (Some(answer), Some(said)) => {
+                let mut told = json!({
+                    "ok": true, "id": id, "answer": answer,
+                    "says": said.asked, "said": said.spoken,
+                });
+                if let Some(acts) = said.acts {
+                    told["acts"] = json!(acts);
+                }
+                told
+            }
             (Some(answer), None) => json!({"ok": true, "id": id, "answer": answer}),
             (None, _) => json!({"ok": true, "id": id}),
         },
@@ -4914,7 +4924,7 @@ mod tests {
 
     /// #6071: an ended run's answer that carries its agent's answer
     /// carries, beside it, the run's says as the token's end counted them
-    /// (`says` taken, `said` spoken whole); once each run, its end asking
+    /// (`says` taken, `said` spoken whole, and `acts` when counted); once each run, its end asking
     /// the says let finish for a run that ended well, and nothing when
     /// the end doesn't know.
     #[test]
@@ -4936,10 +4946,26 @@ mod tests {
             assert_eq!(*tokens.settled.borrow(), [true], "ended once, settled");
             told
         };
-        let says = |asked, spoken| Some(RunSays { asked, spoken });
+        let says = |asked, spoken| {
+            Some(RunSays {
+                asked,
+                spoken,
+                acts: None,
+            })
+        };
         assert_eq!(
             told(says(1, 1)),
             json!({"ok": true, "id": 0, "answer": "-", "says": 1, "said": 1})
+        );
+        // Its acts too, when lamp-control counted them: a sound-only run
+        // (Heron's P2 on #7841).
+        assert_eq!(
+            told(Some(RunSays {
+                asked: 0,
+                spoken: 0,
+                acts: Some(1),
+            })),
+            json!({"ok": true, "id": 0, "answer": "-", "says": 0, "said": 0, "acts": 1})
         );
         assert_eq!(
             told(says(1, 0)),
@@ -4993,6 +5019,7 @@ mod tests {
             said: Some(RunSays {
                 asked: 0,
                 spoken: 0,
+                acts: Some(0),
             }),
             ..Default::default()
         };
@@ -5006,7 +5033,7 @@ mod tests {
         let told = answer_agent(&skill_md, true, skills(), &tokens, &plain, &agent);
         assert_eq!(
             told,
-            json!({"ok": true, "id": 0, "answer": "", "says": 0, "said": 0})
+            json!({"ok": true, "id": 0, "answer": "", "says": 0, "said": 0, "acts": 0})
         );
     }
 

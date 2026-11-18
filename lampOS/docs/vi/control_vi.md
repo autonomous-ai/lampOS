@@ -79,21 +79,30 @@ chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `n
 
 Token kết thúc cùng lần chạy: `{"end": {"run": RUN_ID}}` (lamp-tasks, khi lần
 chạy kết thúc) đóng các kết nối của nó, dừng những gì nó còn đang yêu cầu và
-chấm dứt token, trả lời `{"ended": true, "said": N, "says": M}` cho một lần
-chạy đang chạy (`{"ended": false}` nếu không có): `says` là số dòng `say` của
-lần chạy mà giọng nói đã nhận (đã bắt đầu nói, `begun`, hoặc nói trọn; không
-bao giờ là câu bị từ chối, không tới được, hay bị dừng khi còn chờ), `said`
+chấm dứt token, trả lời `{"ended": true, "acts": A, "said": N, "says": M}` cho một lần
+chạy đang chạy (`{"ended": false}` nếu không có): `acts` là số hành động đèn
+đã nhận cho token của lần chạy (`Op::is_act`: một câu nói, âm thanh hay clip,
+một lượt, đèn, một cảm xúc, một cử chỉ, một cái nhìn, một chuyển động hay
+chuyển động đã ghi, các khớp, âm lượng, luồng loa bật, một lần ghi dịch vụ,
+và một câu nói, âm thanh hay lượt bị giờ yên lặng từ chối ở cửa; không bao giờ
+là một lần đọc hay lời từ chối khác; `Runs::count_act`, giữ qua lần cấp lại
+token), `says` là số dòng `say` của lần chạy mà giọng nói đã nhận (đã bắt đầu
+nói, `begun`, hoặc trả lời bất kỳ cách nào trừ từ chối: đã nói, hoặc bị bỏ,
+hết hạn hay buông trước khi bắt đầu, hoặc bị cắt; không bao giờ là câu bị từ
+chối, không tới được hay không có kết quả, hoặc bị dừng trước khi gửi), `said`
 là số đã nói trọn (kết quả `spoken`; tiếng hum hay clip không tính; kết quả
 đến sau khi số đếm đã được đọc thì không tính), đếm theo client trong bộ nhớ và đọc một lần lúc kết
 thúc (`Parts::said`, #6071). Với `"settle": true` (lamp-tasks, cho lần chạy
 kết thúc tốt trước hạn chót), token chấm dứt ngay nhưng các câu nói đã yêu cầu
 được nói hết, kể cả của kết nối mà chính lần kết thúc đó đóng (client của lần
-chạy được đánh dấu là đang chờ trước, nên việc đóng đi theo đường run-gone), tối đa 15 giây (`SETTLE_SAYS`), rồi mới đếm và hủy phần còn lại;
+chạy được đánh dấu là đang chờ trước, nên việc đóng đi theo đường run-gone), tối đa 15 giây (`SETTLE_SAYS`; một lần kết thúc chờ thứ hai cho cùng lần chạy
+trong lúc lần đầu đang chờ trả lời `{"ended": false}` và giữ nguyên đánh dấu
+của lần đầu, được đếm theo từng lần kết thúc), rồi mới đếm và hủy phần còn lại;
 việc chờ chỉ thuộc câu trả lời đó, không bao giờ chặn giọng nói. Kết nối cuối
 của một lần chạy đóng khi lần chạy còn đang chạy thì các câu nói của nó không bị
 hủy (`Parts::run_gone`), để script nói rồi thoát vẫn được nghe; của một máy tính
-thì vẫn bị dừng như trước. Dòng nhật ký kết thúc thêm `its says: N taken, M
-spoken whole`, chỉ là số đếm.
+thì vẫn bị dừng như trước. Dòng nhật ký kết thúc thêm `its acts: A, its says: N
+taken, M spoken whole`, chỉ là số đếm.
 
 **Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
 lamp-control, đúng `on`, bật trong các unit lamp-control, lamp-skills, lamp-tasks và lamp-services của sản phẩm; quyết định của

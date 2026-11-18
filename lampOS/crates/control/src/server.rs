@@ -228,9 +228,11 @@ pub struct Shared {
     /// said in the close frame, so the computer's SDK can log why it was cut off.
     close_reasons: Mutex<HashMap<u64, &'static str>>,
     /// The clients of runs ended with their says let finish
-    /// ([`Shared::end_run_settled`]), until counted: a connection of theirs
-    /// the end closes leaves its says to finish too (#6071).
-    settling: Mutex<std::collections::HashSet<String>>,
+    /// ([`Shared::end_run_settled`]), until counted, with how many such
+    /// ends wait for each: a connection of theirs the end closes leaves its
+    /// says to finish too (#6071), and a second end for the same run never
+    /// lets go of the first's mark.
+    settling: Mutex<HashMap<String, usize>>,
     /// Whether the camera's, the microphone's and the speaker's streams are usable on
     /// this lamp now (wired, and the owner's switch on): what `{"features": true}` says.
     features: Mutex<Features>,
@@ -371,11 +373,14 @@ impl Shared {
             let mut parts = self.parts.lock().expect("parts");
             let said = parts.said(&ended.client);
             parts.gone(&ended.client, now);
-            said
+            crate::session::Said {
+                acts: ended.acts,
+                ..said
+            }
         };
         eprintln!(
-            "lamp-control: run {} of skill {}: {why}, its says: {} taken, {} spoken whole",
-            ended.run, ended.skill, said.asked, said.spoken
+            "lamp-control: run {} of skill {}: {why}, its acts: {}, its says: {} taken, {} spoken whole",
+            ended.run, ended.skill, said.acts, said.asked, said.spoken
         );
         said
     }
@@ -390,13 +395,15 @@ impl Shared {
         // Marked before its connections close, so their close leaves its
         // says to finish (`Parts::run_gone`), never cancels them.
         let client = crate::runs::run_client(run);
-        self.settling
+        *self
+            .settling
             .lock()
             .expect("settling")
-            .insert(client.clone());
+            .entry(client.clone())
+            .or_default() += 1;
         let ended = self.door.lock().expect("door").end_run(run, None);
         let Some(ended) = ended else {
-            self.settling.lock().expect("settling").remove(&client);
+            self.settled(&client);
             return json!({"ended": false});
         };
         self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
@@ -417,8 +424,20 @@ impl Shared {
             tokio::time::sleep(SETTLE_TICK).await;
         }
         let said = self.finish_run(&ended, self.now_us(), "ended, its says let finish");
-        self.settling.lock().expect("settling").remove(&client);
-        json!({"ended": true, "said": said.spoken, "says": said.asked})
+        self.settled(&client);
+        ended_with(said)
+    }
+
+    /// One settled end of `client`'s run done ([`Self::settling`]): its
+    /// mark goes with the last.
+    fn settled(&self, client: &str) {
+        let mut settling = self.settling.lock().expect("settling");
+        if let Some(waiting) = settling.get_mut(client) {
+            *waiting -= 1;
+            if *waiting == 0 {
+                settling.remove(client);
+            }
+        }
     }
 
     /// Ends every run whose time has come.
@@ -1929,7 +1948,11 @@ async fn connection<S>(
         // A skill run's, while its run goes on: its says are let finish
         // (#6071), so a script that said a line and exited is heard.
         if !still_open {
-            let run = shared.settling.lock().expect("settling").contains(client)
+            let run = shared
+                .settling
+                .lock()
+                .expect("settling")
+                .contains_key(client)
                 || shared.door.lock().expect("door").is_run_client(client, now);
             let mut parts = shared.parts.lock().expect("parts");
             if run {
@@ -1984,6 +2007,13 @@ async fn connection<S>(
 pub const SETTLE_SAYS: Duration = Duration::from_secs(15);
 /// How often that wait looks at the run's says.
 const SETTLE_TICK: Duration = Duration::from_millis(50);
+
+/// An ended run's answer to the owner's side (#6071): `acts`, the acts the
+/// lamp took for it; `says`, its says the voice took; `said`, of those,
+/// spoken whole.
+fn ended_with(said: crate::session::Said) -> Value {
+    json!({"ended": true, "acts": said.acts, "said": said.spoken, "says": said.asked})
+}
 
 /// The run of an admin `{"end": {"run", "settle": true}}`, a run's end
 /// that lets its says finish; none for any other line.
@@ -2242,10 +2272,10 @@ fn admin_answer(
     }
     if let Some(end) = asked.get("end") {
         return match end["run"].as_str() {
-            // Its says (#6071), for a run that was going: `says` taken for
-            // the voice, `said` spoken whole.
+            // Its acts and says (#6071), for a run that was going
+            // ([`ended_with`]).
             Some(run) => match shared.end_run(run, None, now, "ended") {
-                Some(said) => json!({"ended": true, "said": said.spoken, "says": said.asked}),
+                Some(said) => ended_with(said),
                 None => json!({"ended": false}),
             },
             None => json!({"error": "end: a run, as text"}),
