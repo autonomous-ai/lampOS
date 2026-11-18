@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-18 09:11 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
+Written by the first builder from the team's review page at 2026-11-18 09:20 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
 
 **Build 91.7% over 76 rows. Quality 70.3% over 17 rows.** For later (mood, and texting from the app): 48.0% over 4 rows, not in the build figure.
 
@@ -16,7 +16,7 @@ Written by the first builder from the team's review page at 2026-11-18 09:11 (+0
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 0.90 | #753 #792 #800 #7297 | fourth, second, sixth | 17 Nov 14:1x, back up from 0.85: the owner’s case is fixed for customers in stable 13753 (#7297 closed, LAMP_TURNED_FACE_SPEAKS): two people talking to each other while the one facing the lamp listens are not answered (r… |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
-| Faces: remember, hello by name | 0.94 | #759 #775 #7331 | first, sixth | 17 Nov 13:1x, up from 0.9: the fix for the name the owner’s lamp could not learn is on for customers in stable 13706 (#7397, LAMP_NAME_LEARN_FIX: its row on lamp-52e6 passed, and Fifth’s fresh-lamp walk on 13706 learned … |
+| Faces: remember, hello by name | 0.94 | #759 #775 #7331 | first, sixth | 17 Nov 13:1x, up from 0.9: the fix for the name the owner’s lamp could not learn is on for customers in stable 13706 (#7397, LAMP_NAME_LEARN_FIX: its row on lamp-52e6 passed, and a fresh-lamp walk on 13706 learned the na… |
 | Hand work to Claude Code or Codex, and its news | 1.00 | #751 #765 #798 #733 | seventh |  |
 | Backup voice when Gemini is down | 0.50 | #778 #754 | sixth | 16 Nov 13:0x, down from 1.0: the product runs one voice route, and when that route is down the lamp says so and no second voice takes over. |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
@@ -38,7 +38,7 @@ Written by the first builder from the team's review page at 2026-11-18 09:11 (+0
 | One install for a new lamp | 1.00 | #811 | nine | Shown 19 Oct 15:1x on a second lamp, lamp-c0a4: build 3162 installed over V1 from a test-signed local channel, all 45 files equal to the build’s checksums, V1 stopped and kept, no reboot; |
 | No internet at home | 0.90 | #830 #1242 #1256 #1247 | nine | 16 Nov 01:0x, down from 1.0: an outage of the internet is found and said, but the lamp can’t tell it from an outage of the company’s service, since lamp-health runs without its reach probe and LAMP_SERVICE_DOWN_LINE is o… |
 | Everything is a skill, core and installable, no one-off code | 0.85 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh, fifth, thirteen, fourth, fourteen | 24 Oct 08:4x, up from 0.72: this row’s note was stale. |
-| An owner makes their own skill | 0.95 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten, subdarren, blue, fourteen, seventh | 18 Nov 05:1x, down from 0.98: on stable 13894 a thinly heard make ask can come out as an unrelated skill that goes on with no yes (#7621, P1, Thirteen). |
+| An owner makes their own skill | 0.95 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten, subdarren, blue, fourteen, seventh | 18 Nov 05:1x, down from 0.98: on stable 13894 a thinly heard make ask can come out as an unrelated skill that goes on with no yes (#7621, P1). |
 | A Skills Store to publish skills | 1.00 | #1698 #2801 #2802 | fourteen, mobile, backend3 | 31 Oct 11:1x, built: Take back ran too (Fourteen, 10:29, lamp-9adf on 9063): a made skill shared, approved, taken back by its owner and gone from the Store’s queue and downloads (Backend3). |
 | Updates over the internet, by themselves | 0.93 | #737 #1812 | migrate, second | 16 Nov 09:1x, up from 0.9: the put-back on a refused body restart is fixed on stable since 13243 (#7073, #7067 closed), and the two rounds on lamp-52e6 since were clean. |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, fourth, first, backend, third | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
@@ -97,7 +97,7 @@ Written by the first builder from the team's review page at 2026-11-18 09:11 (+0
 
 | Row | Now | Target | Where it is |
 |---|---|---|---|
-| Fast answers | 0.80 | 0.85 | 17 Nov 18:5x, up from 0.75: the owner’s evening on stable felt very very smooth to them (V2, #1711, 18:52), a long real conversation with no complaint of waiting. |
+| Fast answers | 0.80 | 0.85 | 17 Nov 18:5x, up from 0.75: the owner’s evening on stable felt very very smooth to them (the lead, #1711, 18:52), a long real conversation with no complaint of waiting. |
 | Knows when you have finished | 0.65 | 0.85 | 15 Nov 21:1x, down from 0.7: the word right after the name is lost. |
 | Cutting in | 0.60 | 0.75 | 17 Nov 09:0x, up from 0.55: on lamp-52e6, build 13601, now in stable 13681, a story was cut and listened to 22 times in 28 (Fifth’s q-cutin, 17 of 20 and then 5 of 8), against 4 of 6 on 31 Oct. |
 | Stop words | 0.70 | 0.75 | 9 Nov 10:2x, up from 0.6: stable 10824 (promoted 9 Nov 08:41) has the stop words heard over the lamp’s own voice (LAMP_STOP_WORDS_KEYTERM on, #5111 closed). |
@@ -107,7 +107,7 @@ Written by the first builder from the team's review page at 2026-11-18 09:11 (+0
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.85 | 0.85 | 9 Nov 10:2x, back up from 0.8: #5498’s fix (a stale oldest reminder no longer silences every later one, ec2be29dbc) is on stable since 10686, and on 10824 a one-minute timer rang and was said on lamp-52e6 (Fifth, 07:20) … |
 | Onboarding, as a first-time person meets it | 0.80 | 0.90 | 17 Nov 14:1x, up from 0.75: a fresh-lamp walk on stable 13753 with 21 more switches on (walk3e on lamp-52e6, 14:03–14:09) did where_you_sit, who_you_are, touch and how_you_sound, with the body’s energy level on; |
-| Remembers you: your name and what you told it | 0.70 | 0.90 | 17 Nov 13:1x, up from 0.65: the fix for the name the owner’s lamp could not learn is on stable 13706 (#7397, LAMP_NAME_LEARN_FIX), and a fresh-lamp walk on 13706 learned the name with a yes (Fifth, 12:13). |
+| Remembers you: your name and what you told it | 0.70 | 0.90 | 17 Nov 13:1x, up from 0.65: the fix for the name the owner’s lamp could not learn is on stable 13706 (#7397, LAMP_NAME_LEARN_FIX), and a fresh-lamp walk on 13706 learned the name with a yes (12:13). |
 | A good companion | 0.75 | 0.90 | 17 Nov 18:5x, up from 0.65: the owner spent this evening talking with their own lamp on stable, confiding in it and bouncing ideas off it while working alone, and called it amazing, very smooth and crazy good (relayed by… |
 | Both microphones | 0.70 | 0.80 | 17 Nov 09:0x, up from 0.6: on lamp-52e6, build 13601, whose code is in stable 13681, no request with words of 70 came back with none heard (Fifth’s q-mics 53bf20296506, per-run counts saved). |
 | Body | 0.65 | 0.80 | 18 Nov 09:1x, up from 0.6: a lamp folded for strain no longer stands back up on an old talk window, for customers on stable 14008 (#7430, its row on lamp-52e6 PASS; |
