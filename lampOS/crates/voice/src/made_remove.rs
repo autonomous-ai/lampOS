@@ -538,7 +538,9 @@ pub fn asked(
             )
         }),
         _ if owner() => {
-            let theirs: Vec<String> = made(keeping).into_iter().map(|(name, _)| name).collect();
+            // Counted as the list counts them (`made_list::made_on`), so
+            // two answers never disagree.
+            let theirs = crate::made_list::made_on(keeping);
             let named = match theirs.len() {
                 0 => "and that they haven't made any yet".to_owned(),
                 count if count <= NAMED_MOST => format!(
@@ -1091,6 +1093,32 @@ pub(crate) mod tests {
         line_heard(1, "remove the moon fact skill");
         let told = asked(ask("moon fact", 1), &keeping, || panic!("asked whose"), now);
         assert_eq!(told["remove"], "moon-fact", "{told}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 17 Nov: "which skills did you make" said eighteen, and a
+    /// remove that found none, after a removal, said nineteen. The remove
+    /// counts them as the list does: those on, made here.
+    #[test]
+    fn a_remove_finding_none_counts_as_the_list_does() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("remove-count");
+        made_here(
+            &keeping,
+            &[
+                ("moon-fact", true),
+                ("evening-dim", true),
+                ("joke-time", false),
+                ("desk-check", true),
+                ("plant-water", true),
+            ],
+        );
+        let listed = crate::made_list::listed(&keeping, 1, true, owner);
+        assert_eq!(listed["made_count"], 4, "{listed}");
+        let told = asked(ask("weather report", 2), &keeping, owner, Instant::now());
+        assert_eq!(told["error"], NO_MADE, "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("they have made 4"), "{next}");
         let _ = std::fs::remove_dir_all(&root);
     }
 

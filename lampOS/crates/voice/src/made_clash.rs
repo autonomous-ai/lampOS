@@ -325,6 +325,12 @@ mod kept {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
+    static ENDED: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+    pub fn ended<R>(f: impl FnOnce(&mut Option<std::time::Instant>) -> R) -> R {
+        f(&mut ENDED
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
 }
 
 /// Tests: each test thread has its own.
@@ -334,10 +340,54 @@ mod kept {
     use std::cell::RefCell;
     thread_local! {
         static WAITING: RefCell<Option<Waiting>> = const { RefCell::new(None) };
+        static ENDED: RefCell<Option<std::time::Instant>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         WAITING.with(|cell| f(&mut cell.borrow_mut()))
     }
+    pub fn ended<R>(f: impl FnOnce(&mut Option<std::time::Instant>) -> R) -> R {
+        ENDED.with(|cell| f(&mut cell.borrow_mut()))
+    }
+}
+
+/// How long after a clash ended (chosen, cancelled, let go) a reply that
+/// asks a clash's choice with no `make_skill` call is held and judged
+/// ([`lately_ended`]): the history still carries its question then, and
+/// the model may copy it (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0:
+/// request 94, 56 s after a cancel, asked one for a skill never made).
+/// Past it, no reply waits for it (App Only's P2 on #7554: held on every
+/// later turn, each reply's first audio waited two sentences).
+pub const COPIED_WITHIN: Duration = Duration::from_secs(120);
+
+/// A clash ended at `now`: chosen, cancelled or let go.
+fn ended_at(now: Instant) {
+    kept::ended(|ended| *ended = Some(now));
+}
+
+/// Whether a clash waits for the person's choice at `now`, read only: one
+/// past [`CLASH_WITHIN`] does not ([`awaited`] lets it go).
+pub fn waits(now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| now.saturating_duration_since(waiting.at) <= CLASH_WITHIN)
+    })
+}
+
+/// Whether no clash waits at `now` and one ended within [`COPIED_WITHIN`]
+/// before it: a reply asking a clash's choice then, with no `make_skill`
+/// call, copied it (`make_skill_agent::clash_claimed`).
+pub fn lately_ended(now: Instant) -> bool {
+    !waits(now)
+        && kept::ended(|ended| {
+            ended.is_some_and(|at| now.saturating_duration_since(at) <= COPIED_WITHIN)
+        })
+}
+
+/// Tests: a clash ended at `at`, or none.
+#[cfg(test)]
+pub fn set_ended(at: Option<Instant>) {
+    kept::ended(|ended| *ended = at);
 }
 
 static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -435,23 +485,59 @@ pub fn asked(
             other_calls: Vec::new(),
         })
     });
-    if let Some(before) = before.filter(|before| before.sha256 != made.sha256) {
-        let_go(&before, "a newer clash was asked");
-    }
+    // One clash waits at a time: an older one let go is told, never dropped
+    // silently (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0: 12 s after
+    // `dim-light-at-night`'s clash was asked, a newer clash dropped it and
+    // nothing was said).
+    let dropped = before
+        .filter(|before| before.sha256 != made.sha256)
+        .map(|before| {
+            let_go(&before, "a newer clash was asked");
+            made_skill::spoken_name(&before.name)
+        });
     eprintln!(
         "lamp-voice: request {request}: a made skill {} clashes with {} ({}): not put on, the person is asked",
         made.name,
         others.join(", "),
         shares
     );
-    json!({
+    let mut told = json!({
         "made": made.name,
         "on": false,
         "clashes_with": spoken,
         "shares": shares,
         CLASH_ID: id,
         "next": format!("{} {}", say_whole(&question), then_choose(&id)),
-    })
+    });
+    if let Some(dropped) = dropped {
+        told["next"] = json!(format!(
+            "{} {}",
+            dropped_first(&dropped),
+            told["next"].as_str().unwrap_or_default()
+        ));
+        told["dropped"] = json!(dropped);
+    }
+    told
+}
+
+/// The line said first, through the say service, of an older clash let go
+/// for a newer one asked in a turn that was cut ([`cut_line`] follows it):
+/// never dropped silently there either (App Only's P2 on #7554).
+pub fn dropped_line(dropped: &str) -> String {
+    format!(
+        "I didn't put on {dropped}, which I made earlier: it's dropped now, as only one \
+         clash can wait at a time."
+    )
+}
+
+/// What the model is told first of an older clash let go for a newer one
+/// ([`asked`]): the person hears that skill was not put on.
+fn dropped_first(dropped: &str) -> String {
+    format!(
+        "First tell them, in a few words, that {dropped}, made earlier, also clashed and \
+         waited for their choice; it was not put on and is dropped now, as only one clash \
+         waits at a time. Then:"
+    )
 }
 
 /// The note a later heard line `request` is told at `now` of the clash
@@ -492,6 +578,7 @@ fn let_go(waiting: &Waiting, why: &str) {
         waiting.name
     );
     made_skill::forget_unput(&waiting.keeping.directory, &waiting.sha256);
+    ended_at(Instant::now());
 }
 
 /// Whether a clash waits for the person's choice at `now`: the echo hold
@@ -950,6 +1037,8 @@ pub fn chosen(
         }
         Took::Taken(waiting, choice) => (waiting, choice),
     };
+    // Chosen: its question may still be copied for a while.
+    ended_at(now);
     let new = made_skill::spoken_name(&waiting.name);
     let others = spoken_list(&waiting.others);
     let many = waiting.others.len() > 1;
@@ -2189,6 +2278,151 @@ mod tests {
         assert!(!awaited(now + CLASH_WITHIN + Duration::from_secs(1)));
         assert_eq!(names(), ["rest-glow"]);
         assert!(!package.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 18 Nov (#7554's ROW at 2e864a0, 17:39:32 and 17:39:44):
+    /// `dim-light-at-night`'s clash waited, and 12 s later the clash of
+    /// `joke-on-pat-2` let it go with nothing said. The newer clash's answer
+    /// now tells the model to say first that the older one was dropped.
+    #[test]
+    fn a_clash_let_go_for_a_newer_one_is_told() {
+        let (root, keeping) = keeping("clash-newer-told");
+        let now = Instant::now();
+        let first = asked(
+            &keeping,
+            &made("dim-light-at-night"),
+            &clashes_of(&["water-reminder"]),
+            86,
+            now,
+        );
+        assert!(first.get("dropped").is_none(), "{first}");
+        let newer = Made {
+            sha256: "cd".repeat(32),
+            ..made("joke-on-pat-2")
+        };
+        let told = asked(
+            &keeping,
+            &newer,
+            &clashes_of(&["cat-joke-on-pat", "joke-on-pat"]),
+            92,
+            now,
+        );
+        assert_eq!(told["dropped"], "dim light at night", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.starts_with("First tell them, in a few words, that dim light at night"),
+            "{next}"
+        );
+        assert!(next.contains("Say this word for word"), "{next}");
+        // The same skill asked again is no other clash: nothing dropped.
+        let again = asked(
+            &keeping,
+            &newer,
+            &clashes_of(&["cat-joke-on-pat", "joke-on-pat"]),
+            93,
+            now,
+        );
+        assert!(again.get("dropped").is_none(), "{again}");
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P1 on #7554: with `dim-light-at-night` made, not on, and
+    /// its clash waiting, the lamp asks its choice again ("what?"): its own
+    /// sentence and the model's words are no claim, read from the clash's
+    /// own state, and no reply is held for it while it waits. Once it ended
+    /// (here let go past its time), a choice asked with no call within
+    /// [`COPIED_WITHIN`] is a claim; past that, no reply is held.
+    #[test]
+    fn a_clash_asked_again_while_it_waits_is_no_claim() {
+        use crate::make_skill_agent::clash_claimed;
+        let (root, keeping) = keeping("clash-asked-again");
+        let now = Instant::now();
+        set_ended(None);
+        let told = asked(
+            &keeping,
+            &made("dim-light-at-night"),
+            &clashes_of(&["rest-glow"]),
+            3,
+            now,
+        );
+        let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+        assert!(waits(now));
+        assert!(!lately_ended(now), "no reply is held while it waits");
+        for again in [
+            "Shall I replace rest glow, keep both (they may take turns), or cancel?",
+            "Do you want me to replace rest glow, keep both, or cancel?",
+            question,
+        ] {
+            assert_eq!(
+                clash_claimed(again, true, || waits(now)),
+                Some(false),
+                "{again}"
+            );
+        }
+        // Past its time: let go, and so ended.
+        let late = now + CLASH_WITHIN + Duration::from_secs(1);
+        assert!(!awaited(late));
+        assert!(!waits(late));
+        assert!(lately_ended(Instant::now()));
+        assert_eq!(
+            clash_claimed(question, true, || waits(Instant::now())),
+            Some(true)
+        );
+        assert!(!lately_ended(
+            Instant::now() + COPIED_WITHIN + Duration::from_secs(1)
+        ));
+        set_ended(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P2 on #7554: a newer clash made in a cut turn lets the
+    /// older one go, and its line, said through the say service, tells that
+    /// first: never dropped silently.
+    #[test]
+    fn a_newer_clash_in_a_cut_turn_tells_the_older_one_dropped() {
+        let (root, keeping) = keeping("clash-cut-dropped");
+        installed(
+            &keeping,
+            "rest-glow",
+            RESTING,
+            "light = { colour = \"blue\" }",
+        );
+        let older = Made {
+            sha256: "cd".repeat(32),
+            ..made("dim-light-at-night")
+        };
+        asked(
+            &keeping,
+            &older,
+            &clashes_of(&["water-reminder"]),
+            2,
+            Instant::now(),
+        );
+        let (url, served) = service(vec![(200, good())]);
+        let told = crate::make_skill_local::make_with(
+            3,
+            Some("make me a skill that dims the light at 10 pm"),
+            "dim the light at 10 pm",
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["dropped"], "dim light at night", "{told}");
+        let line = crate::make_skill_local::take_said_line().unwrap();
+        assert!(
+            line.starts_with(&dropped_line("dim light at night")),
+            "{line}"
+        );
+        assert!(
+            line.contains("didn't put it on: rest glow starts at the same moment"),
+            "{line}"
+        );
+        forget_waiting();
+        set_ended(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

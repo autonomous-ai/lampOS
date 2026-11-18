@@ -126,6 +126,20 @@ pub enum ChatEvent {
     Text(String),
     /// Every call of the turn, once the model has finished asking.
     ToolCalls(Vec<ToolCall>),
+    /// A call's name, as the stream names it, once per call: when its
+    /// arguments begin, so the name is whole, before they are and before
+    /// [`ChatEvent::ToolCalls`] (the reader El's HOLD on #7554: a reply
+    /// held for the lamp's own make line is let go as soon as its round
+    /// shows a `make_skill` call). Not every call has one: a call with no
+    /// arguments is named only in [`ChatEvent::ToolCalls`].
+    Calling(String),
+    /// A call's name and its first argument's name, once per call, as soon
+    /// as the stream has that argument's name whole, after
+    /// [`ChatEvent::Calling`] and before [`ChatEvent::ToolCalls`] (#7554:
+    /// a `make_skill` call whose first argument is its `request` is a new
+    /// make, and the lamp says its opening at once when the model gave
+    /// none). A call whose arguments open with no name has none.
+    Argued(String, String),
     /// The model's `reasoning_details` for the calls of this round, given
     /// back unchanged with them in the next ([`Message::assistant_calls_with`]),
     /// as OpenRouter asks; before [`ChatEvent::ToolCalls`].
@@ -924,6 +938,31 @@ struct Pending {
     name: String,
     arguments: String,
     extra: Option<Value>,
+    /// [`ChatEvent::Calling`] went out for it.
+    named: bool,
+    /// [`ChatEvent::Argued`] went out for it, or its arguments' opening
+    /// was read past without a first name.
+    argued: bool,
+}
+
+/// How far into a call's arguments its first name is looked for: past
+/// it, the arguments open with none, and the rest is not read again.
+const FIRST_ARGUMENT_WITHIN: usize = 256;
+
+/// The first argument's name in a call's arguments streamed so far, once
+/// it is whole (`{"request"` gives `request`); none yet, or none at all.
+fn first_argument(arguments: &str) -> Option<String> {
+    let rest = arguments.trim_start().strip_prefix('{')?.trim_start();
+    let mut chars = rest.strip_prefix('"')?.chars();
+    let mut name = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => return Some(name),
+            '\\' => name.push(chars.next()?),
+            c => name.push(c),
+        }
+    }
+    None
 }
 
 /// Chunks of the completion to events. Tool calls arrive in fragments
@@ -1034,6 +1073,18 @@ impl Deltas {
             }
             if let Some(part) = call.pointer("/function/arguments").and_then(Value::as_str) {
                 pending.arguments.push_str(part);
+            }
+            if !pending.named && !pending.name.is_empty() && !pending.arguments.is_empty() {
+                pending.named = true;
+                out.push(ChatEvent::Calling(pending.name.clone()));
+            }
+            if pending.named && !pending.argued {
+                if let Some(first) = first_argument(&pending.arguments) {
+                    pending.argued = true;
+                    out.push(ChatEvent::Argued(pending.name.clone(), first));
+                } else if pending.arguments.len() > FIRST_ARGUMENT_WITHIN {
+                    pending.argued = true;
+                }
             }
         }
         Ok(out)
@@ -1263,9 +1314,14 @@ data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}
 
 data: [DONE]
 "#;
+        // Named as its arguments begin, and its first argument once whole,
+        // before the calls whole; the call with none is named only with
+        // them.
         assert_eq!(
             events(recorded),
             [
+                ChatEvent::Calling("remember".into()),
+                ChatEvent::Argued("remember".into(), "fact".into()),
                 ChatEvent::ToolCalls(vec![
                     ToolCall {
                         id: "call_a".into(),
@@ -1514,6 +1570,21 @@ data: [DONE]
         assert_eq!(body["model"], "m");
     }
 
+    /// A call's first argument's name is read once it is whole, never from
+    /// arguments that open with none.
+    #[test]
+    fn a_calls_first_argument_is_read_once_whole() {
+        assert_eq!(first_argument(" { \"request\""), Some("request".into()));
+        assert_eq!(
+            first_argument("{\"request\": \"cat"),
+            Some("request".into())
+        );
+        assert_eq!(first_argument("{\"requ"), None);
+        assert_eq!(first_argument("{"), None);
+        assert_eq!(first_argument("{}"), None);
+        assert_eq!(first_argument("[\"request\"]"), None);
+    }
+
     /// Gemini's OpenAI-compatible stream gives each call whole, its thought
     /// signature in `extra_content`; two calls may come at the same index.
     /// Each is its own call, and the signature goes back with it.
@@ -1526,7 +1597,15 @@ data: {"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"{}","name":"
 data: [DONE]
 "#;
         let got = events(recorded);
-        let ChatEvent::ToolCalls(calls) = &got[0] else {
+        // Each whole call is named as it comes, with its first argument
+        // when it has one, then all are handed out.
+        assert_eq!(got[0], ChatEvent::Calling("set_brightness".into()));
+        assert_eq!(
+            got[1],
+            ChatEvent::Argued("set_brightness".into(), "level".into())
+        );
+        assert_eq!(got[2], ChatEvent::Calling("the_time".into()));
+        let ChatEvent::ToolCalls(calls) = &got[3] else {
             panic!("{got:?}")
         };
         assert_eq!(calls.len(), 2, "{calls:?}");
@@ -1624,14 +1703,15 @@ data: [DONE]
 "#;
         let got = events(recorded);
         assert_eq!(got[0], ChatEvent::Searched);
+        assert_eq!(got[1], ChatEvent::Calling("the_time".into()));
         let details = json!([{"type": "reasoning.encrypted", "data": "c2ln", "format": "google-gemini-v1", "index": 0}]);
-        assert_eq!(got[1], ChatEvent::Reasoning(details.clone()));
-        let ChatEvent::ToolCalls(calls) = &got[2] else {
+        assert_eq!(got[2], ChatEvent::Reasoning(details.clone()));
+        let ChatEvent::ToolCalls(calls) = &got[3] else {
             panic!("{got:?}")
         };
         assert_eq!(calls[0].name, "the_time");
-        assert_eq!(got[3], ChatEvent::Done);
-        assert_eq!(got.len(), 4);
+        assert_eq!(got[4], ChatEvent::Done);
+        assert_eq!(got.len(), 5);
         let back = serde_json::to_value(Message::assistant_calls_with(
             None,
             calls,

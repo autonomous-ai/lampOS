@@ -1325,7 +1325,10 @@ mod tests {
         assert!(cut.contains("say it again, word for word"), "{cut}");
         // A no to a cut say-back keeps it off; it doesn't bring it back.
         assert!(
-            cut.contains("If they decline or wait, say it stays off, and call nothing"),
+            cut.contains(
+                "If they decline or wait, say only that it stays off, never how to start it, and \
+                 call nothing"
+            ),
             "{cut}"
         );
         assert!(cut.contains(&say_back), "{cut}");
