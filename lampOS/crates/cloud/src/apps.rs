@@ -822,6 +822,46 @@ pub fn ask(
     serde_json::from_str(reply.trim()).map_err(|_| unreached.to_owned())
 }
 
+/// The most `systemctl show` may take: `apps.list` asks it twice an app, on
+/// lamp-cloud's loop, and systemd can hang.
+pub const SYSTEMCTL_WAIT: Duration = Duration::from_secs(2);
+
+/// What a program prints, or `None` if it can't start or runs past `wait`
+/// (it is killed then): never a call that waits for good. Its environment
+/// is empty, its stdin closed, its stderr dropped, and at most 64 KiB read.
+pub fn output_within(program: &str, args: &[&str], wait: Duration) -> Option<String> {
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(program)
+        .args(args)
+        .env_clear()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let out = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = out.take(64 * 1024).read_to_end(&mut bytes);
+        bytes
+    });
+    let end = Instant::now() + wait;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                let bytes = reader.join().ok()?;
+                return Some(String::from_utf8_lossy(&bytes).into_owned());
+            }
+            Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(10)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+}
+
 impl Backend for Real {
     fn names(&self) -> Vec<String> {
         let Ok(entries) = std::fs::read_dir(&self.layout.code) else {
@@ -862,14 +902,13 @@ impl Backend for Real {
             lamp_apps::name::plain_unit(name),
             lamp_apps::name::net_unit(name),
         ] {
-            let Ok(output) = std::process::Command::new(lamp_apps::effects::SYSTEMCTL)
-                .args(["show", "--property=ActiveState,Result", "--", &variant])
-                .env_clear()
-                .output()
-            else {
+            let Some(text) = output_within(
+                lamp_apps::effects::SYSTEMCTL,
+                &["show", "--property=ActiveState,Result", "--", &variant],
+                SYSTEMCTL_WAIT,
+            ) else {
                 continue;
             };
-            let text = String::from_utf8_lossy(&output.stdout);
             unit.active |= text.lines().any(|line| line == "ActiveState=active");
             unit.gave_up |= text.lines().any(|line| line == "Result=start-limit-hit");
         }
@@ -1900,5 +1939,27 @@ pub mod tests {
         assert!(!real.package("x1").unwrap().logs);
         std::fs::write(current.join(RECORD_FILE), record(r#""logs":true,"#)).unwrap();
         assert!(real.package("x1").unwrap().logs);
+    }
+
+    #[test]
+    fn a_program_that_runs_past_its_time_is_killed_and_says_nothing() {
+        let start = Instant::now();
+        let got = output_within("/bin/sleep", &["30"], Duration::from_millis(200));
+        assert_eq!(got, None);
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "it waited {:?}",
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn a_program_that_answers_in_time_is_read_and_one_that_is_not_there_says_nothing() {
+        let got = output_within("/bin/echo", &["ActiveState=active"], Duration::from_secs(5));
+        assert_eq!(got.as_deref(), Some("ActiveState=active\n"));
+        assert_eq!(
+            output_within("/nowhere/at/all", &[], Duration::from_secs(1)),
+            None
+        );
     }
 }
