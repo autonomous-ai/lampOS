@@ -639,7 +639,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   done at the limit: a heard line that is plainly a light or volume ask
   (`limit_local::matched`: on, off, a colour, brighter, dimmer, warmer,
   cooler, louder, quieter; once the name, a greeting and politeness are set
-  aside every word left must be the ask's, and a question never is one)
+  aside every word left must be the ask's, and a question never is one; the
+  name and greeting read as a call reads them, `attention::called` and
+  `called_by_name_on`, so "Hey Lampy, make it brighter." or "Lynn, turn
+  the light red." is an ask, while "Make the plan brighter." is not)
   runs the same `lamp-actions` function the model would call, through the
   route's own runner, and the lamp says that function's own short line
   ("Brighter.", "Done.", "I'm already as dim as I go.", one of
@@ -665,7 +668,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   route can match it; any other refusal still holds it. A timer and the
   time are not done yet: their lines carry a time and can't be rendered
   at the limit. The journal: `at the usage limit <function> was done
-  without the model, its own line said in N ms (LAMP_LIMIT_LOCAL_ASKS)`. The journal: `said its thoughts are slow`,
+  without the model, its own line said in N ms (LAMP_LIMIT_LOCAL_ASKS)`,
+  and for a line said to the lamp that is no plain ask, `limit_local: no
+  plain ask matched (N words)`, its word count only, never its words. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
   one) or the usage-limit line has been handed over, or a quiet ask in a
   limit run has ended, the route sends `DownLineSaid` for the request,

@@ -8811,6 +8811,15 @@ async fn say_limit(
     Ok(())
 }
 
+/// The journal line for a line at the usage limit that is no plain ask
+/// ([`limit_local_ask`]): its word count only, never its words.
+fn limit_local_unmatched_line(request: u64, said: &str) -> String {
+    format!(
+        "lamp-voice second: request {request}: limit_local: no plain ask matched ({} words)",
+        said.split_whitespace().count()
+    )
+}
+
 /// `LAMP_LIMIT_LOCAL_ASKS` (#7346, done-when 4): at the usage limit, a
 /// heard line that plainly asks for a light or volume change
 /// ([`limit_local::matched`]) runs the function the model would have called,
@@ -8828,6 +8837,7 @@ async fn limit_local_ask(
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Result<bool, Stop> {
     let Some((name, args)) = limit_local::matched(said) else {
+        eprintln!("{}", limit_local_unmatched_line(request, said));
         return Ok(false);
     };
     let began = Instant::now();
