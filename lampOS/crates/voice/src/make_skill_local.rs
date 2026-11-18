@@ -3992,7 +3992,13 @@ pub fn answer(
             (crate::made_turn::TURN_ON, false),
         ] {
             if let Some(name) = call.args[key].as_str() {
-                return crate::made_turn::asked_here(name, off, request, heard, lease);
+                // Kept as this conversation's, or its candidates begun with
+                // this conversation's (#7660, `crate::just_made`).
+                return crate::just_made::after_turn(
+                    crate::made_turn::asked_here(name, off, request, heard, lease),
+                    request,
+                    lease,
+                );
             }
         }
     }
@@ -4140,6 +4146,8 @@ pub fn answer(
     }
     let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
+    // The skill made, kept as made in this conversation (#7660).
+    crate::just_made::after_make(&told, request, lease);
     told
 }
 
