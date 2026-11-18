@@ -120,6 +120,10 @@ What else a part needs that no build carries: the voice's turn-end model
 and ONNX Runtime library (beside the voice in its folder,
 [endpoint-detection.md](endpoint-detection.md)), the eyes' models, the
 ears' YAMNet pair and the name's models, all from `deploy/product/models.json`, which install fetches
+(each from the CDN's copy, `https://cdn.autonomous.ai/lampos/models/<release>/<name>`,
+first, given 5 s to connect and begin answering, then from its GitHub release when
+the CDN has none, can't be reached or serves one that does not match its SHA-256,
+which is never taken; the journal says which served it, #7709)
 (a published build carries the same list as its manifest's models, which a
 round fetches only where `LAMP_UPDATE_MODELS=on`; with it off, a lamp
 whose install-placed file has another SHA-256 refuses the build,

@@ -3376,7 +3376,68 @@ pub(crate) fn fetch_model(
     result
 }
 
-/// The file at `url` into `to`, only if it is `bytes` long with `sha256`.
+/// Where a model's own release is on GitHub.
+const MODEL_RELEASES: &str = "https://github.com/autonomous-ai/lampOS/releases/download/";
+/// Where the CDN mirror keeps each model at a path no sequence names
+/// (`.github/scripts/lampos-mirror.py`).
+const MODEL_MIRROR: &str = "https://cdn.autonomous.ai/lampos/models/";
+/// Where the CDN mirror keeps a promoted build's models.
+const STABLE_MIRROR: &str = "https://cdn.autonomous.ai/lampos/stable/";
+/// The most a mirror tried before GitHub may take to connect and to begin
+/// answering, before GitHub is asked (#7709).
+pub const MIRROR_QUICK: Duration = Duration::from_secs(5);
+
+/// The URLs a model at `url` is asked for at, in order, each with whether
+/// it is asked quickly, once within [`MIRROR_QUICK`] (#7709): a model of a
+/// GitHub release from the CDN's sequence-free copy first, quickly, then
+/// from GitHub; one at a promoted build's CDN folder
+/// (`lampos/stable/<sequence>/models/<tag>/<file>`) from there, then from
+/// GitHub; any other only where it is. The URL the manifest or
+/// `models.json` names is always asked as before, with a whole fetch's
+/// waits: for a lamp in China, which can't reach GitHub, the CDN is the only
+/// way. Only the copy put in front of it is quick, so a CDN copy not made
+/// yet costs a lamp that can reach GitHub seconds.
+pub fn model_urls(url: &str) -> Vec<(String, bool)> {
+    fn plain(part: &str) -> bool {
+        !part.is_empty()
+            && part != "."
+            && part != ".."
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    }
+    /// `<tag>/<file>`, each a plain name.
+    fn tag_file(rest: &str) -> Option<(&str, &str)> {
+        let (tag, file) = rest.split_once('/')?;
+        (plain(tag) && plain(file)).then_some((tag, file))
+    }
+    if let Some((tag, file)) = url.strip_prefix(MODEL_RELEASES).and_then(tag_file) {
+        return vec![
+            (format!("{MODEL_MIRROR}{tag}/{file}"), true),
+            (url.to_owned(), false),
+        ];
+    }
+    let mirrored = url.strip_prefix(STABLE_MIRROR).and_then(|rest| {
+        let (sequence, rest) = rest.split_once('/')?;
+        if sequence.is_empty() || !sequence.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        tag_file(rest.strip_prefix("models/")?)
+    });
+    match mirrored {
+        Some((tag, file)) => vec![
+            (url.to_owned(), false),
+            (format!("{MODEL_RELEASES}{tag}/{file}"), false),
+        ],
+        None => vec![(url.to_owned(), false)],
+    }
+}
+
+/// The file at `url` into `to`, only if it is `bytes` long with `sha256`:
+/// asked at each of [`model_urls`] in turn, as quickly as it says, until
+/// one serves it whole and matching. A file missing,
+/// out of reach or not matching at one is asked at the next; a file that
+/// does not match is never taken. Which one served it is said.
 fn fetch_checked(
     channel: &mut dyn Channel,
     url: &str,
@@ -3384,12 +3445,46 @@ fn fetch_checked(
     sha256: &str,
     to: &Path,
 ) -> Result<(), Fetch> {
+    let urls = model_urls(url);
+    let mut failed = Fetch::Failed(format!("{url} was not asked for"));
+    for (number, (url, quick)) in urls.iter().enumerate() {
+        let last = number + 1 == urls.len();
+        match fetch_one(channel, url, bytes, sha256, to, *quick) {
+            Ok(()) => {
+                eprintln!("lamp-update: {url} served {}", to.display());
+                return Ok(());
+            }
+            Err(error) => {
+                if !last {
+                    eprintln!("lamp-update: {url}: {error}; asking the next");
+                }
+                failed = error;
+            }
+        }
+    }
+    Err(failed)
+}
+
+/// One try of [`fetch_checked`], at `url` alone: `quick` within
+/// [`MIRROR_QUICK`].
+fn fetch_one(
+    channel: &mut dyn Channel,
+    url: &str,
+    bytes: u64,
+    sha256: &str,
+    to: &Path,
+    quick: bool,
+) -> Result<(), Fetch> {
     let mut out = fs::File::create(to).map_err(|error| Fetch::Failed(error.to_string()))?;
     let mut hashing = Hashing {
         file: &mut out,
         context: digest::Context::new(&digest::SHA256),
     };
-    let fetched = channel.fetch(url, bytes, &mut hashing);
+    let fetched = if quick {
+        channel.fetch_quick(url, bytes, &mut hashing, MIRROR_QUICK)
+    } else {
+        channel.fetch(url, bytes, &mut hashing)
+    };
     let sha = manifest::hex(hashing.context.finish().as_ref());
     match fetched {
         Ok(size) if size == bytes && sha == sha256 => Ok(()),
@@ -4139,5 +4234,189 @@ mod tests {
             rowless.is_empty(),
             "docs/skills.md's \"Core and installable skills\" has no row for {rowless:?}"
         );
+    }
+
+    const GITHUB_MODEL: &str =
+        "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/a.onnx";
+    const CDN_MODEL: &str = "https://cdn.autonomous.ai/lampos/models/models-2026-10-16/a.onnx";
+    const STABLE_MODEL: &str =
+        "https://cdn.autonomous.ai/lampos/stable/14202/models/models-2026-10-16/a.onnx";
+
+    /// `(URL, asked quickly)` pairs as [`model_urls`] gives them.
+    fn asks(pairs: &[(&str, bool)]) -> Vec<(String, bool)> {
+        pairs
+            .iter()
+            .map(|(url, quick)| ((*url).to_owned(), *quick))
+            .collect()
+    }
+
+    /// #7709: a GitHub release's model is asked at the CDN first, quickly;
+    /// one at a promoted build's CDN folder there as before, then at its
+    /// GitHub release; any other URL, or one that is not plainly
+    /// `<tag>/<file>`, only where it is, as before.
+    #[test]
+    fn a_model_is_asked_at_the_cdn_first_and_then_at_github() {
+        assert_eq!(
+            model_urls(GITHUB_MODEL),
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
+        assert_eq!(
+            model_urls(STABLE_MODEL),
+            asks(&[(STABLE_MODEL, false), (GITHUB_MODEL, false)])
+        );
+        for alone in [
+            "https://models.test/a.onnx",
+            "file:///tmp/a.onnx",
+            CDN_MODEL,
+            "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/x/a.onnx",
+            "https://github.com/autonomous-ai/lampOS/releases/download/../a.onnx",
+            "https://github.com/autonomous-ai/lampOS/releases/download/t/a.onnx?x=1",
+            "https://github.com/other/lampOS/releases/download/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable/x/models/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable//models/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable/14202/files/lamp-update",
+        ] {
+            assert_eq!(model_urls(alone), asks(&[(alone, false)]), "{alone}");
+        }
+    }
+
+    /// #7709: every model and notice the product pins is asked at the CDN
+    /// first, quickly, then at its GitHub release as before.
+    #[test]
+    fn every_product_model_is_asked_at_the_cdn_first() {
+        let models = models().unwrap();
+        assert!(!models.is_empty());
+        for model in models {
+            let urls = model_urls(&model.url);
+            assert_eq!(urls.len(), 2, "{}", model.url);
+            assert!(urls[0].0.starts_with(MODEL_MIRROR), "{}", urls[0].0);
+            assert!(urls[0].1);
+            assert_eq!(urls[1], (model.url.clone(), false));
+        }
+    }
+
+    /// A channel of the test's own for one model: the bytes each URL has,
+    /// and each URL asked with whether it was asked quickly. A URL in
+    /// `busy_once` answers 503 to a quick fetch, which asks once; a whole
+    /// fetch asks again after it, as `Web` does, and is served.
+    #[derive(Default)]
+    struct Mirrors {
+        files: std::collections::HashMap<String, Vec<u8>>,
+        busy_once: Option<String>,
+        asked: Vec<(String, bool)>,
+    }
+
+    impl Mirrors {
+        fn serve(&self, url: &str, out: &mut dyn std::io::Write) -> Result<u64, Fetch> {
+            let bytes = self.files.get(url).ok_or(Fetch::Missing)?;
+            out.write_all(bytes).unwrap();
+            Ok(bytes.len() as u64)
+        }
+    }
+
+    impl Channel for Mirrors {
+        fn fetch(
+            &mut self,
+            url: &str,
+            _most: u64,
+            out: &mut dyn std::io::Write,
+        ) -> Result<u64, Fetch> {
+            self.asked.push((url.to_owned(), false));
+            self.serve(url, out)
+        }
+
+        fn fetch_quick(
+            &mut self,
+            url: &str,
+            _most: u64,
+            out: &mut dyn std::io::Write,
+            quick: Duration,
+        ) -> Result<u64, Fetch> {
+            assert_eq!(quick, MIRROR_QUICK);
+            self.asked.push((url.to_owned(), true));
+            if self.busy_once.as_deref() == Some(url) {
+                return Err(Fetch::Failed("the channel answered 503".into()));
+            }
+            self.serve(url, out)
+        }
+    }
+
+    fn fetch_genuine(channel: &mut Mirrors, url: &str) -> (Result<(), Fetch>, Vec<u8>) {
+        let folder = tempfile::tempdir().unwrap();
+        let to = folder.path().join("a.onnx");
+        let genuine = b"genuine model";
+        let sha = manifest::hex(digest::digest(&digest::SHA256, genuine).as_ref());
+        let fetched = fetch_checked(channel, url, genuine.len() as u64, &sha, &to);
+        (fetched, fs::read(&to).unwrap_or_default())
+    }
+
+    /// #7709: the CDN is asked first, quickly, and GitHub only when the CDN
+    /// has no file or one that does not match, which is never taken.
+    #[test]
+    fn the_cdn_serves_first_and_github_is_asked_only_when_it_fails() {
+        let genuine = b"genuine model".to_vec();
+        // The CDN has it: GitHub is never asked.
+        let mut channel = Mirrors::default();
+        channel.files.insert(CDN_MODEL.into(), genuine.clone());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(channel.asked, asks(&[(CDN_MODEL, true)]));
+        // The CDN has none (404): GitHub, asked as before.
+        let mut channel = Mirrors::default();
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
+        // The CDN's copy does not match: GitHub's is taken.
+        let mut channel = Mirrors::default();
+        channel.files.insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(channel.asked.len(), 2);
+        // Neither matches: refused, and GitHub's answer is the one said.
+        let mut channel = Mirrors::default();
+        channel.files.insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        let (fetched, _) = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(
+            fetched,
+            Err(Fetch::Failed(format!("{GITHUB_MODEL} is not there")))
+        );
+    }
+
+    /// #7709: a manifest's own CDN URL keeps a whole fetch and its waits:
+    /// busy once (503), it is still served from the CDN, and GitHub, which a
+    /// lamp in China can't reach, is never asked.
+    #[test]
+    fn a_manifest_cdn_url_busy_once_is_still_served_from_the_cdn() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors {
+            busy_once: Some(STABLE_MODEL.into()),
+            ..Mirrors::default()
+        };
+        channel.files.insert(STABLE_MODEL.into(), genuine.clone());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, STABLE_MODEL);
+        assert_eq!(served, (Ok(()), genuine));
+        assert_eq!(channel.asked, asks(&[(STABLE_MODEL, false)]));
+    }
+
+    /// #7709: what a CDN without the file adds before GitHub is asked,
+    /// measured: well under [`MIRROR_QUICK`].
+    #[test]
+    fn a_cdn_without_the_file_adds_little_before_github() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors::default();
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let started = Instant::now();
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        let took = started.elapsed();
+        assert_eq!(served, (Ok(()), genuine));
+        assert!(took < MIRROR_QUICK, "{took:?}");
+        assert!(took < Duration::from_secs(1), "{took:?}");
     }
 }
