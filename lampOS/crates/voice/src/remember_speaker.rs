@@ -501,6 +501,71 @@ mod tests {
         assert_eq!(requests.len(), 1);
     }
 
+    /// `LAMP_FACE_NO_ASK` (the first builder 18:50; Thirteen's and Heron's
+    /// HOLDs on #7787): a face is kept unasked only with speaking-face
+    /// proof. "I'm Ada" from the face seen saying it is kept, and the model
+    /// says the one line and asks nothing; another person's name ("this is
+    /// Tom") sends nothing; a voice with no face seen saying it (a TV, off
+    /// camera) sends nothing; two faces in view keep nothing and ask
+    /// nothing. Off, kept as before with no line.
+    #[test]
+    fn remember_speaker_with_no_ask_keeps_only_the_speakers_own_face() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let no_ask = known_faces::FaceSwitches {
+            face_no_ask: true,
+            ..switches()
+        };
+        let asks = |answer: &Value| {
+            let text = answer.to_string();
+            ["May I", "Shall I", "Should I", "Do you want"]
+                .iter()
+                .any(|ask| text.contains(ask))
+        };
+        for words in ["I'm Ada.", "My name is Ada."] {
+            let (answer, requests) =
+                own_name_exchange_with(words, "Ada", false, no_ask, json!({"remembered": "Ada"}));
+            assert_eq!(answer["ok"], true, "{words}: {answer}");
+            let note = answer["note"].as_str().unwrap();
+            assert!(note.contains("I'll know you next time."), "{note}");
+            assert!(note.contains("forget my face"), "{note}");
+            assert!(!asks(&answer), "{answer}");
+            assert_eq!(requests.len(), 1, "{words}");
+        }
+        for words in ["Remember my face, this is Tom.", "This is my son Tom."] {
+            let (answer, requests) =
+                own_name_exchange_with(words, "Tom", false, no_ask, json!({"remembered": "Tom"}));
+            assert!(requests.is_empty(), "{words}: {requests:?}");
+            assert!(answer.get("ok").is_none(), "{words}: {answer}");
+        }
+        // Two faces in view: nothing kept, nothing asked, never "I'll know you".
+        let (answer, _) = own_name_exchange_with(
+            "I'm Ada.",
+            "Ada",
+            false,
+            no_ask,
+            json!({"error": "two_faces"}),
+        );
+        assert_eq!(answer["error"], known_faces::NOT_SEEN_NO_ASK, "{answer}");
+        assert!(!asks(&answer) && !answer.to_string().contains("I'll know you"));
+        // A voice with no face seen saying it: refused before the eyes.
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let owner = owner();
+        let (answer, _) = known_faces::run_scoped(
+            &home.path.join("no-eyes.sock"),
+            &call(json!({"name": "Anna"})),
+            no_ask,
+            None,
+            None,
+            REQUEST,
+            Some(&owner.lease()),
+        );
+        assert_eq!(answer["error"], NOT_SEEN, "{answer}");
+        // Off: kept as before, with no line.
+        let (answer, _) =
+            own_name_exchange("I'm Ada.", "Ada", false, true, json!({"remembered": "Ada"}));
+        assert_eq!(answer, json!({"ok": true, "remembered": "Ada"}));
+    }
+
     #[test]
     fn remember_speaker_at_setup_leave_is_the_face_questions_yes_or_their_own_ask() {
         const ASKED: &str = "May I remember your face, so I know you next time?";

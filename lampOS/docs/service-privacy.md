@@ -330,3 +330,9 @@ never the place, its coordinates, the country code, anything the person said
 or who asked. Only the global unicast addresses of its answer are used
 (`net::public::global`), and each is reached as the same named host over TLS,
 so an address it gives can't stand in for another service.
+
+## Faces kept with nothing asked
+
+A face kept with nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric: at the lamp it is kept only with
+the speaker's own "I'm X" proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing
+asked"); from the app's photo, only a photo of one face, never added to someone already kept ("A face from a photo").

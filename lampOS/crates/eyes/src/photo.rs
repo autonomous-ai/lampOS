@@ -538,16 +538,19 @@ pub fn no_ask_from_environment() -> bool {
 }
 
 /// With [`NO_ASK_ENVIRONMENT`] on: a photo's one face kept under `name` at
-/// once, as a confirmed photo yes keeps it (no near-name question), so
-/// "forget my face" and the app's removal forget it as any other. A face
-/// already known by another name is refused as at the lamp (`known_as`).
+/// once, so "forget my face" and the app's removal forget it as any other.
+/// A face already known by another name is refused as at the lamp
+/// (`known_as`). Never `apart`: with nobody at the lamp to judge it, a face
+/// only near someone already kept under `name` (a sibling's photo sent
+/// under the owner's name) is refused (`near_to`), never put beside their
+/// prints (Heron's P2-2 on #7787); one not like them at all, `not_like_them`.
 pub fn keep_at_once(
     people: &mut crate::who::People,
     name: &str,
     print: Vec<f32>,
     now_unix_s: u64,
 ) -> std::result::Result<crate::who::Remembered, crate::who::Refused> {
-    people.remember_one_replacing(name, vec![print], now_unix_s, false, true)
+    people.remember_one_replacing(name, vec![print], now_unix_s, false, false)
 }
 
 /// Whether a yes's `face` is the one that matched the photo here (`here`,
@@ -938,6 +941,35 @@ mod tests {
         people.forget("Lan").unwrap();
         assert!(people.who(&unit(3)).is_none());
         assert!(people.names().is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Heron's P2-2 on #7787: a sibling's photo sent under the owner's name,
+    /// near the owner's face but not theirs, is refused (`near_to`) with
+    /// nobody at the lamp, and the owner's record is left as it was.
+    #[test]
+    fn with_no_ask_a_near_photo_under_a_kept_name_is_refused() {
+        let dir = folder("no-ask-near");
+        let path = dir.join("people.json");
+        let mut people = crate::who::People::open(path.clone()).unwrap();
+        keep_at_once(&mut people, "Owner", unit(3), 1).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        // Between NEAR_PERSON (0.30) and SAME_PERSON (0.363) to theirs.
+        let mut sibling = vec![0.0f32; crate::who::PRINT];
+        sibling[3] = 0.33;
+        sibling[4] = (1.0f32 - 0.33 * 0.33).sqrt();
+        assert_eq!(
+            keep_at_once(&mut people, "Owner", sibling.clone(), 2),
+            Err(crate::who::Refused::NearTo("Owner".into()))
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), before, "owner unchanged");
+        assert!(people.who(&sibling).is_none(), "the sibling is nobody");
+        assert_eq!(people.names(), ["Owner"]);
+        // Someone not like them at all is refused too.
+        assert_eq!(
+            keep_at_once(&mut people, "Owner", unit(9), 3),
+            Err(crate::who::Refused::NotLikeThem)
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 

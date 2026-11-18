@@ -664,3 +664,9 @@ and indicator startup/cleanup latency. Pull-up means a disconnected switch
 wire may resemble HIGH; this software does not establish electrical
 fail-closed wiring or microphone power removal. First must establish those
 physical facts separately. No lamp or acoustic result is asserted here.
+
+## Faces kept with nothing asked
+
+This switch closes the microphones and the camera; it does not decide whose face is kept. A face kept with nothing
+asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric, and at the lamp is kept only with the speaker's own "I'm X"
+proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing asked").
