@@ -788,9 +788,11 @@ mod tests {
         }
         assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
         assert!(lines.iter().all(|line| cache.kept(line).is_some()));
-        assert!(cache
-            .kept(&format!("asked {}", MOST_FILES * 2 - 1))
-            .is_some());
+        assert!(
+            cache
+                .kept(&format!("asked {}", MOST_FILES * 2 - 1))
+                .is_some()
+        );
         assert!(cache.kept("asked 0").is_none());
     }
 
