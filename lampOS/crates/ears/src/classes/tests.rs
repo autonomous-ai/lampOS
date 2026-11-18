@@ -326,6 +326,11 @@ fn the_worker_publishes_scores_then_unavailable_and_the_pump_rechecks_authority(
                         laughter: 0.0,
                         door: 0.0,
                         footsteps: 0.0,
+                        cough: 0.0,
+                        throat_clear: 0.0,
+                        sneeze: 0.0,
+                        sniff: 0.0,
+                        wheeze: 0.0,
                     })
                 }),
                 |classified| sent.send(classified).unwrap(),
@@ -393,6 +398,11 @@ fn a_window_the_lamp_spoke_into_is_its_own_and_the_next_is_unknown() {
                         laughter: 0.0,
                         door: 0.0,
                         footsteps: 0.0,
+                        cough: 0.0,
+                        throat_clear: 0.0,
+                        sneeze: 0.0,
+                        sniff: 0.0,
+                        wheeze: 0.0,
                     })
                 }),
                 |classified| sent.send(classified).unwrap(),
@@ -459,6 +469,11 @@ fn a_patch_near_the_quiet_skips_the_model_and_a_loud_one_runs_it() {
                         laughter: 0.0,
                         door: 0.0,
                         footsteps: 0.0,
+                        cough: 0.0,
+                        throat_clear: 0.0,
+                        sneeze: 0.0,
+                        sniff: 0.0,
+                        wheeze: 0.0,
                     })
                 }),
                 |classified| {

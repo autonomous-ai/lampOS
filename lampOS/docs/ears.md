@@ -291,3 +291,41 @@ behind LAMP_EARS_CLASSES". Guard mode's watch reads the topic
 (`skills/src/watch.rs`, arrivals by sound only with `LAMP_GUARD_SOUNDS=on`,
 which no unit sets), and so does the control door's watch
 (`control/src/watch.rs`).
+
+## Body sounds of the person near the lamp (#7685)
+
+`LAMP_EARS_BODY_SOUNDS=on` (exactly `on`) adds a person's own sounds to what the
+same YAMNet already scores: a cough (class 42), a throat cleared (43), a sneeze
+(44), a sniff (45) and a wheeze (37, `yamnet_class_map.csv`). It acts only where
+the room sounds do (`LAMP_EARS_CLASSES=on`, the model, and the person's yes);
+with it off nothing extra is computed or sent, and `ears/classes` is byte for
+byte what it was (the five scores are left out of the message when they are 0,
+so a reader from before them, which refuses a field it does not know, still
+reads it). On, `SoundScores` carries `cough`, `throat_clear`, `sneeze`, `sniff`
+and `wheeze`, and each sound heard is told once on its own topic:
+
+| Topic | Type | Kind | What |
+|---|---|---|---|
+| `ears/body` | `BodySound` | event | One sound: its `class` (`cough`, `throat_clear`, `sneeze`, `sniff`, `wheeze`), its `score` and `at_us` (the end of the window that held it, on the capture clock). No audio, no words, no name. |
+
+A sound spans two or three overlapping patches, so it is told once, on the
+rise past its class's bar; it is told again only after the score has fallen
+under 70% of the bar and the class's refractory has passed (`body_sounds::Detector`).
+Nothing is told while the lamp speaks into the patch. A skill counts the events
+("four coughs in five minutes") with nothing recorded.
+
+**Bars are measured, not guessed.** `body_sounds::BARS` ships every class unmeasured
+(`None`): a class with no measured bar is never told. A bar is set only from the
+recorded sounds of a person who agreed, at the lamp's own microphone (20 each of
+real coughs, sneezes, throat-clears and sniffs, and 60 other sounds: speech,
+laughter, the lamp's own voice, typing, a desk thump, a chair), checked for false
+alarms over an hour of ordinary office sound logged as scores only; a class that
+cannot catch 9 of 10 of its own sounds with under one false alarm an hour is not
+published (the row in [lamp-runs.md](lamp-runs.md)).
+
+**A person's body is theirs.** The scores and the events stay on the lamp: never
+sent to the cloud, never in telemetry or the usage reports, never kept in memory
+or the records unless the person asks, and the voice never reads them (it never
+answers a cough as if spoken to). `crates/ears/tests/body_sounds_stay_home.rs`
+fails if a part that leaves the lamp or lasts names the topic or the type.
+

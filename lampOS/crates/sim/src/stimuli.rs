@@ -37,6 +37,11 @@ fn sound_scores(class: &str, heard: bool, now_us: u64) -> SoundClasses {
             laughter: at("laughter"),
             door: at("door"),
             footsteps: at("footsteps"),
+            cough: 0.0,
+            throat_clear: 0.0,
+            sneeze: 0.0,
+            sniff: 0.0,
+            wheeze: 0.0,
         },
         own_voice: OwnVoiceEvidence::Clear,
     }

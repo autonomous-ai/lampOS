@@ -121,6 +121,13 @@ const SPEECH: usize = 0;
 const MUSIC: usize = 132;
 const LAUGHTER: usize = 13;
 const FOOTSTEPS: usize = 48;
+// The body sounds of a person (#7685), by `yamnet_class_map.csv`'s index:
+// Wheeze 37, Cough 42, Throat clearing 43, Sneeze 44, Sniff 45.
+const WHEEZE: usize = 37;
+const COUGH: usize = 42;
+const THROAT_CLEAR: usize = 43;
+const SNEEZE: usize = 44;
+const SNIFF: usize = 45;
 /// The door group, whose highest score is `door` (#2562): Door (348),
 /// Sliding door (351), Slam (352) and Knock (353). A knock on a door is
 /// AudioSet's Knock, not Door. Tap (354) is left out: desk taps and typing
@@ -156,6 +163,11 @@ const QUIET: SoundScores = SoundScores {
     laughter: 0.0,
     door: 0.0,
     footsteps: 0.0,
+    cough: 0.0,
+    throat_clear: 0.0,
+    sneeze: 0.0,
+    sniff: 0.0,
+    wheeze: 0.0,
 };
 
 /// One admitted block, owned. Neither Clone nor Debug; zeroed on drop with the
@@ -417,6 +429,9 @@ impl tract_onnx::data_resolver::ModelDataResolver for PinnedData {
 
 pub struct Model {
     plan: Arc<TypedRunnableModel>,
+    /// Whether the body sounds are scored (`LAMP_EARS_BODY_SOUNDS=on`):
+    /// off, five sigmoids are not even taken, and they read 0.
+    body: bool,
 }
 
 impl Model {
@@ -445,7 +460,13 @@ impl Model {
             .into_optimized()
             .and_then(|model| model.into_runnable())
             .map_err(said)?;
-        Ok(Self { plan })
+        Ok(Self { plan, body: false })
+    }
+
+    /// Score a person's body sounds too (#7685, `LAMP_EARS_BODY_SOUNDS=on`).
+    pub fn with_body_sounds(mut self, on: bool) -> Self {
+        self.body = on;
+        self
     }
 
     pub fn score(&self, features: &[f32]) -> Result<SoundScores, String> {
@@ -474,6 +495,33 @@ impl Model {
             // LAMP_GUARD_SOUNDS=on in lamp-skills.
             door: door(logits),
             footsteps: sigmoid(logits[FOOTSTEPS]),
+            // A person's own sounds (#7685): scored only when asked, left 0
+            // (and so left out of the message) otherwise.
+            cough: if self.body {
+                sigmoid(logits[COUGH])
+            } else {
+                0.0
+            },
+            throat_clear: if self.body {
+                sigmoid(logits[THROAT_CLEAR])
+            } else {
+                0.0
+            },
+            sneeze: if self.body {
+                sigmoid(logits[SNEEZE])
+            } else {
+                0.0
+            },
+            sniff: if self.body {
+                sigmoid(logits[SNIFF])
+            } else {
+                0.0
+            },
+            wheeze: if self.body {
+                sigmoid(logits[WHEEZE])
+            } else {
+                0.0
+            },
         })
     }
 }
@@ -669,6 +717,10 @@ impl Window {
 pub struct Classified {
     pub classes: SoundClasses,
     pub fence: u64,
+    /// The body sounds this patch held, told one by one on `ears/body`
+    /// (#7685); empty with the switch off, and only the pump publishes them,
+    /// under the same authority and age bound as the scores.
+    pub body: Vec<lamp_msgs::BodySound>,
 }
 
 impl Classified {
@@ -707,6 +759,7 @@ impl Status {
                 reason: self.reason,
             },
             fence: 0,
+            body: Vec::new(),
         });
     }
 
@@ -841,6 +894,7 @@ pub fn serve(
                             },
                         },
                         fence: patch.fence,
+                        body: Vec::new(),
                     });
                 }
                 Err(_) => {

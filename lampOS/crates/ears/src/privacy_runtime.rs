@@ -12,8 +12,8 @@ use lamp_ears::{
     privacy::{Capture, CaptureOwner, Emission, LeaseGate, PublicationGate},
 };
 use lamp_msgs::{
-    Audio, Diagnostic, Level, MicrophonePrivacy, RoomSound, SoundClasses, SuddenSound, Voice,
-    VoiceState,
+    Audio, BodySound, Diagnostic, Level, MicrophonePrivacy, RoomSound, SoundClasses, SuddenSound,
+    Voice, VoiceState,
 };
 use std::{
     io,
@@ -222,6 +222,9 @@ fn connected(
         )),
         None => None,
     };
+    // `ears/body` (#7685): made when the first body sound is to be told, so a
+    // lamp with the switch off declares nothing.
+    let mut body_publisher = None;
     let mut audio = None;
     let mut audio_retry = lamp_ears::pcm::ExportRetry::default();
     let mut looked = 0;
@@ -377,6 +380,20 @@ fn connected(
                         SoundClasses::Unavailable { .. } => now,
                     };
                     publisher.publish_json(at_us, &classified.classes)?;
+                    // Under the same authority and age bound as the scores
+                    // they came from: no body sound outlives its privacy.
+                    for heard in classified.body.iter().filter(|heard| heard.check().is_ok()) {
+                        if body_publisher.is_none() {
+                            body_publisher = Some(bus.publisher_declared(
+                                BodySound::TOPIC,
+                                &BodySound::declaration(),
+                                NAME,
+                            )?);
+                        }
+                        if let Some(publisher) = body_publisher.as_mut() {
+                            publisher.publish_json(heard.at_us, heard)?;
+                        }
+                    }
                 }
             }
         }
@@ -438,6 +455,7 @@ fn start_classes(
     route: Option<&str>,
     room_sounds: &Path,
     model: Option<String>,
+    body: bool,
     shared: &Arc<Shared>,
 ) -> io::Result<(
     Option<lamp_ears::classes::Handoff>,
@@ -474,7 +492,11 @@ fn start_classes(
         .spawn(move || {
             let model = lamp_ears::classes::model_from(model.as_deref())
                 .inspect_err(|error| log(&format!("ears/classes says invalid_model: {error}")))
-                .ok();
+                .ok()
+                .map(|model| model.with_body_sounds(body));
+            // A person's body sounds (#7685), told one by one: only with the
+            // switch, and a class with no measured bar is never told.
+            let mut detector = body.then(lamp_ears::body_sounds::Detector::new);
             lamp_ears::classes::serve(
                 intake,
                 &worker_shared.publication,
@@ -483,7 +505,19 @@ fn start_classes(
                 model
                     .as_ref()
                     .map(|model| |features: &[f32]| model.score(features)),
-                |classified| {
+                |mut classified| {
+                    if let (
+                        Some(detector),
+                        SoundClasses::Scored {
+                            window,
+                            scores,
+                            own_voice,
+                            ..
+                        },
+                    ) = (detector.as_mut(), &classified.classes)
+                    {
+                        classified.body = detector.feed(scores, *own_voice, window.end_us);
+                    }
                     // A stalled pump drops results; they would go stale.
                     let _ = send_classes.try_send(classified);
                 },
@@ -577,6 +611,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
         std::env::var("LAMP_PRIVACY_CONTROLS").ok().as_deref(),
         Path::new(lamp_ears::classes::ROOM_SOUNDS_FILE),
         std::env::var("LAMP_EARS_CLASSES_MODEL").ok(),
+        lamp_ears::body_sounds::enabled(std::env::var("LAMP_EARS_BODY_SOUNDS").ok().as_deref()),
         &shared,
     )?;
     let pump_shared = shared.clone();
@@ -746,9 +781,15 @@ mod tests {
     fn classes_start_nothing_unless_the_switch_is_on() {
         let shared = Arc::new(Shared::new(false));
         for switch in [None, Some(""), Some("off"), Some("ON"), Some("on ")] {
-            let (handoff, receiver) =
-                start_classes(switch, Some("on"), Path::new("/nonexistent"), None, &shared)
-                    .unwrap();
+            let (handoff, receiver) = start_classes(
+                switch,
+                Some("on"),
+                Path::new("/nonexistent"),
+                None,
+                false,
+                &shared,
+            )
+            .unwrap();
             assert!(handoff.is_none() && receiver.is_none(), "{switch:?}");
         }
         assert_eq!(
@@ -778,7 +819,7 @@ mod tests {
             (Some("off"), yes),
         ] {
             let (handoff, receiver) =
-                start_classes(Some("on"), route, &file, None, &shared).unwrap();
+                start_classes(Some("on"), route, &file, None, false, &shared).unwrap();
             assert!(
                 handoff.is_none() && receiver.is_none(),
                 "{route:?} {file:?}"

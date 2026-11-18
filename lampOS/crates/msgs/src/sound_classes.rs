@@ -30,8 +30,12 @@ pub enum OwnVoiceEvidence {
     Unknown,
 }
 
+fn zero(score: &f32) -> bool {
+    *score == 0.0
+}
+
 /// Independent model scores; their sum need not be one.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SoundScores {
     pub speech: f32,
@@ -45,6 +49,23 @@ pub struct SoundScores {
     pub door: f32,
     #[serde(default)]
     pub footsteps: f32,
+    /// The body sounds of a person near the lamp (#7685): a cough, a throat
+    /// cleared, a sneeze, a sniff, a wheeze. Scored, and so written, ONLY
+    /// with `LAMP_EARS_BODY_SOUNDS=on` in lamp-ears: with it off they are 0
+    /// and left out, so the message is byte for byte what it was and a reader
+    /// from before them (this struct refuses a field it does not know) reads
+    /// it as ever. A reader that finds none reads 0. They are a person's own:
+    /// never sent from the lamp, never kept (docs/ears.md, "Body sounds").
+    #[serde(default, skip_serializing_if = "zero")]
+    pub cough: f32,
+    #[serde(default, skip_serializing_if = "zero")]
+    pub throat_clear: f32,
+    #[serde(default, skip_serializing_if = "zero")]
+    pub sneeze: f32,
+    #[serde(default, skip_serializing_if = "zero")]
+    pub sniff: f32,
+    #[serde(default, skip_serializing_if = "zero")]
+    pub wheeze: f32,
 }
 
 /// The original source window and completion time, all on the capture clock.
@@ -107,6 +128,11 @@ impl SoundClasses {
             ("laughter", scores.laughter),
             ("door", scores.door),
             ("footsteps", scores.footsteps),
+            ("cough", scores.cough),
+            ("throat_clear", scores.throat_clear),
+            ("sneeze", scores.sneeze),
+            ("sniff", scores.sniff),
+            ("wheeze", scores.wheeze),
         ] {
             if !score.is_finite() || !(0.0..=1.0).contains(&score) {
                 return Err(Invalid(format!(
@@ -160,6 +186,11 @@ mod tests {
                 laughter: 0.2,
                 door: 0.1,
                 footsteps: 0.0,
+                cough: 0.0,
+                throat_clear: 0.0,
+                sneeze: 0.0,
+                sniff: 0.0,
+                wheeze: 0.0,
             },
             own_voice: OwnVoiceEvidence::Unknown,
         }
@@ -180,6 +211,72 @@ mod tests {
     }
 
     /// #2562: an older lamp-ears says no door or footsteps; read as none.
+    /// #7685: the body sounds are written only when they are scored, so a
+    /// lamp with the switch off sends the message it always did (and a reader
+    /// from before them, which refuses a field it does not know, reads it).
+    #[test]
+    fn body_scores_off_leave_the_message_byte_for_byte_as_it_was() {
+        let before =
+            "{\"speech\":0.9,\"music\":0.9,\"laughter\":0.2,\"door\":0.1,\"footsteps\":0.0}";
+        let SoundClasses::Scored { scores, .. } = scored() else {
+            unreachable!()
+        };
+        assert_eq!(serde_json::to_string(&scores).unwrap(), before);
+        // From before: no body field, read as 0.
+        let old: SoundScores = serde_json::from_str(before).unwrap();
+        assert_eq!(
+            (
+                old.cough,
+                old.throat_clear,
+                old.sneeze,
+                old.sniff,
+                old.wheeze
+            ),
+            (0.0, 0.0, 0.0, 0.0, 0.0)
+        );
+        // On: written, and read back.
+        let on = SoundScores {
+            sneeze: 0.8,
+            cough: 0.4,
+            ..scores
+        };
+        let text = serde_json::to_string(&on).unwrap();
+        assert!(
+            text.contains("\"cough\":0.4") && text.contains("\"sneeze\":0.8"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("sniff") && !text.contains("wheeze") && !text.contains("throat_clear"),
+            "a zero is left out: {text}"
+        );
+        assert_eq!(serde_json::from_str::<SoundScores>(&text).unwrap(), on);
+    }
+
+    #[test]
+    fn a_body_score_outside_zero_to_one_or_not_finite_is_refused() {
+        for bad in [-0.1, 1.5, f32::NAN] {
+            let SoundClasses::Scored {
+                model_id,
+                window,
+                scores,
+                own_voice,
+            } = scored()
+            else {
+                unreachable!()
+            };
+            let odd = SoundClasses::Scored {
+                model_id,
+                window,
+                scores: SoundScores {
+                    sneeze: bad,
+                    ..scores
+                },
+                own_voice,
+            };
+            assert!(odd.check().is_err(), "{bad}");
+        }
+    }
+
     #[test]
     fn scores_without_a_door_or_footsteps_read_as_none() {
         let json = serde_json::json!({"speech": 0.1, "music": 0.2, "laughter": 0.0});
