@@ -3729,6 +3729,16 @@ async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() 
     )
     .await;
     assert_eq!(short["error"]["code"], "bad_request", "{short}");
+    // A repeat and an unknown field are refused in the app socket's own words.
+    let twice = json!({"id": 10, "op": "phrases.set", "phrases": ["lesson time", "lesson time"]});
+    let twice = app_ask(&mut socket, twice).await;
+    assert_eq!(twice["error"]["why"], "phrases: no phrase twice", "{twice}");
+    let extra = json!({"id": 11, "op": "phrases.set", "phrases": ["lesson time"], "x": 1});
+    let extra = app_ask(&mut socket, extra).await;
+    assert_eq!(
+        extra["error"]["why"], "phrases.set takes only phrases",
+        "{extra}"
+    );
     let none = app_ask(
         &mut socket,
         json!({"id": 9, "op": "phrases.set", "phrases": []}),

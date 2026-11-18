@@ -162,7 +162,7 @@ its grants allow, each refused `no_grant` without its grant, plus:
 
 | op | fields | answer |
 |---|---|---|
-| `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them); an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
+| `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them), no phrase twice (`bad_request`, as the schema's `uniqueItems`), no field but `phrases`; an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
 | `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters | `{"ok":true}` |
 | `app.settings.get` | none | `{"ok":true,"settings":{key: value,…}}`, every key with its current value |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"code":"rate","retry_ms":N}` |
