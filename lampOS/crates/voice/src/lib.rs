@@ -73,6 +73,7 @@ pub mod conversation_summary;
 pub mod cut_in_prompt_log;
 pub mod cut_in_told;
 pub mod cut_in_wordless;
+pub mod day_shed;
 pub mod day_tally;
 pub mod diagnostic_control;
 pub mod diagnostics;
