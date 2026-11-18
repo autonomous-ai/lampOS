@@ -34,7 +34,18 @@
 //!   The posture window's samples older than its ten minutes still age out.
 //! - **The journal** says when each is kept, goes on, or is wiped, and why
 //!   (the gate's word): no id, no box.
+//! - **The next sitting** ([`Seat`]) counts from `room/activity`'s arrival,
+//!   as ever, but never from before the last time the chair emptied: 120 s
+//!   closed ([`Why::Expired`]), or a held sitting ended on another face
+//!   ([`crate::hold::End::OtherFace`]). `room/activity`'s `sitting_s` is
+//!   the room's, forgives a gap under two minutes and knows no face, so on
+//!   lamp-06c1's run 8 the next person's `break_s_ago` counted the first
+//!   one's time (the first builder's rule on #6543). A stand-up, a forget,
+//!   and the gate opening on a new id without the hold (most often the
+//!   same person looking back up) begin from the arrival as before.
 use crate::gate::{Closed, Inputs};
+use crate::hold;
+use crate::sitting::Sitting;
 use crate::watch::OnTrack;
 
 /// The longest a closing keeps the sitting's windows.
@@ -84,8 +95,6 @@ pub struct Now<'a> {
     pub desk: Result<(), Closed>,
     /// Posture's window is being watched ([`crate::pose::Pose::watching`]).
     pub watching: bool,
-    /// A sitting is under way.
-    pub sitting: bool,
 }
 
 /// Whether this step's closing wipes at once, and why.
@@ -226,6 +235,17 @@ impl Away {
     }
 }
 
+impl Away {
+    /// A held sitting ended on another face ([`Keep::step`]): wiped
+    /// as [`Why::OtherFace`], and kept from now for `face`, the one in
+    /// view.
+    fn other_face(&mut self, face: Option<&str>) -> Step {
+        self.since_us = None;
+        self.face = face.map(str::to_owned);
+        Step::Wiped(Why::OtherFace)
+    }
+}
+
 /// What one step does with the posture window and the doing timers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Plan {
@@ -242,24 +262,103 @@ pub struct Keep {
 }
 
 impl Keep {
-    pub fn step(&mut self, now: &Now<'_>) -> Plan {
+    /// One step: `sitting`, a sitting is under way; `other_face`, a held
+    /// sitting ended this step on another face
+    /// ([`crate::hold::End::OtherFace`]), which wipes both as
+    /// [`Why::OtherFace`].
+    pub fn step(&mut self, now: &Now<'_>, sitting: bool, other_face: bool) -> Plan {
         let hard = hard(now);
         let face = now.seen.track.as_ref().map(|track| track.id.as_str());
         let posture_closed = now.posture_gate.is_err();
-        let posture = self
-            .posture
-            .step(now.now_us, posture_closed, hard, now.watching, face);
+        let posture = if other_face && now.watching {
+            self.posture.other_face(face)
+        } else {
+            self.posture
+                .step(now.now_us, posture_closed, hard, now.watching, face)
+        };
         // The sitting ends, as before, only on the desk's own line (nobody).
         let sitting_closed = matches!(now.desk, Err(Closed::Nobody));
         let sitting_hard = hard.filter(|hard| hard.ends_sitting());
-        let sitting =
+        let sitting = if other_face && sitting {
+            self.sitting.other_face(face)
+        } else {
             self.sitting
-                .step(now.now_us, sitting_closed, sitting_hard, now.sitting, face);
+                .step(now.now_us, sitting_closed, sitting_hard, sitting, face)
+        };
         Plan {
             hard,
             posture,
             sitting,
         }
+    }
+}
+
+/// Whether this step shows the chair emptied, so the next sitting never
+/// counts from before it: the sitting's timers wiped after 120 s closed
+/// ([`Why::Expired`]), or a held sitting ended on another face
+/// (`held_other_face`). The keep's own [`Why::OtherFace`] (the gate open
+/// on a new id, most often the same person looking back up), a stand-up
+/// and a forget are not.
+pub fn chair_emptied(sitting: Step, held_other_face: bool) -> bool {
+    held_other_face || sitting == Step::Wiped(Why::Expired)
+}
+
+/// How a sitting begun this step is made: `serve`'s switches and
+/// readings.
+#[derive(Clone, Copy, Debug)]
+pub struct Begin {
+    /// `room/activity`'s arrival (a gap under two minutes forgiven), or now.
+    pub arrived_us: u64,
+    /// `LAMP_SEEN_MORE_DOINGS` on.
+    pub more: bool,
+    /// `LAMP_SEEN_BREAK_IS_STANDING` on.
+    pub break_is_standing: bool,
+    /// When the last `room/stood_up` came.
+    pub stood_up_us: Option<u64>,
+}
+
+/// The sitting as `serve` steps it each step: the keep's plan, its wipe,
+/// and the next sitting's beginning ([`crate::sitting::begins_us`]).
+#[derive(Clone, Debug, Default)]
+pub struct Seat {
+    keep: Keep,
+    sitting: Option<Sitting>,
+    /// When the chair last emptied ([`chair_emptied`]).
+    emptied_us: Option<u64>,
+}
+
+impl Seat {
+    /// The sitting under way, if one is.
+    pub fn sitting(&self) -> Option<&Sitting> {
+        self.sitting.as_ref()
+    }
+
+    pub fn sitting_mut(&mut self) -> Option<&mut Sitting> {
+        self.sitting.as_mut()
+    }
+
+    /// One step after the hold's (`hold_notes`, this step's): the keep's
+    /// plan, the sitting wiped when it says so, and one begun when someone
+    /// is at the desk (`now.desk`) and none is under way.
+    pub fn step(&mut self, now: &Now<'_>, hold_notes: &[hold::Note], begin: &Begin) -> Plan {
+        let held_other_face = hold::ended_on_other_face(hold_notes);
+        let plan = self.keep.step(now, self.sitting.is_some(), held_other_face);
+        if chair_emptied(plan.sitting, held_other_face) {
+            self.emptied_us = Some(now.now_us);
+        }
+        if plan.sitting.wipes() {
+            self.sitting = None;
+        }
+        if now.desk.is_ok() && self.sitting.is_none() {
+            let begins = crate::sitting::begins_us(begin.arrived_us, self.emptied_us);
+            let begun = Sitting::with_more(begins, begin.more);
+            self.sitting = Some(if begin.break_is_standing {
+                begun.break_is_standing(now.now_us, begin.stood_up_us)
+            } else {
+                begun
+            });
+        }
+        plan
     }
 }
 

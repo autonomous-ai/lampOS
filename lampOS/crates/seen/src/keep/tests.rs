@@ -17,17 +17,20 @@ fn plan(scene: &mut Scene, keep: &mut Keep, at: u64, stood_up: bool, forgot: boo
         asleep: Some(false),
         ..inputs
     });
-    keep.step(&Now {
-        now_us: at,
-        inputs: &inputs,
-        seen: &seen,
-        stood_up,
-        forgot,
-        posture_gate: gate,
-        desk,
-        watching: true,
-        sitting: true,
-    })
+    keep.step(
+        &Now {
+            now_us: at,
+            inputs: &inputs,
+            seen: &seen,
+            stood_up,
+            forgot,
+            posture_gate: gate,
+            desk,
+            watching: true,
+        },
+        true,
+        false,
+    )
 }
 
 fn owner(scene: &mut Scene, keep: &mut Keep, at: u64) -> Plan {
@@ -266,4 +269,171 @@ fn nothing_to_keep_is_as_before() {
         Step::Wiped(Why::Expired)
     );
     assert_eq!(away.step(S + KEEP_US, true, None, false, None), Step::Open);
+}
+
+#[test]
+fn a_hold_ended_on_another_face_wipes_both_as_another_face() {
+    let mut scene = Scene::owner_at(0);
+    let mut keep = Keep::default();
+    assert_eq!(owner(&mut scene, &mut keep, S).posture, Step::Open);
+    scene.faces(&[("f2", 0.4)], 2 * S);
+    scene.renew(2 * S);
+    let inputs = scene.readings.inputs(scene.opted_in, true, 2 * S);
+    let seen = scene.readings.on_track(2 * S);
+    let gate = crate::gate::may_request(&inputs);
+    let step = |keep: &mut Keep, sitting: bool, watching: bool| {
+        keep.step(
+            &Now {
+                now_us: 2 * S,
+                inputs: &inputs,
+                seen: &seen,
+                stood_up: false,
+                forgot: false,
+                posture_gate: gate,
+                desk: gate,
+                watching,
+            },
+            sitting,
+            true,
+        )
+    };
+    let plan = step(&mut keep, true, true);
+    assert_eq!(plan.hard, None);
+    assert_eq!(
+        (plan.posture, plan.sitting),
+        (Step::Wiped(Why::OtherFace), Step::Wiped(Why::OtherFace))
+    );
+    // Nothing under way: nothing to wipe.
+    let plan = step(&mut Keep::default(), false, false);
+    assert_eq!((plan.posture, plan.sitting), (Step::Open, Step::Open));
+    // The new face's id is kept: lost and back under it, it goes on.
+    scene.faces(&[], 3 * S);
+    let lost = plan_at(&mut scene, &mut keep, 3 * S);
+    assert_eq!((lost.posture, lost.sitting), (Step::Began, Step::Began));
+    let back = owner_as(&mut scene, &mut keep, "f2", 10 * S);
+    assert_eq!((back.posture, back.sitting), (Step::Resumed, Step::Resumed));
+}
+
+fn plan_at(scene: &mut Scene, keep: &mut Keep, at: u64) -> Plan {
+    plan(scene, keep, at, false, false)
+}
+
+/// One step of `serve`'s seat at `at` ([`Seat::step`]), with posture said,
+/// `room/activity`'s arrival at 0, and the break a stand-up.
+fn seat_step(
+    scene: &mut Scene,
+    seat: &mut Seat,
+    at: u64,
+    stood_up: Option<u64>,
+    hold_notes: &[crate::hold::Note],
+) -> Plan {
+    scene.renew(at);
+    let inputs = scene.readings.inputs(scene.opted_in, true, at);
+    let seen = scene.readings.on_track(at);
+    let gate = crate::gate::may_request(&inputs);
+    seat.step(
+        &Now {
+            now_us: at,
+            inputs: &inputs,
+            seen: &seen,
+            stood_up: stood_up == Some(at),
+            forgot: false,
+            posture_gate: gate,
+            desk: gate,
+            watching: true,
+        },
+        hold_notes,
+        &Begin {
+            arrived_us: 0,
+            more: false,
+            break_is_standing: true,
+            stood_up_us: stood_up,
+        },
+    )
+}
+
+/// What `humans/doing` says at `at`: break, drink and eating, in seconds.
+fn timers(seat: &Seat, at: u64) -> (u32, u32, u32) {
+    let doing = seat.sitting().expect("a sitting").doing(at);
+    (doing.break_s_ago, doing.drank_s_ago, doing.ate_s_ago)
+}
+
+#[test]
+fn seat_a_held_sitting_ended_on_another_face_begins_the_next_from_then() {
+    // lamp-06c1, run 8 (#7506), through `serve`'s step: `room/activity`
+    // still says the sitting began at 0 when another face ends the hold
+    // at 2_100 s; the next person's timers count from then.
+    use crate::hold::{End, Note};
+    let mut scene = Scene::owner_at(0);
+    let mut seat = Seat::default();
+    seat_step(&mut scene, &mut seat, S, None, &[Note::Began]);
+    assert_eq!(timers(&seat, 60 * S), (60, 60, 60), "from the arrival");
+    scene.faces(&[("f2", 0.4)], 2_100 * S);
+    let plan = seat_step(
+        &mut scene,
+        &mut seat,
+        2_100 * S,
+        None,
+        &[Note::Ended(End::OtherFace), Note::Began],
+    );
+    assert_eq!(
+        (plan.posture, plan.sitting),
+        (Step::Wiped(Why::OtherFace), Step::Wiped(Why::OtherFace))
+    );
+    assert_eq!(timers(&seat, 2_160 * S), (60, 60, 60));
+    // Later wipes of other kinds keep that floor.
+    scene.faces(&[], 2_200 * S);
+    seat_step(&mut scene, &mut seat, 2_200 * S, None, &[]);
+    scene.faces(&[("f2", 0.4)], 2_210 * S);
+    seat_step(&mut scene, &mut seat, 2_210 * S, None, &[]);
+    assert_eq!(timers(&seat, 2_260 * S), (160, 160, 160));
+}
+
+#[test]
+fn seat_120_s_with_nobody_begins_the_next_from_the_wipe() {
+    let mut scene = Scene::owner_at(0);
+    let mut seat = Seat::default();
+    seat_step(&mut scene, &mut seat, S, None, &[]);
+    for at in [2 * S, 60 * S] {
+        scene.faces(&[], at);
+        seat_step(&mut scene, &mut seat, at, None, &[]);
+    }
+    scene.faces(&[], 122 * S);
+    let plan = seat_step(&mut scene, &mut seat, 122 * S, None, &[]);
+    assert_eq!(plan.sitting, Step::Wiped(Why::Expired));
+    scene.faces(&[("f2", 0.4)], 130 * S);
+    seat_step(&mut scene, &mut seat, 130 * S, None, &[]);
+    assert_eq!(timers(&seat, 182 * S), (60, 60, 60));
+}
+
+#[test]
+fn seat_a_stand_up_begins_from_the_arrival_as_before() {
+    // Twelve's P2 on #7635: one person's ~30 s stand-up keeps the drink
+    // and eating timers from the first arrival; the break counts from
+    // the return (`LAMP_SEEN_BREAK_IS_STANDING`).
+    let mut scene = Scene::owner_at(0);
+    let mut seat = Seat::default();
+    seat_step(&mut scene, &mut seat, S, None, &[]);
+    let plan = seat_step(&mut scene, &mut seat, 2_072 * S, Some(2_072 * S), &[]);
+    assert_eq!(plan.sitting, Step::Wiped(Why::Hard(Hard::StoodUp)));
+    scene.faces(&[], 2_073 * S);
+    seat_step(&mut scene, &mut seat, 2_073 * S, Some(2_072 * S), &[]);
+    scene.faces(&[("f4", 0.4)], 2_100 * S);
+    seat_step(&mut scene, &mut seat, 2_100 * S, Some(2_072 * S), &[]);
+    assert_eq!(timers(&seat, 3_000 * S), (900, 3_000, 3_000));
+}
+
+#[test]
+fn seat_a_plain_new_id_without_the_hold_begins_from_the_arrival_as_before() {
+    // The keep's own OtherFace: the gate open again on a new passing id,
+    // most often the same person looking back up. The arrival stands.
+    let mut scene = Scene::owner_at(0);
+    let mut seat = Seat::default();
+    seat_step(&mut scene, &mut seat, S, None, &[]);
+    scene.faces(&[], 2_090 * S);
+    seat_step(&mut scene, &mut seat, 2_090 * S, None, &[]);
+    scene.faces(&[("f3", 0.4)], 2_100 * S);
+    let plan = seat_step(&mut scene, &mut seat, 2_100 * S, None, &[]);
+    assert_eq!(plan.sitting, Step::Wiped(Why::OtherFace));
+    assert_eq!(timers(&seat, 2_160 * S), (2_160, 2_160, 2_160));
 }

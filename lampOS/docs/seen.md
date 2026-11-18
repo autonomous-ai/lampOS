@@ -375,7 +375,16 @@ that one too, aborts a burst under way.
 - **The sitting and its timers.** A sitting begins when someone is at the
   desk with a face in view (the gate's presence line, whatever the
   opt-in, its said-back line, the privacy or sleep say), from `room/activity`'s `sitting_s`
-  when it said one lately, else from now. It ends at once on
+  when it said one lately, else from now, but never from before the
+  chair last emptied (`keep::Seat`, `keep::chair_emptied`): nobody at the
+  desk for 120 s (`Why::Expired`), or a held sitting ended on another face
+  (`hold::End::OtherFace`, below). `sitting_s` is the room's, forgives a
+  gap under two minutes and knows no face, so the next person's timers
+  counted the first one's time (lamp-06c1, run 8: `break_s_ago` 2191 a
+  minute after the hold carried over; the first builder's rule on #6543).
+  A stand-up, a forget, and the gate opening on a new passing id without
+  the hold (most often the same person looking back up) begin from
+  `sitting_s` as before. It ends at once on
   `room/stood_up` or a forget; a stranger, a second face or a misread ends
   nothing (no stranger check). When the gate's presence line says nobody,
   it is kept, unsaid, for up to 120 s and goes on if the face is back
@@ -646,7 +655,10 @@ So `lamp-seen` has no stranger rule anywhere, with or without a switch:
   reading there is nothing to pause on, and `diagnostics` no longer says
   `paused` or `misread_on_track`.
 - **The held sitting** (`hold.rs`) no longer ends on another person alone
-  in the seat.
+  in the seat as a stranger. It ends on another passing id only once the
+  chair may have emptied (a pose answer with no close person since the
+  face was lost): two ids from the eyes and the shoulders compared, never
+  who anyone is.
 - **`humans/familiar`** is not read by `lamp-seen`.
 
 What this agrees to: once the owner has opted in and been told, pictures
@@ -672,8 +684,13 @@ the owner onto someone who takes the seat:
   at the desk for 120 s wipes both (`keep::KEEP_US`); posture's samples
   age out of its ten-minute window, so after 10 minutes it holds only the
   one sitting now. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
-  sitting ends at the 10-minute re-check since the gate was last open on
-  a face (`hold::MOST_US`) at the latest. The keep then holds the id it
+  sitting ends when, after the face was lost and an answer with no close
+  person, a face comes into view under another passing id than the one it
+  was open on (`hold::End::OtherFace`, which wipes both and starts the
+  next sitting from that wipe), and at the 10-minute re-check since the gate was last
+  open on a face (`hold::MOST_US`) at the latest. A guest who never shows
+  a face, or who sits down with a close person in every answer, is
+  carried until then. The keep then holds the id it
   had, so the guest's own face opening the gate wipes both as another face
   (`Why::OtherFace`), as the test
   `the_owner_leaving_and_a_guest_sitting_within_1_5_s_ends_at_the_10_min_re_check`
@@ -754,9 +771,25 @@ model sees a close person (`hold.rs`):
   person's answer within 45 s of the hold's beginning, below;
   `room/stood_up`; the privacy slide or capture muted; sleep; the opt-in off
   or its line withdrawn; a forget; or 10 minutes since the gate was last
-  open on a face (`hold::MOST_US`). Another person alone in the seat no
-  longer ends it (#7256's stop, removed at the owner's word; [No stranger
-  check](#no-stranger-check)).
+  open on a face (`hold::MOST_US`). **Another face once the chair
+  emptied** ends it too: the hold keeps, in memory only and never said,
+  the passing id of the one face in view the last step the gate was open
+  on one, as the keep does. Once the face was lost and at least one pose
+  answer since showed no close person, the one face in view coming back
+  under another id (or with none known, as when it began on two faces)
+  ends it and wipes the posture window and the sitting's timers as the
+  keep's `Why::OtherFace` does, and the next sitting counts from that
+  wipe. On lamp-06c1's run 8 (18 Nov, #7506) the owner hid at 07:20:04,
+  the hold went on on a stale close answer, one answer at 07:20:33 had no
+  close person, and another face came into view at 07:20:45 under its own
+  id and took on the owner's sitting. With a close person in every answer
+  it is the same body in the chair, and a new id is them looking back up
+  (the eyes give a face turned away and back a new passing id as a rule,
+  [eyes.md](eyes.md)): the hold goes on, on the new id (Heron's P1 on
+  #7635). With two faces in view no id is matched and nothing ends. Only
+  two ids from the eyes are compared: who anyone is is never asked ([No
+  stranger check](#no-stranger-check); #7256's stranger stop stays
+  removed).
 - **The first answer** (lamp-06c1, run 4: the face lost seconds after
   every beginning, while the first answer was ~30 s away): a hold begins
   with the newest pose answer when its frame went under 30 s ago
@@ -767,13 +800,14 @@ model sees a close person (`hold.rs`):
   (`hold::FIRST_ANSWER_US`), with no frames beyond posture's and activity's
   own rates; with none by then (no answer, or only a far one), it ends.
 - **Nothing kept:** an answer's two shoulders are read as a share of the
-  width and dropped; no frame, point or id is kept, and the rates are
-  unchanged.
+  width and dropped; no frame or point is kept, the one face's passing id
+  is held in memory only, and the rates are unchanged.
 - **What it agrees to:** for up to 10 minutes after the gate was last open
   on a face, pictures may go while no face is visible, as long as someone
-  is close to the lamp. That includes someone else taking the seat, shown
-  or not, and a second person nearby (the owner's call); it ends at the
-  10-minute re-check at the latest.
+  is close to the lamp. That includes someone else taking the seat without
+  showing a face, and a second person nearby (the owner's call); it ends
+  at the 10-minute re-check at the latest, and at once when another face
+  shows after an answer with no close person.
 - **Without posture** (`LAMP_SEEN_POSTURE` off) no pose answer ever comes,
   so a hold ends as soon as the face is lost, with no 45 s wait: nothing
   changes.
@@ -784,7 +818,8 @@ model sees a close person (`hold.rs`):
   sitting ended (no close person in 2 answers in a row)`, or `(stood_up)`,
   `(privacy_closed)`, `(asleep)`, `(no_opt_in)`, `(not_said_yet)`,
   `(forgot)`, `(the face lost and no close posture answer within 45 s)`,
-  `(10 min since the gate was open on a face)`.
+  `(10 min since the gate was open on a face)`, `(another face in view
+  than the one it was held for)`.
 
 Off, `serve` is as without it: the shoulders are read from each answer and
 dropped, and nothing else changes.

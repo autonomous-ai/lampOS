@@ -57,7 +57,7 @@ pub struct Readings {
     presence: Option<(Option<bool>, u64)>,
     faces: Option<(Option<usize>, u64)>,
     /// The one face in view, by its passing id, and its box in the newest
-    /// list; `None` while not exactly one valid face.
+    /// list; `None` while not exactly one valid face with a non-empty id.
     alone: Option<(String, [f32; 4])>,
     asleep: Option<(Option<bool>, u64)>,
 }
@@ -84,7 +84,8 @@ impl Readings {
         let count = faces.check().is_ok().then_some(faces.faces.len());
         self.faces = Some((count, now_us));
         self.alone = match (count, faces.faces.first()) {
-            (Some(1), Some(face)) => Some((
+            // An empty id is no one face's: it would match another.
+            (Some(1), Some(face)) if !face.id.is_empty() => Some((
                 face.id.clone(),
                 [face.xmin, face.ymin, face.xmax, face.ymax],
             )),
@@ -214,6 +215,32 @@ mod tests {
         );
         readings.expression(&state(Some(false)), at);
         readings
+    }
+
+    #[test]
+    fn a_face_with_an_empty_id_is_on_no_track() {
+        // Twelve's P3 on #7635: an empty passing id would match another
+        // empty one, so it is no one face's id; the count still opens the
+        // gate as before.
+        let mut readings = Readings::default();
+        readings.faces(
+            &Faces {
+                faces: vec![face("")],
+            },
+            S,
+        );
+        assert_eq!(readings.on_track(S), OnTrack::default());
+        assert_eq!(readings.inputs(true, true, S).faces, Some(1));
+        readings.faces(
+            &Faces {
+                faces: vec![face("f1")],
+            },
+            2 * S,
+        );
+        assert_eq!(
+            readings.on_track(2 * S).track.map(|track| track.id),
+            Some("f1".to_owned())
+        );
     }
 
     #[test]
