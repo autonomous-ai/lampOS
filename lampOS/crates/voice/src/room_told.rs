@@ -200,6 +200,8 @@ pub struct RoomTold {
     /// ([`Self::seen_talking`]).
     held_talk: bool,
     talking_seen: Option<u64>,
+    /// `LAMP_ROOM_HELD_TALK` ([`Self::count_held_not_spoken_to`]).
+    held_not_spoken_to: bool,
     /// The request whose face turned to the lamp was seen not speaking it
     /// (`LAMP_TURNED_FACE_SPEAKS`, [`Self::face_not_speaking`]).
     not_speaking: Option<u64>,
@@ -242,6 +244,7 @@ impl RoomTold {
             ends_sooner: false,
             held_talk: false,
             talking_seen: None,
+            held_not_spoken_to: false,
             not_speaking: None,
             carried: None,
             colleague_held: None,
@@ -266,6 +269,21 @@ impl RoomTold {
     /// two lines in a row were never left alone.
     pub fn count_held_talk(&mut self, on: bool) {
         self.held_talk = on;
+    }
+
+    /// With `LAMP_ROOM_HELD_TALK` (`second_provider::ROOM_HELD_TALK_ENVIRONMENT`,
+    /// #7332, the first builder on #7570 at 07:14 on 18 Nov), from now on: a
+    /// line the lamp's rule held as said to nobody
+    /// ([`crate::attention::NOT_SPOKEN_TO`]) is talk for the busy room, its
+    /// run and its clock, as a line the Policy held as not the lamp's is
+    /// ([`Self::judged`]); it ends no conversation, and none of the rest of
+    /// `LAMP_NAME_OR_FOLLOW_UP` comes with it. With only talk counted
+    /// (`LAMP_SPOKEN_TO`) such a line was no talk at all, so two people
+    /// talking at a desk, held line after held line, never made the room
+    /// busy. A lone voice's held lines count too: three in a minute make
+    /// the room busy (what [`Self::count_held_talk`]'s note warns of).
+    pub fn count_held_not_spoken_to(&mut self, on: bool) {
+        self.held_not_spoken_to = on;
     }
 
     /// `request` was said while the only faces turned to the lamp were seen
@@ -551,6 +569,15 @@ impl RoomTold {
             // `LAMP_TURNED_FACE_SPEAKS`: said past a face turned to the lamp
             // and seen not speaking it, in any room, it is talk.
             Some(crate::attention::Verdict::Hold(_)) if self.not_speaking == Some(request) => {}
+            // `LAMP_ROOM_HELD_TALK`: said to nobody, it is talk for the busy
+            // room only.
+            Some(crate::attention::Verdict::Hold(why))
+                if self.held_not_spoken_to && why == crate::attention::NOT_SPOKEN_TO =>
+            {
+                if self.talk_only {
+                    self.held_by_policy = Some(request);
+                }
+            }
             Some(crate::attention::Verdict::Hold(_)) => self.held(request),
             _ => {}
         }
@@ -2203,6 +2230,92 @@ mod tests {
             "held untied desk talk is talk, and ends no conversation"
         );
         assert_eq!(run(crate::attention::NOT_SPOKEN_TO).0, Room::Quiet);
+    }
+
+    /// `LAMP_ROOM_HELD_TALK` (#7332), with only talk counted: three lines
+    /// held as said to nobody inside a minute make a room not yet known
+    /// busy, and end no conversation; the busy room's clock runs from the
+    /// last of them. Without the switch they leave it unknown, as before.
+    #[test]
+    fn with_the_switch_held_not_spoken_to_lines_make_the_room_busy() {
+        use crate::attention::{NOT_SPOKEN_TO, Verdict};
+        let run = |on: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.count_held_not_spoken_to(on);
+            room.at(0);
+            let left: Vec<Left> = [(1, 10), (2, 30), (3, 50)]
+                .into_iter()
+                .map(|(request, at)| {
+                    room.heard(request, at * S);
+                    room.ended(request, at * S + S / 2);
+                    room.judged(request, Some(Verdict::Hold(NOT_SPOKEN_TO)), false);
+                    room.left_unanswered(request, at * S + S)
+                })
+                .collect();
+            assert_eq!(left, [Left::Held; 3], "held, not talk past the lamp");
+            assert!(!room.talked_past_the_lamp(), "it ends no conversation");
+            (room.at(52 * S), room)
+        };
+        let (busy, mut room) = run(true);
+        assert_eq!(busy, Room::Busy);
+        assert_eq!(
+            room.at(230 * S),
+            Room::Busy,
+            "under three minutes from the last"
+        );
+        assert_eq!(room.at(231 * S), Room::Quiet);
+        assert_eq!(run(false).0, Room::Unknown);
+        // Any other hold is as before.
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.count_held_not_spoken_to(true);
+        room.at(0);
+        for (request, at) in [(1, 10), (2, 30), (3, 50)] {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            let other = Verdict::Hold(crate::attention::TURNED_NOT_SPOKEN_TO);
+            room.judged(request, Some(other), false);
+            room.left_unanswered(request, at * S + S);
+        }
+        assert_eq!(room.at(52 * S), Room::Unknown);
+    }
+
+    /// `LAMP_ROOM_HELD_TALK` (#7332): a line held as said to nobody that
+    /// the lamp then carries as the same speaker's, or answers, is no talk:
+    /// two such among three held lines leave the room as it was.
+    #[test]
+    fn with_the_switch_a_held_line_carried_or_answered_is_no_talk() {
+        use crate::attention::{NOT_SPOKEN_TO, Verdict};
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.count_held_not_spoken_to(true);
+        room.at(0);
+        let held = |room: &mut RoomTold, request: u64, at: u64| {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            room.judged(request, Some(Verdict::Hold(NOT_SPOKEN_TO)), false);
+        };
+        held(&mut room, 1, 10);
+        assert_eq!(room.left_unanswered(1, 11 * S), Left::Held);
+        held(&mut room, 2, 20);
+        room.carried(2);
+        assert_eq!(room.left_unanswered(2, 21 * S), Left::Held);
+        held(&mut room, 3, 30);
+        room.spoke(3, 31 * S);
+        held(&mut room, 4, 40);
+        assert_eq!(room.left_unanswered(4, 41 * S), Left::Held);
+        assert_eq!(
+            room.at(42 * S),
+            Room::Unknown,
+            "the answer began the run afresh"
+        );
+        held(&mut room, 5, 50);
+        assert_eq!(room.left_unanswered(5, 51 * S), Left::Held);
+        assert_eq!(room.at(52 * S), Room::Unknown);
+        held(&mut room, 6, 60);
+        room.left_unanswered(6, 61 * S);
+        assert_eq!(room.at(62 * S), Room::Busy, "three since the answer");
     }
 
     /// #829: the conversation is over only by another voice until talk is
