@@ -56,6 +56,7 @@ pub mod body_link;
 pub mod body_motion;
 pub mod bus_out;
 pub mod did_history;
+pub mod watches;
 // A developer's computer reads the microphone off the bus (`--microphone-device bus:mic1`).
 #[cfg(unix)]
 pub mod bus_capture;

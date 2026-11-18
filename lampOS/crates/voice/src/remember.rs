@@ -10944,6 +10944,12 @@ impl DaysClient {
                     self.forget_all_service_rows(&owner, Instant::now() + left);
                 }
             }
+            // "Forget everything", done (their memory answered `ok`, after the
+            // yes): the watches end too, and the file that keeps them
+            // (`LAMP_WATCH`); a held or refused forget ends none.
+            if call.name == FORGET_EVERYTHING && answer["ok"] == true {
+                crate::watches::forget_all();
+            }
             if call.name == FORGET_EVERYTHING && crate::rules::on() {
                 let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
                 let answer = deadline
