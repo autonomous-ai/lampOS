@@ -26,6 +26,8 @@
     }
   },
   "default": {
+    "source": "No number: someone the person trusts, or the local emergency number, wherever the lamp is (the safety read, #7689)",
+    "checked": "2026-11-18",
     "lines": {
       "en": "Please reach out to someone you trust, or your local emergency number, right now.",
       "vi": "Hãy nói ngay với một người bạn tin tưởng, hoặc gọi số khẩn cấp nơi bạn ở."
