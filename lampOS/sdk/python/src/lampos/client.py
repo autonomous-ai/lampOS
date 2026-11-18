@@ -1090,6 +1090,10 @@ class Lamp:
         if event not in schema.events() and not is_app_event and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
             raise _no_event(event, on=True)
         _short_phrase(phrases)
+        if self.app is not None and phrases and event == "phrase.heard":
+            # On an app's socket the phrases are the app's whole list, replaced as one (`phrases.set`): a filter here
+            # would never be sent to the lamp, and the handler would never fire.
+            raise LampError("on an app's socket the phrases are the app's own list: use `await lamp.listen_for(phrases, handler)`", code="bad_request")
         # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
         self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
@@ -1137,7 +1141,9 @@ class Lamp:
             handlers.remove(handler)
         if not handlers:
             self._handlers.pop(event, None)
-            if event in schema.events() and self.app is None:
+            # On an app's socket `phrase.heard` and the app's own events were never subscribed: nothing to take back; a door
+            # event `on()` did subscribe is unsubscribed as anywhere.
+            if event in schema.events() and not (self.app is not None and event == "phrase.heard"):
                 task = asyncio.ensure_future(self.request("unsubscribe", events=[event]))
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
@@ -1163,9 +1169,11 @@ class Lamp:
         phrase matched, never what was said. The app's manifest triggers (`app.trigger`) are matched whether or not this
         is ever called. Only on an app's socket."""
         _short_phrase(phrases)
+        answer = await self.request("phrases.set", phrases=list(phrases))
+        # After the lamp took it, so a refusal (`no_grant`, `bad_request`) leaves no handler behind.
         if handler is not None:
             self._handlers["phrase.heard"].append(handler)
-        return await self.request("phrases.set", phrases=list(phrases))
+        return answer
 
     async def took(self, turn: str) -> dict:
         """Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A `say`, gesture or light within
@@ -1189,6 +1197,8 @@ class Lamp:
             )
         if any(unicodedata.category(c) == "Cc" for c in [*title, *"".join(lines)]):
             raise LampError("panel: text, no control characters", code="bad_request")
+        if any(line == "" for line in lines):
+            raise LampError("panel: a line is text, never empty (leave it out)", code="bad_request")
         return (await self.request("app.panel.set", title=title, lines=lines))["rev"]
 
     async def get(self, *states: str) -> dict:

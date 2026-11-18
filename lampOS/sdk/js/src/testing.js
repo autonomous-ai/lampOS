@@ -1248,6 +1248,8 @@ export class FakeLamp {
     if (typeof title !== 'string' || [...title].length < 1 || [...title].length > 40 || !Array.isArray(lines) || lines.length > 6
       || lines.some((l) => typeof l !== 'string' || [...l].length > 80)) return bad('a title of 1 to 40 characters and at most 6 lines of 80');
     if (!text(title) || !lines.every(text)) return bad('text, no control characters');
+    // The schema's `lines` item pattern needs one character at least: an empty line is refused, as the Python fake does.
+    if (lines.some((line) => line === '')) return bad('a line is text, never empty');
     const at = this.clock();
     if (this.panelAt !== null && at - this.panelAt < this.panelRateS * 1000) {
       return this.refuse(ws, id, 'rate', 'one panel a minute', Math.round(this.panelRateS * 1000 - (at - this.panelAt)));
