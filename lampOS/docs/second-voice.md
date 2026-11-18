@@ -2418,9 +2418,12 @@ order is kept. A written turn is the same from the chat on.
     `stop_words::a_stop_and_more`: a stop that the answer wait's
     `wait_words::only_a_stop` does not read as bare; "Hold on a second,
     Lamp." is bare) is told `cut_in_told::ASKED_MORE`
-    instead, the note without its stop sentence: told the whole, that line
-    was answered "Okay, I'll stop." with no call 8 times in 29 core gates
-    (#7285). The early words' chat chooses by its own words the same way
+    instead, only the note's facts (they cut in, it stopped, it goes back
+    only if asked), with no stop sentence and no first words ("Oh, sure —")
+    or their example, so the ask reads as a plain ask: told the whole, that
+    line was answered "Okay, I'll stop." with no call 8 times in 29 core
+    gates, and told the first words it still got no call in about 35 of 146
+    tries (#7285). The early words' chat chooses by its own words the same way
     (`cut_in_told::note`). With `LAMP_SAID_AS_HEARD=on` too, an
     answer cut and kept as heard is followed in the history by
     `cut_in_told::CUT_HERE`, so a later "go on", told no note, says where
@@ -2540,7 +2543,8 @@ order is kept. A written turn is the same from the chat on.
     line's "first answer audio … its fixed line" and "the cut answer's
     rest, its first audio … ms after the words were heard".
   - The journal says each: "it began over the lamp's answer, and the
-    model is told so", "the model is told it may follow on from what the
+    model is told so (NOTE)" (or "(ASKED_MORE)": the cut-in note sent,
+    #7285), "the model is told it may follow on from what the
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".

@@ -11329,8 +11329,18 @@ async fn spoken(
     };
     // The coordinator's marks, told as the Live route tells them (#1712).
     if !cut_in.is_empty() {
+        // The note's name at the line's end, so prefix greps still match
+        // and each journal shows which note was sent (#7285).
+        let name = if cut_in
+            .iter()
+            .any(|note| note == crate::cut_in_told::ASKED_MORE)
+        {
+            "ASKED_MORE"
+        } else {
+            "NOTE"
+        };
         eprintln!(
-            "lamp-voice second: request {request}: it began over the lamp's answer, and the model is told so"
+            "lamp-voice second: request {request}: it began over the lamp's answer, and the model is told so ({name})"
         );
     }
     let follows_on = (marks.follows_on && !marks.sound.load(Ordering::Acquire))
