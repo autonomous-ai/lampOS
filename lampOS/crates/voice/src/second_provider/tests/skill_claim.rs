@@ -34,10 +34,29 @@ struct Went {
 /// The lamp after planet fact and evening dim were made, both on; moon fact
 /// was made and removed earlier, so it is no longer listed.
 fn lamp(test: &str) -> (std::path::PathBuf, crate::made_skill::Keeping) {
+    lamp_with(test, &[("planet-fact", true), ("evening-dim", true)], &[])
+}
+
+/// A lamp whose made skills are `made` (each on the lamp or not) and whose
+/// lamp-skills `off` file names `off` ([`state_of`]).
+fn lamp_with(
+    test: &str,
+    made: &[(&str, bool)],
+    off: &[&str],
+) -> (std::path::PathBuf, crate::made_skill::Keeping) {
     yes::clear_for_test();
     let (root, keeping) = keeping(test);
-    crate::made_remove::tests::made_here(&keeping, &[("planet-fact", true), ("evening-dim", true)]);
+    crate::made_remove::tests::made_here(&keeping, made);
+    let state = state_of(&keeping);
+    std::fs::create_dir_all(&state).unwrap();
+    let names: String = off.iter().map(|name| format!("{name}\n")).collect();
+    std::fs::write(state.join(crate::skill_about::OFF_FILE), names).unwrap();
     (root, keeping)
+}
+
+/// lamp-skills' state folder beside the made skills', in a test.
+fn state_of(keeping: &crate::made_skill::Keeping) -> std::path::PathBuf {
+    keeping.directory.parent().unwrap().join("skills-state")
 }
 
 fn listed(keeping: &crate::made_skill::Keeping) -> Vec<String> {
@@ -134,6 +153,12 @@ fn went(
                     Ok(())
                 },
             )
+        } else if args[crate::made_run::RUN].is_string() {
+            // A run refused as `made_run` refuses one not on the lamp.
+            json!({
+                "error": "it isn't on the lamp now",
+                "next": "Say plainly, in a few words, that planet fact didn't run, and why: it isn't on the lamp now. Call nothing."
+            })
         } else {
             json!({"error": "nothing asked"})
         };
@@ -143,7 +168,7 @@ fn went(
     type Kept = Vec<(String, Value, Option<&'static str>)>;
     let kept: Arc<Mutex<Kept>> = Arc::default();
     let keep = kept.clone();
-    let directory = keeping.directory.clone();
+    let (directory, state) = (keeping.directory.clone(), state_of(keeping));
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(move || Told {
@@ -157,10 +182,7 @@ fn went(
     .announcing(false)
     .checking_action_claims(true)
     .reading_made_names(Some(Arc::new(move || {
-        crate::made_skill::entries(&directory)
-            .iter()
-            .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
-            .collect()
+        crate::action_claim::made_skills(&directory, &state)
     })))
     .keeping_calls_by(Some(Arc::new(
         move |_, name: &str, args: &Value, result| {
@@ -340,10 +362,15 @@ fn a_turn_off_said_done_with_no_call_is_asked_again() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
-/// The same for a turn on, missed twice: said not done, nothing turned.
+/// The same for a turn on of one that is off, missed twice: said not
+/// done, nothing turned.
 #[test]
 fn a_turn_on_said_done_twice_with_no_call_is_said_not_done() {
-    let (root, keeping) = lamp("skill-claim-on");
+    let (root, keeping) = lamp_with(
+        "skill-claim-on",
+        &[("planet-fact", true), ("evening-dim", true)],
+        &["planet-fact"],
+    );
     let went = went(
         &keeping,
         "Turn planet fact back on.",
@@ -459,5 +486,161 @@ fn a_skill_named_in_passing_is_said() {
             "{heard}: {went:?}"
         );
     }
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// The forced yes round says the words and calls in ONE round (Twelve's
+/// and the Reviewer-lead's P2 on #7730): "Okay, planet fact is removed."
+/// beside `{approve_id, answer: "yes"}`. The words ran ahead of their own
+/// call: not said, no note, the call removes it, and the next round says
+/// the lamp's result. Never "Sorry, I didn't do that". ("Done, …" is any
+/// call's own line, which stands beside any call, as before.)
+#[test]
+fn words_beside_their_own_remove_call_are_never_told_not_done() {
+    let (root, keeping) = lamp("skill-claim-one-round");
+    let told = crate::made_remove::asked(
+        crate::made_remove::Ask {
+            name: "planet fact",
+            request: 0,
+            heard: true,
+            sends_here: true,
+        },
+        &keeping,
+        || true,
+        Instant::now(),
+    );
+    yes::lamp_said(0, "Remove planet fact?");
+    let id = told[yes::APPROVE_ID].as_str().unwrap().to_owned();
+    let went = went(
+        &keeping,
+        "Yes.",
+        vec![
+            Message::user("Lamp, remove planet fact."),
+            Message::assistant("Remove planet fact?"),
+        ],
+        vec![
+            vec![
+                text("Okay, planet fact is removed."),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    crate::made_skill::MAKE,
+                    json!({ yes::APPROVE_ID: id, yes::ANSWER: "yes", yes::NAMED: yes::NAMED_NONE }),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying("Planet fact is removed."),
+        ],
+    );
+    assert_eq!(went.said, said(&["Planet fact is removed."]), "{went:?}");
+    assert!(
+        !went.notes.iter().any(|note| note == SKILL_NOTE),
+        "{went:?}"
+    );
+    assert!(never_said(&went, "didn't do that"), "{went:?}");
+    assert_eq!(went.removed, ["planet-fact"], "{went:?}");
+    assert_eq!(listed(&keeping), ["evening-dim"]);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Crossed skills (Twelve's P2 on #7730): turning rain joke off backs no
+/// "Planet fact is off.", which is held and asked again.
+#[test]
+fn another_skills_turn_backs_no_claim() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-crossed",
+        &[("planet-fact", true), ("rain-joke", true)],
+        &[],
+    );
+    let went = went(
+        &keeping,
+        "Lamp, turn off planet fact.",
+        Vec::new(),
+        vec![
+            making(json!({ crate::made_turn::TURN_OFF: "rain joke" })),
+            saying("Planet fact is off."),
+            saying("Sorry, I turned off rain joke, not planet fact."),
+        ],
+    );
+    assert_eq!(went.notes, [SKILL_NOTE], "{went:?}");
+    assert_eq!(
+        went.said,
+        said(&["Sorry, I turned off rain joke,", " not planet fact."]),
+        "{went:?}"
+    );
+    assert_eq!(went.turned, [("rain-joke".to_owned(), true)], "{went:?}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// A true state is never held (the Reviewer-lead's P2 2 on #7730): a run of
+/// planet fact refused as it isn't on the lamp gets "Planet fact is off, so
+/// it didn't run.", said as it is.
+#[test]
+fn a_true_off_after_a_refused_run_is_said() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-run-refused",
+        &[("planet-fact", false), ("evening-dim", true)],
+        &[],
+    );
+    let went = went(
+        &keeping,
+        "Lamp, run planet fact.",
+        Vec::new(),
+        vec![
+            making(json!({ crate::made_run::RUN: "planet fact" })),
+            saying("Planet fact is off, so it didn't run."),
+        ],
+    );
+    assert_eq!(
+        went.said,
+        said(&["Planet fact is off,", " so it didn't run."]),
+        "{went:?}"
+    );
+    assert!(
+        !went.notes.iter().any(|note| note == SKILL_NOTE),
+        "{went:?}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// A polite status ask answered from the history with no call (the
+/// Reviewer-lead's P2 3 on #7730), and "Tell me about planet fact." while
+/// it is off (Twelve's P3): each true, each said as it is.
+#[test]
+fn a_true_state_told_with_no_call_is_said() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-true-state",
+        &[("planet-fact", true), ("rain-joke", true)],
+        &["rain-joke"],
+    );
+    for (heard, reply, lines) in [
+        (
+            "Can you tell me which skills are on?",
+            "Planet fact is on, and rain joke is off.",
+            &["Planet fact is on,", " and rain joke is off."][..],
+        ),
+        (
+            "Tell me about rain joke.",
+            "Rain joke is off.",
+            &["Rain joke is off."][..],
+        ),
+    ] {
+        let went = went(&keeping, heard, Vec::new(), vec![saying(reply)]);
+        assert_eq!(went.said, said(lines), "{heard}: {went:?}");
+        assert!(went.notes.is_empty(), "{heard}: {went:?}");
+    }
+    let _ = std::fs::remove_dir_all(&root);
+    let (root, keeping) = lamp_with(
+        "skill-claim-true-off",
+        &[("planet-fact", true), ("evening-dim", true)],
+        &["planet-fact"],
+    );
+    let went = went(
+        &keeping,
+        "Tell me about planet fact.",
+        Vec::new(),
+        vec![saying("Planet fact is off.")],
+    );
+    assert_eq!(went.said, said(&["Planet fact is off."]), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
     let _ = std::fs::remove_dir_all(&root);
 }

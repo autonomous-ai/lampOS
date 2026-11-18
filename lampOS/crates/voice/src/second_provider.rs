@@ -1621,9 +1621,9 @@ pub type Asked = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 pub type Look = Arc<dyn Fn() -> Result<Vec<u8>, &'static str> + Send + Sync>;
 /// The engine's clock, for the announcement's spell.
 pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
-/// The names of the skills the person made, as `made.json` keeps them
-/// ([`Engine::reading_made_names`], #7683).
-pub type MadeNames = Arc<dyn Fn() -> Vec<String> + Send + Sync>;
+/// The skills the person made, as `made.json` keeps them, each with
+/// whether it is on now ([`Engine::reading_made_names`], #7683).
+pub type MadeNames = Arc<dyn Fn() -> Vec<crate::action_claim::MadeSkill> + Send + Sync>;
 /// The note a spoken request's words earn when they name one of the staff
 /// (`worker::staff_noting`, `crate::staff_note`): `(request, heard)` to the
 /// note, or nothing.
@@ -6280,14 +6280,20 @@ impl Engine {
         self
     }
 
-    /// With [`Engine::checking_action_claims`] and a voice make offered
-    /// (`LAMP_MAKE_SKILL=on`): the names of the skills the person made,
-    /// read once as each turn begins (`made`: `made.json`'s, one small local
-    /// file), so a reply that says one removed, turned off or on in the
-    /// lamp's own result words ("Planet fact is removed.") with no
-    /// `make_skill` that did it is held and asked again once, then said not
-    /// done ([`crate::action_claim::skill_claim`], #7683). None: no such
-    /// claim is read. Before any turn only.
+    /// `LAMP_SKILL_CLAIM_CHECKED=on` ([`crate::action_claim::SKILL_ENVIRONMENT`],
+    /// #7683), with [`Engine::checking_action_claims`] and a voice make
+    /// offered (`LAMP_MAKE_SKILL=on`): the skills the person made, with
+    /// whether each is on, read once as each turn begins (`made`:
+    /// `made.json` and lamp-skills' `off` file, two small local files, 0.2
+    /// to 0.4 ms together on a Mac, `crate::action_claim::made_skills`), so a
+    /// reply that says one removed, turned off or on in the lamp's own
+    /// result words ("Planet fact is removed.") that no `make_skill` of the
+    /// turn did, and that isn't its true state, is held and asked again
+    /// once, then said not done ([`crate::action_claim::skill_claim`],
+    /// [`crate::action_claim::skill_stands`]). A `make_skill` that removed,
+    /// asked a remove's question or turned one is kept for a later turn's
+    /// history then too ([`kept_made`]). None: no such claim is read, and
+    /// the history is as before. Before any turn only.
     pub fn reading_made_names(mut self, made: Option<MadeNames>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_names = made;
@@ -16558,7 +16564,7 @@ async fn answer(
     // lamp-9adf, 18 Nov 14:38: "planet fact is removed." with
     // `calls=none`). A line asked as a question has only its removed forms
     // judged: "Planet fact is on." may answer "is planet fact on?".
-    let made_names: Vec<String> = match &shared.made_names {
+    let made_names: Vec<crate::action_claim::MadeSkill> = match &shared.made_names {
         Some(read) if shared.action_claims && !quoted && asked != Asker::Reminder => read(),
         _ => Vec::new(),
     };
@@ -17254,8 +17260,6 @@ async fn answer(
         // I didn't do that." after the app's MAKE IT, three of three).
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
-            // Its outcome too: a made skill said on stands (#7683).
-            call_statuses.push(serde_json::json!({"tool": crate::made_skill::MAKE, "outcome": {}}));
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -17882,7 +17886,7 @@ async fn answer(
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
-                                        if crate::action_claim::stands_on(
+                                        if crate::action_claim::stands_made_on(
                                             kind,
                                             held,
                                             read_asked,
@@ -17890,6 +17894,7 @@ async fn answer(
                                                 .iter()
                                                 .map(|(name, args)| (name.as_str(), args)),
                                             &call_statuses,
+                                            &made_names,
                                         ) =>
                                     {
                                         action_held.take().unwrap_or_default()
@@ -18588,12 +18593,13 @@ async fn answer(
                 )
                 .flatten()
                 .filter(|kind| {
-                    !crate::action_claim::stands_on(
+                    !crate::action_claim::stands_made_on(
                         *kind,
                         &held,
                         read_asked,
                         called(),
                         &call_statuses,
+                        &made_names,
                     )
                 });
                 // An unplug's act said (#6457): while the skill's turn-off
@@ -18624,9 +18630,19 @@ async fn answer(
                     unmade,
                     Some(
                         crate::action_claim::Claim::SkillRemoved
-                            | crate::action_claim::Claim::SkillTurned
+                            | crate::action_claim::Claim::SkillOff
+                            | crate::action_claim::Claim::SkillOn
                     )
                 );
+                // Said in the round of its own `make_skill` (the forced yes
+                // round's "Done, planet fact is removed." beside its
+                // `approve_id`), the words ran ahead of the call: not said,
+                // and no note, so the next round speaks from its answer, as
+                // a forget's (Twelve's and the Reviewer-lead's P2 on #7730).
+                let skill_calling = skill_said
+                    && calls
+                        .iter()
+                        .any(|call| call.name == crate::made_skill::MAKE);
                 // Said in the round that calls a forget, the words ran ahead
                 // of it: not said, and no note, so the next round speaks from
                 // its answer (Thirteen's P2-2 on #5942).
@@ -18689,6 +18705,13 @@ async fn answer(
                     Some(_) if unplug_calling => {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says an unplug action before its call ran: not said, its {} call(s) run, no note (LAMP_ACTION_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                    }
+                    Some(_) if skill_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says a made skill's change before its make_skill ran: not said, its {} call(s) run, no note (LAMP_SKILL_CLAIM_CHECKED)",
                             calls.len()
                         );
                         text.clear();
@@ -19783,8 +19806,11 @@ async fn answer(
                 if did
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
-                    && let Some((args, result)) =
-                        kept_made(&call.name, &answer.told).or_else(|| {
+                    && let Some((args, result)) = shared
+                        .made_names
+                        .as_ref()
+                        .and_then(|_| kept_made(&call.name, &answer.told))
+                        .or_else(|| {
                             kept_args(&call.name, &call.args)
                                 .map(|args| (args, kept_result(&call.name, &answer.told)))
                         })

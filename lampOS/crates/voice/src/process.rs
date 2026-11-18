@@ -2530,6 +2530,8 @@ fn second_route_worker_environment(
         crate::made_not_on::ENVIRONMENT,
         // And a light act told as under way (#7285).
         crate::action_claim::DOING_ENVIRONMENT,
+        // And a made skill said removed, off or on (#7683).
+        crate::action_claim::SKILL_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2874,6 +2876,7 @@ mod tests {
             crate::action_claim::WORDED_ENVIRONMENT,
             crate::made_not_on::ENVIRONMENT,
             crate::action_claim::DOING_ENVIRONMENT,
+            crate::action_claim::SKILL_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -3977,6 +3980,7 @@ mod tests {
                     || name == crate::action_claim::WORDED_ENVIRONMENT
                     || name == crate::made_not_on::ENVIRONMENT
                     || name == crate::action_claim::DOING_ENVIRONMENT
+                    || name == crate::action_claim::SKILL_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -4330,6 +4334,7 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_CLAIM_CHECKED=on",
                     "LAMP_SKILL_KEYTERM=on",
                     "LAMP_SKILL_NAMED=on",
                     "LAMP_SKILL_RECURRING_TOLD=on",
