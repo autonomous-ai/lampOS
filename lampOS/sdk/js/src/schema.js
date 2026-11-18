@@ -12,6 +12,9 @@ const named = (ref) => defs[ref.$ref.split('/').pop()];
 
 export const ops = defs.request.oneOf.map((ref) => named(ref).properties.op.const);
 export const events = defs.event_name.enum;
+// What only an installed app's socket takes and sends (#7415; `Lamp.connectApp`), kept apart from the door's `ops` and `events`.
+export const appOps = defs.app_request.oneOf.map((ref) => named(ref).properties.op.const);
+export const appEvents = defs.app_event.properties.ev.enum;
 export const states = defs.state_name.enum;
 // The body clips offered to programs (the schema's `examples`). The door takes
 // any gesture name of the right shape (`gesturePattern`), `idle` and `scanning`
