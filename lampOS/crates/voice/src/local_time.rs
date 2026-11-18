@@ -304,6 +304,34 @@ pub fn zone_place_here() -> Option<String> {
     zone_here().as_deref().and_then(own_place)
 }
 
+/// The lamp's country, as its zone's two-letter code in the system's
+/// `zone.tab` ("VN" for `Asia/Ho_Chi_Minh`), for the weather's place
+/// lookup to find a name there first (#7593); `None` when either is not
+/// known.
+pub fn country_here() -> Option<String> {
+    let zone = zone_here()?;
+    let tab = std::fs::read_to_string(format!("{ZONES}/zone.tab")).ok()?;
+    country_of(&zone, &tab)
+}
+
+/// `zone`'s country code in a `zone.tab`'s text: its lines' first column,
+/// on the line whose third names the zone.
+fn country_of(zone: &str, tab: &str) -> Option<String> {
+    let zone = zone
+        .strip_prefix("posix/")
+        .or_else(|| zone.strip_prefix("right/"))
+        .unwrap_or(zone);
+    tab.lines()
+        .filter(|line| !line.starts_with('#'))
+        .find_map(|line| {
+            let mut columns = line.split('\t');
+            let code = columns.next()?;
+            let named = columns.nth(1)?;
+            (named == zone && code.len() == 2 && code.bytes().all(|b| b.is_ascii_uppercase()))
+                .then(|| code.to_owned())
+        })
+}
+
 /// The month and year where the lamp stands ("October 2026"), for a search
 /// of what is new (#1712); `None` when the clock is not set or not known.
 pub fn month_and_year_here() -> Option<String> {
@@ -780,6 +808,22 @@ fn here() -> Option<(Vec<u8>, i64)> {
 
 #[cfg(test)]
 mod tests {
+    /// A zone's country from `zone.tab`'s lines, comments and other
+    /// zones passed over; a zone it doesn't list has none.
+    #[test]
+    fn the_lamps_country_is_its_zones_in_zone_tab() {
+        let tab = "# tzdb timezone descriptions\nTH\t+1345+10031\tAsia/Bangkok\nVN\t+1045+10640\tAsia/Ho_Chi_Minh\nUS\t+404251-0740023\tAmerica/New_York\tEastern (most areas)\n";
+        assert_eq!(
+            super::country_of("Asia/Ho_Chi_Minh", tab).as_deref(),
+            Some("VN")
+        );
+        assert_eq!(
+            super::country_of("posix/America/New_York", tab).as_deref(),
+            Some("US")
+        );
+        assert_eq!(super::country_of("Etc/UTC", tab), None);
+    }
+
     use super::*;
 
     /// A day the memory names reads back as the day it is, and as a person

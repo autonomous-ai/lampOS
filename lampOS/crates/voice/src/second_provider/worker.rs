@@ -1712,20 +1712,22 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
 /// The weather the model may ask for, with `switch` (`LAMP_SECOND_WEATHER`)
 /// exactly `on` (the owner on 22 Oct): looked up with `fetch` only when a
 /// call asks, for the place and the day asked, the lamp's own place
-/// (`here`) for a call that names none, its days told from that place's
-/// own date by `clock`. Nothing is fetched here and no task is started;
+/// (`here`) for a call that names none, a name found in the lamp's
+/// `country` first (#7593), its days told from that place's own date by
+/// `clock`. Nothing is fetched here and no task is started;
 /// with the switch off there is no weather at all. With
 /// `LAMP_OWNER_PLACE=on`, the owner's place from the app goes over `here`
 /// while one is kept (#4333).
 fn weather_asked(
     switch: Option<&str>,
-    here: Option<String>,
+    (here, country): (Option<String>, Option<String>),
     fetch: crate::second_provider::net::weather::Fetch,
     clock: crate::second_provider::net::weather::Clock,
 ) -> Option<Arc<crate::second_provider::net::weather::Weather>> {
     use crate::second_provider::net::weather;
     weather::on(switch).then(|| {
-        let weather = weather::Weather::new(here, fetch, clock);
+        // A place's name is found in the lamp's own country first (#7593).
+        let weather = weather::Weather::new(here, fetch, clock).with_country(country);
         Arc::new(if crate::owner_place::on_from_environment() {
             weather.with_owner_place(lamp_msgs::owner_place::FILE.into())
         } else {
@@ -2554,7 +2556,10 @@ pub fn serve(
         std::env::var(crate::second_provider::net::weather::ENVIRONMENT)
             .ok()
             .as_deref(),
-        crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
+        (
+            crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
+            crate::local_time::country_here(),
+        ),
         crate::second_provider::net::weather::open_meteo(),
         crate::second_provider::net::weather::wall_clock(),
     );
@@ -31540,7 +31545,7 @@ mod tests {
         let (fetched, fetch) = counted_weather_fetch();
         let weather = super::weather_asked(
             Some("on"),
-            Some("Hanoi, Vietnam".into()),
+            (Some("Hanoi, Vietnam".into()), None),
             fetch,
             thursday_in_hanoi(),
         )
@@ -31601,7 +31606,8 @@ mod tests {
         for switch in [None, Some(""), Some("yes"), Some("ON")] {
             let clock = thursday_in_hanoi();
             assert!(
-                super::weather_asked(switch, Some("Hanoi".into()), fetch.clone(), clock).is_none()
+                super::weather_asked(switch, (Some("Hanoi".into()), None), fetch.clone(), clock)
+                    .is_none()
             );
         }
         let settings = crate::tools::Settings::default();
