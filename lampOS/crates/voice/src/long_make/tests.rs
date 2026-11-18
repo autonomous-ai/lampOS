@@ -269,3 +269,34 @@ fn a_cut_turn_lets_only_an_agent_make_run_on() {
     assert!(matches!(read(&dir.0, NOW), Some(State::Making { .. })));
     assert_eq!(settle(6_811_070), Some(dir.0.clone()));
 }
+
+/// Heron's P3 on #7774: a turn cut before its minute marks the agent's
+/// make `making` at the cut, not when it ends, so a restart in between
+/// tells it as not finished; a turn that took its answer marks nothing.
+#[test]
+fn a_cut_turn_marks_the_make_making_at_the_cut() {
+    // The guard marks at the lamp's own clock.
+    let now = crate::app_make::now_unix_ms();
+    let dir = folder("cut-at-drop");
+    begin(6_811_080, &dir.0);
+    to_agent(6_811_080);
+    CutAtDrop::new(6_811_080).answered();
+    assert_eq!(read(&dir.0, now), None, "answered: no cut");
+    drop(CutAtDrop::new(6_811_080));
+    assert!(matches!(read(&dir.0, now), Some(State::Making { .. })));
+    after_start(&dir.0, now + 1_000);
+    assert!(matches!(
+        read(&dir.0, now + 1_000),
+        Some(State::NotMade {
+            why: NotFinished::Restart,
+            ..
+        })
+    ));
+    assert_eq!(settle(6_811_080), Some(dir.0.clone()));
+    // Not handed to the agent: as before, nothing marked at the cut.
+    let other = folder("cut-at-drop-quick");
+    begin(6_811_081, &other.0);
+    drop(CutAtDrop::new(6_811_081));
+    assert_eq!(read(&other.0, now), None);
+    assert_eq!(settle(6_811_081), None);
+}

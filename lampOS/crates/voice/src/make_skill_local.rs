@@ -13125,4 +13125,193 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
+
+    /// The offers counted for the telling `key` in `keeping`'s folder.
+    fn offers_of(keeping: &Keeping, key: &str) -> u64 {
+        std::fs::read(keeping.directory.join(crate::long_make::OFFERS_FILE))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .and_then(|offers| offers[key].as_u64())
+            .unwrap_or(0)
+    }
+
+    /// Heron's P2 on #7774: two long makes with code that keeps its yes,
+    /// told back to back. The second says nothing while the first's yes is
+    /// awaited, its mark kept and its offer given back, so the first's wait
+    /// is never replaced and the first never stranded off; the second is
+    /// told once that wait lapses.
+    #[test]
+    fn a_second_code_make_waits_for_the_firsts_yes_before_it_is_told() {
+        use crate::skill_write_yes as yes;
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-two-yeses");
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        let sends = json!({"code": true, "grants": ["speak"], "messages": true, "speak": true});
+        let btc = "a1".repeat(32);
+        let eth = "b2".repeat(32);
+        kept_long(&keeping, 6_811_350, "btc-price", &btc, sends.clone());
+        kept_long(&keeping, 6_811_351, "eth-price", &eth, sends);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let first = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(first, format!("ready {btc}"));
+        let said = crate::long_make::told(&keeping, 6_811_352, note, (NOW + 5_000, at), || None);
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(yes::waits(&id), "{said}");
+        crate::long_make::heard(&keeping, &first, NOW + 6_000, |_| {
+            panic!("a send keeps its yes")
+        });
+        // 15 s later, the second's chance: nothing said, its mark kept.
+        let later = at + Duration::from_secs(15);
+        let note = tells.next(later, NOW + 20_000).unwrap();
+        let second = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(second, format!("ready {eth}"));
+        let said =
+            crate::long_make::told(&keeping, 6_811_353, note, (NOW + 20_000, later), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(yes::waits(&id), "the first's yes is still awaited");
+        assert_eq!(offers_of(&keeping, &second), 0, "its offer given back");
+        assert!(
+            crate::long_make::marks(&keeping.directory, NOW + 21_000)
+                .iter()
+                .any(|state| matches!(state, crate::long_make::State::Made { sha256, .. } if *sha256 == eth))
+        );
+        assert_eq!(
+            entry_of(&keeping, &eth)[crate::long_make::READY_UNTOLD],
+            true
+        );
+        // The first's yes lapsed: the second is told, its yes awaited.
+        let lapsed = later + yes::YES_WITHIN + Duration::from_secs(10);
+        let note = tells.next(lapsed, NOW + 140_000).unwrap();
+        assert_eq!(crate::long_make::key_of(&note), Some(second.as_str()));
+        let said =
+            crate::long_make::told(&keeping, 6_811_354, note, (NOW + 140_000, lapsed), || None);
+        assert!(said.contains("Your eth price skill is ready."), "{said}");
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(yes::waits(&id), "{said}");
+        yes::clear_for_test();
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7774: a quick make's say-back still awaits its yes;
+    /// a long make's news isn't told over it, and is told once it's gone.
+    #[test]
+    fn a_long_make_is_not_told_over_a_quick_makes_awaited_yes() {
+        use crate::skill_write_yes as yes;
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-over-a-yes");
+        let sip = "c3".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_360,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        // A quick make with code, read back and its yes awaited.
+        let quick = made_skill::kept_by_sha256(&keeping.directory, &sip).unwrap();
+        let at = std::time::Instant::now();
+        let id = yes::wait_for_yes_noted(
+            yes::Asks {
+                skill: "desk-glow".to_owned(),
+                sha256: "d4".repeat(32),
+                ..code_asks(&quick)
+            },
+            6_811_361,
+            at,
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_362, note, (NOW + 5_000, at), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(yes::waits(&id));
+        assert_eq!(offers_of(&keeping, &key), 0);
+        assert!(crate::long_make::read(&keeping.directory, NOW + 6_000).is_some());
+        // Its yes answered (the wait gone): the news is told.
+        assert!(yes::drop_wait(&id));
+        let again = at + Duration::from_secs(130);
+        let note = tells.next(again, NOW + 140_000).unwrap();
+        let said =
+            crate::long_make::told(&keeping, 6_811_363, note, (NOW + 140_000, again), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7774: a clash's choice still asked; a long make's
+    /// news isn't told over it (a second clash ask would let the first
+    /// one's made skill go), and is told once it's answered.
+    #[test]
+    fn a_long_make_is_not_told_over_an_open_clash_ask() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-over-a-clash");
+        let glowing = format!(
+            "{}\n[[do]]\nlight = {{ colour = \"blue\", level = 3 }}\n",
+            made_skill::behaviour_template_toml()
+                .replace("One short, warm line.", "Time for a sip of water.")
+                .replace("needs = [\"voice\"]", "needs = [\"voice\", \"light\"]")
+                .replace("speak = true", "speak = true\nlight = true")
+        );
+        let told = let_run_on(
+            &keeping,
+            6_811_370,
+            |tasks| tasks.agent().running_on(true),
+            Some(route_answer(&glowing, "sip-at-desk")),
+        );
+        assert_eq!(told, crate::long_make::let_go_told());
+        let other = keeping.installed.join("other-sip");
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(other.join("skill.toml"), &glowing).unwrap();
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 80_000).unwrap();
+        let first = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_371, note, (NOW + 80_000, at), || None);
+        assert!(said.contains(crate::made_clash::CLASH_ID), "{said}");
+        crate::long_make::heard(&keeping, &first, NOW + 81_000, |_| {
+            panic!("a clash waits for the person's choice")
+        });
+        // A plain long make ready while the clash's choice is asked.
+        let glow = "e5".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_372,
+            "desk-glow",
+            &glow,
+            json!({"speak": true}),
+        );
+        let later = at + Duration::from_secs(15);
+        let note = tells.next(later, NOW + 95_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("ready {glow}"));
+        let said =
+            crate::long_make::told(&keeping, 6_811_373, note, (NOW + 95_000, later), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(
+            crate::made_clash::awaited(later),
+            "the clash's ask still open"
+        );
+        assert_eq!(offers_of(&keeping, &key), 0);
+        // The choice made (the ask gone): the news is told.
+        crate::made_clash::tests::forget_waiting();
+        let again = at + Duration::from_secs(140);
+        let note = tells.next(again, NOW + 220_000).unwrap();
+        let said =
+            crate::long_make::told(&keeping, 6_811_374, note, (NOW + 220_000, again), || None);
+        assert!(
+            said.contains("Your desk glow skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
