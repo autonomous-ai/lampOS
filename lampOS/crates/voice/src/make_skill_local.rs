@@ -682,9 +682,8 @@ pub fn tool() -> lamp_gemini::Tool {
     let writes = made_skill::writes_on();
     let mut description = "Make a new skill for the lamp: something the lamp then does by itself, \
              whatever the lamp can do (its light, its head, a few exact words it says, its hum, a read of a linked service), at a time each day, when someone comes or goes, a face comes \
-             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting (\"make me a skill that dims the light at 10 pm\"). Make one only when the \
-             person asks for it. In the same breath, before you call it, say in a \
-             few words that you'll make it now. The skill is made, checked, kept and put on the \
+             into view, someone gets up, pats its head, the air gets stuffy, or when it is resting. Make one only when asked. In the same breath, before the call, say in a \
+             few words that you'll make it now. It is made, checked, kept and put on the \
              lamp at once: then say exactly the line you are told, nothing more."
         .to_owned();
     // A made skill read back (`LAMP_SKILL_WRITES`): what it sends, and
@@ -714,8 +713,9 @@ pub fn tool() -> lamp_gemini::Tool {
     // `made` alone; whether a line asks any, or a read-back, is the
     // model's judgment.
     // With `LAMP_MADE_SKILL_OFF_SAID` on (#7445), the same sentence tells
-    // a turn-off, a pause or a stop from a remove, two bytes longer (151 to
-    // 149), still within the link's 1,024 with every switch on.
+    // a turn-off, a pause or a stop from a remove, of one they made or
+    // added (#7594), 154 bytes to 149, still within the link's 1,024 with
+    // every switch on.
     description.push_str(if made_skill::off_said_on() {
         TURN_OFF_TOLD
     } else {
@@ -780,11 +780,14 @@ pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove
 /// time skill" called the remove, the only verb `make_skill` had for a
 /// made skill, and the lamp asked "Remove coffee time?"): turning one off,
 /// pausing or stopping it is `turn_off`, never a remove, and back on
-/// `turn_on`, beside the remove, the run and the list. The verbs are given
-/// to the model, which judges the meaning; with every switch on the
-/// description still fits the link's 1,024 bytes.
-pub const TURN_OFF_TOLD: &str = " To turn off, pause or stop one they made: turn_off alone, \
-     never remove; back on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
+/// `turn_on`, beside the remove, the run and the list. One they made or
+/// added (#7594: on lamp-9adf, 17 Nov, "turn off my btc price skill", one
+/// added from a file in the app, was answered that it is done in the app,
+/// since this told of one they made alone). The verbs are given to the
+/// model, which judges the meaning; with every switch on the description
+/// still fits the link's 1,024 bytes.
+pub const TURN_OFF_TOLD: &str = " To turn off, pause or stop one they made or added: turn_off, never \
+     remove; back on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -833,20 +836,20 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
-    // A made skill turned off and back on by voice (#7445,
-    // [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`): never a remove,
-    // which is then told as for good alone.
+    // A skill the person made or added turned off and back on by voice
+    // (#7445, #7594, [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`):
+    // never a remove, which is then told as for good alone.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
             "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, given alone with no request."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn off, pause or stop a skill they made, which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this."
+            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this."
         });
         parameters["properties"][crate::made_turn::TURN_ON] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn a skill they made back on, or to resume it: its name as they said it, given alone with no request."
+            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, given alone with no request."
         });
     }
     // The skills the person made, listed by voice ([`crate::made_list`]):

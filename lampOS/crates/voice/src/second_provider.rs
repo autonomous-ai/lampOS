@@ -1975,6 +1975,10 @@ struct Shared {
     /// wordless cut of a later line is never asked
     /// [`crate::cut_in_wordless::LINE`] ([`Shared::quiet_for_a_make`]).
     made_by: Mutex<Option<(u64, Instant)>>,
+    /// The offer to turn a turned-off skill back on and run it, waiting for
+    /// a plain yes on the next heard line (#7684, `LAMP_MADE_SKILL_OFF_SAID`,
+    /// [`crate::made_turn::Offer`]): taken by that line, whatever it says.
+    off_offer: Mutex<Option<crate::made_turn::Offer>>,
     /// The newest line's request and how much of the answer it cut was
     /// played (`Start`'s `heard_of_cut`, `LAMP_SAID_AS_HEARD`).
     /// With when that line began, by the engine's clock: a tail of the
@@ -5043,6 +5047,7 @@ impl Engine {
                 begun_over: Mutex::default(),
                 private_now: AtomicBool::new(true),
                 made_by: Mutex::new(None),
+                off_offer: Mutex::new(None),
                 heard_of_cut: Mutex::new(None),
                 wordless_said: Mutex::new(None),
                 said_whole: Mutex::new(None),
@@ -14637,13 +14642,14 @@ fn chat_for(
     }
 }
 
-/// Round 1 of a line that named a skill ([`Engine::calling_skills_named`]):
-/// its call, as a chat would end a round that only calls it, asked of none.
+/// Round 1 of a line that named a skill ([`Engine::calling_skills_named`]),
+/// or of a yes to the offer to turn one back on (#7684): its calls, as a
+/// chat would end a round that only calls them, asked of none.
 fn named_round(
-    call: Option<net::ToolCall>,
+    calls: Option<Vec<net::ToolCall>>,
 ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
     futures_util::stream::iter([
-        Ok(ChatEvent::ToolCalls(call.into_iter().collect())),
+        Ok(ChatEvent::ToolCalls(calls.unwrap_or_default())),
         Ok(ChatEvent::Done),
     ])
     .boxed()
@@ -16772,6 +16778,7 @@ async fn answer(
             request,
             Instant::now(),
         ),
+        choice_held: None,
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -17537,7 +17544,52 @@ async fn answer(
                 )));
             }
         }
+        // The offer to turn a turned-off skill back on and run it (#7684,
+        // the first builder's 11:05 ruling on #7562), taken by this heard
+        // line whatever it says: a plain yes to it, read in code, turns it
+        // on and runs its ask once in round 1, asked of no chat; anything
+        // else lets it go, nothing turned on, and the line is its own.
+        let off_offered = heard
+            .then(|| {
+                shared
+                    .off_offer
+                    .lock()
+                    .ok()
+                    .and_then(|mut offer| offer.take())
+            })
+            .flatten();
+        let mut offer_calls: Option<Vec<net::ToolCall>> = None;
+        if let Some(offer) = off_offered {
+            if crate::made_skill::off_said_on()
+                && !forgot_before_question
+                && offer.taken_by(request, &heard_words, (shared.clock)())
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: a plain yes to turning a skill back on and checking: round 1 turns it on and runs it in code (LAMP_MADE_SKILL_OFF_SAID)"
+                );
+                messages.push(Message::system(crate::made_turn::yes_note(&offer.spoken())));
+                offer_calls = Some(vec![
+                    net::ToolCall {
+                        extra: None,
+                        id: crate::made_turn::OFFER_ON_ID.into(),
+                        name: crate::made_skill::MAKE.into(),
+                        args: offer.turn_on_args(),
+                    },
+                    net::ToolCall {
+                        extra: None,
+                        id: crate::made_turn::OFFER_RUN_ID.into(),
+                        name: offer.name,
+                        args: offer.args,
+                    },
+                ]);
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request}: the offer to turn a skill back on was let go: this line is no plain yes to it (LAMP_MADE_SKILL_OFF_SAID)"
+                );
+            }
+        }
         let mut named_call: Option<net::ToolCall> = skill_named
+            .filter(|_| offer_calls.is_none())
             .filter(|_| !forgot_before_question && !awaits)
             .map(|(name, args)| net::ToolCall {
                 extra: None,
@@ -17547,6 +17599,9 @@ async fn answer(
             });
         let named_by_words = named_call.is_some();
         let mut skill_ran: Option<((String, Value), Value)> = None;
+        // The skill a yes to the offer ran in code (#7684), and its answer:
+        // a model's call of it after is given this answer, never run again.
+        let mut offer_ran: Option<((String, Value), Value)> = None;
         if let Some(call) = &named_call {
             let function = crate::skill_named::function_of(&call.name, &call.args);
             eprintln!(
@@ -17555,6 +17610,13 @@ async fn answer(
             messages.push(Message::system(crate::skill_named::ran_note(
                 &crate::skill_named::spoken(function),
             )));
+        }
+        // A skill they made or added turned off (`LAMP_MADE_SKILL_OFF_SAID`,
+        // #7562's row on lamp-9adf, 18 Nov 03:2x): turned back on only by
+        // `make_skill`'s `turn_on`, never said on without it. Two small
+        // local files read; nothing when none is off.
+        if let Some(note) = crate::made_turn::off_note_here(request, heard) {
+            messages.push(Message::system(note));
         }
         // The owner's own spoken ask of the skill, kept so its task's first
         // yes may be asked in the lamp's quiet hours (#7180,
@@ -17685,6 +17747,15 @@ async fn answer(
         let mut begun_note = false;
         // When the round asked again began, for its journal line's ms.
         let mut begun_again_at: Option<Instant> = None;
+        // A skill the person made or added turned off and on by voice
+        // (`LAMP_MADE_SKILL_OFF_SAID`, #7562's rows on lamp-9adf, 18 Nov):
+        // whether a `turn_on` turned one on in this turn (its function's
+        // answer that it is off is then [`crate::made_turn::just_on`]); the
+        // note of a turn's candidates still unchosen, and whether the turn
+        // was asked once more for them already.
+        let mut turned_on_now = false;
+        let mut turn_unchosen: Option<String> = None;
+        let mut turn_unchosen_asked = false;
         // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
         // ran or rounds were carried from a cut answer.
         let may_go_twice = second_try::may_go_twice(
@@ -17841,8 +17912,19 @@ async fn answer(
             let mut refused = false;
             // Round 1 of a line that named a skill: its call, asked of no
             // chat ([`Engine::calling_skills_named`]).
+            // So do a yes to the offer to turn a skill back on (#7684): its
+            // `turn_on`, then the skill's call for the ask. `offer_round`
+            // marks this round as those two calls of the lamp's own, known
+            // by the round, never by a call's id.
+            let mut offer_round = false;
             let mut by_words = (round == 1 && !quoted && !words_round)
-                .then(|| named_call.take())
+                .then(|| {
+                    named_call.take().map(|call| vec![call]).or_else(|| {
+                        let calls = offer_calls.take();
+                        offer_round = calls.is_some();
+                        calls
+                    })
+                })
                 .flatten();
             // At most one second try in a turn, whatever round 1 is asked again.
             let watch = (by_words.is_none()
@@ -17947,6 +18029,14 @@ async fn answer(
             let mut first = true;
             let mut split = Sentences::default();
             let mut text = String::new();
+            // After a turn's candidates, the round's words wait for its end
+            // (`LAMP_MADE_SKILL_OFF_SAID`): never once it was asked again
+            // for them, nor in the last round.
+            queue.choice_held = (turn_unchosen.is_some()
+                && !turn_unchosen_asked
+                && round < MAX_ROUNDS
+                && !words_round)
+                .then(Vec::new);
             let mut calls = Vec::new();
             let mut reasoning = None;
             let mut called_us = 0;
@@ -18658,6 +18748,26 @@ async fn answer(
                     crate::dont_know::NOTE
                 )));
                 continue;
+            }
+            // A reply with no call after a turn offered the person's own
+            // skills to choose from (`LAMP_MADE_SKILL_OFF_SAID`, #7562's row
+            // on lamp-9adf, 18 Nov 10:57: "Bitcoin price is already off"
+            // while it was on): not said, asked once more with them. With a
+            // call, or once asked, its words are said as they came.
+            if let Some(held) = queue.choice_held.take() {
+                if calls.is_empty()
+                    && let Some(note) = turn_unchosen.take()
+                {
+                    turn_unchosen_asked = true;
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply made no call after a turn offered their skills to choose from: not said, asked once more (LAMP_MADE_SKILL_OFF_SAID)"
+                    );
+                    messages.push(Message::system(note));
+                    continue;
+                }
+                for piece in held {
+                    queue.push(piece).await?;
+                }
             }
             // A partial marker has not reached the other opening filters
             // yet. Give it to their normal end-of-round path too.
@@ -20208,6 +20318,21 @@ async fn answer(
                     ));
                     continue;
                 }
+                // The skill a yes to the offer ran in code (#7684): never
+                // run twice.
+                if let Some((ran, told)) = &offer_ran
+                    && crate::skill_named::same_skill_again(&call.name, &call.args, ran)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the yes to the offer ran that skill already",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::made_turn::ran_already(told).to_string(),
+                    ));
+                    continue;
+                }
                 // A face save their yes already ran ([`HeldSave`]): never a
                 // second.
                 if let Some(told) = saved_already(shared, request, call) {
@@ -20278,6 +20403,33 @@ async fn answer(
                     && let Some(scope) = scope.as_ref()
                 {
                     scope.mark_everything_asked(&EverythingShown(()));
+                }
+                // A turn back on runs only on a line that asks it on, as the
+                // turn's only `make_skill` call (`LAMP_MADE_SKILL_OFF_SAID`,
+                // #7562 point 2; lamp-9adf, 18 Nov 10:53: "use my btc price
+                // skill" turned it on): in any order of the calls, a use or
+                // a run never turns it on. Refused, the model told why. The
+                // `turn_on` of a yes to the offer (#7684) is the lamp's own,
+                // its yes read in code (`offer_round`).
+                if !offer_round
+                    && crate::made_turn::on_refused(
+                        &call.name,
+                        &call.args,
+                        &heard_words,
+                        turn_called
+                            .iter()
+                            .filter(|(name, _)| name == crate::made_skill::MAKE)
+                            .count(),
+                    )
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: a turn on not run: the line doesn't ask it on, or another skill change is in the turn (LAMP_MADE_SKILL_OFF_SAID)"
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::made_turn::not_asked_on().to_string(),
+                    ));
+                    continue;
                 }
                 ran_tool.store(true, Ordering::Relaxed);
                 // A skill made by voice: a wordless cut while it is made
@@ -20402,6 +20554,72 @@ async fn answer(
                 let mut answer = said_while_made(&mut queue, request, made_call, answering).await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // A skill's function still answered off just after a
+                // `turn_on` turned it on in this turn ("turn on btc price
+                // and run it", a yes to the offer; lamp-skills reads its
+                // `off` file again within 2 s): run again after a short
+                // wait, at most `RERUNS` times; still off, told it was just
+                // turned on, never that it is off. Off with nothing turned
+                // on, on a heard line: the offer to turn it back on and
+                // check (#7684), kept for the next line's plain yes.
+                if crate::made_turn::ran_turned_off(&answer.told) {
+                    if turned_on_now {
+                        for _ in 0..crate::made_turn::RERUNS {
+                            tokio::time::sleep(crate::made_turn::RERUN_AFTER).await;
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {} still off just after its turn on: run again (LAMP_MADE_SKILL_OFF_SAID)",
+                                call.name
+                            );
+                            answer.told = run_tool_in_context(
+                                shared,
+                                request,
+                                heard,
+                                call,
+                                scope.as_ref(),
+                                context_epoch,
+                            )
+                            .await;
+                            if !crate::made_turn::ran_turned_off(&answer.told) {
+                                break;
+                            }
+                        }
+                        if crate::made_turn::ran_turned_off(&answer.told) {
+                            answer.told = crate::made_turn::just_on();
+                        }
+                    } else if heard && !offer_round && crate::made_skill::off_said_on() {
+                        let offer = crate::made_turn::Offer {
+                            request,
+                            at: (shared.clock)(),
+                            name: call.name.clone(),
+                            args: call.args.clone(),
+                        };
+                        answer.told = crate::made_turn::offer_told(&offer.spoken());
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a turned-off skill asked for use: offered to turn it back on and check (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        if let Ok(mut kept) = shared.off_offer.lock() {
+                            *kept = Some(offer);
+                        }
+                    }
+                }
+                if let Some(note) =
+                    crate::made_turn::unchosen_note(&call.name, &call.args, &answer.told)
+                {
+                    turn_unchosen = Some(note);
+                } else if crate::made_turn::turned(&call.name, &call.args, &answer.told) {
+                    turn_unchosen = None;
+                    if answer.told["off"] == false {
+                        turned_on_now = true;
+                        // Turned on in this turn: no offer waits for it.
+                        if let Ok(mut kept) = shared.off_offer.lock() {
+                            kept.take();
+                        }
+                    }
+                }
+                // The skill the offer's yes ran: likewise.
+                if offer_round && call.name != crate::made_skill::MAKE {
+                    offer_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
                 }
                 // The skill the heard words named, run: a model's call of it
                 // after is given this answer, never run again.
@@ -21314,6 +21532,10 @@ struct Queue<'a> {
     /// A made skill with code not on, whose claim to be on is never said
     /// (`LAMP_MADE_NOT_ON_TOLD`, #7270).
     made_not_on: Option<crate::made_not_on::Guard>,
+    /// The round's words, held to its end while a `make_skill` turn's
+    /// candidates wait for the model's choice (`LAMP_MADE_SKILL_OFF_SAID`,
+    /// [`crate::made_turn::unchosen_note`]); `None`, said as they come.
+    choice_held: Option<Vec<String>>,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -21346,6 +21568,12 @@ impl Queue<'_> {
     /// [`ProviderOutput::MakeWaiting`] go just after its last audio, in
     /// order, from the saying half (#7371).
     async fn push_ending(&mut self, text: String, ends: bool) -> Result<(), Stop> {
+        // `LAMP_MADE_SKILL_OFF_SAID` (#7562): a round after a turn's
+        // candidates waits for its end, when its calls say whether it chose.
+        if let Some(held) = self.choice_held.as_mut() {
+            held.push(text);
+            return Ok(());
+        }
         // `LAMP_MADE_NOT_ON_TOLD` (#7270): a claim that a made skill not on
         // is on, and the rest of its round, wait for the round's end.
         if let Some(guard) = self.made_not_on.as_mut()

@@ -1442,6 +1442,64 @@ fn the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused() {
     assert_eq!(answer["refused"], package::NOT_A_REQUEST);
 }
 
+/// #7562's row on lamp-9adf, 18 Nov 01:39: btc price, added from a file,
+/// was turned off by voice (`{"off": NAME}`, as the app's switch), then the
+/// model called its function and its task ran, and the lamp said it was
+/// back on. An installable skill turned off runs nothing through its
+/// function until it is turned back on, and the model is told it is off;
+/// a skill the lamp ships keeps its function, as before.
+#[test]
+fn a_skill_turned_off_runs_nothing_through_its_function() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    tutor(&skills, "1.0.0");
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    lamp_skills::keep_names(&state.join("off"), &["dance".to_owned()].into()).unwrap();
+    let ask = |line: &str| {
+        let mut answer = Vec::new();
+        package::asked(
+            &skills,
+            &skills.join("no-made"),
+            &state,
+            package::ASKED_LOCK_WAIT,
+            None,
+            None,
+            line.as_bytes(),
+            &mut answer,
+        )
+        .unwrap()
+    };
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let mut running = lamp_skills::Engine::new(loaded, true);
+    running.keep_off_in(&state).unwrap();
+    let on = running.tool("check_my_work", &serde_json::json!({}), 0);
+    assert_ne!(on.err().as_deref(), Some(lamp_skills::TOOL_TURNED_OFF));
+    // The lamp's own Dance, in `off`, still dances when asked.
+    let core = running.tool("dance", &serde_json::json!({}), 0);
+    assert_ne!(core.err().as_deref(), Some(lamp_skills::TOOL_TURNED_OFF));
+
+    assert!(ask("{\"off\": \"desk-tutor\"}\n"));
+    // The running program's read of the `off` file, within 2 s.
+    assert!(running.reread_off());
+    let off = running.tool("check_my_work", &serde_json::json!({}), 0);
+    assert_eq!(off.err().as_deref(), Some(lamp_skills::TOOL_TURNED_OFF));
+    // Turned back on only by the call, never said on without it (#7562's
+    // row at 03:2x: "back on" was said with no call).
+    assert!(lamp_skills::TOOL_TURNED_OFF.contains("calling make_skill with turn_on"));
+    assert!(lamp_skills::TOOL_TURNED_OFF.contains("never say it is on or back on unless"));
+    // A line that asked to use it is told it is off, never turned on
+    // (#7562's row at 10:53: "use my btc price skill" was turned on).
+    assert!(lamp_skills::TOOL_TURNED_OFF.contains("didn't run"));
+    assert!(lamp_skills::TOOL_TURNED_OFF.contains("Never turn it on for this"));
+
+    assert!(ask("{\"on\": \"desk-tutor\"}\n"));
+    assert!(running.reread_off());
+    let on = running.tool("check_my_work", &serde_json::json!({}), 0);
+    assert_ne!(on.err().as_deref(), Some(lamp_skills::TOOL_TURNED_OFF));
+}
+
 /// #3504's piece C: the owner's yes to the camera is kept by name, so a
 /// package put in place by hand under a name that has it takes it away
 /// before it goes in: its picture is refused until the owner says yes to
