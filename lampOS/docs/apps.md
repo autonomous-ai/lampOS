@@ -8,8 +8,9 @@ page is the contract between the developer, the Store, the phone's app and the
 lamp. It is in English only ([the docs rule](../AGENTS.md)).
 
 **Status, honestly.** Built: the package format and its reader (piece 1,
-`lamp_skills::app_package`, with tests). Designed and not yet built: the app
-socket and the yes ops in lamp-control (piece 3), lamp-cloud's `apps.*` kinds
+`lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
+3a, `app_yes.rs`, [control.md](control.md)). Designed and not yet built: the
+app socket in lamp-control (piece 3b), lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that does not
 know format 2 refuses an app package in words ("format 2 is not one this lamp
@@ -130,16 +131,23 @@ by the same helper with the skill checks.
 ### The owner's yes
 
 An install, an update or a remove needs the owner's yes, recorded in
-lamp-control (memory only, ten minutes, used once) as the five values (`op`,
-`name`, `version`, `sha256`, the sorted grants; for an update only the grants
-newly asked; for a remove the installed version and sha256, no grants) and
-matched exactly: a changed byte or grant never matches. Two writers: the voice
+lamp-control (memory only, ten minutes, used once) as the seven values (`op`,
+`name`, `version`, `sha256`, the sorted grants, `net`, `logs`, all seven
+required and no other; for an update only the grants newly asked, and `net` the
+manifest's and not the installed one's, `logs` likewise, so only what is newly
+on; for a remove the installed version and sha256, no grants, `net` and `logs`
+false) and matched
+exactly: a changed byte, grant, `net` or `logs` never matches. `net` and `logs`
+stand outside the grants in the manifest, so they are in the key and in the
+words said back like grants: an update that turns the internet or the logs on
+is a different key and is said back as such (the owner hears "and the
+internet"), never yes'd as "no new grants". Two writers: the voice
 (a spoken yes) and lamp-cloud (the owner's tap in the phone's app, from the
 owner's signed-in account on the lamp's own channel, after the same words the
 voice would say: what it is and the grants it asks), told apart by `by`. The
 helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 `app_yes_record`, `app_yes_take`, answered `{"ok":true}` or `{"refused":WHY}`
-(piece 3, not yet built).
+(piece 3a, built: [control.md](control.md)).
 
 ### The app socket
 
