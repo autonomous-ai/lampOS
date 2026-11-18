@@ -222,6 +222,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -340,6 +341,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -504,6 +506,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -633,6 +636,7 @@ fn face_remove_entirely_cancels_the_persons_reminders() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -697,6 +701,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -963,6 +968,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -1140,6 +1146,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -1220,6 +1227,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -1328,6 +1336,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -1446,6 +1455,7 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
@@ -1550,6 +1560,7 @@ fn health_passes_every_part_and_the_missing_ones_through() {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     };
