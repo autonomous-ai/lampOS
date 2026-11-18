@@ -1,36 +1,35 @@
-//! A make that asks for what a skill on the lamp already does, offered
-//! that skill instead of a second one (#7747, `LAMP_MAKE_CORE_OFFER`, off
-//! unless `on`). On lamp-9adf three water reminders made by voice sat
-//! beside the core `sip-of-water`, none with its guards: the person asked
-//! for a better water reminder and got a second, worse one.
+//! A make that asks for what a skill on the lamp already does, turned off,
+//! answered by turning that skill on instead of making a second one
+//! (#7747, `LAMP_MAKE_CORE_OFFER`, off unless `on`). On lamp-9adf three
+//! water reminders made by voice sat beside the core `sip-of-water`, none
+//! with its guards: the person asked for a better water reminder and got a
+//! second, worse one. Turned on, never offered: the first builder's rule of
+//! 18 Nov 18:41 (Queue #6811), "offers become the action plus one line
+//! with an undo".
 //!
 //! - **A model judges, before anything is made, within [`JUDGE_WITHIN`].**
-//!   A voice `make_skill` call with a `request` and no [`NEW`] first lists
-//!   the candidates ([`candidates`]): every skill on the lamp the person
-//!   didn't make that is turned off, and the few on (or off in their files)
-//!   whose words come nearest the request (`skill_about::nearest`), at most
-//!   [`LISTED_MOST`]. With none, the make goes on at once. Else one short
-//!   call to the make's own chat asks which one, if any, does the same
-//!   thing on the same trigger and timing ([`question`]): a different
-//!   timing ("every 20 minutes" against a nudge after a long sitting) is
-//!   no match. Whether one matches is that model's judgment, never a list of
-//!   words (the owner's ruling, 13 Nov). "none", an answer naming no
-//!   candidate, a timeout or an error: the make goes on as before. No
-//!   round of the voice's own model is spent on it.
-//! - **One matches:** nothing is made, never a silent swap. The voice
-//!   model is told that one skill ([`offer_told`]): to say what it does as
-//!   its description says, and never that its timing can be changed (no
-//!   core skill exposes a setting the voice may write); one turned off is
-//!   offered to be turned on, any other is said as it is, with whether they
-//!   still want a new one.
-//! - **A yes** comes back as [`CORE_ON`], the name alone ([`turned_on`]):
-//!   only heard, only the owner's line, only that one offered skill, only
-//!   one turned off by voice or in the app (never one off in its files),
-//!   and only in the first heard line after the offer ([`line_heard`]),
-//!   within [`OFFER_WITHIN`]. Turned on by the manage helper's own
-//!   `{"on": NAME}`, as the app's switch and `crate::made_turn` ask it.
-//! - **A no**, when they still want a new one, is the same request with
-//!   [`NEW`]: made as asked, and the offer is let go.
+//!   A voice `make_skill` call with a `request` first lists the candidates
+//!   ([`candidates`]): every skill on the lamp the person didn't make that
+//!   is turned off, and the few on (or off in their files) whose words come
+//!   nearest the request (`skill_about::nearest`), at most [`LISTED_MOST`].
+//!   With none, the make goes on at once. Else one short call to the make's
+//!   own chat asks which one, if any, does the same thing on the same
+//!   trigger and timing ([`question`]): a different timing ("every 20
+//!   minutes" against a nudge after a long sitting) is no match. Whether one
+//!   matches is that model's judgment, never a list of words (the owner's
+//!   ruling, 13 Nov). "none", an answer naming no candidate, a timeout or an
+//!   error: the make goes on as before.
+//! - **It matches and is turned off by voice or in the app:** it is turned
+//!   on at once by the manage helper's own `{"on": NAME}`, as the app's
+//!   switch asks it, nothing is made, and the lamp says one line with its
+//!   undo ([`turned_on_line`]).
+//! - **It matches but can't be turned on** (already on, off in its files,
+//!   or the helper refused): the make goes on as asked, and nothing is said
+//!   of that skill.
+//! - **The undo:** "make my own instead", or the like, judged by the voice
+//!   model, comes back as [`UNDO`] alone within [`UNDO_WITHIN`] ([`undo`]):
+//!   that one skill is turned back off and the person's first ask is made,
+//!   once.
 //!
 //! Off, `make_skill`'s parameters and answers are byte for byte as before.
 use crate::second_provider::net::{ChatEvent, Message};
@@ -64,13 +63,9 @@ pub(crate) fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
 
-/// The `make_skill` argument, with `request`, that makes the skill as
-/// asked: the person heard which skill does it and still wants a new one.
-pub const NEW: &str = "new_skill";
-
-/// The `make_skill` argument that turns on the one skill the lamp just
-/// offered in place of a make: its name, given alone.
-pub const CORE_ON: &str = "core_on";
+/// The `make_skill` argument that undoes a skill turned on in place of a
+/// make: true, given alone.
+pub const UNDO: &str = "make_own_instead";
 
 /// The longest the judge is waited for; past it the make goes on.
 pub const JUDGE_WITHIN: Duration = Duration::from_secs(2);
@@ -78,78 +73,43 @@ pub const JUDGE_WITHIN: Duration = Duration::from_secs(2);
 /// The most bytes of the judge's answer read.
 const JUDGE_MOST_BYTES: usize = 400;
 
-/// How long an offer waits for the person's yes.
-pub const OFFER_WITHIN: Duration = Duration::from_secs(60);
+/// How long a turn-on in place of a make may be undone.
+pub const UNDO_WITHIN: Duration = Duration::from_secs(300);
 
 /// The most skills the judge is shown.
 pub const LISTED_MOST: usize = 40;
 
-/// The most bytes of a skill's description told.
+/// The most bytes of a skill's description shown.
 pub const DOES_MOST: usize = 200;
 
-/// What [`NEW`]'s parameter says.
-pub const NEW_TOLD: &str = "With request only: true once the lamp said which skill on the lamp already does it and the person still wants a new one.";
+/// What [`UNDO`]'s parameter says.
+pub const UNDO_TOLD: &str = "Only when the lamp just turned on a skill in place of making one and the person asks, in any words, to make their own instead: true, given alone with no request.";
 
-/// What [`CORE_ON`]'s parameter says.
-pub const CORE_ON_TOLD: &str = "Only when the lamp just offered to turn on a skill on the lamp that already does what the person asked, and they agree: its name as told, given alone with no request.";
-
-/// What the model is told of a turn-on asked in a turn nobody spoke.
-pub const NOT_ASKED_ALOUD: &str =
-    "a skill is turned on by voice only when the person asks out loud";
-
-/// What the model is told of a turn-on asked by anyone but the owner.
-pub const NOT_OWNER: &str = "only the lamp's owner can turn a skill on by voice";
-
-/// What the model is told of a turn-on that doesn't answer the offer.
-pub const NOT_OFFERED: &str = "only the skill the lamp just offered, in the line that answers the offer, is turned on this way";
-
-/// What the model is told of a turn-on of a skill off in its files.
-pub const ONLY_IN_THE_APP: &str = "that skill can be turned on only in the app";
+/// What the model is told of an undo with nothing to undo.
+pub const NOTHING_TO_UNDO: &str =
+    "no skill was turned on in place of a make in the last few minutes";
 
 /// The judge's system prompt.
 const JUDGE_SYSTEM: &str = "You check whether a skill already on a desk lamp does what a person \
                             asks a new skill to do. Answer one skill's name exactly as listed, \
                             or none.";
 
-/// The one skill offered in place of a make, in which request, and when;
-/// and the first heard line after it, the only one whose yes is taken.
+/// The skill turned on in place of a make, the person's ask for it, and
+/// when: what [`UNDO`] undoes.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Offered {
+pub struct Turned {
     pub name: String,
-    /// Turned off by voice or in the app: the manage helper's `on` turns it
-    /// back on. Never one off in its files, nor one already on.
-    pub can_turn_on: bool,
-    pub request: u64,
+    pub request: String,
     pub at: Instant,
-    pub answer_line: Option<u64>,
 }
 
-impl Offered {
-    /// The person's line of `request` heard (`name_only`: only the lamp's
-    /// name, or no words): the first after the offer that is more than the
-    /// name is the one that may answer it.
-    pub fn heard(&mut self, request: u64, name_only: bool) {
-        if !name_only && request > self.request && self.answer_line.is_none() {
-            self.answer_line = Some(request);
-        }
-    }
-}
+/// The newest turn-on in place of a make.
+static TURNED: Mutex<Option<Turned>> = Mutex::new(None);
 
-/// The newest offer on the lamp.
-static OFFER: Mutex<Option<Offered>> = Mutex::new(None);
-
-fn slot(offer: &Mutex<Option<Offered>>) -> std::sync::MutexGuard<'_, Option<Offered>> {
-    offer
+fn slot(turned: &Mutex<Option<Turned>>) -> std::sync::MutexGuard<'_, Option<Turned>> {
+    turned
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// [`Offered::heard`] for the newest offer, from the second route's heard
-/// lines.
-pub fn line_heard(request: u64, name_only: bool) {
-    if let Some(offered) = slot(&OFFER).as_mut() {
-        offered.heard(request, name_only);
-    }
 }
 
 /// `text` cut to at most `most` bytes, on a character's edge.
@@ -220,68 +180,36 @@ fn judged<'a>(answer: &str, candidates: &[&'a Skill]) -> Option<&'a Skill> {
         .copied()
 }
 
-/// What the voice model is told of the one `skill` offered in place of a
-/// make.
-pub fn offer_told(skill: &Skill) -> Value {
-    let name = &skill.name;
+/// The one line said when the skill `name` was turned on in place of a
+/// make, with its undo.
+pub fn turned_on_line(name: &str) -> String {
     let spoken = crate::made_skill::spoken_name(name);
-    let does = does(skill);
-    let (state, ask) = match skill.state {
-        State::TurnedOff => (
-            "off",
-            format!(
-                "Ask whether to turn it on instead. A yes: make_skill with {CORE_ON} \"{name}\" \
-                 alone. If they still want a new one: make_skill with the same request and {NEW} \
-                 true."
-            ),
-        ),
-        State::InstalledOff => (
-            "off, and it can be turned on only in the app",
-            format!(
-                "Say it is off and can be turned on in the app, and ask whether they still want a \
-                 new one. If they do: make_skill with the same request and {NEW} true."
-            ),
-        ),
-        _ => (
-            "on",
-            format!(
-                "Say it is on, and ask whether they still want a new one. If they do: make_skill \
-                 with the same request and {NEW} true."
-            ),
-        ),
-    };
-    json!({
-        "not_made": format!("nothing was made: {spoken}, on the lamp, already does this"),
-        "offer": name,
-        "does": does,
-        "state": state,
-        "next": format!(
-            "Make nothing. Say in a few words, in the conversation's language, that {spoken} \
-             already does that, and what it does, only as this says: {does} Never say its timing \
-             or settings can be changed. {ask} Otherwise call nothing."
-        ),
-    })
+    let mut spoken_chars = spoken.chars();
+    let spoken = spoken_chars
+        .next()
+        .map(|first| first.to_uppercase().chain(spoken_chars).collect::<String>())
+        .unwrap_or_default();
+    format!("{spoken} already does that, so I turned it on. Say 'make my own instead' to undo.")
 }
 
 /// A `make_skill` call's `args` before a make, with the switch on, in the
-/// voice's request `request`: the offer of the one skill `judge` names
-/// among the [`candidates`] `skills` reads (kept in `offer` as the newest);
-/// none to make as before: [`NEW`] given (the offer waiting let go), the
-/// skills not read, no candidate (the judge not asked), or the judge's
-/// "none", another answer, a timeout or an error.
+/// voice's request `request`: when `judge` names one of the [`candidates`]
+/// `skills` reads that is turned off by voice or in the app, and `turn`
+/// turns it on, what the model is told in place of a make (kept in
+/// `turned` for its undo). Else none, to make as asked: the skills not
+/// read, no candidate (the judge not asked), the judge's "none", another
+/// answer, a timeout or an error, or a match that is on, off in its files,
+/// or not turned on.
 pub fn before_make(
     args: &Value,
     request: u64,
-    offer: &Mutex<Option<Offered>>,
+    turned: &Mutex<Option<Turned>>,
     skills: impl FnOnce() -> Result<Vec<Skill>, String>,
     judge: impl FnOnce(&str) -> Option<String>,
+    turn: impl FnOnce(&str) -> Result<(), String>,
     now: Instant,
 ) -> Option<Value> {
     if !on() {
-        return None;
-    }
-    if args[NEW] == true {
-        *slot(offer) = None;
         return None;
     }
     let asked = args["request"].as_str().unwrap_or_default();
@@ -289,7 +217,7 @@ pub fn before_make(
         Ok(skills) => skills,
         Err(why) => {
             eprintln!(
-                "lamp-voice: request {request}: the lamp's skills couldn't be read for a make's offer, made as asked: {why}"
+                "lamp-voice: request {request}: the lamp's skills couldn't be read before a make, made as asked: {why}"
             );
             return None;
         }
@@ -300,7 +228,7 @@ pub fn before_make(
     }
     let Some(answer) = judge(&question(asked, &candidates)) else {
         eprintln!(
-            "lamp-voice: request {request}: a make's offer judge didn't answer in time, made as asked (#7747)"
+            "lamp-voice: request {request}: the judge of the skills on the lamp didn't answer in time, made as asked (#7747)"
         );
         return None;
     };
@@ -311,30 +239,49 @@ pub fn before_make(
         );
         return None;
     };
+    if skill.state != State::TurnedOff {
+        eprintln!(
+            "lamp-voice: request {request}: a skill on the lamp does it but can't be turned on here, made as asked (#7747)"
+        );
+        return None;
+    }
+    if let Err(why) = turn(&skill.name) {
+        eprintln!(
+            "lamp-voice: request {request}: a skill on the lamp does it but wasn't turned on, made as asked: {why}"
+        );
+        return None;
+    }
     eprintln!(
-        "lamp-voice: request {request}: a skill on the lamp does it: offered, nothing made (#7747)"
+        "lamp-voice: request {request}: a skill on the lamp does it: turned on, nothing made (#7747)"
     );
-    *slot(offer) = Some(Offered {
+    *slot(turned) = Some(Turned {
         name: skill.name.clone(),
-        can_turn_on: skill.state == State::TurnedOff,
-        request,
+        request: asked.to_owned(),
         at: now,
-        answer_line: None,
     });
-    Some(offer_told(skill))
+    let line = turned_on_line(&skill.name);
+    Some(json!({
+        "not_made": "nothing was made: a skill on the lamp already does this, and it was turned on",
+        "turned_on": skill.name,
+        "next": format!(
+            "Say only this line, once, in the conversation's language: \"{line}\" Call nothing."
+        ),
+    }))
 }
 
 /// [`before_make`] on the lamp: the product's places with the voice's
-/// skills folder `skills`, the make's own chat as the judge.
+/// skills folder `skills`, the make's own chat as the judge, the manage
+/// helper's socket.
 pub fn before_make_here(args: &Value, request: u64, skills: Option<&Path>) -> Option<Value> {
     let present = std::env::var(skill_about::PRESENT_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on");
+    let manage = Path::new(crate::made_skill::MANAGE_SOCKET);
     before_make(
         args,
         request,
-        &OFFER,
+        &TURNED,
         || {
             skill_about::skills(
                 &skill_about::Places::product(skills),
@@ -343,6 +290,7 @@ pub fn before_make_here(args: &Value, request: u64, skills: Option<&Path>) -> Op
             )
         },
         judge_here,
+        |name| crate::made_turn::turned_by_helper(manage, name, false),
         Instant::now(),
     )
 }
@@ -395,133 +343,64 @@ fn judge_once(question: &str) -> Option<String> {
     })
 }
 
-/// `text`'s words, lowercase, letters and digits, one space between.
-fn words(text: &str) -> String {
-    text.split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .map(str::to_lowercase)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Whether `asked` names `name`: the same words ("Sip of water",
-/// "sip-of-water"), or its words within it ("a sip of water").
-fn names(asked: &str, name: &str) -> bool {
-    let (asked, name) = (words(asked), words(name));
-    !name.is_empty() && format!(" {asked} ").contains(&format!(" {name} "))
-}
-
-/// A turn-on of `name` asked with [`CORE_ON`] in the voice's request
-/// `request` (`heard`: someone spoke it), of the newest offer `offered`:
-/// only heard, only the owner's (`owner_hears`), only in the first heard
-/// line after the offer and within [`OFFER_WITHIN`] of it as of `now`,
-/// only the one skill offered, and only one turned off by voice or in the
-/// app; turned on by `turn` (done, or why not). What the model is told,
-/// and whether the offer is spent.
-pub fn turned_on(
-    name: &str,
+/// The undo of the newest turn-on in `turned`, asked in the voice's
+/// request `request` at `now`: within [`UNDO_WITHIN`], that one skill
+/// turned back off by `turn_off`, then the person's first ask, to make as
+/// asked (the undo spent). Else what the model is told: nothing to undo,
+/// or why it wasn't turned off (the undo kept, to ask again).
+pub fn undo(
     request: u64,
-    heard: bool,
-    offered: Option<&Offered>,
+    turned: &Mutex<Option<Turned>>,
     now: Instant,
-    owner_hears: impl FnOnce() -> bool,
-    turn: impl FnOnce(&str) -> Result<(), String>,
-) -> (Value, bool) {
-    let refused = |why: &str, said: &str| {
-        eprintln!("lamp-voice: request {request}: a skill wasn't turned on: {why} (#7747)");
-        (
-            json!({ "error": said, "next": format!(
-            "Say plainly, in a few words, that you can't turn that on this way: {said}. Call nothing."
-        ) }),
-            false,
-        )
+    turn_off: impl FnOnce(&str) -> Result<(), String>,
+) -> Result<String, Value> {
+    let mut kept = slot(turned);
+    let Some(done) = kept
+        .clone()
+        .filter(|done| now.saturating_duration_since(done.at) <= UNDO_WITHIN)
+    else {
+        *kept = None;
+        eprintln!("lamp-voice: request {request}: an undo with nothing to undo (#7747)");
+        return Err(json!({
+            "error": NOTHING_TO_UNDO,
+            "next": "Say plainly, in a few words, that there's nothing to undo, and ask what skill \
+                     they'd like made. Call nothing now."
+        }));
     };
-    if !heard {
-        eprintln!("lamp-voice: request {request}: a skill wasn't turned on: no one asked aloud");
-        return (json!({ "error": NOT_ASKED_ALOUD }), false);
-    }
-    if !owner_hears() {
-        return refused("not the owner's line", NOT_OWNER);
-    }
-    let Some(offered) = offered else {
-        return refused("nothing offered", NOT_OFFERED);
-    };
-    if offered.answer_line != Some(request)
-        || now.saturating_duration_since(offered.at) > OFFER_WITHIN
-    {
-        return refused("not the line that answers the offer", NOT_OFFERED);
-    }
-    if !names(name, &offered.name) {
-        return refused("not the skill offered", NOT_OFFERED);
-    }
-    if !offered.can_turn_on {
-        return refused("not one turned off by voice or in the app", ONLY_IN_THE_APP);
-    }
-    let skill = offered.name.as_str();
-    let spoken = crate::made_skill::spoken_name(skill);
-    if let Err(why) = turn(skill) {
-        eprintln!("lamp-voice: request {request}: an offered skill wasn't turned on: {why}");
-        return (
-            json!({
-                "error": why,
-                "next": format!(
-                    "Say plainly, in a few words, in the conversation's language, that {spoken} \
-                     wasn't turned on, and why: {why}. Call nothing."
-                )
-            }),
-            false,
-        );
-    }
-    eprintln!(
-        "lamp-voice: request {request}: an offered skill turned on by voice, in place of a make (#7747)"
-    );
-    (
-        json!({
-            CORE_ON: skill,
-            "on": true,
+    if let Err(why) = turn_off(&done.name) {
+        let spoken = crate::made_skill::spoken_name(&done.name);
+        eprintln!("lamp-voice: request {request}: an undo didn't turn the skill back off: {why}");
+        return Err(json!({
+            "error": why,
             "next": format!(
-                "Say only, in a few words, in the conversation's language, that {spoken} is on \
-                 now, and that no new skill was made. Call nothing."
+                "Say plainly, in a few words, in the conversation's language, that {spoken} \
+                 couldn't be turned back off, so nothing was made: {why}. Call nothing."
             )
-        }),
-        true,
-    )
-}
-
-/// [`turned_on`] on the lamp, by `make_skill`'s call: the newest offer,
-/// the owner's hearing as a turn's (`services::owner_hears`), the manage
-/// helper's socket.
-pub fn turned_on_here(
-    name: &str,
-    request: u64,
-    heard: bool,
-    lease: Option<&crate::memory_scope::ScopeLease>,
-) -> Value {
-    let offered = slot(&OFFER).clone();
-    let manage = Path::new(crate::made_skill::MANAGE_SOCKET);
-    let (told, spent) = turned_on(
-        name,
-        request,
-        heard,
-        offered.as_ref(),
-        Instant::now(),
-        || crate::services::owner_hears(request, heard, lease),
-        |skill| crate::made_turn::turned_by_helper(manage, skill, false),
-    );
-    if spent {
-        *slot(&OFFER) = None;
+        }));
     }
-    told
+    *kept = None;
+    eprintln!(
+        "lamp-voice: request {request}: a skill turned on in place of a make turned back off; the first ask is made (#7747)"
+    );
+    Ok(done.request)
 }
 
-/// `make_skill`'s parameters with the switch on: [`NEW`] and [`CORE_ON`]
-/// added; off, untouched.
+/// [`undo`] on the lamp, by `make_skill`'s call: the newest turn-on, the
+/// manage helper's socket.
+pub fn undone_here(request: u64) -> Result<String, Value> {
+    let manage = Path::new(crate::made_skill::MANAGE_SOCKET);
+    undo(request, &TURNED, Instant::now(), |name| {
+        crate::made_turn::turned_by_helper(manage, name, true)
+    })
+}
+
+/// `make_skill`'s parameters with the switch on: [`UNDO`] added; off,
+/// untouched.
 pub fn with_parameters(parameters: &mut Value) {
     if !on() {
         return;
     }
-    parameters["properties"][NEW] = json!({ "type": "boolean", "description": NEW_TOLD });
-    parameters["properties"][CORE_ON] = json!({ "type": "string", "description": CORE_ON_TOLD });
+    parameters["properties"][UNDO] = json!({ "type": "boolean", "description": UNDO_TOLD });
 }
 
 #[cfg(test)]
@@ -545,7 +424,7 @@ mod tests {
         }
     }
 
-    /// lamp-9adf on 18 Nov, more skills than any one offer: the core water
+    /// lamp-9adf on 18 Nov, more skills than any one match: the core water
     /// reminder as `sip`, Stretch break on, Guard mode off in its files,
     /// Dance on, Welcome back turned off, and a skill the person made.
     fn nines_lamp(sip: State) -> Vec<Skill> {
@@ -582,69 +461,84 @@ mod tests {
         panic!("the judge asked")
     }
 
-    /// The offer of `name` for `request` made in request 4 on `lamp`, its
-    /// answer line 5.
-    fn offered_on(lamp: &[Skill], request: &str, name: &str) -> Offered {
+    fn never_turned(_: &str) -> Result<(), String> {
+        panic!("turned on")
+    }
+
+    /// `request` on `lamp`, the judge naming `named`; what is told, what was
+    /// turned on and what is kept for the undo.
+    fn made(
+        lamp: Vec<Skill>,
+        request: &str,
+        named: Option<&str>,
+        turn: Result<(), String>,
+    ) -> (Option<Value>, Option<String>, Option<Turned>) {
         set_on_here(Some(true));
         let slot = Mutex::new(None);
+        let mut turned = None;
         let told = before_make(
             &ask(request),
             4,
             &slot,
-            || Ok(lamp.to_vec()),
-            |_| Some(name.to_owned()),
+            || Ok(lamp),
+            |_| named.map(str::to_owned),
+            |name| {
+                turned = Some(name.to_owned());
+                turn
+            },
             Instant::now(),
         );
         set_on_here(None);
-        assert_eq!(told.unwrap()["offer"], name);
-        let mut offered = slot.lock().unwrap().clone().unwrap();
-        offered.heard(5, false);
-        offered
+        let kept = slot.lock().unwrap().clone();
+        (told, turned, kept)
     }
 
-    /// #7747: a make whose ask a skill on the lamp already does is not
-    /// made: the judge is shown the turned-off skills and the nearest
-    /// others (never the person's own), and the one it names is offered,
-    /// with what it does as its description says and never a timing change.
+    /// #7747 and the first builder's 18:41: a make whose ask a turned-off
+    /// skill on the lamp already does turns that skill on at once, with no
+    /// offer and no yes; nothing is made, and one line is said once, with
+    /// its undo. The judge is shown the turned-off skills and the nearest
+    /// others, never the person's own.
     #[test]
-    fn a_make_with_a_core_skill_on_the_lamp_is_offered_not_made() {
+    fn a_make_a_turned_off_core_skill_does_turns_it_on_with_one_line_and_its_undo() {
         set_on_here(Some(true));
         let slot = Mutex::new(None);
         let mut asked = String::new();
+        let mut turned = Vec::new();
         let told = before_make(
             &ask(SAT),
             1,
             &slot,
-            || Ok(nines_lamp(State::On)),
+            || Ok(nines_lamp(State::TurnedOff)),
             |question| {
                 asked = question.to_owned();
                 Some("sip-of-water".into())
             },
+            |name| {
+                turned.push(name.to_owned());
+                Ok(())
+            },
             Instant::now(),
         )
-        .expect("offered, not made");
+        .expect("turned on, not made");
         set_on_here(None);
         assert!(asked.contains(&format!("- sip-of-water: {SIP}")), "{asked}");
         assert!(asked.contains("- welcome-back: "), "turned off: {asked}");
         assert!(!asked.contains("coffee"), "{asked}");
         assert!(!asked.contains("dance"), "not near: {asked}");
         assert!(asked.contains("A different timing or trigger is no match"));
-        assert_eq!(told["offer"], "sip-of-water");
-        assert_eq!(told["state"], "on");
+        assert_eq!(turned, ["sip-of-water"]);
+        assert_eq!(told["turned_on"], "sip-of-water");
+        let line = "Sip of water already does that, so I turned it on. Say 'make my own instead' \
+                    to undo.";
         let next = told["next"].as_str().unwrap();
-        assert!(
-            next.contains(&format!("only as this says: {SIP}")),
-            "{next}"
+        assert_eq!(next.matches(line).count(), 1, "{next}");
+        assert!(next.contains("once"), "{next}");
+        assert!(!next.contains('?'), "nothing asked: {next}");
+        let kept = slot.lock().unwrap().clone().unwrap();
+        assert_eq!(
+            (kept.name.as_str(), kept.request.as_str()),
+            ("sip-of-water", SAT)
         );
-        assert!(next.contains("Never say its timing or settings can be changed"));
-        assert!(next.contains("still want a new one"), "{next}");
-        assert!(
-            !next.contains(CORE_ON),
-            "an on skill is never turned on: {next}"
-        );
-        let offered = slot.lock().unwrap().clone().unwrap();
-        assert_eq!(offered.name, "sip-of-water");
-        assert!(!offered.can_turn_on);
         // Only the person's own skills: no judge, made at once; none read.
         set_on_here(Some(true));
         let theirs = || Ok(vec![skill("coffee-time", "Coffee.", State::On, true)]);
@@ -654,6 +548,7 @@ mod tests {
             &slot,
             theirs,
             never_judged,
+            never_turned,
             Instant::now(),
         );
         let unreadable = before_make(
@@ -662,16 +557,50 @@ mod tests {
             &slot,
             || Err("no folder".into()),
             never_judged,
+            never_turned,
             Instant::now(),
         );
         set_on_here(None);
         assert_eq!((only_theirs, unreadable), (None, None));
     }
 
+    /// A match that can't be turned on (already on, off in its files, or the
+    /// helper refused) goes straight on to make as asked: nothing told of
+    /// it, nothing kept for an undo.
+    #[test]
+    fn a_match_that_cant_be_turned_on_is_made_as_asked_and_never_named() {
+        for (sip, request, named, turn) in [
+            (State::On, SAT, "sip-of-water", Ok(())),
+            (State::Snoozed, SAT, "sip-of-water", Ok(())),
+            (
+                State::TurnedOff,
+                "watch my desk when I'm away",
+                "guard-mode",
+                Ok(()),
+            ),
+            (
+                State::TurnedOff,
+                SAT,
+                "sip-of-water",
+                Err("refused".to_owned()),
+            ),
+        ] {
+            let refused = turn.is_err();
+            let (told, turned, kept) = made(nines_lamp(sip), request, Some(named), turn);
+            assert_eq!(told, None, "{named}");
+            assert_eq!(kept, None, "{named}");
+            assert_eq!(
+                turned.is_some(),
+                refused,
+                "{named}: asked only of one turned off"
+            );
+        }
+    }
+
     /// Twelve's and El's P2s on #7763: a different timing ("every 20
     /// minutes" against a nudge after a long sitting), a judge that answers
     /// none or a skill not listed, or one that doesn't answer in time, goes
-    /// on to make; nothing is offered.
+    /// on to make; nothing is turned on.
     #[test]
     fn a_different_timing_or_a_lost_judge_goes_on_to_make() {
         for answer in [Some("none"), Some("None."), Some("guard-mode-2"), None] {
@@ -686,6 +615,7 @@ mod tests {
                     assert!(question.contains("\"every 20 minutes\""), "{question}");
                     answer.map(str::to_owned)
                 },
+                never_turned,
                 Instant::now(),
             );
             set_on_here(None);
@@ -694,95 +624,46 @@ mod tests {
         }
     }
 
-    /// #7747: the owner's yes in the line that answers the offer turns the
-    /// offered skill on through the manage helper, however its name is said.
+    /// The undo: within the minutes, that one skill turned back off, then
+    /// the person's first ask made as asked, once; a second undo, a late
+    /// one, or one with nothing turned on, turns nothing off; a helper's
+    /// refusal is said and the undo kept.
     #[test]
-    fn a_yes_turns_the_offered_core_skill_on() {
-        let offered = offered_on(&nines_lamp(State::TurnedOff), SAT, "sip-of-water");
-        assert!(offered.can_turn_on);
-        for said in ["sip-of-water", "Sip of water", "a sip of water"] {
-            let mut turned = None;
-            let (told, spent) = turned_on(
-                said,
-                5,
-                true,
-                Some(&offered),
-                offered.at,
-                || true,
-                |n| {
-                    turned = Some(n.to_owned());
-                    Ok(())
-                },
-            );
-            assert!(spent, "{said}: {told}");
-            assert_eq!(turned.as_deref(), Some("sip-of-water"), "{said}");
-            assert_eq!(told[CORE_ON], "sip-of-water");
-            assert!(
-                told["next"]
-                    .as_str()
-                    .unwrap()
-                    .contains("sip of water is on now, and that no new skill was made")
-            );
-        }
-    }
-
-    /// The P1 on #7763 (Twelve, El): core_on turns on only the one skill
-    /// offered, never another listed one, never one off in its files, and
-    /// only in the first heard line after the offer, within a minute; not
-    /// heard or not the owner's, nothing.
-    #[test]
-    fn core_on_turns_on_only_the_one_offered_in_the_line_that_answers_it() {
-        let never = |_: &str| -> Result<(), String> { panic!("turned on") };
-        let lamp = nines_lamp(State::TurnedOff);
-        let offered = offered_on(&lamp, SAT, "sip-of-water");
-        let at = offered.at;
-        let refused = |name: &str, request: u64, offered: &Offered, now: Instant| {
-            turned_on(name, request, true, Some(offered), now, || true, never).0["error"].clone()
-        };
-        // Listed beside it, or on the lamp and never listed.
-        assert_eq!(refused("welcome back", 5, &offered, at), NOT_OFFERED);
-        assert_eq!(refused("guard mode", 5, &offered, at), NOT_OFFERED);
-        assert_eq!(refused("stretch break", 5, &offered, at), NOT_OFFERED);
-        // A yes to a later question, or past the minute.
-        assert_eq!(refused("sip of water", 6, &offered, at), NOT_OFFERED);
-        let late = at + OFFER_WITHIN + Duration::from_secs(1);
-        assert_eq!(refused("sip of water", 5, &offered, late), NOT_OFFERED);
-        // No line heard after the offer yet, or only the lamp's name.
-        let mut unanswered = offered.clone();
-        unanswered.answer_line = None;
-        unanswered.heard(5, true);
-        assert_eq!(refused("sip of water", 5, &unanswered, at), NOT_OFFERED);
-        // Off in its files: offered as such, never turned on by voice.
-        let guard = offered_on(&lamp, "watch my desk when I'm away", "guard-mode");
-        assert!(!guard.can_turn_on);
-        assert_eq!(refused("guard mode", 5, &guard, guard.at), ONLY_IN_THE_APP);
-        // Not heard, not the owner's, nothing offered.
-        let (told, _) = turned_on("sip of water", 5, false, Some(&offered), at, || true, never);
-        assert_eq!(told["error"], NOT_ASKED_ALOUD);
-        let (told, _) = turned_on("sip of water", 5, true, Some(&offered), at, || false, never);
-        assert_eq!(told["error"], NOT_OWNER);
-        let (told, _) = turned_on("sip of water", 5, true, None, at, || true, never);
-        assert_eq!(told["error"], NOT_OFFERED);
-    }
-
-    /// #7747: a no that still wants a new one is the same request with
-    /// new_skill: made as asked, with no judge, and the offer let go.
-    #[test]
-    fn a_new_skill_still_wanted_is_made_as_asked_and_the_offer_let_go() {
-        let offered = offered_on(&nines_lamp(State::On), SAT, "sip-of-water");
-        let slot = Mutex::new(Some(offered));
-        set_on_here(Some(true));
-        let again = before_make(
-            &json!({ "request": "remind me to drink water", NEW: true }),
-            7,
-            &slot,
-            || panic!("the skills read again"),
-            never_judged,
-            Instant::now(),
+    fn the_undo_turns_it_back_off_and_makes_the_first_ask() {
+        let (_, _, kept) = made(
+            nines_lamp(State::TurnedOff),
+            SAT,
+            Some("sip-of-water"),
+            Ok(()),
         );
-        set_on_here(None);
-        assert_eq!(again, None, "made as asked");
-        assert_eq!(*slot.lock().unwrap(), None, "the offer let go");
+        let kept = kept.unwrap();
+        let at = kept.at;
+        let slot = Mutex::new(Some(kept.clone()));
+        let refused = undo(8, &slot, at, |_| {
+            Err("the lamp's skills couldn't be reached".into())
+        });
+        assert_eq!(
+            refused.unwrap_err()["error"],
+            "the lamp's skills couldn't be reached"
+        );
+        let mut off = Vec::new();
+        let undone = undo(9, &slot, at + Duration::from_secs(30), |name| {
+            off.push(name.to_owned());
+            Ok(())
+        });
+        assert_eq!(undone.as_deref(), Ok(SAT));
+        assert_eq!(off, ["sip-of-water"]);
+        let again = undo(10, &slot, at, never_turned);
+        assert_eq!(again.unwrap_err()["error"], NOTHING_TO_UNDO);
+        let late_slot = Mutex::new(Some(kept));
+        let late = undo(
+            11,
+            &late_slot,
+            at + UNDO_WITHIN + Duration::from_secs(1),
+            never_turned,
+        );
+        assert_eq!(late.unwrap_err()["error"], NOTHING_TO_UNDO);
+        assert_eq!(*late_slot.lock().unwrap(), None);
     }
 
     /// El's P3 on #7763: the judge is shown at most LISTED_MOST skills.
@@ -794,8 +675,8 @@ mod tests {
         assert_eq!(candidates("glow", &lamp).len(), LISTED_MOST);
     }
 
-    /// #7747: off, nothing changes: no read, no judge, no offer, and
-    /// make_skill's parameters are byte for byte as before.
+    /// #7747: off, nothing changes: no read, no judge, nothing turned on,
+    /// and make_skill's parameters are byte for byte as before.
     #[test]
     fn the_switch_off_changes_nothing() {
         set_on_here(Some(false));
@@ -806,6 +687,7 @@ mod tests {
             &slot,
             || panic!("the skills read with the switch off"),
             never_judged,
+            never_turned,
             Instant::now(),
         );
         let before = json!({"type": "object", "properties": {"request": {}}});
@@ -817,7 +699,7 @@ mod tests {
         set_on_here(Some(true));
         with_parameters(&mut parameters);
         set_on_here(None);
-        assert_eq!(parameters["properties"][NEW]["type"], "boolean");
-        assert_eq!(parameters["properties"][CORE_ON]["type"], "string");
+        assert_eq!(parameters["properties"][UNDO]["type"], "boolean");
+        assert_eq!(parameters["properties"].as_object().unwrap().len(), 2);
     }
 }
