@@ -1653,7 +1653,17 @@ async fn connection<S>(
                     // its `hear` grant and its rate are the door's; only
                     // the reply is the app's.
                     let (door_text, phrases_set) = if session.app_name().is_some() {
-                        crate::app_socket::phrases_set_as_subscribe(text.as_str())
+                        match crate::app_socket::phrases_set_as_subscribe(text.as_str()) {
+                            crate::app_socket::PhrasesSet::NotOurs => (text.to_string(), None),
+                            crate::app_socket::PhrasesSet::Door(door, count) => (door, Some(count)),
+                            crate::app_socket::PhrasesSet::Refused(reply) => {
+                                if socket.send(Message::text(reply.to_string())).await.is_err() {
+                                    break;
+                                }
+                                quiet_until = tokio::time::Instant::now() + quiet;
+                                continue;
+                            }
+                        }
                     } else {
                         (text.to_string(), None)
                     };
