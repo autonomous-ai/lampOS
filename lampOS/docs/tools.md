@@ -610,6 +610,89 @@ every 20 ms); lamp-cloud then sends it up (`stop` goes first, past every cap,
 tested under 100 ms to the send); the cloud's and the desk's own legs are
 measured only on a real desk (the row on lamp-0c89).
 
+## `watch` and `stop_watching`: tell me when (#7761, slice 1)
+
+With `LAMP_WATCH=on` (the provider worker's `--watch`), the model is told of
+two functions, so a person can say "tell me when the air gets stuffy":
+
+- `watch` takes one **fixed fact** and watches it for a while: `arrives`
+  (someone comes into view), `leaves` (nobody is in view any more),
+  `turns_to_lamp` (someone turns to face it), `co2_above` (`ppm`, 400 to
+  5,000; left out it is the sensor's "stuffy", 1,200), `sitting_over`
+  (`minutes`, 1 to 720, against `room/activity`'s `sitting_s`) and `at_time`
+  (`HH:MM`, the next time the lamp's own clock says it; a time farther away
+  than the watch lasts, or this very minute, is refused, and one the lamp could
+  not speak at is dropped unsaid once it is five minutes past, never said as
+  "now" hours late). `for_hours` (1 to 24) is how long to keep watching;
+  never longer than a day. A bad call is
+  refused in words for the model, and nothing is asked of the person.
+- `stop_watching` ends every watch.
+
+**Bounds:** at most 5 watches at once (the sixth is refused: "I'm already
+watching five things"); each at most 24 hours; kept on `/run`, so a
+reboot or a "forget everything" ends them all, and a mute, a hand's sleep or a
+restart of the voice does not (below). The watcher reads the default bus
+(`/run/lampos-bus`), as the worker's air read does, so a sim with its own
+`LAMP_BUS_ROOT` cannot run it.
+
+**Kept across cycles.** The provider worker lives for one cycle: a mute or a
+hand's sleep ends it and the next cycle starts a new one (Heron's P2 on
+#7782). So the list is kept in `/run/lampos-voice/watches.json` (tmpfs,
+mode 0600, the voice's own runtime folder), facts only: kind, level or time,
+and when it ends; no names, no words said, no face ids. It is written whole
+beside itself and moved over, on every take, stop and fire, and read by each
+new worker at its start (`watches::resume`), which also starts the watcher,
+so "tell me at 7:00" set before the lamp slept is told when it wakes (an
+`at_time` more than 5 minutes late is dropped, as before). A file that
+cannot be read is no watches and one journal line, never a crash. The
+voice's `forget_everything`, once it is done (their memory answered, after the
+yes), ends every watch and removes the file; a forget that is held or refused
+ends none, and the app's forget does not reach the watches (on the Live route
+it is drained only by the second route's worker, which has none; a watch holds
+nothing personal: a kind, a level, an end). When a worker starts, the first
+look at the faces is only the baseline: a watch for someone arriving or
+turning to the lamp does not fire on who was in the room already. The folder is the voice unit's own
+`RuntimeDirectory=lampos-voice` with `RuntimeDirectoryPreserve=yes`, so the
+file outlives a restart of the voice (the new voice's first worker takes the
+watches up, as after a mute); a reboot clears `/run` and a factory reset
+empties the folder, so both end them.
+
+The second route's worker strips `--watch`, and the product unit runs
+`LAMP_VOICE_ROUTE=second`, so on a product lamp the tools are not declared
+until the lamp runs the Live route. A note handed to the say thread is lost
+if the worker is killed before it connects (the watch is already over and
+saved): a kill is a lost line, not a repeat.
+
+**Told once.** The tool runs in the provider worker, so the watches AND the
+watcher thread live there too (started at the worker's start, or by the
+first `watch`): one process, no hand-over to the coordinator (Heron's P1 on
+#7782). The second route's
+worker does not get `--watch`, so there is one list; one list for both
+routes is the coordinator's, later. The thread
+(`watches.rs`, as `body_ask.rs` reads the body) reads `humans/faces/tracked` (counts and "facing" only, never who: a
+name is never read here), `air/state` and `room/activity`, and the lamp's
+clock. When a fact holds, that watch is removed and the lamp's own say
+service is asked, on its socket (as `agent_asks` does), for an instruction
+for the MODEL to word (a `note`, the fact in it: "the air's carbon dioxide is
+now 1,250 ppm"), so no fixed spoken line exists. The tool's take never waits
+on a bus call or the socket: `may_speak` is asked before the watches' lock
+is taken, and the say ask is made on a thread of its own. It is handed over at once (within a second of the reading that
+made it true: air comes every 5 s from the sensor, so for air that is within a
+second of the reading) and goes through the say service's gates (paused, nobody
+there, a turn owed, the speaker busy, a second of quiet since the last turn)
+at priority 8, as a reminder does, and is dropped if not begun in a minute: a
+late "the air is stuffy" is never said later. Arrive and leave are the door's
+edges (a face seen after 3 s of none; none for 5 s).
+
+**When the lamp may not speak** (the private room, `LAMP_PRIVATE_ROOM=on`, or
+Expression saying it is asleep: the Policy's gates are not asked by the say
+service, so the watcher asks): a level fact (air, sitting, a time) keeps
+watching and is told when the lamp may speak; an edge fact (arrives, leaves,
+turns) is over and unsaid, since telling it later would be wrong.
+
+**Rule 8:** one line, then the watch is over and the lamp is silent about it;
+no scan, no move.
+
 ## `reports_stop`, a system function
 
 With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,

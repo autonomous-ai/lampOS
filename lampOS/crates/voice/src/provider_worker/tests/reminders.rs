@@ -924,6 +924,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         onboarding: None,
         reports_stop: false,
         devices: false,
+        watch: false,
     };
     let mut rig = LiveRig::start_with(quick_policy(), chosen);
     let mut dial = rig.ready().await;
