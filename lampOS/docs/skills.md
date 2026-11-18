@@ -6971,28 +6971,49 @@ reset still ask. On (`crate::make_no_asks`):
   that yes is what `lamp-services` sends by. An agent skill
   (`LAMP_MAKE_NO_CANNOT`) goes on at once and still reads its task back
   before its first run.
-- **A clash replaces.** A voice make that clashes with skills on the lamp
-  (`made_clash::found`) goes on, then each of them is turned off through the
-  manage helper's own `{"off": NAME}`, as the app's switch does, never
+- **A clash replaces, on the owner's ask.** A plain voice make that clashes
+  with skills on the lamp (`made_clash::found`) goes on first; a put-on that
+  fails changes nothing else. Then, on the owner's own ask alone (as a code
+  make's, `services::owners_yes_of`; Twelve's P1 on #7783), each clashing
+  skill that is on (lamp-skills' `off` file read; one already off is left
+  as it is, and an unreadable file replaces nothing) is turned off through
+  the manage helper's own `{"off": NAME}`, as the app's switch does, never
   deleted: "Made evening dim and replaced your old rest glow. Say 'keep the
-  old one' to undo." A put-on that fails turns nothing off. Nothing waits
-  for a choice.
+  old one' to undo." Anyone else's make goes on beside them, which stay on:
+  "Made evening dim. Your other rest glow is still on. Say 'remove it' to
+  undo." A make with code of its own, and an agent make, never replace:
+  they go on beside. Nothing waits for a choice.
 - **A remove happens at once.** `make_skill`'s `remove`, the name matched
   to the person's own made skills as before (`made_remove::found`), removes
   it on the owner's ask (`services::owners_yes_now`) with no question:
-  taken off by the manage helper, then kept aside for 7 days, its index
-  entry in `undo.json` and its package in `undo/` in the made skills'
-  folder: "Removed moon fact. Say 'put it back' to undo." Several skills
-  with names alike, one they didn't make, or none, remove nothing and ask
-  nothing.
+  taken off by the manage helper, then kept aside, its index entry in
+  `undo.json` and its package in `undo/` in the made skills' folder:
+  "Removed moon fact. Say 'put it back' to undo." Several skills with names
+  alike, one they didn't make, or none, remove nothing and ask nothing. The
+  answer is `{"removed": NAME}`, as a remove's yes answers.
 - **The undo.** `make_skill` takes `undo` with this switch: "last", or a
   skill's name as heard; whether a line asks to undo is the model's
   judgment ("remove it", "keep the old one", "put it back"), never a list
-  of words. Only the owner's ask. A make within 10 minutes is removed (and
-  kept aside); a replace within 10 minutes turns the old skills back on,
-  then removes the new one; a remove within 7 days is put back in the
-  index and on, one with code by its yes's own path. After 7 days a kept
-  package is deleted.
+  of words. Only the owner's ask. Each undo is bound to the one action it
+  was said for (Twelve's P2 on #7783): "last" is the latest action of all,
+  and a name the latest action of that skill or of one it replaced; either
+  only within that action's own time, else nothing is undone and that is
+  said. A make, or a put-back, within 10 minutes is removed and kept aside;
+  a replace within 10 minutes turns the old skills back on, then removes
+  the new one and keeps it aside too; a remove within 7 days is put back in
+  the index and on (`{"made": NAME, "on": true}`). A put-back with code of
+  its own goes on by its yes's own path only with `LAMP_MADE_SCRIPTS=on`;
+  with it off it is put back and stays off, and why is said. A record of a
+  replace outlives the remove of its new skill.
+- **The keep, exactly.** Every record of what was done is kept 7 days, a
+  removed skill's package with its record; at most 50 removed skills and
+  100 records in all, the oldest out first, their packages with them.
+  `lamp-voice` purges it at its start and every hour after (with
+  `LAMP_MAKE_SKILL` on, whatever this switch says), and at each make,
+  remove or undo, so a package goes at most an hour after its 7 days; a
+  package no record names (a crash's) goes at the purge. The owner's
+  "forget everything" deletes `undo.json` and `undo/` whole, as their voice
+  print goes.
 - **Unsure, not acted on.** A make judged not what was asked
   (`LAMP_MADE_UNRELATED_REFUSED`), or a call with no request, makes nothing
   and asks nothing: no "Could you say it again?".

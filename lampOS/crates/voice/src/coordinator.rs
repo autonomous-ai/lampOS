@@ -3429,6 +3429,9 @@ fn run_source(
     #[cfg(not(test))]
     if lifetime.continuous() {
         crate::app_make::start_from_environment(crate::say::Says::parked_asks());
+        // The made skills' undo keep (`LAMP_MAKE_NO_ASKS`), purged now and
+        // hourly, so a removed skill's package goes after its 7 days.
+        crate::make_no_asks::start_purge();
     }
     let mut motor_rearm = true;
     record(

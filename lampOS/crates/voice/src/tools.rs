@@ -2496,6 +2496,15 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the made skills' undo keep (`LAMP_MAKE_NO_ASKS`): a removed
+            // skill's package and the record of what was done, on the same
+            // mark and rule (`crate::make_no_asks`).
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::make_no_asks::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {
