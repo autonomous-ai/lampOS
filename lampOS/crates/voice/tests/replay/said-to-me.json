@@ -75,7 +75,7 @@
 ,
 {
   "case": "7442b-P2-1-r18",
-  "source": "out-7442b-1117-1414 journal-P2-1 request 18, eyes-P2-1.txt; row-7442b P2: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose)",
+  "source": "out-7442b-1117-1414 journal-P2-1 request 18, eyes-P2-1.txt; row-7442b P2: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose). NOTE: expect 'answered' pins the bug's behaviour as the kit's 0.25 s eyes sample shows it (its pitch reads miss the head-down looks lamp-voice saw); a fix that holds this line is not a regression: update expect with it",
   "line_s": [
     -0.94,
     1.46
@@ -98,7 +98,7 @@
 ,
 {
   "case": "7442b-P1-1-r16",
-  "source": "out-7442b-1117-1414 journal-P1-1 request 16, eyes-P1-1.txt; row-7442b P1: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose)",
+  "source": "out-7442b-1117-1414 journal-P1-1 request 16, eyes-P1-1.txt; row-7442b P1: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose). NOTE: expect 'answered' pins the bug's behaviour as the kit's 0.25 s eyes sample shows it (its pitch reads miss the head-down looks lamp-voice saw); a fix that holds this line is not a regression: update expect with it",
   "line_s": [
     1.68,
     4.08
