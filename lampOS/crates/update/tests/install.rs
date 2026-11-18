@@ -4758,6 +4758,9 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 1);
     // #7245: the agent make's own pack check takes a skill its words start.
     assert_eq!(on("Environment=LAMP_MADE_SKILL_ASKS=on"), 1);
+    // #7245: V1's tool grants for the lamp's OpenClaw, live in the product
+    // (the owner's call: the lamp is one user's, OpenClaw unrestricted).
+    assert_eq!(on("Environment=LAMP_OPENCLAW_V1_TOOLS=on"), 1);
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
