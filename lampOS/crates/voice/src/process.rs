@@ -2602,6 +2602,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
+        // Only a quick reaction made by DeepSeek, any other by the agent (#6811).
+        crate::made_skill::REACTIONS_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
         // A live read or a hard ask handed to the lamp's agent (17 Nov).
         crate::agent_asks::SERVICES_ENVIRONMENT,
@@ -2924,6 +2926,7 @@ mod tests {
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+            crate::made_skill::REACTIONS_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
             crate::agent_asks::HARD_ENVIRONMENT,
@@ -4035,6 +4038,7 @@ mod tests {
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
+                    || name == crate::made_skill::REACTIONS_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
                     || name == crate::agent_asks::HARD_ENVIRONMENT
@@ -4232,6 +4236,7 @@ mod tests {
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_NO_CANNOT=on",
+                    "LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",
