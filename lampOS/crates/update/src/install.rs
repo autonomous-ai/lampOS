@@ -969,6 +969,48 @@ pub fn region_servers(
     Ok(())
 }
 
+/// sysstat's collection off (#7254): Debian's `sysstat` timers start
+/// `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
+/// once a day, which write `/var/log/sysstat` on the lamp's SD card for
+/// nothing any part reads (lamp-c0a4 kept about 30 MB by 18 Nov). Each gets a
+/// drop-in that runs it only while [`SYSSTAT_ON_PATH`] is there: a triggered
+/// run then skips at once, nothing is removed, and anyone debugging turns it
+/// back on with that one file.
+pub const SYSSTAT_ON_PATH: &str = "/etc/lampOS/sysstat-on";
+pub const SYSSTAT_DROPINS: [&str; 2] = [
+    "/etc/systemd/system/sysstat-collect.service.d/lampos.conf",
+    "/etc/systemd/system/sysstat-summary.service.d/lampos.conf",
+];
+pub const SYSSTAT_DROPIN: &str = "# lamp-update (#7254): sysstat's collection writes the SD card every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n\
+[Unit]\n\
+ConditionPathExists=/etc/lampOS/sysstat-on\n";
+
+/// [`SYSSTAT_DROPINS`] written with [`SYSSTAT_DROPIN`] (#7254), then
+/// `systemctl daemon-reload` only after a change, so the next trigger reads
+/// them; a reload that fails is said. Written on a lamp without sysstat too:
+/// a drop-in for a unit that isn't there does nothing. Run by install and by
+/// `lamp-region.service` at boot, which starts `update/current` (as
+/// [`region_servers`] is), so a lamp in a home gets them on its first boot
+/// after a round: a round writes the product's units, not install's other
+/// files.
+pub fn sysstat_quiet(
+    root: &Path,
+    host: &mut dyn Host,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let wrote = changed.len();
+    for path in SYSSTAT_DROPINS {
+        put(root, path, SYSSTAT_DROPIN.as_bytes(), 0o644, changed)?;
+    }
+    if changed.len() > wrote
+        && let Err(why) = host.refresh(&["systemctl", "daemon-reload"])
+    {
+        say(&format!("systemctl daemon-reload: {why}"));
+    }
+    Ok(())
+}
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
@@ -1996,6 +2038,9 @@ pub fn install(
     // end of the install.
     if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
         say(&format!("the region's name and time servers: {why}"));
+    }
+    if let Err(why) = sysstat_quiet(&config.root, host, &mut changed, say) {
+        say(&format!("sysstat's drop-ins: {why}"));
     }
 
     let before = state.clone();

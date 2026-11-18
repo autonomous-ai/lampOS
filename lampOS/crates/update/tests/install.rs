@@ -8714,12 +8714,11 @@ fn any_other_lamp_keeps_its_fallback_and_gets_no_time_drop_in() {
             "{region:?}"
         );
         assert!(!lamp.on(install::TIMESYNCD_PATH).exists(), "{region:?}");
+        // Only sysstat's reload (#7254), never the region's own.
         assert!(
-            !lamp
-                .host
-                .calls
-                .iter()
-                .any(|call| call.starts_with("refresh")),
+            !lamp.host.calls.iter().any(|call| {
+                call.starts_with("refresh") && call != "refresh systemctl daemon-reload"
+            }),
             "{region:?}: {:?}",
             lamp.host.calls
         );
@@ -8783,5 +8782,103 @@ fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
         "WantedBy=multi-user.target",
     ] {
         assert!(service.lines().any(|kept| kept == line), "{line}");
+    }
+}
+
+/// #7254: install writes sysstat's two drop-ins, each running its unit only
+/// while `/etc/lampOS/sysstat-on` is there, and reloads systemd once; a run
+/// with them unchanged writes and reloads nothing.
+#[test]
+fn sysstats_collection_is_off_until_its_file_and_written_once() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    for path in install::SYSSTAT_DROPINS {
+        assert_eq!(
+            fs::read_to_string(lamp.on(path)).unwrap(),
+            install::SYSSTAT_DROPIN,
+            "{path}"
+        );
+        let mode = fs::metadata(lamp.on(path)).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o644, "{path}");
+    }
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 1);
+    // Again: nothing written, no reload.
+    let mut changed = Vec::new();
+    let mut said = Vec::new();
+    install::sysstat_quiet(
+        &lamp.root,
+        &mut lamp.host,
+        &mut changed,
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(changed.is_empty(), "{changed:?}");
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 1);
+    assert!(said.is_empty(), "{said:?}");
+}
+
+/// #7254: the drop-ins' bytes, pinned: the condition is the only setting,
+/// and the line says why and how to turn it back on.
+#[test]
+fn sysstats_drop_in_bytes_are_pinned() {
+    assert_eq!(
+        install::SYSSTAT_DROPIN,
+        "# lamp-update (#7254): sysstat's collection writes the SD card every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n[Unit]\nConditionPathExists=/etc/lampOS/sysstat-on\n"
+    );
+    assert_eq!(
+        install::SYSSTAT_DROPINS,
+        [
+            "/etc/systemd/system/sysstat-collect.service.d/lampos.conf",
+            "/etc/systemd/system/sysstat-summary.service.d/lampos.conf",
+        ]
+    );
+    assert!(install::SYSSTAT_DROPIN.contains(install::SYSSTAT_ON_PATH));
+}
+
+/// #7254: a lamp without sysstat gets the same files, harmless with no unit
+/// to drop into, and a drop-in changed on the lamp is put back.
+#[test]
+fn a_lamp_without_sysstat_gets_the_same_harmless_drop_ins() {
+    let mut lamp = Lamp::new(188, &[]);
+    assert!(
+        !lamp
+            .on("/lib/systemd/system/sysstat-collect.service")
+            .exists()
+    );
+    let mut changed = Vec::new();
+    install::sysstat_quiet(&lamp.root, &mut lamp.host, &mut changed, &mut |_| {}).unwrap();
+    assert_eq!(
+        changed,
+        install::SYSSTAT_DROPINS.map(|path| format!("wrote {path}"))
+    );
+    fs::write(lamp.on(install::SYSSTAT_DROPINS[0]), "[Unit]\n").unwrap();
+    let mut changed = Vec::new();
+    install::sysstat_quiet(&lamp.root, &mut lamp.host, &mut changed, &mut |_| {}).unwrap();
+    assert_eq!(changed, [format!("wrote {}", install::SYSSTAT_DROPINS[0])]);
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 2);
+}
+
+/// #7254: `lamp-region.service`, the boot one-shot a lamp in a home runs
+/// from `update/current`, may write both drop-ins (its `ReadWritePaths`
+/// holds `/etc`).
+#[test]
+fn the_region_unit_may_write_sysstats_drop_ins() {
+    let service = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-region.service")
+        .unwrap()
+        .1;
+    let writes: Vec<&str> = service
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .map(|at| at.trim_start_matches('-'))
+        .collect();
+    for path in install::SYSSTAT_DROPINS {
+        assert!(
+            writes.iter().any(|at| path.starts_with(&format!("{at}/"))),
+            "{path} not in {writes:?}"
+        );
     }
 }

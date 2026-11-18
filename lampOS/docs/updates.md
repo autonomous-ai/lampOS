@@ -2342,7 +2342,10 @@ same link. A unit of lamp-update's own that starts through `update/current`
 lamp-update's own unit starts from, and that link is left as it is: no round
 moves it. Before this, such a unit was refused (`update/current is there,
 and no unit of this lamp starts through it`), so a lamp that took the
-region's build through a round refused every later build. A part new to the
+region's build through a round refused every later build. That unit's `lamp-update region`, from `update/current` at every boot, is
+also how install's sysstat drop-ins (#7254, [install.md](install.md),
+"sysstat's collection off") reach a lamp in a home: a round never writes
+install's side files itself. A part new to the
 lamp is installed afresh in the folder of its
 binary's SHA-256, as a switch installs a build, and its `current` link is
 made to name it. A part's template, socket or timer is added when its part
