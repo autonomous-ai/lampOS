@@ -451,7 +451,7 @@ pub fn place_line(kind: &str, data: &Value) -> Result<String, String> {
 }
 
 /// The app's `request_id`, if it gave one: 1 to 64 printable characters.
-fn request_id(data: &Value) -> Result<Option<String>, String> {
+pub(crate) fn request_id(data: &Value) -> Result<Option<String>, String> {
     match data.get("request_id") {
         None | Some(Value::Null) => Ok(None),
         Some(Value::String(id))
@@ -1347,8 +1347,8 @@ impl Changes {
     }
 
     /// Asks the helper for `line` on a thread of its own; its result is
-    /// kept for [`Self::take`].
-    pub fn start(&self, kind: &str, line: String) {
+    /// kept for [`Self::take`], with the app's `request_id` if it gave one.
+    pub fn start(&self, kind: &str, line: String, request_id: Option<String>) {
         let (socket, wait, done) = (self.socket.clone(), self.wait, self.done.clone());
         let kind = kind.to_owned();
         std::thread::spawn(move || {
@@ -1357,7 +1357,7 @@ impl Changes {
                 done.push(Outcome {
                     kind,
                     result,
-                    request_id: None,
+                    request_id,
                     code: None,
                 });
             }
@@ -1828,6 +1828,48 @@ mod tests {
             (&json!("success"), &json!(true))
         );
         let _ = std::fs::remove_file(&path);
+    }
+
+    /// #7432: `monitor.set`'s result carries the app's `request_id` back,
+    /// in its data and its journal line, so the app can match its tap; one
+    /// without it still goes, saying "no request_id".
+    #[test]
+    fn a_monitor_set_result_carries_its_request_id() {
+        for (data, id, said) in [
+            (
+                json!({"on": true, "request_id": "r-7"}),
+                Some("r-7"),
+                "request_id r-7",
+            ),
+            (json!({"on": true}), None, "no request_id"),
+        ] {
+            let path = socket("monitor");
+            let serving = helper(&path, Duration::ZERO, "{\"done\":{\"on\":true}}\n");
+            let changes = Changes::new(&path, Duration::from_secs(5));
+            let (line, request_id) = crate::monitor::line(&data).unwrap();
+            changes.start(crate::monitor::SET_KIND, line, request_id);
+            let until = Instant::now() + Duration::from_secs(5);
+            let done = loop {
+                if let Some(done) = changes.take().into_iter().next() {
+                    break done;
+                }
+                assert!(Instant::now() < until, "no result");
+                std::thread::sleep(Duration::from_millis(10));
+            };
+            assert_eq!(serving.join().unwrap(), "{\"monitor\":true}\n");
+            assert_eq!(done.request_id.as_deref(), id);
+            assert_eq!(
+                done.journal(),
+                format!("a change's result, monitor.set success, {said}")
+            );
+            let reply = done.reply(&identity(), "t");
+            assert_eq!(reply["data"]["on"], json!(true));
+            assert_eq!(
+                reply["data"].get("request_id"),
+                id.map(|id| json!(id)).as_ref()
+            );
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     /// `control.set_agent` goes the same way: acked at once, its line is the
