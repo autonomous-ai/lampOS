@@ -12481,6 +12481,88 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The first builder's leg for the switch-on (19 Nov 00:16): a make
+    /// with the internet down is said plainly as not made, the model's
+    /// silence ([`made_skill::MODEL_SILENT`]), and keeps nothing, never a
+    /// half-made skill. The judgement failing and then the trigger's one
+    /// more call failing (no answer at all, or the judgement answered and
+    /// the link gone before the trigger), and lamp-tasks unreachable with
+    /// DeepSeek's draft failing, alike: no `made.json` entry, no package,
+    /// no `skill.toml` packed, the agent never asked.
+    #[test]
+    fn with_the_switch_a_make_with_the_internet_down_keeps_nothing_and_says_so_plainly() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let silent = format!("the skill couldn't be made: {}", made_skill::MODEL_SILENT);
+        // A port nothing listens on: every call refused, as with no link.
+        let down = || {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}/v1/", listener.local_addr().unwrap())
+        };
+        let packed = |root: &Path| {
+            let mut found = Vec::new();
+            let mut folders = vec![root.to_path_buf()];
+            while let Some(folder) = folders.pop() {
+                for entry in std::fs::read_dir(&folder).unwrap().flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        folders.push(path);
+                    } else if path.extension().is_some_and(|ext| ext == "tar") {
+                        found.push(path);
+                    }
+                }
+            }
+            found
+        };
+        let (_gone, gone) = crate::make_skill_agent::tests::no_socket();
+        let unreachable = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..gone
+        };
+        for case in 0..3 {
+            let (root, keeping, copy) = keeping_copied(&format!("reactions-offline-{case}"));
+            let tasks = agent_answering(vec![]);
+            let (url, served) = match case {
+                1 => {
+                    let (url, served) = service_sent(vec![judgement(false)]);
+                    (url, Some(served))
+                }
+                _ => (down(), None),
+            };
+            let agent = match case {
+                2 => unreachable.clone(),
+                _ => tasks.agent(),
+            };
+            let told = make_with_by(
+                0,
+                None,
+                SIP,
+                &keeping,
+                chat_at(url),
+                NOW + case,
+                || None,
+                Some(&agent),
+            );
+            if let Some(served) = served {
+                assert!(is_judgement(&served.join().unwrap()[0], SIP), "{case}");
+            }
+            assert!(told.get("made").is_none(), "{case}: {told}");
+            assert_eq!(told["error"], silent.as_str(), "{case}: {told}");
+            assert!(made_skill::entries(&keeping.directory).is_empty(), "{case}");
+            assert!(packed(&root).is_empty(), "{case}: {:?}", packed(&root));
+            assert!(!copy.exists(), "{case}");
+            assert_eq!(tasks.hand_overs(), 0, "{case}");
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        assert_eq!(
+            made_skill::not_made_line(&made_skill::plain_reason(made_skill::MODEL_SILENT)),
+            "I couldn't make that: the lamp's model didn't answer."
+        );
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+    }
+
     /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
     /// as before, no judgement, the agent never asked and no `made_with`
     /// written.

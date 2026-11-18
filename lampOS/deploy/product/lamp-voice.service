@@ -474,6 +474,8 @@ Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
 Environment=LAMP_MAKE_CORE_OFFER=on
 Environment=LAMP_SKILL_KEYTERM=on
 Environment=LAMP_SKILL_RECURRING_TOLD=on
+# #7764, docs/switches.md; first builder, 19 Nov 00:16 (only a quick reaction is DeepSeek's; the rest the agent's task)
+Environment=LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
