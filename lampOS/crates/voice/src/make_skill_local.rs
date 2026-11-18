@@ -662,6 +662,20 @@ fn own_accounts_now() -> Vec<(String, String)> {
     own
 }
 
+/// The `make_skill` argument that asks for a new skill: what it should do
+/// and when, in the person's words. Every other use of the function (a
+/// remove, a run, a list, a yes, a clash's choice, a read-back) gives its
+/// own argument alone, with none.
+pub const REQUEST: &str = "request";
+
+/// Whether a `make_skill` call's whole `args` ask for a new skill: they
+/// name its [`REQUEST`], as a streamed call whose first argument is
+/// [`REQUEST`] does (`ChatEvent::Argued`). Neither weighs its words or
+/// what else it carries, since the stream decides before those come.
+pub fn asks_a_new_make(args: &Value) -> bool {
+    args.get(REQUEST).is_some()
+}
+
 /// The function the model is given with the switch: the lamp makes it
 /// itself, at once, and puts it on as soon as it is kept.
 pub fn tool() -> lamp_gemini::Tool {
@@ -802,7 +816,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "properties": {
             "request": {
                 "type": "string",
-                "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn."
+                "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn. Never call it for an ask they take back in the same line."
             }
         },
         "required": []
@@ -872,7 +886,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
-            "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words: its approve_id, given alone with no request."
+            "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words, or a note asks their answer by it: its approve_id, given alone with no request."
         });
         // What the person answered (#6835 gap 2): a call made in code's
         // turn may be a no or unclear, never only a yes.
@@ -1177,6 +1191,22 @@ fn make_with_by(
         &format!("{FROM}{now_unix_ms}"),
         agent,
     );
+    // Declined while it was made ([`making_answered`]): never put on,
+    // nothing of it said, and nothing of it kept (its package and off
+    // entry go, as a cancelled clash's do: `made_skill::forget_unput`);
+    // asked again, it is made again. Not declined, it is marked finishing
+    // in the same lock, so a no from here on is never told it was dropped
+    // while it goes on ([`FINISHING_NEXT`]).
+    if asked.as_ref().is_some_and(OneAsk::dropped_or_finishing) {
+        if let Ok(made) = &made {
+            made_skill::forget_unput(&keeping.directory, &made.sha256);
+        }
+        MADE_LINE.with(|kept| kept.replace(None));
+        eprintln!(
+            "lamp-voice: a skill made here was declined while it was made: not put on, not kept, nothing said"
+        );
+        return json!({ "dropped": true, "next": WONT_MAKE_NEXT });
+    }
     // An ask by voice that made nothing, for the opt-in health report's
     // counts: one atomic add here, written later (`crate::made_counts`).
     if made.is_err() {
@@ -1201,7 +1231,10 @@ fn make_with_by(
     if let Err(Refused(why, _)) = &made
         && why == made_skill::UNRELATED
     {
-        MADE_LINE.with(|kept| kept.replace(Some(made_skill::UNRELATED.to_owned())));
+        // Nothing made: after a cut it is said only while the person has
+        // not gone on with a line of their own (`worker::made_running`).
+        MADE_LINE
+            .with(|kept| kept.replace(Some((made_skill::UNRELATED.to_owned(), Outcome::Failed))));
         return json!({
             "error": made_skill::UNRELATED,
             "next": format!(
@@ -1236,9 +1269,15 @@ fn make_with_by(
         && let clashes = crate::made_clash::found(keeping, made)
         && !clashes.is_empty()
     {
-        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clashes))));
         let told =
             crate::made_clash::asked(keeping, made, &clashes, made_in, std::time::Instant::now());
+        // Said after a cut: an older clash it let go is told first.
+        let cut = crate::made_clash::cut_line(made, &clashes);
+        let line = match told["dropped"].as_str() {
+            Some(dropped) => format!("{} {cut}", crate::made_clash::dropped_line(dropped)),
+            None => cut,
+        };
+        MADE_LINE.with(|kept| kept.replace(Some((line, Outcome::Clash))));
         if let Some(asked) = asked {
             asked.made(&made.name, &told, now_unix_ms);
         }
@@ -1261,11 +1300,15 @@ fn make_with_by(
     let told = match (&made, &at_once) {
         (Ok(kept), Some(at_once)) => {
             let line = code_on_line(kept, at_once);
-            MADE_LINE.with(|kept| kept.replace(Some(line.clone())));
+            let outcome = Outcome::of(at_once.is_ok());
+            MADE_LINE.with(|kept| kept.replace(Some((line.clone(), outcome))));
             told_with(line, made.clone(), on.clone(), needs.as_deref())
         }
         _ => {
-            MADE_LINE.with(|kept| kept.replace(Some(said_line(&made, &on, needs.as_deref()))));
+            let outcome = Outcome::of(made.is_ok() && on.is_ok());
+            MADE_LINE.with(|kept| {
+                kept.replace(Some((said_line(&made, &on, needs.as_deref()), outcome)))
+            });
             told(made.clone(), on.clone(), needs.as_deref())
         }
     };
@@ -1341,13 +1384,16 @@ fn made_no_asks(
                 crate::make_no_asks::turned_off_here().as_ref(),
                 || owners_make(made_in),
             );
-            MADE_LINE.with(|kept| kept.replace(Some(line)));
+            // No clash waits here: put on, or not, as it is told.
+            let outcome = Outcome::of(told["on"].as_bool() == Some(true));
+            MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
             return Some(told);
         }
     }
     let (on, line) = crate::make_no_asks::put_on(keeping, made, || owners_make(made_in))?;
     let told = crate::make_no_asks::made_told(made, &on, &line, needs);
-    MADE_LINE.with(|kept| kept.replace(Some(line)));
+    let outcome = Outcome::of(on.is_ok());
+    MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
     Some(told)
 }
 
@@ -1411,6 +1457,17 @@ struct HeldAsk {
     /// yes agrees to and its say-back, to wait for it again when it is
     /// asked for again (`LAMP_MAKE_NO_CANNOT`).
     yes: Option<(crate::skill_write_yes::Asks, String)>,
+    /// The voice's request that asked it, and the model's request, as told
+    /// to a later line while it is made ([`making_note`]).
+    made_in: u64,
+    asked: String,
+    /// The person declined it while it was made ([`making_answered`]): it
+    /// is not put on, nothing of it is kept, and nothing of it is said.
+    dropped: bool,
+    /// Made, and past the last look for a no
+    /// ([`OneAsk::dropped_or_finishing`]): being put on or said, too late
+    /// to drop ([`FINISHING_NEXT`]).
+    finishing: bool,
 }
 
 /// The voice's asks under way or made within [`ONE_ASK_WITHIN`].
@@ -1424,6 +1481,25 @@ fn ask_words(line: &str) -> Vec<String> {
         .filter(|word| !word.is_empty())
         .map(str::to_lowercase)
         .collect()
+}
+
+/// Whether a call's `heard` line and `request` are the ask held as
+/// `held_heard` and `held_request` ([`same_ask`]). A heard line that holds
+/// the held one whole and at least [`ONE_ASK_FEWEST_WORDS`] words more
+/// carries an ask of its own beside it, and is the same ask only when the
+/// requests are too (lamp-9adf, 17 Nov 18:05: a make cut by the next ask,
+/// its line never answered, was heard again before "make a skill that says
+/// stretch time whenever I say stretch", and that new ask was told it "is
+/// being made already").
+fn one_ask(
+    held_heard: &[String],
+    held_request: &[String],
+    heard: &[String],
+    request: &[String],
+) -> bool {
+    same_ask(held_request, request)
+        || (same_ask(held_heard, heard)
+            && held_heard.len().abs_diff(heard.len()) < ONE_ASK_FEWEST_WORDS)
 }
 
 /// Whether two lines' words are one ask: the one of at least
@@ -1479,6 +1555,7 @@ impl OneAsk {
         made_in: u64,
     ) -> Result<Self, Value> {
         let heard = ask_words(heard.unwrap_or_default());
+        let asked = request;
         let request = ask_words(request);
         // Read from the folder before the lock, held by every voice make.
         let kept = made_skill::kept_names(directory);
@@ -1492,7 +1569,8 @@ impl OneAsk {
         });
         let earlier = asks.iter().position(|ask| {
             ask.directory == directory
-                && (same_ask(&ask.heard, &heard) || same_ask(&ask.request, &request))
+                && !ask.dropped
+                && one_ask(&ask.heard, &ask.request, &heard, &request)
         });
         // `LAMP_MAKE_NO_CANNOT` (lamp-9adf, 16 Nov: the same ask a minute
         // later was told the skill "is still on the lamp", and it was off):
@@ -1562,6 +1640,10 @@ impl OneAsk {
                     request,
                     made: None,
                     yes: None,
+                    made_in,
+                    asked: asked_words(asked),
+                    dropped: false,
+                    finishing: false,
                 });
                 Ok(Self(id))
             }
@@ -1595,6 +1677,201 @@ impl Drop for OneAsk {
     fn drop(&mut self) {
         let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         asks.retain(|ask| ask.id != self.0);
+    }
+}
+
+impl OneAsk {
+    /// Whether the person declined the ask while it was made
+    /// ([`making_answered`]).
+    #[cfg(test)]
+    fn dropped(&self) -> bool {
+        ASKS.lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .iter()
+            .any(|ask| ask.id == self.0 && ask.dropped)
+    }
+
+    /// Whether the person declined the ask while it was made
+    /// ([`making_answered`]); if not, it is marked finishing in the same
+    /// lock, so a no that comes later, while it is put on (the manage
+    /// helper can take seconds) or said, is told it is too late to drop
+    /// ([`FINISHING_NEXT`]), never that it was dropped.
+    fn dropped_or_finishing(&self) -> bool {
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        match asks.iter_mut().find(|ask| ask.id == self.0) {
+            Some(ask) if ask.dropped => true,
+            Some(ask) => {
+                ask.finishing = true;
+                false
+            }
+            None => false,
+        }
+    }
+}
+
+/// The most of the model's request told to a later line while it is made
+/// ([`making_note`]).
+const ASKED_MOST_CHARS: usize = 200;
+
+/// The model's `request`, as a later line's note tells it: one line, at
+/// most [`ASKED_MOST_CHARS`].
+fn asked_words(request: &str) -> String {
+    let line = request.split_whitespace().collect::<Vec<_>>().join(" ");
+    match line.char_indices().nth(ASKED_MOST_CHARS) {
+        Some((at, _)) => format!("{}…", &line[..at]),
+        None => line,
+    }
+}
+
+/// How the id of a voice make under way, told to a later line as its
+/// `approve_id` ([`making_note`]), begins.
+const MAKING_ID: &str = "making-";
+
+/// What the model is told when the person declined a make, while it was
+/// made or as its say-back waited for their yes (lamp-9adf, 17 Nov: "No,
+/// don't turn it on." was answered "Should I stop making it altogether?",
+/// and "Maybe later." with how to start a skill that was never kept). The
+/// owner's fewest steps: dropped, said in one plain line, nothing asked.
+pub const WONT_MAKE_NEXT: &str = "It is dropped: nothing of it is on. Say only, in the \
+     conversation's language: \"Alright, I won't make it.\" Never say it is on, or how to \
+     start it. Ask nothing, call nothing.";
+
+/// What every note of a skill being made or waiting for its yes
+/// ([`making_note`], `crate::skill_write_yes::waiting_note`) ends with
+/// (lamp-9adf, 18 Nov 02:24–02:26: after a make waited for its yes, three
+/// new make asks each got "I'll make that now. This takes about a minute.
+/// I'm on it." with no call, nothing made): a skill asked for now is its
+/// own ask, made by its own call, and a make is never said as begun
+/// without one.
+pub const NEW_ASK_OWN_CALL: &str = "A different skill they ask for now is a new ask, not \
+     this one: call make_skill for it with its own request, as always. Never say a skill is \
+     being made unless make_skill is called for it in this turn.";
+
+/// What the model is told of a make still under way, to any answer but a
+/// no: there is nothing to agree to yet.
+const STILL_MAKING_NEXT: &str = "It is still being made: nothing is on yet, and there is \
+     nothing to agree to now. Say only, in a few words, in the conversation's language, that \
+     it's still being made and they'll hear when it's ready. Never say it is on, or how to \
+     start it. Call nothing.";
+
+/// What the model is told of a no to a make past its last look for one
+/// ([`OneAsk::dropped_or_finishing`]): it is being finished, and the
+/// make's own line says how it went.
+const FINISHING_NEXT: &str = "It is just being finished, too late to stop: nothing was \
+     dropped. Say only, in a few words, in the conversation's language, that it's almost done \
+     and they'll hear in a moment; if they don't want it then, they can ask to remove it. \
+     Never say it won't be made. Call nothing.";
+
+/// What the model is told of an answer to a make no longer held.
+const NOT_MAKING_NEXT: &str = "Nothing is being made now, and nothing was changed. Say so in \
+     a few words, in the conversation's language. Call nothing.";
+
+/// The note a later heard line `request` is told while a voice make is
+/// under way (lamp-9adf, 17 Nov: an agent's make takes about a minute,
+/// and lines heard meanwhile were answered as if the skill were on, or
+/// with a question): what is being made, that nothing of it is on yet,
+/// and the id a no drops it by ([`making_answered`]). The newest under
+/// way, never in its own request; none with none. Read from memory: no
+/// call, no file.
+/// Only with `approve_id` declared (a made skill's writes, code, or a
+/// skill's tasks on).
+pub fn making_note(request: u64) -> Option<String> {
+    if !(made_skill::writes_on() || crate::skill_task_yes::on() || made_skill::scripts_on()) {
+        return None;
+    }
+    making_note_where(request, |_| true)
+}
+
+fn making_note_where(request: u64, of: impl Fn(&std::path::Path) -> bool) -> Option<String> {
+    let asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let ask = asks
+        .iter()
+        .filter(|ask| {
+            ask.made.is_none()
+                && !ask.dropped
+                && ask.made_in != 0
+                && request > ask.made_in
+                && of(&ask.directory)
+        })
+        .max_by_key(|ask| ask.id)?;
+    Some(format!(
+        "(For you to know, not to answer: a skill is still being made for their ask \"{}\", \
+         approve_id \"{MAKING_ID}{}\". It isn't made or on yet, and they'll hear when it is: \
+         never say it is on, or how to start it. If this line declines it or puts it off, \
+         call make_skill with only that approve_id and answer \"no\": it is dropped. \
+         Otherwise don't call it with that approve_id. {NEW_ASK_OWN_CALL})",
+        ask.asked, ask.id
+    ))
+}
+
+/// What a `make_skill` call with `approve_id` `id` in `request` is, when
+/// `id` names a voice make ([`making_note`]).
+#[derive(Debug, PartialEq)]
+pub enum Making {
+    /// Not a make's id: the call goes on as a yes's.
+    NotOurs,
+    /// What the model is told.
+    Told(Value),
+    /// The make is done, and its say-back waits for a yes by this id: the
+    /// call goes on with it.
+    Waits(String),
+}
+
+/// The person's `answer` to the make `id` names, in a later `request`
+/// ([`making_note`]): a no drops a make under way, which is then never put
+/// on and says nothing ([`WONT_MAKE_NEXT`]); any other answer is told it
+/// is still being made. A make done since, waiting for its yes, takes the
+/// answer by its own id ([`Making::Waits`]). The model judges the answer;
+/// code only reads the field.
+pub fn making_answered(id: &str, request: u64, answer: Option<&str>) -> Making {
+    let Some(held) = id
+        .strip_prefix(MAKING_ID)
+        .and_then(|held| held.parse::<u64>().ok())
+    else {
+        return Making::NotOurs;
+    };
+    let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let Some(ask) = asks
+        .iter_mut()
+        .find(|ask| ask.id == held && request > ask.made_in)
+    else {
+        eprintln!("lamp-voice: request {request}: an answer to a make found none under way");
+        return Making::Told(json!({ "approved": false, "next": NOT_MAKING_NEXT }));
+    };
+    match (&ask.made, answer) {
+        (None, Some("no")) if ask.finishing => {
+            eprintln!(
+                "lamp-voice: request {request}: the person declined a make being finished: too late to drop"
+            );
+            Making::Told(json!({ "approved": false, "finishing": true, "next": FINISHING_NEXT }))
+        }
+        (None, Some("no")) => {
+            ask.dropped = true;
+            eprintln!(
+                "lamp-voice: request {request}: the person declined a make under way: it is dropped, never put on"
+            );
+            Making::Told(json!({ "approved": false, "dropped": true, "next": WONT_MAKE_NEXT }))
+        }
+        (None, _) => {
+            Making::Told(json!({ "approved": false, "making": true, "next": STILL_MAKING_NEXT }))
+        }
+        (Some((name, told, _)), _) => {
+            match told
+                .get(crate::skill_write_yes::APPROVE_ID)
+                .and_then(Value::as_str)
+            {
+                Some(waits) => Making::Waits(waits.to_owned()),
+                None => Making::Told(json!({
+                    "approved": false,
+                    "next": format!(
+                        "It was made a moment ago, and nothing waits for their answer: {}. \
+                         Say in a few words, in the conversation's language, what became of \
+                         it; if they don't want it, they can ask to remove it. Call nothing.",
+                        made_skill::spoken_name(name)
+                    )
+                })),
+            }
+        }
     }
 }
 
@@ -2440,7 +2717,31 @@ fn waits_for_yes(mut told: Value, line: &str, id: &str) -> Value {
 std::thread_local! {
     /// The line of the make [`make_with`] last finished on this thread
     /// ([`said_line`]), until [`take_said_line`] takes it.
-    static MADE_LINE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    static MADE_LINE: std::cell::RefCell<Option<(String, Outcome)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// What a make finished on this thread came to, beside its line
+/// ([`take_said_outcome`]): told after a cut by what it is, never by its
+/// turn's answer, which a cut turn's lapsed scope makes an `error` whatever
+/// the make kept (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0: request 86's
+/// `dim-light-at-night` clashed and was asked, yet "kept nothing" was
+/// journaled and its question never said).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    /// Made, and on (or waiting for its yes).
+    Made,
+    /// Made, and not put on: its clash waits for the person's choice
+    /// ([`crate::made_clash`]).
+    Clash,
+    /// Nothing made, or made and not put on.
+    Failed,
+}
+
+impl Outcome {
+    fn of(kept: bool) -> Self {
+        if kept { Self::Made } else { Self::Failed }
+    }
 }
 
 /// The line the lamp says of the make just finished on this thread, for
@@ -2452,6 +2753,11 @@ std::thread_local! {
 /// or not made ([`made_skill::not_made_line`]). None when no make finished
 /// here since the last take (not asked aloud, the brief refused).
 pub fn take_said_line() -> Option<String> {
+    take_said_outcome().map(|(line, _)| line)
+}
+
+/// [`take_said_line`], with what the make came to ([`Outcome`]).
+pub fn take_said_outcome() -> Option<(String, Outcome)> {
     MADE_LINE.with(|kept| kept.take())
 }
 
@@ -2459,7 +2765,7 @@ pub fn take_said_line() -> Option<String> {
 /// of another kind (one with code, cut) would leave it.
 #[cfg(test)]
 pub fn set_said_line(line: String) {
-    MADE_LINE.with(|kept| kept.replace(Some(line)));
+    MADE_LINE.with(|kept| kept.replace(Some((line, Outcome::Made))));
 }
 
 /// The one short line of a make that kept `made`, `on` or not; or not
@@ -2511,6 +2817,25 @@ impl Drop for Pending {
 /// ([`Pending`]).
 pub fn pending() -> bool {
     PENDING.load(std::sync::atomic::Ordering::Acquire) > 0
+}
+
+/// The newest request whose line the person said with words and the
+/// lamp answered ([`person_went_on`]).
+static WENT_ON: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The second route answers `request`, a line heard with words: the
+/// person has gone on from any make whose turn was cut before it. A sound
+/// with no words, or a line held as not said to the lamp, never comes here
+/// (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0: requests 6 and 17 heard 0
+/// words, and request 57 was held, yet each make they cut failed untold).
+pub fn person_went_on(request: u64) {
+    WENT_ON.fetch_max(request, std::sync::atomic::Ordering::AcqRel);
+}
+
+/// Whether the person went on ([`person_went_on`]) with a line after
+/// `request`'s: a cut make of `request` that kept nothing then says nothing.
+pub fn went_on_after(request: u64) -> bool {
+    WENT_ON.load(std::sync::atomic::Ordering::Acquire) > request
 }
 
 /// The skill for `request` (its `brief` made already) written by the
@@ -3576,6 +3901,21 @@ pub fn answer(
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
+        // A voice make's id, told while it was made ([`making_note`]): a
+        // no drops it; done since, its own wait takes the answer.
+        let waits;
+        let id = match making_answered(
+            id,
+            request,
+            call.args[crate::skill_write_yes::ANSWER].as_str(),
+        ) {
+            Making::Told(told) => return told,
+            Making::Waits(own) => {
+                waits = own;
+                waits.as_str()
+            }
+            Making::NotOurs => id,
+        };
         // A no, an unclear answer (#6835 gap 2), or a yes that names
         // another skill than the one waiting (#7545): nothing is kept.
         if let Some(told) = crate::skill_write_yes::answered(
@@ -4461,7 +4801,12 @@ light = { dim = 1 }
         );
         assert!(told.get("made").is_none(), "{told}");
         assert!(!told.to_string().to_lowercase().contains("moon"), "{told}");
-        assert_eq!(take_said_line().as_deref(), Some(made_skill::UNRELATED));
+        // Nothing made: a failure, never told after a cut once the person
+        // went on (`worker::made_running`).
+        assert_eq!(
+            take_said_outcome(),
+            Some((made_skill::UNRELATED.to_owned(), Outcome::Failed))
+        );
         assert!(made_skill::entries(&keeping.directory).is_empty());
         made_skill::set_asks_here(None);
         made_skill::set_english_here(None);
@@ -4860,6 +5205,316 @@ light = { dim = 1 }
             .unwrap()
             .made("glow-on-return", &json!({"made": "glow-on-return"}), NOW);
         assert!(OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW).is_ok());
+    }
+
+    /// lamp-9adf, 17 Nov 18:05 and 18:10: a make cut by the next ask, its
+    /// line never answered, was heard again before a new, other ask ("make
+    /// a skill that says stretch time whenever I say stretch"; "make a
+    /// skill that waters my plants. Actually, never mind."), and that ask
+    /// was told the earlier one "is being made already", whose words the
+    /// model then said. A line that holds the held ask and an ask of its
+    /// own is the same ask only when the requests are too; the held line
+    /// carried with the lamp's name, or a few words, still is.
+    #[test]
+    fn a_line_carrying_another_ask_beside_one_under_way_is_not_that_ask() {
+        const OLD: &str =
+            "Lamp, make a skill that sends my test note whenever I say send my test note.";
+        const NEW: &str = "Lamp, make a skill that says stretch time whenever I say stretch.";
+        const ASKED: &str = "send my test note whenever I say send my test note";
+        let directory = std::env::temp_dir().join(format!("one-ask-other-{}", std::process::id()));
+        let held = OneAsk::begin_in(&directory, Some(OLD), ASKED, NOW, 31).unwrap();
+        // The new ask, the old line heard before it: made.
+        let both = format!("{OLD} {NEW}");
+        let new = OneAsk::begin_in(
+            &directory,
+            Some(&both),
+            "say stretch time whenever I say stretch",
+            NOW,
+            33,
+        );
+        assert!(new.is_ok(), "{:?}", new.err());
+        drop(new);
+        // The old line carried again with the lamp's name: the same ask.
+        let carried = OneAsk::begin_in(
+            &directory,
+            Some(&format!("Hey Lamp. {OLD}")),
+            "a skill that sends my test note",
+            NOW,
+            34,
+        );
+        assert_eq!(carried.err().unwrap()["making"], true);
+        // The same request, whatever was heard with it: the same ask.
+        let same = OneAsk::begin_in(&directory, Some(&both), ASKED, NOW, 35);
+        assert_eq!(same.err().unwrap()["making"], true);
+        drop(held);
+    }
+
+    /// lamp-9adf, 17 Nov: lines heard while a make was under way were
+    /// answered as if it were on ("Just say joke time whenever you want
+    /// one."), or with a question ("Should I stop making it altogether?").
+    /// A later line is told what is being made, that nothing of it is on,
+    /// and the id a no drops it by; the model's no drops it, and the make,
+    /// done, is never put on and says nothing; any other answer is told it
+    /// is still being made. Never in the make's own request.
+    #[test]
+    fn a_make_under_way_is_told_to_later_lines_and_a_no_drops_it() {
+        let directory = std::env::temp_dir().join(format!("one-ask-making-{}", std::process::id()));
+        let of = |at: &std::path::Path| at == directory;
+        let held = OneAsk::begin_in(
+            &directory,
+            Some("make a skill that tells me a joke whenever I say joke time"),
+            "tell me a joke whenever I say joke time",
+            NOW,
+            40,
+        )
+        .unwrap();
+        assert!(making_note_where(40, of).is_none(), "its own request");
+        let note = making_note_where(41, of).unwrap();
+        assert!(
+            note.contains("\"tell me a joke whenever I say joke time\""),
+            "{note}"
+        );
+        assert!(note.contains("never say it is on"), "{note}");
+        let id = format!("{MAKING_ID}{}", held.0);
+        assert!(note.contains(&id), "{note}");
+        // Not a make's id: the call goes on as a yes's.
+        assert_eq!(
+            making_answered("yes-0000abcd", 41, Some("no")),
+            Making::NotOurs
+        );
+        // A yes, or none: still being made, nothing dropped.
+        for answer in [Some("yes"), None, Some("unclear")] {
+            let Making::Told(told) = making_answered(&id, 41, answer) else {
+                panic!("{answer:?}");
+            };
+            assert_eq!(told["making"], true, "{told}");
+            assert!(!held.dropped());
+        }
+        // A no: dropped, and told the plain line.
+        let Making::Told(told) = making_answered(&id, 41, Some("no")) else {
+            panic!("no");
+        };
+        assert_eq!(told["dropped"], true, "{told}");
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("Alright, I won't make it."),
+            "{told}"
+        );
+        assert!(held.dropped());
+        assert!(making_note_where(42, of).is_none(), "dropped: no note");
+        // Asked again, it is made again.
+        let again = OneAsk::begin_in(
+            &directory,
+            Some("make a skill that tells me a joke whenever I say joke time"),
+            "tell me a joke whenever I say joke time",
+            NOW,
+            43,
+        );
+        assert!(again.is_ok());
+        drop(again);
+        drop(held);
+        // Gone: nothing under way, nothing changed.
+        let Making::Told(told) = making_answered(&id, 44, Some("no")) else {
+            panic!("gone");
+        };
+        assert!(told.get("dropped").is_none(), "{told}");
+    }
+
+    /// lamp-9adf, 18 Nov 02:24–02:26 (#7554's row): a make ended waiting
+    /// for its yes, and later make asks got a waiting line with no call.
+    /// Ended (waiting for its yes, failed or dropped), a make is never told
+    /// to a later line as under way, and a different ask is its own make;
+    /// while one is under way, its note has a new ask made by its own call.
+    #[test]
+    fn a_make_ended_waiting_for_its_yes_is_never_told_under_way() {
+        let directory = std::env::temp_dir().join(format!("one-ask-ended-{}", std::process::id()));
+        let of = |at: &std::path::Path| at == directory;
+        let under_way = OneAsk::begin_in(
+            &directory,
+            Some("make me a skill that tells me my first calendar event every evening at six"),
+            "tell me my first calendar event every evening at six",
+            NOW,
+            5,
+        )
+        .unwrap();
+        let note = making_note_where(6, of).unwrap();
+        assert!(
+            note.contains("a new ask, not this one: call make_skill for it with its own request"),
+            "{note}"
+        );
+        assert!(
+            note.contains("Never say a skill is being made unless make_skill is called"),
+            "{note}"
+        );
+        // Made, its code waiting for the person's yes.
+        under_way.made_with(
+            "first-event",
+            &json!({"made": "first-event", "on": false, "code_waits_for_yes": true}),
+            NOW,
+            None,
+        );
+        assert!(
+            making_note_where(8, of).is_none(),
+            "waits for its yes: not under way"
+        );
+        // A different make ask is its own: begun, and only it is under way.
+        let other = OneAsk::begin_in(
+            &directory,
+            Some("make me a skill that tells me how many unread emails I have at noon"),
+            "tell me how many unread emails I have at noon",
+            NOW,
+            8,
+        )
+        .unwrap();
+        let note = making_note_where(9, of).unwrap();
+        assert!(note.contains("unread emails"), "{note}");
+        assert!(!note.contains("calendar"), "{note}");
+        // Failed (let go): nothing under way.
+        drop(other);
+        assert!(making_note_where(10, of).is_none(), "failed: not under way");
+        // Dropped: nothing under way.
+        let dropped = OneAsk::begin_in(
+            &directory,
+            Some("make me a skill that reads me my next meeting every weekday at nine"),
+            "read me my next meeting every weekday at nine",
+            NOW,
+            11,
+        )
+        .unwrap();
+        let id = format!("{MAKING_ID}{}", dropped.0);
+        assert!(matches!(
+            making_answered(&id, 12, Some("no")),
+            Making::Told(_)
+        ));
+        assert!(
+            making_note_where(13, of).is_none(),
+            "dropped: not under way"
+        );
+        drop(dropped);
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != directory);
+    }
+
+    /// A make declined while it was made ([`making_answered`]) is kept
+    /// nowhere on: never put on, no line left to say, and its turn told it
+    /// was dropped.
+    #[test]
+    fn a_make_declined_while_made_is_never_put_on_or_said() {
+        let (root, keeping) = keeping("declined-while-made");
+        let (url, served) = service(vec![(200, good())]);
+        let directory = keeping.directory.clone();
+        let chat = chat_at(url);
+        let told = make_with(
+            50,
+            Some("make me a skill that dims the light at 10 pm"),
+            REQUEST,
+            &keeping,
+            move || {
+                // The person's no comes while the model writes it.
+                let id = ASKS
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|ask| ask.directory == directory && ask.made.is_none())
+                    .map(|ask| ask.id)
+                    .unwrap();
+                let answered = making_answered(&format!("{MAKING_ID}{id}"), 51, Some("no"));
+                assert!(matches!(answered, Making::Told(_)), "{answered:?}");
+                chat()
+            },
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["dropped"], true, "{told}");
+        assert_eq!(take_said_line(), None);
+        assert!(!any_on(&keeping.directory));
+        // Nothing of it kept (El's read on #7554): no index entry, off or
+        // on, to count toward the cap or be listed, and no package.
+        assert!(
+            made_skill::entries(&keeping.directory).is_empty(),
+            "{:?}",
+            made_skill::entries(&keeping.directory)
+        );
+        let packages: Vec<_> = std::fs::read_dir(&keeping.directory)
+            .map(|read| {
+                read.filter_map(Result::ok)
+                    .map(|entry| entry.file_name())
+                    .filter(|name| name.to_string_lossy().ends_with(".tar"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(packages.is_empty(), "{packages:?}");
+        assert!(
+            !ASKS
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|ask| ask.directory == keeping.directory),
+            "let go"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's and El's race on #7554: a no that comes after the make's
+    /// last look for one, while the manage helper puts it on, is never told
+    /// it was dropped: the make goes on, its line is said, and the no is
+    /// told it is too late to drop.
+    #[test]
+    fn a_no_while_a_make_is_put_on_is_never_told_dropped() {
+        use std::io::BufRead;
+        let (root, keeping) = keeping("no-while-put-on");
+        let (url, served) = service(vec![(200, good())]);
+        let directory = keeping.directory.clone();
+        let listener = std::os::unix::net::UnixListener::bind(&keeping.manage).unwrap();
+        // The manage helper, gated: the person's no comes while it puts the
+        // skill on, before it answers.
+        let helper = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            let id = ASKS
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|ask| ask.directory == directory && ask.made.is_none())
+                .map(|ask| ask.id)
+                .unwrap();
+            let answered = making_answered(&format!("{MAKING_ID}{id}"), 61, Some("no"));
+            writeln!(&stream, r#"{{"done": "installed"}}"#).unwrap();
+            answered
+        });
+        let told = make_with(
+            60,
+            Some("make me a skill that dims the light at 10 pm"),
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        let Making::Told(answered) = helper.join().unwrap() else {
+            panic!("a make's id");
+        };
+        assert!(answered.get("dropped").is_none(), "{answered}");
+        assert_eq!(answered["finishing"], true, "{answered}");
+        assert!(
+            !answered["next"]
+                .as_str()
+                .unwrap()
+                .contains("I won't make it"),
+            "{answered}"
+        );
+        assert!(told.get("dropped").is_none(), "{told}");
+        assert!(any_on(&keeping.directory), "{told}");
+        assert!(take_said_line().is_some());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// `LAMP_MAKE_NO_CANNOT` (lamp-9adf, 16 Nov): the same ask a minute
@@ -7946,7 +8601,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(
             parameters["properties"]["request"]["description"],
             "What this skill should do and when, in the person's own words for this ask, \
-             nothing else: never a time, step or trigger of an earlier skill or turn."
+             nothing else: never a time, step or trigger of an earlier skill or turn. Never \
+             call it for an ask they take back in the same line."
         );
         made_skill::set_scripts_here(Some(true));
         let on = tool();

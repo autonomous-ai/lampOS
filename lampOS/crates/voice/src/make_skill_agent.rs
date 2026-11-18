@@ -108,6 +108,15 @@ pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// silence: in the make's own voice turn when one waits on it
 /// ([`waiting_due`]), else through the say service.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
+/// The opening a voice make asks of the model before its `make_skill`
+/// call ([`crate::make_skill_local::tool`]: "say in a few words that you'll
+/// make it now"), said by the lamp itself when round 1 names the call with
+/// no words before it, so the person isn't left in silence while the make
+/// and the next round run (lamp-9adf, 18 Nov, #7554: a bare call's first
+/// audio at 8104 ms). One of the lamp's fixed lines, in the owner's
+/// language and rendered ahead (`second_provider::FixedClips`). Never one
+/// of [`BEGUN_LINES`]: the model may say it.
+pub const MAKE_OPENING: &str = "I'll make it now.";
 /// With the one run path ([`ONE_PATH_ENVIRONMENT`], #7371): the waiting
 /// line says how long, as an agent's make takes about a minute (lamp-c0a4,
 /// 16 Nov: 63 s from the waiting line to the result).
@@ -128,6 +137,305 @@ pub fn waiting_line(one_path: bool) -> &'static str {
         WAITING_LINE
     }
 }
+
+/// The lamp's own lines that tell a make as begun on the one run path:
+/// said only by the lamp once `make_skill` runs, never by the model. A
+/// reply of the model's that says one with no `make_skill` call in its turn
+/// copied it from the history (lamp-9adf, 18 Nov 04:23–04:25: after a make
+/// waited for its yes, three new make asks each got "I'll make it now. This
+/// takes about a minute. I'm on it." with `calls=none`, nothing made).
+pub const BEGUN_LINES: [&str; 2] = [ONE_PATH_WAITING_LINE, LONG_WAIT_LINE];
+
+/// What the model is told when its reply said one of [`BEGUN_LINES`] with
+/// no `make_skill` call: that reply was not said, and the round is asked
+/// again once with `make_skill` offered, never forced: the model judges
+/// whether the person's last line asks for a skill (the reader El's guard on
+/// #7554). Names `make_skill` so a narrowed request is given it.
+pub const BEGUN_AGAIN_NOTE: &str = "Your reply said the lamp's own line that a skill is \
+     being made, or asked of a clash for a skill not made, but you called no make_skill, so \
+     nothing is being made and your reply was not said. Those lines are the lamp's, said only \
+     once make_skill runs; never say them yourself. If their last line asks you to make a skill, call make_skill now for it, \
+     with its own request. If it doesn't, answer it in your own words.";
+
+/// `text` in plain form for [`says_begun`]: lower case, one kind of
+/// apostrophe, single spaces, no closing stop.
+fn plain(text: &str) -> String {
+    text.replace('\u{2019}', "'")
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end_matches(['.', '!', '?'])
+        .to_owned()
+}
+
+/// Whether `text` says one of `lines` whole (the lamp's own constants,
+/// never a word list): case, apostrophes and spacing aside.
+pub fn says_begun(text: &str, lines: &[&str]) -> bool {
+    let text = plain(text);
+    lines.iter().any(|line| text.contains(&plain(line)))
+}
+
+/// For a reply's opening held while it may say one of `lines`
+/// ([`says_begun`]): `Some(true)` once it does; `Some(false)` once two of
+/// its sentences have ended with neither the first sentence of a line in
+/// it, or when `whole` (the round ended) and it says none; `None` while
+/// undecided. The lamp's lines come at most a sentence in ("I'll make it
+/// now. This takes about a minute. I'm on it."), so at most two sentences
+/// are held.
+pub fn opens_begun(held: &str, whole: bool, lines: &[&str]) -> Option<bool> {
+    if says_begun(held, lines) {
+        return Some(true);
+    }
+    if whole {
+        return Some(false);
+    }
+    let text = plain(held);
+    let heads = lines.iter().any(|line| {
+        let head = line.split(['.', '!', '?']).next().unwrap_or(line);
+        text.contains(&plain(head))
+    });
+    let ended = held
+        .char_indices()
+        .filter(|(at, c)| {
+            matches!(c, '.' | '!' | '?')
+                && held[at + c.len_utf8()..]
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_whitespace)
+        })
+        .count();
+    (ended >= 2 && !heads).then_some(false)
+}
+
+/// [`MAKE_OPENING`] in English and in each language the lamp speaks.
+fn openings() -> impl Iterator<Item = &'static str> {
+    use crate::language::Language;
+    std::iter::once(MAKE_OPENING).chain(
+        [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ]
+        .into_iter()
+        .filter_map(|language| language.fixed(MAKE_OPENING)),
+    )
+}
+
+/// Whether `piece`, one said piece of an answer, is the make's opening
+/// whole ([`MAKE_OPENING`], in any of the lamp's languages): the lamp's
+/// line, or the model's same words, kept out of the thread (lamp-9adf,
+/// 18 Nov, #7554: after three makes whose turns opened with it, three new
+/// make asks were answered "I'll make it now. Done — … is on the lamp"
+/// with no call, the model copying it from the history; nothing made).
+pub fn is_opening(piece: &str) -> bool {
+    let piece = plain(piece);
+    !piece.is_empty() && openings().any(|opening| plain(opening) == piece)
+}
+
+/// For a reply's opening held while it may begin with [`MAKE_OPENING`]
+/// (in any of the lamp's languages): `Some(true)` once it does, the line
+/// whole at its start; `Some(false)` once it can't, or when `whole` (the
+/// round ended) and it doesn't; `None` while it is still the line's start.
+/// Only the reply's start is read, so a reply that doesn't open with it is
+/// let go at its first words that differ. The line's sentence must end
+/// where it does ('.', '!' or '…', or the reply's end): "I'll make it now,
+/// then set the light." goes on to something else and is not it (App
+/// Only's P3 on #7554).
+pub fn opens_with_opening(held: &str, whole: bool) -> Option<bool> {
+    let text = plain(held);
+    if text.is_empty() {
+        return whole.then_some(false);
+    }
+    let mut undecided = false;
+    for opening in openings() {
+        let line = plain(opening);
+        if let Some(rest) = text.strip_prefix(&line) {
+            // A line ending in its own mark (Japanese, Chinese) is whole.
+            if !line.ends_with(char::is_alphanumeric) {
+                return Some(true);
+            }
+            match rest.chars().next() {
+                Some('.' | '!' | '…') => return Some(true),
+                // `plain` takes off the reply's last mark: the held words
+                // end here, closed by one, or the round ended.
+                None if held.trim_end().ends_with(['.', '!', '…']) || whole => {
+                    return Some(!held.trim_end().ends_with('?'));
+                }
+                None => undecided = true,
+                Some(_) => {}
+            }
+        } else if line.starts_with(&text) {
+            undecided = true;
+        }
+    }
+    (whole || !undecided).then_some(false)
+}
+
+/// The make's opening in the model's own words (lamp-9adf, 18 Nov, #7554's
+/// ROW at 2e864a0, request 94: "I'll make that now. Cat joke on pat 3
+/// clashes with …" with `calls=none`, let go at "that" by
+/// [`opens_with_opening`]): its own family, never a word list. One of
+/// these heads, one of [`OPENING_OBJECTS`], then one or two of
+/// [`OPENING_TAILS`], and the sentence's end. So "I'll make that now.",
+/// "Making it now!" and "Let me make that one for you." are the opening;
+/// "I'll make it brighter.", "I'll make that now?" and "I'll make it."
+/// (bare, as about anything else) are not.
+const OPENING_HEADS: [&str; 8] = [
+    "i'll make",
+    "i will make",
+    "let me make",
+    "i'm making",
+    "i am making",
+    "i'm going to make",
+    "i'll go ahead and make",
+    "making",
+];
+/// What the opening's make names: the skill asked for, never a thing of
+/// its own ("it brighter", "a cake").
+const OPENING_OBJECTS: [&str; 10] = [
+    "it",
+    "that",
+    "this",
+    "one",
+    "that one",
+    "this one",
+    "a skill",
+    "the skill",
+    "that skill",
+    "this skill",
+];
+/// What may close the opening's sentence after its object.
+const OPENING_TAILS: [&str; 5] = ["now", "right now", "for you", "right away", "straight away"];
+
+/// Every sentence of the opening's family ([`OPENING_HEADS`]), in plain
+/// form, built once.
+fn opening_family() -> &'static [String] {
+    static FAMILY: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    FAMILY.get_or_init(|| {
+        let mut tails = Vec::new();
+        for one in OPENING_TAILS {
+            tails.push(format!(" {one}"));
+            for two in OPENING_TAILS.iter().filter(|two| **two != one) {
+                tails.push(format!(" {one} {two}"));
+            }
+        }
+        OPENING_HEADS
+            .iter()
+            .flat_map(|head| {
+                OPENING_OBJECTS
+                    .iter()
+                    .map(move |object| format!("{head} {object}"))
+            })
+            .flat_map(|said| tails.iter().map(move |tail| format!("{said}{tail}")))
+            .collect()
+    })
+}
+
+/// A sentence's end in `text`: '.', '!', '?' or '…'.
+fn is_sentence_mark(c: char) -> bool {
+    matches!(c, '.' | '!' | '?' | '…')
+}
+
+/// [`opens_with_opening`], with the opening in the model's own words too
+/// ([`OPENING_HEADS`]): `Some(true)` once the reply's first sentence is one
+/// of the family, closed by anything but a '?'; `Some(false)` once it
+/// can't be; `None` while its words so far are still a family sentence's
+/// start. Only the reply's start is read, as for [`opens_with_opening`], so
+/// a reply that opens with other words is let go at its first word that
+/// differs.
+pub fn opens_with_make_line(held: &str, whole: bool) -> Option<bool> {
+    let exact = opens_with_opening(held, whole);
+    if exact == Some(true) {
+        return exact;
+    }
+    let (first, mark) = match held.char_indices().find(|(_, c)| is_sentence_mark(*c)) {
+        Some((at, mark)) => (&held[..at], Some(mark)),
+        None => (held, None),
+    };
+    let first = plain(&first.replace(',', " "));
+    if first.is_empty() {
+        return exact;
+    }
+    let family = opening_family();
+    let said = family.contains(&first);
+    let decided = match mark {
+        Some(mark) => Some(said && mark != '?'),
+        None if whole => Some(said),
+        None if family.iter().any(|line| line.starts_with(&first)) => None,
+        None => Some(false),
+    };
+    // Still the exact opening's start in another language: undecided.
+    match (decided, exact) {
+        (Some(false), None) => None,
+        _ => decided,
+    }
+}
+
+/// Whether `sentence` asks the lamp's clash choice ([`crate::made_clash`]'s
+/// question) in any words: a question whose last words are "or cancel",
+/// with "replace" and then "keep" before them. The lamp's three choices in
+/// its own order, never a word list: "Shall I replace them all, keep them
+/// all (they may take turns), or cancel?" and "Replace them all, keep them
+/// all so they take turns, or cancel?" are; "Shall I cancel it?" is not.
+fn asks_clash_choice(sentence: &str) -> bool {
+    let Some(asked) = sentence.trim_end().strip_suffix('?') else {
+        return false;
+    };
+    let words: Vec<String> = asked
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '\u{2019}'))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let Some(before) = words
+        .strip_suffix(&["or".to_owned(), "cancel".to_owned()])
+        .filter(|before| !before.is_empty())
+    else {
+        return false;
+    };
+    let replace = before.iter().position(|word| word == "replace");
+    let keep = before.iter().rposition(|word| word == "keep");
+    matches!((replace, keep), (Some(replace), Some(keep)) if replace < keep)
+}
+
+/// The sentences of `text` that have ended, each with its mark: one ends
+/// at a mark followed by a space, or at the text's end.
+fn ended_sentences(text: &str) -> Vec<&str> {
+    let mut ended = Vec::new();
+    let mut from = 0;
+    for (at, c) in text.char_indices() {
+        let next = at + c.len_utf8();
+        if is_sentence_mark(c) && text[next..].chars().next().is_none_or(char::is_whitespace) {
+            ended.push(text[from..next].trim());
+            from = next;
+        }
+    }
+    ended
+}
+
+/// For a reply held while it may ask the lamp's clash choice with no
+/// `make_skill` call in its turn (lamp-9adf, 18 Nov, #7554's ROW, request
+/// 94: "… Cat joke on pat 3 clashes with cat joke on pat, joke on pat and
+/// tell joke on pat… Replace them all, keep them all so they take turns, or
+/// cancel?" with `calls=none`, 56 s after the last clash was cancelled, and
+/// no such skill made): `Some(true)` once one of its sentences asks it
+/// ([`asks_clash_choice`]) and no clash waits for its choice (`waits`, read
+/// from the clash's own state, [`crate::made_clash::waits`]: while one
+/// does, the lamp may ask its question again in any words, App Only's P1 on
+/// #7554); `Some(false)` once two sentences have ended with neither asking
+/// it (the lamp's clash is told in two: what clashes, then the choice), or
+/// when `whole` (the round ended) and none does; `None` while undecided.
+/// Only a turn just after a clash ended is held for it
+/// ([`crate::made_clash::lately_ended`]).
+pub fn clash_claimed(held: &str, whole: bool, waits: impl FnOnce() -> bool) -> Option<bool> {
+    let ended = ended_sentences(held);
+    if ended.iter().any(|sentence| asks_clash_choice(sentence)) {
+        return Some(!waits());
+    }
+    (whole || ended.len() >= 2).then_some(false)
+}
+
 /// What the lamp says when the agent's own answer is `cannot:`: never the
 /// agent's words.
 pub const CANNOT_LINE: &str = "I couldn't make that one.";

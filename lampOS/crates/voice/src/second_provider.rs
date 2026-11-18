@@ -1854,6 +1854,8 @@ struct Shared {
     say_at_once: bool,
     /// [`Engine::keeping_at_once`] (C59).
     keep_at_once: bool,
+    /// [`Engine::rendering_make_opening`] (#7554).
+    make_opening_ahead: bool,
     /// [`Engine::checking_action_claims`] (#5215).
     action_claims: bool,
     /// [`Engine::checking_worded_claims`] (#5215).
@@ -4946,6 +4948,7 @@ impl Engine {
                 checking_line: false,
                 say_at_once: false,
                 keep_at_once: false,
+                make_opening_ahead: false,
                 action_claims: false,
                 worded_claims: false,
                 made_not_on: false,
@@ -6220,6 +6223,18 @@ impl Engine {
         self
     }
 
+    /// With a voice make offered (`LAMP_MAKE_SKILL=on`): the make's opening
+    /// ([`crate::make_skill_agent::MAKE_OPENING`], #7554) rendered ahead in
+    /// the owner's language as the worker starts ([`FixedClips`]), so a
+    /// bare make_skill call's first audio never waits on the voice. Off,
+    /// it is said by the voice as the turn's piece. Before any turn only.
+    pub fn rendering_make_opening(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.make_opening_ahead = on;
+        }
+        self
+    }
+
     /// `LAMP_ACTION_CLAIM_CHECKED=on` ([`crate::action_claim`], #5215): a
     /// reply that is or opens with the acting part's own line for a light,
     /// volume or Schedule action ("Louder.", "Timer set. It rings at 9:39
@@ -7332,6 +7347,12 @@ impl Engine {
             (
                 shared.keep_at_once && shared.language.is_some(),
                 crate::keep_at_once::KEPT,
+            ),
+            // The make's opening for a bare make_skill call (#7554), in
+            // every language, so its first audio never waits on the voice.
+            (
+                shared.make_opening_ahead,
+                crate::make_skill_agent::MAKE_OPENING,
             ),
         ]
         .into_iter()
@@ -10586,6 +10607,9 @@ async fn spoken(
         crate::agent_asks::forget();
         // A reminder's ring this line cut is held, not rung once more.
         let _ = shared.emit(ProviderOutput::StopAnswered { request }).await;
+        // A line of theirs, answered by the lamp's own stop line: they went
+        // on from any make whose turn was cut (`worker::made_running`).
+        crate::make_skill_local::person_went_on(request);
         say_fixed(
             &shared,
             request,
@@ -11437,6 +11461,9 @@ async fn spoken(
             request,
             Instant::now(),
         ))
+        // A voice make still under way (lamp-9adf, 17 Nov): what is being
+        // made, nothing of it on yet, and the id a no drops it by.
+        .chain(crate::make_skill_local::making_note(request))
         // A made skill with code still not on after its say-back (#7270):
         // the model is told it isn't on.
         .chain(crate::made_not_on::note(
@@ -16125,6 +16152,40 @@ fn claim_released(
     }
 }
 
+/// Whether a reply's opening held by `action_held` while its round streams
+/// is let go now: always without the action claims; with them
+/// (`LAMP_ACTION_CLAIM_CHECKED`, #5215), once it is known to claim nothing,
+/// or a claim that `called` (the turn's calls so far) stands for. `turns`
+/// is the turn's (worded, forget, doing) claims; `made` the person's made
+/// skills and whether the line was asked, for a skill told removed, off or
+/// on (#7683).
+fn claim_lets_go(
+    claims: bool,
+    held: &str,
+    turns: (bool, bool, bool),
+    read_asked: bool,
+    called: &[(String, Value)],
+    statuses: &[Value],
+    (made, made_asked): (&[crate::action_claim::MadeSkill], bool),
+) -> bool {
+    if !claims {
+        return true;
+    }
+    match crate::action_claim::claim_made_on(held, false, turns, made, made_asked) {
+        Some(None) => true,
+        Some(Some(kind)) => crate::action_claim::stands_made_on(
+            kind,
+            held,
+            read_asked,
+            called.iter().map(|(name, args)| (name.as_str(), args)),
+            statuses,
+            made,
+        ),
+        // Undecided.
+        None => false,
+    }
+}
+
 /// `piece` added to a round's held claim (`LAMP_ACTION_CLAIM_CHECKED`,
 /// #5215) while one is held, so nothing of it is said before the claim is
 /// judged at the round's end; else `piece` as it is.
@@ -16314,6 +16375,11 @@ async fn answer(
     // next line, which may be someone else's.
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.line_of(request, &said);
+    }
+    // A line the person said with words, answered: they went on from any
+    // make whose turn was cut before it (`worker::made_running`).
+    if heard && said.chars().any(char::is_alphanumeric) {
+        crate::make_skill_local::person_went_on(request);
     }
     // `LAMP_KEEP_QUIETLY`: an offer to keep said at most once a
     // conversation, never about a thing offered before, never on small
@@ -17266,6 +17332,19 @@ async fn answer(
         // is told one went unsaid beside other calls.
         let mut action_claim_asked = false;
         let mut action_claim_note: Option<String> = None;
+        // The lamp's own make lines, in English and the owner's language
+        // ([`crate::make_skill_agent::BEGUN_LINES`]): a reply that says one
+        // with no make_skill call in the turn copied it from the history
+        // (lamp-9adf, 18 Nov). Whether it was asked again once already, and
+        // whether the next round, after other calls, is told so.
+        let begun_lines: Vec<&'static str> = crate::make_skill_agent::BEGUN_LINES
+            .iter()
+            .flat_map(|line| [*line, shared.fixed(line)])
+            .collect();
+        let mut begun_asked = false;
+        let mut begun_note = false;
+        // When the round asked again began, for its journal line's ms.
+        let mut begun_again_at: Option<Instant> = None;
         // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
         // ran or rounds were carried from a cut answer.
         let may_go_twice = second_try::may_go_twice(
@@ -17387,6 +17466,12 @@ async fn answer(
             }
             if let Some(note) = action_claim_note.take() {
                 messages.push(Message::system(note));
+            }
+            // After other calls ran beside the lamp's own make line: this
+            // round is the one asked again, timed from here.
+            if std::mem::take(&mut begun_note) {
+                messages.push(Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE));
+                begun_again_at = Some(Instant::now());
             }
             if words_round {
                 past_cap_from = queue.pieces;
@@ -17521,8 +17606,65 @@ async fn answer(
             // the turn, is held to the round's end, when its calls say
             // whether it stands (`LAMP_ACTION_CLAIM_CHECKED`, #5215). Not on
             // a turn offered no function.
+            // A reply's opening held too while it may say one of the lamp's
+            // own make lines with no make_skill call in the turn: only on a
+            // turn whose messages carry one already (the model copies it
+            // from there), so no other turn waits ([`begun_lines`]).
+            let begun_gate = !quoted
+                && asked != Asker::Reminder
+                && !turn_called
+                    .iter()
+                    .any(|(name, _)| name == crate::made_skill::MAKE)
+                && messages.iter().any(|message| {
+                    message.words().is_some_and(|words| {
+                        crate::make_skill_agent::says_begun(words, &begun_lines)
+                    })
+                });
+            // A reply's opening held too while it may begin with the make's
+            // opening ([`crate::make_skill_agent::MAKE_OPENING`], in any of
+            // the lamp's languages) with no make_skill call in the turn
+            // (lamp-9adf, 18 Nov, #7554: after three makes, three new make
+            // asks were answered "I'll make it now. Done — … is on the
+            // lamp" with no call, nothing made). On every turn offered
+            // functions, the opening being kept out of the history; only a
+            // reply whose first words are the opening's waits, and it is
+            // let go as soon as the round names a make_skill call.
+            // The opening in the model's own words too ("I'll make that
+            // now.", #7554's ROW at 2e864a0, request 94:
+            // [`crate::make_skill_agent::opens_with_make_line`]).
+            let opening_gate = !quoted
+                && asked != Asker::Reminder
+                && !turn_called
+                    .iter()
+                    .any(|(name, _)| name == crate::made_skill::MAKE);
+            // A reply's opening held too while it may ask the lamp's clash
+            // choice with no make_skill call in the turn (#7554's ROW at
+            // 2e864a0, request 94: a clash told for a skill never made):
+            // only on a turn just after a clash ended, none waiting (the
+            // history still carries its question, and the model copies it),
+            // so no other turn waits: not while one waits, whose question
+            // the lamp may ask again, nor once it is past (App Only's P1 and
+            // P2 on #7554; [`crate::make_skill_agent::clash_claimed`]).
+            let clash_gate = opening_gate && crate::made_clash::lately_ended(Instant::now());
+            // Whether a clash waits, read again as a held reply is judged.
+            let clash_waits = || crate::made_clash::waits(Instant::now());
             let mut action_held =
-                (shared.action_claims && !quoted && asked != Asker::Reminder).then(String::new);
+                ((shared.action_claims || begun_gate || opening_gate || clash_gate)
+                    && !quoted
+                    && asked != Asker::Reminder)
+                    .then(String::new);
+            // The round named a make_skill call as it streamed (the reader
+            // El's HOLD on #7554: on lamp-9adf a make asked right after
+            // another called it, yet its opening was held to the round's
+            // end, first audio at 8539 ms against 1.6-2.1 s): the lamp's
+            // own make line stands, so nothing is held for it from then.
+            let mut begun_made = false;
+            // The lamp's own make opening said for a bare make_skill call
+            // in this round ([`crate::make_skill_agent::MAKE_OPENING`]).
+            let mut make_opened = false;
+            // The stream named a make_skill call's first argument in this
+            // round: its decision on the opening stands.
+            let mut make_argued = false;
             // A reply's opening on a line about the person, held until it is
             // known whether it says it doesn't know; one that does is
             // searched for at once, and with the person's kept things found
@@ -17774,7 +17916,115 @@ async fn answer(
                         began.elapsed().as_millis()
                     );
                 }
+                // A make_skill call named while the round streams: an opening
+                // held for the lamp's own make line is let go at once, before
+                // the round ends or the make answers; with the action claims
+                // it is judged with that call as the turn's.
+                let make_named = match &event {
+                    ChatEvent::Calling(name) => name == crate::made_skill::MAKE,
+                    ChatEvent::ToolCalls(asked) if !words_round => asked
+                        .iter()
+                        .any(|call| call.name == crate::made_skill::MAKE),
+                    _ => false,
+                };
+                if make_named
+                    && (begun_gate || opening_gate)
+                    && !std::mem::replace(&mut begun_made, true)
+                {
+                    let mut called = turn_called.clone();
+                    called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
+                    if let Some(held) = action_held.take_if(|held| {
+                        !held.is_empty()
+                            && claim_lets_go(
+                                shared.action_claims,
+                                held,
+                                (worded_turn, forget_turn, doing_turn),
+                                read_asked,
+                                &called,
+                                &call_statuses,
+                                (&made_names, made_asked),
+                            )
+                    }) {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a make_skill call named as it streams: its held opening said, {} ms in",
+                            began.elapsed().as_millis()
+                        );
+                        if held.chars().any(char::is_alphanumeric)
+                            && !crate::not_speech::names_a_function(&text)
+                        {
+                            queue.announce().await?;
+                        }
+                        for sentence in split.push(&held) {
+                            if let Some(sentence) = said_quietly(
+                                &mut quiet,
+                                &mut offer_hold,
+                                sentence,
+                                remember_ran,
+                                request,
+                            ) {
+                                queue.push(sentence).await?;
+                            }
+                        }
+                    }
+                }
+                // Round 1 names a make_skill call for a new skill with no
+                // words before it and nothing said yet (lamp-9adf, 18 Nov,
+                // #7554: a bare call's first audio at 8104 ms, after the
+                // make and round 2): the lamp says the make's own opening
+                // at once, once, from its clip rendered ahead. Words the
+                // model gave are said as they came instead. A new make is
+                // a call whose arguments name its `request`; a remove, a
+                // run, a list or a yes gives its own argument alone and is
+                // said nothing first. Both paths read that one rule, and
+                // neither weighs what else the call carries: the stream
+                // must decide before the rest of the arguments come, so
+                // it reads the first argument's name
+                // ([`ChatEvent::Argued`]); with no stream event for the
+                // round's make_skill calls their whole calls are read, for
+                // a `request` among the arguments (parsed, they keep no
+                // order). Once the stream named a make_skill argument,
+                // its decision stands and the whole calls are not read
+                // again for it.
+                let new_make = match &event {
+                    ChatEvent::Argued(name, first) if name == crate::made_skill::MAKE => {
+                        make_argued = true;
+                        first == crate::make_skill_local::REQUEST
+                    }
+                    ChatEvent::ToolCalls(asked) if !words_round && !make_argued => {
+                        asked.iter().any(|call| {
+                            call.name == crate::made_skill::MAKE
+                                && crate::make_skill_local::asks_a_new_make(&call.args)
+                        })
+                    }
+                    _ => false,
+                };
+                // The round asked again for a reply that said a make line
+                // with no call is the turn's first words too: the same.
+                if new_make
+                    && (round == 1 || begun_again_at.is_some())
+                    && !queue.started
+                    && !text.chars().any(char::is_alphanumeric)
+                    && !std::mem::replace(&mut make_opened, true)
+                {
+                    let english = crate::make_skill_agent::MAKE_OPENING;
+                    let line = shared.fixed(english);
+                    let clip = shared.fixed_clips.kept(english);
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: a make_skill call named with no words before it: the lamp's opening said, {} ms in{}",
+                        began.elapsed().as_millis(),
+                        if clip.is_some() {
+                            ", from its clip rendered ahead"
+                        } else {
+                            ""
+                        }
+                    );
+                    match clip {
+                        Some(clip) => queue.push_clip(line, clip).await?,
+                        None => queue.push(line.to_owned()).await?,
+                    }
+                }
                 match event {
+                    ChatEvent::Calling(_) | ChatEvent::Argued(..) => {}
                     ChatEvent::Text(piece) => {
                         let piece = match silent_after.as_mut() {
                             Some(silent) => silent.piece(piece),
@@ -17877,31 +18127,53 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_made_on(
-                                    held,
-                                    false,
-                                    (worded_turn, forget_turn, doing_turn),
-                                    &made_names,
-                                    made_asked,
-                                ) {
-                                    Some(None) => action_held.take().unwrap_or_default(),
-                                    Some(Some(kind))
-                                        if crate::action_claim::stands_made_on(
-                                            kind,
-                                            held,
-                                            read_asked,
-                                            turn_called
-                                                .iter()
-                                                .map(|(name, args)| (name.as_str(), args)),
-                                            &call_statuses,
-                                            &made_names,
-                                        ) =>
-                                    {
-                                        action_held.take().unwrap_or_default()
-                                    }
-                                    // Undecided, or a claim with no call yet.
-                                    _ => continue,
+                                // The lamp's own make line, or not known yet:
+                                // held until the round shows a make_skill
+                                // call, else to its end.
+                                if begun_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::opens_begun(
+                                        held,
+                                        false,
+                                        &begun_lines,
+                                    ) != Some(false)
+                                {
+                                    continue;
                                 }
+                                // The make's opening at its start, or not
+                                // known yet: held the same way.
+                                if opening_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::opens_with_make_line(held, false)
+                                        != Some(false)
+                                {
+                                    continue;
+                                }
+                                // The lamp's clash choice, or not known yet:
+                                // held the same way.
+                                if clash_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::clash_claimed(
+                                        held,
+                                        false,
+                                        clash_waits,
+                                    ) != Some(false)
+                                {
+                                    continue;
+                                }
+                                // Undecided, or a claim with no call yet: held.
+                                if !claim_lets_go(
+                                    shared.action_claims,
+                                    held,
+                                    (worded_turn, forget_turn, doing_turn),
+                                    read_asked,
+                                    &turn_called,
+                                    &call_statuses,
+                                    (&made_names, made_asked),
+                                ) {
+                                    continue;
+                                }
+                                action_held.take().unwrap_or_default()
                             }
                         };
                         // The model has chosen to speak: the announcement
@@ -17960,6 +18232,16 @@ async fn answer(
                     ),
                     ChatEvent::Done => break,
                 }
+            }
+            // Held only for the make's opening, and nothing of it came while
+            // the round streamed (all of it held elsewhere to the round's
+            // end): its end goes as without that hold.
+            if opening_gate
+                && !shared.action_claims
+                && !begun_gate
+                && action_held.as_deref() == Some("")
+            {
+                action_held = None;
             }
             if refused {
                 // What the refused round wrote is not said.
@@ -18565,6 +18847,85 @@ async fn answer(
                         ) {
                             queue.push(sentence).await?;
                         }
+                    }
+                }
+            }
+            // A reply that said one of the lamp's own make lines with no
+            // make_skill call in the turn (lamp-9adf, 18 Nov: copied from the
+            // history, nothing made): not said, and asked again once with
+            // make_skill offered, never forced: the model judges whether the
+            // person's line asks for a skill (El's guard on #7554). Beside
+            // other calls those run and the next round is so asked. The line
+            // said again, or in the last round, is said as the plain line
+            // that it wasn't done; the round asked again that calls nothing
+            // and says no such line is said as it came.
+            // So does a reply that begins with the make's opening, in any
+            // of the lamp's languages, with no make_skill call in the turn
+            // (#7554: "I'll make it now. Done — … is on the lamp" with none).
+            let begun_said = !calls
+                .iter()
+                .any(|call| call.name == crate::made_skill::MAKE)
+                && action_held.as_deref().is_some_and(|held| {
+                    (begun_gate
+                        && crate::make_skill_agent::opens_begun(held, true, &begun_lines)
+                            == Some(true))
+                        || (opening_gate
+                            && crate::make_skill_agent::opens_with_make_line(held, true)
+                                == Some(true))
+                        || (clash_gate
+                            && crate::make_skill_agent::clash_claimed(held, true, clash_waits)
+                                == Some(true))
+                });
+            // The round asked again, ended: what it cost the reply.
+            if let Some(at) = begun_again_at.take() {
+                let ended = if calls
+                    .iter()
+                    .any(|call| call.name == crate::made_skill::MAKE)
+                {
+                    "it called make_skill"
+                } else if begun_said {
+                    "it said the line again"
+                } else {
+                    "it answered in its own words"
+                };
+                eprintln!(
+                    "lamp-voice second: request {request}: the waiting line with no make call was not said; asked again with make_skill: {} ms, {ended}",
+                    at.elapsed().as_millis()
+                );
+            }
+            if begun_said {
+                action_held = None;
+                text.clear();
+                if round < MAX_ROUNDS && !std::mem::replace(&mut begun_asked, true) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply said the lamp's own make line with no make_skill call: not said, asked again with make_skill offered, {} other call(s) run first",
+                        calls.len()
+                    );
+                    if calls.is_empty() {
+                        messages.push(Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE));
+                        begun_again_at = Some(Instant::now());
+                        continue;
+                    }
+                    begun_note = true;
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply said the lamp's own make line again with no make_skill call: said it wasn't done"
+                    );
+                    for sentence in offered(&mut offer_hold, false, request, round) {
+                        queue.push(sentence).await?;
+                    }
+                    return queue
+                        .push(shared.fixed(crate::action_claim::NOT_DONE_LINE).to_owned())
+                        .await;
+                }
+            }
+            // Without the action claims, only the make line held it: said.
+            if !shared.action_claims
+                && let Some(held) = action_held.take().filter(|held| !held.is_empty())
+            {
+                for sentence in split.push(&held) {
+                    if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                        queue.push(sentence).await?;
                     }
                 }
             }
@@ -20090,8 +20451,12 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             // The announcement's time counts in what was heard, its words
-            // don't: they are never kept as the lamp's.
-            shared.said_piece(request, answering.then_some(text.as_str()));
+            // don't: they are never kept as the lamp's. Nor are the make's
+            // opening's (#7554, [`crate::make_skill_agent::is_opening`]).
+            shared.said_piece(
+                request,
+                (answering && !crate::make_skill_agent::is_opening(&text)).then_some(text.as_str()),
+            );
             if answering {
                 shared.took_piece(request);
                 words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);

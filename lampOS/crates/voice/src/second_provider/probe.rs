@@ -137,7 +137,10 @@ pub async fn time_chat(
                     times.clause = Some(ms(from));
                 }
             }
-            ChatEvent::ToolCalls(_) | ChatEvent::Reasoning(_) => {}
+            ChatEvent::ToolCalls(_)
+            | ChatEvent::Calling(_)
+            | ChatEvent::Argued(..)
+            | ChatEvent::Reasoning(_) => {}
             ChatEvent::Searched => {
                 times.searched.get_or_insert(ms(from));
             }

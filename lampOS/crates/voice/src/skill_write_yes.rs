@@ -375,11 +375,12 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             return Some(format!(
                 "(For you to know, not to answer: the say-back of the skill {} was cut, so it \
                  was not heard whole, and no yes to it is taken yet. If they agree to it or ask for \
-                 it, say it again, word for word, before any yes, and call nothing now. If they \
-                 decline or wait, say it stays off, and call nothing. {} End as it ends, asking \
-                 nothing.)",
+                 it, say it again, word for word, before any yes, and call nothing for it now. If \
+                 they decline or wait, say only that it stays off, never how to start it, and call \
+                 nothing for it. {} End as it ends, asking nothing. {})",
                 crate::made_skill::spoken_name(&waiting.asks.skill),
-                say_whole(&waiting.asks.say_back)
+                say_whole(&waiting.asks.say_back),
+                crate::make_skill_local::NEW_ASK_OWN_CALL
             ));
         }
         let before = if waiting.asks.code {
@@ -389,13 +390,30 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         } else {
             "before it sends anything"
         };
+        // A voice make's own code, not on until the yes (lamp-9adf, 17 Nov:
+        // "No, don't turn it on." was answered with a question, "Maybe
+        // later." with how to start it): a no or a wait drops it, judged by
+        // the model and told by its answer, never a word list.
+        let declined = if waiting.asks.code && !answer_forced(waiting) {
+            " If they decline or put it off, call make_skill with that approve_id and answer \
+             \"no\": it is dropped. If they change this skill, don't call it. Until their yes, \
+             never say it is on or how to start it."
+        } else {
+            " If they decline, wait or change it, don't call it: it stays off."
+        };
         Some(format!(
             "(For you to know, not to answer: the skill {} that the lamp just said back waits \
              for their yes {before}, approve_id \"{}\". If they agree, in any words, call \
-             make_skill with only that approve_id. If they decline, wait or change it, don't \
-             call it: it stays off.{answer})",
+             make_skill with only that approve_id.{declined}{answer}{new_ask})",
             crate::made_skill::spoken_name(&waiting.asks.skill),
             waiting.id,
+            // A forced answer has its own new_ask; else a new ask is told to
+            // be made by its own call (lamp-9adf, 18 Nov).
+            new_ask = if answer_forced(waiting) {
+                String::new()
+            } else {
+                format!(" {}", crate::make_skill_local::NEW_ASK_OWN_CALL)
+            },
             answer = if answer_forced(waiting) {
                 format!(
                     " For this one, always give answer with that approve_id: \"yes\" only if \
@@ -1181,6 +1199,7 @@ pub fn answered(
         };
         let skill = waiting.asks.skill.clone();
         let remove = waiting.asks.remove;
+        let code_of_a_voice_make = waiting.asks.code && !answer_forced(waiting);
         let spoken = crate::made_skill::spoken_name(&skill);
         // A yes, bound to the skill waiting (#7545): taken by [`approve`]
         // with every guard only when the line names that skill or none.
@@ -1279,7 +1298,13 @@ pub fn answered(
                 "no"
             }
         );
-        Some(json!({ "approved": false, "next": DECLINED_NEXT }))
+        // A voice make's own code, never on: dropped, said plainly.
+        let next = if code_of_a_voice_make {
+            crate::make_skill_local::WONT_MAKE_NEXT
+        } else {
+            DECLINED_NEXT
+        };
+        Some(json!({ "approved": false, "next": next }))
     })
 }
 
@@ -2016,6 +2041,30 @@ mod tests {
         assert!(!approve_forced_now(now));
         let note = waiting_note(26, now).unwrap();
         assert!(!note.contains("always give answer"), "{note}");
+        // lamp-9adf, 17 Nov: "No, don't turn it on." and "Maybe later."
+        // after a voice make's say-back were answered with a question and
+        // with how to start it. The note has the model answer a decline or
+        // a wait as a no, and the no drops it, said plainly.
+        assert!(
+            note.contains("If they decline or put it off, call make_skill with that approve_id"),
+            "{note}"
+        );
+        assert!(
+            note.contains("never say it is on or how to start it"),
+            "{note}"
+        );
+        let id = kept::waiting(|waiting| waiting.as_ref().unwrap().id.clone());
+        let no = answered(&id, 26, Some("no"), None).unwrap();
+        assert_eq!(no["next"], crate::make_skill_local::WONT_MAKE_NEXT, "{no}");
+        assert!(!awaited(now));
+        // A made skill's writes, on already: a decline calls nothing, as
+        // before.
+        said_back("leaving-mail", &[mail()], 27, now);
+        let note = waiting_note(28, now).unwrap();
+        assert!(
+            note.contains("If they decline, wait or change it, don't call it"),
+            "{note}"
+        );
     }
 
     /// #7245, c0a4 17 Nov 19:43: a voice make with code outlived its turn
@@ -2156,6 +2205,48 @@ mod tests {
             crate::made_skill::CUT_WRITE_UNSAID
         );
         assert_eq!(said_by_the_say_service(13, &write_line), None);
+    }
+
+    /// lamp-9adf, 18 Nov 02:24–02:26 (#7554's row): a voice make waited for
+    /// its yes, its turn cut, and three new make asks each got "I'll make
+    /// that now. This takes about a minute. I'm on it." with no make_skill
+    /// call: the note said "call nothing" and "don't call it" with nothing
+    /// for another ask. Every note of the wait, cut or heard whole, has a
+    /// different skill asked for made by its own call, and no make said as
+    /// begun without one.
+    #[test]
+    fn a_new_make_ask_beside_a_make_waiting_for_its_yes_gets_its_own_call() {
+        let now = Instant::now();
+        let code = Asks {
+            code: true,
+            writes: Vec::new(),
+            ..asks("newest-mail-subject", &[])
+        };
+        let new_ask = [
+            "a new ask, not this one: call make_skill for it with its own request",
+            "Never say a skill is being made unless make_skill is called for it in this turn",
+        ];
+        // Its turn cut before the say-back was heard.
+        wait_for_yes(code.clone(), 5, now);
+        lamp_cut(5);
+        let note = waiting_note(8, now).unwrap();
+        assert!(note.contains("was cut"), "{note}");
+        assert!(note.contains("call nothing for it now"), "{note}");
+        for words in new_ask {
+            assert!(note.contains(words), "{words}: {note}");
+        }
+        // Heard whole.
+        wait_for_yes(code, 10, now);
+        lamp_said(10, SAY_BACK);
+        let note = waiting_note(11, now).unwrap();
+        assert!(!note.contains("was cut"), "{note}");
+        assert!(
+            note.contains("If they change this skill, don't call it"),
+            "{note}"
+        );
+        for words in new_ask {
+            assert!(note.contains(words), "{words}: {note}");
+        }
     }
 
     /// App Only's P1 on #6142: a say-back cut, summed up or missing a
