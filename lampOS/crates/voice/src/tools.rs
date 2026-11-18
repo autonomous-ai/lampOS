@@ -246,6 +246,8 @@ pub struct Settings {
     /// The owner's desk and Hydrate bottles read by voice
     /// ([`crate::devices_tools`], `LAMP_DEVICES=on`, #7470).
     pub devices: bool,
+    /// The conversation's watches ([`crate::watches`], `LAMP_WATCH=on`, #7761).
+    pub watch: bool,
     /// Typed local recording offers for an explicitly spoken request.
     pub requested_audio: bool,
     /// The person may put the lamp to sleep by voice
@@ -335,6 +337,9 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::devices_tools::ENVIRONMENT)
             .ok()
             .as_deref(),
+    ));
+    flags.extend(crate::watches::arguments(
+        std::env::var(crate::watches::ENVIRONMENT).ok().as_deref(),
     ));
     flags.extend(crate::requested_audio::arguments_from_environment());
     flags.extend(crate::sleep_asked::arguments(
@@ -566,6 +571,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::devices_tools::FLAG
     {
         settings.devices = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::watches::FLAG
+    {
+        settings.watch = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -973,6 +984,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.devices {
         tools.extend(crate::devices_tools::tools());
     }
+    if settings.watch {
+        tools.extend(crate::watches::tools());
+    }
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
     }
@@ -1066,6 +1080,7 @@ pub(crate) fn voices_own(name: &str) -> bool {
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
         || crate::devices_tools::is_tool(name)
+        || crate::watches::is_tool(name)
         || crate::sleep_asked::is_tool(name)
         || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
@@ -1184,6 +1199,9 @@ pub enum Route {
     Devices(crate::devices_tools::Read),
     /// The desk stopped ([`crate::devices_tools::run_stop`]): no yes, from anyone.
     DeskStop,
+    /// A watch taken or ended ([`crate::watches::run`]): nothing is asked of
+    /// the person, and it is quick.
+    Watch,
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -1340,6 +1358,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             && (settings.seen_voice_offer || name != crate::seen_yes::OFFER)
         {
             Route::SeenActivity(settings.seen_posture, settings.seen_voice_offer)
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::watches::is_tool(name) {
+        return if settings.watch {
+            Route::Watch
         } else {
             Route::Nobody
         };
@@ -2768,6 +2793,7 @@ fn run_call_with_scope(
                 told
             },
         ),
+        Route::Watch => ("the watches", crate::watches::run(&call.name, &call.args)),
         Route::DeskStop => ("the devices", {
             let mut cache = crate::devices_tools::CACHE
                 .lock()
@@ -3652,6 +3678,7 @@ mod tests {
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
             devices: false,
+            watch: false,
         };
         let mut tools = declared(&settings);
         tools.push(crate::attention::name_tool());
@@ -3991,6 +4018,7 @@ mod tests {
                 onboarding: None,
                 reports_stop: false,
                 devices: false,
+                watch: false,
             }
         );
         assert_eq!(rest, ["--session", "7"]);

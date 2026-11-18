@@ -1829,6 +1829,11 @@ pub async fn run_with_continuation(
     if let Some(place) = &files.tools.tasks {
         crate::agent_tasks::start(place);
     }
+    // The watches of the cycle before (a mute or a sleep ended that worker),
+    // and the watcher that tells them.
+    if files.tools.watch {
+        crate::watches::resume();
+    }
     let (provider_config, patience) =
         ProviderConfig::load_with_patience(config_path, files.provider_patience)?;
     // What came from the file and what was filled in, so a lamp shows it
@@ -4030,6 +4035,7 @@ impl ToolDesk {
                         | Route::ReportsStop(_)
                         | Route::Devices(_)
                         | Route::DeskStop
+                        | Route::Watch
                         | Route::Sleep
                         | Route::SeenActivity(..)
                 ))
@@ -4211,6 +4217,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::DeskStop
+            | Route::Watch
             | Route::SeenActivity(..))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
@@ -4229,6 +4236,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::DeskStop
+            | Route::Watch
             | Route::SeenActivity(..)
             | Route::AgentAsk
             | Route::Nobody => {

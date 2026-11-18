@@ -719,7 +719,11 @@ pub fn checks_sounds(files: &crate::provider_worker::Files) -> bool {
 /// `coordinator::provider_arguments` passes them, parsed by the same code,
 /// but for `--keep-link`: this route has no link to keep.
 pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_worker::Parsed> {
-    let parsed = crate::provider_worker::parse_flags(dir, flags)?;
+    let mut parsed = crate::provider_worker::parse_flags(dir, flags)?;
+    // One list of watches, the Live worker's: this route does not declare the
+    // tools, so none is set here that nothing would hear. One list for both
+    // routes is the coordinator's, later (#7761).
+    parsed.2.tools.watch = false;
     if parsed.2.keep_link {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -24565,6 +24569,14 @@ mod tests {
     /// `arguments`), and it parses them with the same parser into its tools'
     /// place. What each one does is `agent_tasks`', the same code on either
     /// route.
+    #[test]
+    fn the_second_worker_has_no_watch_tools() {
+        let dir = Path::new("/run/lamp-voice");
+        let (_, _, files, _) =
+            parse_flags(dir, &strings(&["--tools", crate::watches::FLAG])).unwrap();
+        assert!(!files.tools.watch);
+    }
+
     #[test]
     fn the_second_worker_takes_the_task_switches_as_live_does() {
         let dir = Path::new("/run/lamp-voice");
