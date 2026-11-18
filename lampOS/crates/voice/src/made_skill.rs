@@ -39,10 +39,15 @@ use std::{
 pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL";
 /// The function the model calls for a skill to be made.
 pub const MAKE: &str = "make_skill";
-/// The most of the person's request carried in the brief: the brief and it
-/// fit in [`MOST_BRIEF_BYTES`] (480 since the owner found 180 too short in
-/// the app, 6 Nov).
-pub const MOST_REQUEST_BYTES: usize = 480;
+/// The most of the person's request carried in the brief, in bytes: the
+/// brief and it fit in [`MOST_BRIEF_BYTES`]. 180 at first, 480 since the
+/// owner found 180 too short in the app (6 Nov), 2,000 since a Vietnamese
+/// request, 2 or 3 bytes a letter, was still cut at 160 to 240 letters in
+/// the app's "Make a skill" box (18 Nov). The app's MAKE IT
+/// (`crate::app_make`, held to it by lamp-cloud's own
+/// `make_skill::MOST_WORDS_BYTES`, which `system.info` tells the app) and
+/// the voice's own make share it: a spoken request is far shorter.
+pub const MOST_REQUEST_BYTES: usize = 2_000;
 /// At most this many made skills are kept; the oldest not on is let go,
 /// and one on never is.
 pub const KEPT_MOST: usize = 5;
@@ -1515,23 +1520,29 @@ pub fn request_of(task: &str) -> &str {
 pub const REPAIR_MARK: &str = "Your last answer did not pass the lamp's check, which said: ";
 /// What it asks after them.
 const REPAIR_ASK: &str = " Answer again with both blocks, fixed. ";
-/// The check's lines a repair carries, at most, in bytes: with the longest
-/// request the brief stays within 2,000 bytes (the first
+/// The check's lines a repair carries, at most, in bytes (the first
 /// builder on #3126, 23 Oct 13:07). 560 since the brief says what each
 /// trigger means (lamp-74ff, 10 Nov: "come back to my desk"); 735 since a
 /// made skill has six triggers ([`SAYABLE_TRIGGERS`]), the brief shorter
 /// by as much, its triggers and gestures told in the system prompt
-/// (`make_skill_local`): the two still within the tasks part's 2,000.
+/// (`make_skill_local`).
 pub const MOST_REPAIR_BYTES: usize = 735;
 /// The longest a [`brief`] is with the longest request, any service's
-/// read step included: no longer half the tasks part's 2,000 bytes, but
-/// small enough that its repair, with the [`REPAIR_MARK`], the check's
-/// [`MOST_REPAIR_BYTES`] and the ask, still fits that bound.
-pub const MOST_BRIEF_BYTES: usize = 1_160;
-const _: () = assert!(
-    MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len()
-        <= crate::agent_tasks::MOST_TASK_BYTES
-);
+/// read step included: its own words, at most 680 bytes, and the
+/// request's [`MOST_REQUEST_BYTES`]. 1,160 with a 480-byte request, 2,680
+/// with 2,000 (18 Nov).
+pub const MOST_BRIEF_BYTES: usize = 2_680;
+/// The longest a [`repair_brief`] is: the longest [`brief`], the
+/// [`REPAIR_MARK`], the check's [`MOST_REPAIR_BYTES`] and the ask. A brief
+/// goes only to a maker, the lamp's own chat (`make_skill_local`) or the
+/// lamp's agent's make run (`make_skill_agent`), whose rules, the system
+/// prompt and the brief, lamp-tasks takes up to
+/// `lamp_tasks::skill_make::MOST_RULES_BYTES` (48 KiB; a test holds the
+/// longest system prompt with it within that). No longer the tasks part's
+/// 2,000 bytes (`agent_tasks::MOST_TASK_BYTES`): no brief has been handed
+/// there since the lamp's own model became the maker (3 Nov).
+pub const MOST_REPAIR_BRIEF_BYTES: usize =
+    MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len();
 
 /// The brief for a repair (#2813 piece 2): when the lamp's check refuses
 /// a made skill, the model is asked once more, with the whole [`brief`]
@@ -6405,8 +6416,10 @@ const MOST_PLAIN_CHARS: usize = 240;
 
 /// The longest [`plainly`] says of a skill that writes (#6066): its write
 /// said whole, every recipient and every word, which are the request's own
-/// ([`MOST_REQUEST_BYTES`]) and may be said twice over (a subject and a
-/// text), with when it runs. Never cut: longer is unsaid.
+/// and may be said twice over (a subject and a text), with when it runs.
+/// Sized for a 480-byte request; a request may be 2,000 bytes
+/// ([`MOST_REQUEST_BYTES`]) since 18 Nov, but a write's words past this
+/// still never are said cut: longer is unsaid, and not kept.
 const MOST_WRITE_PLAIN_CHARS: usize = 1_400;
 
 /// The triggers [`plainly`] says, each with what it means: in
@@ -10435,8 +10448,8 @@ light = { dim = 1 }
     }
 
     /// The brief and the longest request fit in [`MOST_BRIEF_BYTES`], so a
-    /// repair with the check's lines still fits the tasks part's 2,000;
-    /// it carries the request and nothing else of the conversation, and a
+    /// repair with the check's lines fits [`MOST_REPAIR_BRIEF_BYTES`]; it
+    /// carries the request and nothing else of the conversation, and a
     /// longer request is refused, never cut.
     #[test]
     fn the_brief_fits_the_hand_over_and_carries_only_the_request() {
@@ -11670,10 +11683,10 @@ light = { colour = "green", level = 3, for = "20s" }
             ),
             "{lines}"
         );
-        // The repair goes back whole within the tasks part's bound.
+        // The repair goes back whole within its bound.
         let repair = repair_brief(&"x".repeat(MOST_REQUEST_BYTES), &lines).unwrap();
         assert!(repair.contains(&lines), "{repair}");
-        assert!(repair.len() <= crate::agent_tasks::MOST_TASK_BYTES);
+        assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES);
         // Written as the repair says, it is said.
         let fixed = one.replace(
             "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\nnear = 0.14\n",
@@ -13010,7 +13023,7 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
         let repair = repair_brief(&"x".repeat(MOST_REQUEST_BYTES), &lines).unwrap();
         assert!(repair.contains(&lines), "{repair}");
-        assert!(repair.len() <= crate::agent_tasks::MOST_TASK_BYTES);
+        assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES);
         let Err(Refused(_, Some(off))) = plainly_with(&mail, false) else {
             panic!("a read is unsaid with reads off");
         };
@@ -13174,20 +13187,16 @@ light = { colour = "green", level = 3, for = "20s" }
     }
 
     /// #2813 piece 2 (the first builder, 23 Oct 13:07): a repair's brief
-    /// is the brief again with the check's lines, cut to 600 bytes, before
-    /// the request, so it stays within 2,000 bytes with the longest
-    /// request; it is a brief, its request is the person's, and it carries
-    /// the repair's mark.
+    /// is the brief again with the check's lines, cut to
+    /// [`MOST_REPAIR_BYTES`], before the request, so it stays within
+    /// [`MOST_REPAIR_BRIEF_BYTES`] with the longest request; it is a brief,
+    /// its request is the person's, and it carries the repair's mark.
     #[test]
     fn a_repairs_brief_carries_the_checks_lines_and_still_fits() {
         let request = "x".repeat(MOST_REQUEST_BYTES);
         let lines = "y".repeat(5_000);
         let repair = repair_brief(&request, &lines).unwrap();
-        assert!(
-            repair.len() <= crate::agent_tasks::MOST_TASK_BYTES,
-            "{}",
-            repair.len()
-        );
+        assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES, "{}", repair.len());
         assert!(repair.contains(&"y".repeat(MOST_REPAIR_BYTES)));
         assert!(!repair.contains(&"y".repeat(MOST_REPAIR_BYTES + 1)));
         assert!(is_brief(&repair) && repair.contains(REPAIR_MARK));

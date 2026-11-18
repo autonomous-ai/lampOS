@@ -35,8 +35,12 @@ sau:
 2. **Bản hướng dẫn** (`made_skill::brief`): chữ cố định, gồm định dạng kỹ
    năng và những gì một kỹ năng tạo ra được phép dùng, rồi đến yêu cầu của
    người dùng.
-   - Yêu cầu tối đa 480 byte; dài hơn thì bị từ chối, không bao giờ bị cắt,
-     và khi đó không hỏi mô hình gì cả.
+   - Yêu cầu tối đa 2.000 byte (`MOST_REQUEST_BYTES`; lúc đầu là 180, từ
+     6/11 là 480 khi chủ sở hữu thấy 180 quá ngắn trong app, từ 18/11 là
+     2.000 khi một yêu cầu tiếng Việt, 2 hoặc 3 byte mỗi chữ, vẫn bị cắt ở
+     160 đến 240 chữ); dài hơn thì bị từ chối, không bao giờ bị cắt, và khi
+     đó không hỏi mô hình gì cả. MAKE IT của app và lần tạo bằng giọng nói
+     dùng chung giới hạn này.
    - Không có gì khác của cuộc trò chuyện đi kèm.
    - Giờ trong ngày được hỏi là khung giờ riêng của trigger,
      `during = { from = "HH:MM", to = "HH:MM" }` "if asked", không phải một
@@ -57,10 +61,17 @@ sau:
    - Bản hướng dẫn chỉ nêu trigger và cử chỉ là "one [trigger] as listed
      (coming to the desk is room/presence)" và `body = { gesture }`: system
      prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
-     `made_skill::gesture_names`). Vì vậy bản hướng dẫn dài nhất là 1.160
-     byte (`MOST_BRIEF_BYTES`, trước là 1.340) và các dòng kiểm tra của một
-     lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là 560), đủ chỗ cho
-     nghĩa của cả sáu trigger; tổng vẫn nằm trong 2.000 byte của phần tasks.
+     `made_skill::gesture_names`). Vì vậy chữ riêng của bản hướng dẫn tối
+     đa 680 byte, bản hướng dẫn dài nhất là 2.680 byte với yêu cầu 2.000
+     byte (`MOST_BRIEF_BYTES`; 1.160 với 480, trước đó là 1.340) và các dòng
+     kiểm tra của một lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là
+     560), đủ chỗ cho nghĩa của cả sáu trigger. Bản hướng dẫn chỉ đi tới
+     một bên tạo: chat riêng của đèn, hoặc lượt tạo của agent của đèn, mà
+     rules của nó (system prompt và bản hướng dẫn) được lamp-tasks nhận tới
+     48 KiB (`lamp_tasks::skill_make::MOST_RULES_BYTES`; một test giữ lần
+     sửa dài nhất cùng system prompt dài nhất trong giới hạn đó). Nó không
+     còn bị giữ trong 2.000 byte của phần tasks: từ 3/11 không bản hướng
+     dẫn nào được gửi tới đó.
 3. **Mô hình của đèn viết.** Bản hướng dẫn được gửi tới chat của tuyến thứ
    hai (`llm_*`, relay hoặc DeepSeek riêng của người dùng), không có hàm,
    dạng stream, trên luồng và runtime riêng, tối đa 30 giây
@@ -496,7 +507,7 @@ sau:
      thuộc loại khác thì quay lại để sửa (`made_skill::WRITE_NOT_FIXED`).
      System prompt liệt kê các loại và khoá của chúng
      (`make_skill_local::write_rules`); brief thêm "Or one write, as
-     above." (hoặc "Or a read/write as above."), vẫn trong 1.160
+     above." (hoặc "Or a read/write as above."), vẫn trong 2.680
      byte.
    - **Lời của nó là lời của chính yêu cầu**
      (`made_skill::write_from_request`, tại `keep_asked`, nay nhận yêu
@@ -687,7 +698,7 @@ sau:
      (`make_skill_local::code_rules`) nói dạng, các giới hạn và các quyền,
      rằng mã chỉ tới được đèn qua SDK của đèn với đúng các quyền đó và không
      có mạng nào khác, và rằng đèn đọc lại rồi chờ lời đồng ý; brief thêm
-     "Or code, as above." (vẫn trong 1.160 byte), và một câu trả lời có thể
+     "Or code, as above." (vẫn trong 2.680 byte), và một câu trả lời có thể
      dài tới 37 KiB. Nó nêu đúng các lời gọi thật của SDK
      (`made_skill::SCRIPT_SDK`, #6749 E): `import asyncio`,
      `from lampos import Lamp`, `lamp = await Lamp.local()` trong
@@ -2885,7 +2896,7 @@ công tắc không đọc được. Câu của kỹ năng vừa tạo, nếu h�
 từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
-  480 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
+  2.000 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
   `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do. Không
   tạo được (hoặc kỹ năng viết trong ứng dụng không giữ được), đèn cũng nói
@@ -3043,7 +3054,7 @@ chối khi cài.
    không `[trigger]` và không `[ask]`. Mô hình được biết kỹ năng chưa thể
    nghe những gì nói trong phòng, và bản brief ghi "one [trigger] as listed
    or [said] as above" ở chỗ vốn nêu sự có mặt ở bàn (lời nhắc hệ thống cũng
-   nêu điều đó), nên brief dài nhất vẫn trong 1.160 byte. Bất cứ gì khác
+   nêu điều đó), nên brief dài nhất vẫn trong 2.680 byte. Bất cứ gì khác
    cạnh `[said]` bị từ chối kèm các dòng cho một lần sửa
    (`made_skill::said_asked`), và người dùng nghe "I couldn't make that
    one." nếu đã hết lượt sửa.
@@ -3188,7 +3199,7 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    phòng "other than a request told to the lamp (a [said] start) or the
    words the person names to start it (asks), both below", và brief nói
    "one [trigger] listed, [said]/asks as above", viết ngắn để brief dài
-   nhất với mọi switch bật vẫn trong 1.160 byte.
+   nhất với mọi switch bật vẫn trong 2.680 byte.
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
