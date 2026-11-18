@@ -478,7 +478,9 @@ mod tests {
             assert_eq!(refused, Err(UNREACHED.to_owned()));
             assert_eq!(
                 lines,
-                [format!("monitor.link from the app: lamp-peek not reached: {error}")]
+                [format!(
+                    "monitor.link from the app: lamp-peek not reached: {error}"
+                )]
             );
         }
         let _ = std::fs::remove_dir_all(dir);
