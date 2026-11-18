@@ -3520,44 +3520,72 @@ cả hai người viết.
     (`long_make::WRITE_WITHIN`) trong 600 giây (`long_make::MAKE_WITHIN`),
     và lamp-tasks chỉ nhận `within_ms` tới `skill_make::RUN_ON_MOST_WITHIN`
     (600 giây) cho dấu đó; mọi lần tạo khác, và MAKE IT của app, vẫn 120
-    giây. Mỗi lần một: khi một lần đang chạy tiếp (dấu `long-make.json`
-    cạnh `made.json` ghi `making`), yêu cầu tạo mới được trả lời "I'm still
-    making your <name> skill." (tên bản nháp của DeepSeek, hoặc "your
-    skill"), không tạo gì.
+    giây. Lần tạo đã giao cho agent với thời gian đó mà lượt bị cắt trước
+    một phút vẫn được chạy tiếp (`long_make::to_agent`, `long_make::cut`),
+    nên đi qua cùng cổng, không bao giờ được bật hay nói qua dịch vụ say mà
+    không có cổng (P2 của El trên #7774); phản ứng nhanh của DeepSeek giữ
+    đường lượt bị cắt cũ. Mỗi lần một: khi một lần đang chạy tiếp (dấu của
+    nó trong `long-make.json` cạnh `made.json` ghi `making`), yêu cầu tạo
+    mới được trả lời "I'm still making your <name> skill." (tên bản nháp
+    của DeepSeek, hoặc "your skill"), không tạo gì. Tin của mỗi lần tạo có
+    dấu riêng ở đó (`long_make::marks`), nên lần tạo lâu thứ hai không bao
+    giờ chiếm chỗ lần đầu chưa báo (P1 của Twelve trên #7774); quá ba
+    (`long_make::MOST_MARKS`), dấu cũ nhất chưa báo được để lại cho
+    `ready_untold` trong danh sách của app.
   - **Xong.** Cùng các kiểm tra và sửa như mọi lần tạo của agent. Lần tạo
     lâu đã xong được giữ nhưng tắt, `"ready_untold": true` trong mục
-    `made.json` (thứ app đọc về skill tự tạo, nên hiện ngay), dấu ghi
-    `made`; lần tạo không bao giờ tự bật nó.
-  - **Báo cho đúng người.** Coordinator đưa ra như lượt nói của chính đèn
-    (`long_make::Tells`, admission basis `long_make_told`) chỉ khi
-    `long_make::may_tell` đúng: thấy khuôn mặt của chủ
-    (`long_make::owner_seen_now`), không có hội thoại đang diễn ra (15 giây
-    không ai nói với đèn hay đèn nói, `task_news::quiet_for_news`), không
-    trong giờ yên lặng (`run_write_yes::quiet_hours_now`), có người ở đèn;
-    phòng không bận, không nợ câu nào. Hôm nay họ không quay lại thì chờ lần
-    sau, bao lâu cũng được. Worker xử lý ghi chú của lượt đó
-    (`long_make::told_here`): "Your <name> skill is ready." và phần đọc lại
-    (`made_skill::on_line`), kèm lời nhắc liên kết cho dịch vụ nó đọc mà
-    chưa liên kết, như câu của lần tạo xong. Skill có code riêng chờ câu
-    đồng ý nói ra, được hỏi lúc đó (`skill_write_yes::wait_for_yes_noted`,
-    như của app); skill trùng với một skill trên đèn được hỏi câu hỏi trùng
-    (`made_clash::asked`), như lần tạo xong. Worker không bật và không xóa
-    gì: chỉ khi coordinator thấy chính lượt đó được phát trọn (mọi từ được
-    phát, không ai chen lượt, `long_make::heard_through`) thì
-    `long_make::heard` mới bật skill thường, bỏ `ready_untold` và xóa dấu,
-    nên chỉ báo một lần. Bị cắt hoặc bị nói đè thì skill vẫn tắt, chưa báo,
-    và được báo lại ở lúc phù hợp kế tiếp (sớm nhất hai phút sau).
+    `made.json` (thứ app đọc về skill tự tạo, nên hiện ngay), dấu của nó
+    ghi `made`; lần tạo không bao giờ tự bật nó.
+  - **Báo cho đúng người.** Coordinator trước hết tìm dấu đến hạn
+    (`long_make::Tells::has_news`, đọc nhiều nhất mỗi 3 giây), rồi đưa ra
+    như lượt nói của chính đèn (`long_make::Tells`, admission basis
+    `long_make_told`) chỉ khi `long_make::may_tell` đúng: thấy chủ ở một
+    mình, hoặc phòng riêng (`services::owner_sees_alone_now`, như phần đọc
+    lại câu ghi của một lần chạy, vì câu nói nêu tên skill), không có hội
+    thoại đang diễn ra (15 giây không ai nói với đèn hay đèn nói,
+    `task_news::quiet_for_news`), không trong giờ yên lặng
+    (`run_write_yes::quiet_hours_now`), có người ở đèn; phòng không bận,
+    không nợ câu nào. Hôm nay họ không quay lại thì chờ lần sau, bao lâu
+    cũng được. Mỗi tin được đưa ra nhiều nhất ba lần
+    (`long_make::MOST_OFFERS`, cách nhau ít nhất hai phút); sau đó để lại
+    cho `ready_untold` trong danh sách của app và câu "Skill của tôi xong
+    chưa?", skill vẫn tắt. Worker xử lý ghi chú của lượt đó
+    (`long_make::told_here`): một câu, "Your <name> skill is ready and on.
+    Say 'remove it' to undo." (`long_make::ready_on_line`), không đọc lại
+    và không hỏi đồng ý, có code riêng hay không (first builder, 18/11
+    18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
+    câu của lần tạo xong. Skill có code khi đèn không chạy code của skill
+    (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
+    bao giờ nói là bật; skill trùng với một skill trên đèn được nói là xong
+    và hỏi câu hỏi trùng (`made_clash::asked`), như lần tạo xong; skill đã
+    bật rồi được nói là bật, không hỏi lại gì. Worker không bật và không
+    xóa gì: chỉ khi coordinator thấy chính lượt đó được phát trọn (mọi từ
+    được phát, không ai chen lượt, `long_make::heard_through`) thì
+    `long_make::heard` mới bỏ dấu đó (giữ các dấu khác) và bật skill: skill
+    thường như lần tạo xong được bật, skill có code theo đường mà câu đồng ý
+    của nó sẽ đi (`make_skill_local::code_on_at_once`, không hỏi đồng ý).
+    Đã bật thì bỏ `ready_untold`. Không bật được (giới hạn số skill, bước
+    kiểm tra), skill vẫn tắt và giữ `ready_untold`, và người dùng được báo
+    "I couldn't turn your <name> skill on: <why>." ở lúc phù hợp kế tiếp
+    (`long_make::NotOn`), không bao giờ để họ tưởng nó đang bật. Bị cắt
+    hoặc bị nói đè thì skill vẫn tắt, chưa báo, và được báo lại ở lúc phù
+    hợp kế tiếp. `heard` và các lần tạo của worker ghi `made.json` và các
+    dấu dưới cùng một khóa (`made_skill::index_locked`, một `flock` trên
+    `.made.lock` cạnh nó), không giữ khóa khi chờ manage helper.
   - **Lỗi, hết 10 phút, hoặc khởi động lại** khi đang chạy (worker của
-    tuyến thứ hai đọc dấu `making` khi khởi động, `long_make::after_start`;
-    dấu `making` quá 11 phút được đọc là hết giờ): một câu rõ ràng ở lúc phù
-    hợp kế tiếp, "I couldn't finish your <name> skill.", và không giữ gì.
-    Không bao giờ dùng bản nháp của DeepSeek: lần chạy tiếp mà agent không
-    tạo được được nói là lỗi của agent.
+    tuyến thứ hai đổi dấu `making` thành khởi động lại khi khởi động,
+    `long_make::after_start`; dấu `making` quá 11 phút được ghi ngay là hết
+    giờ, thời điểm cố định, nên chỉ báo một lần rồi xóa): một câu rõ ràng ở
+    lúc phù hợp kế tiếp, "I couldn't finish your <name> skill.", và không
+    giữ gì. Không bao giờ dùng bản nháp của DeepSeek: lần chạy tiếp mà agent
+    không tạo được được nói là lỗi của agent. Skill đã xong mà bị xóa trong
+    app trước khi báo thì dấu của nó được bỏ lặng lẽ, không bao giờ nói
+    "couldn't finish".
   - **"Skill của tôi xong chưa?"** Danh sách skill của người dùng trong
     `make_skill` (`made: true`, mô tả của nó nêu câu hỏi này) mang
-    `long_make`: `still_making` với `minutes_so_far`, `made`, `not_made`,
-    hoặc `none_being_made`, tên chỉ nói với chủ; mô hình tự hiểu ý câu hỏi,
-    không danh sách từ.
+    `long_make`: `still_making` với `minutes_so_far`, `made`,
+    `made_not_on`, `not_made`, hoặc `none_being_made`, tên chỉ nói với chủ;
+    mô hình tự hiểu ý câu hỏi, không danh sách từ.
 
   Tắt: mọi lần tạo, câu nói và giới hạn giữ nguyên từng byte như trước.
   Kiểm thử: như bản tiếng Anh.

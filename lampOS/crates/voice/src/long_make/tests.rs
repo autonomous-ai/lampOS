@@ -197,3 +197,71 @@ fn the_news_is_offered_once_and_again_only_if_not_taken() {
             .is_some()
     );
 }
+
+/// Twelve's P3 and El's P2 on #7774: a telling not taken is offered at
+/// most [`MOST_OFFERS`] times, then left to the app's list; news is
+/// looked for before anything else of the moment.
+#[test]
+fn a_telling_is_offered_at_most_three_times() {
+    let dir = folder("cap");
+    let mut tells = Tells::at(dir.0.clone());
+    let at = Instant::now();
+    assert!(!tells.has_news(at, NOW));
+    begin(6_811_050, &dir.0);
+    assert!(let_go(6_811_050, NOW));
+    settle(6_811_050);
+    settled(&dir.0, Err(false), NOW + 1);
+    let mut offered = 0;
+    for step in 0..20u32 {
+        let now = at + READ_EVERY + OFFER_AGAIN_AFTER * step;
+        if tells.has_news(now, NOW + 2) {
+            assert!(tells.next(now, NOW + 2).is_some());
+            offered += 1;
+        }
+    }
+    assert_eq!(offered, MOST_OFFERS);
+    assert_eq!(
+        read(&dir.0, NOW + 3).map(|state| key(&state)),
+        Some(Some(format!("not_made {}", NOW + 1))),
+        "kept, not told"
+    );
+}
+
+/// Each make keeps a mark of its own; past [`MOST_MARKS`], a make let run
+/// on drops the oldest untold one, and no ask is refused for them.
+#[test]
+fn past_the_most_marks_the_oldest_is_left_to_the_list() {
+    let dir = folder("most");
+    for (at, request) in (6_811_060..6_811_060 + MOST_MARKS as u64 + 1).enumerate() {
+        let now = NOW + at as u64 * 10;
+        assert_eq!(still_making(&dir.0, now), None);
+        begin(request, &dir.0);
+        assert!(let_go(request, now));
+        assert!(still_making(&dir.0, now).is_some());
+        settle(request);
+        settled(&dir.0, Err(false), now + 1);
+    }
+    let kept: Vec<_> = marks(&dir.0, NOW + 100).iter().filter_map(key).collect();
+    assert_eq!(
+        kept,
+        [
+            "not_made 1800000000011",
+            "not_made 1800000000021",
+            "not_made 1800000000031"
+        ]
+    );
+}
+
+/// El's P2 on #7774: a make handed to the agent with the long make's time
+/// whose turn is cut before its minute is let run on, its outcome through
+/// the gate; one never handed to it (DeepSeek's quick reaction) is not.
+#[test]
+fn a_cut_turn_lets_only_an_agent_make_run_on() {
+    let dir = folder("cut");
+    begin(6_811_070, &dir.0);
+    assert!(!cut(6_811_070, NOW), "not the agent's: as before");
+    to_agent(6_811_070);
+    assert!(cut(6_811_070, NOW));
+    assert!(matches!(read(&dir.0, NOW), Some(State::Making { .. })));
+    assert_eq!(settle(6_811_070), Some(dir.0.clone()));
+}

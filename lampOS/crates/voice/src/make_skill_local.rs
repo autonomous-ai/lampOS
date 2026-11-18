@@ -1601,6 +1601,12 @@ fn make_with_by(
         );
         return json!({ "dropped": true, "next": WONT_MAKE_NEXT });
     }
+    // A make given the long make's time whose turn was cut before its
+    // minute goes the same way (El's P2 on #7774): never on, nor said
+    // through the say service, with no gate.
+    if run_on && turn_cut() {
+        crate::long_make::cut(made_in, crate::app_make::now_unix_ms().max(now_unix_ms));
+    }
     // Let run on past a minute (#6811): kept off until its person hears it
     // is ready, or nothing kept and that told; never put on here, and no
     // line for this turn, which has ended.
@@ -4135,6 +4141,11 @@ fn handed_to_agent(
     deepseek_repaired: &impl Fn(Result<Made, Refused>, Duration) -> Result<Made, Refused>,
 ) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
+    // Given the long make's time (`LAMP_MAKE_MAY_RUN_ON`): its outcome goes
+    // through the long make's gate if its turn is cut (El's P2 on #7774).
+    if agent.may_run_on {
+        crate::long_make::to_agent(crate::make_skill_agent::made_for());
+    }
     // The person's own addresses never go in the agent's rules file: each
     // stands there as a placeholder, put back in its answer before the
     // checks (the Reviewer-lead on #6439).
@@ -12642,9 +12653,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// `LAMP_MAKE_MAY_RUN_ON` on: a make let run on that the agent then
     /// makes is kept but off, `ready_untold` for the app, never put on and
     /// no line for the turn that ended. Its "ready" is told only with its
-    /// person's face seen, not mid-conversation, not at night and not to an
-    /// empty room; then it is said ready with its read-back and goes on.
-    /// Told once.
+    /// person's face seen alone, not mid-conversation, not at night and not
+    /// to an empty room; then it is said ready and on in one line with its
+    /// undo, and goes on once that line was heard through. Told once.
     #[test]
     fn a_make_let_run_on_stays_off_until_its_person_is_told_then_goes_on() {
         crate::long_make::set_on_here(Some(true));
@@ -12689,10 +12700,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let note = tells.next(at, NOW + 80_000).unwrap();
         let key = crate::long_make::key_of(&note).unwrap().to_owned();
         let said = crate::long_make::told(&keeping, 6_811_201, note, (NOW + 80_000, at), || None);
+        // One line with its undo, never read back (the first builder, 18
+        // Nov 18:41).
         assert!(
-            said.contains("Your sip at desk skill is ready. I made sip at desk"),
+            said.contains("Your sip at desk skill is ready and on. Say 'remove it' to undo.)"),
             "{said}"
         );
+        assert!(!said.contains("I made"), "never read back: {said}");
         // Its turn cut before the read-back was played: still off and
         // untold, so told again next time.
         assert!(!crate::long_make::heard_through(true, false));
@@ -12708,7 +12722,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .unwrap();
         assert_eq!(crate::long_make::key_of(&again), Some(key.as_str()));
         let said = crate::long_make::told(&keeping, 6_811_202, again, (NOW + 230_000, at), || None);
-        assert!(said.contains("Your sip at desk skill is ready."), "{said}");
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
         // Heard through: on, and told once.
         assert!(crate::long_make::heard_through(true, true));
         let asked = manage_helper(&keeping.manage);
@@ -12804,7 +12821,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let said = crate::long_make::told(&keeping, 6_811_263, note, (NOW + 100_000, at), || {
             Some(Vec::new())
         });
-        assert!(said.contains("Your mail read skill is ready."), "{said}");
+        assert!(
+            said.contains("Your mail read skill is ready and on."),
+            "{said}"
+        );
         assert!(said.contains("Gmail"), "the link ask: {said}");
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
@@ -12923,6 +12943,372 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["on"], true, "{told}");
         assert!(asked.join().unwrap()["install_made"].is_string());
         assert_eq!(crate::long_make::read(&keeping.directory, NOW), None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A kept skill `name` of SHA-256 `sha256` using `uses`, off, as a
+    /// long make that settled made keeps it; its mark settled made.
+    fn kept_long(keeping: &Keeping, request: u64, name: &str, sha256: &str, uses: Value) {
+        let package = format!("{name}-1.0.0.tar");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        std::fs::write(keeping.directory.join(&package), "tar").unwrap();
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries.push(json!({
+            "name": name, "version": "1.0.0", "sha256": sha256,
+            "description": "Glows at the desk.", "package": package, "uses": uses,
+        }));
+        std::fs::write(
+            keeping.directory.join(made_skill::INDEX),
+            serde_json::to_vec(&entries).unwrap(),
+        )
+        .unwrap();
+        crate::long_make::begin(request, &keeping.directory);
+        assert!(crate::long_make::let_go(request, NOW));
+        crate::long_make::settle(request);
+        crate::long_make::settled(&keeping.directory, Ok((name, sha256)), NOW + 1);
+    }
+
+    /// The kept skill `sha256`'s index entry.
+    fn entry_of(keeping: &Keeping, sha256: &str) -> Value {
+        made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["sha256"] == sha256)
+            .unwrap()
+    }
+
+    /// El's P2 on #7774: a make given the long make's time whose turn was
+    /// cut before its minute is never put on nor said through the say
+    /// service with no gate: kept off, `ready_untold`, and told as a long
+    /// make is.
+    #[test]
+    fn a_long_make_cut_before_its_minute_goes_through_the_gate() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-cut");
+        let request = 6_811_320;
+        // The turn waiting on it is cut already.
+        set_turn(std::sync::Arc::downgrade(&std::sync::Arc::new(())));
+        made_skill::set_reactions_here(Some(true));
+        let answer = guarded_sip();
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(move |_: &str| Some(answer.clone())),
+        );
+        let (url, served) = service(vec![
+            judgement(true),
+            (200, route_answer("not = [toml", "deepseek-draft")),
+        ]);
+        crate::make_skill_agent::set_made_for(request);
+        let told = make_with_by(
+            request,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent().running_on(true)),
+        );
+        crate::make_skill_agent::set_made_for(0);
+        assert_eq!(served.join().unwrap(), 2);
+        made_skill::set_reactions_here(None);
+        assert_eq!(told, crate::long_make::let_go_told());
+        assert_eq!(take_said_line(), None, "nothing said with no gate");
+        assert!(!any_on(&keeping.directory));
+        let entry = made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["name"] == "sip-at-desk")
+            .unwrap();
+        assert_eq!(entry[crate::long_make::READY_UNTOLD], true);
+        assert!(matches!(
+            crate::long_make::read(&keeping.directory, NOW + 70_000),
+            Some(crate::long_make::State::Made { .. })
+        ));
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7774: the power off mid-make and the lamp back past
+    /// its ten minutes. The run-out mark is kept once, its key fixed, so its
+    /// "couldn't finish" is told once and then cleared, never offered on.
+    #[test]
+    fn a_long_make_run_out_across_a_restart_is_told_once_then_cleared() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-restart-late");
+        crate::long_make::begin(6_811_270, &keeping.directory);
+        crate::long_make::hint(6_811_270, "water-reminder");
+        assert!(crate::long_make::let_go(6_811_270, NOW));
+        crate::long_make::settle(6_811_270);
+        // Back an hour later.
+        let back = NOW + 3_600_000;
+        crate::long_make::after_start(&keeping.directory, back);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        assert!(tells.has_news(at, back + 15_000));
+        let note = tells.next(at, back + 15_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("not_made {back}"), "its key fixed");
+        let said = crate::long_make::told(
+            &keeping,
+            6_811_271,
+            note.clone(),
+            (back + 30_000, at),
+            || None,
+        );
+        assert!(
+            said.contains("I couldn't finish your water reminder skill."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, back + 45_000, |_| {
+            panic!("nothing is put on")
+        });
+        assert!(!keeping.directory.join(crate::long_make::FILE).exists());
+        assert!(!tells.has_news(at + Duration::from_secs(600), back + 900_000));
+        let again =
+            crate::long_make::told(&keeping, 6_811_272, note, (back + 900_000, at), || None);
+        assert!(!again.contains("couldn't finish"), "told once: {again}");
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7774: A made and not told yet, then B let run on:
+    /// A's mark stays, A is told and goes on, then B's news; and the same
+    /// with A failed. Nothing is lost.
+    #[test]
+    fn a_second_long_make_never_takes_an_untold_firsts_place() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-two");
+        let first = "ab".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_280,
+            "sip-at-desk",
+            &first,
+            json!({"speak": true}),
+        );
+        crate::long_make::begin(6_811_281, &keeping.directory);
+        crate::long_make::hint(6_811_281, "water-reminder");
+        assert!(crate::long_make::let_go(6_811_281, NOW + 5_000));
+        assert_eq!(
+            crate::long_make::marks(&keeping.directory, NOW + 6_000).len(),
+            2
+        );
+        crate::long_make::settle(6_811_281);
+        crate::long_make::settled(&keeping.directory, Err(false), NOW + 7_000);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 8_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("ready {first}"));
+        let said = crate::long_make::told(&keeping, 6_811_282, note, (NOW + 8_000, at), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, NOW + 9_000, |made| {
+            made_skill::mark(&keeping.directory, &made.sha256, "on", Some(json!(true)));
+            Ok(())
+        });
+        let entry = entry_of(&keeping, &first);
+        assert_eq!(entry["on"], true);
+        assert!(entry.get(crate::long_make::READY_UNTOLD).is_none());
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 10_000)
+            .unwrap();
+        let said = crate::long_make::told(
+            &keeping,
+            6_811_283,
+            note.clone(),
+            (NOW + 10_000, at),
+            || None,
+        );
+        assert!(
+            said.contains("I couldn't finish your water reminder skill."),
+            "{said}"
+        );
+        crate::long_make::heard(
+            &keeping,
+            crate::long_make::key_of(&note).unwrap(),
+            NOW + 11_000,
+            |_| panic!("nothing is put on"),
+        );
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 12_000),
+            None
+        );
+        // A failed, then B made: A's "couldn't finish" first, then B.
+        crate::long_make::begin(6_811_284, &keeping.directory);
+        assert!(crate::long_make::let_go(6_811_284, NOW + 20_000));
+        crate::long_make::settle(6_811_284);
+        crate::long_make::settled(&keeping.directory, Err(true), NOW + 21_000);
+        let second = "cd".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_285,
+            "desk-glow",
+            &second,
+            json!({"speak": true}),
+        );
+        let keys: Vec<String> = crate::long_make::marks(&keeping.directory, NOW + 22_000)
+            .iter()
+            .map(|state| match state {
+                crate::long_make::State::NotMade { .. } => "not_made".to_owned(),
+                crate::long_make::State::Made { name, .. } => name.clone(),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(keys, ["not_made", "desk-glow"]);
+        assert_eq!(
+            entry_of(&keeping, &second)[crate::long_make::READY_UNTOLD],
+            true
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7774 and the first builder's 18:41 rule: a long make
+    /// with code of its own is said ready and on in one line, no read-back
+    /// and no yes asked, and goes on once heard through by its yes's path;
+    /// with `LAMP_MADE_SCRIPTS` off it is never said on, and stays off.
+    #[test]
+    fn a_long_make_with_code_is_said_on_in_one_line_with_no_yes_and_never_on_while_off() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-code");
+        let code = json!({"code": true, "grants": ["light"], "light": true});
+        let glow = "ef".repeat(32);
+        made_skill::set_scripts_here(Some(true));
+        kept_long(&keeping, 6_811_290, "desk-glow", &glow, code.clone());
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_291, note, (NOW + 5_000, at), || None);
+        assert!(
+            said.contains("Your desk glow skill is ready and on."),
+            "{said}"
+        );
+        assert!(said.contains("Say 'remove it' to undo."), "{said}");
+        assert!(!said.contains("approve_id"), "no yes asked: {said}");
+        assert!(!said.contains("I made"), "never read back: {said}");
+        let mut put = false;
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |made| {
+            assert!(made.uses.code);
+            put = true;
+            made_skill::mark(&keeping.directory, &made.sha256, "on", Some(json!(true)));
+            Ok(())
+        });
+        assert!(put, "on once heard, with no yes");
+        assert_eq!(entry_of(&keeping, &glow)["on"], true);
+        // `LAMP_MADE_SCRIPTS` off: said off and why, never put on.
+        made_skill::set_scripts_here(Some(false));
+        let off = "12".repeat(32);
+        kept_long(&keeping, 6_811_292, "desk-pulse", &off, code);
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 7_000)
+            .unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_293, note, (NOW + 7_000, at), || None);
+        assert!(
+            said.contains(
+                "Your desk pulse skill is ready. I made it but couldn't put it on: this lamp doesn't run a skill's own code."
+            ),
+            "{said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 8_000, |_| {
+            panic!("never on with the lamp running no skill's code")
+        });
+        assert_ne!(entry_of(&keeping, &off)["on"], true);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7774: told ready and heard, but the lamp couldn't
+    /// put it on. It stays off and `ready_untold`, and its person is told
+    /// why at the next moment, once.
+    #[test]
+    fn a_long_make_not_put_on_once_heard_is_told_why() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-not-on");
+        let sip = "34".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_300,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        crate::long_make::told(&keeping, 6_811_301, note, (NOW + 5_000, at), || None);
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| {
+            Err("the lamp has as many skills on as it holds".into())
+        });
+        let entry = entry_of(&keeping, &sip);
+        assert_ne!(entry["on"], true);
+        assert_eq!(entry[crate::long_make::READY_UNTOLD], true);
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 7_000)
+            .unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_302, note, (NOW + 7_000, at), || None);
+        assert!(
+            said.contains(
+                "I couldn't turn your sip at desk skill on: the lamp has as many skills on as it holds."
+            ),
+            "{said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 8_000, |_| {
+            panic!("told why, not tried again")
+        });
+        assert!(
+            entry_of(&keeping, &sip)
+                .get(crate::long_make::READY_UNTOLD)
+                .is_none()
+        );
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 9_000),
+            None
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P3 on #7774: one put on already (its turn cut after the
+    /// clash's choice, or on by another way) is said on once more, nothing
+    /// asked again and nothing put on.
+    #[test]
+    fn a_long_make_on_already_is_told_with_nothing_asked_again() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-on-already");
+        let sip = "56".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_310,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        made_skill::mark(&keeping.directory, &sip, "on", Some(json!(true)));
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_311, note, (NOW + 5_000, at), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| panic!("on already"));
+        assert!(
+            entry_of(&keeping, &sip)
+                .get(crate::long_make::READY_UNTOLD)
+                .is_none()
+        );
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
