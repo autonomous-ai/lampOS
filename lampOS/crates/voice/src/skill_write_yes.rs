@@ -1179,7 +1179,9 @@ fn bounds(word: &str) -> bool {
 ///   "Có, dùng skill page title".
 /// - **Else, after "skill":** nothing. Words that name no installed skill
 ///   never form another's name ("yes, run the skill again", "Có, chạy
-///   skill đi").
+///   skill đi"), but with no skill on the lamp read (`installed` empty)
+///   the words right after it, up to a bounding word, fail closed as
+///   another's.
 /// - **Else, before "skill":** the words back to a word that comes before
 ///   a name ([`BEFORE_A_NAME`]) or the clause's start, at most
 ///   [`NAME_WORDS`], name another skill when they are two words or more,
@@ -1238,6 +1240,20 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
                 let name = &words[start..at];
                 if name.len() > 1 || !FILLERS.contains(&name[0].as_str()) {
                     return Some(name.join(" "));
+                }
+            }
+            // With no skill on the lamp read (none listed, or its folders
+            // unread), a name after "skill" can't be told from a word like
+            // "again": it fails closed, read as another skill's.
+            if installed.is_empty() {
+                let after: Vec<&str> = words[at + 1..]
+                    .iter()
+                    .map(String::as_str)
+                    .take(NAME_WORDS)
+                    .take_while(|word| !bounds(word))
+                    .collect();
+                if !after.is_empty() {
+                    return Some(after.join(" "));
                 }
             }
         }
@@ -2913,19 +2929,25 @@ mod tests {
             "Yes.",
             "Yes, that skill.",
             "What skill is that?",
-            // A word after "skill" that names no installed skill, and a
-            // filler before it (the re-read's P2 on #7634).
-            "yes the skill thanks",
-            "yes, run the skill again",
-            "Có, chạy skill đi",
             "Yes, great skill.",
-            "run skill look title",
             // Not read (accepted limits): no "skill", or "kỹ năng".
             "Yes, and use my weather.",
             "Có, dùng kỹ năng thời tiết",
         ] {
             assert_eq!(other(own), None, "{own}");
             assert_eq!(on_lamp(own, &backup), None, "{own}");
+        }
+        // A word after "skill" that names no installed skill is no name
+        // (the re-read's P2 on #7634), but with no skill on the lamp read,
+        // it fails closed (the final read's P3).
+        for after in [
+            "yes the skill thanks",
+            "yes, run the skill again",
+            "Có, chạy skill đi",
+            "run skill look title",
+        ] {
+            assert_eq!(on_lamp(after, &backup), None, "{after}");
+            assert!(other(after).is_some(), "{after}");
         }
         // A waiting skill's own name may hold the words that bound
         // another's: only a run's ends are bounded.

@@ -5006,7 +5006,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   nhận: câu không có từ "skill" thì không được đọc (chỉ `named` gắn nó,
   #7545); "kỹ năng" không được đọc; một tên sau "skill" chỉ được tính khi
   là tên một kỹ năng đã cài, nên "run skill look title" khi look title
-  không có trên đèn được để cho `named`; một từ trước "skill" không phải
+  không có trên đèn được để cho `named` (nhưng khi không đọc được kỹ năng
+  nào trên đèn, các từ ngay sau "skill" thất bại theo hướng an toàn, được
+  đọc là tên kỹ năng khác); một từ trước "skill" không phải
   từ đệm ("Yes, awesome skill.") thất bại theo hướng an toàn, được đọc là
   tên kỹ năng khác; và việc chờ gỡ kỹ năng cố ý không được đọc, nên "Yes,
   and remove the joke time skill too." vẫn gỡ kỹ năng đã hỏi (P2 của El

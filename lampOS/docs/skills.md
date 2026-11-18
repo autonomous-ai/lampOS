@@ -2004,7 +2004,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   skill." is not. Accepted limits: a line without the word "skill" is not
   read (its `named` alone binds it, #7545); "kỹ năng" is not read; a name
   after "skill" counts only as an installed skill's, so "run skill look
-  title" with look title not on the lamp is left to `named`; one word
+  title" with look title not on the lamp is left to `named` (but with no
+  skill on the lamp read at all, the words right after "skill" fail
+  closed, read as another skill's name); one word
   before "skill" that is not a filler ("Yes, awesome skill.") fails
   closed, read as another skill's name; and a remove's wait is not read
   on purpose, so "Yes, and remove the joke time skill too." still removes
