@@ -6850,6 +6850,40 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   Nothing of it is kept past the note. The
   journal, at that first audio: `request N is told what the person was
   last seen doing`.
+- **How long the person at the desk has sat there (`LAMP_DESK_TIME=on`,
+  #7694; [`desk_time`](../crates/voice/src/desk_time.rs)):** off. The
+  owner, 18 Nov: the lamp said "take a sip of water, you've been at the
+  desk for a while", was asked "how long have I been at the desk?", and
+  answered "I don't know. I don't track your time." Two parts, one switch:
+  - **The nudge's reason stays in the conversation.** `lamp-skills`, with
+    the same switch, begins Sip of water's, Stretch break's and Rest your
+    eyes' notes with the sitting from `room/activity`'s `sitting_s`, the
+    one their `[[while]]` waits on (`lamp_skills::SITTING_SLOT`): "(Measured:
+    at the desk 47 minutes, since 14:12. Tell it only if asked, rounded.)".
+    The thread keeps a written request's note with its answer, its first
+    300 bytes (`Thread::written`), so the fact is first and short; the
+    follow-up within `HISTORY_WITHIN` (10 minutes) has it.
+  - **The voice can answer any time.** The `desk_time` function, declared
+    only with the switch, reads the bus's latched `room/activity` at the
+    call (as `known_faces::faces_in_view` reads the faces: no wait, no ask,
+    nothing kept) and tells the model the sitting rounded the way a person
+    says it ("about 45 minutes") with when it began (`sat_down_at`, local
+    clock), and that their last break was just before it. Both routes answer
+    it at once (`Route::DeskTime`). Without the eyes' `LAMP_ACTIVITY` the
+    topic says nothing.
+  - **The words.** With no sitting known (no fresh value, away, nobody
+    sitting, or not exactly one face in view) it is told to say warmly "I
+    didn't catch when you sat down", never that it doesn't keep track of
+    them; the function's description says the same.
+
+  Privacy, squared with `doing_told`'s "never volunteers" (its header says
+  both): only the current sitting, which the eyes begin again when someone
+  else sits down and end when the chair empties; only for a line heard at
+  the lamp (a written turn, such as the nudge's own, or a typed one is told
+  `desk_time::ASKED_ONLY` and reads nothing), so it is never volunteered
+  outside the nudge's own line; only with exactly one face in view, so
+  never about another person; never the state label. Nothing of it goes to
+  a report or telemetry.
 - **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;
   [`opens_further`](../crates/voice/src/opens_further.rs)). The lead's
   testers, 4 Nov: "whatever you ask the lamp, it only answers that; it never

@@ -1114,6 +1114,20 @@ fn serve(
         );
         engine = engine.sooner();
     }
+    // A wellbeing note says the current sitting, only with LAMP_DESK_TIME=on
+    // (#7694: the voice's follow-up knows what the nudge was about).
+    if watch::switched_on(
+        std::env::var(lamp_skills::DESK_TIME_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        eprintln!(
+            "lamp-skills: a note's {} says the current sitting ({})",
+            lamp_skills::SITTING_SLOT,
+            lamp_skills::DESK_TIME_ENVIRONMENT
+        );
+        engine = engine.telling_the_sitting();
+    }
     // A skill's [present] values stand in for its own, only with
     // LAMP_NUDGES_PRESENT=on (#5207); read at each load (`lamp_skills::load`).
     if lamp_skills::present_on() {

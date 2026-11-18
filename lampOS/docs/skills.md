@@ -1008,7 +1008,7 @@ had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
   the check above. Any other note is said as written, braces and all, as
   before slots: a lone `}`, `{a short break}`, two slots, `{{`, or a field
   the triggers do not give. A plain `say = "…"` and exact words (`text`)
-  keep their braces too. So a skill already on a lamp, made by voice, from
+  keep their braces too, but for a plain note's `{sitting}` (below). So a skill already on a lamp, made by voice, from
   the Store or pushed, never stops loading for a brace. A new skill is held
   to the slot at make, pack and install (`Skill::made_refuses`): a note
   whose braces are no slot is refused ("any other brace is said as
@@ -1023,6 +1023,34 @@ had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
 
 Tests (`crates/skills/src/lib.rs`):
 `a_note_says_one_number_from_the_reading_that_fired_it`.
+
+### The current sitting in a wellbeing note (#7694)
+
+A plain `say = "…"` note may hold `{sitting}` (`lamp_skills::SITTING_SLOT`):
+with `LAMP_DESK_TIME=on` in `lamp-skills`, it is filled with the person's
+current sitting at the desk from `room/activity`'s `sitting_s`, the value the
+nudge's own `[[while]]` waits on: "(Measured: at the desk 47 minutes, since
+14:12. Tell it only if asked, rounded.)". So the voice's follow-up to the
+nudge ("how long have I been here?") agrees with it instead of guessing; the
+voice's thread keeps a written note with its answer (its first 300 bytes, so
+the slot goes first). The voice's `desk_time` function goes with the same
+switch ([second-voice.md](second-voice.md)).
+
+- **Who has it.** Sip of water (both its notes), Stretch break and Rest your
+  eyes begin their note with it. It is filled only for a skill whose
+  `[permissions] topics` name `room/activity`, from that topic's newest value
+  that still lasts with a sitting under way.
+- **What it says.** The whole minutes, and with the local clock known
+  (`Engine::clock`), the clock time the sitting began; never the eyes' state
+  label, and only the current sitting, which the eyes begin again when
+  someone else sits down.
+- **Unchanged without it.** Switch off, no fresh value, away, or a skill not
+  given `room/activity`: the slot is dropped with the space after it, and the
+  note is the same note as before (every recorded case of the three skills
+  replays as before, the switch off).
+
+Tests (`crates/skills/src/lib.rs`):
+`a_wellbeing_note_says_the_sitting_only_with_the_switch`.
 
 ### Four additions to V2
 
