@@ -1341,6 +1341,77 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
     matches!(route, Route::Memory(..)) && name != crate::remember::RECALL
 }
 
+/// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`: only the exact value `on`; off. On
+/// the second route, a `remember` that kept nothing gives its line back to
+/// the journal ([`keep_back_if_kept_nothing`]).
+pub const REFUSED_KEEP_ENVIRONMENT: &str = "LAMP_REFUSED_KEEP_KEEPS_EXCHANGE";
+static REFUSED_KEEP_ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// The switch for one test's own thread ([`set_refused_keep_for_test`]):
+    /// the process switch is read once, and other tests read it off.
+    static REFUSED_KEEP_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` is on in this process, read once.
+pub fn refused_keep_keeps_exchange() -> bool {
+    #[cfg(test)]
+    if REFUSED_KEEP_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *REFUSED_KEEP_ON
+        .get_or_init(|| std::env::var(REFUSED_KEEP_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// The switch on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_refused_keep_for_test(on: bool) {
+    REFUSED_KEEP_FOR_TEST.with(|cell| cell.set(on));
+}
+
+/// Whether a `remember` answered `told` kept nothing and holds nothing: not
+/// `remembered`, and no keep `held` for a yes. A forget or recall is never.
+fn kept_nothing(name: &str, told: &Value) -> bool {
+    name == crate::remember::REMEMBER && told["remembered"] != true && told.get("held").is_none()
+}
+
+/// With `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` (lamp-06c1, 17 Nov, build
+/// 13894): a `remember` whose own [`keeps_out`] took request `request`'s
+/// exchange out of the journal (`marked`) and that then kept nothing, told
+/// so (`answered`: a refusal such as `keep_quietly::unheard`'s or
+/// `remember::heard::yes_alone`'s, or the memory's own "not kept"), gives
+/// the exchange back, as if `remember` had never been called. A line whose
+/// quiet keep was refused was otherwise stored nowhere. Decided after the
+/// call: a keep that kept, or is held for a yes, stays out, so nothing is
+/// stored twice; an exchange kept out before the call (another keep or a
+/// forget in the request, a gap's or a carried line's hold, a written
+/// reminder) stays out; a held keep run on the person's yes
+/// (`remember::heard::released`), a call with no answer (it may have kept)
+/// and a scope no longer current change nothing. Only the mark goes: the
+/// exchange keeps the scope and person it carries. Off, nothing changes.
+fn keep_back_if_kept_nothing(
+    call: &ToolCall,
+    request: u64,
+    marked: bool,
+    (told, answered): (&Value, bool),
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) {
+    if marked
+        && answered
+        && refused_keep_keeps_exchange()
+        && kept_nothing(&call.name, told)
+        && crate::remember::heard::released(lease).is_none()
+        && spoken_scope_current(lease, request, context)
+    {
+        crate::remember::keep_back(request);
+        eprintln!(
+            "lamp-voice second: request {request}: a remember that kept nothing leaves its exchange in the journal (LAMP_REFUSED_KEEP_KEEPS_EXCHANGE)"
+        );
+    }
+}
+
 /// One call answered to the end, for a voice route that waits for each
 /// call's answer before it goes on: the time from the lamp's clock, a
 /// decline answered, a call nobody here runs told so, any other run by
@@ -1481,12 +1552,18 @@ fn answer_inner(
         }
         Route::Nobody => ToolAnswer::plain(unavailable()),
         route => {
-            if keeps_out(&route, &call.name) {
-                crate::remember::keep_out(request);
-            }
+            let marked = keeps_out(&route, &call.name) && crate::remember::keep_out(request);
             let began = std::time::Instant::now();
             let (whom, mut answer, answered) =
                 run_spoken_call_inner(settings, &route, call, request, heard, context, lease);
+            keep_back_if_kept_nothing(
+                call,
+                request,
+                marked,
+                (&answer.told, answered),
+                lease,
+                context,
+            );
             // Kept only for the second voice's spoken turn, which takes it
             // out before its model reads the answer; the key is never a
             // model's (#1390).
@@ -4401,6 +4478,172 @@ mod tests {
             }
             std::fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    /// A known person's own scope for request `request`, as the second
+    /// route admits a line: `name`'s, never held by a gap.
+    fn own_scope(request: u64, name: &str) -> std::sync::Arc<crate::memory_scope::RequestScope> {
+        std::sync::Arc::new(crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([0x51; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            crate::memory_scope::ScopeSnapshot::of(name),
+        ))
+    }
+
+    /// A `remember` of `text` asked in heard line `request` (`line`), the
+    /// person's face `seen` saying it or not, with `LAMP_KEEP_QUIETLY` on and
+    /// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` as `on`: what the model is told,
+    /// and whether the exchange is kept out of the journal after.
+    fn quiet_keep(request: u64, line: &str, text: &str, seen: bool, on: bool) -> (Value, bool) {
+        let name = "Refused Keep Mai";
+        crate::thread::THREAD.lock().unwrap().line_of(request, line);
+        let person = crate::remember::person_id(name);
+        let speakers: &[String] = if seen { &["b9/f1".to_owned()] } else { &[] };
+        crate::keep_quietly::saw(
+            request,
+            &person,
+            speakers,
+            Some((name.to_owned(), "b9/f1".to_owned())),
+            false,
+        );
+        assert_eq!(crate::keep_quietly::seen_saying(request, &person), seen);
+        let owner = own_scope(request, name);
+        let lease = owner.lease();
+        // No memory answers here: a refusal never reaches it.
+        let settings = Settings {
+            memory: Some(PathBuf::from("/nonexistent/refused-keep-memory.sock")),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "keep".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": text}),
+        };
+        crate::keep_quietly::set_on_for_test(true);
+        set_refused_keep_for_test(on);
+        let told = answer_inner(&settings, &call, request, true, None, Some(&lease), false).told;
+        crate::keep_quietly::set_on_for_test(false);
+        set_refused_keep_for_test(false);
+        (told, crate::remember::kept_out(request))
+    }
+
+    /// lamp-06c1, 17 Nov, build 13894, the seed's haircut line: the model
+    /// kept a date quietly on a line the person was not seen saying, the
+    /// keep was refused (`keep_quietly::NOT_SEEN`), and its exchange had
+    /// been kept out of the journal before the call ran, so the line was
+    /// stored nowhere. With `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` the exchange
+    /// is journalled; off, it stays out, as before.
+    #[test]
+    fn a_quiet_keep_refused_as_not_seen_leaves_its_exchange_in_with_the_switch() {
+        let line = "I'm getting my hair cut on Thursday at five.";
+        let text = "Getting a haircut on Thursday at five.";
+        for (request, on) in [(13_894_101_u64, true), (13_894_102, false)] {
+            let (told, kept_out) = quiet_keep(request, line, text, false, on);
+            assert_eq!(told, crate::keep_quietly::not_seen(), "{on}");
+            assert_eq!(kept_out, !on, "switch {on}: the exchange kept out");
+        }
+    }
+
+    /// lamp-06c1, 17 Nov, build 13894, the seed's second bouldering line:
+    /// seen said, but the quiet keep had words the person did not say
+    /// (`keep_quietly::NOT_KEPT`): with the switch its exchange is
+    /// journalled.
+    #[test]
+    fn a_quiet_keep_refused_for_unsaid_words_leaves_its_exchange_in() {
+        let (told, kept_out) = quiet_keep(
+            13_894_103,
+            "I'm going bouldering again this Friday.",
+            "Goes bouldering with friends every Friday evening as a weekly habit.",
+            true,
+            true,
+        );
+        assert_eq!(told, crate::keep_quietly::not_kept());
+        assert!(!kept_out, "the exchange is journalled");
+    }
+
+    /// A keep that kept still keeps its exchange out, with the switch on:
+    /// the line is stored once, as the kept thing, never twice.
+    #[test]
+    fn a_keep_that_kept_still_keeps_its_exchange_out_with_the_switch() {
+        let request = 13_894_104;
+        let dir = schedule_directory("refused-keep-kept");
+        let socket = dir.join("memory.sock");
+        let owner = own_scope(request, "Refused Keep Mai");
+        let lease = owner.lease();
+        let served = scoped_reply(&socket, owner.clone(), false, json!({"ok":true,"id":1}));
+        let settings = Settings {
+            memory: Some(socket),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "keep".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": "My bike is blue."}),
+        };
+        set_refused_keep_for_test(true);
+        let told = answer_inner(&settings, &call, request, true, None, Some(&lease), false).told;
+        set_refused_keep_for_test(false);
+        served.join().unwrap();
+        assert_eq!(told["remembered"], true, "{told}");
+        assert!(crate::remember::kept_out(request), "no double");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Only a `remember` that kept nothing and holds nothing gives its line
+    /// back: a keep that kept or is held for a yes, and any forget, never.
+    /// An exchange kept out before the call (another keep or a forget in
+    /// the request, a gap's hold) stays out.
+    #[test]
+    fn only_a_remember_that_kept_nothing_gives_its_line_back() {
+        let remember = crate::remember::REMEMBER;
+        assert!(kept_nothing(remember, &crate::keep_quietly::not_seen()));
+        assert!(kept_nothing(remember, &crate::keep_quietly::not_kept()));
+        assert!(kept_nothing(
+            remember,
+            &json!({"remembered": false, "note": crate::remember::heard::YES_ALONE})
+        ));
+        assert!(kept_nothing(remember, &unavailable()));
+        assert!(!kept_nothing(remember, &json!({"remembered": true})));
+        assert!(!kept_nothing(
+            remember,
+            &json!({"remembered": true, "note": crate::remember::ALREADY_KEPT})
+        ));
+        assert!(!kept_nothing(remember, &crate::remember::held_keep_told()));
+        for forget in [crate::remember::FORGET, crate::remember::FORGET_EVERYTHING] {
+            assert!(
+                !kept_nothing(forget, &json!({"forgotten": false})),
+                "{forget}"
+            );
+        }
+        // Kept out before this call: the refused keep leaves it out.
+        let request = 13_894_105;
+        assert!(crate::remember::keep_out(request));
+        let marked = crate::remember::keep_out(request);
+        assert!(!marked);
+        let call = ToolCall {
+            id: "keep".into(),
+            name: remember.into(),
+            args: json!({"text": "x"}),
+        };
+        set_refused_keep_for_test(true);
+        keep_back_if_kept_nothing(
+            &call,
+            request,
+            marked,
+            (&crate::keep_quietly::not_seen(), true),
+            None,
+            None,
+        );
+        // No answer (the memory may have kept it): out too.
+        let other = 13_894_106;
+        assert!(crate::remember::keep_out(other));
+        keep_back_if_kept_nothing(&call, other, true, (&unavailable(), false), None, None);
+        set_refused_keep_for_test(false);
+        assert!(crate::remember::kept_out(request));
+        assert!(crate::remember::kept_out(other));
     }
 
     #[test]
