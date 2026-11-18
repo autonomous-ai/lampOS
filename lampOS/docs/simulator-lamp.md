@@ -160,7 +160,10 @@ is a sim bug (or a recorded, listed difference).
 5. Viewer smoke (headless Chrome): loads the glb, five bones move on a feed, ring shows 32
    distinct pixels, no console errors; screenshot kept as a CI artifact (never a camera frame).
 6. CI: a job on Linux and macOS: build lamp-sim and lamp-control for the host, start it, run 1,
-   2 and 5; conformance (3) is run by hand on the lamp for each release of the sim.
+   2 and 5; conformance (3) is run by hand on the lamp for each release of the sim. The Linux
+   job runs on every pull request it covers. The macOS job runs only after a merge (lamp-voice's
+   push) or by hand, never on a pull request or a train, so it never holds a train; a failure
+   there is reported on the Queue and fixed after.
 7. Host devices: a webcam/mic/speaker loop test on a developer machine (a manual checklist) and,
    in CI, fake devices (a test pattern as the camera, a tone as the mic, a null speaker).
 
