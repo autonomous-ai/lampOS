@@ -2774,15 +2774,19 @@ mod capture_wait_tests {
         let (socket, _peer) = UnixDatagram::pair().unwrap();
         rustix::io::write(&write, &[1]).unwrap();
         let calls = Cell::new(0);
-        let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(
+            &[socket.as_fd()],
+            false,
+            Instant::now(),
+            device(&read, &calls),
+        );
         assert_eq!(waited, Waited::Samples);
         assert_eq!(calls.get(), 1);
-        // The claim: it returned before its own timeout, so it was woken, not
-        // timed out. Not a few-millisecond bound, which a loaded macOS runner
-        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
-        // least WAIT_AT_MOST.
-        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
+        // The claim is that it was woken, not timed out, and the answer says
+        // so: a poll that ran out reports no readiness, so it would be
+        // `Timeout` or `Ticked`, never `Samples`. No wall-clock bound: a
+        // loaded macOS runner took 6.8 ms, then 43 ms (train 1042), to a
+        // wait that returned at once.
     }
 
     /// The stop comes on the coordinator's control socket: it ends the wait
@@ -2793,15 +2797,19 @@ mod capture_wait_tests {
         let (socket, peer) = UnixDatagram::pair().unwrap();
         peer.send(b"stop").unwrap();
         let calls = Cell::new(0);
-        let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(
+            &[socket.as_fd()],
+            false,
+            Instant::now(),
+            device(&read, &calls),
+        );
         assert_eq!(waited, Waited::Sockets);
         assert_eq!(calls.get(), 1);
-        // The claim: it returned before its own timeout, so it was woken, not
-        // timed out. Not a few-millisecond bound, which a loaded macOS runner
-        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
-        // least WAIT_AT_MOST.
-        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
+        // The claim is that it was woken, not timed out, and the answer says
+        // so: a poll that ran out reports no readiness, so it would be
+        // `Timeout` or `Ticked`, never `Sockets`. No wall-clock bound: a
+        // loaded macOS runner took 6.8 ms, then 35 ms (train 1042), to a
+        // wait that returned at once.
     }
 
     /// A block the device already holds (read ahead of the wait, as its
@@ -2827,12 +2835,19 @@ mod capture_wait_tests {
         let (read, _write) = pcm();
         let (socket, _peer) = UnixDatagram::pair().unwrap();
         let calls = Cell::new(0);
+        let given = Cell::new(Duration::MAX);
         let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(&[socket.as_fd()], false, started, |others, timeout| {
+            given.set(timeout);
+            device(&read, &calls)(others, timeout)
+        });
         assert_eq!(waited, Waited::Timeout);
         let took = started.elapsed();
         assert!(took >= WAIT_AT_MOST - Duration::from_millis(1), "{took:?}");
-        assert!(took < WAIT_AT_MOST * 3, "{took:?}");
+        // That it ends at its bound, not later, is the timeout it hands the
+        // poll: never more than WAIT_AT_MOST from the pass's start. Not a
+        // wall-clock ceiling, which a loaded macOS runner overshoots.
+        assert!(given.get() <= WAIT_AT_MOST, "{:?}", given.get());
     }
 
     /// A device that cannot be waited on, whose wait failed, or that woke
