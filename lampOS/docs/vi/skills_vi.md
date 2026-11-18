@@ -3518,7 +3518,8 @@ cả hai người viết.
   của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
   của skill bật (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; gọi bằng lời thì
   `LAMP_UPLOAD_TO_AGENT`), được nói lại như một task cho agent và chờ câu
-  đồng ý, và `made_with` là của agent. Nhật ký ghi `a skill made here:
+  đồng ý (khi bật `LAMP_MAKE_NO_ASKS`: bật ngay và nói một câu kèm cách
+  hoàn tác, xem "Không hỏi gì"), và `made_with` là của agent. Nhật ký ghi `a skill made here:
   judged not a quick reaction: to the agent (Hermes), its trigger and one
   task of the request; no DeepSeek draft kept`. Không tạo được (task tắt,
   quyền không công tắc nào cho), được nói rõ và không giữ gì; agent không
@@ -4849,9 +4850,16 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   hạn, bước kiểm tra gói, các quyền, `LAMP_TASK_NET` và namespace chạy không
   đổi. MAKE IT trong app cũng vậy, yêu cầu từ app là của chủ đèn. Kỹ năng có
   gửi đi (một lần ghi, hoặc code nhắn tin tới điện thoại) vẫn đọc lại và chờ
-  đồng ý, vì `lamp-services` gửi theo lời đồng ý đó. Kỹ năng của agent
-  (`LAMP_MAKE_NO_CANNOT`) được bật ngay và vẫn đọc lại tác vụ trước lần chạy
-  đầu.
+  đồng ý, vì `lamp-services` gửi theo lời đồng ý đó. Một task cho agent của
+  đèn trên trigger (dạng giữa, hoặc của `LAMP_MAKE_NO_CANNOT`) cũng được bật
+  ngay theo cách đó, lời đồng ý cho task được ghi cho đúng các quyền của
+  nó, và được nói bằng cùng một câu kèm cách hoàn tác, không bao giờ "It
+  runs only once you agree" và không chờ lời đồng ý nào
+  (`made_skill::agent_said_as`; người xây dựng đầu tiên, 01:26 trên
+  #7819): "say hi when I sit down" thành "Made sit hi. Say 'remove it' to
+  undo.", và "remove it" xóa nó. Các quyền, namespace chạy và việc giữ nó
+  ngoài mạng gia đình không đổi. Task chỉ chạy khi được gọi (không có
+  trigger) vẫn đọc lại task ở lần gọi đầu.
 - **Trùng thì thay thế, khi chủ đèn yêu cầu.** Một lần tạo bằng giọng nói
   không có code, trùng với kỹ năng trên đèn làm cùng một việc
   (`made_clash::same_found`), được bật trước; bật không được thì không đổi
