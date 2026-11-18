@@ -65,7 +65,7 @@ fn a_did_that_fails_its_check_is_never_kept() {
 #[test]
 fn the_switch_and_the_one_teller_are_named() {
     assert_eq!(ENVIRONMENT, "LAMP_DID_KEEP");
-    assert_eq!(TELLER, "skills");
+    assert_eq!(TELLERS, ["skills", "body"]);
 }
 
 /// The keeper reads the bus on a thread of its own and a turn only the
@@ -132,5 +132,93 @@ fn a_did_published_on_the_bus_is_kept() {
             .iter()
             .any(|d| d.why == "words from elsewhere")
     );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Heron on #7812: with the presence on the body makes about 90 shifts an
+/// hour and a turn to a call every 10 s; its dids must not push the skills'
+/// out of the shared 200.
+#[test]
+fn a_body_flood_never_pushes_the_skills_dids_out() {
+    let mut history = DidHistory::default();
+    for at in 0..120 {
+        history.keep(did(MINUTE + at, "a skill's"), MINUTE + at);
+    }
+    for at in 0..400 {
+        history.keep_from(
+            did(MINUTE + 200 + at, "the body's"),
+            true,
+            MINUTE + 200 + at,
+        );
+    }
+    let all = history.newest(MOST * 2, MINUTE + 700);
+    let body = all.iter().filter(|d| d.why == "the body's").count();
+    let skills = all.len() - body;
+    assert_eq!(body, BODY_MOST, "the body keeps at most its share");
+    assert_eq!(skills, MOST - BODY_MOST, "the skills keep at least theirs");
+    assert_eq!(all.len(), MOST);
+    // The body's own oldest went first: its newest are all there.
+    assert!(all.iter().take(BODY_MOST).all(|d| d.why == "the body's"));
+}
+
+#[test]
+fn skills_alone_still_fill_all_two_hundred() {
+    let mut history = DidHistory::default();
+    for at in 0..300 {
+        history.keep(did(MINUTE + at, "a skill's"), MINUTE + at);
+    }
+    assert_eq!(history.len(), MOST);
+    // And a body that tells a little leaves the rest to the skills.
+    for at in 0..10 {
+        history.keep_from(
+            did(MINUTE + 400 + at, "the body's"),
+            true,
+            MINUTE + 400 + at,
+        );
+    }
+    let all = history.newest(MOST, MINUTE + 500);
+    assert_eq!(all.iter().filter(|d| d.why == "the body's").count(), 10);
+    assert_eq!(all.len(), MOST);
+}
+
+/// Told by the body on the bus, a did takes the body's share: 150 of them keep
+/// 100, and the skills' did before them stays.
+#[test]
+fn dids_told_by_the_body_on_the_bus_take_the_bodys_share() {
+    use lamp_bus::Bus;
+    let dir = std::env::temp_dir().join(format!("dhb{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let bus = Bus::new(&dir).unwrap();
+    let mut skills = bus
+        .publisher_declared(LampDid::TOPIC, &LampDid::declaration(), "skills")
+        .unwrap();
+    let mut body = bus
+        .publisher_declared(LampDid::TOPIC, &LampDid::declaration(), "body")
+        .unwrap();
+    let history = watch_into(&bus, Arc::default()).expect("a keeper on a real bus");
+    std::thread::sleep(Duration::from_millis(200));
+    let now = lamp_ipc::monotonic_us();
+    skills.publish_json(now, &did(now, "the skill's")).unwrap();
+    for _ in 0..150 {
+        let at = lamp_ipc::monotonic_us();
+        body.publish_json(at, &did(at, "the body's")).unwrap();
+    }
+    let end = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let all = history
+            .lock()
+            .unwrap()
+            .newest(MOST, lamp_ipc::monotonic_us());
+        let body_kept = all.iter().filter(|d| d.why == "the body's").count();
+        if body_kept == BODY_MOST && all.iter().any(|d| d.why == "the skill's") {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < end,
+            "kept {body_kept} of the body's"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
     let _ = std::fs::remove_dir_all(&dir);
 }
