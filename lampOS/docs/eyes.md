@@ -1717,21 +1717,33 @@ With the switch:
   asked for their face in words, the model is told to ask nothing and
   never to say it will know them (`NOT_SEEN_NO_ASK`). Another person's name
   ("this is Tom") or a voice with no face seen saying it (a TV, someone off
-  camera) sends nothing. Without that route, `one_face` says only that one
-  face is in view, not whose voice it was, so the face question stays
-  (`ASK_FACE_FIRST`, even with `LAMP_NAME_LEARN_FIX` off): "I'm Anna" from a
-  TV, "This is my son Tom" then a yes to "Tom, right?", and "Remember my
-  face, this is Tom" are all asked; their own ask for their face counts
-  there only under a name they gave as their own ("Remember my face, my
-  name is Ada."). A `remember` of their own name while nobody is known
+  camera) sends nothing, and is not asked to look and say it again
+  (`NOT_SEEN` and `NOT_OWN_NAME` are told as below, `no_ask_speaker`).
+  **Not speaker-bound, nothing is kept and nothing is asked** (the first
+  builder 21:13, 18 Nov): without that route, `one_face` says only that one
+  face is in view, not whose voice it was, so no new face is kept past
+  setup (`no_ask_unkept`, even with `LAMP_NAME_LEARN_FIX` off): "I'm Ada",
+  "I'm Anna" from a TV, "This is my son Tom" then a yes to "Tom, right?",
+  and "Remember my face, this is Tom" send nothing, and the model is told
+  to ask nothing and say nothing about the face (`NOT_KEPT_NO_ASK`), not
+  the face question. Only when they asked in words for their face, under a
+  name they gave as their own ("Remember my face, my name is Ada.") or as a
+  yes to a face question, is the model told the plain reason ("I could not
+  see that the face in view was the one saying it"), still asking nothing
+  (`CANT_KEEP_NO_ASK`), as the eyes' own reason is told on the speaker
+  route. A rename agreed to and "Forget my face" are unchanged. A
+  `remember` of their own name while nobody is known
   (`LAMP_MEMORY_PERSONAL_NEEDS_FACE` with `LAMP_NAME_LEARN_FIX`) is told to
-  call `remember_my_face` at once, not to ask, only with
-  `LAMP_REMEMBER_SPEAKER` on too (`needs_face`). "Forget my face" is
-  unchanged. The setup walk's first save (`at_setup`, its read-back and face
-  question, `FACE_LEAVE`) is not this path and is unchanged. Off, as above
-  (`known_faces::tests::with_no_ask_and_no_speaker_proof_the_face_is_still_asked`,
+  call `remember_my_face` at once, not to ask, with `LAMP_REMEMBER_SPEAKER`
+  on too; without it, that nothing was kept, to ask nothing and say nothing
+  about it, but the plain reason if they asked for their face in words
+  (`needs_face::NAME_QUIET`). The setup walk's first save (`at_setup`, its
+  read-back and face question, `FACE_LEAVE`) is not this path and is
+  unchanged. Off, as above, the face question included
+  (`known_faces::tests::with_no_ask_and_no_speaker_proof_nothing_is_kept_or_asked`,
   `remember_speaker::tests::remember_speaker_with_no_ask_keeps_only_the_speakers_own_face`,
-  `needs_face::tests::with_no_ask_a_name_goes_to_the_face_save_unasked`).
+  `needs_face::tests::with_no_ask_a_name_goes_to_the_face_save_unasked`,
+  `needs_face::tests::with_no_ask_not_speaker_bound_a_name_keeps_nothing_and_asks_nothing`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a

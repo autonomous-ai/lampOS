@@ -108,9 +108,10 @@ pub fn name_learn_fix_on() -> bool {
 /// ([`run_speaker`], `LAMP_REMEMBER_SPEAKER`), a speaker naming themselves
 /// keeps their face at once and the lamp says only "I'll know you next
 /// time." ([`KEPT_NO_ASK`]); a face the eyes could not see alone keeps
-/// nothing and asks nothing ([`NOT_SEEN_NO_ASK`]). Without that proof the
-/// face question stays ([`ASK_FACE_FIRST`], Thirteen's and Heron's HOLDs on
-/// #7787). Who was here's question is not asked past setup
+/// nothing and asks nothing ([`NOT_SEEN_NO_ASK`]). Without that proof
+/// (Thirteen's and Heron's HOLDs on #7787) no face is kept and nothing is
+/// asked either, only a plain reason said to their own ask for their face
+/// ([`no_ask_unkept`], the first builder 21:13). Who was here's question is not asked past setup
 /// ([`no_ask_visits`]). Never the setup walk's first save (`at_setup`),
 /// whose asks are its own. Only with names checked; `on` only, off unless
 /// set.
@@ -937,6 +938,8 @@ pub(crate) fn refused_here(told: &Value) -> bool {
             SAY_IT_BACK,
             NOT_AGREED,
             ASK_FACE_FIRST,
+            NOT_KEPT_NO_ASK,
+            CANT_KEEP_NO_ASK,
         ]
         .contains(&error)
     })
@@ -2048,6 +2051,13 @@ pub(crate) const ASK_FACE_FIRST: &str = "I have not kept their face: a name is n
 /// one face, none, too far, the eye shut) for a save the person did not ask
 /// for in words ([`no_ask_told`]): nothing kept, and nothing asked.
 pub(crate) const NOT_SEEN_NO_ASK: &str = "Their face was not kept: I could not see only them clearly. Nothing was asked of them, so ask them nothing about it, don't tell them to try again, and never say you'll know them; just carry on with what they said.";
+/// With `LAMP_FACE_NO_ASK`: a new face with no proof it is the speaker's,
+/// past setup, the person not having asked for it ([`no_ask_unkept`]):
+/// nothing kept, nothing asked, nothing said about it.
+pub(crate) const NOT_KEPT_NO_ASK: &str = "Their face was not kept, and nothing was asked of them. Ask them nothing about it and say nothing about their face; just carry on with what they said.";
+/// With `LAMP_FACE_NO_ASK`: the same, when they asked in words for their
+/// face to be remembered ([`no_ask_unkept`]): the plain reason, nothing asked.
+pub(crate) const CANT_KEEP_NO_ASK: &str = "Their face was not kept: I could not see that the face in view was the one saying it. Tell them that plainly in a few words, in their language. Ask them nothing, and don't ask them to try again.";
 /// With `LAMP_FACE_NO_ASK`: beside a face kept with nothing asked, the one
 /// line the lamp says ([`no_ask_told`]).
 pub(crate) const KEPT_NO_ASK: &str = "Their face is kept, and nothing was asked of them. Say this, in their language: \"I'll know you next time. Say 'forget my face' to undo.\" Ask them nothing.";
@@ -2387,7 +2397,10 @@ fn run_scoped_into(
     if call.name != REMEMBER || !switches.remember_speaker {
         return run_for_with(socket, call, switches, person, line, None, replaced);
     }
-    let told = run_speaker(socket, call, switches, line, request, lease, replaced);
+    let mut told = run_speaker(socket, call, switches, line, request, lease, replaced);
+    if switches.face_no_ask && !switches.at_setup {
+        told = no_ask_speaker(told, call, line, request);
+    }
     record_told(socket, call, told, switches, person, line)
 }
 
@@ -2582,6 +2595,8 @@ pub fn refusal_reason(error: &str) -> &'static str {
         (NOT_OWN_NAME, "not_own_name"),
         (FACE_LEAVE, "face_leave"),
         (NOT_SEEN_NO_ASK, "not_seen_no_ask"),
+        (NOT_KEPT_NO_ASK, "not_kept_no_ask"),
+        (CANT_KEEP_NO_ASK, "cant_keep_no_ask"),
         (NAME_UNCHANGED, "name_unchanged"),
         (NOT_AGREED, "not_agreed"),
         (NEAR_TO, "near_to"),
@@ -2765,26 +2780,22 @@ fn run_switched(
     // "Call me Jay." goes to the eyes, whose "known as" answer holds the
     // rename for their yes, and two faces are the eyes' own refusal
     // (row-7422c on lamp-52e6, #7653).
-    // With `LAMP_FACE_NO_ASK`, this route keeps no face unasked: it has no
-    // proof the face in view is the speaker's (`one_face` is only one face
-    // in view; Thirteen's and Heron's HOLDs on #7787: a TV's "I'm Anna", or
-    // a parent's "This is my son Tom" and a yes to "Tom, right?"). A face
-    // is kept unasked only on the speaker-bound route ([`run_speaker`]);
-    // here the question stays, even with `LAMP_NAME_LEARN_FIX` off, and
-    // their own ask for their face counts only under a name they gave as
-    // their own ("Remember my face, this is Tom" is asked).
+    // With `LAMP_FACE_NO_ASK`, this route keeps no new face at all: it has
+    // no proof the face in view is the speaker's (`one_face` is only one
+    // face in view; Thirteen's and Heron's HOLDs on #7787: a TV's "I'm
+    // Anna", or a parent's "This is my son Tom" and a yes to "Tom,
+    // right?"). A face is kept unasked only on the speaker-bound route
+    // ([`run_speaker`]); here nothing is kept and nothing is asked (the
+    // first builder 21:13), even with `LAMP_NAME_LEARN_FIX` on, only the
+    // plain reason said to their own ask for their face ([`no_ask_unkept`]).
     let lamp_before = said.before.last().map(|(_, lamp)| lamp.as_str());
-    let leave = speaker_gave_face_leave(&said.this, lamp_before)
-        && !(switches.face_no_ask
-            && !lamp_before.is_some_and(asks_for_the_face)
-            && !speaker_named_self(name, &said.this));
-    if checked
-        && (switches.name_learn_fix || switches.face_no_ask)
-        && call.name == REMEMBER
-        && !replacing
-        && !setup
-        && !corrected
-        && !leave
+    let new_face = checked && call.name == REMEMBER && !replacing && !setup && !corrected;
+    if new_face && switches.face_no_ask {
+        return (no_ask_unkept(Some(name), &said.this, lamp_before), true);
+    }
+    if new_face
+        && switches.name_learn_fix
+        && !speaker_gave_face_leave(&said.this, lamp_before)
         && known_now(&known_file_of(socket)).is_none()
     {
         return (json!({"error": ASK_FACE_FIRST}), true);
@@ -2950,6 +2961,51 @@ fn no_ask_told(mut told: Value, answer: &Value, this: &str) -> Value {
         return json!({"error": NOT_SEEN_NO_ASK});
     }
     told
+}
+
+/// With `LAMP_FACE_NO_ASK`, past setup, a new face with no proof it is the
+/// speaker's own (the first builder 21:13): nothing kept, nothing asked.
+/// Their own ask for their face in `this`, their words, under a name they
+/// gave as their own or as a yes to the lamp's face question, is told the
+/// route's plain reason ([`CANT_KEEP_NO_ASK`]), as the eyes' own reason is
+/// told on the speaker route ([`no_ask_told`]); anything else, nothing to
+/// say about their face ([`NOT_KEPT_NO_ASK`]): a TV's "I'm Anna", a
+/// parent's yes to "Tom, right?", or "Remember my face, this is Tom".
+fn no_ask_unkept(name: Option<&str>, this: &str, lamp_before: Option<&str>) -> Value {
+    let asked = speaker_gave_face_leave(this, lamp_before)
+        && (lamp_before.is_some_and(asks_for_the_face)
+            || name.is_none_or(|name| speaker_named_self(name, this)));
+    json!({"error": if asked { CANT_KEEP_NO_ASK } else { NOT_KEPT_NO_ASK }})
+}
+
+/// [`run_speaker`]'s answer with `LAMP_FACE_NO_ASK`, past setup: its
+/// refusals for want of the face seen saying their own name
+/// ([`crate::remember_speaker::NOT_SEEN`], [`NOT_OWN_NAME`]), which ask
+/// them to look and say it again, are told as [`no_ask_unkept`]: nothing
+/// asked. Their words are the request's own when seen, else the turn's.
+fn no_ask_speaker(
+    told: (Value, bool),
+    call: &ToolCall,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    request: u64,
+) -> (Value, bool) {
+    let error = told.0.get("error").and_then(Value::as_str);
+    if !error
+        .is_some_and(|error| error == crate::remember_speaker::NOT_SEEN || error == NOT_OWN_NAME)
+    {
+        return told;
+    }
+    let window = crate::thread::THREAD
+        .lock()
+        .map(|thread| thread.names_window(1))
+        .unwrap_or_default();
+    let this = line
+        .filter(|line| line.request == request)
+        .and_then(|line| line.enrollment.as_ref())
+        .map_or(window.this.as_str(), |proof| proof.heard.as_str());
+    let lamp_before = window.before.last().map(|(_, lamp)| lamp.as_str());
+    let name = call.args.get("name").and_then(Value::as_str).map(str::trim);
+    (no_ask_unkept(name, this, lamp_before), told.1)
 }
 
 /// With `LAMP_FACE_NO_ASK` and Who was here's names on (the first builder
@@ -6409,16 +6465,19 @@ mod tests {
     }
 
     /// `LAMP_FACE_NO_ASK` on the route with no speaking-face proof
-    /// (Thirteen's and Heron's HOLDs on #7787): `one_face` is only one face
-    /// in view, so no face is kept unasked here. A voice off camera or on a
-    /// TV saying "I'm Anna" with one unknown face in view, a parent's "This
-    /// is my son Tom" and a yes to "Tom, right?", and "Remember my face,
-    /// this is Tom" are all asked ([`ASK_FACE_FIRST`]), with `LAMP_NAME_LEARN_FIX`
-    /// off too; their own ask under their own name, or a yes to the face
-    /// question, still keeps it. "Forget my face" still forgets; the setup
-    /// walk's first save is untouched.
+    /// (Thirteen's and Heron's HOLDs on #7787; the first builder 21:13):
+    /// `one_face` is only one face in view, so no new face is kept here and
+    /// nothing is asked. "I'm Ada", a TV or off-camera "I'm Anna", a
+    /// parent's "This is my son Tom" and a yes to "Tom, right?", and
+    /// "Remember my face, this is Tom" send nothing and are told to say
+    /// nothing about the face ([`NOT_KEPT_NO_ASK`]), with
+    /// `LAMP_NAME_LEARN_FIX` on or off. Their own ask under their own name,
+    /// or a yes to a face question, sends nothing either and is told the
+    /// plain reason, still asking nothing ([`CANT_KEEP_NO_ASK`]). Off, the
+    /// face question as before. "Forget my face" still forgets, a rename
+    /// still runs, and the setup walk's first save is untouched.
     #[test]
-    fn with_no_ask_and_no_speaker_proof_the_face_is_still_asked() {
+    fn with_no_ask_and_no_speaker_proof_nothing_is_kept_or_asked() {
         let switches = |face_no_ask: bool, name_learn_fix: bool| FaceSwitches {
             checked: true,
             rename_yes: true,
@@ -6438,8 +6497,8 @@ mod tests {
         let (socket, sent) = eyes(vec![
             json!({"remembered": "Tom", "replaced": []}),
             json!({"remembered": "Ada", "replaced": []}),
-            json!({"remembered": "Ada", "replaced": []}),
             json!({"forgot": true}),
+            json!({"remembered": "Ada", "replaced": ["Ana"]}),
         ]);
         let run = |on: bool, learn: bool, function: &str, name: &str, said: &Said| {
             run_switched(
@@ -6452,8 +6511,22 @@ mod tests {
             )
             .0
         };
-        // On: asked, nothing sent.
+        let asks = |told: &Value| {
+            let text = told.to_string();
+            [
+                "Shall I",
+                "May I",
+                "Should I",
+                "Do you want",
+                "Ask them only",
+            ]
+            .iter()
+            .any(|ask| text.contains(ask))
+        };
+        let face_question = "Nice to meet you, Ada! Shall I remember your face as Ada?";
+        // On: nothing kept, nothing asked, nothing said about the face.
         for (name, said) in [
+            ("Ada", Said::now("I'm Ada.")),
             ("Anna", Said::now("I'm Anna.")),
             ("Ada", Said::now("My name is Ada.")),
             ("Tom", after("This is my son Tom.", "Tom, right?", "Yes.")),
@@ -6461,10 +6534,32 @@ mod tests {
         ] {
             for learn in [true, false] {
                 let told = run(true, learn, REMEMBER, name, &said);
-                assert_eq!(told["error"], ASK_FACE_FIRST, "{learn} {said:?}: {told}");
+                assert_eq!(told["error"], NOT_KEPT_NO_ASK, "{learn} {said:?}: {told}");
+                assert!(!asks(&told), "{learn} {said:?}: {told}");
+                assert!(refused_here(&told));
             }
         }
-        // Off, as before: the face-leave clause keeps under any name.
+        // On, their own ask in words: the plain reason, nothing asked.
+        for said in [
+            Said::now("Remember my face, my name is Ada."),
+            after("My name is Ada.", face_question, "Yes."),
+        ] {
+            for learn in [true, false] {
+                let told = run(true, learn, REMEMBER, "Ada", &said);
+                assert_eq!(told["error"], CANT_KEEP_NO_ASK, "{learn} {said:?}: {told}");
+                assert!(!asks(&told), "{learn} {said:?}: {told}");
+                assert!(refused_here(&told));
+            }
+        }
+        // Off, as before: a name alone is asked; the face-leave clause
+        // keeps under any name.
+        for (name, said) in [
+            ("Ada", Said::now("I'm Ada.")),
+            ("Tom", after("This is my son Tom.", "Tom, right?", "Yes.")),
+        ] {
+            let told = run(false, true, REMEMBER, name, &said);
+            assert_eq!(told["error"], ASK_FACE_FIRST, "{said:?}: {told}");
+        }
         let off = run(
             false,
             true,
@@ -6473,25 +6568,27 @@ mod tests {
             &Said::now("Remember my face, this is Tom."),
         );
         assert_eq!(off["ok"], true, "{off}");
-        // On: their own ask under their own name, or a yes to the face
-        // question, keeps it, as before.
-        let own = run(
-            true,
-            true,
-            REMEMBER,
-            "Ada",
-            &Said::now("Remember my face, my name is Ada."),
-        );
-        assert_eq!(own["ok"], true, "{own}");
-        let yes = after(
-            "My name is Ada.",
-            "Nice to meet you, Ada! Shall I remember your face as Ada?",
-            "Yes.",
-        );
-        assert_eq!(run(true, true, REMEMBER, "Ada", &yes)["ok"], true);
+        let yes = after("My name is Ada.", face_question, "Yes.");
+        assert_eq!(run(false, true, REMEMBER, "Ada", &yes)["ok"], true);
         // "Forget my face" still forgets.
         let forgot = run(true, true, FORGET, "Ada", &Said::now("Forget my face."));
         assert_eq!(forgot["ok"], true);
+        // A rename agreed to still runs.
+        let rename = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ada", "replace": true}),
+        };
+        let renamed = run_switched(
+            &socket,
+            &rename,
+            switches(true, true),
+            &after("Call me Ada.", "Ada, did I get that right?", "Yes."),
+            None,
+            &mut None,
+        )
+        .0;
+        assert_eq!(renamed["ok"], true, "{renamed}");
         // The setup walk's first save is not this path: unchanged.
         let setup = run_switched(
             &socket,
@@ -6512,8 +6609,8 @@ mod tests {
             [
                 remember("Tom"),
                 remember("Ada"),
-                remember("Ada"),
                 json!({"forget": "Ada"}),
+                json!({"remember": "Ada", "one_face": true, "replace": true}),
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
@@ -6551,8 +6648,18 @@ mod tests {
             kept,
             json!({"visits": "no"}),
         ]);
-        let said = Said::now("Remember my face, my name is Ada.");
-        let run = |on: bool| run_switched(&socket, &save, switches(on), &said, None, &mut None).0;
+        // Past setup this route keeps no new face with the switch on
+        // (the first builder 21:13): a rename agreed to is kept.
+        let rename = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ada", "replace": true}),
+        };
+        let said = Said {
+            this: "Yes.".into(),
+            before: vec![("Call me Ada.".into(), "Ada, did I get that right?".into())],
+        };
+        let run = |on: bool| run_switched(&socket, &rename, switches(on), &said, None, &mut None).0;
         // On: taken, and the undo said once in the question's place.
         let told = run(true);
         assert_eq!(told["ok"], true, "{told}");
@@ -6610,7 +6717,7 @@ mod tests {
         };
         assert!(description(true).contains("keep my visits private"));
         assert!(!description(false).contains("keep my visits private"));
-        let remember = json!({"remember": "Ada", "one_face": true, "replace": false});
+        let remember = json!({"remember": "Ada", "one_face": true, "replace": true});
         let yes = json!({"visits_yes": "Ada"});
         assert_eq!(
             sent.join().unwrap(),
@@ -6621,8 +6728,8 @@ mod tests {
                 yes.clone(),
                 remember.clone(),
                 yes,
-                remember.clone(),
                 remember,
+                json!({"remember": "Ada", "one_face": true, "replace": false}),
                 json!({"visits_no": "Ada"}),
             ]
         );
