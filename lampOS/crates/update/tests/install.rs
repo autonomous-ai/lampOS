@@ -2863,6 +2863,29 @@ fn the_product_never_says_an_action_no_call_made() {
     );
 }
 
+/// A reply saying a made skill was removed, turned off or on, with no call
+/// that did it, is asked again, never said (`LAMP_SKILL_CLAIM_CHECKED`,
+/// #7730): on lamp-9adf a false "Space facts is off." came with no call.
+/// `on` once in `lamp-voice.service`, the one unit that reads it (passed to
+/// its second worker alone), and no other product unit names it.
+#[test]
+fn the_product_never_says_a_made_skill_change_no_call_made() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_CLAIM_CHECKED=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_SKILL_CLAIM_CHECKED"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
 /// A line that is only an installed skill's name said plainly ("photo
 /// booth", "run photo booth") calls that skill in code as round 1
 /// (`LAMP_SKILL_NAMED`, #6772, #6782): on lamp-52e6 at 12587 (13 Nov)

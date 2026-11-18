@@ -1788,7 +1788,9 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
 - **Không bao giờ nói sai rằng đã gỡ, đã tắt hay đã bật khi không có lời gọi
   nào làm việc đó** (#7683, `LAMP_SKILL_CLAIM_CHECKED`, chỉ `on`, mặc định
   tắt, cùng `LAMP_ACTION_CLAIM_CHECKED` và `LAMP_MAKE_SKILL`; chỉ chuyển cho
-  worker của tuyến thứ hai, chưa có trong unit sản phẩm). Trên lamp-9adf
+  worker của tuyến thứ hai; bật trong `lamp-voice` của sản phẩm từ lần bật
+  #7730, sau một câu sai "Space facts is off." không có lời gọi nào trên
+  lamp-9adf). Trên lamp-9adf
   (18/11 14:38, request 72) "Lamp, remove planet fact." chỉ được trả lời
   "planet fact" với `calls=none`, và "Yes." (request 73) được trả lời
   "planet fact is removed." với `calls=none`: không hỏi gì, không gỡ gì, kỹ
