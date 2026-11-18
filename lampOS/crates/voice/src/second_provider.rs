@@ -2244,6 +2244,9 @@ struct Shared {
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
     own_echo: bool,
+    /// `LAMP_CARE_LINE` (#7689): words of self-harm caught on a line, and
+    /// the fixed care line said after its answer ([`Engine::caring`]).
+    care: Option<Arc<crate::care_line::Care>>,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
     /// The last send try's attempt id ([`send_attempt_in_context`], #5853).
@@ -4130,6 +4133,26 @@ async fn play_fixed(
     kept_words: bool,
 ) -> bool {
     let line = shared.fixed(english);
+    play_words(
+        shared,
+        (request, heard_at),
+        (line, Some(english)),
+        why,
+        kept_words,
+    )
+    .await
+}
+
+/// [`play_fixed`]'s words `line`, its clip kept under `english` when it is
+/// one of the fixed lines (`None`: a line chosen as the lamp runs, such as
+/// the care line, #7689, streamed from the voice each time).
+async fn play_words(
+    shared: &Shared,
+    (request, heard_at): (u64, Instant),
+    (line, english): (&str, Option<&'static str>),
+    why: &str,
+    kept_words: bool,
+) -> bool {
     if !shared
         .emit(ProviderOutput::Transcript {
             request: Some(request),
@@ -4141,7 +4164,7 @@ async fn play_fixed(
         return false;
     }
     shared.said_piece(request, kept_words.then_some(line));
-    let kept = shared.fixed_clips.kept(english);
+    let kept = english.and_then(|english| shared.fixed_clips.kept(english));
     let ahead = kept.is_some();
     let mut first = true;
     let mut play = |samples: Vec<i16>| {
@@ -4199,7 +4222,7 @@ async fn play_fixed(
             }
             if played > 0 {
                 // Kept for the next time only when said whole.
-                if !failed {
+                if !failed && let Some(english) = english {
                     shared.fixed_clips.keep(english, clip);
                 }
                 break;
@@ -5197,6 +5220,7 @@ impl Engine {
                 wordless_bar: None,
                 name_as_a_sentence: false,
                 own_echo: false,
+                care: None,
                 spare: Mutex::new(None),
                 sent_write: Mutex::new(Vec::new()),
                 write_sent_in: Mutex::new(None),
@@ -6178,6 +6202,17 @@ impl Engine {
     /// run at its start or end is taken out of what the model is sent. A
     /// line adding words, or begun after its words and answering its offer
     /// or question, is never held. Before any turn only.
+    /// With `LAMP_CARE_LINE` (#7689): a line whose words say the person
+    /// might harm themselves ([`crate::care_line::said_harm`]) is told so
+    /// beside it, kept out of memory, and its answer is followed by the
+    /// fixed care line for the lamp's region and language.
+    pub fn caring(mut self, care: Option<Arc<crate::care_line::Care>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.care = care;
+        }
+        self
+    }
+
     pub fn holding_own_echo(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.own_echo = on;
@@ -12006,6 +12041,23 @@ async fn spoken(
             }
         }
     }
+    // `LAMP_CARE_LINE` (#7689): words of self-harm, or, within the hold
+    // after one, the person asking who they can call. The model is told,
+    // the exchange stays out of memory, and the care line follows the
+    // answer ([`answer`]). Everyone heard, no face asked first.
+    if let Some(care) = &shared.care {
+        let now = Instant::now();
+        if crate::care_line::said_harm(&text)
+            || (care.holds(now) && crate::care_line::asks_who_to_call(&text))
+        {
+            care.mark(request, now);
+            crate::remember::keep_out(request);
+            notes.insert(notes.len() - cut_in_told, crate::care_line::NOTE.to_owned());
+            eprintln!(
+                "lamp-voice second: request {request} is a care turn: the care line follows its answer (LAMP_CARE_LINE)"
+            );
+        }
+    }
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
@@ -16869,6 +16921,9 @@ async fn answer(
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
     let made_said = made_skill_said(&asked, &said);
     let heard_at = Instant::now();
+    // Whether the person asks who they can call: the care line again at
+    // once (`crate::care_line::AGAIN_AFTER`).
+    let care_asks = heard && crate::care_line::asks_who_to_call(&said);
     // The request's own words, for a forget it calls (#3113): never the
     // next line, which may be someone else's.
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
@@ -21495,6 +21550,35 @@ async fn answer(
         wrote
     };
     let ended = tokio::try_join!(writing, saying);
+    // `LAMP_CARE_LINE` (#7689): a care turn's fixed line, after whatever
+    // the model said or failed to say, unless a newer line took the turn.
+    // Never the model's words: the line for the lamp's region and language.
+    if let Some(care) = &shared.care
+        && !matches!(ended, Err(Stop::Gone))
+        && let Some(line) = care.line_after(request, Instant::now(), care_asks)
+    {
+        let line = line.to_owned();
+        if play_words(
+            shared,
+            (request, heard_at),
+            (&line, None),
+            "the care line, LAMP_CARE_LINE",
+            true,
+        )
+        .await
+        {
+            eprintln!("lamp-voice second: request {request}: the care line followed its answer");
+            // Its words are over again, as the answer's were: what reads
+            // the lamp's words line by line ends this one too.
+            let _ = shared
+                .emit(ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: String::new(),
+                    finished: true,
+                })
+                .await;
+        }
+    }
     if shared.note_tools
         && let Ok(noted) = turn_tools.lock()
     {

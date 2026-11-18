@@ -68,6 +68,7 @@ pub mod camera_config;
 pub mod camera_inspect;
 pub mod camera_worker;
 pub mod capture_cores;
+pub mod care_line;
 pub mod choreography;
 pub mod chosen_voice;
 pub mod code_lock;

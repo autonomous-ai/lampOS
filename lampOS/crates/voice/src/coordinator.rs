@@ -6663,6 +6663,10 @@ fn conversation_with_gate_inner(
     // the model; its own down line keeps the room's other lines quiet.
     let limit_local = model_refusing::limit_local_on();
     let mut model_refusing = model_refusing::ModelRefusing::default();
+    // With `LAMP_CARE_LINE=on` (#7689): words of self-harm heard hold what
+    // nobody asked for for 30 minutes, on either route.
+    let mut care_hold =
+        crate::care_line::on_from_environment().then(crate::care_line::Hold::default);
     // With `LAMP_SIGNED_OUT=on`: the login no longer accepted is said, and
     // turns wait for a new one.
     let signed_out_line = signed_out::switched_on();
@@ -7735,6 +7739,12 @@ fn conversation_with_gate_inner(
         let day_sheds = day_look
             .level(std::time::Instant::now(), crate::day_shed::wall_ms())
             .sheds();
+        // After words of self-harm (#7689): a skill's say, a computer's turn,
+        // news and a run's waiting result wait; the reminders the person set
+        // still go.
+        let care_holds = care_hold
+            .as_ref()
+            .is_some_and(|hold| hold.holds(std::time::Instant::now()));
         if paused != was_paused {
             was_paused = paused;
             refused_while_paused = false;
@@ -8775,6 +8785,20 @@ fn conversation_with_gate_inner(
             }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
+            }
+            if let (
+                Some(hold),
+                ProviderOutput::Transcript {
+                    request: None,
+                    text,
+                    finished,
+                },
+            ) = (care_hold.as_mut(), &event)
+                && hold.heard(text, *finished, std::time::Instant::now())
+            {
+                eprintln!(
+                    "lamp-voice: words of self-harm heard: what nobody asked for is held for 30 min, reminders aside (LAMP_CARE_LINE)"
+                );
             }
             // A call's line whose own turn ended without `StepCallHeard`
             // (#3923): its words were more than the name, or none, and the
@@ -13140,6 +13164,7 @@ fn conversation_with_gate_inner(
                         last_capture,
                     )
                     && playback_mask.available(say_now_us)))
+            && !care_holds
             && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             // The model service refusing (#4265, the lead's call on #1711):
             // while turns are held, a skill's fixed words are said as they
@@ -13355,6 +13380,7 @@ fn conversation_with_gate_inner(
                 && snapshot.listening_ready(MonoTime::from_micros(control_now_us))
                 && playback_mask.available(control_now_us)
                 && !(refused_hold && model_refusing.holds(control_now_us))
+                && !care_holds
                 && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
                 && let Some((prompt, _, ticket)) = says.take_turn_start(control_now_us)
             {
@@ -14076,6 +14102,7 @@ fn conversation_with_gate_inner(
                 || said_at_us
                     .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
             && !room.busy()
+            && !care_holds
             && reply.is_none()
             && provider_queue.is_empty()
             && !admission.owns_stream()
@@ -14155,6 +14182,7 @@ fn conversation_with_gate_inner(
                 || said_at_us
                     .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
             && !room.busy()
+            && !care_holds
             && reply.is_none()
             && provider_queue.is_empty()
             && !admission.owns_stream()

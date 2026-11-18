@@ -4072,6 +4072,24 @@ pub fn serve(
         );
         engine = engine.holding_own_echo(true);
     }
+    // `LAMP_CARE_LINE` (#7689): words of self-harm answered with care, and
+    // the fixed care line for the lamp's region and language after it.
+    if crate::care_line::on_from_environment() {
+        let region = crate::second_provider::region_from_file()
+            .map(|region| region.trim().to_owned())
+            .filter(|region| !region.is_empty());
+        let language =
+            crate::language::from_environment().map_or("en", crate::language::Language::code);
+        eprintln!(
+            "lamp-voice second: words of self-harm are answered with care and the care line for region {} in {language} (LAMP_CARE_LINE)",
+            region.as_deref().unwrap_or("not known")
+        );
+        engine = engine.caring(Some(std::sync::Arc::new(crate::care_line::Care::new(
+            crate::care_line::CareLines::shipped(),
+            region,
+            language,
+        ))));
+    }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)
         .ok()
