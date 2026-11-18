@@ -49,23 +49,36 @@ What a skill can do, all of it in format.md and examples/:
   examples/water-breaks. Once in or at a time is the lamp's reminders', not
   a skill's.
 - **Its own code**: a `task` step running scripts/main.py, Python with the
-  lamp's `lampos` SDK. Any call sdk.md lists may be used: light, say,
-  gesture, events (`lamp.on`), leases, notes, the device, the air, the
-  camera, and more. Its `grants` name what the code uses: body, light,
-  speak, look, hear, sound, air, device, camera, microphone, notes, speech,
-  or a linked service's `<code>-read` / `<code>-write`. Light, speak and body
-  go on at once; the others the owner says yes to once. Loops, waits and
-  several steps in one script are fine; examples/breathing-coach.
+  lamp's `lampos` SDK. This is the widest thing a skill can do, so use it
+  whenever steps alone fall short: any call sdk.md lists (light, say,
+  gesture and the body, sounds, events with `lamp.on`, leases, notes, the
+  device, the air, the camera, the microphone, speech, linked services),
+  loops, waits, sums, several steps in order, and Python's own standard
+  library; examples/breathing-coach.
+- **Its `grants` must name every grant its code's calls need**, as sdk.md
+  gives each call's grant: body, light, speak, look, hear, sound, air,
+  device, camera, microphone, notes, speech, net, or a linked service's
+  `<code>-read` / `<code>-write`. A call whose grant isn't named is refused
+  when the skill runs, and the lamp's check can't see that in the code:
+  check each call against sdk.md yourself. Code that talks needs `speak`
+  (`lamp.say`); code that keeps a note needs `notes`. Light, speak and body
+  go on at once; the others the owner says yes to once.
 - **The internet, when rules.md allows `net`**: what only the web knows at
   the time it runs (a price, the weather, the news, a search) is the skill's
-  own code granted `net`: `grants = ["net", "speak"]`, and scripts/main.py
-  fetches it and says it with `lamp.say`; examples/exchange-rate. Use
-  Python's own `urllib.request` (no packages to install), a public HTTPS
+  own code granted `net` beside `speak`: `grants = ["net", "speak"]`, and
+  scripts/main.py fetches it and says it with `lamp.say`;
+  examples/exchange-rate. Light, body, sound, air and device may join them.
+  Use Python's own `urllib.request` (no packages to install), a public HTTPS
   API that needs no key, a `timeout` of 15 s or less, and a plain spoken
   line when the fetch fails. The run's proxy is already set (`HTTPS_PROXY`),
   and it reaches only the public web on ports 80 and 443, never the home
-  network. `net` never sits beside camera, microphone, speech, notes, look
-  or a service grant: a skill needing both is two skills. Again every N
+  network.
+- **The one limit with `net`**: it never sits beside a private grant
+  (notes, camera, microphone, speech, look, or a linked service), so
+  nothing private leaves the lamp; the check refuses the pair. So a net
+  skill keeps nothing between runs: for "how much it changed", ask the API
+  for its own change (e.g. a 24-hour change), never `lamp.notes`. A request
+  needing both the web and a private grant is two skills. Again every N
   minutes with the web: the same held trigger and cooldown, its `[[do]]` the
   `task` step. When rules.md doesn't allow `net`, answer its internet line.
 
@@ -73,8 +86,8 @@ How a skill runs, so its code fits:
 
 - The lamp starts a `task` step's scripts/main.py on its own each time the
   skill starts: by its words, its trigger, or its repeat. One run at a time;
-  keep a run short (a fetch and a line or two) and keep nothing between runs
-  but `notes`.
+  keep a run short (a fetch and a line or two). Only `notes` lasts from one
+  run to the next, and a skill granted `net` has none.
 - What the person hears is what the code says with `lamp.say(text)` (said
   exactly, within 900 bytes; `wait=True` to say lines in order). Anything
   printed is not said.
