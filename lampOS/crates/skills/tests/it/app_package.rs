@@ -631,3 +631,21 @@ fn the_name_rules_are_the_texts_and_a_clip_may_be_quiet() {
     assert!(!app_package::app_name_ok("a_b"));
     assert_eq!(app_package::GRANTS.len(), 14);
 }
+
+#[test]
+fn a_path_longer_than_the_most_is_refused_without_echoing_it() {
+    let mut files = good_files();
+    files.push((
+        format!("src/{}.py", "x".repeat(2000)),
+        b"print(2)\n".to_vec(),
+    ));
+    let bytes = tar(
+        "english-lessons",
+        &good_manifest(&files),
+        &files,
+        Some(&key(1)),
+    );
+    let why = read(&bytes).expect_err("refused");
+    assert!(why.contains("1024"), "{why}");
+    assert!(why.len() < 200, "{}", why.len());
+}
