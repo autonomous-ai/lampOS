@@ -507,7 +507,10 @@ mod tests {
     /// says the one line and asks nothing; another person's name ("this is
     /// Tom") sends nothing; a voice with no face seen saying it (a TV, off
     /// camera) sends nothing; two faces in view keep nothing and ask
-    /// nothing. Off, kept as before with no line.
+    /// nothing. Neither of the first two asks them to look and say it again
+    /// (the first builder 21:13: [`known_faces::NOT_KEPT_NO_ASK`]). Off, kept
+    /// as before with no line, and the voice with no face seen still told
+    /// [`NOT_SEEN`].
     #[test]
     fn remember_speaker_with_no_ask_keeps_only_the_speakers_own_face() {
         let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -536,6 +539,7 @@ mod tests {
                 own_name_exchange_with(words, "Tom", false, no_ask, json!({"remembered": "Tom"}));
             assert!(requests.is_empty(), "{words}: {requests:?}");
             assert!(answer.get("ok").is_none(), "{words}: {answer}");
+            assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{words}");
         }
         // Two faces in view: nothing kept, nothing asked, never "I'll know you".
         let (answer, _) = own_name_exchange_with(
@@ -550,16 +554,22 @@ mod tests {
         // A voice with no face seen saying it: refused before the eyes.
         let home = crate::process::SessionDirectory::create().unwrap();
         let owner = owner();
-        let (answer, _) = known_faces::run_scoped(
-            &home.path.join("no-eyes.sock"),
-            &call(json!({"name": "Anna"})),
-            no_ask,
-            None,
-            None,
-            REQUEST,
-            Some(&owner.lease()),
-        );
-        assert_eq!(answer["error"], NOT_SEEN, "{answer}");
+        let unseen = |switches| {
+            known_faces::run_scoped(
+                &home.path.join("no-eyes.sock"),
+                &call(json!({"name": "Anna"})),
+                switches,
+                None,
+                None,
+                REQUEST,
+                Some(&owner.lease()),
+            )
+            .0
+        };
+        let answer = unseen(no_ask);
+        assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{answer}");
+        assert!(!asks(&answer), "{answer}");
+        assert_eq!(unseen(switches())["error"], NOT_SEEN);
         // Off: kept as before, with no line.
         let (answer, _) =
             own_name_exchange("I'm Ada.", "Ada", false, true, json!({"remembered": "Ada"}));
