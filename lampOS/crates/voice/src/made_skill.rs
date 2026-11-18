@@ -5111,6 +5111,15 @@ fn code_held(
             }
         }
     }
+    // Never `net` beside a private grant (Heron's P1 on #7590), as
+    // lamp-skills refuses it at load: refused here in words, so no such
+    // code is said back and given a yes that never goes on (Twelve's P2
+    // on #7780).
+    if let Some(private) = crate::skill_task_yes::private_beside_net(&grants) {
+        return Err(scripts_not_held(&crate::upload_agent::net_beside_private(
+            private,
+        )));
+    }
     Ok(grants)
 }
 
@@ -16621,6 +16630,31 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             checked += 1;
         }
         assert!(checked > 50, "{checked}");
+    }
+
+    /// Twelve's P2 on #7780: with `LAMP_TASK_NET_GATEWAY` on, a made
+    /// skill's own code granted `net` beside a private grant is refused at
+    /// the check, in words its repair can act on, so it is never said back
+    /// and given a yes that lamp-skills then refuses at load. `net` alone,
+    /// or beside `speak`, is still kept.
+    #[test]
+    fn with_gateway_net_code_granted_net_beside_a_private_grant_is_refused() {
+        set_scripts_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(true));
+        crate::skill_task_yes::set_gateway_net_here(Some(true));
+        let with = |grants: &str| CODE_TOML.replace(r#"grants = ["camera", "light"]"#, grants);
+        let kept = put_on_cap(&with(r#"grants = ["net", "speak"]"#));
+        assert!(kept.is_ok(), "{:?}", kept.err());
+        for private in ["notes", "camera"] {
+            let refused = put_on_cap(&with(&format!(r#"grants = ["net", "speak", "{private}"]"#)))
+                .expect_err(private);
+            assert_eq!(refused.0, SCRIPTS_NOT_HELD, "{private}");
+            let repair = refused.1.unwrap_or_default();
+            assert!(repair.contains("one skill can't do both"), "{repair}");
+        }
+        crate::skill_task_yes::set_gateway_net_here(None);
+        crate::skill_task_yes::set_net_here(None);
+        set_scripts_here(None);
     }
 
     /// The manage helper holds a made package's code again as it puts it on

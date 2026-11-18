@@ -6195,7 +6195,12 @@ the same code for both writers.
   `lamp-skills-manage@` (lamp-9adf, 18 Nov 21:37: the helper, without it,
   refused a kept bitcoin-price skill "a grant the lamp doesn't have: net").
   The switch off, `net` stays only beside the lamp's own `scripts/agent.py`.
-  Test: `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`.
+  `code_held` still refuses `net` beside a private grant (`notes`, `camera`
+  and the like), in the repair's words "one skill can't do both: make it
+  two skills", as lamp-skills refuses it at load, so no such code is said
+  back and given a yes that never goes on (Twelve's P2 on #7780).
+  Tests: `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`,
+  `made_skill::tests::with_gateway_net_code_granted_net_beside_a_private_grant_is_refused`.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
