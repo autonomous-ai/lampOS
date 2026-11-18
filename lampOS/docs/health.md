@@ -262,6 +262,30 @@ the health is worked out it gets one more item, `selftest`
   is then `error` too, with that as its message.
 - **The lamp's USB hub dropped** (the newest run's `voice_mic` says `usb_hub_said`): `warn` with that line when nothing failed, and before the failed parts' message when something did (so the line's 160-byte cap never cuts it). Beside failed parts, when the whole line won't fit, it's the self-test's short form (`usb_hub_said_short`: "the lamp's USB hub dropped 2 times since boot, with the voice mic, servo port, speaker/room mic and camera"), so the part's name still fits and at worst the end of its reason is cut; until a run's `voice_mic` says nothing of it. `lamp-health` can't read the kernel's log itself (it runs as `lampos`, without `CAP_SYSLOG`), so it takes the self-test's word.
 - **A fault from before an update:** "a fault seen before this update, which this self-test could not check: PART (REASON), …". Alone it is `warn`, after the hub's line if there is one; beside a part failing now it is named after the failed parts, inside the `error`, where the 160-byte cap cuts it first.
+- **The board's heat, cleared once it has cooled** (#7718 item 5):
+  a run that failed the board on heat names the zone, its reading and the
+  limit (`hot_zone`, `hot_c`, `hot_limit_c`). `serve` reads those same
+  zones itself every 5 s (`board/state` is what the self-test's board check
+  reads). Once every reading for 30 s (`parts::HEAT_CLEARS_AFTER`,
+  `Times::heat_clears_after`) has had the hottest zone 5 °C or more under
+  that limit (`parts::HEAT_CLEARS_BELOW_C`: under 80 °C for the self-test's
+  85), the board's fail is dropped (`SelfTests::cooled`), said once ("the
+  self-test's heat fail of the board is cleared: …"), and the ok item reads
+  "passed; the computer was hot during the run and has cooled (ZONE C)"
+  until the next run. A reading at or over that line, or with no zone,
+  begins the 30 s again, so a board that stays hot keeps its `error`. Only a
+  heat fail clears so: a full disk, a stale `board/state`, or a heat fail
+  from a self-test before these values stands until a run passes the board,
+  and another part's fail is never touched. A later run that fails the
+  board on heat again makes the lamp `error` again and starts the 30 s
+  over; a run that cannot check the board leaves the heat fail, and its
+  clearing, as they were. This is safe because the live heat is still
+  judged every 5 s by the board's own item ([the board](#the-board)): past
+  a processor zone's first trip point (70 °C) it is `warn`, past its second
+  (90 °C) `error`. On lamp-0c89 on 18 Nov the passive run failed the board
+  at 92 °C under the setup walk (14:37:14), its second look half a minute
+  later found it still hot, and the lamp stayed `error` with its zones at
+  74 °C until the next run, six hours on.
 - **None failed:** `ok`, `passed`, or `passed; N not checked` for the newest
   run. An ok item lowers nothing.
 - **Its age** is since the newest run began, by the wall clock. It is never
@@ -461,6 +485,10 @@ A line whenever the lamp's level becomes another, with the lamp's message:
     lamp-health: health ok
     lamp-health: health ok -> warn: board: cpul_thermal_zone is at 66 °C: the board slows itself down from 70
     lamp-health: health warn -> ok
+
+A line when the self-test's heat fail of the board is cleared (#7718 item 5):
+
+    lamp-health: the self-test's heat fail of the board is cleared: its zones have read 5 °C or more under its limit since (hottest now cpul_thermal_zone 74 °C)
 
 And each trouble of the table below once when it begins and once when it
 ends. Nothing else: no line for a report, a reading or a publish.

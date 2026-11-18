@@ -272,7 +272,15 @@ pub fn board(heard: &Heard<BoardState>) -> PartResult {
     if let Some((sensor, &c)) = hottest
         && c >= HOT_C
     {
-        return PartResult::new(part, Verdict::Fail, &format!("{sensor} is at {c:.0} °C"));
+        // The zone, its reading and the limit go beside the reason, so that
+        // `lamp-health`, which reads the same zones every 5 s, can tell a
+        // heat fail from the board's other fails and clear it once the
+        // board has cooled (#7718 item 5, `SelfTests::cooled` there). A
+        // `lamp-health` from before these values ignores them.
+        return PartResult::new(part, Verdict::Fail, &format!("{sensor} is at {c:.0} °C"))
+            .with(lamp_msgs::BOARD_HOT_ZONE, sensor)
+            .with(lamp_msgs::BOARD_HOT_C, format!("{c:.1}"))
+            .with(lamp_msgs::BOARD_HOT_LIMIT_C, format!("{HOT_C:.1}"));
     }
     if state.disk_free < DISK_FREE_LEAST {
         return PartResult::new(
@@ -657,6 +665,26 @@ mod tests {
         assert!(hot.reason.contains("cpu is at 91"), "{}", hot.reason);
         let full = board(&seen(1_000, board_state(55.0, 0.01)));
         assert!(full.reason.contains("all but full"), "{}", full.reason);
+        // Only a heat fail names its zone, reading and limit (#7718 item 5):
+        // lamp-health clears that fail alone once the board has cooled.
+        let value = |result: &PartResult, key: &str| {
+            result
+                .values
+                .iter()
+                .find(|v| v.key == key)
+                .map(|v| v.value.clone())
+        };
+        assert_eq!(
+            value(&hot, lamp_msgs::BOARD_HOT_ZONE).as_deref(),
+            Some("cpu")
+        );
+        assert_eq!(value(&hot, lamp_msgs::BOARD_HOT_C).as_deref(), Some("91.0"));
+        assert_eq!(
+            value(&hot, lamp_msgs::BOARD_HOT_LIMIT_C).as_deref(),
+            Some("85.0")
+        );
+        assert_eq!(value(&full, lamp_msgs::BOARD_HOT_LIMIT_C), None);
+        assert_eq!(value(&fine, lamp_msgs::BOARD_HOT_LIMIT_C), None);
     }
 
     fn health_with(eyes: Option<(Level, &str)>) -> Health {
