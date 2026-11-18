@@ -52,6 +52,14 @@ fn on(keeping: &Keeping) -> (Vec<String>, Vec<String>) {
     (made, added)
 }
 
+/// The skills the person made on the lamp, newest first, as [`listed`]
+/// counts them: every count said of them comes from here (lamp-9adf, 17
+/// Nov: the list said eighteen, a remove that found none said nineteen,
+/// counting those off and added from a file too).
+pub fn made_on(keeping: &Keeping) -> Vec<String> {
+    on(keeping).0
+}
+
 /// `names`' newest [`NAMED_MOST`], as said.
 fn said(names: &[String]) -> Vec<String> {
     names

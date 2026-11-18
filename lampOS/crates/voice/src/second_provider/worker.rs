@@ -4380,6 +4380,11 @@ pub fn serve(
         );
     }
     engine = engine.keeping_at_once(keep_at_once);
+    // A voice make offered: its opening for a bare make_skill call rendered
+    // ahead in the owner's language (#7554).
+    engine = engine.rendering_make_opening(
+        std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on"),
+    );
     // A reply that claims a light, volume or Schedule action in the acting
     // part's own words, with no call of that kind, is never said as it is
     // (`LAMP_ACTION_CLAIM_CHECKED=on`, #5215).
@@ -6122,9 +6127,14 @@ async fn run_call(
     // its line is then said through the say service ([`made_running`]), at
     // the product's socket: a worker is given no `LAMP_SAY_SOCKET`.
     if made {
-        return made_running(request, running, |line| {
-            crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
-        })
+        return made_running(
+            request,
+            running,
+            |line| {
+                crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
+            },
+            crate::make_skill_local::went_on_after,
+        )
         .await;
     }
     tokio::task::spawn_blocking(running)
@@ -6139,12 +6149,24 @@ async fn run_call(
 /// the lamp's own echo cut "I'll make it", the skill was made and put on,
 /// and the person never heard so) gives that round no answer: the make
 /// goes on, and its line ([`crate::make_skill_local::take_said_line`]) is
-/// given to `say` on a thread of its own, once. Under way, and until that
-/// line is said, the make is [`crate::make_skill_local::Pending`].
+/// given to `say` on a thread of its own, once. What it came to
+/// ([`crate::make_skill_local::Outcome`]) is read from the make itself,
+/// never from the answer, which a cut turn's lapsed scope makes an `error`
+/// whatever the make kept (#7554's ROW at 2e864a0, request 86). A clash is
+/// always said: its skill is made and waits for the person's choice, and a
+/// later line is told it too (`crate::made_clash::waiting_note`). A make
+/// that failed says nothing only when the person went on with a line of
+/// their own after it (`went_on`: heard with words, and answered; lamp-9adf,
+/// 17 Nov 18:10, "I couldn't make that" said 88 s after the next ask); a
+/// sound with no words, or a line held as not said to the lamp, is no
+/// going on, and its failure is said (#7554's ROW, requests 6, 17 and 57).
+/// Under way, and until that line is said, the make is
+/// [`crate::make_skill_local::Pending`].
 fn made_running(
     request: u64,
     work: impl FnOnce() -> crate::tools::ToolAnswer + Send + 'static,
     say: impl FnOnce(String) + Send + 'static,
+    went_on: impl FnOnce(u64) -> bool + Send + 'static,
 ) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
     let pending = crate::make_skill_local::Pending::begin();
     let (given, answered) = tokio::sync::oneshot::channel();
@@ -6157,22 +6179,37 @@ fn made_running(
         // The agent's waiting line goes to this request's turn (#6749).
         crate::make_skill_agent::set_made_for(request);
         // Nothing an earlier call left on this thread is taken as this one's.
-        let _ = crate::make_skill_local::take_said_line();
+        let _ = crate::make_skill_local::take_said_outcome();
         let answer = work();
         crate::make_skill_agent::set_made_for(0);
-        let line = crate::make_skill_local::take_said_line();
+        let made = crate::make_skill_local::take_said_outcome();
         if given.send(answer).is_ok() {
             drop(pending);
             return;
         }
-        let Some(line) = line else {
+        use crate::make_skill_local::Outcome;
+        let Some((line, outcome)) = made else {
             eprintln!(
                 "lamp-voice second: request {request}: its turn was cut while make_skill ran, and nothing was made to say"
             );
             return;
         };
+        // Failed, and the person went on since (lamp-9adf, 17 Nov 18:10: a
+        // make cut by the next ask failed 88 s later, and "I couldn't make
+        // that" was said in a later, unrelated turn): nothing is said.
+        if outcome == Outcome::Failed && went_on(request) {
+            eprintln!(
+                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and it kept nothing; the person went on with a line of their own: nothing is said"
+            );
+            return;
+        }
         eprintln!(
-            "lamp-voice second: request {request}: its turn was cut while make_skill ran: the made skill's line is said through the say service"
+            "lamp-voice second: request {request}: its turn was cut while make_skill ran, {}: its line is said through the say service",
+            match outcome {
+                Outcome::Made => "and the skill was made",
+                Outcome::Clash => "and the made skill clashes, its choice waiting",
+                Outcome::Failed => "and it kept nothing, the person not gone on",
+            }
         );
         // No model round saw the make's answer, so its wait is an app
         // make's: the line after the say-back must answer it (#7245).
@@ -14316,6 +14353,14 @@ fn keep_scoped(
             // the thread's ([`crate::remember::forgetting_reply`]).
             if crate::remember::forgetting_reply(*request) {
                 skipped(*request, "a forget's answer", text);
+                return;
+            }
+            // The make's opening, the lamp's own or the model's same words,
+            // is said but never the thread's: the model copied it from
+            // there and claimed makes done with no call (lamp-9adf, 18 Nov,
+            // #7554; [`crate::make_skill_agent::is_opening`]).
+            if crate::make_skill_agent::is_opening(text) {
+                skipped(*request, "the make's opening", text);
                 return;
             }
             // Sentences come trimmed, those after the first with a space
@@ -23577,6 +23622,57 @@ mod tests {
             None,
         );
         assert!(!crate::remember::forgetting_reply(request));
+        *crate::thread::THREAD.lock().unwrap() = before;
+    }
+
+    /// lamp-9adf, 18 Nov (#7554): the make's opening, in English or the
+    /// owner's language, is said but never kept in the thread as the lamp's
+    /// words, so the model never sees it as its own reply to copy; the rest
+    /// of the answer is kept.
+    #[test]
+    fn the_make_opening_never_enters_the_history() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let request = u64::MAX - 7_554;
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let before = std::mem::take(&mut *thread);
+        drop(thread);
+        let japanese = crate::language::fixed_in(
+            Some(crate::language::Language::Japanese),
+            crate::make_skill_agent::MAKE_OPENING,
+        );
+        for text in [
+            crate::make_skill_agent::MAKE_OPENING.to_owned(),
+            format!(" {japanese}"),
+            " Made cat joke.".to_owned(),
+        ] {
+            super::keep_scoped(
+                &ProviderOutput::Transcript {
+                    request: Some(request),
+                    text,
+                    finished: false,
+                },
+                None,
+                None,
+                None,
+            );
+        }
+        let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+            None,
+            Instant::now(),
+            Duration::from_secs(60),
+            8,
+        );
+        let lamp: Vec<String> = recent.iter().map(|recent| recent.lamp.clone()).collect();
+        assert!(
+            lamp.iter().any(|lamp| lamp.contains("Made cat joke.")),
+            "{lamp:?}"
+        );
+        assert!(
+            !lamp
+                .iter()
+                .any(|lamp| lamp.contains("make it now") || lamp.contains(japanese)),
+            "{lamp:?}"
+        );
         *crate::thread::THREAD.lock().unwrap() = before;
     }
 

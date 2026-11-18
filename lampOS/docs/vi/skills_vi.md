@@ -1357,12 +1357,41 @@ sau:
     something?"). Một câu mới cắt lượt thì kết thúc vòng của mô hình lẽ ra
     nói câu đó, nhưng không dừng việc tạo: nó chạy tiếp trong worker của
     tuyến thứ hai đến hết (`worker::made_running`). Câu của nó, đúng những
-    chữ mô hình được đưa ("I made evening dim, and it's on.", "I made it but
-    couldn't put it on: <lý do>." hoặc "I couldn't make that: <lý do>.";
+    chữ mô hình được đưa ("I made evening dim, and it's on." hoặc "I made
+    it but couldn't put it on: <lý do>.";
     `make_skill_local::take_said_line`), khi đó được nói một lần qua dịch
     vụ nói, như việc tạo từ ứng dụng (`app_make::say_line_at`: cùng note
     theo ngôn ngữ của cuộc trò chuyện, tên skill `voice-make`, vào lúc thích
-    hợp trong vòng một giờ, hỏi lại một lần nếu bị bỏ). Lượt còn đang chờ
+    hợp trong vòng một giờ, hỏi lại một lần nếu bị bỏ). Kết quả của lần
+    tạo được đọc từ chính lần tạo (`make_skill_local::take_said_outcome`:
+    đã tạo, xung đột, hoặc thất bại), không bao giờ từ câu trả lời của
+    lượt, vì phạm vi đã hết hạn của một lượt bị cắt biến nó thành một
+    `error` dù lần tạo đã giữ được gì (ROW của #7554 ở 2e864a0, 17:39:32:
+    `dim-light-at-night` của request 86 bị xung đột và đã được hỏi, nhưng
+    journal ghi "kept nothing" và câu xung đột không bao giờ được nói).
+    Một xung đột luôn được nói sau khi bị cắt, bằng `made_clash::cut_line`,
+    và vẫn chờ, nên câu sau cũng được báo. Một lần tạo thất bại ("I
+    couldn't make that: <lý do>.") chỉ không nói gì sau khi bị cắt khi
+    người dùng đã sang chuyện khác bằng một câu của chính họ sau nó: một
+    câu nghe được có từ mà tuyến thứ hai trả lời
+    (`make_skill_local::person_went_on`, đánh dấu khi lượt của nó bắt đầu,
+    và khi một lệnh dừng nói ra được trả lời bằng câu dừng của đèn; chỉ
+    tuyến thứ hai chạy một lần tạo qua khỏi một lần cắt,
+    `worker::made_running`, nên câu do tuyến khác trả lời không bao giờ gặp
+    nó;
+    lamp-9adf, 18:10 ngày 17/11: một lần tạo bị lời nhờ sau cắt đã thất
+    bại 88 giây sau, và câu của nó được nói trong một lượt sau không liên
+    quan). Một âm thanh không có từ, hoặc một câu bị giữ lại vì không nói
+    với đèn, không phải là sang chuyện khác, và thất bại được nói (ROW của
+    #7554: request 6 và 17 nghe được 0 từ, request 57 bị giữ lại, và các
+    lần tạo chúng cắt đã thất bại mà không được báo). Journal ghi "its
+    turn was cut while make_skill ran, and it kept nothing; the person went
+    on with a line of their own: nothing is said", hoặc "…: its line is
+    said through the say service". Kiểm thử
+    `a_cut_make_that_kept_nothing_says_nothing`,
+    `a_cut_make_that_failed_is_told_when_the_person_did_not_go_on`,
+    `a_cut_make_that_clashes_tells_its_clash` và
+    `only_a_later_answered_line_is_going_on`. Lượt còn đang chờ
     thì nhận câu trả lời như trước, và không có gì đi qua dịch vụ nói. Khi
     dịch vụ nói tắt, câu không được nói. Một kỹ năng gửi hoặc ghi, đã tạo
     và đã bật, không bao giờ được nói "it's on" ở đó (P2 của App Only trên
@@ -1418,7 +1447,15 @@ sau:
     hoặc câu được mang sang có tên đèn hoặc một mảnh trước đó ở đầu, hoặc
     không có. Hai câu giống nhau dưới 5 từ không phải một lời nhờ, nên hai
     lần tạo cùng kết thúc bằng một câu trả lời ngắn giống nhau cho câu hỏi
-    của đèn ("green", "yes", "do it") đều được tạo. Khi lần tạo trước còn đang chạy, lời gọi không tạo
+    của đèn ("green", "yes", "do it") đều được tạo. Một câu nghe được chứa
+    trọn câu trước và thêm từ 5 từ trở lên bên cạnh thì mang một lời nhờ
+    của riêng nó, và chỉ là cùng lời nhờ khi request cũng vậy
+    (`make_skill_local::one_ask`; lamp-9adf, 18:05 ngày 17/11: một lần tạo
+    bị lời nhờ sau cắt, câu của nó chưa từng được đáp, được nghe lại trước
+    "make a skill that says stretch time whenever I say stretch", và lời
+    nhờ đó bị báo là cái trước "is being made already"; kiểm thử
+    `a_line_carrying_another_ask_beside_one_under_way_is_not_that_ask`).
+    Một lần tạo bị từ chối không giữ gì. Khi lần tạo trước còn đang chạy, lời gọi không tạo
     gì và được báo là đang tạo (`"making": true`), câu của nó vẫn do lần
     tạo trước nói. Khi lần tạo đó đã được giữ và bật (hoặc đang chờ lời
     "có"), trong 3 phút (`make_skill_local::ONE_ASK_WITHIN`) và khi kỹ năng
@@ -1431,6 +1468,205 @@ sau:
     MAKE IT của ứng dụng không bị giữ. Kiểm thử:
     `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
     `only_the_same_ask_is_held_as_made`.
+
+    **Được báo trong lúc đang tạo, và một lời "không" bỏ nó** (lamp-9adf,
+    17/11: một lần tạo qua agent mất khoảng một phút; "Maybe later." trong
+    lúc đó được đáp "Just say joke time whenever you want one." cho một kỹ
+    năng chưa từng được giữ, và "No, don't turn it on." được đáp "Should I
+    stop making it altogether?"). Khi `approve_id` được khai báo (bật ghi
+    của kỹ năng đã tạo, code, hoặc tác vụ của kỹ năng), mỗi câu nghe được
+    sau đó của tuyến thứ hai được báo, khi một lần tạo bằng giọng nói còn
+    đang chạy, cái gì đang được tạo (request của mô hình, tối đa 200 ký
+    tự), rằng chưa có gì của nó được bật và họ sẽ nghe khi nó bật, không
+    bao giờ nói nó đã bật hay cách khởi động nó, và một `approve_id` của
+    riêng nó (`making-<n>`, `make_skill_local::making_note`). Câu đó có từ
+    chối hay hoãn nó không là việc mô hình phán đoán: nó gọi `make_skill`
+    với id đó và `answer: "no"` (`make_skill_local::making_answered`). Lần
+    tạo, khi xong, khi đó không bao giờ được bật, không gì của nó được giữ
+    (gói và mục tắt trong index bị bỏ, như của một xung đột bị huỷ,
+    `made_skill::forget_unput`, nên nó không bao giờ tính vào giới hạn hay
+    danh sách), câu của nó không được nói, và lời nhờ của nó được thả; mô
+    hình được bảo chỉ nói "Alright, I won't make it."
+    (`make_skill_local::WONT_MAKE_NEXT`), không hỏi gì. Lần tạo tìm lời
+    "không" một lần, khi kỹ năng được viết xong, và trong cùng lần khoá đó
+    tự đánh dấu đang hoàn tất (`OneAsk::dropped_or_finishing`): một lời
+    "không" sau đó, trong lúc helper quản lý bật nó (có thể mất vài giây)
+    hoặc câu của nó được nói, được báo là đã quá muộn để dừng, rằng họ sẽ
+    nghe trong giây lát và khi đó có thể nhờ gỡ nó
+    (`make_skill_local::FINISHING_NEXT`, `"finishing": true`), không bao
+    giờ báo là đã bỏ (race của Twelve và El trên #7554; kiểm thử
+    `a_no_while_a_make_is_put_on_is_never_told_dropped`). Mọi câu trả lời
+    khác cho id đó được báo là nó vẫn đang được tạo, chưa có gì để đồng ý.
+    Một lần tạo đã xong từ đó, đang chờ lời "có", nhận câu trả lời qua
+    `approve_id` của chính nó. Code của một lần tạo bằng giọng nói đang chờ
+    lời "có" được đáp theo cùng cách: note bảo mô hình gọi một lời từ chối
+    hay hoãn là `answer: "no"`, bỏ nó với cùng câu đó, và không bao giờ nói
+    nó đã bật hay cách khởi động nó trước lời "có"; ghi của một kỹ năng, đã
+    bật rồi, vẫn không gọi gì khi bị từ chối. Tham số `request` nói không
+    bao giờ gọi nó cho một lời nhờ mà người dùng rút lại trong cùng câu
+    ("make a skill that waters my plants. Actually, never mind."). Chỉ một
+    lần tạo còn đang chạy mới được báo như vậy: một lần tạo đã kết thúc
+    (đang chờ lời "có", thất bại hay bị bỏ) không bao giờ được báo cho câu
+    sau là đang chạy. Mọi note của một lần tạo đang chạy hoặc đang chờ lời
+    "có", bị cắt hay đã nghe trọn, kết thúc bằng
+    `make_skill_local::NEW_ASK_OWN_CALL`: một kỹ năng khác được nhờ lúc
+    này là một lời nhờ mới, được tạo bằng lời gọi `make_skill` riêng của
+    nó, và không bao giờ nói một lần tạo đã bắt đầu nếu không có lời gọi
+    đó (lamp-9adf, 18/11 02:24–02:26: sau khi một lần tạo chờ lời "có", ba
+    lời nhờ tạo mới đều được đáp "I'll make that now. This takes about a
+    minute. I'm on it." mà không có lời gọi nào; note nói "call nothing"
+    mà không nói gì cho lời nhờ khác). "call nothing" và "don't call it"
+    của lần chờ giờ chỉ nói về kỹ năng đó. Đọc từ bộ nhớ: không có lời gọi
+    hay file nào trong lượt. Kiểm thử:
+    `a_make_ended_waiting_for_its_yes_is_never_told_under_way`,
+    `a_new_make_ask_beside_a_make_waiting_for_its_yes_gets_its_own_call`,
+    `a_make_under_way_is_told_to_later_lines_and_a_no_drops_it`,
+    `a_make_declined_while_made_is_never_put_on_or_said`,
+    `an_app_makes_yes_past_a_cut_call_is_forced_to_answer_its_wait`.
+    Riêng note đó không chặn được việc chép lại (hàng FAIL thứ hai của
+    #7554, lamp-9adf, 18/11 04:23–04:25), nên nó được chặn cả trong code:
+    trên tuyến thứ hai, một câu trả lời nói trọn một trong các câu tạo
+    của chính đèn (`make_skill_agent::BEGUN_LINES`: câu chờ của one path
+    và câu chờ lâu, bằng tiếng Anh và ngôn ngữ của chủ; là hằng số của
+    đèn, không phải danh sách từ) trong một lượt không có lời gọi
+    `make_skill` thì không được nói. Vòng của nó được hỏi lại một lần,
+    kết thúc bằng `make_skill_agent::BEGUN_AGAIN_NOTE`, với `make_skill`
+    được đưa ra nhưng không bao giờ bị buộc: mô hình tự đánh giá câu của
+    người dùng có nhờ tạo kỹ năng hay không (điều kiện của người đọc El trên
+    #7554), và một lần hỏi lại trả lời bằng lời của chính nó mà không có
+    câu tạo thì được nói như nó đến. Nếu có lời gọi khác thì chúng chạy và
+    vòng sau được hỏi như vậy. Một câu trả lời có câu đó lần thứ hai, hay ở
+    vòng cuối, được nói thành "Sorry, I
+    didn't do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`).
+    Journal ghi "its reply said the lamp's own make line with no
+    make_skill call: not said, asked again with make_skill offered", và khi
+    lần hỏi lại kết thúc, "the waiting line with no make call was not said;
+    asked again with make_skill: <ms> ms, <cách nó kết thúc>", thời gian
+    thêm của nó. Lịch sử được để nguyên (`LAMP_LATE_ANSWER_LET_GO`, #7583,
+    là việc riêng). Việc
+    giữ lại chỉ tốn thời gian ở lượt mà các message đã mang một trong các
+    câu đó (lượt sau một lần tạo): phần mở đầu câu trả lời được giữ đến
+    khi hai câu đã kết thúc mà không có câu đầu của một câu tạo, hoặc đến
+    hết vòng khi có. Nó được thả ra ngay khi vòng đang stream nêu tên một
+    lời gọi `make_skill` (`ChatEvent::Calling`, gửi khi đối số của lời gọi
+    bắt đầu, trước khi vòng kết thúc hay lần tạo trả lời; HOLD của người
+    đọc El trên #7554: trên lamp-9adf một lần tạo được nhờ ngay sau một
+    lần khác đã gọi `make_skill`, vậy mà âm thanh đầu tiên đến lúc 8539 ms
+    so với 1.6–2.1 s), và sau đó không còn gì bị giữ vì câu đó, nên câu
+    chờ của chính đèn cũng không bao giờ bị giữ; journal ghi "a make_skill
+    call named as it streams: its held opening said, <ms> ms in". Một câu
+    trả lời nói câu đó cùng một lời gọi `make_skill` vẫn được nói như
+    trước. Kiểm thử
+    `a_make_line_turn_that_calls_make_skill_has_its_first_audio_unheld`.
+    Một vòng 1 chỉ có một lời gọi `make_skill` cho một kỹ năng mới, không
+    có lời nào trước nó và chưa nói gì trong lượt (#7554, lamp-9adf,
+    18 Nov 11:12: một lần tạo được nhờ khi một lần khác đang chạy, âm
+    thanh đầu tiên lúc 8104 ms, sau lần tạo, một xung đột và vòng 2), thì
+    đèn nói ngay câu mở đầu của chính lần tạo, "I'll make it now."
+    (`make_skill_agent::MAKE_OPENING`, đúng lời mà công cụ tạo nhờ mô hình
+    nói), một lần. Đó là một trong các câu cố định của đèn
+    (`language::FIXED_LINES`, có lời bằng tiếng Việt, Nhật, Trung và Hàn),
+    được dựng sẵn khi worker của tuyến thứ hai khởi động với
+    `LAMP_MAKE_SKILL=on` (`Engine::rendering_make_opening`, `FixedClips`,
+    trong mọi ngôn ngữ, cả tiếng Anh) và phát từ clip đó, nên âm thanh đầu
+    tiên không bao giờ phải chờ giọng nói; khi chưa có clip, giọng nói nói
+    nó như một phần của lượt. Vòng được hỏi lại vì một câu tạo bị chép
+    (ở trên) cũng là lời đầu tiên của lượt, và lời gọi trơn của nó cũng có
+    cùng câu mở đầu. Một lần tạo mới là một lời gọi có đối số mang
+    tên `request`; xóa, chạy, liệt kê, đồng ý, lựa chọn cho một xung đột
+    hay đọc lại thì đưa đối số riêng của nó một mình, không nói gì trước, và
+    không có câu mở đầu. Cả hai đường đọc cùng một quy tắc đó và không đường
+    nào cân nhắc lời gọi còn mang gì khác: stream phải quyết định trước khi
+    các đối số còn lại đến, nên nó đọc tên đối số đầu tiên của lời gọi
+    (`ChatEvent::Argued`, gửi một lần cho mỗi lời gọi khi tên đó đã trọn,
+    vài token sau `ChatEvent::Calling`); khi không có sự kiện stream nào
+    cho các lời gọi `make_skill` của vòng, các lời gọi trọn vẹn được đọc,
+    tìm một `request` trong các đối số
+    (`make_skill_local::asks_a_new_make`; khi đã phân tích, chúng không giữ
+    thứ tự). Khi stream đã nêu tên một đối số `make_skill` trong vòng,
+    quyết định của nó giữ nguyên và các lời gọi trọn vẹn không được đọc lại
+    cho việc đó. Câu chờ của lần tạo, khi agent của nó bắt đầu, theo sau
+    câu mở đầu, rồi đến câu trả lời của vòng 2. Journal ghi "a make_skill
+    call named with no words before it: the lamp's opening said, <ms> ms
+    in", thêm ", from its clip rendered ahead" khi đúng vậy. Lời mô hình đã
+    nói trước lời gọi được nói như nó đến, không bao giờ cùng câu của đèn;
+    một vòng không có lời gọi thì không có câu mở đầu.
+    Câu mở đầu được nói nhưng không bao giờ được giữ trong thread: một
+    phần trả lời đúng trọn câu mở đầu, ở bất kỳ ngôn ngữ nào của đèn, của
+    đèn hay cùng lời đó của mô hình (`make_skill_agent::is_opening`), bị
+    loại khỏi lời của đèn mà worker giữ và khỏi phần đã nghe của một câu
+    trả lời bị cắt, nên mô hình không bao giờ đọc nó như câu trả lời của
+    chính mình. ROW của #7554 ở 98e76debb0 trên lamp-9adf cho thấy lý do:
+    sau ba lần tạo mà lượt nào cũng mở đầu bằng câu đó, ba lần nhờ tạo mới
+    (request 28, 30, 33) được trả lời "I'll make it now. Done — … is on the
+    lamp" với `calls=none`, và không có gì được tạo. Một câu trả lời bắt
+    đầu bằng câu mở đầu (`make_skill_agent::opens_with_opening`: trọn câu
+    ở đầu, bằng tiếng Anh hay bất kỳ ngôn ngữ nào của đèn) mà lượt không có
+    lời gọi `make_skill` thì bị giữ và bắt như một câu tạo bị chép: không
+    được nói, được hỏi lại một lần kết thúc bằng
+    `make_skill_agent::BEGUN_AGAIN_NOTE`, cùng các dòng journal, và lần
+    thứ hai được nói thành câu trơn rằng việc đó chưa được làm. Việc giữ
+    này bật ở mọi lượt có đưa hàm mà chưa có lời gọi make_skill, nhưng chỉ
+    câu trả lời có những từ đầu là của câu mở đầu mới phải chờ: câu mở đầu
+    khác đi được thả ra ở từ đầu tiên khác, và câu mở đầu đúng như vậy được
+    thả ra ngay khi vòng nêu tên một lời gọi `make_skill`. Câu mở đầu
+    bằng lời của chính mô hình cũng bị bắt như vậy (ROW của #7554 ở
+    2e864a0, request 94: "I'll make that now. Cat joke on pat 3 clashes
+    with cat joke on pat, joke on pat and tell joke on pat… Replace them
+    all, keep them all so they take turns, or cancel?" với `calls=none`,
+    được thả ra ở "that", và không có skill nào như vậy được tạo):
+    `make_skill_agent::opens_with_make_line` đọc câu đầu tiên của câu trả
+    lời theo cấu trúc, không bao giờ theo danh sách từ: một phần đầu
+    ("I'll make", "I will make", "Let me make", "I'm making", "I am
+    making", "I'm going to make", "I'll go ahead and make", "Making"),
+    thứ được tạo ("it", "that", "this", "one", "that one", "this one", "a
+    skill", "the skill", "that skill", "this skill"), một hoặc hai phần kết
+    ("now", "right now", "for you", "right away", "straight away"), rồi
+    hết câu, không bao giờ là '?'; câu phải kết thúc ở đó, và câu mở đầu
+    nguyên văn của đèn cũng vậy (`opens_with_opening`: '.', '!', '…' hoặc
+    hết câu trả lời sau nó, P3 của App Only trên #7554). Vì vậy "I'll make
+    it brighter.", "Sure, I'll make that now.", "I'll make that now?",
+    "I'll make it now, then set the light." và "I'll make it." trơn được
+    thả ra. Câu hỏi xung
+    đột bằng lời của mô hình cũng bị bắt
+    (`make_skill_agent::clash_claimed`): một câu hỏi ba lựa chọn của đèn
+    theo đúng thứ tự (câu hỏi có các từ cuối là "or cancel", với "replace"
+    rồi "keep" đứng trước), khi lượt không có lời gọi `make_skill`, thì
+    không được nói và được hỏi lại như trên, trừ khi có một xung đột đang
+    chờ lựa chọn (`made_clash::waits`, đọc từ chính trạng thái của xung
+    đột): khi đó đèn có thể hỏi lại câu của nó, bằng lời của đèn hay của
+    mô hình (P1 của App Only trên #7554: "Shall I replace rest glow, keep
+    both (they may take turns), or cancel?" khi xung đột của
+    `dim-light-at-night` đang chờ). Việc giữ này chỉ bật ở lượt trong vòng
+    `made_clash::COPIED_WITHIN` (2 phút) sau khi một xung đột kết thúc
+    (đã chọn, đã hủy hoặc bị bỏ) mà không có xung đột nào đang chờ
+    (`made_clash::lately_ended`): lịch sử khi đó vẫn còn câu hỏi của nó, và
+    request 94 của #7554 đã chép một câu 56 giây sau một lần hủy. Không
+    giữ khi một xung đột đang chờ, và không giữ sau đó (P2 của App Only:
+    trước đây giữ ở mọi lượt có xung đột trong lịch sử, âm thanh đầu tiên
+    của mỗi câu trả lời phải chờ hai câu). Câu trả lời được giữ đến khi hai
+    câu đã kết thúc mà không câu nào hỏi nó, hoặc đến hết vòng khi có, và
+    được thả ra ngay khi vòng nêu tên một lời gọi `make_skill`. Đo trên
+    đồng hồ của kiểm thử, mỗi từ cách 40 ms: "Why did the cat sit on the
+    computer? To keep an eye on the mouse." có âm thanh đầu tiên ở 600 ms
+    trong khoảng đó (như mọi lượt như vậy trước đây) và 40 ms khi đã qua
+    hoặc khi không có xung đột nào kết thúc; "Sure. Cats nap about sixteen
+    hours a day, and they dream as we do." ở 560 ms và 80 ms
+    (`a_turn_long_after_a_clash_ended_is_not_held_for_it`).
+    `BEGUN_AGAIN_NOTE` nêu cả hai câu. Kiểm thử
+    `a_make_and_clash_claimed_in_the_models_own_words_are_never_said`,
+    `a_clash_claimed_with_no_call_is_not_said_and_other_replies_are`,
+    `made_clash::tests::a_clash_asked_again_while_it_waits_is_no_claim` và
+    `the_make_opening_and_clash_choice_are_read_by_their_structure`. Kiểm thử
+    `a_make_claimed_done_after_the_opening_with_no_call_is_asked_again`,
+    `only_a_reply_that_opens_with_the_make_opening_is_held_for_it`,
+    `worker::tests::the_make_opening_never_enters_the_history`,
+    `a_bare_make_skill_call_has_the_lamps_opening_said_first_once`,
+    `a_bare_make_skill_call_has_its_first_audio_before_the_round_ends`,
+    `a_make_with_the_models_opening_says_it_once_and_no_call_says_none`,
+    `the_stream_and_the_whole_calls_agree_on_a_new_make`,
+    `the_make_opening_is_said_in_the_owners_language_from_its_clip`;
+    kiểm thử: `second_provider::tests::make_begun_line`.
 12. **Một xung đột được nói ra, không bao giờ nạp cả hai trong im lặng**
     (#6593, phán quyết của first builder: trên lamp-9adf sáu kỹ năng
     `glow-*-on-return` cùng chạy trên một lần đến, cái này lấn ánh sáng của
@@ -1472,7 +1708,19 @@ sau:
     starts at the same moment and uses the light. Ask me again to replace
     it or to keep both.", khi nhiều hơn "I made NAME, but didn't put it
     on: A, B and C start at the same moment and use the light. Ask me
-    again to replace them or to keep them all." (`made_clash::cut_line`). Câu trả lời quay lại là
+    again to replace them or to keep them all." (`made_clash::cut_line`).
+    Mỗi lúc chỉ một xung đột chờ: xung đột mới hơn bỏ xung đột cũ, không
+    bao giờ im lặng (ROW của #7554 ở 2e864a0, 17:39:44: xung đột của
+    `joke-on-pat-2` đã bỏ xung đột của `dim-light-at-night` 12 giây sau
+    khi nó được hỏi, mà không nói gì). Câu trả lời của xung đột mới mang
+    `dropped`, tên đọc của xung đột cũ, và `next` của nó yêu cầu trước hết
+    báo cho người dùng, trong vài từ, rằng skill đó chưa được bật và đã bị
+    bỏ (kiểm thử `a_clash_let_go_for_a_newer_one_is_told`). Một xung đột
+    mới được tạo trong một lượt bị cắt cũng nói điều đó trước qua dịch vụ
+    nói, "I didn't put on NAME, which I made earlier: it's dropped now, as
+    only one clash can wait at a time.", trước `cut_line` của chính nó
+    (`made_clash::dropped_line`; kiểm thử
+    `a_newer_clash_in_a_cut_turn_tells_the_older_one_dropped`). Câu trả lời quay lại là
     `make_skill` chỉ với `clash_id` và `choice` (`replace`, `keep` hoặc
     `cancel`), nên `request` không còn bắt buộc (`made_clash::chosen`);
     một `choice` không thuộc ba lựa chọn thì được hỏi lại như câu hỏi đã
@@ -1667,7 +1915,10 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   quản lý cũng từ chối kỹ năng lõi. Những cái gần như nhau thì hỏi một
   lần, ngắn, là cái nào ("moon fact or noon fact", tối đa ba, ngắn nhất
   trước). Không cái nào gần thì nói vậy (`made_remove::NO_MADE`), kể tên
-  các kỹ năng của họ, tối đa 3, hoặc họ đã tạo bao nhiêu. Một tên khác với
+  các kỹ năng của họ, tối đa 3, hoặc họ đã tạo bao nhiêu, đếm như danh
+  sách đếm (`made_list::made_on`: đang bật, tạo tại đây; lamp-9adf, 17/11:
+  danh sách nói mười tám và lần gỡ nói mười chín; kiểm thử
+  `a_remove_finding_none_counts_as_the_list_does`). Một tên khác với
   đúng tên được hỏi (của họ, hay một tên gần mà họ không tạo), và tên các
   kỹ năng của họ, chỉ được nói khi chủ đèn nghe (`services::owner_hears`,
   chỉ hỏi lúc đó: trong phòng riêng thì luôn luôn), như tên của read-back;

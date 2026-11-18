@@ -4331,12 +4331,39 @@ gone ([switches.md](switches.md)). What happens:
     something?"). A newer line that cuts the turn ends the model's round
     that would have said the line, but not the make: it goes on in the
     second route's worker to its end (`worker::made_running`). Its line,
-    the same words the model is given ("I made evening dim, and it's on.",
-    "I made it but couldn't put it on: <why>." or "I couldn't make that:
-    <why>."; `make_skill_local::take_said_line`), is then said once through
+    the same words the model is given ("I made evening dim, and it's on."
+    or "I made it but couldn't put it on: <why>.";
+    `make_skill_local::take_said_line`), is then said once through
     the say service, as an app's make is (`app_make::say_line_at`: the same
     note in the conversation's language, the skill name `voice-make`, at a
-    good moment within the hour, asked once more after a drop). A turn that
+    good moment within the hour, asked once more after a drop). What the
+    make came to is read from the make itself
+    (`make_skill_local::take_said_outcome`: made, a clash, or failed),
+    never from the turn's answer, which a cut turn's lapsed scope makes an
+    `error` whatever the make kept (#7554's ROW at 2e864a0, 17:39:32:
+    request 86's `dim-light-at-night` clashed and was asked, yet "kept
+    nothing" was journaled and its clash never said). A clash is always
+    said after a cut, its `made_clash::cut_line`, and still waits, so a
+    later line is told it too. A make that failed ("I couldn't make that:
+    <why>.") says nothing after a cut only when the person went on with a
+    line of their own after it: a line heard with words that the second
+    route answers (`make_skill_local::person_went_on`, marked as its turn
+    begins, and as a spoken stop is answered with the lamp's stop line;
+    only the second route runs a make past a cut, `worker::made_running`,
+    so a line another route answers never meets one; lamp-9adf, 17 Nov
+    18:10: a make cut by the next ask failed
+    88 s later, and its line was said in a later, unrelated turn). A sound
+    with no words, or a line held as not said to the lamp, is no going
+    on, and the failure is said (#7554's ROW: requests 6 and 17 heard 0
+    words and request 57 was held, and the makes they cut failed untold).
+    The journal says "its turn was cut while make_skill ran, and it kept
+    nothing; the person went on with a line of their own: nothing is
+    said", or "…, <made | the made skill clashes, its choice waiting | it
+    kept nothing, the person not gone on>: its line is said through the
+    say service". Tests `a_cut_make_that_kept_nothing_says_nothing`,
+    `a_cut_make_that_failed_is_told_when_the_person_did_not_go_on`,
+    `a_cut_make_that_clashes_tells_its_clash` and
+    `only_a_later_answered_line_is_going_on`. A turn that
     still waits gets the answer as before, and nothing goes to the say
     service. With the say service off, the line is not said. A skill that
     sends or writes, made and on, is never said "it's on" there (App
@@ -4388,7 +4415,15 @@ gone ([switches.md](switches.md)). What happens:
     with the lamp's name or an earlier piece before it, or without them.
     Lines alike of fewer than 5 words are no one ask, so two makes each
     ending on the same short answer to the lamp's question ("green",
-    "yes", "do it") are both made. While the earlier make is under way, the call makes nothing and
+    "yes", "do it") are both made. A heard line that holds the earlier
+    one whole and 5 or more words beside it carries an ask of its own,
+    and is the same ask only when the requests are too
+    (`make_skill_local::one_ask`; lamp-9adf, 17 Nov 18:05: a make cut by
+    the next ask, its line never answered, was heard again before "make a
+    skill that says stretch time whenever I say stretch", and that ask was
+    told the earlier one "is being made already"; test
+    `a_line_carrying_another_ask_beside_one_under_way_is_not_that_ask`).
+    A declined make holds nothing. While the earlier make is under way, the call makes nothing and
     is told it is being made (`"making": true`), its line still said by
     the earlier make. Once that make is kept and on (or waits for its yes),
     for 3 minutes (`make_skill_local::ONE_ASK_WITHIN`) and while the skill
@@ -4400,6 +4435,199 @@ gone ([switches.md](switches.md)). What happens:
     on holds nothing, so asking again tries again. The app's MAKE IT is
     not held. Tests: `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
     `only_the_same_ask_is_held_as_made`.
+
+    **Told while it is made, and a no drops it** (lamp-9adf, 17 Nov: an
+    agent's make takes about a minute; "Maybe later." meanwhile was
+    answered "Just say joke time whenever you want one." for a skill never
+    kept, and "No, don't turn it on." with "Should I stop making it
+    altogether?"). With `approve_id` declared (a made skill's writes,
+    code or a skill's tasks on), each later heard line of the second
+    route is told, while a voice make is under way, what is being made
+    (the model's request, at most 200 characters), that nothing of it is
+    on yet and they'll hear when it is, never to say it is on or how to
+    start it, and an `approve_id` of its own (`making-<n>`,
+    `make_skill_local::making_note`). Whether the line declines it or puts
+    it off is the model's to judge: it calls `make_skill` with that id
+    and `answer: "no"` (`make_skill_local::making_answered`). The make,
+    done, is then never put on, nothing of it is kept (its package and its
+    off index entry go, as a cancelled clash's do,
+    `made_skill::forget_unput`, so it never counts toward the cap or the
+    list), its line is not said, and its ask is let go; the model is told
+    to say only "Alright, I won't make it."
+    (`make_skill_local::WONT_MAKE_NEXT`), asking nothing. The make looks
+    for a no once, when the skill is written, and in the same lock marks
+    itself finishing (`OneAsk::dropped_or_finishing`): a no after that,
+    while the manage helper puts it on (which can take seconds) or its
+    line is said, is told it is too late to stop, that they'll hear in a
+    moment and can ask to remove it then
+    (`make_skill_local::FINISHING_NEXT`, `"finishing": true`), never that
+    it was dropped (Twelve's and El's race on #7554; test
+    `a_no_while_a_make_is_put_on_is_never_told_dropped`). Any other answer
+    to that id is told it is still being made, with nothing to agree to
+    yet. A make done since, waiting for its yes, takes the answer by its
+    own `approve_id`. A voice make's code waiting for its yes is answered
+    the same way: the note has the model call a decline or a wait as
+    `answer: "no"`, which drops it with the same line, and never say it is
+    on or how to start it before the yes; a skill's writes, on already,
+    still call nothing on a decline. The `request` parameter says never to
+    call it for an ask the person takes back in the same line ("make a
+    skill that waters my plants. Actually, never mind."). Only a make
+    still under way is told so: one ended (waiting for its yes, failed or
+    dropped) is never told to a later line as under way. Every note of a
+    make under way or waiting for its yes, cut or heard whole, ends with
+    `make_skill_local::NEW_ASK_OWN_CALL`: a different skill asked for now
+    is a new ask, made by its own `make_skill` call, and a make is never
+    said as begun without that call (lamp-9adf, 18 Nov 02:24–02:26: after
+    a make waited for its yes, three new make asks each got "I'll make
+    that now. This takes about a minute. I'm on it." with no call; the
+    note said "call nothing" with nothing for another ask). The wait's
+    "call nothing" and "don't call it" now name that skill alone. Read
+    from memory: no call or file on the turn. Tests:
+    `a_make_ended_waiting_for_its_yes_is_never_told_under_way`,
+    `a_new_make_ask_beside_a_make_waiting_for_its_yes_gets_its_own_call`,
+    `a_make_under_way_is_told_to_later_lines_and_a_no_drops_it`,
+    `a_make_declined_while_made_is_never_put_on_or_said`,
+    `an_app_makes_yes_past_a_cut_call_is_forced_to_answer_its_wait`.
+    That note alone did not stop the copy (#7554's second FAIL row,
+    lamp-9adf, 18 Nov 04:23–04:25), so it is gated in code too: on the
+    second route, a reply that says one of the lamp's own make lines
+    whole (`make_skill_agent::BEGUN_LINES`: the one-path waiting line and
+    the long-wait line, in English and the owner's language; the lamp's
+    constants, never a word list) in a turn with no `make_skill` call is
+    not said. Its round is asked again once ending with
+    `make_skill_agent::BEGUN_AGAIN_NOTE`, with `make_skill` offered and
+    never forced: the model judges whether the person's line asks for a
+    skill (the reader El's guard on #7554), and a retry that answers in
+    its own words with no make line is said as it came. Beside other
+    calls those run and the next round is so asked. A second reply with
+    the line, or one in the last round, is said as "Sorry, I didn't do
+    that. Could you ask me again?"
+    (`action_claim::NOT_DONE_LINE`). The journal says "its reply said the
+    lamp's own make line with no make_skill call: not said, asked again
+    with make_skill offered", and once the retry ends, "the waiting line
+    with no make call was not said; asked again with make_skill: <ms> ms,
+    <how it ended>", its added time. History is left as it is
+    (`LAMP_LATE_ANSWER_LET_GO`, #7583, is apart from this). The hold
+    costs time only on a turn whose messages already carry one of those
+    lines (a turn after a make): the
+    reply's opening is held until two sentences have ended without a
+    line's first sentence, or to the round's end when one is in it. It
+    is let go the moment the streamed round names a `make_skill` call
+    (`ChatEvent::Calling`, sent once a call's arguments begin, before the
+    round ends or the make answers; the reader El's HOLD on #7554: on
+    lamp-9adf a make asked right after another called `make_skill`, yet
+    its first audio came at 8539 ms against 1.6–2.1 s), and nothing is
+    held for the line after that, so the lamp's own waiting line is
+    never held either; the journal says "a make_skill call named as it
+    streams: its held opening said, <ms> ms in". A reply that says the
+    line beside a `make_skill` call is said as before. Test
+    `a_make_line_turn_that_calls_make_skill_has_its_first_audio_unheld`.
+    A round 1 that is only a `make_skill` call for a new skill, with no
+    words before it and nothing said yet in the turn (#7554, lamp-9adf,
+    18 Nov 11:12: a make asked while another ran, its first audio at
+    8104 ms, after the make, a clash and round 2), has the lamp say the
+    make's own opening at once, "I'll make it now."
+    (`make_skill_agent::MAKE_OPENING`, the words the make tool asks of
+    the model), once. It is one of the lamp's fixed lines
+    (`language::FIXED_LINES`, with its words in Vietnamese, Japanese,
+    Chinese and Korean), rendered ahead as the second route's worker
+    starts with `LAMP_MAKE_SKILL=on` (`Engine::rendering_make_opening`,
+    `FixedClips`, in every language, English too) and played from that
+    clip, so its first audio never waits on the voice; with no clip yet
+    it is said by the voice as the turn's piece. The round asked again
+    for a copied make line (above) is the turn's first words too, and
+    gets the same opening for its bare call. A new make is
+    a call whose arguments name its `request`; a remove, a run, a list,
+    a yes, a clash's choice or a read-back gives its own argument alone,
+    is said nothing first, and gets no opening. Both paths read that one
+    rule and neither weighs what else the call carries: the stream must
+    decide before the rest of the arguments come, so it reads the call's
+    first argument's name (`ChatEvent::Argued`, sent once per call as
+    that name is whole, a few tokens after `ChatEvent::Calling`); with
+    no stream event for the round's `make_skill` calls their whole
+    calls are read, for a `request` among the arguments
+    (`make_skill_local::asks_a_new_make`; parsed, they keep no order).
+    Once the stream named a `make_skill` argument in the round, its
+    decision stands and the whole calls are not read again for it. The
+    make's waiting line, when its agent begins, follows the opening, and
+    round 2's reply after that. The journal says "a make_skill call
+    named with no words before it: the lamp's opening said, <ms> ms in",
+    with ", from its clip rendered ahead" when it was. Words the model
+    gave before its call are said as they came, never beside the
+    lamp's; a round with no call says no opening.
+    The opening is said but never kept in the thread: a piece that is
+    the opening whole, in any of the lamp's languages, the lamp's or the
+    model's same words (`make_skill_agent::is_opening`), is left out of
+    the lamp's words the worker keeps and of what was heard of a cut
+    answer, so the model never reads it as its own reply. #7554's ROW at
+    98e76debb0 on lamp-9adf showed why: after three makes whose turns
+    opened with it, three new make asks (requests 28, 30, 33) were
+    answered "I'll make it now. Done — … is on the lamp" with
+    `calls=none`, and nothing was made. A reply that begins with the
+    opening (`make_skill_agent::opens_with_opening`: the line whole at
+    its start, in English or any of the lamp's languages) with no
+    `make_skill` call in its turn is held and caught as a copied make
+    line is: not said, asked again once ending with
+    `make_skill_agent::BEGUN_AGAIN_NOTE`, the same journal lines, and a
+    second one said as the plain line that it wasn't done. This hold is
+    on every turn offered functions with no make_skill call yet, but
+    only a reply whose first words are the opening's waits: one that
+    opens otherwise is let go at its first word that differs, and one
+    that opens with it is let go the moment the round names a
+    `make_skill` call. The opening in the model's own words is caught the
+    same way (#7554's ROW at 2e864a0, request 94: "I'll make that now.
+    Cat joke on pat 3 clashes with cat joke on pat, joke on pat and tell
+    joke on pat… Replace them all, keep them all so they take turns, or
+    cancel?" with `calls=none`, let go at "that", and no such skill made):
+    `make_skill_agent::opens_with_make_line` reads the reply's first
+    sentence by its structure, never a word list: a head ("I'll make",
+    "I will make", "Let me make", "I'm making", "I am making", "I'm going
+    to make", "I'll go ahead and make", "Making"), what it makes ("it",
+    "that", "this", "one", "that one", "this one", "a skill", "the skill",
+    "that skill", "this skill"), one or two closers ("now", "right now",
+    "for you", "right away", "straight away"), then the sentence's end,
+    never a '?'; the sentence must end there, and so must the lamp's
+    exact opening (`opens_with_opening`: '.', '!', '…' or the reply's end
+    after it, App Only's P3 on #7554). So "I'll make it brighter.", "Sure,
+    I'll make that now.", "I'll make that now?", "I'll make it now, then
+    set the light." and a bare "I'll make it." are let go. The clash's question in the
+    model's words is caught too (`make_skill_agent::clash_claimed`): a
+    sentence that asks the lamp's three choices in their order (a question
+    whose last words are "or cancel", with "replace" and then "keep"
+    before them), with no `make_skill` call in the turn, is not said and
+    asked again the same way, unless a clash waits for its choice
+    (`made_clash::waits`, read from the clash's own state): the lamp may
+    ask its question again then, in its words or the model's (App Only's
+    P1 on #7554: "Shall I replace rest glow, keep both (they may take
+    turns), or cancel?" with `dim-light-at-night`'s clash waiting). That
+    hold is only on a turn within `made_clash::COPIED_WITHIN` (2 minutes)
+    after a clash ended (chosen, cancelled or let go) with none waiting
+    (`made_clash::lately_ended`): the history still carries its question
+    then, and #7554's request 94 copied one 56 s after a cancel. Not while
+    one waits, and not later (App Only's P2: held on every turn whose
+    history carried a clash, each reply's first audio waited two
+    sentences). Its reply is held until two sentences have ended with
+    neither asking it, or to the round's end when one does, and let go the
+    moment the round names a `make_skill` call. Timed on the test's clock,
+    a word every 40 ms: "Why did the cat sit on the computer? To keep an
+    eye on the mouse." has its first audio at 600 ms within that window
+    (as on every such turn before) and at 40 ms past it or with no clash
+    ended; "Sure. Cats nap about sixteen hours a day, and they dream as we
+    do." at 560 ms and 80 ms (`a_turn_long_after_a_clash_ended_is_not_held_for_it`).
+    `BEGUN_AGAIN_NOTE` names both lines. Tests
+    `a_make_and_clash_claimed_in_the_models_own_words_are_never_said`,
+    `a_clash_claimed_with_no_call_is_not_said_and_other_replies_are`,
+    `made_clash::tests::a_clash_asked_again_while_it_waits_is_no_claim` and
+    `the_make_opening_and_clash_choice_are_read_by_their_structure`. Tests
+    `a_make_claimed_done_after_the_opening_with_no_call_is_asked_again`,
+    `only_a_reply_that_opens_with_the_make_opening_is_held_for_it`,
+    `worker::tests::the_make_opening_never_enters_the_history`,
+    `a_bare_make_skill_call_has_the_lamps_opening_said_first_once`,
+    `a_bare_make_skill_call_has_its_first_audio_before_the_round_ends`,
+    `a_make_with_the_models_opening_says_it_once_and_no_call_says_none`,
+    `the_stream_and_the_whole_calls_agree_on_a_new_make`,
+    `the_make_opening_is_said_in_the_owners_language_from_its_clip`;
+    tests: `second_provider::tests::make_begun_line`.
 12. **A clash is said, never loaded silently** (#6593, the first builder's
     ruling: on lamp-9adf six `glow-*-on-return` skills sat on one arrival,
     each outranking the others' light, so "glow green when I'm present"
@@ -4437,7 +4665,18 @@ gone ([switches.md](switches.md)). What happens:
     moment and uses the light. Ask me again to replace it or to keep
     both.", with more "I made NAME, but didn't put it on: A, B and C start
     at the same moment and use the light. Ask me again to replace them or
-    to keep them all." (`made_clash::cut_line`). The answer comes back as `make_skill`
+    to keep them all." (`made_clash::cut_line`). One clash waits at a
+    time: a newer one lets the older one go, never silently (#7554's ROW
+    at 2e864a0, 17:39:44: `joke-on-pat-2`'s clash dropped
+    `dim-light-at-night`'s 12 s after it was asked, with nothing said).
+    The newer clash's answer carries `dropped`, the older one's spoken
+    name, and its `next` asks first that the person be told, in a few
+    words, that it was not put on and is dropped (test
+    `a_clash_let_go_for_a_newer_one_is_told`). A newer clash made in a cut
+    turn says the same first through the say service, "I didn't put on
+    NAME, which I made earlier: it's dropped now, as only one clash can
+    wait at a time.", before its own `cut_line` (`made_clash::dropped_line`;
+    test `a_newer_clash_in_a_cut_turn_tells_the_older_one_dropped`). The answer comes back as `make_skill`
     with `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
     `request` is no longer required (`made_clash::chosen`); a `choice`
     that is none of the three is asked again as the question was, "replace
@@ -4632,7 +4871,10 @@ code (`made_remove::asked`):
   nothing waits, and the manage helper refuses a core one too. Those as
   near are asked once, short, which one ("moon fact or noon fact", three
   at most, shortest first). None near is said so (`made_remove::NO_MADE`)
-  naming theirs, at most 3, or how many they made. A name other than the
+  naming theirs, at most 3, or how many they made, counted as the list
+  counts them (`made_list::made_on`: on, made here; lamp-9adf, 17 Nov: the
+  list said eighteen and a remove nineteen; test
+  `a_remove_finding_none_counts_as_the_list_does`). A name other than the
   very one asked (theirs, or a near one they didn't make), and their
   skills' names, are said only when the owner hears
   (`services::owner_hears`, asked only then: in the private room always),

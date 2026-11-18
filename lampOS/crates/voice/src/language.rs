@@ -679,6 +679,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "오, 안녕하세요.",
         ],
     ),
+    // The make's opening, said by the lamp for a make_skill call with no
+    // words before it (#7554), from its clip rendered ahead.
+    (
+        crate::make_skill_agent::MAKE_OPENING,
+        [
+            "Mình làm ngay đây.",
+            "今から作るね。",
+            "我这就来做。",
+            "지금 바로 만들게요.",
+        ],
+    ),
 ];
 
 impl Language {
