@@ -3404,7 +3404,12 @@ cả hai người viết.
   judged not a quick reaction: to the agent (Hermes), its trigger and one
   task of the request; no DeepSeek draft kept`. Không tạo được (task tắt,
   quyền không công tắc nào cho), được nói rõ và không giữ gì; agent không
-  bao giờ được nhờ viết skill. Đèn không có agent nào (`missing` của
+  bao giờ được nhờ viết skill. Lần gọi thêm của dạng giữa từ chối nhắc việc
+  như brief (`make_no_cannot::reminder_rule`, nói bằng câu của
+  `Uncovered::Reminder`, không bao giờ giữ thành task hằng ngày), và sau
+  đánh giá đúng, mỗi lần DeepSeek sửa cũng phải qua `quick_reaction`, lần
+  sửa không phải phản ứng nhanh chuyển sang dạng giữa (hai P2 của
+  Reviewer-lead trên #7764). Đèn không có agent nào (`missing` của
   #7375): "this lamp has no agent set up to make it"; chưa biết agent (chưa
   đọc được targets của lamp-tasks, hoặc engine không có lần chạy make):
   không đánh giá, của DeepSeek như trước. Câu trả lời `cannot:`

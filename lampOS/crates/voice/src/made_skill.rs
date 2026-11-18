@@ -5027,7 +5027,7 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     "hear what is said",
     "know who someone is",
     "sending a message",
-    "Ask me for a reminder instead",
+    REMINDER_ASK,
     "sending what you didn't say word for word",
     "adding an event with no day and time",
     "adding a calendar event while my clock isn't set",
@@ -5036,6 +5036,27 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     BRIEFS_SKILL_CANT,
     "deleting or changing what is in your services",
 ];
+
+/// What a reminder at a time or every so often is, as the making model is
+/// told it (`make_skill_local`'s `system_with`) and, with [`reactions_on`],
+/// the middle form's one more call (`crate::make_no_cannot::system`, the
+/// Reviewer-lead's P2 on #7764): the lamp's own timer, never a skill.
+pub const REMINDER_IS_TIMER: &str = "A reminder at a time or every so often is the lamp's own \
+timer, not a skill; a skill runs at a time only each day or on named days of the week";
+
+/// How the brief's `cannot:` for a reminder ([`REMINDER_IS_TIMER`]) ends:
+/// what to ask instead ([`REMINDER_ASK`] begins it).
+pub const REMINDER_INSTEAD: &str =
+    "Ask me for a reminder instead, like 'remind me every hour to stand up'.";
+
+/// The mark of the brief's own refusal of a reminder ([`REMINDER_INSTEAD`]).
+pub const REMINDER_ASK: &str = "Ask me for a reminder instead";
+
+/// Whether the model's `cannot:` reason `why` is the brief's own refusal
+/// of a reminder ([`REMINDER_ASK`]), as [`briefs_own_refusal`] reads it.
+pub fn briefs_reminder_refusal(why: &str) -> bool {
+    briefs_own_refusal_in(why, &[REMINDER_ASK])
+}
 
 /// The brief's own refusals ([`BRIEFS_OWN_REFUSALS`]) of a send: with a
 /// service skill made as a task for the lamp's agent

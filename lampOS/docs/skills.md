@@ -6630,6 +6630,11 @@ the same code for both writers.
   the agent (Hermes), its trigger and one task of the request; no DeepSeek
   draft kept`. Not made (tasks off, a grant no switch covers), it is said
   plainly and nothing is kept; the agent is never asked to write the skill.
+  The middle form's one more call refuses a reminder as the brief does
+  (`make_no_cannot::reminder_rule`, said as `Uncovered::Reminder`'s line, never
+  kept as a daily task), and after a true judgement each DeepSeek repair is
+  held to `quick_reaction` too, one that is none going to the middle form
+  (the Reviewer-lead's two P2s on #7764).
   With no agent on the lamp at all (#7375's `missing`), "this lamp has no
   agent set up to make it"; with the agent not known (lamp-tasks' targets
   unread, or an engine no make run takes), no judgement and DeepSeek's as
