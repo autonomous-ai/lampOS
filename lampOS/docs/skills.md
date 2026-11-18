@@ -6898,7 +6898,9 @@ the same code for both writers.
   `make_no_cannot`'s (`net` only with `LAMP_TASK_NET`), it needs skills'
   tasks on (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; asked for by its
   words, `LAMP_UPLOAD_TO_AGENT`), it is said back as a task for the
-  agent and waits for the spoken yes, and its `made_with` is the agent's.
+  agent and waits for the spoken yes (with `LAMP_MAKE_NO_ASKS` on, on at
+  once and said in one line with its undo, "Nothing asked" below), and its
+  `made_with` is the agent's.
   The journal says `a skill made here: judged not a quick reaction: to
   the agent (Hermes), its trigger and one task of the request; no DeepSeek
   draft kept`. Not made (tasks off, a grant no switch covers), it is said
@@ -8543,9 +8545,15 @@ reset still ask. On (`crate::make_no_asks`):
   check, the grants, `LAMP_TASK_NET` and the run namespace are unchanged.
   The app's MAKE IT alike, the app's ask the owner's. A skill that sends (a
   write, or code that messages the phone) keeps its read-back and yes, as
-  that yes is what `lamp-services` sends by. An agent skill
-  (`LAMP_MAKE_NO_CANNOT`) goes on at once and still reads its task back
-  before its first run.
+  that yes is what `lamp-services` sends by. A task for the lamp's agent on
+  a trigger (the middle form, or `LAMP_MAKE_NO_CANNOT`'s) goes on at once
+  the same way, its task's yes recorded for exactly its grants, and is said
+  in the same one line with its undo, never "It runs only once you agree"
+  and no spoken yes awaited (`made_skill::agent_said_as`; the first
+  builder, 01:26 on #7819): "say hi when I sit down" is "Made sit hi. Say
+  'remove it' to undo.", and "remove it" removes it. Its grants, the run
+  namespace and its hold off the home network are unchanged. A task only
+  asked for (no trigger) still reads its task back at its first ask.
 - **A clash replaces, on the owner's ask.** A plain voice make that clashes
   with skills on the lamp doing the same thing (`made_clash::same_found`)
   goes on first; a put-on that fails changes nothing else. The same thing
