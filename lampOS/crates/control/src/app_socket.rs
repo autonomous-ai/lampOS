@@ -227,6 +227,45 @@ pub fn answer(
     })
 }
 
+/// An app's `phrases.set` (`{"id", "op": "phrases.set", "phrases": [text…]}`,
+/// replace-whole) as the door's own op: a `subscribe` to `phrase.heard` with
+/// the phrases, or, for none, an `unsubscribe` of it. The text to hand the
+/// door and how many phrases were set; a frame that is no `phrases.set`, or a
+/// malformed one, is handed on as it came (the door refuses it in its own
+/// words) with `None`.
+pub fn phrases_set_as_subscribe(text: &str) -> (String, Option<usize>) {
+    let as_is = || (text.to_owned(), None);
+    let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text) else {
+        return as_is();
+    };
+    if frame.get("op").and_then(Value::as_str) != Some("phrases.set") {
+        return as_is();
+    }
+    let (Some(id), Some(Value::Array(phrases))) = (frame.get("id"), frame.get("phrases")) else {
+        return as_is();
+    };
+    if frame.len() != 3 || phrases.iter().any(|phrase| !phrase.is_string()) {
+        return as_is();
+    }
+    let door = if phrases.is_empty() {
+        json!({"id": id, "op": "unsubscribe", "events": ["phrase.heard"]})
+    } else {
+        json!({"id": id, "op": "subscribe", "events": ["phrase.heard"], "phrases": phrases})
+    };
+    (door.to_string(), Some(phrases.len()))
+}
+
+/// The door's answer to a [`phrases_set_as_subscribe`]d frame, as the app's:
+/// `{"ok": true, "phrases": N}` for a success, a refusal as it is.
+pub fn phrases_reply(reply: &mut Value, count: usize) {
+    if reply.get("ok") == Some(&json!(true))
+        && let Some(fields) = reply.as_object_mut()
+    {
+        fields.remove("events");
+        fields.insert("phrases".to_owned(), json!(count));
+    }
+}
+
 /// The event an app is told when the owner changed settings.
 pub fn settings_event(changed: &[String], settings: &Map<String, Value>) -> Value {
     json!({"ev": "app.settings", "changed": changed, "settings": settings})

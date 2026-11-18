@@ -185,3 +185,40 @@ fn a_settings_event_says_what_changed_and_the_whole_map() {
         json!({"ev": "app.settings", "changed": ["loud"], "settings": {"loud": 4}})
     );
 }
+
+#[test]
+fn phrases_set_is_the_doors_subscribe_and_only_the_reply_is_the_apps() {
+    let set =
+        json!({"id": 4, "op": "phrases.set", "phrases": ["start the lesson", "begin the lesson"]});
+    let (door, count) = phrases_set_as_subscribe(&set.to_string());
+    assert_eq!(count, Some(2));
+    let door: Value = serde_json::from_str(&door).unwrap();
+    assert_eq!(door["op"], "subscribe");
+    assert_eq!(door["events"], json!(["phrase.heard"]));
+    assert_eq!(door["id"], 4);
+    assert_eq!(door["phrases"].as_array().unwrap().len(), 2);
+    let (door, count) =
+        phrases_set_as_subscribe(&json!({"id": 5, "op": "phrases.set", "phrases": []}).to_string());
+    assert_eq!(count, Some(0));
+    assert!(door.contains("\"unsubscribe\""));
+    // Anything else goes to the door as it came: another op, an extra field, a non-text phrase.
+    for text in [
+        json!({"id": 1, "op": "gesture", "name": "nod"}).to_string(),
+        json!({"id": 1, "op": "phrases.set", "phrases": ["a"], "x": 1}).to_string(),
+        json!({"id": 1, "op": "phrases.set", "phrases": [1]}).to_string(),
+        "not json".to_owned(),
+    ] {
+        assert_eq!(
+            phrases_set_as_subscribe(&text),
+            (text.clone(), None),
+            "{text}"
+        );
+    }
+    let mut ok = json!({"re": 4, "ok": true, "events": ["phrase.heard"]});
+    phrases_reply(&mut ok, 2);
+    assert_eq!(ok, json!({"re": 4, "ok": true, "phrases": 2}));
+    let mut no = json!({"re": 4, "ok": false, "error": {"code": "bad_request", "why": "x"}});
+    let before = no.clone();
+    phrases_reply(&mut no, 2);
+    assert_eq!(no, before);
+}
