@@ -6479,7 +6479,7 @@ mod tests {
         let id = accepted(&mut engine, 0);
         let mut state = stored(&memory);
         let task = state.tasks.iter_mut().find(|task| task.id == id).unwrap();
-        task.launch.prompt = "\u{1}".repeat(1_000);
+        task.launch.prompt = "\u{1}".repeat(MAX_PROMPT_BYTES / 3 + 1);
         assert!(!prompt_fits(&task.launch.prompt));
         task.prepared_digest =
             digest(&(&state.store_id, task.id, &task.target_alias, &task.launch));
@@ -6488,7 +6488,10 @@ mod tests {
         let engine = Engine::open(memory, targets(), STORE, RESTART, &clock(1))
             .expect("the store opens with the task");
         assert_eq!(engine.state.tasks.len(), 1);
-        assert_eq!(engine.state.tasks[0].launch.prompt, "\u{1}".repeat(1_000));
+        assert_eq!(
+            engine.state.tasks[0].launch.prompt,
+            "\u{1}".repeat(MAX_PROMPT_BYTES / 3 + 1)
+        );
     }
 
     /// A stored state with a field twice is refused, as before #1512, and

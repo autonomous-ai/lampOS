@@ -3064,10 +3064,11 @@ gone ([switches.md](switches.md)). What happens:
    - It names the triggers and gestures only as "one [trigger] as listed
      (coming to the desk is room/presence)" and `body = { gesture }`: the
      system prompt lists each (`TRIGGER_MEANINGS`,
-     `made_skill::gesture_names`). So the longest brief is 1,160 bytes
-     (`MOST_BRIEF_BYTES`, 1,340 before) and a repair's check lines 735
+     `made_skill::gesture_names`). So the longest brief is 1,440 bytes
+     (`MOST_BRIEF_BYTES`; 1,160 until the brief told the remind step and
+     its `every` in #7245, 1,340 before that) and a repair's check lines 735
      (`MOST_REPAIR_BYTES`, 560 before), the six triggers' meanings whole
-     in it; the two still fit the tasks part's 2,000 bytes.
+     in it; the two still fit the tasks part's 3,000 bytes.
 3. **Written by the lamp's own model.** The brief goes to the second
    route's chat (`llm_*`, the relay or the person's own DeepSeek), with no
    tools, streamed, on a thread and runtime of its own, at most 30 s
@@ -3502,7 +3503,7 @@ gone ([switches.md](switches.md)). What happens:
      another kind goes back for repair (`made_skill::WRITE_NOT_FIXED`).
      The system prompt lists the kinds and their keys
      (`make_skill_local::write_rules`); the brief adds "Or one write, as
-     above." (or "Or a read/write as above."), still within 1,160
+     above." (or "Or a read/write as above."), still within 1,440
      bytes.
    - **Its words are the request's own** (`made_skill::write_from_request`,
      at `keep_asked`, which now takes the request, `made_skill::Asked`):
@@ -3705,7 +3706,7 @@ gone ([switches.md](switches.md)). What happens:
      the grants, that the code reaches the lamp only through the lamp's
      SDK with those grants and has no other network, and that the lamp
      says it back and waits for the yes; the brief adds "Or code, as
-     above." (still within 1,160 bytes), and an answer may be up to 37 KiB.
+     above." (still within 1,440 bytes), and an answer may be up to 37 KiB.
      It names the SDK's real calls (`made_skill::SCRIPT_SDK`, #6749 E):
      `import asyncio`, `from lampos import Lamp`, `lamp = await
      Lamp.local()` in `async def main()`, then only `lamp.device()` (its
@@ -6613,7 +6614,7 @@ made skill is refused at install.
    no `[trigger]` and no `[ask]`. The model is told a skill can't yet hear
    what is said in the room, and the brief says "one [trigger] as listed or
    [said] as above" where it otherwise names the desk's presence (the
-   system prompt names it too), so the longest brief stays within 1,160
+   system prompt names it too), so the longest brief stays within 1,440
    bytes. Anything else beside `[said]` is refused with lines for a repair
    (`made_skill::said_asked`), and the person hears "I couldn't make that
    one." if the repairs are used up.
@@ -6761,7 +6762,7 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    request told to the lamp (a [said] start) or the words the person names
    to start it (asks), both below", and the brief "one [trigger] listed,
    [said]/asks as above", written short so the longest brief with every
-   switch on stays within 1,160 bytes.
+   switch on stays within 1,440 bytes.
 2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any

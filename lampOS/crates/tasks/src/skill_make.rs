@@ -2597,7 +2597,7 @@ mod tests {
         for bad in [
             line("", 2_000),
             line("R", 10),
-            line("R", 600_000),
+            line("R", MOST_WITHIN.as_millis() as u64 + 1),
             line(&"x".repeat(MOST_RULES_BYTES + 1), 2_000),
             br#"{"op":"skill_make","rules":"R","within_ms":2000,"net":"host"}"#.to_vec(),
             br#"{"op":"skill_task","rules":"R","within_ms":2000}"#.to_vec(),
@@ -3384,7 +3384,7 @@ mod tests {
         let off = gateway_run_with(folder, Duration::from_secs(5), true, false, &both);
         assert_eq!(off.prompt, gateway_prompt(folder, true));
         let unguided = gateway_run_with(folder, Duration::from_secs(5), false, true, &none);
-        assert_eq!(unguided.prompt, prompt(folder));
+        assert_eq!(unguided.prompt, gateway_prompt(folder, false));
     }
 
     /// #7245: a gateway agent's make never gets the guide's check, which
@@ -3491,6 +3491,8 @@ mod tests {
         let folder = Path::new("/w/make-1");
         for guided in [false, true] {
             let words = gateway_prompt(folder, guided);
+            // After the first words, which name every file the folder may hold.
+            let words = words.strip_prefix(GATEWAY_CAN).unwrap();
             let before = &words[..words.find(FORM_ORDER).unwrap()];
             assert!(before.contains(RULES_FILE), "{before}");
             assert_eq!(before.contains(GUIDE_FILE), guided, "{before}");
@@ -3606,6 +3608,6 @@ mod tests {
                 words
             );
         }
-        assert!(GATEWAY_CAN.len() <= 320, "{}", GATEWAY_CAN.len());
+        assert!(GATEWAY_CAN.len() <= 420, "{}", GATEWAY_CAN.len());
     }
 }

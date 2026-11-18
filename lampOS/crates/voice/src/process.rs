@@ -3959,6 +3959,7 @@ mod tests {
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
+                    || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
                     || name == crate::agent_asks::HARD_ENVIRONMENT
@@ -4150,6 +4151,7 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
+                    "LAMP_MAKE_AGENT_FIRST=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_NO_CANNOT=on",

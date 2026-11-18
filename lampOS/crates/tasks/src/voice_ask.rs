@@ -78,10 +78,12 @@ pub const MOST_ASK_BYTES: usize = 2_000;
 /// The most grants: one service's read (writes come with their own gates
 /// in a later cut).
 pub const MOST_GRANTS: usize = 1;
-/// The least and most a run may be given: a make's
-/// (`crate::skill_make::MOST_WITHIN`, 120 s).
+/// The least and most a run may be given: a make's least
+/// (`crate::skill_make::LEAST_WITHIN`) and 120 s, its own: a live ask is
+/// waited on by the person, so it keeps 120 s though a make may now take
+/// 10 minutes (#7245).
 pub const LEAST_WITHIN: Duration = crate::skill_make::LEAST_WITHIN;
-pub const MOST_WITHIN: Duration = crate::skill_make::MOST_WITHIN;
+pub const MOST_WITHIN: Duration = Duration::from_secs(120);
 /// What a second ask is told while one runs.
 pub const BUSY: &str = "the lamp's agent is already on an ask; one is taken at a time";
 /// A gateway agent's ask is an answer only (Heron's P2 on #7509): its turn

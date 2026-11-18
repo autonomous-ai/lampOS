@@ -1634,8 +1634,10 @@ pub const MOST_REPAIR_BYTES: usize = 735;
 /// The longest a [`brief`] is with the longest request, any service's
 /// read step included: no longer half the tasks part's 2,000 bytes, but
 /// small enough that its repair, with the [`REPAIR_MARK`], the check's
-/// [`MOST_REPAIR_BYTES`] and the ask, still fits that bound.
-pub const MOST_BRIEF_BYTES: usize = 1_160;
+/// [`MOST_REPAIR_BYTES`] and the ask, still fits that bound. 1,440 since
+/// the brief tells the remind step, `every` with it (#7245), within the
+/// tasks part's 3,000.
+pub const MOST_BRIEF_BYTES: usize = 1_440;
 const _: () = assert!(
     MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len()
         <= crate::agent_tasks::MOST_TASK_BYTES
