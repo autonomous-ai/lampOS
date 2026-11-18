@@ -252,6 +252,12 @@ struct Look {
     /// `looking`, both from that face (`LAMP_EYES_PITCH_GAZE`,
     /// [`SpeakingFaces::turned_pose_between`]); none with two such faces.
     turned_pose: (Option<f32>, Option<bool>),
+    /// The speaker's `pitch` and `looking`, turned to the lamp or not: the
+    /// one face read speaking, or, with none read speaking, the only face in
+    /// view when its mouth was not read still (a head down to a phone may
+    /// leave its mouth unread); none with two speaking faces or several in
+    /// view (#7721, [`SpeakingFaces::speaker_pose_between`]).
+    speaker_pose: (Option<f32>, Option<bool>),
     /// The eyes' word in this look on which lost id each face follows
     /// (`follows`, #4885): (old, new), bare ids.
     follows: Vec<(String, String)>,
@@ -457,6 +463,15 @@ impl SpeakingFaces {
             [face] => (face.pitch, face.looking),
             _ => (None, None),
         };
+        let speaker = match speaking_faces.as_slice() {
+            [face] => Some(*face),
+            [] => frame.and_then(|(_, faces)| match faces.faces.as_slice() {
+                [face] if state(&face) != Some(SpeakingState::No) => Some(face),
+                _ => None,
+            }),
+            _ => None,
+        };
+        let speaker_pose = speaker.map_or((None, None), |face| (face.pitch, face.looking));
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
@@ -498,6 +513,7 @@ impl SpeakingFaces {
             turned_silent,
             turned_unread,
             turned_pose,
+            speaker_pose,
             follows,
         });
     }
@@ -1055,6 +1071,50 @@ impl SpeakingFaces {
                 .filter(|look| look.at >= from && look.at <= to)
                 .find(|look| look.turned_pose != (None, None))
                 .map_or((None, None), |look| look.turned_pose)
+        })
+    }
+
+    /// The speaker's pose over the looks from `from` to `to` (each look's
+    /// speaker as [`Look::speaker_pose`] has it): the median pitch (radians,
+    /// down positive) of the looks that gave one, the eyes' lost marks
+    /// ([`crate::said_to_me::LOST_DEG`]) left out, so most looks down is
+    /// down, and `looking` false when more looks read it false than true;
+    /// `None` when no look gave it, which is unknown (`LAMP_SAID_TO_ME` in a
+    /// conversation's window, #7721); with the number of looks that gave
+    /// either, for the journal.
+    pub fn speaker_pose_between(
+        &self,
+        from: Instant,
+        to: Instant,
+    ) -> (Option<f32>, Option<bool>, usize) {
+        self.looks.lock().map_or((None, None, 0), |looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            // The eyes' lost-marks sentinel is no pitch (#7721).
+            let measured = |look: &&Look| {
+                look.speaker_pose
+                    .0
+                    .filter(|pitch| !crate::said_to_me::lost(*pitch))
+            };
+            let mut pitches: Vec<f32> = during().filter_map(measured).collect();
+            let used = during()
+                .filter(|look| measured(look).is_some() || look.speaker_pose.1.is_some())
+                .count();
+            pitches.sort_by(f32::total_cmp);
+            let half = pitches.len() / 2;
+            let pitch = match pitches.len() {
+                0 => None,
+                n if n % 2 == 1 => Some(pitches[half]),
+                _ => Some((pitches[half - 1] + pitches[half]) / 2.0),
+            };
+            let gaze: Vec<bool> = during().filter_map(|look| look.speaker_pose.1).collect();
+            let away = gaze.iter().filter(|looking| !**looking).count();
+            let looking = (!gaze.is_empty()).then_some(away * 2 <= gaze.len());
+            (pitch, looking, used)
         })
     }
 
@@ -2813,6 +2873,44 @@ mod tests {
         seen.faces[0].speaking.as_mut().unwrap().state = Yes;
         both.look(from, Some((("b", 0), &seen)));
         assert_eq!(both.turned_pose_between(from, to), (None, None));
+    }
+
+    /// #7721: the speaker's pose over the line, turned to the lamp or not:
+    /// most looks down is down (one level look among them changes nothing),
+    /// most looks away is away; the only face in view, its mouth unread,
+    /// is the speaker; a lone face read still, or no pose, is unknown.
+    #[test]
+    fn the_speakers_pose_is_read_over_the_line() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        let look = |eyes: &SpeakingFaces,
+                    index: u32,
+                    state: SpeakingState,
+                    pitch: f32,
+                    looking: Option<bool>| {
+            let mut seen = faces(&[("f1", state)]);
+            seen.faces[0].facing = Some(false);
+            seen.faces[0].pitch = Some(pitch);
+            seen.faces[0].looking = looking;
+            eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
+        };
+        look(&eyes, 0, Yes, 0.7, Some(false));
+        look(&eyes, 1, Yes, 0.8, Some(false));
+        look(&eyes, 2, Yes, 0.0, Some(true));
+        let to = from + EVERY * 3;
+        assert_eq!(eyes.speaker_pose_between(from, to), (Some(0.7), Some(false), 3));
+        assert_eq!(eyes.turned_pose_between(from, to), (None, None), "not turned");
+        let unread = SpeakingFaces::default();
+        look(&unread, 0, Unknown, 0.7, None);
+        assert_eq!(unread.speaker_pose_between(from, to), (Some(0.7), None, 1));
+        let still = SpeakingFaces::default();
+        look(&still, 0, No, 0.7, Some(false));
+        assert_eq!(still.speaker_pose_between(from, to), (None, None, 0));
+        // Lost marks (the eyes' 90 degrees) are no pitch: unread.
+        let lost = SpeakingFaces::default();
+        look(&lost, 0, Yes, std::f32::consts::FRAC_PI_2, None);
+        assert_eq!(lost.speaker_pose_between(from, to), (None, None, 0));
+        assert_eq!(eyes.speaker_pose_between(to, to), (None, None, 0));
     }
 
     /// #7442: one `yes` in one or two looks is a face seen speaking; a mouth
