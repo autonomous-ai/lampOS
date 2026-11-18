@@ -786,7 +786,8 @@ pub fn tell_news(lines: &[String], room: &mut impl Room) -> String {
 /// time.
 pub const FAILED_ONCE_WITHIN: Duration = Duration::from_secs(6 * 60 * 60);
 
-/// When each skill's failure line was last taken to be said, unix ms
+/// When each skill's failure line was last taken to be said, in the room's
+/// ms (its monotonic clock, [`Room::now_ms`])
 /// ([`tell_failed_once`]). In memory only: a restart may tell one once
 /// more. Entries older than [`FAILED_ONCE_WITHIN`] are dropped at each
 /// take, so it holds at most the skills that failed in that time.
