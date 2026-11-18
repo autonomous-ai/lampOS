@@ -737,6 +737,7 @@ A case carries no words and no names:
 | `words`, `question`, `named` | Its word count, a `?` in it, the lamp's name heard in its sound |
 | `going_on`, `turned`, `yes_awaited` | In a live conversation's window; a face turned to the lamp (the worker's `signs.turned`); the lamp waits for a yes or no of its own asking |
 | `lamp_asked`, `another_voice` | The lamp's own question waits for its answer (the worker's `signs.lamp_asked`); another voice in the conversation, so the lone face's pose gives none (#7726). Both default to `false` |
+| `asked_s` | Seconds from the start of the lamp's words that asked to the line, when the journal gives them: with `lamp_asked`, the question still waits for the out-of-window answer within `said_to_me::QUESTION_WAITS` (120 s). Not given, it waits no more (the Reviewer-lead's HOLD on #7705) |
 | `yes_no` | The line was a bare yes or no, as the journal or its reader recorded it: its placeholder words are "yes", for `said_to_me`'s out-of-window answer to the lamp's question (#7698). Defaults to `false` |
 | `eyes` | The kit's eyes sample lines as saved: `S <s> <faces> <area> <yaw deg> <pitch deg> <facing> <looking> <speaking> <voice state>` (the largest face only) |
 | `expect` | `answered`, or the journal's `held: <reason>` (`said_to_me::Held::reason`) |
