@@ -85,3 +85,18 @@ def request_def(op: str) -> dict[str, Any]:
         if definition["properties"]["op"]["const"] == op:
             return definition
     raise KeyError(op)
+
+
+def app_ops() -> tuple[str, ...]:
+    """The ops only an installed app's socket takes (#7415): `phrases.set`, `app.took`, `app.settings.get` and
+    `app.panel.set`, kept apart from `ops()` (the door's) in the schema's `app_request`."""
+    defs = schema()["$defs"]
+    return tuple(
+        defs[ref["$ref"].rsplit("/", 1)[1]]["properties"]["op"]["const"]
+        for ref in defs["app_request"]["oneOf"]
+    )
+
+
+def app_events() -> tuple[str, ...]:
+    """The events only an installed app's socket sends: `app.trigger` and `app.settings`."""
+    return tuple(schema()["$defs"]["app_event"]["properties"]["ev"]["enum"])

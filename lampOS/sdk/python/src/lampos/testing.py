@@ -32,6 +32,7 @@ import ssl
 import sys
 import tempfile
 import time
+import unicodedata
 import wave
 from collections import defaultdict
 from typing import Any
@@ -558,7 +559,35 @@ class FakeLamp:
         face: dict[str, float] | None = None,
         app_reach: bool = False,
         local: bool = False,
+        app: bool = False,
+        app_name: str = "fake-app",
+        app_grants: tuple[str, ...] | list[str] = ("speak", "hear", "light"),
+        app_version: str = "1.0.0",
+        app_settings: dict[str, Any] | None = None,
+        panel_rate_s: float = 60.0,
     ):
+        # `app`: also serve an installed app's socket (a unix socket, `app_path`, what LAMP_APP_SOCKET names on the lamp)
+        # for `Lamp.connect_app`: no token and no key, the kernel's word on who connects is the trust, so a connection
+        # IS the app `app_name` with `app_grants` (the installed manifest's, which lamp-control reads, never the app).
+        # The messages are nine's (#7415, piece 3): phrases.set, app.took, app.settings.get, app.panel.set, and the
+        # events phrase.heard, app.trigger and app.settings.
+        self.app = app
+        self.app_name = app_name
+        self.app_version = app_version
+        self.app_grants = list(app_grants)
+        # The owner's values for the manifest's settings (`set_app_setting` changes one and tells the app), the
+        # phrases each connection listens for (`phrases.set`), the turns an app took (`app.took`), and the panel.
+        self.app_settings: dict[str, Any] = dict(app_settings or {})
+        self.app_phrases: dict[int, list[str]] = {}
+        self.app_took_turns: list[str] = []
+        self.panel_rate_s = panel_rate_s
+        self.app_panel: dict[str, Any] | None = None
+        self._panel_rev = 0
+        self._panel_at: float | None = None
+        self.app_path: str | None = None
+        self._app_server = None
+        self._app_dir: tempfile.TemporaryDirectory | None = None
+        self._app_ws: set[int] = set()
         # `local`: also serve lamp-control's control socket (a unix socket, `local_path`) for a skill's run,
         # where a one-run token from `mint_token` is what lets a connection in (`Lamp.local`).
         self.local = local
@@ -695,6 +724,11 @@ class FakeLamp:
             if jsonschema
             else None
         )
+        self._app_validator = (
+            jsonschema.Draft202012Validator({**schema.schema(), "oneOf": [{"$ref": "#/$defs/app_request"}]})
+            if jsonschema
+            else None
+        )
 
     async def __aenter__(self) -> "FakeLamp":
         cert, key = _certificate()
@@ -714,6 +748,10 @@ class FakeLamp:
             self._local_dir = tempfile.TemporaryDirectory()
             self.local_path = os.path.join(self._local_dir.name, "control.sock")
             self._local_server = await unix_serve(self._serve_local, self.local_path)
+        if self.app:
+            self._app_dir = tempfile.TemporaryDirectory()
+            self.app_path = os.path.join(self._app_dir.name, "app.sock")
+            self._app_server = await unix_serve(self._serve_app, self.app_path)
         return self
 
     async def __aexit__(self, *_exc) -> None:
@@ -729,6 +767,10 @@ class FakeLamp:
             self._local_server.close()
             await self._local_server.wait_closed()
             self._local_dir.cleanup()
+        if self._app_server is not None:
+            self._app_server.close()
+            await self._app_server.wait_closed()
+            self._app_dir.cleanup()
         for folder in self._folders:
             shutil.rmtree(folder, ignore_errors=True)
         self._folders.clear()
@@ -1113,6 +1155,13 @@ class FakeLamp:
         finally:
             self._local_ws.discard(id(ws))
 
+    async def _serve_app(self, ws: ServerConnection) -> None:
+        self._app_ws.add(id(ws))
+        try:
+            await self._serve(ws)
+        finally:
+            self._app_ws.discard(id(ws))
+
     async def _serve(self, ws: ServerConnection) -> None:
         nonce = os.urandom(32)
         client: str | None = None
@@ -1156,7 +1205,16 @@ class FakeLamp:
                     if refusal is not None:
                         await self._refuse(ws, id_, "bad_request", refusal)
                         continue
-                if self._validator is not None:
+                if request.get("op") in schema.app_ops():
+                    # An app's own ops: only on an app's socket, held to the schema's `app_request`.
+                    if id(ws) not in self._app_ws:
+                        await self._refuse(ws, id_, "bad_request", f"{request['op']}: only on an app's socket")
+                        continue
+                    errors = list(self._app_validator.iter_errors(request)) if self._app_validator is not None else []
+                    if errors:
+                        await self._refuse(ws, id_, "bad_request", errors[0].message)
+                        continue
+                elif self._validator is not None:
                     errors = list(self._validator.iter_errors(request))
                     if errors:
                         await self._refuse(ws, id_, "bad_request", errors[0].message)
@@ -1168,6 +1226,9 @@ class FakeLamp:
                     await self._refuse(ws, id_, "bad_request", "frames: each frame is five whole counts")
                     continue
                 op = request.get("op")
+                if op == "pair" and id(ws) in self._app_ws:
+                    await self._refuse(ws, id_, "bad_request", "this socket is not for pairing: it is an app's")
+                    continue
                 if op == "pair" and id(ws) in self._local_ws:
                     await self._refuse(ws, id_, "bad_request", "this socket is not for pairing: it is a skill run's")
                     continue
@@ -1186,6 +1247,7 @@ class FakeLamp:
         finally:
             self._connections.discard(ws)
             self.subscribed.pop(id(ws), None)
+            self.app_phrases.pop(id(ws), None)
             self.following.pop(id(ws), None)
             # A computer gone lifts its mute: its last connection closed.
             gone = self._client_of.pop(id(ws), None)
@@ -1218,6 +1280,8 @@ class FakeLamp:
         await self._ok(ws, request["id"], client=client, grants=self.grants)
 
     async def _hello(self, ws, request: dict, nonce: bytes) -> str | None:
+        if id(ws) in self._app_ws:
+            return await self._hello_app(ws, request)
         if id(ws) in self._local_ws or "token" in request:
             return await self._hello_token(ws, request)
         paired = self.clients.get(request["client"])
@@ -1232,6 +1296,22 @@ class FakeLamp:
         limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
         await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
         return request["client"]
+
+    async def _hello_app(self, ws, request: dict) -> str | None:
+        """A hello on an app's socket (#7415): client c_0 and a zero signature, as the agent socket's, and no token;
+        the app is known by the socket (the kernel's word on its cgroup), not by anything it sends. The reply adds the
+        app's name and version beside the manifest's grants."""
+        if request.get("client") != "c_0" or request.get("sig") != base64.b64encode(bytes(64)).decode() or "token" in request:
+            await self._refuse(ws, request["id"], "bad_request", "on this socket hello is client c_0 and a zero sig, no token")
+            await ws.close()
+            return None
+        client = f"app_{self.app_name}"
+        self.clients[client] = {"key": b"", "name": f"app {self.app_name}", "grants": list(self.app_grants)}
+        limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
+        await self._ok(
+            ws, request["id"], lamp=self.lamp, grants=list(self.app_grants), limits=limits, app=self.app_name, version=self.app_version
+        )
+        return client
 
     async def _hello_token(self, ws, request: dict) -> str | None:
         """A hello on the control socket: a live one-run token and no key (client c_0, a zero signature)."""
@@ -1269,6 +1349,8 @@ class FakeLamp:
     STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
+        if op == "phrases.set":
+            return ["hear"]
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
@@ -1461,6 +1543,72 @@ class FakeLamp:
             moves={"kept": sorted(moves), "left_out": [{"name": n, "why": w} for n, w in left_out]},
         )
 
+    # An installed app's ops and events (#7415).
+
+    async def _app_op(self, ws, request: dict) -> None:
+        op, id_ = request["op"], request["id"]
+        if op == "phrases.set":
+            phrases = request["phrases"]
+            if any(sum(unicodedata.category(c)[0] in "LMN" for c in phrase) < 8 for phrase in phrases):
+                await self._refuse(ws, id_, "bad_request", "a phrase is at least 8 letters")
+                return
+            # At most 16 an app across its connections: this connection's new list and the others' kept ones.
+            others = {p for key, held in self.app_phrases.items() if key != id(ws) for p in held}
+            if len(others | set(phrases)) > 16:
+                await self._refuse(ws, id_, "bad_request", "at most 16 phrases")
+                return
+            self.app_phrases[id(ws)] = list(phrases)
+            await self._ok(ws, id_, phrases=len(phrases))
+        elif op == "app.took":
+            self.app_took_turns.append(request["turn"])
+            await self._ok(ws, id_)
+        elif op == "app.settings.get":
+            await self._ok(ws, id_, settings=dict(self.app_settings))
+        else:
+            # app.panel.set: text only, one a minute an app.
+            if any(unicodedata.category(c) == "Cc" for c in [*request["title"], *"".join(request["lines"])]):
+                await self._refuse(ws, id_, "bad_request", "text, no control characters")
+                return
+            now = self.clock()
+            if self._panel_at is not None and now - self._panel_at < self.panel_rate_s:
+                await self._refuse(ws, id_, "rate", "one panel a minute", retry_ms=round((self.panel_rate_s - (now - self._panel_at)) * 1000))
+                return
+            self._panel_at = now
+            self._panel_rev += 1
+            self.app_panel = {"title": request["title"], "lines": list(request["lines"]), "rev": self._panel_rev}
+            await self._ok(ws, id_, rev=self._panel_rev)
+
+    async def _tell_apps(self, event: str, only_phrase: str | None = None, **fields: Any) -> None:
+        frame = json.dumps({"ev": event, "at": _now(), **fields})
+        for ws in list(self._connections):
+            if id(ws) not in self._app_ws:
+                continue
+            if only_phrase is not None and only_phrase not in self.app_phrases.get(id(ws), []):
+                continue
+            await ws.send(frame)
+
+    async def hear_phrase(self, phrase: str) -> None:
+        """The person said `phrase`: each app connection that listens for it (`listen_for`) is told `phrase.heard`,
+        the phrase only, never what was said."""
+        await self._tell_apps("phrase.heard", only_phrase=phrase, phrase=phrase)
+
+    async def trigger(self, trigger: str, phrase: str, turn: str = "turn-1") -> None:
+        """A trigger of the app's manifest matched `phrase`: `app.trigger` with its name and a `turn` to `took`,
+        whether or not the app ever called `listen_for`."""
+        await self._tell_apps("app.trigger", trigger=trigger, phrase=phrase, turn=turn)
+
+    async def set_app_setting(self, **changed: Any) -> None:
+        """The owner changed settings in the app: the values are kept and the app is told `app.settings`, the keys
+        that changed and every value now. (lamp-control checks a value against the manifest first: a bad one never
+        gets here.)"""
+        self.app_settings.update(changed)
+        await self._tell_apps("app.settings", changed=sorted(changed), settings=dict(self.app_settings))
+
+    async def stop_app(self, why: str = "the owner stopped the app") -> None:
+        """The owner stops, removes or updates the app: no goodbye event, the connection closes with `why`."""
+        for ws in [ws for ws in list(self._connections) if id(ws) in self._app_ws]:
+            await ws.close(1000, why)
+
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
         grants = self.clients[client]["grants"]
@@ -1496,7 +1644,9 @@ class FakeLamp:
             return
         self.requests.append(request)
         self._asker[id_] = ws
-        if op == "subscribe":
+        if op in schema.app_ops():
+            await self._app_op(ws, request)
+        elif op == "subscribe":
             self.subscribed[id(ws)].update(request["events"])
             await self._ok(ws, id_)
         elif op == "unsubscribe":
