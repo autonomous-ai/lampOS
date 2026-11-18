@@ -353,7 +353,7 @@ pub fn set_off_said_here(on: Option<bool>) {
 /// pass of no cost) is judged in one short call ([`Judge`], [`judge_ask`]);
 /// a clear no refuses it, before anything is kept, and the person is
 /// asked again ([`UNRELATED`]). Yes or an unclear answer keeps it; a
-/// timeout or an error does as [`ON_JUDGE_LOST`] says (kept). Off,
+/// timeout or an error does as [`on_judge_lost`] says: kept when it runs only when asked and never moves the body, asked again otherwise. Off,
 /// every make is byte for byte as before. Read by the voice alone: set it
 /// in `lamp-voice`.
 pub const UNRELATED_ENVIRONMENT: &str = "LAMP_MADE_UNRELATED_REFUSED";
@@ -710,9 +710,40 @@ pub enum OnJudgeLost {
     AskAgain,
 }
 
-/// What a judge's timeout or error does (#7621): kept for now, the first
-/// builder's call to flip to [`OnJudgeLost::AskAgain`] in this one line.
-pub const ON_JUDGE_LOST: OnJudgeLost = OnJudgeLost::Keep;
+/// What a judge's timeout or error does to a made skill (#7621, the first
+/// builder's ruling, 18 Nov 05:34): kept when it runs only when the person
+/// asks for it and never moves the body (wrong, it does nothing until
+/// asked, and its say-back is heard); asked again when it runs on its own
+/// (a trigger or a time) or moves the body (wrong, it is the 04:15 dance:
+/// unasked, at night, with nobody to stop it).
+pub fn on_judge_lost(toml: &str) -> OnJudgeLost {
+    let Ok(table) = toml.parse::<toml::Table>() else {
+        return OnJudgeLost::AskAgain;
+    };
+    let on_its_own = ["trigger", "triggers", "schedule", "at", "every"]
+        .iter()
+        .any(|key| table.contains_key(*key));
+    let body_granted = table
+        .get("permissions")
+        .and_then(|permissions| permissions.get("body"))
+        .and_then(toml::Value::as_bool)
+        .unwrap_or(false);
+    let body_step = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            steps.iter().any(|step| {
+                ["body", "gesture", "move"]
+                    .iter()
+                    .any(|key| step.get(*key).is_some())
+            })
+        });
+    if on_its_own || body_granted || body_step {
+        OnJudgeLost::AskAgain
+    } else {
+        OnJudgeLost::Keep
+    }
+}
 
 impl Judged {
     /// Whether this answer refuses the skill, a lost judge's as `lost`
@@ -750,7 +781,7 @@ impl std::fmt::Debug for Judge<'_> {
 
 /// Whether a made skill is refused as unrelated to what was asked (#7621):
 /// a clear no of `judge` for one with no word of the ask
-/// ([`unrelated_words`]), or its timeout or error as [`ON_JUDGE_LOST`]
+/// ([`unrelated_words`]), or its timeout or error as [`on_judge_lost`]
 /// says; none without a judge.
 fn judged_unrelated(files: &Files, request: &Asked<'_>) -> bool {
     let Some(judge) = request.judge else {
@@ -760,7 +791,7 @@ fn judged_unrelated(files: &Files, request: &Asked<'_>) -> bool {
         return false;
     };
     let judged = (judge.ask)(&judge_ask(judge.line, &made));
-    let refused = judged.refuses(ON_JUDGE_LOST);
+    let refused = judged.refuses(on_judge_lost(&files.toml));
     eprintln!(
         "lamp-voice: a made skill with no word of the ask: judge={}{}",
         judged.journaled(),
@@ -16843,6 +16874,23 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             &unjudged,
         );
         assert!(made.is_ok(), "{made:?}");
+        // A lost judge asks again of a skill that runs on its own and moves
+        // the body (the first builder's ruling, 05:34): the 04:15 dance.
+        for (index, lost) in [Judged::Timeout, Judged::Failed].into_iter().enumerate() {
+            let judge = move |_: &str| lost;
+            let refused = keep_asked(
+                &answer(MORNING_SKIP, MORNING_SKIP_CARD),
+                false,
+                &format!("local:s1:{}:1", 20 + index),
+                &keeping,
+                &judged_by(FOURTEEN_ASK, FOURTEEN, &judge),
+            );
+            assert_eq!(
+                refused.unwrap_err(),
+                Refused(UNRELATED.into(), None),
+                "{lost:?}"
+            );
+        }
         set_asks_here(None);
         set_english_here(None);
         set_unrelated_here(None);
@@ -17093,7 +17141,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             let asked = judged_by(FOURTEEN_ASK, FOURTEEN, &no);
             assert!(judged_unrelated(&files, &asked), "{card}");
         }
-        // A lost judge, both ways [`ON_JUDGE_LOST`] may be set.
+        // A lost judge, both ways [`on_judge_lost`] may give.
         for lost in [Judged::Timeout, Judged::Failed] {
             assert!(!lost.refuses(OnJudgeLost::Keep), "{lost:?}");
             assert!(lost.refuses(OnJudgeLost::AskAgain), "{lost:?}");
@@ -17107,7 +17155,15 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
                 assert_eq!(judged.refuses(lost), refuses, "{judged:?} {lost:?}");
             }
         }
-        assert_eq!(ON_JUDGE_LOST, OnJudgeLost::Keep, "kept for now");
+        // The first builder's ruling (05:34): a lost judge keeps a say-only
+        // skill the person starts, and asks again of one that runs on its
+        // own or moves the body.
+        assert_eq!(on_judge_lost(MOON_TIME), OnJudgeLost::Keep);
+        assert_eq!(on_judge_lost(MORNING_SKIP), OnJudgeLost::AskAgain);
+        let timed = "asks = [\"moon time\"]\n[[do]]\nsay = { text = \"Hi.\" }\n[[do]]\nbody = { gesture = \"nod\" }\n";
+        assert_eq!(on_judge_lost(timed), OnJudgeLost::AskAgain, "a body step");
+        assert_eq!(on_judge_lost("every = \"1h\"\n"), OnJudgeLost::AskAgain);
+        assert_eq!(on_judge_lost("not toml ["), OnJudgeLost::AskAgain);
         assert_eq!(Judged::read(" No, it doesn't."), Judged::No);
         assert_eq!(Judged::read("Yes."), Judged::Yes);
         assert_eq!(Judged::read("Nope"), Judged::Unclear);
