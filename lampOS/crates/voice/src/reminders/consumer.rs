@@ -686,6 +686,9 @@ impl<P: Persistence> Consumer<P> {
             .as_str()
             .ok_or_else(|| invalid("Schedule item has no text"))?
             .to_owned();
+        // A timer by Schedule's `kind` (#7642); any other, or none from an
+        // older Schedule, is a reminder's.
+        let timer = item["kind"] == "timer";
         let late = item["late"]
             .as_bool()
             .ok_or_else(|| invalid("Schedule item has no late flag"))?;
@@ -730,6 +733,7 @@ impl<P: Persistence> Consumer<P> {
             expires_at_us,
             also,
             again,
+            timer,
         };
         // Disk latency cannot refresh the observation that preceded it.
         if !offer.fresh(monotonic_us()) {

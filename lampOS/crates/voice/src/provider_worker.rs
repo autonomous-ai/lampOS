@@ -977,6 +977,12 @@ pub enum ProviderInput {
         /// with that switch on, so the packet is as before when off.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         ids: Vec<u64>,
+        /// A timer (Schedule's `kind`), not a reminder: at the usage limit
+        /// the second route rings it with its own fixed line
+        /// (`LAMP_LIMIT_LOCAL_ASKS`, #7642). Sent only when true, so an
+        /// older build's packet is a reminder's.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        timer: bool,
     },
 }
 impl ProviderInput {

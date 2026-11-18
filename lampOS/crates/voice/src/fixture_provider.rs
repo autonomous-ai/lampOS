@@ -954,6 +954,7 @@ mod reminder_tests {
                         also: Vec::new(),
                         again: false,
                         ids: Vec::new(),
+                        timer: false,
                     },
                 )
                 .unwrap();

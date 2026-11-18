@@ -1700,6 +1700,20 @@ drops it from the retry map. Tests:
 `no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording`
 (`coordinator/tests/reminders.rs`).
 
+At the relay's usage limit, with `LAMP_LIMIT_LOCAL_ASKS=on` (#7642, V2's
+ruling A), every such chat turn is refused, so a ring would end with no
+audio five times and be held. Instead the second route rings a due timer
+with "Your timer is done." and a reminder with "You have a reminder.", from
+clips rendered at start ([second-voice.md](second-voice.md)), and the turn
+ends answered with that audio: the item is completed as said, rung once,
+neither held nor rung again. The consumer reads the item's `kind` from
+Schedule's `get` into `Offer::timer`, passed on as `ProviderInput::Reminder`'s
+`timer`; both are sent only when true and read as false when absent, so an
+older packet is a reminder's. A timer said with others as late takes the
+reminder's line. Tests: `an_offer_without_timer_is_a_reminders_and_sent_as_before`
+(`reminders/tests.rs`), and the two in `second_provider/tests/limit_local.rs`
+named for a due timer.
+
 Crash-uncertain attempts (no settlement ever sent) stay pending without
 re-speech while the voice that made them runs. Such an oldest entry does
 not starve other due work: a bounded page scan may select another pending

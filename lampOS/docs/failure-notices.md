@@ -453,7 +453,9 @@ the key, not whether the turn had audio: a turn that played part of its
 answer and then failed mid-sentence still says `turn_lost`, since nothing
 told the person it broke, and so does a turn with nothing played. The route's
 "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) sends no
-`DownLineSaid`.
+`DownLineSaid`. A due timer or reminder rung at the usage limit with
+`LAMP_LIMIT_LOCAL_ASKS` ("Your timer is done.", "You have a reminder.",
+#7642) is no failure: its turn ends answered, so no notice is selected.
 
 `failure_notice_selected`, `failure_notice_attempted`,
 `failure_notice_first_write` and `failure_notice_final_sample_retired` describe
