@@ -191,6 +191,7 @@ fn every_gateway_make_example_packs() {
             "water-while-here",
             "break-timer",
             "breathing-coach",
+            "exchange-rate",
             "water-breaks",
         ]
     );
