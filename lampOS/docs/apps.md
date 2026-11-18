@@ -9,8 +9,8 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 
 **Status, honestly.** Built: the package format and its reader (piece 1,
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
-3a, `app_yes.rs`, [control.md](control.md)). Designed and not yet built: the
-app socket in lamp-control (piece 3b), lamp-cloud's `apps.*` kinds
+3a, `app_yes.rs`) and the app socket without phrases and triggers (piece 3b-1, `app_socket.rs`, [control.md](control.md)). Designed and not yet built: the
+app socket's phrases and triggers (piece 3b-2), lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that does not
 know format 2 refuses an app package in words ("format 2 is not one this lamp
@@ -151,7 +151,7 @@ helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 
 ### The app socket
 
-(Piece 3, not yet built; the SDK's fake lamp speaks it.) One socket,
+(Built in piece 3b-1 except `phrases.set`, `phrase.heard` and `app.trigger`, which are 3b-2; the SDK's fake lamp speaks it all. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
 `LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in a root
 0755 folder: the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`),
 read from `SO_PEERCRED`'s pid, never a name the app says. It speaks the door's

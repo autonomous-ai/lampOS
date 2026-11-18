@@ -204,6 +204,11 @@ pub struct Shared {
     /// The owner's yeses to apps and what lamp-control holds of them
     /// ([`crate::app_yes`]), in memory only.
     apps: Mutex<(crate::app_yes::Yeses, crate::app_yes::Live)>,
+    /// Where the installed apps are (`crate::app_yes::APPS_DIR` unless the
+    /// app socket was served from another place).
+    apps_dir: Mutex<PathBuf>,
+    /// Whether apps are on, as the app socket reads it.
+    apps_on: Mutex<fn() -> bool>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
@@ -386,6 +391,8 @@ impl Shared {
             manage: Mutex::new(None),
             task_yes: Mutex::new(None),
             apps: Mutex::default(),
+            apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+            apps_on: Mutex::new(crate::app_yes::on),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -633,6 +640,8 @@ impl Shared {
                 manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
                 apps: Mutex::default(),
+                apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+                apps_on: Mutex::new(crate::app_yes::on),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -913,6 +922,14 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
+    fn tell_client(&self, client: &str, event: &Value) {
+        for each in self.open.lock().expect("open").values() {
+            if each.client.as_deref() == Some(client) {
+                let _ = each.outbox.send(event.clone());
+            }
+        }
+    }
+
     fn close_client(&self, client: &str, why: &'static str) {
         let mut open = self.open.lock().expect("open");
         let mut reasons = self.close_reasons.lock().expect("close reasons");
@@ -1220,7 +1237,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote, None, false).await;
+                connection(socket, shared, remote, None, false, None).await;
             }
         });
     }
@@ -1295,7 +1312,7 @@ pub async fn serve_agent(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, Some(client), false).await;
+                connection(socket, shared, false, Some(client), false, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
         });
@@ -1361,9 +1378,115 @@ pub async fn serve_run(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, None, true).await;
+                connection(socket, shared, false, None, true, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+/// The app socket (`crate::app_socket`): the same WebSocket protocol on a unix
+/// socket with no TLS, for the apps installed on this lamp. The kernel names
+/// the peer (`SO_PEERCRED`), and its cgroup the app; a peer in no app's unit,
+/// an app not installed or with a manifest that does not load, or any
+/// connection while apps are off, is closed before a byte is read and said in
+/// the journal.
+pub async fn serve_app(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+) {
+    serve_app_as(
+        listener,
+        apps,
+        shared,
+        crate::app_socket::app_of,
+        crate::app_yes::on,
+    )
+    .await;
+}
+
+/// [`serve_app`] with who the peer is and whether apps are on given, so a
+/// test can name an app without a cgroup.
+pub async fn serve_app_as(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+    who: fn(Option<i32>) -> Option<String>,
+    on: fn() -> bool,
+) {
+    *shared.apps_dir.lock().expect("apps_dir") = apps.clone();
+    *shared.apps_on.lock().expect("apps_on") = on;
+    let held = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let pid = stream.peer_cred().ok().and_then(|cred| cred.pid());
+        if !on() {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: {}",
+                pid.unwrap_or(-1),
+                crate::app_socket::OFF
+            );
+            continue;
+        }
+        let Some(name) = who(pid) else {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: in no app's unit",
+                pid.unwrap_or(-1)
+            );
+            continue;
+        };
+        let peer = match crate::app_socket::peer_for(&apps, &name) {
+            Ok(peer) => peer,
+            Err(why) => {
+                eprintln!(
+                    "lamp-control: app socket: refused {name} (pid {}): {why}",
+                    pid.unwrap_or(-1)
+                );
+                continue;
+            }
+        };
+        {
+            let mut held = held.lock().expect("held");
+            let all: usize = held.values().sum();
+            let mine = held.entry(name.clone()).or_default();
+            if *mine >= crate::app_socket::MOST_EACH || all >= crate::app_socket::MOST {
+                eprintln!("lamp-control: app socket: refused {name}: too many connections");
+                continue;
+            }
+            *mine += 1;
+        }
+        eprintln!(
+            "lamp-control: app {name} {}: a connection from pid {}",
+            peer.version,
+            pid.unwrap_or(-1)
+        );
+        let (shared, held) = (shared.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                shared.apps.lock().expect("apps").1.connection(&name, true);
+                connection(socket, shared.clone(), false, None, false, Some(peer)).await;
+                let mut apps = shared.apps.lock().expect("apps");
+                apps.1.connection(&name, false);
+            }
+            if let Some(count) = held.lock().expect("held").get_mut(&name) {
+                *count = count.saturating_sub(1);
+            }
         });
     }
 }
@@ -1389,6 +1512,7 @@ async fn connection<S>(
     remote: bool,
     local: Option<String>,
     run: bool,
+    app: Option<crate::app_socket::AppPeer>,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -1408,6 +1532,7 @@ async fn connection<S>(
         match &local {
             Some(client) => door.open_local(client),
             None if run => door.open_run(),
+            None if app.is_some() => door.open_app(app.clone().expect("app")),
             None => door.open(),
         }
     };
@@ -1472,6 +1597,52 @@ async fn connection<S>(
                         }
                         _ => break,
                     };
+                    // The ops only an app has, answered before the door parses
+                    // a frame, once it has said hello.
+                    if let Some(name) = session.app_name().map(str::to_owned)
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_socket::is_app_op(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            )
+                        } else {
+                            let state = shared.task_yes.lock().expect("task_yes").clone();
+                            let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+                            let place = crate::app_yes::Place {
+                                apps: &apps_dir,
+                                state: state.as_deref(),
+                            };
+                            let mut apps = shared.apps.lock().expect("apps");
+                            crate::app_socket::answer(
+                                &mut apps.1,
+                                &place,
+                                &name,
+                                &frame,
+                                (*shared.apps_on.lock().expect("apps_on"))(),
+                                std::time::Instant::now(),
+                            )
+                            .unwrap_or_else(|| {
+                                crate::protocol::refused(
+                                    None,
+                                    &crate::protocol::Error::new(
+                                        crate::protocol::ErrorCode::BadRequest,
+                                        "an op has an id and a name",
+                                    ),
+                                )
+                            })
+                        };
+                        if socket.send(Message::text(reply.to_string())).await.is_err() {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
                     let now = shared.now_us();
                     let wall = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -1771,7 +1942,11 @@ fn admin_answer(
     {
         let mut apps = shared.apps.lock().expect("apps");
         let (yeses, live) = &mut *apps;
-        let place = crate::app_yes::Place::product(folder.as_deref());
+        let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+        let place = crate::app_yes::Place {
+            apps: &apps_dir,
+            state: folder.as_deref(),
+        };
         if let Some(answer) = crate::app_yes::answer(
             yeses,
             live,
@@ -1781,6 +1956,25 @@ fn admin_answer(
             crate::app_yes::on(),
             std::time::Instant::now(),
         ) {
+            // The owner changed settings: the app is told at once, whole map.
+            if let (Some(name), Some(changed)) = (
+                asked
+                    .get(crate::app_yes::SETTINGS_SET)
+                    .and_then(|set| set.get("name"))
+                    .and_then(Value::as_str),
+                answer.get("changed").and_then(Value::as_array),
+            ) && !changed.is_empty()
+                && let Some(settings) = crate::app_yes::settings_of(&place, name)
+            {
+                let changed: Vec<String> = changed
+                    .iter()
+                    .filter_map(|key| key.as_str().map(str::to_owned))
+                    .collect();
+                shared.tell_client(
+                    &crate::app_socket::app_client(name),
+                    &crate::app_socket::settings_event(&changed, &settings),
+                );
+            }
             return answer;
         }
     }

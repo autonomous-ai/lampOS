@@ -202,6 +202,10 @@ pub struct Session {
     /// hold a one-run token (`crate::runs`), and says nothing else of who it
     /// is.
     run_socket: bool,
+    /// Set for a connection that came by the app socket: the installed app
+    /// whose cgroup the socket read (`crate::app_socket`). Its `hello` takes
+    /// any well-formed client and signature; the grants are the manifest's.
+    app: Option<crate::app_socket::AppPeer>,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -209,6 +213,11 @@ pub struct Session {
 pub const LOCAL_ONLY: &str = "local network only: the camera, the microphone and the speaker are never given beyond the lamp's own network";
 
 impl Session {
+    /// The app this connection is, by the app socket.
+    pub fn app_name(&self) -> Option<&str> {
+        self.app.as_ref().map(|app| app.name.as_str())
+    }
+
     /// This connection comes from beyond the lamp's own network.
     /// The server's number for this connection.
     pub fn set_connection(&mut self, connection: u64) {
@@ -641,6 +650,7 @@ impl Door {
             connection: None,
             local: None,
             run_socket: false,
+            app: None,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -665,6 +675,14 @@ impl Door {
     pub fn open_run(&mut self) -> (Session, Value) {
         let (mut session, welcome) = self.open();
         session.run_socket = true;
+        (session, welcome)
+    }
+
+    /// A connection that came by the app socket, whose peer the socket has
+    /// already named by its cgroup.
+    pub fn open_app(&mut self, app: crate::app_socket::AppPeer) -> (Session, Value) {
+        let (mut session, welcome) = self.open();
+        session.app = Some(app);
         (session, welcome)
     }
 
@@ -866,6 +884,10 @@ impl Door {
         });
         if left == Some(0) {
             self.open.remove(client);
+            // An app's record lives while it has a connection.
+            if session.app.is_some() {
+                self.clients.end_run(client);
+            }
             return self.leases.client_gone(client, LeaseWhy::Released, now_us);
         }
         Vec::new()
@@ -971,13 +993,17 @@ impl Door {
             return outcome;
         }
         match &op {
-            Op::Pair { .. } if session.local.is_some() || session.run_socket => {
+            Op::Pair { .. }
+                if session.local.is_some() || session.run_socket || session.app.is_some() =>
+            {
                 return reply_refused(
                     Some(re),
                     Error::new(
                         ErrorCode::BadRequest,
                         if session.run_socket {
                             "this socket is not for pairing: it is a skill run's"
+                        } else if session.app.is_some() {
+                            "this socket is not for pairing: it is an app's"
                         } else {
                             "this socket is not for pairing: it is the local agent's"
                         },
@@ -1554,6 +1580,44 @@ impl Door {
             return reply_refused(
                 Some(re),
                 Error::new(ErrorCode::BadRequest, "hello once a connection"),
+            );
+        }
+        // By the app socket: the app its cgroup named, with its manifest's
+        // grants; the client and signature need only be well-formed, and a
+        // token is no part of it.
+        if let Some(app) = session.app.clone() {
+            if token.is_some() || !crate::runs::plain(client) || sig.len() > 128 {
+                let mut outcome = reply_refused(
+                    Some(re),
+                    Error::new(
+                        ErrorCode::BadRequest,
+                        "on this socket hello is a plain client id and a signature, no token",
+                    ),
+                );
+                outcome.close = true;
+                return outcome;
+            }
+            self.clients.add_run(
+                &app.client,
+                &app.name,
+                app.grants.clone(),
+                now_us / 1_000_000,
+            );
+            *self.open.entry(app.client.clone()).or_default() += 1;
+            session.client = Some(app.client.clone());
+            let limits = limits(
+                self.quiet.as_ref().and_then(|quiet| quiet.window),
+                self.rates.lifted(),
+            );
+            return ok(
+                re,
+                json!({
+                    "lamp": self.lamp_info(),
+                    "grants": app.grants,
+                    "limits": limits,
+                    "app": app.name,
+                    "version": app.version,
+                }),
             );
         }
         // By the run socket: a live one-run token and nothing else; the run's
@@ -3974,6 +4038,71 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["re"], 4);
         assert!(fake.did.is_empty());
+    }
+
+    // --- An installed app's socket (#7415 3b) ---
+
+    fn app_peer(grants: &[Grant]) -> crate::app_socket::AppPeer {
+        crate::app_socket::AppPeer {
+            name: "demo".to_owned(),
+            version: "1.2.3".to_owned(),
+            client: crate::app_socket::app_client("demo"),
+            grants: grants.iter().copied().collect(),
+        }
+    }
+
+    #[test]
+    fn an_app_says_hello_with_its_manifests_grants_and_is_told_its_name_and_version() {
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        let mut fake = Fake::default();
+        let (mut session, _) = door.open_app(app_peer(&[Grant::Light]));
+        // No pairing here, and no hello yet.
+        let pair =
+            json!({"id": 1, "op": "pair", "name": "x", "key": "k", "proof": "p"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &pair, &mut fake, S, 1)),
+            Some("bad_request")
+        );
+        let early = json!({"id": 2, "op": "gesture", "name": "nod"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &early, &mut fake, S, 1)),
+            Some("no_hello")
+        );
+        // A token is no part of it; a client that is not plain is refused.
+        let token =
+            json!({"id": 3, "op": "hello", "client": "c_1", "sig": crate::runs::hello_sig(), "token": "T"})
+            .to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &token, &mut fake, S, 1)),
+            Some("bad_request")
+        );
+        let hello =
+            json!({"id": 4, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
+                .to_string();
+        let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+        let said = reply(&outcome);
+        assert_eq!(said["ok"], true, "{outcome:?}");
+        assert_eq!(said["app"], "demo");
+        assert_eq!(said["version"], "1.2.3");
+        assert_eq!(said["grants"], json!(["light"]));
+        // A grant the manifest did not have is refused as the door refuses it.
+        let gesture = json!({"id": 5, "op": "gesture", "name": "nod"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &gesture, &mut fake, S, 3)),
+            Some("no_grant")
+        );
+        // The record lives while a connection does.
+        assert!(
+            door.clients()
+                .get(&crate::app_socket::app_client("demo"))
+                .is_some()
+        );
+        door.closed(&session, 4);
+        assert!(
+            door.clients()
+                .get(&crate::app_socket::app_client("demo"))
+                .is_none()
+        );
     }
 
     // --- A skill run's linked services (#6432) ---
