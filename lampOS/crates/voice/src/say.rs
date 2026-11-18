@@ -261,6 +261,38 @@ fn quiet_for(priority: u8) -> u64 {
         QUIET_US
     }
 }
+
+/// The asker of the app's onboarding pages' lines (lamp-cloud's
+/// `onboarding_page::SAY_SKILL`, #6353): Try's, Add's and the last page's
+/// line, said as the person reads the page the app has open (#7718 items 1
+/// and 9). Self-declared, as every skill name on this socket is.
+pub const PAGE_SKILL: &str = "onboarding-app";
+
+/// Whether `request` is one of the app's page lines ([`PAGE_SKILL`]): a
+/// plain note or exact text, with nothing else asked of it. Such a line
+/// answers the page the person has open, as a computer's turn answers its
+/// computer: it waits only for the lamp's own speech to end and nobody
+/// heard, never a say's [`QUIET_US`] after the last turn nor a
+/// conversation going on (on lamp-0c89 on 18 Nov the Try line came 18 s
+/// after the light turned blue, and the last page's 15 s after the made
+/// skill's read ended). Every other say keeps its gates.
+fn is_page_line(request: &Request) -> bool {
+    request.skill == PAGE_SKILL
+        && matches!(
+            request.words,
+            Words::Note(_) | Words::Exact(_) | Words::ExactSound { .. }
+        )
+        && !request.who
+        && !request.question
+        && !request.quiet
+        && !request.answers
+        && !request.may_end_unsaid
+        && request.task.is_none()
+        && request.invitation.is_none()
+        && request.unplug_request.is_none()
+        && request.line.by.is_none()
+        && request.line.voice.is_none()
+}
 /// How long a client has to send its whole line, from when it was taken:
 /// one deadline for the line, not for each read, so that a client sending
 /// a little at a time cannot keep a place among [`MOST_WAITING`] (the
@@ -2452,8 +2484,29 @@ impl Says {
 
     /// The quiet the next say needs since the last turn, if one waits.
     pub fn quiet_needed_us(&self) -> Option<u64> {
-        self.next_index()
-            .map(|index| quiet_for(self.waiting[index].request.priority))
+        self.next_index().map(|index| {
+            let request = &self.waiting[index].request;
+            // A page line needs no quiet since the last turn ([`is_page_line`]):
+            // the coordinator's other gates still hold it while the lamp
+            // speaks or anyone is heard.
+            if is_page_line(request) {
+                0
+            } else {
+                quiet_for(request.priority)
+            }
+        })
+    }
+
+    /// Whether the next exact line is a page line ([`is_page_line`]) with
+    /// another say of its own waiting: it is said after that say, so the
+    /// last page's line never begins before a made skill's line asked
+    /// earlier (#7718 item 2's order). Only then does it wait for that
+    /// say's quiet.
+    pub fn page_line_behind_a_say(&self) -> bool {
+        self.next_index().is_some()
+            && self
+                .next_of(|request| matches!(request.words, Words::ExactSound { .. }))
+                .is_some_and(|index| is_page_line(&self.waiting[index].request))
     }
 
     /// Whether the next exact line is the prepare-unplug skill's (#6899):
@@ -2469,11 +2522,15 @@ impl Says {
     /// ([`Request::answers`]) while that run now by the owner's voice is
     /// within [`crate::made_run::ANSWERS_WITHIN`] (#7363: "Fig facts is
     /// running now.", then its failure held for the conversation and lost).
+    /// Also an app page's line ([`is_page_line`], #7718 item 1): it answers
+    /// the page the person has open, so the turn that set the light keeps
+    /// no conversation holding it (up to 45 s, past its 30 s expiry).
     pub fn exact_answers(&self) -> bool {
         self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))
             .is_some_and(|index| {
                 let request = &self.waiting[index].request;
                 request.skill == "prepare-unplug"
+                    || is_page_line(request)
                     || (request.answers
                         && crate::made_run::answers_now(&request.skill, Instant::now()))
             })
@@ -5122,6 +5179,54 @@ mod tests {
         assert!(says.asks_for(Source::Tasks, deadline - 1));
         assert!(says.take_from(Source::Tasks, None, deadline).is_none());
         assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Expired)));
+    }
+
+    /// #7718 items 1 and 9: an app page's line (`onboarding-app`, as
+    /// lamp-cloud asks it, no new field) answers the page the person has
+    /// open. As a note it needs no quiet since the last turn; as exact words
+    /// a conversation going on doesn't hold it, as the unplug's lines. Any
+    /// other skill's say, and a page's asked with anything more, keeps its
+    /// gates. Fails before the fix: the note needed 15 s, the exact line
+    /// waited out the conversation.
+    #[test]
+    fn an_app_pages_line_skips_the_quiet_and_every_other_say_keeps_it() {
+        let note = "(Say only this, nothing before or after it: \"That's your first skill. Tap Next in the app.\")";
+        let (page, _answered) = Says::note_for_test("onboarding-app", note, NORMAL_PRIORITY);
+        assert_eq!(page.quiet_needed_us(), Some(0));
+        let (other, _other_answered) = Says::note_for_test("stretch", note, NORMAL_PRIORITY);
+        assert_eq!(other.quiet_needed_us(), Some(QUIET_US));
+        let (mut who, _who_answered) = Says::note_for_test("onboarding-app", note, NORMAL_PRIORITY);
+        who.waiting[0].request.who = true;
+        assert_eq!(who.quiet_needed_us(), Some(QUIET_US));
+
+        let (exact, _exact_answered) = Says::exact_for_test("onboarding-app", vec![0; 16]);
+        assert!(exact.exact_answers());
+        assert_eq!(exact.exact_quiet_us(), None);
+        let (other, _other_answered) = Says::exact_for_test("lamp-control", vec![0; 16]);
+        assert!(!other.exact_answers(), "another skill's exact line waits");
+    }
+
+    /// #7718: a page's exact line goes after a say of its own already
+    /// waiting, so the last page's line never begins before a made skill's
+    /// line asked earlier; once that is taken, it goes.
+    #[test]
+    fn an_app_pages_line_goes_after_a_say_already_waiting() {
+        let (mut exact, _exact_answered) = Says::exact_for_test(PAGE_SKILL, vec![0; 16]);
+        assert!(!exact.page_line_behind_a_say());
+        let (made, _made_answered) = asked("app-make", URGENT_FROM, u64::MAX);
+        exact.own.send(made).unwrap();
+        exact.poll(0);
+        assert!(exact.page_line_behind_a_say());
+        let (_, _, ticket, _) = exact.take(0).unwrap();
+        assert_eq!(ticket.skill(), "app-make");
+        assert!(!exact.page_line_behind_a_say());
+        // The wire is lamp-cloud's as it is: an older voice takes the same.
+        for line in [
+            json!({"skill": PAGE_SKILL, "text": "Done.", "exact": true, "expires_in_ms": 30_000}),
+            json!({"skill": PAGE_SKILL, "note": "(Say only this, nothing before or after it: \"Done.\")", "expires_in_ms": 30_000}),
+        ] {
+            assert!(is_page_line(&parse(&line.to_string()).unwrap()), "{line}");
+        }
     }
 
     #[test]

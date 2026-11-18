@@ -797,7 +797,33 @@ other.
 free, nobody's utterance pending, the microphone's capture fresh and a
 second since the last speech, the playback mask free, a ready session and
 the keeper's pause off; and a quiet since the last turn of 15 s (as the
-news), or 1 s from priority 8 up (as a reminder). It is a written turn like
+news), or 1 s from priority 8 up (as a reminder).
+
+**The app's onboarding pages' lines** (#7718 items 1 and 9; the skill
+`onboarding-app`, `say::PAGE_SKILL`, lamp-cloud's `onboarding_page`
+([cloud.md](cloud.md))) answer the page the person has open, as a
+computer's turn answers its computer. Asked as a plain note or exact
+text with nothing more (`say::is_page_line`; no new field, so the same
+line works with the voice before this), such a line needs no quiet since
+the last turn (`Says::quiet_needed_us` is 0): as a note it waits only for
+the gates above, the lamp's own speech over and nobody heard for a
+second; as exact text a conversation going on doesn't hold it, as the
+unplug's lines (`Says::exact_answers`), only the speaker, a turn on its
+way, anyone heard and an answer owed. On lamp-0c89 on 18 Nov the Try
+line came 18 s after the light turned blue and the last page's 15 s
+after the made skill's read; the exact form, held for the 45 s
+conversation, would have lapsed at its 30 s. A page's exact line still
+goes after a say of the lamp's own already waiting
+(`Says::page_line_behind_a_say`: a made skill's line asked before it is
+said first). The last page's line is not even sent while a make asked on
+Create still owes its line, cut and asked once more included: lamp-cloud
+holds it until lamp-voice tells that line's end (#7718 item 2,
+[cloud.md](cloud.md), "The app's onboarding pages, done on the lamp").
+Any other skill's say keeps every gate. Tests:
+`say::tests::an_app_pages_line_skips_the_quiet_and_every_other_say_keeps_it`,
+`say::tests::an_app_pages_line_goes_after_a_say_already_waiting`.
+
+A say is a written turn like
 the others (`skill_says` in the record, with the skill, the priority, `told_who`
 and `familiar` (above); never the words), the lamp's own turn to the attention rule and the
 Policy's hold. The Policy is not asked here: whoever asks the voice to

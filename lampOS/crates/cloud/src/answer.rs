@@ -208,6 +208,15 @@ pub trait Lamp {
             .open(data, crate::onboarding_page::Seen::default(), |_| None)
     }
 
+    /// The app asked a make or a written skill, `request_id`, that
+    /// lamp-voice took: the last onboarding page's line waits for its line
+    /// when Create is open (#7718 item 2, `crate::onboarding_page`).
+    fn onboarding_made_asked(&mut self, request_id: &str) {
+        if let Ok(mut pages) = crate::onboarding_page::PAGES.lock() {
+            pages.made_asked(request_id);
+        }
+    }
+
     /// The open page's line due now handed to the voice, and the reply's
     /// `data` when the page is done with it (#6076, #6353).
     fn onboarding_page_done(&mut self) -> Option<Value> {
@@ -549,6 +558,17 @@ pub const QUIET_WHEN_DONE: [&str; 1] = ["led.resting.preview"];
 pub const MIC_SET_REFUSED: &str =
     "on this lamp the microphones are muted and unmuted with the button or the switch";
 
+/// A make or a written skill lamp-voice took (`{"making": true,
+/// "request_id"}`), told to the open onboarding page (#7718 item 2).
+fn made_asked(lamp: &mut impl Lamp, told: Option<&Value>) {
+    if let Some(request_id) = told
+        .filter(|told| told["making"] == true)
+        .and_then(|told| told["request_id"].as_str())
+    {
+        lamp.onboarding_made_asked(request_id);
+    }
+}
+
 /// The answer to `kind` with `data`: its reply's `data`, or why not.
 pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<Value>, String> {
     let some = |value: Value| Ok(Some(value));
@@ -847,7 +867,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // own reason, as before.
         "skills.make" if lamp.make_skill().is_some() => {
             let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
-            crate::make_skill::make(&socket, data)
+            let told = crate::make_skill::make(&socket, data)?;
+            made_asked(lamp, told.as_ref());
+            Ok(told)
         }
         "skills.made" if lamp.make_skill().is_some() || lamp.write_skill().is_some() => {
             let socket = lamp
@@ -869,7 +891,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // spoken yes at the lamp puts it on.
         "skills.write" if on(lamp, kind) => {
             let socket = lamp.write_skill().ok_or_else(|| not_here(kind))?;
-            crate::make_skill::write(&socket, data)
+            let told = crate::make_skill::write(&socket, data)?;
+            made_asked(lamp, told.as_ref());
+            Ok(told)
         }
         // A made skill sent to the Skills Store (fourteen-P13): packed here,
         // only a skill made on this lamp and on, and uploaded with the

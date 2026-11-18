@@ -24,12 +24,19 @@
 //!   installed.
 //! - **create:** nothing here: lamp-voice says the made skill's own line
 //!   (`made_skill::on_line`, "I made <Name>, and it's on.").
-//! - **done:** [`DONE`], once.
+//! - **done:** [`DONE`], once. After a make or a written skill the app
+//!   asked while Create was open ([`Pages::made_asked`], #7718 item 2), it
+//!   waits until lamp-voice tells that ask's line said or let go (`line`
+//!   in `skills.made`'s answer, `crate::make_skill::line_ended`, looked at
+//!   every [`LOOK_EVERY`] while it waits), at most [`MADE_LINE_LONGEST`]
+//!   from the ask: the congratulations never begins before the made
+//!   skill's line, its one more ask after a cut included.
 //!
 //! Each line goes to the voice's say socket: as written (`exact`, no chat)
 //! for an English owner; as a note in the person's language otherwise,
 //! these lines having no translation (`crate::say` in lamp-voice: said only
-//! once nobody is talking and the lamp's own line has ended). Behind
+//! once nobody is talking and the lamp's own line has ended; as the page's
+//! answer, with no say's 15 s quiet after the last turn, #7718). Behind
 //! `onboarding.done`'s switch (`LAMP_APP_ONBOARDING_DONE`), with
 //! `onboarding_page_supported: true` and [`VERSION`] in `system.info`. No
 //! words heard.
@@ -96,6 +103,19 @@ const SAY_EXPIRES_MS: u64 = 30_000;
 /// background never sends `null`, and its page is let go after this.
 const LAPSE: Duration = Duration::from_secs(10 * 60);
 
+/// The longest the last page's line waits for the line of a make asked on
+/// Create ([`Pages::made_asked`]), from the ask: lamp-voice's longest make,
+/// 240 s (`make_skill_local::MAKE_WITHIN`, 120 s, then with
+/// `LAMP_MAKE_SKILL_AGENT` the agent's own `make_skill_agent::MAKE_WITHIN`,
+/// 120 s; held equal by a test). The voice says why a make failed, and
+/// tells its line's end, so this is only for a voice that never tells
+/// (an older build reading `making` past it, or one gone).
+pub const MADE_LINE_LONGEST: Duration = Duration::from_secs(240);
+
+/// How often lamp-voice is asked about that line while the last page's
+/// line waits for it: soon after it ends, never a busy loop on its socket.
+pub const LOOK_EVERY: Duration = Duration::from_millis(250);
+
 /// How long after a turn said to the lamp on Try the light may still
 /// change before [`TRY_NUDGE`] is said: the turn's answer runs the light.
 pub const NUDGE_WAIT: Duration = Duration::from_secs(8);
@@ -158,15 +178,28 @@ struct Open {
     opened_at: Instant,
 }
 
+/// A make asked while Create was open, its line not yet told ended.
+struct Made {
+    request_id: String,
+    asked_at: Instant,
+    looked_at: Option<Instant>,
+}
+
 /// The page the app has open.
 #[derive(Default)]
 pub struct Pages {
     open: Option<Open>,
+    /// A make asked on Create whose line the last page's line waits for
+    /// (#7718 item 2).
+    made: Option<Made>,
 }
 
 /// The one lamp-cloud's open page: one app, one walk at a time.
 // ponytail: one process-wide page; keyed by app if two apps ever onboard one lamp.
-pub static PAGES: Mutex<Pages> = Mutex::new(Pages { open: None });
+pub static PAGES: Mutex<Pages> = Mutex::new(Pages {
+    open: None,
+    made: None,
+});
 
 /// A skill run seen on `skills/events`: its publisher's boot and seq, and
 /// the run.
@@ -204,6 +237,7 @@ impl Pages {
         let page = match data.get("page") {
             None | Some(Value::Null) => {
                 self.open = None;
+                self.made = None;
                 return Ok(json!({}));
             }
             Some(Value::String(page)) => match page.as_str() {
@@ -216,6 +250,10 @@ impl Pages {
             Some(_) => return Err(PAGE.into()),
         };
         let same = self.is_open() && self.open.as_ref().is_some_and(|open| open.page == page);
+        // Only Create's make is waited for, and only by the page after it.
+        if !matches!(page, Page::Create | Page::Done) {
+            self.made = None;
+        }
         // Add's taps and a done sent again go on the page already open.
         if !(same && matches!(page, Page::Add | Page::Done)) {
             self.open = Some(Open {
@@ -271,8 +309,83 @@ impl Pages {
             .is_some_and(|open| open.opened_at.elapsed() > LAPSE)
         {
             self.open = None;
+            self.made = None;
         }
         self.open.is_some()
+    }
+
+    /// The app asked a make or a written skill, `request_id`, that
+    /// lamp-voice took (`making`): kept only while Create is open, so the
+    /// last page's line waits for that skill's own line (#7718 item 2).
+    pub fn made_asked(&mut self, request_id: &str) {
+        self.made_asked_at(request_id, Instant::now());
+    }
+
+    fn made_asked_at(&mut self, request_id: &str, at: Instant) {
+        if self.is_open()
+            && self
+                .open
+                .as_ref()
+                .is_some_and(|open| open.page == Page::Create)
+        {
+            self.made = Some(Made {
+                request_id: request_id.to_owned(),
+                asked_at: at,
+                looked_at: None,
+            });
+        }
+    }
+
+    /// Whether the last page's line waits for Create's make's line: one
+    /// asked, not told ended, within [`MADE_LINE_LONGEST`] of its ask.
+    /// Past that it is let go, said in the journal.
+    fn waits_for_made(&mut self) -> bool {
+        let Some(made) = &self.made else {
+            return false;
+        };
+        if made.asked_at.elapsed() < MADE_LINE_LONGEST {
+            return true;
+        }
+        eprintln!(
+            "lamp-cloud: onboarding page: the made skill's line not told ended within {} s of its ask; the last page's line goes",
+            MADE_LINE_LONGEST.as_secs()
+        );
+        self.made = None;
+        false
+    }
+
+    /// The request id to ask lamp-voice about now, when the last page's
+    /// line is waiting for Create's make's line ([`Self::waits_for_made`])
+    /// and [`LOOK_EVERY`] has passed since the last look.
+    pub fn made_to_look_at(&mut self) -> Option<String> {
+        let done_owed = self
+            .open
+            .as_ref()
+            .is_some_and(|open| open.page == Page::Done && !open.lines.is_empty());
+        if !done_owed || !self.waits_for_made() {
+            return None;
+        }
+        let made = self.made.as_mut()?;
+        if made
+            .looked_at
+            .is_some_and(|looked| looked.elapsed() < LOOK_EVERY)
+        {
+            return None;
+        }
+        made.looked_at = Some(Instant::now());
+        Some(made.request_id.clone())
+    }
+
+    /// lamp-voice told the line of the make `request_id` said or let go:
+    /// the last page's line waits no more.
+    pub fn made_line_ended(&mut self, request_id: &str) {
+        if self
+            .made
+            .as_ref()
+            .is_some_and(|made| made.request_id == request_id)
+        {
+            self.made = None;
+        }
     }
 
     /// The line due now, if any: an owed one (Add, done) in turn; Try's
@@ -280,6 +393,15 @@ impl Pages {
     /// page, or its nudge; nothing once the page has lapsed.
     pub fn done(&mut self, seen: Seen) -> Option<Due> {
         if !self.is_open() {
+            return None;
+        }
+        // The last page's line after Create's made skill's line (#7718).
+        if self
+            .open
+            .as_ref()
+            .is_some_and(|open| open.page == Page::Done)
+            && self.waits_for_made()
+        {
             return None;
         }
         let open = self.open.as_mut()?;
@@ -718,6 +840,92 @@ mod tests {
                 .open(&json!({"page": "next"}), Seen::default(), none)
                 .is_err()
         );
+    }
+
+    /// #7718 item 2: a make asked on Create holds the last page's line
+    /// (and its push) until lamp-voice tells that make's line said or let
+    /// go, looked at no more often than [`LOOK_EVERY`]; then it goes once.
+    /// The app tells `done` while the make is still under way, as on
+    /// lamp-0c89 on 18 Nov.
+    #[test]
+    fn the_last_pages_line_waits_for_creates_made_line() {
+        let mut pages = Pages::default();
+        pages
+            .open(&json!({"page": "create"}), Seen::default(), none)
+            .unwrap();
+        pages.made_asked("r1");
+        assert_eq!(pages.made_to_look_at(), None, "nothing waits on Create");
+        pages
+            .open(&json!({"page": "done"}), Seen::default(), none)
+            .unwrap();
+        assert!(
+            pages.done(Seen::default()).is_none(),
+            "held for the made line"
+        );
+        assert_eq!(pages.made_to_look_at().as_deref(), Some("r1"));
+        assert_eq!(pages.made_to_look_at(), None, "not again within LOOK_EVERY");
+        // Another ask's end lets nothing go.
+        pages.made_line_ended("r2");
+        assert!(pages.done(Seen::default()).is_none());
+        pages.made.as_mut().unwrap().looked_at =
+            Instant::now().checked_sub(LOOK_EVERY).unwrap().into();
+        assert_eq!(pages.made_to_look_at().as_deref(), Some("r1"));
+        pages.made_line_ended("r1");
+        assert_eq!(pages.made_to_look_at(), None);
+        assert_eq!(
+            pages.done(Seen::default()),
+            Some((Some(json!({"page": "done"})), DONE.to_owned()))
+        );
+        assert!(pages.done(Seen::default()).is_none());
+    }
+
+    /// #7718 item 2: only a make asked on Create is waited for, and at
+    /// most [`MADE_LINE_LONGEST`] from its ask (lamp-voice's longest make):
+    /// a make asked on another page, a page closed or a new walk's Try
+    /// holds nothing.
+    #[test]
+    fn the_last_pages_line_waits_only_for_creates_make_and_not_for_ever() {
+        assert_eq!(
+            MADE_LINE_LONGEST,
+            lamp_voice::make_skill_local::MAKE_WITHIN + lamp_voice::make_skill_agent::MAKE_WITHIN
+        );
+        let done = |pages: &mut Pages| {
+            pages
+                .open(&json!({"page": "done"}), Seen::default(), none)
+                .unwrap();
+            pages.done(Seen::default())
+        };
+        // Asked past the longest make: let go, the line goes at once.
+        let mut pages = Pages::default();
+        pages
+            .open(&json!({"page": "create"}), Seen::default(), none)
+            .unwrap();
+        let long_ago = Instant::now()
+            .checked_sub(MADE_LINE_LONGEST + Duration::from_secs(1))
+            .unwrap();
+        pages.made_asked_at("r1", long_ago);
+        assert!(done(&mut pages).is_some());
+        assert!(pages.made.is_none());
+        // Asked on Add (or with no page open): not waited for.
+        let mut pages = Pages::default();
+        pages.made_asked("r1");
+        pages
+            .open(&json!({"page": "add"}), Seen::default(), none)
+            .unwrap();
+        pages.made_asked("r1");
+        assert!(done(&mut pages).is_some());
+        // Create's make, then the app closes the pages or starts a new
+        // Try: forgotten.
+        for next in [json!({"page": null}), json!({"page": "try"})] {
+            let mut pages = Pages::default();
+            pages
+                .open(&json!({"page": "create"}), Seen::default(), none)
+                .unwrap();
+            pages.made_asked("r1");
+            pages.open(&next, Seen::default(), none).unwrap();
+            assert!(pages.made.is_none(), "{next}");
+            assert!(done(&mut pages).is_some(), "{next}");
+        }
     }
 
     /// Reviewer-lead's P2 on #6132: a Try page left open by an app killed

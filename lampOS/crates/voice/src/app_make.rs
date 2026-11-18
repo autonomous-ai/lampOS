@@ -47,8 +47,13 @@
 //!   on the second route as a voice make's (`put_on_line`).
 //! - **Kept** beside the made skills, in their root-only folder: the app's
 //!   asks, at most [`MOST_ASKS`] ([`APP_INDEX`]), each its request id,
-//!   when, the task it became, and why it wasn't kept if it wasn't. Never
-//!   the words.
+//!   when, the task it became, why it wasn't kept if it wasn't, and what
+//!   became of the line the lamp says of it ([`LINE_OWED`] from the ask
+//!   until [`say_line`], its one more ask included, has an outcome:
+//!   [`LINE_SPOKEN`] or [`LINE_NOT_SAID`]; [`line_said`]). Never the words.
+//!   `{"made": ...}` tells it as `line` ([`status`]): lamp-cloud holds the
+//!   app's last onboarding page's line behind it (#7718 item 2), and the
+//!   app can wait on it rather than guess how long the line takes.
 use crate::made_skill;
 use serde_json::{Value, json};
 use std::{
@@ -226,7 +231,10 @@ fn admit(
         {
             return (false, Err("a skill is still being made".to_owned()));
         }
-        let mut entry = json!({"request_id": request_id, "at_unix_ms": now_unix_ms});
+        // Its line is owed from the ask: the make, then the line said, its
+        // one more ask after a drop included ([`line_said`]).
+        let mut entry =
+            json!({"request_id": request_id, "at_unix_ms": now_unix_ms, "line": LINE_OWED});
         if written {
             entry["written"] = json!(true);
         }
@@ -293,6 +301,42 @@ pub fn handed(directory: &Path, request_id: &str, task: &str) {
     }
 }
 
+/// What an app's ask's line is while the lamp is still to say it: being
+/// made, or its line waiting, said or asked once more ([`say_line`]).
+pub const LINE_OWED: &str = "owed";
+/// Its line said whole.
+pub const LINE_SPOKEN: &str = "spoken";
+/// Its line let go unsaid: dropped twice, not begun within its wait,
+/// refused, no say service, or the voice restarted before it was said
+/// ([`cut_by_restart`]). Nothing will say it.
+pub const LINE_NOT_SAID: &str = "not_said";
+
+/// The app's ask `request_id`'s line ended with `outcome` (the last of
+/// [`say_line`]'s asks; none when the say service went away or there is
+/// none): [`LINE_SPOKEN`] or [`LINE_NOT_SAID`], kept against the ask, so
+/// [`status`] tells the app, and lamp-cloud's last onboarding page, that
+/// nothing more of it will be said (#7718 item 2).
+pub fn line_said(directory: &Path, request_id: &str, outcome: Option<&crate::say::Outcome>) {
+    let line = match outcome {
+        Some(crate::say::Outcome::Spoken) => LINE_SPOKEN,
+        _ => LINE_NOT_SAID,
+    };
+    let changed = transact(directory, false, |entries| {
+        let Some(entry) = entries
+            .iter_mut()
+            .find(|entry| entry["request_id"] == request_id)
+        else {
+            return (false, ());
+        };
+        entry["line"] = json!(line);
+        (true, ())
+    });
+    match changed {
+        Ok(_) => eprintln!("lamp-voice: an app's skill: its line kept as {line}"),
+        Err(error) => eprintln!("lamp-voice: an app's skill: its line's end not kept: {error}"),
+    }
+}
+
 /// The linked services the ask `request_id`'s skill reads that weren't
 /// linked when it was made (`made_skill::needs_link`, empty with none),
 /// kept against the ask: told to the app as `needs_link` ([`status`]).
@@ -351,17 +395,24 @@ pub const RESTARTED: &str = "the lamp restarted while making it; try again";
 /// process's threads alone, gone with the process that stopped. Each is
 /// marked not kept, [`RESTARTED`], so the app stops showing "making" (the
 /// audit's B4, 16 Nov: a make cut off by a lamp-voice restart or update
-/// read `making` forever) and another ask may start. How many.
+/// read `making` forever) and another ask may start. How many. A line
+/// still owed ([`LINE_OWED`]), kept or not, is [`LINE_NOT_SAID`]: the
+/// thread that would have said it went with the process (#7718 item 2).
 pub fn cut_by_restart(directory: &Path) -> usize {
     let cut = transact(directory, false, |entries| {
         let mut cut = 0;
+        let mut changed = false;
         for entry in entries.iter_mut() {
             if entry.get("not_kept").is_none() && made_of(directory, entry).is_none() {
                 entry["not_kept"] = json!(RESTARTED);
                 cut += 1;
             }
+            if entry["line"] == LINE_OWED {
+                entry["line"] = json!(LINE_NOT_SAID);
+                changed = true;
+            }
         }
-        (cut > 0, cut)
+        (cut > 0 || changed, cut)
     });
     match cut {
         Ok(cut) => {
@@ -448,8 +499,11 @@ fn why_not(entry: &Value, made: Option<&Value>) -> Value {
 /// second route's worker keeps it), is also told
 /// `"awaits_yes": true`, so the app keeps asking until the yes puts it
 /// `on`; not said back (someone else present, or not on the second
-/// route), nothing waits and the field is absent. Only the app's own asks:
-/// a skill made by voice is never told here. `{"state": "none"}` with none.
+/// route), nothing waits and the field is absent. `line`, in any state:
+/// [`LINE_OWED`], [`LINE_SPOKEN`] or [`LINE_NOT_SAID`] ([`line_said`]);
+/// absent for an ask kept before it was told (#7718 item 2). Only the
+/// app's own asks: a skill made by voice is never told here.
+/// `{"state": "none"}` with none.
 pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> Value {
     let entries = asks(directory);
     let entry = match request_id {
@@ -461,6 +515,9 @@ pub fn status(directory: &Path, request_id: Option<&str>, now_unix_ms: u64) -> V
     };
     let state = state(directory, entry, now_unix_ms);
     let mut told = json!({"request_id": entry["request_id"], "state": state});
+    if entry["line"].is_string() {
+        told["line"] = entry["line"].clone();
+    }
     // Written in the app, never the Store's nor made by a model.
     if entry["written"] == true {
         told["written"] = json!(true);
@@ -682,8 +739,10 @@ pub fn write_here(
 /// skill's line, `user_interrupted`, and it was never said), it is asked
 /// once more, said at the next good moment within what is left of
 /// [`LINE_WAITS_MS`]. Asked at [`LINE_PRIORITY`]: said as soon as the
-/// lamp is free, never after the whole quiet a nudge waits.
-pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
+/// lamp is free, never after the whole quiet a nudge waits. The last
+/// outcome, none when the voice went away: an app's ask keeps it
+/// ([`line_said`]).
+pub fn say_line(asks: &crate::say::OwnAsks, line: &str) -> Option<crate::say::Outcome> {
     said("an app's skill", line, |words, note, within_ms| {
         let priority = LINE_PRIORITY;
         if note {
@@ -691,7 +750,7 @@ pub fn say_line(asks: &crate::say::OwnAsks, line: &str) {
         } else {
             asks.text("app-make", words, priority, within_ms)
         }
-    });
+    })
 }
 
 /// The skill name a voice make's line is asked under on the say socket
@@ -1156,9 +1215,12 @@ fn accept(
             &line,
             now_unix_ms(),
             move |asked, request_id| {
+                // Its line's end, kept against the ask once said or let go
+                // ([`line_said`]): none said with no say service.
+                let mut outcome = None;
                 let say = |line: &str| {
                     if let Some(asks) = &asks {
-                        say_line(asks, line);
+                        outcome = say_line(asks, line);
                     }
                 };
                 match asked {
@@ -1174,6 +1236,7 @@ fn accept(
                         say,
                     ),
                 }
+                line_said(&making.directory, &request_id, outcome.as_ref());
             },
         );
         let _ = writeln!(stream, "{told}");
@@ -1286,6 +1349,87 @@ mod tests {
         assert_eq!(cut_by_restart(made), 0);
         assert_eq!(status(made, Some("r3"), NOW + 5_000)["state"], "making");
         assert_eq!(status(made, Some("r1"), NOW + 5_000)["why"], RESTARTED);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7718 item 2: an app's ask tells its line owed from the ask, through
+    /// the make and the skill put on, until the line is said or let go;
+    /// a restart lets a line still owed go (nothing will say it), the
+    /// ask's own state left as it was. Fails before the fix: no `line`.
+    #[test]
+    fn an_apps_ask_tells_its_line_owed_until_said_and_a_restart_lets_it_go() {
+        let dir = folder("line-owed");
+        let made = dir.as_path();
+        begin(
+            made,
+            "make me a skill that dims the light at 10 pm",
+            "r1",
+            NOW,
+        )
+        .unwrap();
+        let told = status(made, Some("r1"), NOW);
+        assert_eq!(
+            (told["state"].as_str(), told["line"].as_str()),
+            (Some("making"), Some(LINE_OWED))
+        );
+        handed(made, "r1", "s1:7");
+        let mut on = made_entry("s1:7:1", &"a".repeat(64));
+        on["on"] = json!(true);
+        write_made(made, &[on]);
+        // On, its line not said yet: still owed.
+        let told = status(made, Some("r1"), NOW + 1_000);
+        assert_eq!(
+            (told["state"].as_str(), told["line"].as_str()),
+            (Some("on"), Some(LINE_OWED))
+        );
+        // Kept, so not cut; its line, owed, is let go.
+        assert_eq!(cut_by_restart(made), 0);
+        let told = status(made, Some("r1"), NOW + 2_000);
+        assert_eq!(
+            (told["state"].as_str(), told["line"].as_str()),
+            (Some("on"), Some(LINE_NOT_SAID))
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7718 item 2: the line's last outcome is kept against its ask:
+    /// spoken, or anything else (dropped twice, expired, refused, no say
+    /// service) not said. Another ask's line is left as it is.
+    #[test]
+    fn an_apps_ask_keeps_its_lines_end() {
+        use crate::say::Outcome;
+        let dir = folder("line-end");
+        let made = dir.as_path();
+        begin(
+            made,
+            "make me a skill that dims the light at 10 pm",
+            "r1",
+            NOW,
+        )
+        .unwrap();
+        line_said(made, "r1", Some(&Outcome::Spoken));
+        assert_eq!(status(made, Some("r1"), NOW)["line"], LINE_SPOKEN);
+        for (round, (id, outcome)) in [
+            ("r2", Some(Outcome::Dropped("user_interrupted".into()))),
+            ("r3", Some(Outcome::Expired)),
+            ("r4", Some(Outcome::Refused("too long".into()))),
+            ("r5", None),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            // Each a new ask, the one before let go as too old.
+            let at = NOW + MAKING_LONGEST_MS * (round as u64 + 1);
+            begin(made, "make me a skill that dims the light at 10 pm", id, at).unwrap();
+            assert_eq!(status(made, Some(id), at)["line"], LINE_OWED);
+            line_said(made, id, outcome.as_ref());
+            assert_eq!(
+                status(made, Some(id), at)["line"],
+                LINE_NOT_SAID,
+                "{outcome:?}"
+            );
+        }
+        assert_eq!(status(made, Some("r1"), NOW)["line"], LINE_SPOKEN);
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1708,6 +1852,71 @@ mod tests {
         assert_eq!(told["state"], "not_kept", "{told}");
         assert_eq!(told["why"], "the lamp's model didn't answer");
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// #7718 item 2, through the socket: a make not kept still says why,
+    /// and its line reads owed until the say service answers it; with no
+    /// outcome (the say service gone), not said, and nothing more asked.
+    /// Fails before the fix: no `line`.
+    #[test]
+    fn through_the_socket_a_makes_line_is_told_owed_until_its_say_ends() {
+        let dir = folder("served-line");
+        let path = PathBuf::from(format!("/tmp/aml-{}/make.sock", std::process::id()));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+        let keeping = made_skill::Keeping {
+            directory: dir.join("made"),
+            program: dir.join("no-pack"),
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        fn no_model() -> Result<Chat, String> {
+            Err("no model here".into())
+        }
+        let (asks, asked) = crate::say::OwnAsks::for_test();
+        serve(
+            &path,
+            None,
+            MAKE,
+            keeping,
+            Some(asks),
+            no_model,
+            dir.join("skills"),
+            |_| true,
+        )
+        .unwrap();
+        let ask = |line: &str| {
+            let mut stream = std::os::unix::net::UnixStream::connect(&path).unwrap();
+            writeln!(stream, "{line}").unwrap();
+            let mut told = String::new();
+            BufReader::new(stream).read_line(&mut told).unwrap();
+            serde_json::from_str::<Value>(&told).unwrap()
+        };
+        let told = ask(
+            r#"{"make": {"words": "make me a skill that dims the light", "request_id": "r1"}}"#,
+        );
+        assert_eq!(told, json!({"making": true}));
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut told = ask(r#"{"made": {"request_id": "r1"}}"#);
+        while told["state"] == "making" && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+            told = ask(r#"{"made": {"request_id": "r1"}}"#);
+        }
+        // Not kept, its why said aloud: the say is asked and not answered.
+        assert_eq!(told["state"], "not_kept", "{told}");
+        assert_eq!(told["line"], LINE_OWED, "{told}");
+        // The say service takes it and goes away with no outcome.
+        assert_eq!(
+            asked(),
+            Some(("app-make".to_owned(), crate::say::URGENT_FROM))
+        );
+        let mut told = ask(r#"{"made": {"request_id": "r1"}}"#);
+        while told["line"] == LINE_OWED && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+            told = ask(r#"{"made": {"request_id": "r1"}}"#);
+        }
+        assert_eq!(told["line"], LINE_NOT_SAID, "{told}");
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// Writers that overlap (reviewer-two's P2 on #2887): an old ask's
@@ -2212,9 +2421,12 @@ mod tests {
                 || alone,
             )
         };
+        // Its line is still owed here: this test says it by hand, never
+        // through the socket's `say_line` that tells its end (#7718).
         let not_kept = json!({
             "request_id": "r1",
             "state": "not_kept",
+            "line": LINE_OWED,
             "why": format!("it couldn't be put on: {}", made_skill::CODE_BY_VOICE),
         });
         // Kept, not said back yet: today's answer, no field.
