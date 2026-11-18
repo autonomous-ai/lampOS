@@ -1918,7 +1918,11 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
         // that may record the person's yes to a skill's task.
         let from_the_voice =
             crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
-        let peer = crate::app_yes::peer_of(stream.peer_cred().ok().and_then(|peer| peer.pid()));
+        let cred = stream.peer_cred().ok();
+        let peer = crate::app_yes::peer_of(
+            cred.as_ref().and_then(|cred| cred.pid()),
+            cred.as_ref().map(|cred| cred.uid()),
+        );
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
@@ -2421,6 +2425,19 @@ mod tests {
         mpsc::UnboundedReceiver<Value>,
         watch::Receiver<Option<Value>>,
     ) {
+        stalled_keeping(None)
+    }
+
+    /// [`stalled`] with the computers' notes and clips kept under `state`.
+    #[allow(clippy::type_complexity)]
+    fn stalled_keeping(
+        state: Option<&std::path::Path>,
+    ) -> (
+        Arc<Shared>,
+        Arc<Mutex<Vec<String>>>,
+        mpsc::UnboundedReceiver<Value>,
+        watch::Receiver<Option<Value>>,
+    ) {
         let lines = Arc::new(Mutex::new(Vec::new()));
         let into = lines.clone();
         let door = Door::new(
@@ -2433,6 +2450,12 @@ mod tests {
         .with_journal(crate::journal::Journal::to(move |line| {
             into.lock().unwrap().push(line.to_owned());
         }));
+        let door = match state {
+            Some(state) => door
+                .with_notes_folder(state.join("notes"))
+                .with_sound_folder(state.join("sounds")),
+            None => door,
+        };
         let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
         let (outbox, inbox) = mpsc::unbounded_channel();
         let (frames, _) = mpsc::channel(FRAMES_QUEUED);
@@ -2457,10 +2480,10 @@ mod tests {
     /// connections (Heron's P3 on #7793).
     #[test]
     fn app_forget_is_the_helpers_and_closes_the_apps_connections() {
-        let (shared, _lines, _inbox, _newest) = stalled();
         let state = std::env::temp_dir().join(format!("lampos-forget-op-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&state);
         std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
         let client = crate::app_socket::app_client("demo");
         let connect = |id: u64| {
             let (outbox, _inbox) = mpsc::unbounded_channel();
@@ -2480,6 +2503,21 @@ mod tests {
             );
         };
         connect(7);
+        // The door's notes and clips of the app, and of another.
+        let notes = crate::notes::Notes::new(state.join("notes"));
+        let other = crate::app_socket::app_client("other");
+        for who in [&client, &other] {
+            match notes.set(who, "k", &json!(1)).unwrap() {
+                crate::notes::Step::Later(write) => {
+                    write().unwrap();
+                }
+                crate::notes::Step::Now(_) => {}
+            }
+            std::fs::create_dir_all(state.join("sounds").join(who)).unwrap();
+            std::fs::write(state.join("sounds").join(who).join("a.wav"), b"x").unwrap();
+        }
+        let note_file = |who: &str| crate::notes::Notes::path(&state.join("notes"), who).unwrap();
+        assert!(note_file(&client).is_file() && note_file(&other).is_file());
         // What is kept of the app, and of another: settings, a panel.
         std::fs::write(
             state.join(crate::app_yes::SETTINGS_FILE),
@@ -2524,6 +2562,11 @@ mod tests {
             shared.close_reasons.lock().unwrap().get(&7),
             Some(&CLOSED_REMOVED)
         );
+        // Its notes and clips are gone too, the other app's stay.
+        assert!(!note_file(&client).exists());
+        assert!(!state.join("sounds").join(&client).exists());
+        assert!(note_file(&other).is_file());
+        assert!(state.join("sounds").join(&other).join("a.wav").is_file());
         // What was kept of it is gone and the other app's stays.
         assert_eq!(shared.apps.lock().unwrap().1.panel_rev("demo"), None);
         assert_eq!(shared.apps.lock().unwrap().1.panel_rev("other"), Some(1));

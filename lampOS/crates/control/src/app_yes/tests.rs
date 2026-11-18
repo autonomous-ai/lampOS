@@ -144,7 +144,7 @@ fn who_may_write_and_take() {
     let yes = five("remove", "demo", json!([]));
     // Only lamp-cloud records the owner's yes: not the voice (no spoken yes to
     // an app exists), not the helper, not anyone else.
-    for peer in [Peer::Helper, Peer::Other, Peer::Voice] {
+    for peer in [Peer::Helper, Peer::Resume, Peer::Other, Peer::Voice] {
         let got = run(&mut yeses, &live, &place, RECORD, yes.clone(), peer, true);
         assert!(got.get("refused").is_some(), "{peer:?}");
     }
@@ -160,7 +160,7 @@ fn who_may_write_and_take() {
         ),
         json!({"ok": true})
     );
-    for peer in [Peer::Voice, Peer::Cloud, Peer::Other] {
+    for peer in [Peer::Voice, Peer::Cloud, Peer::Resume, Peer::Other] {
         let got = run(&mut yeses, &live, &place, TAKE, yes.clone(), peer, true);
         assert_eq!(got, json!({"refused": "not the apps helper"}), "{peer:?}");
     }
@@ -241,7 +241,7 @@ fn the_peer_is_known_by_its_cgroup() {
     ] {
         assert_eq!(peer_of_cgroup(&line(other)), Peer::Other, "{other}");
     }
-    assert_eq!(peer_of(None), Peer::Other);
+    assert_eq!(peer_of(None, None), Peer::Other);
 }
 
 fn settings() -> Value {
@@ -337,9 +337,19 @@ fn settings_are_checked_whole_kept_and_read_back() {
     );
     assert_eq!(got["apps"]["demo"]["socket"], json!(false));
     // Only lamp-cloud reads or writes them.
-    for peer in [Peer::Voice, Peer::Helper, Peer::Other] {
+    for peer in [Peer::Voice, Peer::Helper, Peer::Resume, Peer::Other] {
         let got = run(&mut yeses, &live, &place, STATE, json!({}), peer, true);
-        assert_eq!(got, json!({"refused": "not the cloud"}));
+        assert_eq!(got, json!({"refused": "not the cloud"}), "{peer:?}");
+        let got = run(
+            &mut yeses,
+            &live,
+            &place,
+            SETTINGS_SET,
+            json!({"name": "demo", "settings": {"name": "x"}}),
+            peer,
+            true,
+        );
+        assert_eq!(got, json!({"refused": "not the cloud"}), "{peer:?}");
     }
     let _ = std::fs::remove_dir_all(&apps);
     let _ = std::fs::remove_dir_all(&state);

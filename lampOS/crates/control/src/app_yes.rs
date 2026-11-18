@@ -137,10 +137,11 @@ pub fn peer_of_cgroup(cgroup: &str) -> Peer {
     }
 }
 
-/// The peer with `pid` (its `SO_PEERCRED`), by its cgroup; never on a system
-/// without `/proc`.
-pub fn peer_of(pid: Option<i32>) -> Peer {
-    crate::app_socket::cgroup_text(pid, None).map_or(Peer::Other, |cgroup| peer_of_cgroup(&cgroup))
+/// The peer with `pid` (its `SO_PEERCRED`), by its cgroup, and with a `uid`
+/// only while the process still has it (a pid that came back as another
+/// process is no peer); never on a system without `/proc`.
+pub fn peer_of(pid: Option<i32>, uid: Option<u32>) -> Peer {
+    crate::app_socket::cgroup_text(pid, uid).map_or(Peer::Other, |cgroup| peer_of_cgroup(&cgroup))
 }
 
 /// The seven values, matched exactly.
