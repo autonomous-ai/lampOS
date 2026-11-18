@@ -554,10 +554,11 @@ mod tests {
         // A voice with no face seen saying it: refused before the eyes.
         let home = crate::process::SessionDirectory::create().unwrap();
         let owner = owner();
-        let unseen = |switches| {
+        let socket = home.path.join("no-eyes.sock");
+        let unseen_with = |switches, args: Value| {
             known_faces::run_scoped(
-                &home.path.join("no-eyes.sock"),
-                &call(json!({"name": "Anna"})),
+                &socket,
+                &call(args),
                 switches,
                 None,
                 None,
@@ -566,10 +567,19 @@ mod tests {
             )
             .0
         };
+        let unseen = |switches| unseen_with(switches, json!({"name": "Anna"}));
         let answer = unseen(no_ask);
         assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{answer}");
         assert!(!asks(&answer), "{answer}");
         assert_eq!(unseen(switches())["error"], NOT_SEEN);
+        // A rename (`replace`), or a face the eyes' known file names at the
+        // lamp, keeps its own answer, never a no-ask "not kept" (Heron's and
+        // Migrate's HOLDs on #7800).
+        let rename = unseen_with(no_ask, json!({"name": "Jay", "replace": true}));
+        assert_eq!(rename["error"], NOT_SEEN, "{rename}");
+        std::fs::write(known_faces::known_file_of(&socket), "Walter\n").unwrap();
+        let known = unseen_with(no_ask, json!({"name": "Jay"}));
+        assert_eq!(known["error"], NOT_SEEN, "{known}");
         // Off: kept as before, with no line.
         let (answer, _) =
             own_name_exchange("I'm Ada.", "Ada", false, true, json!({"remembered": "Ada"}));
