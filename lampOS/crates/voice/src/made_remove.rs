@@ -343,11 +343,14 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
         .filter(|(apart, ..)| *apart == best)
         .copied()
         .collect();
-    for candidate in &theirs {
-        if !tied.contains(candidate) && tied.iter().any(|(_, short, _)| inside(short, candidate.1))
-        {
-            tied.push(*candidate);
-        }
+    // With `LAMP_MADE_SKILL_OFF_SAID` on, a near one is taken in only for
+    // a nearest one still standing after the step below (#7562's rows on
+    // lamp-9adf, 18 Nov: "good morning three" is good morning 3 named as it
+    // is written, and was asked which beside good morning 2, taken in for
+    // holding good morning, itself only good morning 3's part).
+    let late = made_skill::off_said_on();
+    if !late {
+        hold_nearest(&theirs, &mut tied);
     }
     // A name inside another named as it is written is that other's part.
     let whole: Vec<&str> = tied
@@ -356,6 +359,9 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
         .map(|(_, name, _)| *name)
         .collect();
     tied.retain(|(_, name, _)| !whole.iter().any(|long| inside(name, long)));
+    if late {
+        hold_nearest(&theirs, &mut tied);
+    }
     tied.sort_by_key(|(_, name, _)| (name.len(), *name));
     match tied.as_slice() {
         [(apart, name, sha256)] => Found::Made {
@@ -364,6 +370,20 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
             exact: *apart == 0,
         },
         _ => Found::Alike(tied.iter().map(|(_, name, _)| (*name).to_owned()).collect()),
+    }
+}
+
+/// Each of `theirs` not in `tied` that holds the words of one in `tied`,
+/// taken in ([`found`]): "moon fact" beside "moon" for "the moon fax".
+fn hold_nearest<'a>(
+    theirs: &[(usize, &'a str, &'a str)],
+    tied: &mut Vec<(usize, &'a str, &'a str)>,
+) {
+    for candidate in theirs {
+        if !tied.contains(candidate) && tied.iter().any(|(_, short, _)| inside(short, candidate.1))
+        {
+            tied.push(*candidate);
+        }
     }
 }
 
@@ -1163,6 +1183,66 @@ pub(crate) mod tests {
             "{told}"
         );
         assert!(!yes::awaited(now));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7562's rows on lamp-9adf, 18 Nov: "use my good morning three
+    /// skill" didn't find `good-morning-3` beside good morning and good
+    /// morning 2. A number said as a word or as digits, zero to twenty and
+    /// past, is the same as its digits, and a name said whole is that
+    /// skill alone, never asked which beside one a digit apart; "good
+    /// morning" alone, beside three such skills, still asks which. With
+    /// `LAMP_MADE_SKILL_OFF_SAID` on; off, as before.
+    #[test]
+    fn a_number_said_as_a_word_or_digits_finds_its_skill() {
+        let (root, keeping) = keeping("found-numbered");
+        made_here(
+            &keeping,
+            &[
+                ("good-morning", true),
+                ("good-morning-2", true),
+                ("good-morning-3", true),
+                ("alarm-20", true),
+                ("alarm-0", true),
+            ],
+        );
+        let one = |name: &str| Found::Made {
+            name: name.to_owned(),
+            sha256: made(&keeping)
+                .into_iter()
+                .find(|(made, _)| made == name)
+                .unwrap()
+                .1,
+            exact: true,
+        };
+        crate::made_skill::set_off_said_here(Some(true));
+        for said in [
+            "good morning three",
+            "good morning 3",
+            "my good morning three skill",
+            "Good Morning 3",
+        ] {
+            assert_eq!(found(said, &keeping), one("good-morning-3"), "{said}");
+        }
+        assert_eq!(found("good morning two", &keeping), one("good-morning-2"));
+        assert_eq!(found("alarm twenty", &keeping), one("alarm-20"));
+        assert_eq!(found("alarm 20", &keeping), one("alarm-20"));
+        assert_eq!(found("alarm zero", &keeping), one("alarm-0"));
+        match found("good morning", &keeping) {
+            Found::Alike(names) => assert_eq!(
+                names,
+                ["good-morning", "good-morning-2", "good-morning-3"],
+                "{names:?}"
+            ),
+            other => panic!("{other:?}"),
+        }
+        let turned_off = std::collections::BTreeSet::from(["good-morning-3".to_owned()]);
+        assert_eq!(
+            crate::made_run::off_named("use my good morning three skill", &keeping, &turned_off)
+                .as_deref(),
+            Some("good-morning-3")
+        );
+        crate::made_skill::set_off_said_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
