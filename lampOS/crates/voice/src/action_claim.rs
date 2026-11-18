@@ -158,11 +158,14 @@
 //! (`second_provider::kept_made` keeps it now). The test is structure,
 //! never a word list for meaning ([`skill_claim`]): the reply opens, bare or
 //! after a lead-in ([`LEAD_INS`]), with the name of a skill the person made
-//! (`made.json`, read as the turn begins, a name of two words or more:
-//! "music" is a common noun) and then one of the lamp's own result words for
-//! it ([`SKILL_REMOVED`]: "X is removed."; [`SKILL_OFF`]: "X is off.";
-//! [`SKILL_ON`]: "X is on again.", "X is on."), or with a clash's "I
-//! removed X", closing at its sentence's end, never a '?'. "Planet fact is
+//! (`made.json`, read as the turn begins; for off and on a name of two words
+//! or more: "music" is a common noun) and then one of the lamp's own result
+//! words for it ([`SKILL_REMOVED`]: "X is removed."; [`SKILL_OFF`]: "X is
+//! off."; [`SKILL_ON`]: "X is on again.", "X is on now.", "X is on."), or
+//! with a clash's "I removed X", closing at its sentence's end, never a
+//! '?', after a "Done" opening too. A put-on is that skill's own: a make's
+//! or a clash's `made` with `on`, and a code make's yes names it so.
+//! "Planet fact is
 //! still there." and "Is planet fact removed?" are none, and a skill gone
 //! from `made.json` is never named here. On a line the person asked as a
 //! question ([`asked_as_a_question`]) only the removed forms are judged.
@@ -840,9 +843,10 @@ pub const SKILL_OFF: [&str; 1] = ["is off"];
 
 /// The lamp's own words for a made skill turned back on or put on, after
 /// its spoken name (`made_turn::asked`: "that moon fact is on again";
-/// `made_clash`'s "Done: moon fact is on"). A test holds the producers to
-/// them.
-pub const SKILL_ON: [&str; 2] = ["is on again", "is on"];
+/// a code make's yes, `skill_write_yes::CODE_APPROVED_NEXT`: "that it's on
+/// now"; `made_clash`'s "Done: moon fact is on"). A test holds the
+/// producers to them.
+pub const SKILL_ON: [&str; 3] = ["is on again", "is on now", "is on"];
 
 /// How a clash's replace line says the skills it took off, before their
 /// names (`made_clash`: "Done: moon fact is on, and I removed moon"), as a
@@ -884,7 +888,7 @@ pub fn made_skills(directory: &std::path::Path, state: &std::path::Path) -> Vec<
         .collect()
 }
 
-/// Whether the made skill `name` is judged at all: a name of two words or
+/// Whether the made skill `name` is judged off or on: a name of two words or
 /// more, a hyphen in its folder's name (`moon-fact`). A one-word name
 /// ("music", "light") is a common noun as often as a skill, so "Music is
 /// off." is never read as a claim about a skill called music (the
@@ -897,9 +901,11 @@ fn judged(name: &str) -> bool {
 /// its kind.
 fn skill_runs(name: &str, asked: bool) -> Vec<(String, Claim)> {
     let mut patterns = Vec::new();
-    if !judged(name) {
-        return patterns;
-    }
+    // "Removed" is read for a one-word name too ("Pomodoro is removed."):
+    // a skill that leaves `made.json` has no true "removed" state to tell,
+    // and that is not how a common noun is said (Twelve's P3 at c881d48f19
+    // on #7730). Off and on stay for two words or more ([`judged`]).
+    let judged = judged(name);
     let spoken = crate::made_skill::spoken_name(name).to_lowercase();
     let words = spoken.split_whitespace().collect::<Vec<_>>().join(" ");
     for said in [words, name.to_lowercase()]
@@ -914,7 +920,7 @@ fn skill_runs(name: &str, asked: bool) -> Vec<(String, Claim)> {
             format!("{SKILL_REMOVED_BEFORE} {named} $"),
             Claim::SkillRemoved,
         ));
-        if !asked {
+        if judged && !asked {
             for tail in SKILL_OFF {
                 patterns.push((format!("{named} {tail} $"), Claim::SkillOff));
             }
@@ -928,7 +934,7 @@ fn skill_runs(name: &str, asked: bool) -> Vec<(String, Claim)> {
 
 /// Whether `text` (already [`normalised`]) opens, bare or after one of
 /// [`LEAD_INS`], with a skill the person made (`made`, its names as kept,
-/// those of two words or more alone, [`judged`]; each said as its words or
+/// those of two words or more alone for off and on, [`judged`]; each said as its words or
 /// as written, with "the" before or "skill" after it or not) and then one
 /// of the lamp's own result words for it, closing at its sentence's end,
 /// never on a '?' (#7683): [`SKILL_REMOVED`] or a clash's "I removed"
@@ -1086,7 +1092,11 @@ pub fn claim_made_on(
     asked: bool,
 ) -> Option<Option<Claim>> {
     let found = claim_on(reply, ended, worded, forget, doing);
-    if made.is_empty() || matches!(found, Some(Some(_))) {
+    // A "Done" opening is any call's own line, and still read for a made
+    // skill's change after it: "Done, planet fact is removed." beside a
+    // remove that only asked is bound to that skill (Twelve's P3 at
+    // c881d48f19 on #7730).
+    if made.is_empty() || matches!(found, Some(Some(kind)) if kind != Claim::AnyCall) {
         return found;
     }
     let mut text = normalised(reply);
@@ -1095,6 +1105,7 @@ pub fn claim_made_on(
     }
     match (found, skill_claim(&text, ended, made, asked)) {
         (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(Some(any)), _) => Some(Some(any)),
         (Some(None), Some(None)) => Some(None),
         _ => None,
     }
@@ -3039,12 +3050,16 @@ pub(crate) mod tests {
         ] {
             assert_eq!(read(reply, false), Some(Claim::SkillRemoved), "{reply}");
         }
-        // A clash's replace line opens "Done:", any call's line, read first;
-        // its skill's words alone are an on.
+        // A clash's replace line opens "Done:", any call's line, and is
+        // still read for its skill: an on, bound to the clash's own result.
         let clash = normalised("Done: evening dim is on, and I removed planet fact.");
         assert_eq!(
             skill_claim(&clash, true, &made, false),
             Some(Some(Claim::SkillOn))
+        );
+        assert_eq!(
+            read("Done: evening dim is on, and I removed planet fact.", false),
+            Some(Claim::SkillOn)
         );
         // A removal is judged on a question's line too: still listed, it
         // was not removed.
@@ -3070,12 +3085,21 @@ pub(crate) mod tests {
             "moon fact is removed.",
             "I can remove planet fact if you like.",
             "The planet fact skill tells you a fact.",
-            // One word: a common noun as often as a skill.
+            // One word: a common noun as often as a skill, off or on.
             "Music is off.",
-            "Music is removed.",
+            "Music is on.",
         ] {
             assert_eq!(read(reply, false), None, "{reply}");
         }
+        // Removed is read for one word too, and after a "Done" opening.
+        for reply in [
+            "Music is removed.",
+            "Done, planet fact is removed.",
+            "Done: planet fact is removed.",
+        ] {
+            assert_eq!(read(reply, false), Some(Claim::SkillRemoved), "{reply}");
+        }
+        assert_eq!(read("Done, it's on now.", false), Some(Claim::AnyCall));
         // Undecided while it streams, then decided at the sentence's end.
         assert_eq!(
             claim_made_on("planet fact is", false, (false, false, false), &made, false),
@@ -3241,6 +3265,13 @@ pub(crate) mod tests {
         let clash = include_str!("made_clash.rs");
         assert!(clash.contains("Done: {new} is on, and I removed {others}."));
         assert!(SKILL_ON.contains(&"is on"));
+        for next in [
+            crate::skill_write_yes::CODE_APPROVED_NEXT,
+            crate::skill_write_yes::CODE_ON_TASK_WAITS_NEXT,
+        ] {
+            assert!(next.contains("it's on now"), "{next}");
+        }
+        assert!(SKILL_ON.contains(&"is on now"));
     }
 
     /// C-make (Fourteen, lamp-9adf, 11 Nov 21:28): `make_skill`'s own line
