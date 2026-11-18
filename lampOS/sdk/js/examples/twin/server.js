@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
-import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt } from './controls.js';
+import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt, stopRainbow } from './controls.js';
 import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
 import { loadReachMap, rangesDeg, restrict, restrictAll } from './reach-guard.js';
@@ -399,19 +399,21 @@ wss.on('connection', (page) => {
     if (message.type === 'hear') hearing(page, message);
     if (tryPanel && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
-  page.on('close', () => pages.delete(page));
+  // The endless rainbow goes with the last page: nobody is left to switch it off.
+  page.on('close', () => { pages.delete(page); if (pages.size === 0) stopRainbow().catch(() => {}); });
 });
 // The end of a real run: this run's scratch clip and notes come off the lamp (nothing else is touched), then the connection
 // closes. try.js sends SIGTERM; a second signal ends it at once.
 if (real) {
-  // Five steps, each bounded at 3 s, are 15 s at worst; the limit is that plus 5 s, so a lamp that hangs on every step still ends 0.
+  // Six steps, each bounded at 3 s, are 18 s at worst; the limit is that plus 5 s, so a lamp that hangs on every step still ends 0.
   const STEP_MS = 3000;
-  const STEPS = 5;
+  const STEPS = 6;
   const bounded = (work) => Promise.race([work.catch((error) => console.error(`try: could not clean up on the lamp: ${error?.message ?? error}`)), new Promise((resolve) => setTimeout(resolve, STEP_MS))]);
   const end = endHandler({
     mostMs: STEPS * STEP_MS + 5000,
     exit: (code) => process.exit(code),
     cleanup: async () => {
+      await bounded(stopRainbow());
       await bounded(release());
       await bounded(cleanScratch(lamp));
       await bounded(cleanScratchNotes(lamp));
