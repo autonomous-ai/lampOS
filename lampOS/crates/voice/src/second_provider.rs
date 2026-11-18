@@ -18280,8 +18280,12 @@ async fn answer(
                                 {
                                     return Err(Stop::Failed(fault(&error)));
                                 }
-                                // And a due timer or reminder is rung (#7642).
+                                // And a due timer or reminder is rung, on the
+                                // same usage-limit word only: plain 429s that
+                                // last fail the turn as before, for the item
+                                // to be offered again (#7642).
                                 if let Some(timer) = limit_ring_timer
+                                    && word.is_some()
                                     && limit_ring(shared, request, timer).await?
                                 {
                                     return Ok(());

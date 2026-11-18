@@ -680,7 +680,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   set or a piece not kept, the limit's own way. A due timer or
   reminder (#7642, V2's ruling A) is rung in place of the chat turn the
   limit refuses, at the known limit before any chat and at its own chat's
-  limit refusal: a timer with "Your timer is done.", a reminder (or a
+  limit refusal (only the relay's `usage_limit` 429: a run of plain 429s
+  rings nothing, the turn failing as before for the item to be offered
+  again, `plain_429s_that_last_ring_no_due_timer`): a timer with "Your
+  timer is done.", a reminder (or a
   timer said with others as late) with "You have a reminder.", both
   rendered at start with the fixed answers (`LIMIT_TIMER_DONE`,
   `LIMIT_REMINDER_DUE`). The turn ends answered, with `OwnWordsSaid` first
