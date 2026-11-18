@@ -80,6 +80,14 @@ class Parsing(unittest.TestCase):
                          ("HOLD", "256d8a201e5f9b7d"))
         self.assertEqual(read_markers([c("writer-b", v2)], W), "")
 
+    def test_a_hold_on_its_own_line_after_a_lifting_word_still_counts(self):
+        # Heron's P2 on #7711: the words before a HOLD are read on its own line only.
+        for last in ("only", "lifts", "clears", "replaced", "the", "your"):
+            body = "Ten, 10:00: one P2, in the docs " + last + "\nHOLD 136b22c459 the row is wrong"
+            self.assertEqual(parse_marker(body)[:2], ("HOLD", "136b22c459"), last)
+            self.assertEqual(parse_marker("Ten, 10:00: one P2, in the docs " + last + "\n**HOLD** 136b22c459 x")[:2],
+                             ("HOLD", "136b22c459"), last)
+
     def test_bracketed_and_quoted_markers_do_not_count(self):
         self.assertIsNone(parse_marker("Friday, to Reviewer-two (HOLD 3e741c2201): new head"))
         self.assertIsNone(parse_marker("your 19:34 comment opens with `HOLD 73aa8b23f0`"))

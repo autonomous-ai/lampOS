@@ -110,7 +110,9 @@ def parse_marker(body):
     m = next((x for x in re.finditer(r"\b(READ-OK|HOLD)\*{0,2}\s+(?:#\d+\s+)?`?([0-9a-f]{9,40})`?\b\s*(.*)", body[:400])
               if not x.group(2).isdigit()
               and not re.search(r"(?i)(\b(your|for|the|that|this|their|his|her|its|only|lifts?|lifted|lifting|clears?|"
-                                r"cleared|clearing|replaces|replaced)|['’]s)\s+\**$", body[:x.start()])
+                                r"cleared|clearing|replaces|replaced)|['’]s)[^\S\n]+\**$", body[:x.start()])
+              # Heron's P2 on #7711: the gap stays on the HOLD's own line, so a HOLD on its own line after a line that
+              # ends in "only" or "lifts" still counts (`\s+` crossed the newline and dropped it).
               # 27 Oct 05:3x: nor one in brackets, the HOLD a reply answers ("Friday, to Reviewer-two (HOLD
               # 3e741c220): new head ..."): three such replies held #3608 under Friday's name after both READ-OKs.
               and not re.search(r"[(\[]\**`?$", body[:x.start()])
