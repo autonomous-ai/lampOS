@@ -228,7 +228,7 @@ jobs:
       # `kill` by about a second and still write, so wait for the sim, poll up to 5 s for its sockets to go, and retry
       # the `rm -rf`; the step's exit is the voice's result, never the `rm`'s.
       - name: lamp-voice starts on a Mac with no host sound and the no-slide gate
-        continue-on-error: true # until a runner's stall can't end the privacy reading (#7657, 18 Nov)
+        continue-on-error: true # until a runner's stall can't end the privacy reading (#7675, 18 Nov)
         working-directory: lampOS
         run: |
           cargo build --locked -p lamp-voice -p lamp-controls
