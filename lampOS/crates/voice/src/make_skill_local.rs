@@ -3624,6 +3624,10 @@ pub fn answer(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
 
     /// #7245 (lamp-c0a4, 16 Nov 19:44-19:58): the agent's code was refused for
     /// a task's words over the limit or on two lines, and for a do step with
@@ -3643,10 +3647,6 @@ pub(crate) mod tests {
             "{rules}"
         );
     }
-    use super::*;
-    use std::io::{Read, Write};
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::{Path, PathBuf};
 
     /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
     /// only. A visitor's "yes" approves nothing and drops the wait; the
