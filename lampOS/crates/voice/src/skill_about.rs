@@ -518,6 +518,14 @@ fn ago(ran_us: u64, now_us: u64) -> String {
 /// What the model is told after the facts.
 pub const NEXT: &str = "These are the lamp's own records: every skill on it with its state, and those whose words come nearest to what they asked in full. Answer what they asked from these alone, in a few words: on, off, snoozed or resting, what it does and what starts it, when it last ran, whether it waits for their yes. Never guess: what is not given here the lamp doesn't keep, so say so. If none is the skill they mean, say no skill on the lamp is that one (a reminder they set themselves is not a skill). Only answer: offer to change, turn on or turn off nothing. Don't call use_skill again for it.";
 
+/// The key of the about answer that tells, with `LAMP_MADE_SKILL_OFF_SAID`
+/// on, how a turn off is done (`made_turn::TURN_OFF_AT_ONCE`): #7562's rows
+/// on lamp-9adf, 18 Nov, "Lamp, turn off my space facts skill." was taken
+/// for a question about it, and a skill started only by its words (its
+/// description: "It starts only when you say it") was said to have
+/// "nothing running to switch off". Off, the answer is as before.
+pub const TURNING_OFF: &str = "turning_off";
+
 /// The schedule's function whose answer carries the skills' lines too
 /// ([`with_reminders`]): the owner, 16 Nov, "is my water reminder on or
 /// off?" called it on lamp-9adf (#7335's row), and with no reminder set it
@@ -610,6 +618,9 @@ pub fn told(
     });
     if not_named > 0 {
         told["made_here_not_named"] = json!(not_named);
+    }
+    if made_skill::off_said_on() {
+        told[TURNING_OFF] = json!(crate::made_turn::TURN_OFF_AT_ONCE);
     }
     if !fit(&mut told, &["skills", "nearest"]) {
         eprintln!("lamp-voice: request {request}: skills' state not told: too long to send");
@@ -1582,6 +1593,37 @@ mod tests {
         with_made_here(&call, &mut told, 1, true, None, None);
         set_on_here(None);
         assert_eq!(told.to_string(), list.to_string());
+    }
+
+    /// #7562's rows on lamp-9adf, 18 Nov: "Lamp, turn off my space facts
+    /// skill." was taken for a question, and a skill started only by its
+    /// words was said to have "nothing running to switch off". With
+    /// `LAMP_MADE_SKILL_OFF_SAID` on, the about answer tells how a turn
+    /// off is done: `turn_off` at once, never a remove, one started by
+    /// their words too, nothing asked. Off, as before.
+    #[test]
+    fn the_about_answer_tells_a_turn_off_is_done_at_once() {
+        let (root, places) = lamp(
+            "turning-off",
+            &[(
+                "space-facts",
+                "Tells a space fact. It starts only when you say it, never on its own.",
+                "kind = \"installable\"\nasks = [\"space facts\"]\n",
+            )],
+        );
+        made_skill::set_off_said_here(Some(true));
+        let told = told_about(&places, "space facts");
+        assert_eq!(
+            told[TURNING_OFF],
+            crate::made_turn::TURN_OFF_AT_ONCE,
+            "{told}"
+        );
+        assert!(crate::tools::sendable(&told));
+        made_skill::set_off_said_here(Some(false));
+        let before = told_about(&places, "space facts");
+        assert!(before.get(TURNING_OFF).is_none(), "{before}");
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// An answer about a skill only answers: it offers no change.

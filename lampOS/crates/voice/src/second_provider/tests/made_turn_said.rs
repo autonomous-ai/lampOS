@@ -47,6 +47,11 @@ fn make_skill_answers(args: &Value) -> Value {
             ],
             "next": "No skill they made or added has that name."
         }),
+        (Some(off), _) if off.contains("space") => json!({
+            crate::made_turn::TURN_OFF: "space-facts",
+            "off": true,
+            "next": "Say only that space facts is off, and that they can say turn it back on."
+        }),
         (Some(_), _) => json!({
             crate::made_turn::TURN_OFF: "btc-price",
             "off": true,
@@ -552,6 +557,47 @@ fn a_turn_off_found_by_its_name_is_said_as_before() {
     );
     assert_eq!(went.said, said(&["Btc price is off."]), "{went:?}");
     assert!(went.notes.is_empty(), "{went:?}");
+}
+
+/// #7562's rows on lamp-9adf, 18 Nov: "Lamp, turn off my space facts
+/// skill." (a skill started only by its words) was asked back ("Do you
+/// want it off?", "Remove space facts?"). The product owner's 18:41 rule:
+/// a turn off of a named made skill acts at once, in one line with its
+/// undo. The line goes to `make_skill`'s `turn_off` alone, never a remove,
+/// and its answer is said as the one line, with no question and no round
+/// held.
+#[test]
+fn a_turn_off_of_one_started_by_its_words_acts_at_once_in_one_line() {
+    let went = went(
+        "Lamp, turn off my space facts skill.",
+        vec![
+            calls(
+                "c1",
+                crate::made_skill::MAKE,
+                json!({ crate::made_turn::TURN_OFF: "space facts" }),
+            ),
+            saying("Space facts is off. Say turn it back on whenever you like."),
+        ],
+    );
+    assert_eq!(
+        went.ran,
+        [(
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_turn::TURN_OFF: "space facts" })
+        )],
+        "{went:?}"
+    );
+    assert_eq!(
+        went.said,
+        said(&[
+            "Space facts is off.",
+            " Say turn it back on whenever you like."
+        ]),
+        "{went:?}"
+    );
+    assert!(went.said.iter().all(|line| !line.contains('?')), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    assert!(told_for(&went, "c1").contains("space-facts"), "{went:?}");
 }
 
 /// A skill's function still answered off right after a `turn_on` turned it
