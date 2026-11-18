@@ -273,7 +273,8 @@ pub fn reply(
                     || kind == crate::settings::WIFI_KIND
                     || crate::services::connector_kind(&kind).is_some()
                     || kind == crate::apps::INSTALL_KIND
-                    || crate::upload::id_of(&kind).is_some())
+                    || crate::upload::id_of(&kind).is_some()
+                    || crate::attach::id_of(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
                 // The keys' kinds say the app's id back at once too (#2094).
@@ -812,6 +813,8 @@ async fn session(
         let apps = lamp.apps();
         // Skills added from a file: their results go on the same tick.
         let uploads = lamp.upload();
+        // An attachment from the app's result (#7659), the same way.
+        let attachments = lamp.attachments();
         // The desk and Hydrate bridge (#7470), with its switch.
         let devices_on = lamp.devices_on();
         let polled = {
@@ -833,7 +836,7 @@ async fn session(
                         back_to_tcp = true;
                         break None;
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || apps.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || apps.is_some() || uploads.is_some() || attachments.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -1026,6 +1029,18 @@ async fn session(
                                 let tag = Tagged::Upload(outcome.clone());
                                 if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
                                     uploads.owe(vec![outcome]);
+                                }
+                            }
+                        }
+                        // An attachment from the app (#7659): `success` or
+                        // `failure`, so the backend deletes its copy (it
+                        // does after an hour anyway). Handed once; one the
+                        // client didn't take waits for the next tick.
+                        if connected && let Some(attachments) = &attachments {
+                            for outcome in attachments.take() {
+                                let reply = outcome.reply(&me, &now()).to_string();
+                                if !handed.publish(&client, account.fd_channel.as_str(), reply, None) {
+                                    attachments.owe(vec![outcome]);
                                 }
                             }
                         }
