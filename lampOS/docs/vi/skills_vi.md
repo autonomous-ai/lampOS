@@ -3361,6 +3361,51 @@ cả hai người viết.
   nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
   ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
   của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
+- **Chỉ phản ứng nhanh ở lại với DeepSeek (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
+  tắt nếu không đặt, không có trong unit sản phẩm nào; phán quyết của
+  first builder trên #6811, 18/11 16:23, và tuyến rộng hơn anh đồng ý lúc
+  16:34).** DeepSeek vẫn viết bản nháp như trước. Bản nháp chỉ được giữ khi
+  là một phản ứng nhanh (`made_skill::quick_reaction`, chỉ theo cách bắt đầu
+  và loại bước, không bao giờ theo từ ngữ): do chính người dùng khởi động
+  (câu họ đặt, `asks` hoặc `[said]`; `[trigger]` trên `controls/*`: chạm,
+  vuốt đầu, nút bấm; hoặc không có trigger, chỉ chạy khi được gọi), chỉ có
+  `light`, `body`, một `say` đúng lời hoặc tiếng ngân, không `task`, không
+  `[[while]]`, không `grants`. Mọi bản nháp khác (đồng hồ, có người ở bàn,
+  khuôn mặt, việc người ngồi đang làm, cảm biến khác, guard, đọc, ghi, task)
+  không bao giờ được giữ: lần tạo chuyển cho agent của đèn với cùng brief,
+  câu "khoảng một phút" được nói như mọi lần chuyển giao, và nhật ký ghi
+  `a skill made here: not a quick reaction (on room/presence): made by the
+  agent (Hermes), DeepSeek's draft not kept`. Agent được cho biết, sau
+  luật và trong luật của mỗi lần sửa, các guard của sip-of-water làm mẫu
+  (`made_skill::BEHAVIOUR_TEMPLATE`, 986 byte; luật với brief dài nhất từ
+  7.789 lên 8.777 byte, trong giới hạn 48 KiB của lamp-tasks, brief không
+  đổi, trong `MOST_BRIEF_BYTES`): `[[while]]` trên `voice/state`
+  `not_equals = "speaking"` 30 giây và `equals = "resting"` 5 giây, trên
+  `room/activity` `state not_equals = "head_down"` với `unknown = "holds"`,
+  `rearm = "leaves"`, `most_a_day`, ngân sách `wellbeing`, giờ `[active]`,
+  đêm `[quiet]`, `[rest] after_ignored = 2` và một câu ngắn, ấm áp, đúng lời
+  (lời của skill tự tạo được nói đúng như viết). Agent không tạo được (không
+  trả lời kịp, bận, lần chạy hỏng, không có lần chạy make) thì được nói rõ
+  bằng lời lỗi của chính agent (`make_skill_agent::not_made_try`) và không
+  giữ gì: không bao giờ giữ bản nháp không guard của DeepSeek. Đèn không có
+  agent nào (`missing` của #7375): "this lamp has no agent set up to make
+  it"; chưa biết agent (chưa đọc được targets của lamp-tasks, hoặc engine
+  không có lần chạy make): của DeepSeek như trước. Câu trả lời `cannot:`
+  (nhắc việc một lần là bộ hẹn giờ của đèn, không bao giờ là make), dòng
+  internet và make dịch vụ liên kết giữ tuyến của chúng. Hai guard: một
+  `[[while]]` trên `voice/state` hoặc `room/activity` đọc như trên được nói
+  rõ ("never in the middle of a conversation or with your head down",
+  `made_skill::guards_said`) và được đèn cấp trong `[permissions] topics`
+  (`topic_granted`); không giới hạn nào của skill tự tạo đếm topic (từ
+  #6066), nên chúng không tính vào đâu; `[[while]]` khác, hoặc topic guard
+  đọc theo cách khác, vẫn là phần riêng, không nói được như trước. Skill
+  trên topic hiện diện hoặc con người (`made_skill::BEHAVIOUR_TOPICS`) giữ
+  phép tắc của đèn kể cả khi `LAMP_MADE_SKILL_LOOSE` bật (đánh dấu
+  `limits: asked`). Ai tạo là dòng của riêng đèn: `made_with: deepseek`,
+  `hermes` hoặc `openclaw` trên thẻ sau `made_by`, và `"made_with"` trong
+  mục `made.json`; dòng do mô hình viết bị bỏ, như `made_by`, dù bật hay
+  tắt. Tắt: mọi lần tạo giữ nguyên từng byte như trước. Kiểm thử: như bản
+  tiếng Anh.
 - **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
   nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần
