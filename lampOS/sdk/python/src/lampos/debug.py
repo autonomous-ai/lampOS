@@ -23,7 +23,9 @@ from typing import Any
 # secret already (the pairing key), and `value` and `prefix` join it. A skill
 # run's `service.read` / `service.write` `args` and their `result` are the
 # person's mail, calendar and the like: never logged.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token", "args", "result"})
+# An installed app's panel text (`title`, `lines`) and the owner's `settings` values are the app's own and the
+# person's (a learner's name may be one): never logged; the keys that `changed` and a manifest `trigger`'s name are shown.
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token", "args", "result", "title", "lines", "settings"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
@@ -82,7 +84,9 @@ SHOWN = frozenset({
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
     "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "shows", "side", "size", "skill", "skills",
     "started", "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "turn", "until", "v", "where",
-    "why", "within_ms", "x", "y", "yaw"
+    "why", "within_ms", "x", "y", "yaw",
+    # An installed app's `app.settings` event and `app.trigger` (#7415).
+    "changed", "trigger"
 })
 # Fields a lamp sends that the schema leaves open (`limits`, an `express`
 # answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,

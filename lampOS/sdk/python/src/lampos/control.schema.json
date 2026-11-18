@@ -3556,6 +3556,209 @@
         "on"
       ],
       "additionalProperties": false
+    },
+    "phrases.set": {
+      "description": "An installed app's phrases, replaced whole (an empty list clears them): matched on the lamp as subscribe's are, and told as phrase.heard, never what was said. At most 16 an app across its connections, each 8 letters at least. Needs hear. Only on an app's socket (LAMP_APP_SOCKET); the manifest's own triggers come as app.trigger whether or not this is ever sent.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "phrases.set"
+        },
+        "phrases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "phrases"
+      ],
+      "additionalProperties": false
+    },
+    "app.took": {
+      "description": "The app takes the turn an app.trigger named: the voice keeps quiet. A say, gesture or light from the app within 3 s of the trigger counts as well; with neither, the voice answers itself.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.took"
+        },
+        "turn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "app.settings.get": {
+      "description": "The values of every key of the app's manifest settings schema, the default for one never set; reply carries settings. The schema itself is in the app's own manifest.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.settings.get"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "app.panel.set": {
+      "description": "The app's panel in the owner's app: a title and at most 6 lines of text, nothing else in v1. One a minute an app: over it rate with retry_ms. The reply carries rev, which counts up.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.panel.set"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+          },
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "title",
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "app_request": {
+      "description": "The ops only an installed app's socket (LAMP_APP_SOCKET) takes, besides the door's own that its manifest's grants allow. Apart from `request` until lamp-control's app socket takes them as ops (#7415).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/phrases.set"
+        },
+        {
+          "$ref": "#/$defs/app.took"
+        },
+        {
+          "$ref": "#/$defs/app.settings.get"
+        },
+        {
+          "$ref": "#/$defs/app.panel.set"
+        }
+      ]
+    },
+    "app_event": {
+      "description": "The events only an installed app's socket sends, besides phrase.heard (which phrases.set turns on). They come without a subscribe. Apart from `event` until lamp-control's app socket sends them (#7415).",
+      "type": "object",
+      "properties": {
+        "ev": {
+          "enum": [
+            "app.trigger",
+            "app.settings"
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "required": [
+        "ev"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "app.trigger"
+              }
+            }
+          },
+          "then": {
+            "description": "One of the manifest's triggers (at most 8, outside the 16 phrases) matched: its name, the phrase matched and a turn to take with app.took. Never the words around it.",
+            "properties": {
+              "trigger": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "phrase": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "turn": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "trigger",
+              "phrase",
+              "turn"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "app.settings"
+              }
+            }
+          },
+          "then": {
+            "description": "The owner changed settings: the keys that changed and every value now. lamp-control checked each against the manifest's schema first, so a bad value never arrives.",
+            "properties": {
+              "changed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "settings": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "changed",
+              "settings"
+            ]
+          }
+        }
+      ]
     }
   }
 }
