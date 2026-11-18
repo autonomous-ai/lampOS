@@ -5045,7 +5045,11 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   answers, a sign-out or an engine switch is `harness close
   lamp-one-openclaw --program-token-file …` and then `openclaw gateway call
   sessions.delete` of its `engineSession`, which deletes the conversation
-  (Harness's `close --forget` is not built yet); a sign-out or an engine
+  (Harness's `close --forget` is not built yet); a cancel (a turn cut at
+  its deadline included) closes it with `--now` too, as Harness refuses a
+  plain close while the session is working (#7245: on lamp-c0a4 a make cut
+  at its deadline left the kept session `working`, and every later make was
+  told `NOT_IDLE` until the gateway restarted); a sign-out or an engine
   switch removes the token file too. One not closed is tried again at the
   next look, and no pane is opened meanwhile. A factory reset wipes the
   store folder, token included.

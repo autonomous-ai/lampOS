@@ -2404,7 +2404,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất
   hoặc đổi engine là `harness close lamp-one-openclaw --program-token-file …`
   rồi `openclaw gateway call sessions.delete` với `engineSession` của nó, xoá
-  hội thoại (`close --forget` của Harness chưa được xây); đăng xuất hoặc đổi
+  hội thoại (`close --forget` của Harness chưa được xây); một lần huỷ (kể cả
+  lượt bị cắt ở hạn chót) đóng phiên kèm `--now`, vì Harness từ chối lệnh
+  close thường khi phiên đang chạy (#7245: trên lamp-c0a4 một lần make bị cắt
+  ở hạn chót để phiên giữ lại ở trạng thái `working`, và mọi lần make sau đều
+  bị báo `NOT_IDLE` cho tới khi gateway khởi động lại); đăng xuất hoặc đổi
   engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
   và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
   token.

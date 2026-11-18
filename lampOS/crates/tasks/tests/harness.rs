@@ -10825,7 +10825,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         ),
         Ok(Some("needs-input".into()))
     );
-    assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, false), Ok(()));
+    // #7245: a turn cancelled or at its deadline closes it `--now`.
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, true), Ok(()));
     let calls = rig.calls();
     let path = token.to_str().unwrap();
     for call in &calls {
@@ -10854,9 +10856,17 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let held = last_reply["args"].as_array().unwrap();
     let at = held.iter().position(|arg| arg == "--timeout").unwrap();
     assert_eq!(held[at + 1], "60s");
-    let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
-    assert_eq!(close[0], "close");
-    assert!(!close.contains(&json!("--forget")), "not built yet");
+    let closes: Vec<Vec<Value>> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "close")
+        .map(|call| call["args"].as_array().unwrap().clone())
+        .collect();
+    assert_eq!(closes.len(), 2, "{closes:?}");
+    assert!(!closes[0].contains(&json!("--now")), "{:?}", closes[0]);
+    assert!(closes[1].contains(&json!("--now")), "{:?}", closes[1]);
+    for close in &closes {
+        assert!(!close.contains(&json!("--forget")), "not built yet");
+    }
     // No `capabilities` verb: `ensure --help` naming the token flag says yes.
     rig.plan(json!({
         "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},

@@ -311,9 +311,10 @@ pub trait PaneHarness {
     ) -> Result<Option<String>, String> {
         Err("unsupported".into())
     }
-    /// `harness close` of it with the token ([`Cli::close_kept`]); its
-    /// conversation stays in the engine's store.
-    fn close_kept(&self, _name: &str, _token: &Path) -> Result<(), String> {
+    /// `harness close` of it with the token ([`Cli::close_kept`]), `--now`
+    /// when `now` (a turn cancelled or at its deadline, the session maybe
+    /// still working); its conversation stays in the engine's store.
+    fn close_kept(&self, _name: &str, _token: &Path, _now: bool) -> Result<(), String> {
         Err("unsupported".into())
     }
 }
@@ -378,8 +379,8 @@ impl PaneHarness for Cli {
     ) -> Result<Option<String>, String> {
         Cli::wait_kept(self, name, token, input, cancel)
     }
-    fn close_kept(&self, name: &str, token: &Path) -> Result<(), String> {
-        Cli::close_kept(self, name, token)
+    fn close_kept(&self, name: &str, token: &Path, now: bool) -> Result<(), String> {
+        Cli::close_kept(self, name, token, now)
     }
     fn wait_after(
         &self,
@@ -1089,7 +1090,7 @@ impl OneSession {
             && let Some(file) = &self.kept_token
             && let Some(kind) = engine_named(&engine)
         {
-            if let Err(code) = harness.close_kept(&name_for(kind), file) {
+            if let Err(code) = harness.close_kept(&name_for(kind), file, false) {
                 eprintln!(
                     "tasks: one session: the kept session {} not closed: {code}; tried again next",
                     short(&agent)
@@ -1869,7 +1870,9 @@ impl OneSession {
                 if !pane.place.same_spot(place)
                     && let Some(file) = self.kept_token.clone()
                 {
-                    if let Err(code) = harness.close_kept(&name_for(pane.place.engine), &file) {
+                    if let Err(code) =
+                        harness.close_kept(&name_for(pane.place.engine), &file, false)
+                    {
                         eprintln!(
                             "tasks: one session: the old kept session {} not closed: {code}",
                             short(&pane.agent)
@@ -2655,7 +2658,7 @@ impl Turn<'_> {
                 Ok(Some(state)) if state == "needs-input" => {
                     match kept {
                         Some((name, token)) => {
-                            let _ = harness.close_kept(name, token);
+                            let _ = harness.close_kept(name, token, false);
                             self.one.kept_closed(agent, EngineKind::Openclaw);
                         }
                         None => {
@@ -2696,11 +2699,14 @@ impl Turn<'_> {
     }
 
     fn cancelled(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Ended {
-        // The kept session: closed, its conversation deleted, ensured anew
-        // next.
+        // The kept session: closed `--now` (its turn may still be working,
+        // and Harness refuses a plain close then), its conversation
+        // deleted, ensured anew next.
         let closed = match self.one.kept_now(agent) {
             Some((name, token)) => {
-                let closed = harness.close_kept(&name, &token).map(|()| Closed::Closed);
+                let closed = harness
+                    .close_kept(&name, &token, true)
+                    .map(|()| Closed::Closed);
                 self.one.kept_closed(agent, EngineKind::Openclaw);
                 closed
             }
