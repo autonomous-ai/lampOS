@@ -24,7 +24,7 @@
 //! Hermes, the one engine with a namespace runner for a make today
 //! ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.
-use crate::made_skill::{self, Keeping, Made, Refused};
+use crate::made_skill::{self, Keeping, Made, REMINDER_INSTEAD, REMINDER_IS_TIMER, Refused};
 use crate::second_provider::net::{self, Chat, ChatEvent, Message};
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
@@ -38,6 +38,10 @@ pub const AGENT_FIRST_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_FIRST";
 /// refused (the owner, 10 Nov: "re-run it yourself until it works"; one,
 /// before: lamp-74ff's "come back to my desk" failed its one repair).
 pub const MOST_REPAIRS: usize = 3;
+/// What a DeepSeek repair of a make judged a quick reaction is refused as
+/// when it is none ([`made_skill::quick_reaction`]): never kept and never
+/// said, as the middle form takes its place.
+const NOT_A_REACTION: &str = "a repaired draft that is no quick reaction";
 /// The longest a make goes on: no repair is begun once one more round
 /// ([`ROUND_WITHIN`]) would end past it. 120 s, the longest a make with
 /// one repair could take before (two answers, each asked once more).
@@ -488,9 +492,8 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
-         the form only: never answer with it. A reminder at a time or every so often is the \
-         lamp's own timer, not a skill; a skill runs at a time only each day or on named \
-         days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
+         the form only: never answer with it. {REMINDER_IS_TIMER}, by the clock trigger \
+         below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, \
          {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
@@ -509,9 +512,8 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          person, beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} \
          {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
-         for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
-         me every hour to stand up'.\"{check_steps} {found_out} Never stand something \
-         else in for it, and add no time of day the request didn't name. When a part of the \
+         for a reminder at a time or every so often: \"{REMINDER_INSTEAD}\"{check_steps} {found_out} Never \
+         stand something else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
          {services}{code}{steps}{said}"
@@ -3424,6 +3426,14 @@ fn made_and_journaled_by(
     // 10 Nov: "re-run it yourself until it works"), each begun only while
     // one more round, two answers at worst, still fits [`MAKE_WITHIN`],
     // the time `skipped` (a hand-over the agent didn't take) not counted.
+    // With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on and a make judged a quick
+    // reaction (`held_to_reaction`), every DeepSeek repair is held to
+    // [`made_skill::quick_reaction`] as its first draft is, before it is
+    // kept (the Reviewer-lead's P2 on #7764): one that is no quick reaction
+    // is never kept, and `repaired_not_reaction` sends the make to the
+    // middle form. Never set on any other make.
+    let held_to_reaction = std::cell::Cell::new(false);
+    let repaired_not_reaction = std::cell::Cell::new(None::<String>);
     let deepseek_repaired = |made: Result<Made, Refused>, skipped: Duration| {
         let (made, before) = repaired(
             made,
@@ -3431,7 +3441,17 @@ fn made_and_journaled_by(
             "",
             MOST_REPAIRS,
             || round_fits(began.elapsed().saturating_sub(skipped)),
-            |repair| kept(ask(Arc::clone(&chat), repair)),
+            |repair| {
+                let answer = ask(Arc::clone(&chat), repair);
+                if held_to_reaction.get()
+                    && let Ok(text) = &answer
+                    && let Some(why) = made_skill::not_a_reaction(text)
+                {
+                    repaired_not_reaction.set(Some(why));
+                    return Err(Refused(NOT_A_REACTION.to_owned(), None));
+                }
+                kept(answer)
+            },
         );
         refused_before.set(before);
         made
@@ -3564,7 +3584,9 @@ fn made_and_journaled_by(
             })
             .flatten()
     };
-    if let Some(why) = route {
+    // The middle form, for a make judged none or drafted (or repaired) as
+    // no quick reaction: one task for the agent, or told it has none.
+    let middle_form = |why: &str| {
         if let Some((_, engine)) = engine {
             eprintln!(
                 "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
@@ -3580,8 +3602,18 @@ fn made_and_journaled_by(
         );
         let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
         let line = kept_line(&made, false, began.elapsed().as_millis());
-        return (plain_unless_cannot(made, false), line);
+        (plain_unless_cannot(made, false), line)
+    };
+    if let Some(why) = route {
+        return middle_form(&why);
     }
+    // Judged a quick reaction: its repairs are held to it too.
+    held_to_reaction.set(routed);
+    let repaired_away = || {
+        repaired_not_reaction
+            .take()
+            .map(|why| format!("repaired, not a quick reaction ({why})"))
+    };
     // Never left unasked here: a route with no draft returned above.
     let first = first.unwrap_or_else(first_ask);
     web_task_held.set(net_code);
@@ -3594,6 +3626,9 @@ fn made_and_journaled_by(
     }
     if engine.is_none() {
         made = deepseek_repaired(made, Duration::ZERO);
+        if let Some(why) = repaired_away() {
+            return middle_form(&why);
+        }
     }
     let made = match engine {
         // What only the internet tells (`LAMP_TASK_NET` on): never handed
@@ -3685,6 +3720,10 @@ fn made_and_journaled_by(
         }
         None => made,
     };
+    // DeepSeek's repairs for a make the agent didn't take (the app's).
+    if let Some(why) = repaired_away() {
+        return middle_form(&why);
+    }
     let made = net_made(
         made,
         &needs_net,
@@ -12037,6 +12076,144 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(served.join().unwrap(), 2);
         assert_eq!(tasks.hand_overs(), 0);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2 on #7764: a one-off reminder judged no quick
+    /// reaction (false, unsure or late) comes to the middle form, whose one
+    /// more call refuses a reminder as the make's own brief does; its
+    /// `cannot:` is said with the lamp's own line and no daily task is
+    /// ever kept. The agent is never asked.
+    #[test]
+    fn with_the_switch_a_reminder_judged_none_never_keeps_a_daily_task() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping) = keeping("reactions-reminder-middle");
+        const MOM: &str = "remind me at 9 to call mom";
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (
+                200,
+                format!(
+                    "cannot: I can't do that yet: a reminder at nine. {}",
+                    made_skill::REMINDER_INSTEAD
+                ),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            MOM,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(is_judgement(&sent[0], MOM), "{}", sent[0]);
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs")
+                && sent[1].contains(made_skill::REMINDER_IS_TIMER)
+                && sent[1].contains(made_skill::REMINDER_INSTEAD),
+            "the middle form refuses a reminder: {}",
+            sent[1]
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(
+            told["error"].as_str().is_some_and(
+                |error| error.contains(&crate::make_no_cannot::Uncovered::Reminder.line())
+            ),
+            "{told}"
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2 on #7764: judged a quick reaction, a first
+    /// draft that can't be read gets DeepSeek's repairs, each held to
+    /// [`made_skill::quick_reaction`] as the first draft is: a repair on
+    /// someone at the desk is never kept. With no agent on the lamp, told
+    /// so; for the app's make the agent didn't take, the middle form.
+    #[test]
+    fn with_the_switch_a_repaired_draft_that_is_no_reaction_is_never_kept() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-repaired");
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        // Fenced, but no TOML the check can read: refused with its lines.
+        let unread = (200, route_answer("[[do]\nsay = = sip\n", "sip-unread"));
+        let repair = (200, route_answer(&presence_say(), "deepseek-draft"));
+        // No agent on the lamp (the one path, no `lamp` target).
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let on = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..none.agent()
+        };
+        let (url, served) = service_sent(vec![judgement(true), unread.clone(), repair.clone()]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&on),
+        );
+        assert_eq!(served.join().unwrap().len(), 3, "{told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_MISSING)
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // The app's make, the agent making none: DeepSeek's repairs, then
+        // the middle form.
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let app = crate::make_skill_agent::Agent {
+            repairs_if_untaken: true,
+            ..tasks.agent()
+        };
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            unread,
+            repair,
+            (
+                200,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&app),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 4, "{told}");
+        assert!(
+            sent[3].contains("You choose, for a lamp, when a skill runs"),
+            "{}",
+            sent[3]
+        );
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
