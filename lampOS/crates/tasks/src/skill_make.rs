@@ -105,9 +105,9 @@ pub const MOST_LINE_BYTES: usize = 2 * MOST_RULES_BYTES + 256;
 pub const MOST_ANSWER_BYTES: u64 = 20 * 1024;
 /// The least and most a run may be given (`within_ms`).
 pub const LEAST_WITHIN: Duration = Duration::from_secs(1);
-// #7245 (the owner, 18 Nov 14:5x): a gateway agent's make may take up to
-// 45 minutes.
-pub const MOST_WITHIN: Duration = Duration::from_secs(45 * 60);
+// #7245: a gateway agent's make may take up to 10 minutes (the first
+// builder's call on #6811, 18 Nov 17:23, the owner's yes).
+pub const MOST_WITHIN: Duration = Duration::from_secs(10 * 60);
 /// The rules' file in a make's folder.
 pub const RULES_FILE: &str = "rules.md";
 /// The one file the run writes in a make's folder.
