@@ -527,6 +527,29 @@ pub fn speaker_from_environment() -> bool {
     std::env::var(SPEAKER_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Off unless `LAMP_FACE_NO_ASK=on` on lamp-eyes (the first builder 18:50,
+/// from the product owner: nothing is asked of the person): the one face of
+/// a photo is kept at once as an ordinary print ([`keep_at_once`]), with no
+/// yes at the lamp. Off, it is kept unconfirmed as before.
+pub const NO_ASK_ENVIRONMENT: &str = "LAMP_FACE_NO_ASK";
+
+pub fn no_ask_from_environment() -> bool {
+    std::env::var(NO_ASK_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`NO_ASK_ENVIRONMENT`] on: a photo's one face kept under `name` at
+/// once, as a confirmed photo yes keeps it (no near-name question), so
+/// "forget my face" and the app's removal forget it as any other. A face
+/// already known by another name is refused as at the lamp (`known_as`).
+pub fn keep_at_once(
+    people: &mut crate::who::People,
+    name: &str,
+    print: Vec<f32>,
+    now_unix_s: u64,
+) -> std::result::Result<crate::who::Remembered, crate::who::Refused> {
+    people.remember_one_replacing(name, vec![print], now_unix_s, false, true)
+}
+
 /// Whether a yes's `face` is the one that matched the photo here (`here`,
 /// `boot/f3`, `None` while speaking isn't judged): the same id under the
 /// same boot, or the yes is not kept. It closes the gap between the voice's
@@ -889,6 +912,33 @@ mod tests {
         let mut print = vec![0.0f32; crate::who::PRINT];
         print[n] = 1.0;
         print
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the first builder 18:50): a photo's face is kept
+    /// at once in the people's file, recognised with no yes, and forgotten
+    /// as any other face; a face known by another name is refused.
+    #[test]
+    fn with_no_ask_a_face_from_a_photo_is_kept_at_once_and_forgets() {
+        let dir = folder("no-ask");
+        let mut people = crate::who::People::open(dir.join("people.json")).unwrap();
+        let kept = keep_at_once(&mut people, "Lan", unit(3), 1).unwrap();
+        assert_eq!(kept.name, "Lan");
+        assert_eq!(
+            people.who(&unit(3)).map(|(name, _)| name).as_deref(),
+            Some("Lan")
+        );
+        assert!(matches!(
+            keep_at_once(&mut people, "Mai", unit(3), 2),
+            Err(crate::who::Refused::KnownAs(known)) if known == "Lan"
+        ));
+        // Read back from the file: kept, not held apart.
+        let reopened = crate::who::People::open(dir.join("people.json")).unwrap();
+        assert_eq!(reopened.names(), ["Lan"]);
+        // "Forget my face" removes it.
+        people.forget("Lan").unwrap();
+        assert!(people.who(&unit(3)).is_none());
+        assert!(people.names().is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// The first builder on #1968, 22:12: a face from a photo is kept

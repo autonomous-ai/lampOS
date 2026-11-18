@@ -2667,6 +2667,8 @@ fn second_route_worker_environment(
         crate::known_faces::RENAME_YES_ENVIRONMENT,
         // The owner's name kept on the paths that lost it on lamp-74ff (#7331).
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+        // A new face past setup kept with nothing asked (the first builder 18:50).
+        crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
         crate::owner_link::ENVIRONMENT,
         // A held rename's short yes, with it (#7419).
@@ -2971,6 +2973,7 @@ mod tests {
             crate::known_faces::RENAME_ASKED_ENVIRONMENT,
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
+            crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
@@ -4079,6 +4082,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_ASKED_ENVIRONMENT
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
+                    || name == crate::known_faces::FACE_NO_ASK_ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
@@ -4194,6 +4198,7 @@ mod tests {
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",
+                    "LAMP_FACE_NO_ASK=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",

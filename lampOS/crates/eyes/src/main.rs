@@ -772,6 +772,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         photo_here: Option<(String, Option<String>, Instant)>,
         /// `LAMP_PHOTO_SPEAKER=on` (#2856): a yes is kept only with that id.
         photo_speaker: bool,
+        /// `LAMP_FACE_NO_ASK=on`: a photo's face kept at once, no yes.
+        photo_no_ask: bool,
         remember_speaker: bool,
         speaker_anchors: lamp_eyes::remember_speaker::Anchors,
         /// With it on, a yes that passed, waiting for the look forced after
@@ -1203,6 +1205,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 }),
                 photo_here: None,
                 photo_speaker: lamp_eyes::photo::speaker_from_environment(),
+                photo_no_ask: lamp_eyes::photo::no_ask_from_environment(),
                 remember_speaker: lamp_eyes::remember_speaker::from_environment(),
                 speaker_anchors: lamp_eyes::remember_speaker::Anchors::default(),
                 photo_yes: None,
@@ -1711,6 +1714,25 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                                 "lamp-eyes: did not add a face from a photo: it is known by another name"
                                             );
                                             serde_json::json!({"error": "known_as", "known_as": known})
+                                        }
+                                        // `LAMP_FACE_NO_ASK=on`: kept at once,
+                                        // nothing asked at the lamp.
+                                        None if who.photo_no_ask => {
+                                            let now_unix_s = std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .map_or(0, |since| since.as_secs());
+                                            let kept = lamp_eyes::photo::keep_at_once(
+                                                &mut who.people,
+                                                &name,
+                                                print,
+                                                now_unix_s,
+                                            );
+                                            if kept.is_ok() {
+                                                eprintln!(
+                                                    "lamp-eyes: kept a face from a photo at once, nothing asked (LAMP_FACE_NO_ASK)"
+                                                );
+                                            }
+                                            kept_reply(kept, who.visits, who.people.names().len())
                                         }
                                         None => {
                                             let now_unix_s = std::time::SystemTime::now()

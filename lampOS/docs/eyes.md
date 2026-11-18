@@ -1686,6 +1686,29 @@ With the switch:
   `a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename`).
   Off, a new face is kept on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
+- **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
+  checked; off unless set; the first builder 18:50, 18 Nov, from the
+  product owner). Past setup, in place of the yes above: a
+  `remember_my_face` with no `replace` is sent at once when the name is
+  clearly the speaker's own (`known_faces::told_own_name`: they named
+  themselves in the turn in hand, "My name is Ada." or "I'm Ada."; said a
+  plain yes to the lamp saying it back; spelled it after the lamp asked;
+  or asked for their own face in words). The eyes still keep it only with
+  one face in view (`one_face`). Kept (the eyes' `remembered`, and only
+  then), the model is told to say one line, "I'll know you next time. Say
+  'forget my face' to undo.", and ask nothing (`KEPT_NO_ASK`). A name not
+  clearly theirs ("I'm meeting Ada later.") sends nothing, and the model is
+  told to ask and say nothing about a face (`NOT_KEPT_NO_ASK`). A face the
+  eyes could not see alone (`two_faces`, `no_face`, `too_far`,
+  `eyes_shut`) keeps nothing, and unless the person asked for their face
+  in words, the model is told to ask nothing and never to say it will know
+  them (`NOT_SEEN_NO_ASK`). A `remember` of their own name while nobody is
+  known (`LAMP_MEMORY_PERSONAL_NEEDS_FACE` with `LAMP_NAME_LEARN_FIX`) is
+  told to call `remember_my_face` now, not to ask (`needs_face`). "Forget my
+  face" is unchanged. The setup walk's first save (`at_setup`, its read-back
+  and face question, `FACE_LEAVE`) is not this path and is unchanged. Off,
+  as above (`known_faces::tests::with_no_ask_a_name_keeps_the_face_and_nothing_is_asked`,
+  `needs_face::tests::with_no_ask_a_name_goes_to_the_face_save_unasked`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a
@@ -2525,6 +2548,24 @@ Tests (`photo.rs`):
 
 The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
 wipe in `crates/setup/tests/it/reset.rs`. Not run on a lamp.
+
+**With nothing asked** (`LAMP_FACE_NO_ASK=on` on lamp-eyes and lamp-voice,
+off unless set; the first builder 18:50, 18 Nov, from the product owner:
+nothing is asked of the person). The photo's one face, found and printed as
+above, is kept **at once** in the people's file as a confirmed photo yes
+keeps it (`photo::keep_at_once`, no near-name question): the answer is the
+eyes' `{"remembered":NAME,…}`, which lamp-cloud tells the app as
+`{"remembered":NAME}`, and nothing is said at the lamp (it is the app's
+flow). A photo with more than one face, or none, is still refused, and a
+face known by another name is `known_as`. "Forget my face" and the app's
+removal forget it as any other face. A face still unconfirmed at the lamp
+(added before, or by eyes without the switch) is kept with no question:
+lamp-voice's watch tells the eyes it was asked, then its yes, which they
+take only for that face at the lamp now, and says nothing
+(`photo_faces::keep_unasked`). Off, all of this section stands as written
+(tests `photo::tests::with_no_ask_a_face_from_a_photo_is_kept_at_once_and_forgets`,
+`photo_faces::tests::with_no_ask_a_face_from_a_photo_is_kept_and_nothing_is_asked`).
+Not run on a lamp.
 
 ### How familiar a remembered person is (`--visits on`, #1670)
 
