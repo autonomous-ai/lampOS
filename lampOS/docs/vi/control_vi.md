@@ -44,6 +44,10 @@ và thoát với mã 0.
 - **Hành động:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. `look`, `move`, `play` và `joints` cần một
   lease.
+- **`say`:** lời được đọc đúng như gửi, qua dịch vụ giọng nói của đèn, phải
+  dựng xong trọn câu trong 5 s với câu đến 120 ký tự, thêm 1 s cho mỗi 30 ký
+  tự bắt đầu sau đó, tối đa 20 s; quá thời hạn thì bị từ chối
+  (`tts_cache::render_within`, #7742).
 - **Quyền:** `body`, `light`, `speak`, `look`, `hear`, `sound`.
 - **Không bao giờ qua cửa này:** khung hình camera, âm thanh, bản ghi lời
   nói, dấu khuôn mặt hay tên.
