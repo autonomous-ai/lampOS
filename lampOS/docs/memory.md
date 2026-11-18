@@ -248,7 +248,10 @@ socket is refused before the eyes forget anything.
   transaction their id comes off every room line they were seen saying
   (`speakers`, `LAMP_MEMORY_ROOM_SPEAKER`), so no one later remembered by
   the same name takes those lines over; the lines stay, as they did before
-  that table (reviewer-three's P2 on #3213). The person's
+  that table (reviewer-three's P2 on #3213). Their food diary and its
+  care pause go in the same transaction (`diary`, `diary_care`, the
+  voice's `LAMP_FOOD_DIARY`, #7687; [memory-days.md](memory-days.md#the-food-diary-diary_add-the-voices-lamp_food_diary)), as they do
+  with `forget_all`. The person's
   row keeps its id high-water mark, so a stale reference never names a new
   entry. The legacy store removes the person's directory, then the `r-`
   one's; asking again finishes a removal a failure stopped half way. Such

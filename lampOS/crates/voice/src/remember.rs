@@ -5881,7 +5881,7 @@ pub fn person_id(name: &str) -> String {
 }
 
 /// Whose memory the person at the lamp now has: `None` for the room's.
-fn person_now() -> Option<String> {
+pub(crate) fn person_now() -> Option<String> {
     KNOWN_FILE
         .get()
         .and_then(|path| crate::known_faces::FaceObservation::read(path))

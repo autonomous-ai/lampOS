@@ -470,6 +470,8 @@ impl Days {
         // their source exchanges (`nightly::expire`).
         crate::nightly::expire(&tx, &today, &day, self.now)?;
         crate::chapters::expire(&tx, self.now)?;
+        // The food diary keeps 28 days, whatever `keep_days` says (#7687).
+        crate::diary::expire(&tx, self.now)?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
@@ -3671,6 +3673,9 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
     let count = count + crate::service_records::empty(tx, person)?;
     // And their mail contacts (the voice's `LAMP_SERVICE_CONTACTS`).
     let count = count + crate::service_contacts::empty(tx, person)?;
+    // And their food diary with its care pause (the voice's
+    // `LAMP_FOOD_DIARY`, #7687), counted the same way.
+    let count = count + crate::diary::empty(tx, person)?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],

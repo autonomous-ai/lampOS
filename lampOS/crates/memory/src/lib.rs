@@ -8,6 +8,7 @@
 pub mod chapters;
 pub mod days;
 pub mod days_protocol;
+pub mod diary;
 pub mod forgot;
 pub mod health;
 pub mod health_counts;

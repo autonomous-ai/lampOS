@@ -941,6 +941,48 @@ most 2,000 a person, the one changed longest ago going first past it. An
 older memory answers `unknown_op`, so the voice sends them only with its
 switch on.
 
+## The food diary (`diary_add`, the voice's `LAMP_FOOD_DIARY`)
+
+The voice's `LAMP_FOOD_DIARY` (#7687, slice 1; off by default, in no
+product unit) keeps what a known person told the lamp they ate or drank in
+`diary(rid, person, at_unix_ms, meal, words, how)`: one row a meal, `meal`
+one of `breakfast`, `lunch`, `dinner`, `snack` or `drink`, `words` the
+person's own (tidied to one line, at most 200 bytes), `how` `told` (or
+`seen_asked`, for the seen ask of a later slice). No number, no weight and
+never a picture: there is no column for one, and a request naming one is
+`bad_request`. `diary_care(person, at_unix_ms)` holds the person's care
+pause, one row while it is on. Both are created `IF NOT EXISTS`,
+`user_version` unchanged, in tables of their own, so the taste rules, the
+nightly pass, the tidy and the journal's expiry, which read `entries`,
+never reach them, and memory's "never health or diet unless asked" stays
+as it is for everything else.
+
+- `diary_add {person, at_unix_ms, meal, words, how?}` keeps one:
+  `{ok:true,id}`. `bad_meal` for another meal, `empty` with no words,
+  `too_old` for a meal older than the diary keeps, and `forgotten` for one
+  told before the person's (or everyone's) last forget everything, as a
+  service record's is, so one retried after the forget never comes back.
+- `diary_list {person, days?}` gives the meals of the last `days` local
+  days, today the first (1, the default, is today; 7 this week; 1 to 28),
+  oldest first, each `{id, at_unix_ms, day, meal, words, how}`, with
+  `care_pause`: `{ok:true,meals,care_pause}`.
+- `diary_forget {person, last?}` removes the whole diary and the care
+  pause, or with `last: true` the newest meal only, leaving the pause:
+  `{ok:true,removed}`.
+- `diary_care {person, pause}` sets or clears the care pause:
+  `{ok:true,care_pause}`.
+
+Only a known person (`p-` id) has a diary (`bad_person` otherwise): a
+guest's or the room's meal is never kept. **28 days:** a row older than
+that is deleted at every request's upkeep (`Days::maintain`, the same pass
+that ends the journal's days), so none is ever answered past it, whatever
+`--keep-days` says. `forget_all` (of the person or of everyone) and
+`forget_person` remove the diary and the care pause in the same
+transaction (counted in `removed`). At most 600 meals a person, the oldest
+going first past it. The request line in the journal names the op and the
+person, never a meal. An older memory answers `unknown_op`, so the voice
+sends these only with its switch on. Tests: `diary::tests`.
+
 ## Storage and migration
 
 `<dir>/memory-days.sqlite3` holds raw exchanges, explicit kept facts,

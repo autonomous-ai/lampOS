@@ -272,3 +272,23 @@ CREATE TABLE IF NOT EXISTS service_contacts (
     changed_unix_ms INTEGER NOT NULL,
     PRIMARY KEY(person,name_key)
 );
+-- The food diary (the voice's LAMP_FOOD_DIARY, #7687 slice 1; `diary.rs`):
+-- what a known person told the lamp they ate or drank, in their own words,
+-- one row a meal, never a number, a weight or a picture. Kept 28 days
+-- (`Days::maintain`); forget everything, forget the person and
+-- `diary_forget` remove rows. `diary_care`: the person's care pause, one row
+-- while it is on, removed with the diary. Older builds pass these tables
+-- over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS diary (
+    rid INTEGER PRIMARY KEY,
+    person TEXT NOT NULL REFERENCES people(person),
+    at_unix_ms INTEGER NOT NULL,
+    meal TEXT NOT NULL CHECK(meal IN ('breakfast','lunch','dinner','snack','drink')),
+    words TEXT NOT NULL,
+    how TEXT NOT NULL CHECK(how IN ('told','seen_asked'))
+);
+CREATE INDEX IF NOT EXISTS diary_by ON diary(person,at_unix_ms);
+CREATE TABLE IF NOT EXISTS diary_care (
+    person TEXT PRIMARY KEY REFERENCES people(person),
+    at_unix_ms INTEGER NOT NULL
+);

@@ -876,6 +876,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         sleep_asked: false,
         seen_activity: false,
         seen_posture: false,
+        food_diary: false,
         shutdown_from_app: false,
         services: None,
         decline: true,

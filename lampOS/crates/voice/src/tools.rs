@@ -256,6 +256,9 @@ pub struct Settings {
     pub seen_activity: bool,
     /// With it, posture too: the offer names it (`LAMP_SEEN_POSTURE=on`).
     pub seen_posture: bool,
+    /// The food diary told in conversation ([`crate::food_diary`],
+    /// `LAMP_FOOD_DIARY=on`, #7687): its three functions, with a memory.
+    pub food_diary: bool,
     /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
@@ -350,6 +353,11 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::services::arguments(
         std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
+    ));
+    flags.extend(crate::food_diary::arguments(
+        std::env::var(crate::food_diary::ENVIRONMENT)
+            .ok()
+            .as_deref(),
     ));
     flags
 }
@@ -602,6 +610,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--services-dir must be absolute"));
         }
         settings.services = Some(PathBuf::from(folder));
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::food_diary::FLAG
+    {
+        settings.food_diary = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -962,6 +976,10 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.seen_activity {
         tools.extend(crate::seen_yes::tools());
     }
+    // The food diary's three, only with a memory to keep it in (#7687).
+    if settings.food_diary && settings.memory.is_some() {
+        tools.extend(crate::food_diary::tools());
+    }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
     // A recurring thing for the lamp to do is a skill to make, told in the
@@ -1044,6 +1062,7 @@ pub(crate) fn voices_own(name: &str) -> bool {
         || crate::sleep_asked::is_tool(name)
         || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
+        || crate::food_diary::is_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -1168,6 +1187,9 @@ pub enum Route {
     /// it back ([`crate::seen_yes`], #6543). True when the offer also names
     /// posture (`LAMP_SEEN_POSTURE`).
     SeenActivity(bool),
+    /// The food diary's functions, against the memory's socket
+    /// ([`crate::food_diary`], #7687).
+    FoodDiary(PathBuf),
     /// A connected service's function, through `lamp-services`' tools
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
@@ -1294,6 +1316,12 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             Route::Sleep
         } else {
             Route::Nobody
+        };
+    }
+    if crate::food_diary::is_tool(name) {
+        return match (&settings.memory, settings.food_diary) {
+            (Some(socket), true) => Route::FoodDiary(socket.clone()),
+            _ => Route::Nobody,
         };
     }
     if crate::seen_yes::is_tool(name) {
@@ -2752,6 +2780,13 @@ fn run_call_with_scope(
             "the services",
             crate::services::run(folder, call, request, heard, lease),
         ),
+        Route::FoodDiary(socket) => (
+            "the food diary",
+            (
+                crate::food_diary::run(socket, call, request, heard, lease),
+                true,
+            ),
+        ),
         Route::SeenActivity(posture) => (
             "the seen activity yes",
             (
@@ -3524,6 +3559,7 @@ mod tests {
             sleep_asked: false,
             seen_activity: false,
             seen_posture: false,
+            food_diary: false,
             shutdown_from_app: false,
             services: None,
             decline: true,
@@ -3882,6 +3918,7 @@ mod tests {
                 sleep_asked: false,
                 seen_activity: false,
                 seen_posture: false,
+                food_diary: false,
                 shutdown_from_app: false,
                 services: None,
                 decline: true,
@@ -5957,6 +5994,42 @@ mod tests {
             answer(&on, &offer, 70_102, false)["say"],
             crate::seen_yes::SEEN_DISCLOSURE_POSTURE
         );
+    }
+
+    /// #7687: the food diary's three functions are declared and routed only
+    /// with `LAMP_FOOD_DIARY=on` and a memory, their flag taken after the
+    /// services'; off, none is declared and a call of one is nobody's.
+    #[test]
+    fn the_food_diary_is_declared_and_routed_only_with_its_switch_and_a_memory() {
+        let untouched = ["--session".to_owned(), "7".to_owned()];
+        let mut flags = crate::food_diary::arguments(Some("on"));
+        flags.extend(untouched.clone());
+        let (mut on, rest) = take(&flags).unwrap();
+        assert!(on.food_diary);
+        assert_eq!(rest, untouched);
+        let switched_without_memory = on.clone();
+        on.memory = Some(PathBuf::from("/run/lampos-memory/memory.sock"));
+        let (mut off, _) = take(&untouched).unwrap();
+        assert!(!off.food_diary);
+        off.memory = on.memory.clone();
+        for name in [
+            crate::food_diary::LOG,
+            crate::food_diary::DIARY,
+            crate::food_diary::FORGET,
+        ] {
+            let named =
+                |settings: &Settings| core_tools(settings).iter().any(|tool| tool.name == name);
+            assert!(named(&on), "{name}");
+            assert!(!named(&off) && !named(&switched_without_memory), "{name}");
+            assert!(voices_own(name));
+            assert_eq!(
+                route(&on, name),
+                Route::FoodDiary(PathBuf::from("/run/lampos-memory/memory.sock"))
+            );
+            assert_eq!(route(&off, name), Route::Nobody);
+            assert_eq!(route(&switched_without_memory, name), Route::Nobody);
+            assert_eq!(answer(&off, &call(name), 7, true), unavailable());
+        }
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

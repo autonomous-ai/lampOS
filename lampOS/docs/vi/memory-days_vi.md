@@ -669,6 +669,47 @@ bị quên: không hết hạn, tidy hay nightly không đọc bảng này; `for
 người, liên hệ thay đổi lâu nhất bị bỏ trước khi vượt quá. Memory cũ trả
 `unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật.
 
+## Nhật ký ăn uống (`diary_add`, `LAMP_FOOD_DIARY` của voice)
+
+Công tắc `LAMP_FOOD_DIARY` của voice (#7687, phần 1; mặc định tắt, không có
+trong unit sản phẩm nào) giữ những gì một người đã biết kể với đèn rằng họ đã
+ăn hay uống trong `diary(rid, person, at_unix_ms, meal, words, how)`: mỗi bữa
+một dòng, `meal` là một trong `breakfast`, `lunch`, `dinner`, `snack` hoặc
+`drink`, `words` là lời của chính người đó (gọn về một dòng, tối đa 200
+byte), `how` là `told` (hoặc `seen_asked`, cho câu hỏi khi thấy ở phần sau).
+Không con số, không cân nặng và không bao giờ có ảnh: không có cột nào cho
+chúng, và một yêu cầu nêu một con số là `bad_request`. `diary_care(person,
+at_unix_ms)` giữ việc tạm dừng vì quan tâm (care pause) của người đó, một dòng
+khi nó bật. Cả hai được tạo bằng `IF NOT EXISTS`, `user_version` không đổi,
+trong bảng riêng, nên taste rules, nightly, tidy và hết hạn của nhật ký, vốn
+đọc `entries`, không bao giờ chạm tới chúng, và quy tắc "không bao giờ giữ sức
+khỏe hay ăn kiêng nếu không được nhờ" của bộ nhớ vẫn giữ nguyên cho mọi thứ khác.
+
+- `diary_add {person, at_unix_ms, meal, words, how?}` giữ một bữa:
+  `{ok:true,id}`. `bad_meal` cho bữa khác, `empty` khi không có lời,
+  `too_old` cho bữa cũ hơn thời gian nhật ký giữ, và `forgotten` cho bữa được
+  kể trước lần quên mọi thứ gần nhất của người đó (hoặc của mọi người), như
+  bản ghi dịch vụ, nên một lần gửi lại sau khi quên không bao giờ đưa nó trở lại.
+- `diary_list {person, days?}` cho các bữa của `days` ngày địa phương gần
+  nhất, hôm nay là ngày đầu (1, mặc định, là hôm nay; 7 là tuần này; từ 1 đến
+  28), cũ nhất trước, mỗi bữa `{id, at_unix_ms, day, meal, words, how}`, cùng
+  `care_pause`: `{ok:true,meals,care_pause}`.
+- `diary_forget {person, last?}` xóa cả nhật ký và care pause, hoặc với
+  `last: true` chỉ bữa mới nhất, giữ nguyên care pause: `{ok:true,removed}`.
+- `diary_care {person, pause}` bật hoặc tắt care pause:
+  `{ok:true,care_pause}`.
+
+Chỉ người đã biết (id `p-`) có nhật ký (còn lại `bad_person`): bữa ăn của
+khách hay của phòng không bao giờ được giữ. **28 ngày:** dòng cũ hơn bị xóa ở
+lần bảo trì của mỗi yêu cầu (`Days::maintain`, cùng lượt kết thúc các ngày của
+nhật ký), nên không bao giờ được trả lời quá hạn đó, dù `--keep-days` là bao
+nhiêu. `forget_all` (của người đó hoặc của mọi người) và `forget_person` xóa
+nhật ký và care pause trong cùng một giao dịch (đếm trong `removed`). Tối đa
+600 bữa một người, bữa cũ nhất bị bỏ trước khi vượt quá. Dòng yêu cầu trong
+journal chỉ nêu op và người, không bao giờ nêu một bữa ăn. Memory cũ trả
+`unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật. Kiểm thử:
+`diary::tests`.
+
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 
 Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,

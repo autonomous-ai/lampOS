@@ -408,6 +408,39 @@ enum Extra {
         #[serde(default)]
         all: bool,
     },
+    /// The voice's `LAMP_FOOD_DIARY` (#7687): one meal a known person told,
+    /// in their own words (`Days::diary_add`).
+    DiaryAdd {
+        #[serde(default)]
+        person: Who,
+        at_unix_ms: u64,
+        meal: String,
+        words: String,
+        #[serde(default = "told")]
+        how: String,
+    },
+    /// `LAMP_FOOD_DIARY`: a known person's meals of the last `days` local
+    /// days, 1 (today) without it, and their care pause (`Days::diary_list`).
+    DiaryList {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        days: Option<u32>,
+    },
+    /// `LAMP_FOOD_DIARY`: the whole diary, or with `last` the newest meal,
+    /// forgotten (`Days::diary_forget`).
+    DiaryForget {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        last: bool,
+    },
+    /// `LAMP_FOOD_DIARY`: the care pause set or cleared (`Days::diary_care`).
+    DiaryCare {
+        #[serde(default)]
+        person: Who,
+        pause: bool,
+    },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
         #[serde(default)]
@@ -415,6 +448,10 @@ enum Extra {
         to: String,
         ids: Vec<u64>,
     },
+}
+
+fn told() -> String {
+    "told".to_owned()
 }
 
 fn one(person: Who) -> Result<Person> {
@@ -1314,6 +1351,25 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             };
             json!({"ok":true,"removed":removed})
         }
+        Extra::DiaryAdd {
+            person,
+            at_unix_ms,
+            meal,
+            words,
+            how,
+        } => {
+            json!({"ok":true,"id":store.diary_add(&one(person)?, at_unix_ms, &meal, &words, &how)?})
+        }
+        Extra::DiaryList { person, days } => {
+            let (meals, care_pause) = store.diary_list(&one(person)?, days.unwrap_or(1))?;
+            json!({"ok":true,"meals":meals,"care_pause":care_pause})
+        }
+        Extra::DiaryForget { person, last } => {
+            json!({"ok":true,"removed":store.diary_forget(&one(person)?, last)?})
+        }
+        Extra::DiaryCare { person, pause } => {
+            json!({"ok":true,"care_pause":store.diary_care(&one(person)?, pause)?})
+        }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
             let moved = store.adopt(&one(person)?, &to, &ids)?;
@@ -1369,6 +1425,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts",
             "service_contacts_forget",
             "exchanges_forget",
+            "diary_add",
+            "diary_list",
+            "diary_forget",
+            "diary_care",
         ];
         const OLD: &[&str] = &[
             "append",

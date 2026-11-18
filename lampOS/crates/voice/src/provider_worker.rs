@@ -4193,7 +4193,8 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Devices(_)
-            | Route::SeenActivity(_))
+            | Route::SeenActivity(_)
+            | Route::FoodDiary(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -4211,6 +4212,7 @@ impl ToolDesk {
             | Route::ReportsStop(_)
             | Route::Devices(_)
             | Route::SeenActivity(_)
+            | Route::FoodDiary(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
