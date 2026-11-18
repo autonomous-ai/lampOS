@@ -27,17 +27,23 @@ fn booth() -> TaskAsks {
 /// begun in written request 0, and the lamp's words of it (`said`, none
 /// yet when `None`) kept as played. The wait's id.
 fn said_back_unasked(said: Option<&str>) -> String {
+    said_back_unasked_as(booth(), said)
+}
+
+/// [`said_back_unasked`] for the skill `task`.
+fn said_back_unasked_as(task: TaskAsks, said: Option<&str>) -> String {
     yes::clear_for_test();
     task_yes::set_on_here(Some(true));
     let mut kept = None;
+    let name = task.name.clone();
     let note = task_yes::asked_aloud(
-        "photo-booth",
+        &name,
         task_yes::Here {
             quiet_hours: false,
             owner_sees_alone: true,
             asked_by_voice: false,
         },
-        |_| Ok(Some(booth())),
+        |_| Ok(Some(task.clone())),
         |file| {
             kept = Some(file.clone());
             Ok(())
@@ -310,5 +316,133 @@ fn photo2_no_force_after_a_cut_or_partial_read_back_or_with_nothing_waiting() {
     assert_eq!(forced("Yes."), None, "one round only");
     yes::clear_for_test();
     assert_eq!(forced("Yes."), None);
+    task_yes::set_on_here(None);
+}
+
+/// page-title on the lamp (lamp-9adf, 18 Nov), its do.task with no yes.
+fn page_title() -> TaskAsks {
+    TaskAsks {
+        name: "page-title".into(),
+        sha256: "cd".repeat(32),
+        grants: vec!["light".into(), "speak".into()],
+        task: "Read the open page's title aloud.".into(),
+        package: None,
+        from: "your computer".into(),
+        approved: false,
+    }
+}
+
+/// The forced round 1: `make_skill` with the wait's id, `answer`, and the
+/// skill the model named.
+fn answers_naming(id: &str, answer: &str, named: &str) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            crate::made_skill::MAKE,
+            json!({ yes::APPROVE_ID: id, yes::ANSWER: answer, yes::NAMED: named }),
+        )])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// #7634 (lamp-9adf, 18 Nov 07:20:43): page-title's task said back and
+/// waiting, then "Lamp, use my look title skill.", a line naming another
+/// skill, read by the model as a yes naming page-title. Never its yes:
+/// nothing is kept, the wait is let go as a new ask is, and the line is
+/// answered as its own ask, the look title skill used in the next round.
+#[test]
+fn a_line_naming_another_skill_is_never_the_yes_to_a_tasks_wait() {
+    for named in ["page-title", yes::NAMED_NONE] {
+        let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+        let heard = "Lamp, use my look title skill.";
+        assert_eq!(forced(heard), make_skill_forced());
+        let use_it = vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c2",
+                crate::use_skill::NAME,
+                json!({ "skill": "look-title" }),
+            )])),
+            Ok(ChatEvent::Done),
+        ];
+        let went = went(
+            heard,
+            vec![
+                answers_naming(&id, "yes", named),
+                use_it,
+                said("Page title stays as it was. Here's look title."),
+            ],
+        );
+        assert_eq!(went.approved, 0, "{named}: {:?}", went.ran);
+        assert_eq!(went.ran[0].2["approved"], false, "{named}: {:?}", went.ran);
+        assert_eq!(
+            went.ran[0].2["left"], "page-title",
+            "{named}: {:?}",
+            went.ran
+        );
+        assert_eq!(
+            went.ran[0].2["next"],
+            yes::new_ask_next("page title"),
+            "{named}: {:?}",
+            went.ran
+        );
+        assert_eq!(went.ran.len(), 2, "{named}: {:?}", went.ran);
+        assert_eq!(
+            went.ran[1].0,
+            crate::use_skill::NAME,
+            "{named}: {:?}",
+            went.ran
+        );
+        assert!(!yes::awaited(Instant::now()), "{named}");
+        assert!(!yes::waits(&id), "{named}");
+    }
+    task_yes::set_on_here(None);
+}
+
+/// #7634: "yes" with another skill's name after it ("Yes, and use my
+/// weather skill.") is no yes to page-title's task either, whatever the
+/// model named.
+#[test]
+fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
+    for named in ["page-title", yes::NAMED_NONE, "weather"] {
+        let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+        let heard = "Yes, and use my weather skill.";
+        let went = went(
+            heard,
+            vec![
+                answers_naming(&id, "yes", named),
+                said("Okay, the weather."),
+            ],
+        );
+        assert_eq!(went.approved, 0, "{named}: {:?}", went.ran);
+        assert_eq!(went.ran[0].2["approved"], false, "{named}: {:?}", went.ran);
+        assert!(!yes::waits(&id), "{named}");
+    }
+    task_yes::set_on_here(None);
+}
+
+/// #7634: a yes that names its own skill, or none, is still the yes:
+/// "yes, use my page title", "Yes, use my page title skill." and "Yes.".
+#[test]
+fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
+    for (heard, named) in [
+        ("yes, use my page title", "page-title"),
+        ("Yes, use my page title skill.", "page title"),
+        ("Yes.", yes::NAMED_NONE),
+        ("Yes.", "page-title"),
+    ] {
+        let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+        assert_eq!(forced(heard), make_skill_forced(), "{heard}");
+        let went = went(
+            heard,
+            vec![
+                answers_naming(&id, "yes", named),
+                said("Okay, next time you ask."),
+            ],
+        );
+        assert_eq!(went.ran.len(), 1, "{heard}: {:?}", went.ran);
+        assert_eq!(went.ran[0].2["approved"], true, "{heard}: {:?}", went.ran);
+        assert_eq!(went.approved, 1, "{heard}");
+        assert!(!yes::awaited(Instant::now()), "{heard}");
+    }
     task_yes::set_on_here(None);
 }

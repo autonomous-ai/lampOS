@@ -130,6 +130,11 @@ pub struct Waiting {
     /// ([`round_called`]), at most [`SAID_KEPT`]: no remove is confirmed in
     /// one.
     pub other_calls: Vec<u64>,
+    /// For a skill's task's wait (#6305): later requests whose heard line
+    /// named a skill other than the waiting one ([`other_skill_named`],
+    /// #7634), with that name as said, at most [`SAID_KEPT`]. A yes in one
+    /// is never this wait's ([`answered`]).
+    pub other_named: Vec<(u64, String)>,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -270,6 +275,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             played: VecDeque::new(),
             answer_line: None,
             other_calls: Vec::new(),
+            other_named: Vec::new(),
         });
     });
     if remove {
@@ -845,6 +851,10 @@ fn name_only_line(waiting: &Waiting, request: u64) -> bool {
 /// remove, nothing removed: only the very next line can confirm it
 /// (lamp-9adf, 18 Nov, stock 14083: a make two lines after "Remove daily
 /// stretch reminder?" was taken as its yes).
+///
+/// For a skill's task's wait, a line that names another skill
+/// ([`other_skill_named`], #7634) is kept by its request, so a yes in it
+/// is never this wait's ([`answered`]).
 pub fn line_heard(request: u64, name_only: bool, line: &str) {
     kept::waiting(|kept| {
         let Some(waiting) = kept.as_mut().filter(|waiting| request > waiting.request) else {
@@ -859,6 +869,15 @@ pub fn line_heard(request: u64, name_only: bool, line: &str) {
                 waiting.name_only.push(request);
             }
             return;
+        }
+        if task_wait(waiting)
+            && !waiting.other_named.iter().any(|(kept, _)| *kept == request)
+            && let Some(other) = other_skill_named(line, &waiting.asks.skill)
+        {
+            if waiting.other_named.len() == SAID_KEPT {
+                waiting.other_named.remove(0);
+            }
+            waiting.other_named.push((request, other));
         }
         if !waiting.asks.remove {
             return;
@@ -1062,6 +1081,62 @@ fn not_a_plain_yes(waiting: &Waiting, request: u64) -> Option<&'static str> {
     }
 }
 
+/// Whether `waiting` is a skill's task's (#6305): grants said back, not a
+/// made skill's code or a remove.
+fn task_wait(waiting: &Waiting) -> bool {
+    waiting.asks.grants.is_some() && !waiting.asks.code && !waiting.asks.remove
+}
+
+/// Words that end a skill's name said before "skill", going back: what
+/// comes before a name ("my look title skill", "use page title skill"),
+/// never part of it.
+const BEFORE_A_NAME: &[&str] = &[
+    "my", "the", "your", "our", "this", "that", "a", "an", "use", "run", "open", "try", "launch",
+    "start", "play", "what", "which", "yes", "and", "then", "lamp",
+];
+
+/// The most words a skill's name is said in before "skill".
+const NAME_WORDS: usize = 6;
+
+/// The skill other than `skill` that a heard line names (#7634, lamp-9adf
+/// 18 Nov 07:20:43: "Lamp, use my look title skill." was taken as the yes
+/// to `page-title`'s task): the words said right before "skill" or
+/// "skills", back to a word that comes before a name ([`BEFORE_A_NAME`])
+/// or the start of the clause, at most [`NAME_WORDS`]. It is another skill
+/// when no run of them ending at "skill" is `skill`'s own name by the
+/// made-skill name match #7545 binds a yes with
+/// ([`crate::made_remove::same_name`]), so "yes, use my page title skill"
+/// names its own, and "that skill" or a line with no "skill" names none.
+/// Spelling only: no word is judged by what it means.
+pub fn other_skill_named(heard: &str, skill: &str) -> Option<String> {
+    for clause in heard.split([',', ';', '.', '?', '!']) {
+        let words: Vec<String> = clause
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .map(str::to_lowercase)
+            .collect();
+        for (at, word) in words.iter().enumerate() {
+            if word != "skill" && word != "skills" {
+                continue;
+            }
+            let start = (0..at)
+                .rev()
+                .take(NAME_WORDS)
+                .take_while(|&before| !BEFORE_A_NAME.contains(&words[before].as_str()))
+                .last();
+            let Some(start) = start else {
+                continue;
+            };
+            let own = (start..at)
+                .any(|from| crate::made_remove::same_name(&words[from..at].join(" "), skill));
+            if !own {
+                return Some(words[start..at].join(" "));
+            }
+        }
+    }
+    None
+}
+
 /// Whether [`approve_force`] forces a request at `now`.
 pub fn approve_forced_now(now: Instant) -> bool {
     kept::waiting(|waiting| {
@@ -1203,8 +1278,21 @@ pub fn answered(
         let spoken = crate::made_skill::spoken_name(&skill);
         // A yes, bound to the skill waiting (#7545): taken by [`approve`]
         // with every guard only when the line names that skill or none.
+        // For a skill's task, the heard line itself is read too (#7634):
+        // one that names another skill ([`line_heard`]) is never its yes,
+        // whatever skill the model named.
         let mut other = None;
-        let answer = if answer == "yes" {
+        let heard_other = waiting
+            .other_named
+            .iter()
+            .find(|(kept, _)| *kept == request)
+            .map(|(_, other)| other.clone());
+        let answer = if answer == "yes"
+            && let Some(heard_other) = heard_other
+        {
+            other = Some(heard_other);
+            NEW_ASK
+        } else if answer == "yes" {
             match named.map(str::trim).filter(|named| !named.is_empty()) {
                 Some(named)
                     if named.eq_ignore_ascii_case(NAMED_NONE)
@@ -2660,6 +2748,33 @@ mod tests {
         assert!(note.contains("never new_ask"), "{note}");
         assert!(waits(&id));
         clear_for_test();
+    }
+
+    /// #7634: what a heard line names before "skill", read against the
+    /// waiting skill by the made-skill name match.
+    #[test]
+    fn a_line_names_another_skill_only_by_a_name_before_skill() {
+        let other = |heard| other_skill_named(heard, "page-title");
+        assert_eq!(
+            other("Lamp, use my look title skill."),
+            Some("look title".into())
+        );
+        assert_eq!(
+            other("Yes, and use my weather skill."),
+            Some("weather".into())
+        );
+        assert_eq!(other("yes run joke time skill"), Some("joke time".into()));
+        for own in [
+            "yes, use my page title",
+            "Yes, use my page title skill.",
+            "yes page title skill",
+            "use the page tidle skill",
+            "Yes.",
+            "Yes, that skill.",
+            "What skill is that?",
+        ] {
+            assert_eq!(other(own), None, "{own}");
+        }
     }
 
     /// #7545 on a task's wait too: photo booth's task said back, then a

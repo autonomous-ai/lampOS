@@ -4973,7 +4973,23 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   năng câu đó nhắc tới hoặc `none`, phải là chính tên kỹ năng đang chờ hoặc
   `none`, nếu không cái "có" được đọc là `new_ask`; một `yes` bị buộc mà
   không có `named` được đọc là `unclear` ("Gỡ bằng giọng nói", "Cái "có"
-  gắn với kỹ năng của nó"). Vòng bị buộc
+  gắn với kỹ năng của nó"). Với task của kỹ năng, câu nghe được cũng được
+  đọc (#7634, lamp-9adf 07:20:43 ngày 18/11: câu "Lamp, use my look title
+  skill." bị lấy làm cái "có" cho task đang chờ của `page-title`): một câu
+  nhắc tới kỹ năng khác với kỹ năng đang chờ không bao giờ là cái "có" của
+  nó, dù mô hình nêu kỹ năng nào. Code đọc các từ nói ngay trước "skill"
+  hoặc "skills", lùi về tới một từ đứng trước tên ("my", "the", "use",
+  "run", "yes", "and", …, `skill_write_yes::BEFORE_A_NAME`) hoặc đầu mệnh
+  đề, nhiều nhất sáu từ (`skill_write_yes::other_skill_named`, được đánh
+  dấu theo từng request bởi `line_heard`); khi không có đoạn nào trong số
+  đó kết thúc ở "skill" là chính tên kỹ năng đang chờ theo cùng phép so
+  khớp (`made_remove::same_name`), câu đó nhắc tới kỹ năng khác, và `yes`
+  của nó được đọc là `new_ask`: không giữ gì, bỏ việc chờ, và câu đó được
+  trả lời như một yêu cầu riêng (kỹ năng được nhắc tới được dùng hoặc
+  hỏi). "yes, use my page title", "Yes, use my page title skill." và một
+  câu "Yes." đơn thuần vẫn là cái "có" của page title; "Yes, and use my
+  weather skill." thì không. Nhật ký: "… was a new ask, not an answer (a
+  yes naming look title, not page-title) …". Vòng bị buộc
   chỉ được nói `approve_id`, `answer` và `named` trong form của `make_skill`, cả ba
   bắt buộc (`skill_write_yes::APPROVE_FIELDS`, #6921), nên lời gọi bị buộc
   không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. `no` hoặc

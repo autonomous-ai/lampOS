@@ -1972,7 +1972,23 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (#7545): `named`, the skill the line names or `none`, must be the
   waiting skill's own name or `none`, else the yes is read as `new_ask`;
   a forced `yes` with no `named` reads as `unclear` ("Removed by voice",
-  "A yes bound to its skill"). The forced round is told only
+  "A yes bound to its skill"). For a skill's task the heard line is read
+  too (#7634, lamp-9adf 18 Nov 07:20:43: "Lamp, use my look title skill."
+  was taken as the yes to `page-title`'s waiting task): a line that names
+  a skill other than the waiting one is never its yes, whatever skill the
+  model named. Code reads the words said right before "skill" or
+  "skills", back to a word that comes before a name ("my", "the", "use",
+  "run", "yes", "and", …, `skill_write_yes::BEFORE_A_NAME`) or the
+  clause's start, at most six (`skill_write_yes::other_skill_named`,
+  marked per request by `line_heard`); when no run of them ending at
+  "skill" is the waiting skill's own name by the same match
+  (`made_remove::same_name`), the line names another skill, and its `yes`
+  is read as `new_ask`: nothing kept, the wait let go, and the line
+  answered as its own ask (the named skill used or asked). "yes, use my
+  page title", "Yes, use my page title skill." and a plain "Yes." are
+  still page title's yes; "Yes, and use my weather skill." is not. The
+  journal: "… was a new ask, not an answer (a yes naming look title, not
+  page-title) …". The forced round is told only
   `approve_id`, `answer` and `named` of `make_skill`'s form, all required
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
   make or edit beside the answer. A `no` or `unclear` is read before the
