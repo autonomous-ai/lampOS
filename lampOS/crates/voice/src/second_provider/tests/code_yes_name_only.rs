@@ -199,7 +199,7 @@ fn a_call_with_nothing_past_it_is_no_yes_to_a_code_skill_said_back() {
         // route marks it before its chat): its round is forced again, and
         // it is the answer the say-back awaits.
         yes::lamp_said(1, "Yes? I'm here.");
-        yes::line_heard(2, false);
+        yes::line_heard(2, false, 1);
         assert!(yes::approve_forced_now(Instant::now()), "{name} {called}");
         assert!(yes::answer_awaited(2, Instant::now()), "{name} {called}");
         let (told, on) = went(
