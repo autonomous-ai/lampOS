@@ -2052,7 +2052,11 @@ pub(crate) const NOT_KEPT_NO_ASK: &str = "I have not kept a face: that was not c
 pub(crate) const NOT_SEEN_NO_ASK: &str = "Their face was not kept: I could not see only them clearly. Nothing was asked of them, so ask them nothing about it, don't tell them to try again, and never say you'll know them; just carry on with what they said.";
 /// With `LAMP_FACE_NO_ASK`: beside a face kept with nothing asked, the one
 /// line the lamp says ([`no_ask_told`]).
-pub(crate) const KEPT_NO_ASK: &str = "Their face is kept, and nothing was asked of them. Say only this, in their language: \"I'll know you next time. Say 'forget my face' to undo.\" Ask them nothing about their face.";
+pub(crate) const KEPT_NO_ASK: &str = "Their face is kept, and nothing was asked of them. Say this, in their language: \"I'll know you next time. Say 'forget my face' to undo.\" Ask them nothing.";
+/// With `LAMP_FACE_NO_ASK` and Who was here's names on (the first builder
+/// 19:47): in [`ASK_TO_NAME`]'s place, once their yes to being named was
+/// taken with nothing asked ([`no_ask_visits`]), the one undo line.
+pub(crate) const VISITS_UNDO: &str = "Also say once, in their language: \"I'll mention you stopped by. Say 'keep my visits private' to undo.\" Ask them nothing about it.";
 /// With `LAMP_NAME_LEARN_FIX` (#7331): what the model is told beside a
 /// name kept from letters spelled to it ([`spelled_back`]).
 pub(crate) const SPELLED_KEPT: &str = "Say say_back exactly as it is, a statement: the name, its letters, and that you've got it. Ask nothing more about the name. If their next line fixes a letter (\"No, N as in nose\") or spells it again, call this again with replace true and the name that makes: that line is their yes, so don't ask again.";
@@ -2154,12 +2158,24 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
         },
     ];
     if switches.visits {
-        tools.extend(visits_tools());
+        tools.extend(visits_tools(switches.face_no_ask));
     }
     tools
 }
 
-fn visits_tools() -> [Tool; 2] {
+/// With `no_ask` (`LAMP_FACE_NO_ASK`), the no also names the undo the lamp
+/// says ([`VISITS_UNDO`]): "keep my visits private".
+fn visits_tools(no_ask: bool) -> [Tool; 2] {
+    let dont_tell = if no_ask {
+        "Call this when someone you know says you should not tell others when they've \
+         been here, asks you to keep their visits private (\"keep my visits private\"), or \
+         takes back a yes to it (\"don't tell anyone I was here\"). Then tell them briefly \
+         that you'll only say someone you know was here."
+    } else {
+        "Call this when someone you know says you should not tell others when they've \
+         been here, or takes back a yes to it (\"don't tell anyone I was here\"). Then \
+         tell them briefly that you'll only say someone you know was here."
+    };
     let name = || {
         Some(json!({
             "type": "object",
@@ -2180,10 +2196,7 @@ fn visits_tools() -> [Tool; 2] {
         },
         Tool {
             name: DONT_TELL.into(),
-            description: "Call this when someone you know says you should not tell others when they've \
-                          been here, or takes back a yes to it (\"don't tell anyone I was here\"). Then \
-                          tell them briefly that you'll only say someone you know was here."
-                .into(),
+            description: dont_tell.into(),
             parameters: name(),
             silent: false,
         },
@@ -2466,14 +2479,17 @@ fn run_speaker(
         }
         Some(answer) => {
             *replaced = replaced_of(&answer);
-            let told = told_asking(&answer, switches.visits);
+            let mut told = told_asking(&answer, switches.visits);
             // With `LAMP_FACE_NO_ASK`, past setup: kept said in one line,
             // nothing asked (the speaker's own line already named them).
             if switches.face_no_ask && !switches.at_setup && !replace {
-                (no_ask_told(told, &answer, &said.this), true)
-            } else {
-                (told, true)
+                told = no_ask_told(told, &answer, &said.this);
             }
+            // Past setup only, as in `run_switched`.
+            if switches.face_no_ask && switches.visits && !switches.at_setup {
+                told = no_ask_visits(socket, told);
+            }
+            (told, true)
         }
         None => (
             json!({"error": "I could not finish remembering that face. I have not confirmed that it was saved."}),
@@ -2899,6 +2915,11 @@ fn run_switched(
             if no_ask {
                 told = no_ask_told(told, &answer, &said.this);
             }
+            // Past setup only: the setup walk's save, its visits ask too, is
+            // the setup walk's own part.
+            if switches.face_no_ask && switches.visits && !setup {
+                told = no_ask_visits(socket, told);
+            }
             (told, true)
         }
         None => (
@@ -2944,6 +2965,47 @@ fn no_ask_told(mut told: Value, answer: &Value, this: &str) -> Value {
     );
     if unseen && !speaker_gave_face_leave(this, None) {
         return json!({"error": NOT_SEEN_NO_ASK});
+    }
+    told
+}
+
+/// With `LAMP_FACE_NO_ASK` and Who was here's names on (the first builder
+/// 19:47: [`ASK_TO_NAME`] is in the no-asks rule): a remembering the model
+/// would be told to ask about ([`told_asking`]) is not asked. The voice
+/// gives the eyes their yes itself, as [`TELL`] would (`visits_yes`, which
+/// the eyes take only for that face at the lamp now), and in the question's
+/// place the model says the undo line once ([`VISITS_UNDO`]); "keep my
+/// visits private" is [`DONT_TELL`], as any no. If the eyes don't take it,
+/// nothing is asked and nothing is said about it. Any other answer is told
+/// as it was.
+fn no_ask_visits(socket: &Path, mut told: Value) -> Value {
+    let Some(name) = told["remembered"].as_str().map(str::to_owned) else {
+        return told;
+    };
+    let Some(also_say) = told["also_say"].as_str().map(str::to_owned) else {
+        return told;
+    };
+    if !also_say.contains(ASK_TO_NAME) {
+        return told;
+    }
+    let taken = crate::tools::exchange(socket, &json!({"visits_yes": name}), VISITS_DEADLINE)
+        .is_some_and(|answer| visits_told(&answer, true).get("ok").is_some());
+    eprintln!(
+        "lamp-voice: being named in Who was here {} with nothing asked (LAMP_FACE_NO_ASK)",
+        if taken { "taken" } else { "not taken" }
+    );
+    let counted = also_say.contains(VISITS_LINE);
+    let also_say = match (counted, taken) {
+        (true, true) => Some(format!("{VISITS_LINE} {VISITS_UNDO}")),
+        (false, true) => Some(VISITS_UNDO.to_owned()),
+        (true, false) => Some(VISITS_LINE.to_owned()),
+        (false, false) => None,
+    };
+    if let Some(told) = told.as_object_mut() {
+        match also_say {
+            Some(also_say) => told.insert("also_say".into(), json!(also_say)),
+            None => told.remove("also_say"),
+        };
     }
     told
 }
@@ -6482,6 +6544,116 @@ mod tests {
                 vec![json!({"forget": "Ada"})],
             ]
             .concat()
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// `LAMP_FACE_NO_ASK` with Who was here's names on (the first builder
+    /// 19:47: [`ASK_TO_NAME`] is in the no-asks rule). A face kept is not
+    /// asked whether it may be named: the voice gives the eyes its yes, and
+    /// the model says the undo line once in the question's place, only if
+    /// the eyes took it. "Keep my visits private" is the existing no
+    /// ([`DONT_TELL`]). Off, the question as before.
+    #[test]
+    fn with_no_ask_being_named_is_taken_and_the_undo_said_once() {
+        let switches = |face_no_ask: bool| FaceSwitches {
+            checked: true,
+            visits: true,
+            face_no_ask,
+            ..FaceSwitches::default()
+        };
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ada"}),
+        };
+        let kept = json!({"remembered": "Ada", "replaced": []});
+        let counted = json!({"remembered": "Ada", "replaced": [], "visits": true});
+        let (socket, sent) = eyes(vec![
+            kept.clone(),
+            json!({"visits": "yes"}),
+            counted,
+            json!({"visits": "yes"}),
+            kept.clone(),
+            json!({"error": "not_here"}),
+            kept.clone(),
+            kept,
+            json!({"visits": "no"}),
+        ]);
+        let said = Said::now("My name is Ada.");
+        let run = |on: bool| run_switched(&socket, &save, switches(on), &said, None, &mut None).0;
+        // On: taken, and the undo said once in the question's place.
+        let told = run(true);
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(told["also_say"], VISITS_UNDO, "{told}");
+        assert!(!told.to_string().contains(ASK_TO_NAME));
+        assert!(VISITS_UNDO.contains("Say 'keep my visits private' to undo."));
+        // On, visits counted: that line stays beside the undo.
+        let told = run(true);
+        assert_eq!(
+            told["also_say"],
+            format!("{VISITS_LINE} {VISITS_UNDO}"),
+            "{told}"
+        );
+        // On, the eyes didn't take the yes: nothing asked, nothing claimed.
+        let told = run(true);
+        assert_eq!(told["ok"], true, "{told}");
+        assert!(told.get("also_say").is_none(), "{told}");
+        // Off: the question as before, and no yes sent.
+        assert_eq!(run(false)["also_say"], ASK_TO_NAME);
+        // The setup walk's save, on: its visits ask stays as before (the
+        // setup walk's own part), and no yes is sent.
+        let read_back = Said {
+            this: "Yes.".into(),
+            before: vec![(
+                "My name is Ada.".into(),
+                "Ada, did I get that right?".into(),
+            )],
+        };
+        let setup = run_switched(
+            &socket,
+            &save,
+            FaceSwitches {
+                at_setup: true,
+                ..switches(true)
+            },
+            &read_back,
+            None,
+            &mut None,
+        )
+        .0;
+        assert_eq!(setup["also_say"], ASK_TO_NAME, "{setup}");
+        // "Keep my visits private": the existing no, named in its tool.
+        let undo = ToolCall {
+            id: "2".into(),
+            name: DONT_TELL.into(),
+            args: json!({"name": "Ada"}),
+        };
+        assert_eq!(run_visits(&socket, &undo, None).0["ok"], true);
+        let description = |on: bool| {
+            tools_for(switches(on))
+                .into_iter()
+                .find(|tool| tool.name == DONT_TELL)
+                .unwrap()
+                .description
+        };
+        assert!(description(true).contains("keep my visits private"));
+        assert!(!description(false).contains("keep my visits private"));
+        let remember = json!({"remember": "Ada", "one_face": true, "replace": false});
+        let yes = json!({"visits_yes": "Ada"});
+        assert_eq!(
+            sent.join().unwrap(),
+            [
+                remember.clone(),
+                yes.clone(),
+                remember.clone(),
+                yes.clone(),
+                remember.clone(),
+                yes,
+                remember.clone(),
+                remember,
+                json!({"visits_no": "Ada"}),
+            ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
