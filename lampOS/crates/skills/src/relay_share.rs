@@ -26,7 +26,7 @@
 //!   itself, and the forwarder only reads the header; it forwards every
 //!   request as before, the owner's own agent tasks included.
 //! - **Not known is let through:** no reading, one of another UTC day, a
-//!   2xx answer with no header (not limited), or a file that can't be read.
+//!   chat answer with no header (not limited), or a file that can't be read.
 //!   The relay's own limit still holds, and a broken reading must not stop
 //!   every skill for good.
 //! - **How fresh:** the reading is the forwarder's last answer's. The voice's
@@ -110,14 +110,21 @@ fn directory() -> PathBuf {
     PathBuf::from(DIRECTORY)
 }
 
-/// The header's value as a share of the day used: a number from 0 to 1.
+/// The header's value as a share of the day used: a number from 0 to 1,
+/// and one over 1 up to [`MOST_SAID`] as 1, the whole day, so a relay that
+/// overshoots its limit is never left at an older, lower value (#7538's
+/// P3, blue and Twelve). Anything else isn't read.
 pub fn used_from(header: &str) -> Option<f64> {
     header
         .trim()
         .parse::<f64>()
         .ok()
-        .filter(|used| used.is_finite() && (0.0..=1.0).contains(used))
+        .filter(|used| used.is_finite() && (0.0..=MOST_SAID).contains(used))
+        .map(|used| used.min(1.0))
 }
+
+/// The most a header may say and still be read: twice the day.
+const MOST_SAID: f64 = 2.0;
 
 /// The UTC day of `ms` since 1970.
 pub fn day_of(ms: u64) -> u64 {
@@ -132,7 +139,7 @@ pub struct Reading {
     /// The UTC day, in days since 1970, all of this is for.
     pub day: u64,
     /// The relay's [`HEADER`] at the last answer that said: `None` when a
-    /// 2xx answer came without one (no day limit) or none has said today.
+    /// chat answer came without one (no day limit) or none has said today.
     pub used: Option<f64>,
     /// When it was last read, milliseconds since 1970.
     pub at_ms: u64,
@@ -162,9 +169,11 @@ impl Reading {
     }
 
     /// An answer's [`HEADER`] at `now_ms`: `Some(value)` when it carried
-    /// one (a value that isn't 0 to 1 is not kept), `None` when not; a
-    /// successful answer without one says the lamp has no day limit.
-    pub fn heard(&mut self, now_ms: u64, header: Option<&str>, success: bool) {
+    /// one (one [`used_from`] doesn't read is not kept), `None` when not.
+    /// Only an answer that `clears` (a successful one on the metered chat
+    /// route) says, with none, that the lamp has no day limit: another
+    /// route's may carry no header at all (#7538's P2).
+    pub fn heard(&mut self, now_ms: u64, header: Option<&str>, clears: bool) {
         self.roll(now_ms);
         match header {
             Some(header) => {
@@ -173,7 +182,7 @@ impl Reading {
                     self.at_ms = now_ms;
                 }
             }
-            None if success => {
+            None if clears => {
                 self.used = None;
                 self.at_ms = now_ms;
             }
@@ -359,6 +368,22 @@ mod tests {
         assert!(refuses(Some(&reading(Some(0.7))), 0.3, NOW).is_some());
     }
 
+    /// #7538's P3 (blue, Twelve): a relay that says a little over the whole
+    /// day, on an overshoot, is at its limit, never left at an older, lower
+    /// value; past twice the day, or not a number, it isn't read.
+    #[test]
+    fn a_little_over_the_whole_day_is_the_whole_day() {
+        assert_eq!(used_from("1.02"), Some(1.0));
+        assert_eq!(used_from("2"), Some(1.0));
+        let mut kept = reading(Some(0.4));
+        kept.heard(NOW, Some("1.020"), true);
+        assert_eq!(kept.used, Some(1.0));
+        assert!(refuses(Some(&kept), 0.5, NOW).is_some());
+        for unread in ["2.01", "-0.1", "NaN", "inf", "0.9x", ""] {
+            assert_eq!(used_from(unread), None, "{unread}");
+        }
+    }
+
     #[test]
     fn what_is_not_known_lets_a_run_through() {
         assert_eq!(refuses(None, 0.5, NOW), None);
@@ -376,8 +401,8 @@ mod tests {
             (kept.day, kept.used, kept.at_ms),
             (day_of(NOW), Some(0.412), NOW)
         );
-        // Out of range is not kept, nor is a refusal without the header.
-        kept.heard(NOW + 1, Some("1.2"), true);
+        // Past twice the day is not kept, nor is a refusal without the header.
+        kept.heard(NOW + 1, Some("2.5"), true);
         kept.heard(NOW + 2, None, false);
         assert_eq!((kept.used, kept.at_ms), (Some(0.412), NOW));
         kept.counted(Some(&serde_json::json!({

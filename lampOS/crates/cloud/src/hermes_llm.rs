@@ -232,19 +232,27 @@ struct Meter {
 }
 
 impl Meter {
-    /// An answer's header and, for a chat, its `usage`, kept in memory and
-    /// then in the file, off the runtime's threads; a chat's line in the
-    /// journal.
-    async fn note(&self, success: bool, header: Option<String>, chat: Option<Option<Value>>) {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |since| since.as_millis() as u64);
+    /// An answer's header, taken in memory as its head arrives, so a longer
+    /// answer begun before a newer one never writes its older value over it
+    /// (Twelve's P3 on #7538). Only a successful answer on the metered chat
+    /// route with no header says the day is not limited (`clears`): the
+    /// models list may carry none (#7538's P2, blue and Twelve).
+    fn heard(&self, header: Option<&str>, clears: bool) {
+        self.reading
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .heard(now_ms(), header, clears);
+    }
+
+    /// An answer ended: a chat's `usage` counted, the reading kept in the
+    /// file off the runtime's threads, and a chat's line in the journal.
+    async fn ended(&self, chat: Option<Option<Value>>) {
         let used = {
             let mut reading = self
                 .reading
                 .lock()
                 .unwrap_or_else(|poison| poison.into_inner());
-            reading.heard(now_ms, header.as_deref(), success);
+            reading.roll(now_ms());
             if let Some(usage) = &chat {
                 reading.counted(usage.as_ref());
             }
@@ -274,6 +282,13 @@ impl Meter {
             eprintln!("lamp-cloud: the Hermes forwarder: the relay's day used can't be kept");
         }
     }
+}
+
+/// Milliseconds since 1970 by the lamp's clock.
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
 }
 
 /// A chat answer's journal line: its tokens, as its `usage` gives them, and
@@ -455,6 +470,12 @@ impl Forwarder {
             started: Mutex::new(Started::default()),
             meter: None,
         })
+    }
+
+    /// [`Self::with_meter`] when `on` (`lamp_skills::relay_share::on`, the
+    /// switch); off, the forwarder as it was, reading and keeping nothing.
+    pub fn metered(self, on: bool, dir: &Path) -> Self {
+        if on { self.with_meter(dir) } else { self }
     }
 
     /// The relay's day used and the chats' tokens kept in `dir`'s
@@ -686,19 +707,19 @@ impl Forwarder {
             status.canonical_reason().unwrap_or("Answer"),
         );
         // The relay's day used, read only with the switch set (#7342).
-        let header = self.meter.as_ref().and_then(|_| {
-            answer
+        // A header that isn't text is one said but not read, never "none"
+        // (Twelve's P2 on #7538): it is kept as it came and fails as a number.
+        if let Some(meter) = &self.meter {
+            let header = answer
                 .headers()
                 .get(lamp_skills::relay_share::HEADER)
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_owned)
-        });
+                .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned());
+            meter.heard(header.as_deref(), chat && status.is_success());
+        }
         let mut usage = (self.meter.is_some() && chat).then(|| Usage::new(&kind));
         let passed = Self::pass(&mut stream, &mut answer, head, usage.as_mut()).await;
         if let Some(meter) = &self.meter {
-            meter
-                .note(status.is_success(), header, usage.map(Usage::end))
-                .await;
+            meter.ended(usage.map(Usage::end)).await;
         }
         match passed {
             Ok(true) => stream.shutdown().await,
@@ -750,14 +771,25 @@ pub async fn run(
     key: &str,
     say: &mut dyn FnMut(&str),
 ) {
-    serve_when(on_from_environment(), PORT, state, second_json, key, say).await
+    serve_when(
+        on_from_environment(),
+        lamp_skills::relay_share::on(),
+        PORT,
+        state,
+        second_json,
+        key,
+        say,
+    )
+    .await
 }
 
-/// [`run`] with the switches already read (`on`, [`on_from`]) and the port
-/// given, so a test can show either switch alone starts the listener
-/// (#6226). Off, nothing is listened on.
+/// [`run`] with the switches already read (`on`, [`on_from`]; `metered`,
+/// `lamp_skills::relay_share::on`) and the port given, so a test can show
+/// either switch alone starts the listener (#6226) and the meter is kept
+/// only with its own (#7342). Off, nothing is listened on.
 pub async fn serve_when(
     on: bool,
+    metered: bool,
     port: u16,
     state: Option<&Path>,
     second_json: Option<&str>,
@@ -770,10 +802,8 @@ pub async fn serve_when(
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
         let token = token(state).map_err(|_| "the local token can't be kept")?;
-        let mut forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
-        if lamp_skills::relay_share::on() {
-            forwarder = forwarder.with_meter(state);
-        }
+        let forwarder =
+            Forwarder::new(&relay_base(second_json), key, &token)?.metered(metered, state);
         let listener = Forwarder::bind(port)
             .await
             .map_err(|_| format!("127.0.0.1:{port} can't be listened on"))?;

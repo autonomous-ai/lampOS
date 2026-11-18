@@ -3488,6 +3488,15 @@ the lamp unable to answer. The switch is off unless set, in no product unit.
   file holds the UTC day, the day used, when it was read, and the day's
   count of agent chat answers and tokens from the relay's `usage`. Numbers
   only. A new UTC day starts from nothing.
+  - The header is taken as an answer's head arrives, so a longer answer
+    begun earlier never writes its older value over a newer one.
+  - Only a successful answer on the chat route with no header says the day
+    is not limited. The models list may carry none, so it clears nothing,
+    and a header that isn't text is kept as said but unread (#7538).
+  - A value over 1, up to 2, reads as 1, the whole day, so an overshoot
+    is never left at an older, lower value. Past 2 it isn't read.
+  - Set the switch in both units, or the bound reads nothing: lamp-skills
+    alone finds no reading and lets every run through.
 - **The bound:** with the switch set in lamp-skills, a skill's run is refused
   before it is handed over once what is left of the day, `1 - used`, is at
   or below the voice's share. `on` keeps half the day; a decimal between 0
@@ -3501,9 +3510,9 @@ the lamp unable to answer. The switch is off unless set, in no product unit.
 - **The voice is never refused by it.** The voice talks to the relay itself.
   The forwarder only reads the header and forwards every request as before,
   the owner's own agent tasks and a request past the share included.
-- **Not known is let through:** no reading, one of another UTC day, a 2xx
-  answer with no header, or a file that can't be read. The relay's own
-  limit still holds.
+- **Not known is let through:** no reading, one of another UTC day, a
+  successful chat answer with no header, or a file that can't be read. The
+  relay's own limit still holds.
 - **How fresh:** the reading is the forwarder's last answer's. The voice's
   use since then is not in it yet, so a run may start a little past the
   mark; its first chat updates the reading and the next run is refused.
@@ -3518,8 +3527,11 @@ the lamp unable to answer. The switch is off unless set, in no product unit.
 - Tests: `relay_share::tests`,
   `task::tests::a_run_is_refused_once_the_voices_share_is_reached`, and
   the forwarder's
-  `hermes_llm::tests::the_meter_keeps_the_day_used_and_every_chat_still_goes`
-  and `without_the_meter_nothing_is_kept`.
+  `hermes_llm::tests::the_meter_keeps_the_day_used_and_every_chat_still_goes`,
+  `only_a_chat_with_no_header_says_the_day_is_not_limited`,
+  `the_newest_header_wins_over_a_longer_answer_begun_before_it`,
+  `without_the_meter_nothing_is_kept` and
+  `the_meter_is_started_only_with_its_own_switch`.
 
 ### A voice make in a skill run's namespace (`skill_make`, #6643)
 
