@@ -12105,9 +12105,24 @@ async fn spoken(
             care.mark(now, asks);
             crate::remember::keep_out(request);
             crate::care_line::hold_from_summary(request);
-            notes.insert(notes.len() - cut_in_told, crate::care_line::NOTE.to_owned());
+            // The lamp's line follows only when it is due: said in the last
+            // five minutes, the model is told so, never that it comes.
+            let note = if care.owes(now) {
+                crate::care_line::NOTE
+            } else {
+                crate::care_line::NOTE_SAID
+            };
+            notes.insert(notes.len() - cut_in_told, note.to_owned());
             eprintln!(
                 "lamp-voice second: request {request} is a care turn: the care line follows its answer, or the next one if this is cut (LAMP_CARE_LINE)"
+            );
+        } else if care.owes(now) {
+            // A line owed by a care turn cut before it: this answer is
+            // followed by it, so the model doesn't say it too (the safety
+            // read's P2 on #7752).
+            notes.insert(
+                notes.len() - cut_in_told,
+                crate::care_line::OWED_NOTE.to_owned(),
             );
         }
     }
@@ -21609,6 +21624,14 @@ async fn answer(
     if let Some(care) = &shared.care
         && !matches!(ended, Err(Stop::Gone))
         && let Some(line) = care.owed_line(Instant::now())
+        && {
+            // The answer it follows is held from memory and the summary
+            // too: the line says what the talk was about (the safety read's
+            // P2 on #7752).
+            crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
+            true
+        }
         && let Some((played, whole)) = play_words(
             shared,
             (request, heard_at),

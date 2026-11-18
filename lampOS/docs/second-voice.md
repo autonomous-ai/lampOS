@@ -3015,8 +3015,12 @@ gives one fixed line with a real place to turn. Off unless
   (two letters, set by hand) first; else lamp-cloud's placement
   (`/var/lib/lampos-cloud/region`) when it says `CN`; else the country of
   the lamp's set time zone (`local_time::zone_here`, as setup's time zone
-  sets it: the US zones, `Asia/Ho_Chi_Minh` or `Asia/Saigon`, the China
-  zones); none of those, the default line. Read again at each line, so a
+  sets it: the US zones and their old names, Puerto Rico,
+  `Asia/Ho_Chi_Minh` or `Asia/Saigon`, the China zones); none of those,
+  the default line. The images' own zone (`care_line::IMAGE_ZONE`,
+  `America/New_York`, kept by setup when the app sends none it knows)
+  counts only for an owner who speaks English: in another language it may
+  never have been set, and the default is never a wrong number. Read again at each line, so a
   time zone set after the worker starts counts. The language is the
   owner's, not the speaker's.
 - **The model's instruction** (`care_line::instruction`). On every route
@@ -3039,9 +3043,14 @@ gives one fixed line with a real place to turn. Off unless
   30 s is not caught.
 - **A care turn on the second route.** The line caught (or, within the
   hold, one asking who they can call, `care_line::asks_who_to_call`) is
-  told `care_line::NOTE` beside its words, kept out of memory
+  told `care_line::NOTE` beside its words (`NOTE_SAID` when the line was
+  said in the last 5 min: don't repeat it), kept out of memory
   (`remember::keep_out`) and held from the running summary and its talk
-  note (`care_line::hold_from_summary`, `Thread::held_for`). The line is
+  note (`care_line::hold_from_summary`, `Thread::held_for`), across a
+  restart too (`thread.json` keeps the mark). While a line is owed, any
+  other line is told `care_line::OWED_NOTE` (the lamp says it after this
+  answer), so the number isn't said twice, and the answer it follows is
+  held the same way. The line is
   then owed (`Care::mark`), and the end of any answer says it
   (`Care::owed_line`): this one's, whatever the model said or failed to
   say, or, when a cut, a stop or a newer line ended it, the next answer's.
@@ -3057,7 +3066,9 @@ gives one fixed line with a real place to turn. Off unless
   (`STILL_HERE_LIVE`). Once; a mute or sleep lets it go.
 - **The line** comes from the installed copy (`LAMP_CARE_LINES_FILE`,
   default `/etc/lampOS/voice/care-lines.json`) when it is a good one, else
-  the shipped `deploy/character/care-lines.json` (`care_line::SHIPPED`),
+  the shipped `deploy/character/care-lines.json` (`care_line::SHIPPED`);
+  a copy missing a shipped region is not a good one
+  (`CareLines::or_shipped_whole`). They are
   kept by the safety reader: each region's line only from an official
   source, with that source and the date it was checked, the default too.
   US: 988. CN: 12356 and 120, no "any time" (hours vary by province). VN:

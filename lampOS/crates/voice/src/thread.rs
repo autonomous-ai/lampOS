@@ -294,6 +294,12 @@ struct Kept {
     whose: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     written: Option<String>,
+    /// Never given to the running summary or a talk note
+    /// ([`Thread::held_for`]): kept across a restart (a care turn's, the
+    /// safety read's P1 on #7752). Absent when false, so a file with none
+    /// held is as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    held: bool,
 }
 
 /// One exchange as [`Thread::recent`] gives it.
@@ -690,6 +696,7 @@ impl Thread {
                 lamp: exchange.lamp.clone(),
                 whose: exchange.whose.clone(),
                 written: exchange.written.clone(),
+                held: exchange.held,
             })
             .collect();
         serde_json::to_string(&kept).ok()
@@ -758,7 +765,7 @@ impl Thread {
                 journalled: true,
                 summarized: false,
                 folded: None,
-                held: false,
+                held: kept.held,
                 let_go: false,
                 whose: kept.whose,
                 written: kept.written.map(|text| {
@@ -4521,6 +4528,31 @@ mod tests {
         assert!(!given.is_empty());
         assert!(given.iter().all(|request| request % 3 != 0), "{given:?}");
         assert_eq!(given.len(), EXCHANGES - EXCHANGES / 3, "{given:?}");
+    }
+
+    /// A held exchange stays held when a fresh process reads the thread's
+    /// file (the safety read's P1 on #7752: a care turn's words came back
+    /// to the summary after a restart); a file with none held is as before.
+    #[test]
+    fn a_held_exchange_stays_held_across_a_restart() {
+        let start = Instant::now();
+        let wall = SystemTime::now();
+        let mut thread = Thread::new();
+        thread.person("I want to kill myself", true, start);
+        thread.lamp(1, "I'm here with you.", start);
+        thread.held_for(1);
+        thread.person("What's the weather?", true, start);
+        thread.lamp(2, "Sunny.", start);
+        let text = thread.save(start, wall).expect("changed");
+        assert_eq!(text.matches("\"held\":true").count(), 1, "{text}");
+        let mut read = Thread::load(&text, start, wall);
+        let rest = read.summary_rest(None, start + Duration::from_secs(1));
+        assert_eq!(rest.len(), 1, "{rest:?}");
+        assert_eq!(rest[0].2, "Sunny.");
+        let mut plain = Thread::new();
+        plain.person("What's the weather?", true, start);
+        plain.lamp(2, "Sunny.", start);
+        assert!(!plain.save(start, wall).unwrap().contains("held"));
     }
 
     /// The bike lock (lamp-06c1, 5 Nov): a room's line that corrected A's

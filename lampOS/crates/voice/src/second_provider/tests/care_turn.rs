@@ -4,6 +4,12 @@
 //! An ordinary line, and every line with the switch off, go on as before.
 use super::*;
 
+thread_local! {
+    /// Whether the last [`care_turn_with`] told its model
+    /// [`crate::care_line::OWED_NOTE`].
+    static OWED_TOLD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// One spoken turn heard as `heard`, answered `reply`: what was said, and
 /// whether the model was told the care note.
 fn care_turn(
@@ -42,14 +48,25 @@ fn care_turn_with(
             engine.submit(end(1));
             turn(&mut engine).await
         });
-    let told = script
+    let asked: Vec<String> = script
         .asked
         .lock()
         .unwrap()
         .iter()
         .flatten()
         .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    let told = asked
+        .iter()
         .any(|content| content.contains(crate::care_line::NOTE));
+    OWED_TOLD.with(|owed| {
+        owed.set(
+            asked
+                .iter()
+                .any(|content| content.contains(crate::care_line::OWED_NOTE)),
+        )
+    });
     let said = labels
         .into_iter()
         .filter(|label| label.starts_with("said:"))
@@ -115,13 +132,20 @@ fn a_line_owed_by_a_cut_care_turn_follows_the_next_answer() {
     let line = crate::care_line::CareLines::shipped()
         .line(Some("US"), "en")
         .to_owned();
-    assert!(!told, "an ordinary line is told nothing");
+    assert!(!told, "an ordinary line is not told it is a care turn");
+    // The safety read's P2 on #7752: told the lamp says the line itself,
+    // so the number isn't said twice.
+    assert!(
+        OWED_TOLD.with(std::cell::Cell::get),
+        "told the line follows"
+    );
     assert_eq!(
         said,
         ["said:I'm listening.".to_owned(), format!("said:{line}")]
     );
     let (said, _) = care_turn_with(Some(care), "thanks", "Of course.", None);
     assert_eq!(said, ["said:Of course.".to_owned()], "said once");
+    assert!(!OWED_TOLD.with(std::cell::Cell::get), "nothing owed now");
 }
 
 /// A line of self-harm is never held by the said-to-me rule (the first
