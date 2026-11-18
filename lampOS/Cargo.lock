@@ -2084,6 +2084,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "tar",
  "tempfile",
  "tokio",
  "tokio-tungstenite",

@@ -37,6 +37,8 @@ webpki-roots = "1"
 lamp-skills = { path = "../skills" }
 # The apps the owner installs (#7415 piece 4): the name rule and the folders and marks of root's helper, read here.
 lamp-apps = { path = "../apps" }
+# An app's manifest, read out of the package for the owner's yes (`apps.install`); the helper checks everything again.
+tar = { version = "0.4", default-features = false }
 # A connector a skill needs, named as a person says it (`skills.list`'s
 # `needs_link`), from lamp-services' own catalogue (`lamp_services::spoken`).
 lamp-services = { path = "../services" }
