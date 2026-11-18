@@ -10958,6 +10958,13 @@ impl Heeding {
                     "out of the window"
                 },
             );
+            // A short line standing in the window: which input let it
+            // (#7698), for a row or a replay to tell a reply from a remark.
+            if let Some(input) = crate::said_to_me::short_stood_by(line) {
+                eprintln!(
+                    "lamp-voice second: request {request}: said to me: a short line stands in the window by {input} (LAMP_SAID_TO_ME)"
+                );
+            }
             return false;
         };
         eprintln!(

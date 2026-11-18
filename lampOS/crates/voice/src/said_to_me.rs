@@ -238,10 +238,7 @@ pub fn pose(pitch: Option<f32>, looking: Option<bool>, looks: usize) -> String {
 /// The rule, on one line (see the module).
 pub fn judge(line: Line<'_>) -> Said {
     let words = line.heard.split_whitespace().count();
-    let named = line.name_heard
-        || crate::attention::called(line.heard)
-        || crate::attention::called_by_name_on(line.heard, true);
-    if named || yes_awaited() {
+    if named(line) || yes_awaited() {
         return Said::Stands;
     }
     if line.going_on {
@@ -273,6 +270,36 @@ pub fn judge(line: Line<'_>) -> Said {
     } else {
         Said::ToTheLamp
     }
+}
+
+/// For the journal: which input let a short line ([`SHORT_WORDS`] words or
+/// fewer) in a conversation's window stand, the first in [`judge`]'s order;
+/// `None` for a longer line, one out of the window, or one held (#7698).
+pub fn short_stood_by(line: Line<'_>) -> Option<&'static str> {
+    if !line.going_on
+        || line.heard.split_whitespace().count() > SHORT_WORDS
+        || matches!(judge(line), Said::Held(_))
+    {
+        return None;
+    }
+    Some(if named(line) {
+        "named"
+    } else if yes_awaited() {
+        "yes awaited"
+    } else if line.lamp_asked {
+        "lamp_asked"
+    } else if line.seen_speaking {
+        "seen_speaking"
+    } else {
+        "read_silent false"
+    })
+}
+
+/// The lamp's name heard in the line's sound or written in its words.
+fn named(line: Line<'_>) -> bool {
+    line.name_heard
+        || crate::attention::called(line.heard)
+        || crate::attention::called_by_name_on(line.heard, true)
 }
 
 /// A pitch (radians) outside [`PITCH_DEG`]; unknown is not.
@@ -515,5 +542,55 @@ mod tests {
         };
         assert_eq!(judge(between), Said::Held(Held::NotSeenSpeaking));
         assert_eq!(judge(facing("Yes.", true)), Said::Held(Held::Short));
+    }
+
+    /// #7698: the journal says which input let a short line in the window
+    /// stand; nothing for a held one, a longer one or one out of the window.
+    #[test]
+    fn a_short_line_standing_in_the_window_says_which_input_let_it() {
+        let short = Line {
+            heard: "Yes.",
+            going_on: true,
+            ..Line::default()
+        };
+        let named = Line {
+            name_heard: true,
+            read_silent: true,
+            ..short
+        };
+        assert_eq!(short_stood_by(named), Some("named"));
+        let asked = Line {
+            lamp_asked: true,
+            read_silent: true,
+            ..short
+        };
+        assert_eq!(short_stood_by(asked), Some("lamp_asked"));
+        let seen = Line {
+            seen_speaking: true,
+            read_silent: true,
+            ..short
+        };
+        assert_eq!(short_stood_by(seen), Some("seen_speaking"));
+        assert_eq!(short_stood_by(short), Some("read_silent false"));
+        let silent = Line {
+            read_silent: true,
+            ..short
+        };
+        assert_eq!(
+            awaiting_yes(true, || short_stood_by(silent)),
+            Some("yes awaited")
+        );
+        // Held, longer, or out of the window: nothing.
+        assert_eq!(short_stood_by(silent), None);
+        let longer = Line {
+            heard: "Turn the light on",
+            ..short
+        };
+        assert_eq!(short_stood_by(longer), None);
+        let late = Line {
+            going_on: false,
+            ..short
+        };
+        assert_eq!(short_stood_by(late), None);
     }
 }

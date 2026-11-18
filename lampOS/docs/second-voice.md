@@ -5951,7 +5951,11 @@ after a take-over, but now for every turn:
   true|false|unread, <n> looks` (#7721). A line let through, in the window
   or out of it, has its own line, `request N: said to me: let through:
   <verdict>: <W> words, in the window|out of the window; pitch …, looking
-  …, <n> looks (LAMP_SAID_TO_ME)`. A tap, near or
+  …, <n> looks (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
+  words or fewer) standing in the window adds which input let it,
+  `request N: said to me: a short line stands in the window by
+  named|yes awaited|lamp_asked|seen_speaking|read_silent false
+  (LAMP_SAID_TO_ME)` (`said_to_me::short_stood_by`, #7698). A tap, near or
   addressed still lets a line out.
   `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
   whose mouth the eyes cannot read, or who says one word that is no
