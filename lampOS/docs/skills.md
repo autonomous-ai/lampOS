@@ -7543,7 +7543,7 @@ description beginning with the `when` line).
 #### A start by the person's own words (`LAMP_MADE_SKILL_ASKS=on`, off)
 
 Off unless `LAMP_MADE_SKILL_ASKS=on`; on in the product, in lamp-voice,
-lamp-skills, its manage helper, lamp-cloud and lamp-control (#7233;
+lamp-skills, its manage helper, lamp-cloud, lamp-control and lamp-tasks (#7233; lamp-tasks for the agent's pack check, #7245;
 the owner, 16 Nov: "Every task must be doable; no 'couldn't' here"). A
 skill made here, by voice or in the app, may be started by words the
 person names for it, for any step a made skill may have: a fixed write
