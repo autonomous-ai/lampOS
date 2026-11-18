@@ -1120,6 +1120,23 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `/etc/resolv.conf`), `ProtectHome`, `PrivateTmp` and `NoNewPrivileges`.
    A round that brings the two units enables them; they run from the next
    boot.
+   **sysstat's collection off** (#7254; `install::sysstat_quiet`, also
+   `lamp-update region`). Debian's `sysstat` timers start
+   `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
+   daily, writing `/var/log/sysstat` on the SD card for nothing any part reads
+   (lamp-c0a4 kept about 30 MB by 18 Nov). Install writes
+   `/etc/systemd/system/sysstat-collect.service.d/lampos.conf` and
+   `/etc/systemd/system/sysstat-summary.service.d/lampos.conf`, 0644, each a
+   comment line, `[Unit]` and `ConditionPathExists=/etc/lampOS/sysstat-on`,
+   then `systemctl daemon-reload`, only after a change (a failed reload is
+   said). A triggered run then skips at once and nothing is removed;
+   `touch /etc/lampOS/sysstat-on` turns collection back on, and removing it
+   off again. A lamp without sysstat gets the same files, harmless with no
+   unit to drop into. A round writes the product's own units, not install's
+   other files, so a lamp in a home gets these the way the region's do:
+   `lamp-region.service` runs `update/current`'s `lamp-update region` at every
+   boot, which writes them too. They reach it at its first boot after a
+   round. What sysstat has already kept stays (#7254's second part).
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does

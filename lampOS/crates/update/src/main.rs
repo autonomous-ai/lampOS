@@ -434,11 +434,14 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
     let mut changed = Vec::new();
-    install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say)?;
+    let servers = install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say);
+    // sysstat's collection off (#7254), this unit being the one a lamp in a
+    // home runs from `update/current` at every boot.
+    let sysstat = install::sysstat_quiet(Path::new("/"), &mut System, &mut changed, &mut say);
     for line in &changed {
         println!("{line}");
     }
-    Ok(())
+    servers.and(sysstat)
 }
 
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
