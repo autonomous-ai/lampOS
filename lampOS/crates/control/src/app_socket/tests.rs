@@ -29,12 +29,23 @@ fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
     let line = |path: &str| format!("0::{path}\n");
     let unit = "/lampos.slice/lampos-apps.slice/lampapp@english-lesson.service";
     assert_eq!(
-        app_of_cgroup(&line(unit)).as_deref(),
-        Some("english-lesson")
+        app_of_cgroup(&line(unit)),
+        Some(("english-lesson".to_owned(), false))
+    );
+    // An app with `net: true` runs in its own unit, with the same exactness.
+    assert_eq!(
+        app_of_cgroup(&line(
+            "/lampos.slice/lampos-apps.slice/lampapp-net@english-lesson.service"
+        )),
+        Some(("english-lesson".to_owned(), true))
     );
     for other in [
         "/lampos.slice/lampos-apps.slice/lampapp@english-lesson.service/sub",
         "/lampos.slice/lampos-apps.slice/lampapp@Bad.service",
+        "/lampos.slice/lampos-apps.slice/lampapp-net@english-lesson.service/sub",
+        "/lampos.slice/lampos-apps.slice/lampapp-net@.service",
+        "/lampos.slice/lampos-parts.slice/lampapp-net@demo.service",
+        "/lampos.slice/lampos-apps.slice/lampapp-netx@demo.service",
         "/lampos.slice/lampos-apps.slice/lampapp@.service",
         "/lampos.slice/lampos-parts.slice/lampapp@demo.service",
         "/user.slice/lampapp@demo.service",
@@ -42,7 +53,19 @@ fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
     ] {
         assert_eq!(app_of_cgroup(&line(other)), None, "{other}");
     }
-    assert_eq!(app_of(None), None);
+    assert_eq!(app_of(None, 0), None);
+    // A pid whose process is not the uid the kernel named is no peer.
+    assert_eq!(app_of(Some(std::process::id() as i32), u32::MAX), None);
+    // The handle read gives this process's own cgroup for its own uid and
+    // nothing for another's: the uid check bites, and the `openat` path works.
+    let me = std::process::id() as i32;
+    // SAFETY-free: the uid of this process, from its own `/proc` entry.
+    let uid = std::os::unix::fs::MetadataExt::uid(&std::fs::metadata("/proc/self").unwrap());
+    let text = cgroup_text(Some(me), Some(uid)).expect("its own cgroup");
+    assert!(text.contains(':'), "{text}");
+    assert_eq!(cgroup_text(Some(me), Some(uid.wrapping_add(1))), None);
+    assert_eq!(cgroup_text(Some(me), None), Some(text));
+    assert_eq!(cgroup_text(Some(0), None), None);
     // The id is the name's, never a pid's.
     assert_eq!(app_client("demo"), app_client("demo"));
     assert_ne!(app_client("demo"), app_client("demo2"));
@@ -53,12 +76,14 @@ fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
 fn a_peer_is_the_installed_manifests_and_a_service_grant_is_refused() {
     let apps = folder("peer");
     install(&apps, "demo", json!(["speak", "light"]), json!([]));
-    let peer = peer_for(&apps, "demo").unwrap();
+    let peer = peer_for(&apps, "demo", false).unwrap();
     assert_eq!(peer.version, "2.0.1");
     assert_eq!(peer.grants.len(), 2);
-    assert!(peer_for(&apps, "ghost").is_err());
+    assert!(peer_for(&apps, "ghost", false).is_err());
+    // The unit must be the manifest's: the net unit for a plain app is refused.
+    assert!(peer_for(&apps, "demo", true).is_err());
     install(&apps, "odd", json!(["gmail"]), json!([]));
-    assert!(peer_for(&apps, "odd").is_err());
+    assert!(peer_for(&apps, "odd", false).is_err());
     let _ = std::fs::remove_dir_all(&apps);
 }
 
@@ -99,6 +124,22 @@ fn the_app_ops_are_answered_checked_and_off_means_off() {
     );
     assert_eq!(got["settings"], json!({"loud": 3}));
     assert_eq!(got["re"], 2);
+    // Ten reads a second, not more.
+    let again = ask(
+        &mut live,
+        json!({"id": 20, "op": "app.settings.get"}),
+        true,
+        t0 + Duration::from_millis(10),
+    );
+    assert_eq!(again["error"]["code"], "rate", "{again}");
+    assert!(again["error"]["retry_ms"].as_u64().unwrap() <= 100);
+    let after = ask(
+        &mut live,
+        json!({"id": 21, "op": "app.settings.get"}),
+        true,
+        t0 + Duration::from_millis(200),
+    );
+    assert_eq!(after["settings"], json!({"loud": 3}), "{after}");
     let extra = ask(
         &mut live,
         json!({"id": 3, "op": "app.settings.get", "x": 1}),
@@ -167,9 +208,19 @@ fn the_app_ops_are_answered_checked_and_off_means_off() {
     // The panel goes with the app's last connection.
     live.connection("demo", true);
     live.connection("demo", false);
+    // The rev goes on and so does the minute: a minute on it is free.
     assert_eq!(
-        ask(&mut live, panel("Lesson", json!([])), true, later)["rev"],
-        1
+        ask(&mut live, panel("Lesson", json!([])), true, later)["error"]["code"],
+        "rate"
+    );
+    assert_eq!(
+        ask(
+            &mut live,
+            panel("Lesson", json!([])),
+            true,
+            later + Duration::from_secs(61)
+        )["rev"],
+        3
     );
     let _ = std::fs::remove_dir_all(&apps);
     let _ = std::fs::remove_dir_all(&state);
@@ -251,4 +302,68 @@ fn phrases_set_is_the_doors_subscribe_and_only_the_reply_is_the_apps() {
     let before = no.clone();
     phrases_reply(&mut no, 2);
     assert_eq!(no, before);
+}
+
+#[test]
+fn the_panel_rate_survives_a_reconnect_and_only_a_remove_forgets_it() {
+    let apps = folder("reconnect");
+    install(&apps, "demo", json!(["speak"]), json!([]));
+    let place = Place {
+        apps: &apps,
+        state: None,
+    };
+    let mut live = Live::default();
+    let t0 = Instant::now();
+    let panel = |title: &str| json!({"id": 6, "op": "app.panel.set", "title": title, "lines": []});
+    let ask = |live: &mut Live, value: Value, at: Instant| {
+        answer(live, &place, "demo", &frame(value), true, at).unwrap()
+    };
+    assert_eq!(ask(&mut live, panel("One"), t0)["rev"], 1);
+    // The app's last connection closes and it reconnects: still one a minute.
+    live.connection("demo", true);
+    live.connection("demo", false);
+    let again = ask(&mut live, panel("Two"), t0 + Duration::from_secs(5));
+    assert_eq!(again["error"]["code"], "rate", "{again}");
+    // A remove forgets all of it.
+    live.forget_app("demo");
+    assert_eq!(
+        ask(&mut live, panel("Three"), t0 + Duration::from_secs(6))["rev"],
+        1
+    );
+    let _ = std::fs::remove_dir_all(&apps);
+}
+
+#[test]
+fn took_is_ten_a_second_and_a_panel_cannot_carry_a_line_break_or_a_bidi_mark() {
+    let apps = folder("took");
+    install(&apps, "demo", json!(["speak"]), json!([]));
+    let place = Place {
+        apps: &apps,
+        state: None,
+    };
+    let mut live = Live::default();
+    let t0 = Instant::now();
+    let mut ask = |value: Value, at: Instant| {
+        answer(&mut live, &place, "demo", &frame(value), true, at).unwrap()
+    };
+    let took = |id: u64| json!({"id": id, "op": "app.took", "turn": "t1"});
+    assert_eq!(ask(took(1), t0)["ok"], true);
+    assert_eq!(
+        ask(took(2), t0 + Duration::from_millis(10))["error"]["code"],
+        "rate"
+    );
+    assert_eq!(ask(took(3), t0 + Duration::from_millis(150))["ok"], true);
+    for bad in [
+        "a\u{2028}b",
+        "a\u{2029}b",
+        "a\u{202E}b",
+        "a\u{2066}b",
+        "a\u{200F}b",
+        "a\u{061C}b",
+    ] {
+        let panel = json!({"id": 9, "op": "app.panel.set", "title": "T", "lines": [bad]});
+        let reply = ask(panel, t0 + Duration::from_secs(61));
+        assert_eq!(reply["error"]["code"], "bad_request", "{bad:?}: {reply}");
+    }
+    let _ = std::fs::remove_dir_all(&apps);
 }

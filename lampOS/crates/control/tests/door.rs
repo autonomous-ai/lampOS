@@ -3619,15 +3619,15 @@ fn install_app(apps: &std::path::Path, name: &str, grants: Value) {
     std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
 }
 
-fn is_demo(_: Option<i32>) -> Option<String> {
-    Some("demo".to_owned())
+fn is_demo(_: Option<i32>, _: u32) -> Option<(String, bool)> {
+    Some(("demo".to_owned(), false))
 }
 
-fn is_ghost(_: Option<i32>) -> Option<String> {
-    Some("ghost".to_owned())
+fn is_ghost(_: Option<i32>, _: u32) -> Option<(String, bool)> {
+    Some(("ghost".to_owned(), false))
 }
 
-fn is_nobody(_: Option<i32>) -> Option<String> {
+fn is_nobody(_: Option<i32>, _: u32) -> Option<(String, bool)> {
     None
 }
 
@@ -3642,7 +3642,7 @@ fn apps_off() -> bool {
 async fn app_socket(
     lamp: &Lamp,
     file: &str,
-    who: fn(Option<i32>) -> Option<String>,
+    who: fn(Option<i32>, u32) -> Option<(String, bool)>,
     on: fn() -> bool,
 ) -> std::path::PathBuf {
     let path = lamp.dir.join(file);
@@ -3771,7 +3771,7 @@ async fn a_peer_in_no_apps_unit_or_for_an_app_not_installed_or_with_apps_off_is_
     for (file, who, on) in [
         (
             "nobody.sock",
-            is_nobody as fn(Option<i32>) -> Option<String>,
+            is_nobody as fn(Option<i32>, u32) -> Option<(String, bool)>,
             apps_on as fn() -> bool,
         ),
         ("ghost.sock", is_ghost, apps_on),

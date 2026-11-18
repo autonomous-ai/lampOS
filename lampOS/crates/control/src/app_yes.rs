@@ -12,8 +12,9 @@
 //!   "version", "sha256", "grants", "net", "logs"}`, with who gave it kept beside it
 //!   (`voice` or `app`), set from the writer's cgroup, never from the
 //!   request.
-//! - **Written** (`app_yes_record`) by the voice (a spoken yes) and lamp-cloud
-//!   (the owner's tap in the app, on the lamp's own account channel); taken
+//! - **Written** (`app_yes_record`) by lamp-cloud alone (the owner's tap in
+//!   the app, on the lamp's own account channel; the voice's cgroup is
+//!   refused: no spoken yes to an app exists); taken
 //!   (`app_yes_take`) by the apps helper alone, once. Every answer is
 //!   `{"ok":true}` or `{"refused":"<why>"}`.
 //! - **Read and written for lamp-cloud** (its cgroup alone): `app_state`
@@ -46,6 +47,8 @@ pub const RECORD: &str = "app_yes_record";
 pub const TAKE: &str = "app_yes_take";
 pub const STATE: &str = "app_state";
 pub const SETTINGS_SET: &str = "app_settings_set";
+/// The apps helper's, on a remove: what lamp-control kept of the app goes.
+pub const FORGET: &str = "app_forget";
 
 /// The most yeses waiting, and how long one lives.
 pub const MOST: usize = 8;
@@ -57,12 +60,18 @@ pub const LAMP_CLOUD: &str = "/lampos.slice/lampos-parts.slice/lamp-cloud.servic
 pub const HELPER_SLICE: &str = "/lampos.slice/lampos-parts.slice/";
 /// The helper's unit name begins and ends so (its instance is a connection's).
 pub const HELPER_PREFIX: &str = "lamp-apps-manage@";
+/// The apps' boot start, in the same slice: it finishes what a cut install or
+/// remove left (`lamp-apps-manage start-all`), so a cut remove's `app_forget`
+/// comes from it too (Thirteen's P2a on #7813).
+pub const RESUME_UNIT: &str = "lamp-apps-start.service";
 
 /// Where the installed apps are: `<dir>/<name>/current/lamp-skill.json`.
 pub const APPS_DIR: &str = "/opt/lampOS/apps";
 /// In `--state-dir`: the owner's settings for each app.
 pub const SETTINGS_FILE: &str = "app-settings.json";
 
+/// The shortest time between two reads of its settings by one app.
+pub const READ_EVERY: Duration = Duration::from_millis(100);
 /// The one panel an app may set in a minute.
 pub const PANEL_EVERY: Duration = Duration::from_secs(60);
 
@@ -72,6 +81,8 @@ pub enum Peer {
     Voice,
     Cloud,
     Helper,
+    /// The boot start (`lamp-apps-start.service`): `app_forget` only.
+    Resume,
     Other,
 }
 
@@ -105,6 +116,12 @@ pub fn is_helper_path(path: &str) -> bool {
             .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase() || b == b'-')
 }
 
+/// Whether `path` is the boot start's unit: [`HELPER_SLICE`], then exactly
+/// `lamp-apps-start.service` and nothing after it.
+pub fn is_resume_path(path: &str) -> bool {
+    path.strip_prefix(HELPER_SLICE) == Some(RESUME_UNIT)
+}
+
 /// The peer a cgroup's text says.
 pub fn peer_of_cgroup(cgroup: &str) -> Peer {
     if crate::task_yes::from_voice(cgroup) {
@@ -113,6 +130,8 @@ pub fn peer_of_cgroup(cgroup: &str) -> Peer {
         Peer::Cloud
     } else if paths(cgroup).any(is_helper_path) {
         Peer::Helper
+    } else if paths(cgroup).any(is_resume_path) {
+        Peer::Resume
     } else {
         Peer::Other
     }
@@ -121,9 +140,7 @@ pub fn peer_of_cgroup(cgroup: &str) -> Peer {
 /// The peer with `pid` (its `SO_PEERCRED`), by its cgroup; never on a system
 /// without `/proc`.
 pub fn peer_of(pid: Option<i32>) -> Peer {
-    pid.filter(|pid| *pid > 0)
-        .and_then(|pid| std::fs::read_to_string(format!("/proc/{pid}/cgroup")).ok())
-        .map_or(Peer::Other, |cgroup| peer_of_cgroup(&cgroup))
+    crate::app_socket::cgroup_text(pid, None).map_or(Peer::Other, |cgroup| peer_of_cgroup(&cgroup))
 }
 
 /// The seven values, matched exactly.
@@ -276,6 +293,12 @@ pub struct Live {
     panels: BTreeMap<String, Panel>,
     sockets: BTreeMap<String, usize>,
     revs: BTreeMap<String, u64>,
+    reads: BTreeMap<String, Instant>,
+    took: BTreeMap<String, Instant>,
+    /// When each app last set a panel: kept across its runs, so closing and
+    /// reconnecting is not a way round one a minute (the first builder's P2
+    /// on #7714). Only a remove forgets it.
+    panel_last: BTreeMap<String, Instant>,
 }
 
 impl Live {
@@ -288,12 +311,13 @@ impl Live {
         lines: &[String],
         now: Instant,
     ) -> Result<u64, Duration> {
-        if let Some(last) = self.panels.get(name) {
-            let since = now.saturating_duration_since(last.at);
+        if let Some(last) = self.panel_last.get(name) {
+            let since = now.saturating_duration_since(*last);
             if since < PANEL_EVERY {
                 return Err(PANEL_EVERY - since);
             }
         }
+        self.panel_last.insert(name.to_owned(), now);
         let rev = self.revs.entry(name.to_owned()).or_insert(0);
         *rev += 1;
         self.panels.insert(
@@ -306,6 +330,20 @@ impl Live {
             },
         );
         Ok(*rev)
+    }
+
+    /// An app's read of its settings at `now`: `Ok`, or how long until it
+    /// may read again (ten a second, so a loop cannot hold the lock and the
+    /// disk).
+    pub fn may_read(&mut self, name: &str, now: Instant) -> Result<(), Duration> {
+        if let Some(last) = self.reads.get(name) {
+            let since = now.saturating_duration_since(*last);
+            if since < READ_EVERY {
+                return Err(READ_EVERY - since);
+            }
+        }
+        self.reads.insert(name.to_owned(), now);
+        Ok(())
     }
 
     /// A connection of `name` opened (`+1`) or closed (`-1`).
@@ -323,10 +361,41 @@ impl Live {
         }
     }
 
+    /// An app's read of a turn it took (`app.took`) at `now`, as
+    /// [`Live::may_read`]: ten a second.
+    pub fn may_take(&mut self, name: &str, now: Instant) -> Result<(), Duration> {
+        if let Some(last) = self.took.get(name) {
+            let since = now.saturating_duration_since(*last);
+            if since < READ_EVERY {
+                return Err(READ_EVERY - since);
+            }
+        }
+        self.took.insert(name.to_owned(), now);
+        Ok(())
+    }
+
+    /// An app that was removed: everything held of it, its panel's rate too.
+    pub fn forget_app(&mut self, name: &str) {
+        self.forget_run(name);
+        self.sockets.remove(name);
+        self.reads.remove(name);
+        self.took.remove(name);
+        self.panel_last.remove(name);
+        self.revs.remove(name);
+    }
+
     /// An app's panel is gone with its run (it stopped).
+    ///
+    /// The revision is kept across runs, so a panel's `rev` never starts again
+    /// at 1 after a reconnect (Heron's P3 on #7793); only a remove forgets it.
+    /// It is in memory only: a restart of lamp-control starts it again at 1.
     pub fn forget_run(&mut self, name: &str) {
         self.panels.remove(name);
-        self.revs.remove(name);
+    }
+
+    /// The revision of the app's panel, if it has one.
+    pub fn panel_rev(&self, name: &str) -> Option<u64> {
+        self.panels.get(name).map(|panel| panel.rev)
     }
 
     fn socket(&self, name: &str) -> bool {
@@ -437,6 +506,15 @@ fn kept_of(state: Option<&Path>) -> Map<String, Value> {
         .unwrap_or_default()
 }
 
+/// A removed app's kept settings, gone from the file.
+pub fn forget_settings(state: &Path, name: &str) -> Result<(), String> {
+    let mut all = kept_of(Some(state));
+    if all.remove(name).is_none() {
+        return Ok(());
+    }
+    keep_all(state, &all)
+}
+
 fn keep_all(state: &Path, all: &Map<String, Value>) -> Result<(), String> {
     use std::io::Write as _;
     use std::os::unix::fs::OpenOptionsExt as _;
@@ -495,10 +573,12 @@ pub fn answer(
     }
     Some(match op {
         RECORD => {
+            // The owner's tap is the yes (the product rule of 18 Nov): only
+            // lamp-cloud, on the owner's own channel, records it. The voice
+            // wrote one before and nothing ever called it, so it is closed.
             let by = match peer {
-                Peer::Voice => "voice",
                 Peer::Cloud => "app",
-                _ => return Some(refused("only the voice and the app's channel record a yes")),
+                _ => return Some(refused("only lamp-cloud records the owner's yes to an app")),
             };
             match key_of(value) {
                 Ok(key) => {

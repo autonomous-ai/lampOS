@@ -35,6 +35,7 @@ sha2.workspace = true
 # The owner's yes to a skill's task read and written never through a link
 # (`O_NOFOLLOW`, `task_yes`), as lamp-skills reads its own files.
 libc = "0.2"
+rustix = { version = "=1.1.5", features = ["fs"] }
 # A pushed package's `moves/` read as lamp-skills reads the package (`play`).
 tar = { version = "0.4", default-features = false }
 # A computer's clip checked at upload as the voice checks it (`sounds`).

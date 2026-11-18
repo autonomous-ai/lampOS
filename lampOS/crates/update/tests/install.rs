@@ -489,6 +489,17 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
             .unwrap()
             .contains("\nd /run/lampos-agent 0755 lampos lampos -\n")
     );
+    // The apps' socket folder: made here, and named writable by lamp-control's
+    // unit (it never makes the folder itself; Heron's P2 on #7793).
+    assert!(
+        fs::read_to_string(lamp.on("/etc/tmpfiles.d/lampos.conf"))
+            .unwrap()
+            .contains("\nd /run/lampos-apps 0755 lampos lampos -\n")
+    );
+    assert!(
+        include_str!("../../../deploy/product/lamp-control.service")
+            .contains("\nReadWritePaths=-/run/lampos-apps\n")
+    );
     assert!(
         calls.contains("tmpfiles /etc/tmpfiles.d/lampos.conf"),
         "{calls}"
@@ -8526,10 +8537,22 @@ fn a_servo_port_not_there_never_fails_a_unit_that_hides_it() {
 /// Reviewer-lead's P2 on #6346). A new `lampos` unit is held to it too.
 #[test]
 fn no_other_lampos_unit_can_write_lamp_controls_yes() {
-    const FOLDER: &str = "/var/lib/lampos-control";
+    no_other_lampos_unit_can_write("/var/lib/lampos-control", Some("lampos-control"));
+}
+
+/// The apps' socket folder (`/run/lampos-apps`) is lamp-control's to bind in:
+/// a unit that runs as `lampos` and could write it (no `ProtectSystem=strict`)
+/// could remove `apps.sock` and bind its own, and every app would talk to it
+/// (SubDarren's P2 on #7793). It is hidden from them as the state folder is.
+#[test]
+fn no_other_lampos_unit_can_write_the_apps_socket_folder() {
+    no_other_lampos_unit_can_write("/run/lampos-apps", None);
+}
+
+fn no_other_lampos_unit_can_write(folder: &str, state_directory: Option<&str>) {
     let covers = |path: &str| {
         let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');
-        path.is_empty() || FOLDER == path || FOLDER.starts_with(&format!("{path}/"))
+        path.is_empty() || folder == path || folder.starts_with(&format!("{path}/"))
     };
     let mut held = Vec::new();
     for (name, text) in PRODUCT.iter() {
@@ -8551,15 +8574,15 @@ fn no_other_lampos_unit_can_write_lamp_controls_yes() {
         };
         let hidden = values("InaccessiblePaths=")
             .iter()
-            .any(|path| path.trim_start_matches('-') == FOLDER);
+            .any(|path| path.trim_start_matches('-') == folder);
         let strict = service.contains(&"ProtectSystem=strict")
             && !values("ReadWritePaths=").iter().any(|path| covers(path))
             && !values("StateDirectory=")
                 .iter()
-                .any(|dir| dir == "lampos-control");
+                .any(|dir| Some(dir.as_str()) == state_directory);
         assert!(
             hidden || strict,
-            "{name} runs as lampos and could write {FOLDER}: add InaccessiblePaths=-{FOLDER}"
+            "{name} runs as lampos and could write {folder}: add InaccessiblePaths=-{folder}"
         );
         held.push(*name);
     }
