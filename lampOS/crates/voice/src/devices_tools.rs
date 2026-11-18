@@ -156,6 +156,24 @@ impl Link for Bus {
         let Some(bus) = self.0.as_ref() else {
             return Vec::new();
         };
+        // Nobody listening for asks (lamp-cloud is down or not started) is
+        // answered at once as away, never waited for: a stop must not cost
+        // its whole wait to say so (El's and the Reviewer-lead's P2 on #7697).
+        let listening = bus
+            .subscribers(DevicesAsk::TOPIC)
+            .map(|subs| subs.iter().any(|sub| sub.listening))
+            .unwrap_or(false);
+        if !listening {
+            return asks
+                .into_iter()
+                .map(|ask| DevicesAnswer {
+                    req_id: ask.req_id,
+                    answer: DeviceAnswer::None {
+                        why: NoAnswer::Away,
+                    },
+                })
+                .collect();
+        }
         // Listening before asking: an answer is never missed.
         let Ok(mut heard) = bus.subscribe_typed(DevicesAnswer::TOPIC, SOURCE, DevicesAnswer::TYPE)
         else {
@@ -449,8 +467,6 @@ pub fn run_stop(link: &mut impl Link, cache: &mut Cache, within: Duration) -> (V
             }
         }
     };
-    // Whatever comes of the answer, a desk told to stop is no move in flight.
-    set_moving(None);
     let ask = DevicesAsk {
         req_id: req_id(),
         ask: DeviceAsk::Command {
@@ -465,7 +481,13 @@ pub fn run_stop(link: &mut impl Link, cache: &mut Cache, within: Duration) -> (V
             answer: DeviceAnswer::Command { status, .. },
             ..
         }) => match status {
-            DeviceStatus::Ok => (json!({"ok": true, "say": STOPPED}), true),
+            DeviceStatus::Ok => {
+                // Only a stop the desk was handed ends the move in flight: one
+                // that ended "not sure" or refused leaves the touch guard armed,
+                // the last fallback (the Reviewer-lead's P2 on #7697).
+                set_moving(None);
+                (json!({"ok": true, "say": STOPPED}), true)
+            }
             DeviceStatus::Refused => (json!({"error": STOP_REFUSED}), false),
             DeviceStatus::Error => (json!({"error": STOP_NOT_SURE}), false),
         },
