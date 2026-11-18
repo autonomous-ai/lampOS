@@ -16,6 +16,7 @@ pub mod facts;
 pub mod install;
 pub mod layout;
 pub mod lock;
+pub mod manage;
 pub mod name;
 pub mod package;
 pub mod remove;
