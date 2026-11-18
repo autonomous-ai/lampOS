@@ -174,7 +174,7 @@ lamp says so.
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
 | `harness.sign_in.start`, `harness.sign_in.state`, `harness.sign_in.answer` | Harness signed in from the app by its 8-digit code or its QR link (#5198, `LAMP_TASKS_SIGN_IN_APP=on`, the QR with no switch of its own, `crate::harness_sign_in`): handed to lamp-tasks' app route (`/run/lampos-tasks/app.sock`, `serve --app-socket`) as `app_sign_in_start` (`{"method":"code"}` or none, or `{"method":"qr"}`, whose view is `sign_in:"qr"` with `expires_in` and `expires_at` and no code; another method, or `qr` refused by a lamp-tasks from before it, fails `method_not_supported`, "This lamp can't sign in to Harness that way. Use the code."), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`). The view on the broker (`sign_in`, `id`, `revision`, `instance_id`, `by`, `method`, `answer_here`, `expires_in`, `expires_at`, `answer_within`, `answer`, `result`, `error`, `message`, `already_signed_in`, and `signed_in`: whether Harness is signed in, `yes`, `offline` or `no`, as lamp-tasks last read it from Harness itself, right after a restart too, absent before its first read, #5524) never holds the code, the QR link or the email (`SECRET_FIELDS`): those go to the backend over HTTPS only (Backend2's `<base>/devices/harness/sign-in`, the same base and lamp key as `/devices/get-message`: `PUT` `{id, code, expires_at}` for any sign-in's code, again when `expires_at` moves; `PUT` `{id, qr_url, expires_at}` for a QR sign-in's link (Backend2, live 11 Nov), in the same hand-off and the same order, each time lamp-tasks gives the link (once per telling, again on a keepalive), only when it is the Harness sign-in page (`https://harness.autonomous.ai/signin#k=` and a key of 1 to 512 letters, digits, `-`, `_`, `.` or `~`, `qr_url_ok`), which the backend requires (any other is its 400): another link is never sent, is said in the journal without the link, and is told to lamp-tasks as a failed put (`relay_failed` below); `PUT` `{id, email}` for an app-started question, which replaces the code there; `DELETE ?id=N` once it ends; one call at a time, each after the last answered, in the order seen; an extension's new `expires_at` put as soon as Harness gives it; a 5xx (503 `unavailable` too) tried again once, then said in the journal without the body, and the sign-in goes on; after each put lamp-cloud tells lamp-tasks `app_sign_in_relay {id, delivered}`, so a failed put (5xx after its retry, 401, 400 (also an extension the backend finds already past), 409 `sign_in_old_id` (also after the 11 minutes)) gives the view `error:"relay_failed"` and the message "The sign-in code couldn't reach the app. Try again." with a new revision, cleared with another by the next put that works). Without the backend's base or key the kinds stay off. The sign-in's `id` only grows, across lamp-tasks restarts too (`docs/tasks.md`). It is also pushed unasked as `harness.sign_in.state` whenever its `instance_id`, `revision` or `signed_in` moves (looked at every second while a sign-in is open, every 3 s otherwise, only while connected). A failure carries `error` and a plain `message`. No journal line or error holds the code, the QR link or the email |
 | `mic.get` | `{"muted", "hw_switch_muted", "available"}`: the voice's own mute (`voice/mute`), the privacy switch (`voice/privacy`, `null` while unknown) and whether the voice is running. While muted, `muted_by` too (#4332), from `voice/mute`'s own `muted_by`: `sleep` (a hand held on the head), `button` (the person's hold of the button or the base), `restart_guard` (the restart guard's mute after a fault, which a tap on the head clears) or `unreadable` (a mute record the voice couldn't trust, from a newer build or a cut write, read as muted). So a setup screen can tell the guard's mute from one the person chose. No field while listening, nor from a voice that doesn't say it, though a sleep's `reason` still reads as `sleep`. A paired computer's mute (`voice/mute`'s `control`, lamp-control's `listen.set false`) is not passed on yet: alone, it reads `muted` with no `muted_by`. There is no `app` value: the app can't mute (`mic.set` is refused). While asleep and still listening for its name alone (`LAMP_SLEEP_HEARS_NAME`, migrate-P2), `hears_name: true` too, from `voice/mute`'s own and only with a sleep's mute, so the app can say "asleep, wakes to its name", never "muted"; absent otherwise (test: `app_contract`'s `mic.get`). |
-| `lamp.health` | `lamp/health`'s `level` and `message`, and `stale`; its `items` (each part as `{name, level, message, age_ms}`, the worst first) and `missing` (parts expected and never heard from), passed through as they are (#7447); with `account` too while signed out ("Signed out" below) |
+| `lamp.health` | `lamp/health`'s `level` and `message`, and `stale`; its `items` (each part as `{name, level, message, age_ms}`, the worst first) and `missing` (parts expected and never heard from), passed through as they are (#7447); with `account` too while signed out ("Signed out" below); with `monitor` too while `monitor.set` is taken: `{"on": true, "since_unix_ms", "until_unix_ms"}` or `{"on": false}`, the owner's dev monitor and when it turns itself off (#7432, "The dev monitor" below) |
 | `led.resting.get` | the person's own light (`light/state`, `docs/ring-choreography.md`), in V1's snapshot: `mode` (`off`; `default` while it is the light the lamp starts with, warm at the lowest level; else `custom`), `color` (`[r, g, b]` for `custom`, else `null`), `default` and `effective` (`{"effect", "color"}`), and `light`, the light by its own names (`on`, `colour`, `level`) |
 | `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
@@ -3158,10 +3158,36 @@ lamp".
   says to the lamp, household and guests too; the app's switch says so in
   one line, "Words anyone says to the lamp show here while this is on."
   (the first builder on #5883).
+- **On for a day, and said in the lamp's health** (#7432). The drop-in's
+  own modified time is when the monitor was turned on: it is on disk with
+  the on-state, so it survives a restart, and the reset wipes both.
+  `lamp.health` carries `"monitor": {"on": true, "since_unix_ms": N,
+  "until_unix_ms": N + day}`, or `{"on": false}`, only with the switch.
+  lamp-cloud looks once a minute, connected or not. Once the day has passed,
+  it asks root's helper for off exactly as the app's Off does
+  (`{"monitor": false}`, lamp-peek stopped before the result). The result
+  goes to the app unasked as `monitor.set` `{"on": false, "closed": true}`.
+  If an off leaves the drop-in in place, it is asked again after an hour,
+  not every minute. Once the drop-in is gone, the owner is told once, as
+  unasked news on the phone (a `task_news` `chat.event`, "News for the
+  phone, unasked" above, so only with `LAMP_SKILL_MESSAGES=on` or texts):
+  "The dev monitor turned itself off after a day. Turn it on again in the
+  app if you still need it." The journal says "the dev monitor has been on
+  for its day: turning it off", then "the dev monitor went off after its
+  day: the owner is told in the app" (or "is not told" without the news).
+  Turning it on again writes a new drop-in, so a new day begins. An On
+  while it is already on doesn't rewrite the drop-in, so it keeps the day it
+  has. The day is 24 h; `LAMP_APP_MONITOR_DAY_S` (whole seconds, in
+  lamp-cloud's environment) shortens it for a lamp row only. The product
+  never sets it. If lamp-cloud restarts between the off and the drop-in
+  going, the owner's news is lost: the off itself is not.
 
 Tests: `monitor::tests` (the switch, the set's line, the get from the
 drop-in, the link sealed, bound to the lamp and the request and refused
-before a code is made, lamp-peek giving none); setup's
+before a code is made, lamp-peek giving none, the day and its test-only
+override, health on since and until, off after the day and not before,
+asked again only after the hour, the owner told once, a new day when
+turned on again); `answer::tests::lamp_health_says_the_dev_monitor_is_on_and_since_when`; setup's
 `the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it` and
 `the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply`.
 

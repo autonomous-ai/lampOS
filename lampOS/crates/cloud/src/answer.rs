@@ -115,6 +115,12 @@ pub trait Lamp {
     /// Pieces not handed to the client, or lost before the broker's ack, to
     /// go again first.
     fn owe_unasked(&mut self, _pieces: Vec<crate::unasked::Piece>) {}
+    /// Lamp-cloud's own news for the owner's phone, `text` at `now_ms`
+    /// (the dev monitor's day, #7432): put with the skills' lines waiting,
+    /// to go as they do. Whether it will go: only while [`Lamp::skill_lines`].
+    fn tell_owner(&mut self, _from: &str, _text: &str, _now_ms: u64) -> bool {
+        false
+    }
     /// A piece the broker acknowledged: how many have been since the start.
     fn unasked_sent(&mut self) -> u64 {
         0
@@ -667,6 +673,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if let Some(account) = lamp.account() {
                 health["account"] = json!(account);
             }
+            // The dev monitor on, since when and until when (#7432).
+            if on(lamp, crate::monitor::SET_KIND)
+                && let Some(place) = lamp.monitor()
+            {
+                health["monitor"] = crate::monitor::health(&place);
+            }
             Some(health)
         }),
         // The app's Light row (Fourth on #1396, the first builder's 10:2x on
@@ -1131,6 +1143,8 @@ pub mod tests {
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
         pub consent: Option<crate::consent::Place>,
+        /// The owner's dev monitor (#5883), with its switch.
+        pub monitor: Option<crate::monitor::Place>,
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
@@ -1273,6 +1287,9 @@ pub mod tests {
         }
         fn consent(&self) -> Option<crate::consent::Place> {
             self.consent.clone()
+        }
+        fn monitor(&self) -> Option<crate::monitor::Place> {
+            self.monitor.clone()
         }
         fn update_events(&self) -> Option<std::path::PathBuf> {
             self.update_events.clone()
@@ -1620,6 +1637,41 @@ pub mod tests {
             answer(&mut lamp, "lamp.health", &Value::Null).unwrap(),
             Some(json!({"level": "ok", "message": ""}))
         );
+    }
+
+    /// `lamp.health` says the dev monitor is on and since when (#7432),
+    /// only with its switch and the change helper.
+    #[test]
+    fn lamp_health_says_the_dev_monitor_is_on_and_since_when() {
+        let dir = std::env::temp_dir().join(format!("cloud-health-monitor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let place = crate::monitor::Place {
+            dropin: dir.join("monitor.conf"),
+            admin: dir.join("admin.sock"),
+            device_id: "d-1".into(),
+            wait: crate::monitor::WAIT,
+            day: crate::monitor::DAY,
+        };
+        let mut lamp = Fake {
+            monitor: Some(place.clone()),
+            changes: Some(crate::settings::Changes::new(
+                dir.join("change.sock"),
+                std::time::Duration::from_secs(1),
+            )),
+            ..lamp()
+        };
+        let health = |lamp: &mut Fake| answer(lamp, "lamp.health", &Value::Null).unwrap().unwrap();
+        assert_eq!(health(&mut lamp)["monitor"], json!({"on": false}));
+        std::fs::write(&place.dropin, crate::monitor::DROPIN_TEXT).unwrap();
+        let said = health(&mut lamp);
+        assert_eq!(said["monitor"]["on"], json!(true));
+        assert_eq!(said["monitor"], crate::monitor::health(&place));
+        assert_eq!(said["level"], "ok");
+        // Without the change helper the switch is off: nothing said of it.
+        lamp.changes = None;
+        assert!(health(&mut lamp).get("monitor").is_none());
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// The app's Light row (the first builder's 10:2x on #705): V1's

@@ -1037,6 +1037,20 @@ impl Lamp for Real {
         self.texts.outbox.owe(pieces);
     }
 
+    fn tell_owner(&mut self, from: &str, text: &str, now_ms: u64) -> bool {
+        if !self.skill_lines() {
+            return false;
+        }
+        let data = self.texts.stream.unasked(text, now_ms);
+        self.texts.outbox.owe(vec![crate::unasked::Piece {
+            skill: from.to_owned(),
+            data,
+            unnamed: None,
+            named: Vec::new(),
+        }]);
+        true
+    }
+
     fn unasked_sent(&mut self) -> u64 {
         self.texts.outbox.sent()
     }

@@ -19,6 +19,14 @@
 //!   `http://<host>.local/in#<code>`. The code rides only in the fragment, so
 //!   it is never in a request line; neither it nor the url is in a journal
 //!   line, an error or the clear part of the reply.
+//!
+//! On for a day only (#7432): the drop-in's own modified time is when it was
+//! turned on, kept on disk with the on-state itself, so `lamp.health` says
+//! since when ([`health`]) across restarts. Once [`DAY`] has passed,
+//! lamp-cloud asks the helper for off as the app's Off does, and once the
+//! drop-in is gone the owner is told once, as unasked news on the phone
+//! ([`Expiry`], [`WENT_OFF`]). Turned on again, the helper writes a new
+//! drop-in, so a new day begins; an On while on keeps the day it has.
 use crate::control::{MUST_SEAL, NO_REQUEST_ID, NOT_SEALED};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -26,7 +34,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 
 /// `on` takes [`KINDS`], beside `LAMP_CLOUD` and `LAMP_SETTINGS_CHANGE`.
 pub const ENVIRONMENT: &str = "LAMP_APP_MONITOR";
@@ -63,6 +71,27 @@ pub const WAIT: Duration = Duration::from_secs(2);
 /// A code lasts this long on lamp-peek (`lamp_peek::monitor::CODE_LASTS`).
 pub const CODE_LASTS_MS: u64 = 5 * 60 * 1_000;
 
+/// How long the dev monitor stays on before it turns itself off (#7432).
+pub const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Test-only: a shorter day, in whole seconds, for a lamp row (#7432). The
+/// product unit never sets it.
+pub const DAY_ENVIRONMENT: &str = "LAMP_APP_MONITOR_DAY_S";
+
+/// How often lamp-cloud looks whether the day has passed.
+pub const LOOK_MS: u64 = 60 * 1_000;
+
+/// An off that left the drop-in in place is asked again after this long,
+/// not at every look.
+pub const RETRY_MS: u64 = 60 * 60 * 1_000;
+
+/// The helper's line for off once the day has passed: [`line`]'s for
+/// `{"on": false}`.
+pub const OFF_LINE: &str = r#"{"monitor":false}"#;
+
+/// The owner's news once the dev monitor went off by itself (#7432).
+pub const WENT_OFF: &str = "The dev monitor turned itself off after a day. Turn it on again in the app if you still need it.";
+
 /// The app's refusals, shown as they are.
 pub const OFF: &str = "the dev monitor is off on this lamp: turn it on first";
 pub const UNREACHED: &str = "the dev monitor did not answer on the lamp now";
@@ -76,6 +105,17 @@ pub struct Place {
     /// The backend's device id, as every reply's `id` says it.
     pub device_id: String,
     pub wait: Duration,
+    /// How long it stays on: [`DAY`], or [`DAY_ENVIRONMENT`]'s.
+    pub day: Duration,
+}
+
+/// The day `value` ([`DAY_ENVIRONMENT`] as set or not) asks for: whole
+/// seconds above zero, else [`DAY`].
+pub fn day_from(value: Option<&str>) -> Duration {
+    value
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|seconds| *seconds > 0)
+        .map_or(DAY, Duration::from_secs)
 }
 
 /// Whether the kinds are taken: `LAMP_CLOUD`, `LAMP_SETTINGS_CHANGE` and
@@ -98,6 +138,7 @@ impl Place {
             admin: ADMIN_SOCKET.into(),
             device_id: device_id.to_owned(),
             wait: WAIT,
+            day: day_from(var(DAY_ENVIRONMENT).as_deref()),
         })
     }
 
@@ -109,6 +150,96 @@ impl Place {
             .and_then(|file| file.take(1_024).read_to_string(&mut text))
             .is_ok()
             && text == DROPIN_TEXT
+    }
+
+    /// Since when it is on, in unix ms: the drop-in's modified time, which
+    /// the helper sets as it writes it. None while off.
+    pub fn since_ms(&self) -> Option<u64> {
+        if !self.on() {
+            return None;
+        }
+        let modified = std::fs::metadata(&self.dropin)
+            .and_then(|meta| meta.modified())
+            .ok()?;
+        Some(
+            u64::try_from(modified.duration_since(UNIX_EPOCH).ok()?.as_millis())
+                .unwrap_or(u64::MAX),
+        )
+    }
+
+    fn day_ms(&self) -> u64 {
+        u64::try_from(self.day.as_millis()).unwrap_or(u64::MAX)
+    }
+}
+
+/// `lamp.health`'s `monitor` (#7432): `{"on": true, "since_unix_ms",
+/// "until_unix_ms"}`, when it was turned on and when it turns itself off,
+/// or `{"on": false}`.
+pub fn health(place: &Place) -> Value {
+    match place.since_ms() {
+        Some(since) => json!({
+            "on": true,
+            "since_unix_ms": since,
+            "until_unix_ms": since.saturating_add(place.day_ms()),
+        }),
+        None => json!({"on": place.on()}),
+    }
+}
+
+/// What a look at the day asks of lamp-cloud.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Look {
+    /// Ask root's helper for off: the day has passed.
+    pub off: bool,
+    /// Tell the owner [`WENT_OFF`]: an on-period turned off by its day has
+    /// gone. Once per on-period.
+    pub tell: bool,
+}
+
+/// The day kept by lamp-cloud (#7432): looked at every [`LOOK_MS`].
+#[derive(Debug, Default)]
+pub struct Expiry {
+    next_look_ms: u64,
+    /// The on-period (its since) this asked off, when it last asked, and
+    /// whether the owner was told it went.
+    asked: Option<(u64, u64, bool)>,
+}
+
+impl Expiry {
+    /// A look at `now_ms`, at most every [`LOOK_MS`].
+    // ponytail: the period asked off is in memory only; a lamp-cloud restart
+    // between the ask and the drop-in going loses the owner's news.
+    pub fn look(&mut self, place: &Place, now_ms: u64) -> Look {
+        let mut look = Look::default();
+        if now_ms < self.next_look_ms {
+            return look;
+        }
+        self.next_look_ms = now_ms.saturating_add(LOOK_MS);
+        let since = place.since_ms();
+        if let Some((asked, _, told)) = self.asked.as_mut()
+            && since != Some(*asked)
+            && !*told
+        {
+            *told = true;
+            look.tell = true;
+        }
+        let Some(since) = since.filter(|since| now_ms >= since.saturating_add(place.day_ms()))
+        else {
+            return look;
+        };
+        match self.asked.as_mut() {
+            Some((asked, at, _)) if *asked == since => {
+                if now_ms.saturating_sub(*at) >= RETRY_MS {
+                    *at = now_ms;
+                    look.off = true;
+                }
+            }
+            _ => {
+                self.asked = Some((since, now_ms, false));
+                look.off = true;
+            }
+        }
+        look
     }
 }
 
@@ -243,6 +374,7 @@ mod tests {
             admin,
             device_id: "d-42".into(),
             wait: WAIT,
+            day: DAY,
         };
         (place, connections)
     }
@@ -273,10 +405,7 @@ mod tests {
             line_of(json!({"on": true})),
             (r#"{"monitor":true}"#.into(), None)
         );
-        assert_eq!(
-            line_of(json!({"on": false})),
-            (r#"{"monitor":false}"#.into(), None)
-        );
+        assert_eq!(line_of(json!({"on": false})), (OFF_LINE.into(), None));
         assert_eq!(
             line_of(json!({"on": true, "request_id": "r-7"})),
             (r#"{"monitor":true}"#.into(), Some("r-7".into()))
@@ -387,6 +516,116 @@ mod tests {
         assert_eq!(
             link_saying(&place, "lamp-ab12", &asked("r-1"), 0, &mut |_| {}),
             Err(UNREACHED.to_owned())
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// The drop-in written as the helper writes it, modified at `at_ms`.
+    fn turned_on(place: &Place, at_ms: u64) {
+        std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&place.dropin)
+            .unwrap()
+            .set_modified(UNIX_EPOCH + Duration::from_millis(at_ms))
+            .unwrap();
+    }
+
+    const DAY_MS: u64 = 24 * 60 * 60 * 1_000;
+    const ON_AT: u64 = 1_800_000_000_000;
+
+    #[test]
+    fn the_day_is_a_day_unless_a_test_asks_for_whole_seconds() {
+        assert_eq!(day_from(None), DAY);
+        assert_eq!(day_from(Some("300")), Duration::from_secs(300));
+        for value in ["", "0", "-5", "1.5", "a day"] {
+            assert_eq!(day_from(Some(value)), DAY, "{value}");
+        }
+    }
+
+    #[test]
+    fn health_says_on_since_when_and_until_when() {
+        let dir = folder("health");
+        let (place, _) = place(&dir, CODE);
+        assert_eq!(health(&place), json!({"on": false}));
+        turned_on(&place, ON_AT);
+        assert_eq!(
+            health(&place),
+            json!({"on": true, "since_unix_ms": ON_AT, "until_unix_ms": ON_AT + DAY_MS})
+        );
+        let short = Place {
+            day: Duration::from_secs(300),
+            ..place.clone()
+        };
+        assert_eq!(health(&short)["until_unix_ms"], json!(ON_AT + 300_000));
+        std::fs::remove_file(&place.dropin).unwrap();
+        assert_eq!(health(&place), json!({"on": false}));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Off once the day has passed, not before; the owner told once, only
+    /// when the drop-in is gone; an off that left it is asked again after
+    /// the hour, not every minute; turned on again, a new day.
+    #[test]
+    fn it_turns_itself_off_after_its_day_and_the_owner_is_told_once() {
+        let dir = folder("expiry");
+        let (place, _) = place(&dir, CODE);
+        let mut expiry = Expiry::default();
+        assert_eq!(expiry.look(&place, ON_AT), Look::default());
+        turned_on(&place, ON_AT);
+        assert_eq!(expiry.look(&place, ON_AT + DAY_MS - 1), Look::default());
+        // Within a minute of the last look: not looked at.
+        let due = ON_AT + DAY_MS + 1;
+        assert_eq!(expiry.look(&place, due), Look::default());
+        let at = ON_AT + DAY_MS + LOOK_MS;
+        assert_eq!(
+            expiry.look(&place, at),
+            Look {
+                off: true,
+                tell: false
+            }
+        );
+        // The helper hasn't removed it yet: not asked again, nobody told.
+        assert_eq!(expiry.look(&place, at + LOOK_MS), Look::default());
+        assert_eq!(
+            expiry.look(&place, at + RETRY_MS),
+            Look {
+                off: true,
+                tell: false
+            }
+        );
+        // Gone: told once.
+        std::fs::remove_file(&place.dropin).unwrap();
+        let gone = at + RETRY_MS + LOOK_MS;
+        assert_eq!(
+            expiry.look(&place, gone),
+            Look {
+                off: false,
+                tell: true
+            }
+        );
+        assert_eq!(expiry.look(&place, gone + LOOK_MS), Look::default());
+        // On again: a new day from then.
+        let again = gone + 2 * LOOK_MS;
+        turned_on(&place, again);
+        assert_eq!(
+            expiry.look(&place, again + DAY_MS - LOOK_MS),
+            Look::default()
+        );
+        assert_eq!(
+            expiry.look(&place, again + DAY_MS),
+            Look {
+                off: true,
+                tell: false
+            }
+        );
+        std::fs::remove_file(&place.dropin).unwrap();
+        assert_eq!(
+            expiry.look(&place, again + DAY_MS + LOOK_MS),
+            Look {
+                off: false,
+                tell: true
+            }
         );
         let _ = std::fs::remove_dir_all(dir);
     }

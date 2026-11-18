@@ -769,6 +769,11 @@ async fn session(
     // A skill that needs a connector not linked, told to the app
     // (`crate::skills::NEEDS_LINK_KIND`), with its switch.
     let skill_link = lamp.skills().is_some_and(|places| places.link.is_some());
+    // The dev monitor's day (#7432), with its switch and root's helper.
+    let mut monitor_day = lamp
+        .monitor()
+        .filter(|_| lamp.changes().is_some())
+        .map(|place| (place, crate::monitor::Expiry::default()));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
@@ -816,7 +821,7 @@ async fn session(
                         back_to_tcp = true;
                         break None;
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on || monitor_day.is_some() => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -920,6 +925,28 @@ async fn session(
                                 if !handed.publish(&client, account.fd_channel.as_str(), event, None) {
                                     lamp.devices_unsent(&req_id);
                                 }
+                            }
+                        }
+                        // The dev monitor's day (#7432): looked at connected
+                        // or not, so it goes off offline too. Off goes to
+                        // root's helper as the app's Off does; its result and
+                        // the owner's news go out once connected.
+                        if let Some((place, expiry)) = monitor_day.as_mut()
+                            && let Some(changes) = &changes
+                        {
+                            let now_ms = crate::chat::now_ms();
+                            let look = expiry.look(place, now_ms);
+                            if look.off {
+                                changes.start(crate::monitor::SET_KIND, crate::monitor::OFF_LINE.to_owned(), None);
+                                say.line("the dev monitor has been on for its day: turning it off");
+                            }
+                            if look.tell {
+                                let told = lamp.tell_owner("dev-monitor", crate::monitor::WENT_OFF, now_ms);
+                                say.line(if told {
+                                    "the dev monitor went off after its day: the owner is told in the app"
+                                } else {
+                                    "the dev monitor went off after its day: the owner is not told, the phone's news is off"
+                                });
                             }
                         }
                         if texting {
