@@ -4,7 +4,7 @@
 //! undo'), never read back for a yes. Offers become the action plus that
 //! one line. An unsure line is simply not acted on, with no 'did you
 //! say…?'"; and at 18:45: a made skill's remove is not in the carve-out).
-//! With [`ENVIRONMENT`] `on` exactly, in no unit; off, every make and
+//! With [`ENVIRONMENT`] `on` exactly, as lamp-voice's unit sets it; off, every make and
 //! remove is byte for byte as before.
 //!
 //! - **Made, on, one line.** A voice make, plain or with code of its own,
@@ -50,7 +50,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// The switch: `on` exactly, off unless set, in no unit.
+/// The switch: `on` exactly, off unless set; on in the product's `lamp-voice`.
 pub const ENVIRONMENT: &str = "LAMP_MAKE_NO_ASKS";
 
 thread_local! {

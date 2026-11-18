@@ -7501,12 +7501,13 @@ the check is skipped and journaled. `lamp-voice` passes the exact `on` to its
 
 #### Nothing asked (`LAMP_MAKE_NO_ASKS=on`, off)
 
-Off unless `LAMP_MAKE_NO_ASKS=on`, in no product unit (the first builder,
-18 Nov 18:41, from the product owner: "A made skill is made and said in one
-line, with an undo ('Made it, say "remove it" to undo'), never read back
+Off unless `LAMP_MAKE_NO_ASKS=on`; on in the product's `lamp-voice` since
+#7783's switch-on (the first builder's ruling on #7819, 19 Nov 01:26). The
+first builder, 18 Nov 18:41, from the product owner: "A made skill is made
+and said in one line, with an undo ('Made it, say "remove it" to undo'), never read back
 for a yes. Offers become the action plus that one line. An unsure line is
 simply not acted on, with no 'did you say…?'"; and 18:45: a made skill's
-remove is not in the carve-out). Only "forget everything" and a factory
+remove is not in the carve-out. Only "forget everything" and a factory
 reset still ask. On (`crate::make_no_asks`):
 
 - **Made, on, one line.** A voice make, plain or with code of its own, goes
