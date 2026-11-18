@@ -823,9 +823,12 @@ pub const MADE_CANT_CHECK: &str = "The lamp can't check its other skills right n
 /// (`run`, `remove`, `read_back`), or with `LAMP_MADE_SKILL_OFF_SAID` on a
 /// turn off or on (`turn_off`, `turn_on`, #7445), that refused, found none
 /// or found another (`error`) with no yes awaited. Never a make, a clash's
-/// choice or a yes.
+/// choice or a yes, nor a turn that offers the person's own skills to call
+/// again with (`made_turn::CANDIDATES`): told "offer to turn on or turn off
+/// nothing" beside the lamp's skills, the model called an added skill the
+/// lamp's own (#7562's row on lamp-9adf, 18 Nov).
 pub fn tells_their_skills(args: &Value, told: &Value) -> bool {
-    if *told == crate::tools::unavailable() {
+    if *told == crate::tools::unavailable() || told.get(crate::made_turn::CANDIDATES).is_some() {
         return false;
     }
     if args[crate::made_list::LIST] == true {

@@ -2201,12 +2201,14 @@ chính `make_skill`, chỉ với `turn_off`, và bật lại chỉ với `turn_o
 như đã nghe (`made_turn::TURN_OFF`, `made_turn::TURN_ON`), là tham số của
 hàm giọng nói đã có, như việc gỡ. Một câu xin điều nào là do mô hình phán
 đoán, không bao giờ theo danh sách từ: câu cuối của mô tả hàm thành "To
-turn off, pause or stop one they made: turn_off alone, never remove; back
-on: turn_on; delete: remove; run now: run; list: made; say nothing first."
-(`make_skill_local::TURN_OFF_TOLD`, 151 byte so với 149 byte của câu nó
-thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte của liên kết), tham số
-`turn_off` nói "turn off, pause or stop a skill they made, which keeps it
-to turn back on ... Never remove for this", và tham số `remove` nói "delete
+turn off, pause or stop one they made or added: turn_off, never remove;
+back on: turn_on; delete: remove; run now: run; list: made; say nothing
+first." (`make_skill_local::TURN_OFF_TOLD`, 154 byte so với 149 byte của
+câu nó thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte của liên
+kết, ở 1.023), tham số `turn_off` nói "turn off, pause or stop a skill they
+made or added (by voice, in the app or from a file), which keeps it to turn
+back on ... Never remove for this", tham số `turn_on` nói điều tương tự cho
+việc bật lại, và tham số `remove` nói "delete
 or remove a skill for good, never to turn one off, pause or stop it". Lời
 gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
 thành gỡ. Sau đó, trong code (`made_turn::asked`):
@@ -2219,6 +2221,140 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   nhau, hay không có cái nào gần, đều được nói ra, như khi chạy. Một kỹ
   năng hiện không có trên đèn, hoặc thư mục của nó ở đó không phải gói đã
   tạo, được nói là không tắt/bật, và vì sao.
+- **Không có cái nào gần: đưa ra kỹ năng của họ để gọi lại** (dòng thử
+  của #7562 trên lamp-9adf, 18/11 lúc 01:3x: "turn my bitcoin price skill
+  back on" không tìm thấy gì gần btc price, và mô hình, không được cho biết
+  kỹ năng nào khác, gọi nó là kỹ năng riêng của đèn và bảo bật lại trong
+  ứng dụng). Câu trả lời mang `candidates` (`made_turn::CANDIDATES`,
+  `made_turn::offered`): các kỹ năng chính người dùng đã tạo hoặc đã thêm
+  đang có trên đèn, khi bật lại là những kỹ năng đang tắt, khi tắt là
+  những kỹ năng chưa tắt, theo tệp `off` của lamp-skills (tất cả của họ
+  khi không đọc được tệp), mới nhất trước, tối đa 8 (`OFFERED_MOST`), mỗi
+  kỹ năng có tên đọc lên và 8 từ đầu của mô tả. Mô hình được bảo gọi lại
+  `make_skill` ngay với cùng việc tắt/bật và một trong các tên đó, nếu một
+  kỹ năng là cái họ muốn theo tên hay việc nó làm, nếu không thì nói là
+  không tìm thấy, và không bao giờ gọi nó là kỹ năng riêng của đèn hay nói
+  nó được tắt/bật trong ứng dụng. Không có danh sách từ hay tên gọi khác
+  trong code: chọn cái nào là do mô hình phán đoán. Câu trả lời như vậy
+  không kèm các dòng kỹ năng của đèn (`skill_about::tells_their_skills`).
+  Khi không có gì để đưa ra, câu trả lời như trước, và cũng không bao giờ
+  gọi nó là kỹ năng riêng của đèn.
+- **Hàm của một kỹ năng đã tắt không chạy.** Hàm của một kỹ năng cài thêm
+  (đã tạo, thêm từ tệp, từ Store) đang tắt không chạy gì: mô hình được bảo
+  `lamp_skills::TOOL_TURNED_OFF` (dòng thử trên lamp-9adf, 18/11 lúc 01:39:
+  btc price, đã tắt bằng giọng nói, vẫn chạy tác vụ khi mô hình gọi hàm của
+  nó, và đèn nói nó đã bật lại). Kỹ năng đèn mang sẵn vẫn giữ hàm của nó
+  như trước.
+- **Chỉ bật lại bằng lời gọi** (dòng thử của #7562 trên lamp-9adf, 18/11
+  lúc 03:2x: sau khi btc price đã tắt, "turn my bitcoin price skill back
+  on" không gọi hàm nào và được trả lời "Bitcoin price is back on" trong
+  khi nó vẫn tắt). Khi có kỹ năng họ đã tạo hoặc đã thêm nằm trong tệp
+  `off` của lamp-skills, mỗi lượt được nghe trên tuyến thứ hai cho mô hình
+  một ghi chú (`made_turn::off_note`): có bao nhiêu kỹ năng đang tắt, không
+  bao giờ nói là kỹ năng nào, rằng một câu xin dùng hay chạy một kỹ năng
+  như vậy không chạy gì, nên được nói là nó đang tắt và đã không chạy, và
+  họ có thể xin bật lại, không bao giờ bật nó lên vì câu đó, và
+  `made_turn::BACK_ON_BY_CALL` ("A skill turned off is turned back on only
+  by calling make_skill with turn_on and its name, when their line asks to
+  turn it on; never say it is on or back on unless that call's answer says
+  so."). Câu trả lời khi tắt mang cùng dòng đó ở `later`. Đây là chốt chặn
+  theo cấu trúc: không khớp từ nào, một câu có xin bật lại hay không vẫn do
+  mô hình phán đoán. Mỗi lượt đọc hai tệp cục bộ nhỏ; không nói gì khi
+  không có kỹ năng nào tắt, khi lượt không được nghe, hoặc khi công tắc
+  tắt.
+- **Xin dùng thì được nói là đang tắt, không bao giờ bị bật lên** (dòng thử
+  của #7562 trên lamp-9adf, 18/11 lúc 10:53: "Lamp, use my btc price
+  skill." khi btc price đang tắt được trả lời bằng một lời gọi `turn_on` và
+  "Bitcoin price is back on.", và kỹ năng không hề chạy). Hàm của một kỹ
+  năng đang tắt trả lời `made_turn::FUNCTION_OFF`, cũng chính là
+  `TOOL_TURNED_OFF` của lamp-skills ("That skill is turned off, so it did
+  nothing. Say so in a few words: it is off and didn't run, and they can
+  ask to turn it back on. Never turn it on for this ..."). Trên tuyến thứ
+  hai, một lời gọi `make_skill` với `turn_on` (`made_turn::turns_on`) chỉ
+  chạy khi câu được nghe của người dùng xin bật nó, dù các lời gọi trong
+  lượt theo thứ tự nào (#7562 điểm 2, xếp hạng của người xây dựng đầu
+  tiên, 18/11; `made_turn::on_refused`), như cái "có" chặt của #7683 giữ
+  một lần gỡ: nó là lời gọi `make_skill` duy nhất trong lượt, và câu đó
+  xin bật một thứ (`made_turn::asks_on`: "turn on", "back on", "switch
+  on", "enable", "put back on", "resume", "unpause" hoặc tiếng Việt "bật",
+  bộ từ cố định ngắn theo phán quyết 12:51 của người xây dựng đầu tiên
+  trên #7683, hoặc "turn"/"switch" với "on" là từ cuối câu, "turn btc
+  price on"). Một câu "có" đơn thuần không bao giờ cho `turn_on` của chính
+  mô hình đi qua, dù đèn vừa hỏi gì (P2 của Thirteen, 18/11): chỉ lời đề
+  nghị của chính đèn, bên dưới, mới nhận một câu "có", đọc trong code, cho
+  đúng kỹ năng của nó và trong thời gian chờ của nó. Nếu không, nó
+  không được chạy, dù trước hay sau hàm của kỹ năng hay một mình: mô hình
+  được bảo `made_turn::not_asked_on` (`NOT_ASKED_ON`, "a skill turned off
+  is turned back on only when the person asks to turn it on, never to use
+  it", và nói là nó đang tắt và đã không chạy). "Use my bitcoin skill",
+  "run btc price", "play btc price" và một câu hỏi về nó không bao giờ bật
+  nó; một câu mà bộ từ bỏ sót chỉ khiến người dùng phải nói "turn it on".
+  "Turn on btc price and run it" bật nó, theo thứ tự nào cũng vậy; một lần
+  chạy được gọi sau khi bật trong cùng lượt đi tới kỹ năng, và nếu kỹ năng
+  vẫn trả lời là đang tắt (lamp-skills đọc lại tệp `off` trong vòng 2 giây)
+  thì mô hình được bảo `made_turn::just_on` (`JUST_ON`, "it was turned on
+  just now and runs from their next ask"), nên đèn nói nó đã bật và có thể
+  chạy ngay, không bao giờ nói nó đang tắt. Trước đó lần chạy như vậy được
+  thử lại, tối đa `made_turn::RERUNS` (2) lần, cách nhau `RERUN_AFTER`
+  (1,2 giây), để nó được trả lời khi lamp-skills đã đọc lại `off`.
+- **Đề nghị bật lại, và một câu "có" chạy nó một lần** (#7684, phán quyết
+  11:05 của người xây dựng đầu tiên trên #7562). Trên tuyến thứ hai, hàm
+  của một kỹ năng đang tắt được gọi trên một câu được nghe, khi trong lượt
+  chưa bật gì, được trả lời bằng `made_turn::offer_told` thay cho
+  `FUNCTION_OFF`: mô hình chỉ nói "X is turned off. Want me to turn it back
+  on and check?", và lời gọi được giữ làm lời đề nghị (`made_turn::Offer`,
+  `Shared::off_offer`). Câu được nghe tiếp theo nhận nó, dù câu đó nói gì.
+  Chỉ một câu "có" đơn thuần, đọc trong code (`made_turn::offer_yes`: tối
+  đa sáu từ, không phải câu hỏi, chỉ "yes", "yeah", "yep", "yup", "sure",
+  "ok", "okay", "go ahead", "do it", "turn it on", "vâng", "ừ", "có",
+  "được", "bật lại" hoặc "bật lên" bên cạnh "please", "lamp", "hey", "đi"
+  hoặc "nhé"; một TODO sẽ dùng chung helper của #7683 khi nó được gộp),
+  trong vòng `OFFER_FOR` (60 giây), mới bật nó và chạy nó một lần: vòng 1
+  gọi, trong code và không hỏi chat nào, `make_skill` với `turn_on` và tên
+  đọc lên của nó, rồi chính lời gọi mà câu xin dùng đã gọi, và vòng 2 được
+  bảo `made_turn::yes_note` và nói điều nó tìm được; nó vẫn bật sau đó. Hai
+  lời gọi của vòng đó là của chính đèn, được nhận ra bằng vòng mà đèn tạo
+  trong code (`offer_round`), không bao giờ bằng id của lời gọi, nên
+  `turn_on` của nó không bao giờ bị từ chối như trên; một lời gọi cùng hàm
+  của mô hình sau đó được trao câu trả lời của lần chạy ấy
+  (`made_turn::ran_already`), không bao giờ chạy lại, và `turn_on` của
+  chính mô hình cho bất kỳ kỹ năng nào trong lượt đó bị từ chối như trên.
+  Một câu "có" quá 60 giây, hoặc một câu nêu kỹ năng khác ("Yes, moon
+  fact."), không bật gì. "No.", im lặng, một yêu cầu mới ("What
+  time is it?"), hoặc nhiều hơn một câu "có" đơn thuần ("Yes, and play some
+  music.") bỏ lời đề nghị: không bật hay chạy gì, và câu đó được trả lời
+  như chính nó; một câu "có" muộn một câu không phải câu "có" cho lời đề
+  nghị. Một lượt đã bật kỹ năng bỏ mọi lời đề nghị.
+- **Chỉ nói đã tắt hay đã bật lại sau lời gọi đã làm việc đó** (dòng thử
+  của #7562 trên lamp-9adf, 18/11 lúc 10:57: "Lamp, turn off my bitcoin
+  price skill." không tìm thấy gì gần btc price và đưa ra các kỹ năng của
+  họ, và mô hình, không gọi lần hai, nói "Bitcoin price is already off"
+  trong khi nó đang bật). Trên tuyến thứ hai, sau khi câu trả lời của một
+  lời gọi tắt/bật `make_skill` đưa ra `candidates`
+  (`made_turn::unchosen_note`), lời của vòng kế tiếp được giữ tới cuối vòng
+  (`Queue::choice_held`). Vòng có lời gọi thì nói lời đó như khi nó đến;
+  vòng không có lời gọi thì không nói, và mô hình được hỏi thêm một lần với
+  một ghi chú mở đầu bằng `made_turn::UNCHOSEN_OPENS` ("(Not said: you
+  answered with no call ..."): chưa có gì được tắt (hay bật), mỗi kỹ năng
+  trong candidates hiện đang bật (hay tắt), không bao giờ nói một kỹ năng
+  đã tắt hay đã tắt rồi (đã bật hay đã bật lại), gọi `make_skill` ngay với
+  cùng việc đó và tên nếu có kỹ năng là cái họ muốn, nếu không thì nói
+  không tìm thấy cái nào như vậy; các candidates được nêu lại. Lời của vòng
+  đó sau đó được nói như khi nó đến; không bao giờ có vòng thứ ba cho việc
+  này. Một lời gọi đã tắt/bật được (`made_turn::turned`) không giữ gì. Chọn
+  candidate nào, nếu có, vẫn do mô hình phán đoán. Chỉ tốn thêm một vòng
+  chat, và chỉ khi vòng như vậy trả lời mà không có lời gọi.
+- **Đã tạo hay đã thêm đều như nhau** (#7594: trên lamp-9adf, 17/11 lúc
+  23:1x, "Lamp, turn off my btc price skill", một kỹ năng thêm từ một
+  `SKILL.md` trong ứng dụng, được trả lời "I can't turn skills off myself,
+  that's done in the app", vì hàm chỉ nói đến kỹ năng họ đã tạo). Kỹ năng
+  của chính người dùng là chỉ mục kỹ năng đã tạo (`made.json`), gồm những
+  kỹ năng tạo bằng giọng nói, gõ trong ứng dụng và thêm từ tệp trong ứng
+  dụng (`"added": "file"`, kể cả `SKILL.md` của một kỹ năng tác tử cùng các
+  quyền của nó): mỗi kỹ năng được tắt và bật theo cùng một cách, và mô hình
+  được bảo là kỹ năng họ đã tạo hoặc đã thêm. Kỹ năng đèn mang sẵn, kỹ năng
+  từ Store và kỹ năng đẩy từ máy tính không phải của họ ở đây, như khi gỡ;
+  kỹ năng đèn mang sẵn giữ cách tạm dừng riêng của nó.
 - **Như công tắc của ứng dụng.** Nó được tắt hay bật bằng chính
   `{"off": NAME}` hoặc `{"on": NAME}` của helper quản lý
   (`made_turn::turned_by_helper`), đúng những dòng mà công tắc trong ứng
@@ -2247,6 +2383,11 @@ Kiểm thử: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing
 `turn_on_clears_the_off_state`, `the_helper_is_asked_the_apps_off_and_on`,
 `a_stranger_cant_turn_one_off_or_on`,
 `only_their_own_made_skill_on_the_lamp_is_turned`,
+`an_uploaded_skill_is_turned_off_told_off_and_turned_back_on`,
+`a_turn_on_by_another_name_offers_theirs_turned_off_to_call_again`,
+`at_most_eight_of_theirs_are_offered`,
+`while_one_of_theirs_is_off_back_on_is_told_as_a_turn_on_call`,
+`a_turned_off_skill_asked_for_use_is_told_off_never_turned_on`,
 `a_refusal_is_said_not_turned`, `switch_off_is_byte_for_byte_as_before`,
 `switch_on_tells_a_turn_off_from_a_remove_within_the_bounds`,
 `remove_still_waits_for_its_yes`, `a_turn_drops_a_remove_of_the_same_skill`,
@@ -2254,7 +2395,15 @@ Kiểm thử: `made_turn::tests::turn_off_sets_the_off_state_and_removes_nothing
 `switch_on_a_turn_off_with_a_remove_is_a_turn_off` (qua
 `make_skill_local::answer`); và
 `made::a_made_skill_is_turned_off_and_on_by_voice_as_the_apps_switch` của
-lamp-skills, qua helper quản lý thật.
+lamp-skills, qua helper quản lý thật, và
+`package::a_skill_turned_off_runs_nothing_through_its_function`; trên tuyến
+thứ hai, các kiểm thử của `second_provider::tests::made_turn_said`:
+`a_turned_off_skill_asked_for_use_is_never_turned_on`,
+`a_turn_on_asked_is_run_as_before`,
+`already_off_with_no_turn_off_is_not_said_and_the_candidates_are_asked_again`,
+`back_on_with_no_turn_on_is_not_said_and_the_candidates_are_asked_again`,
+`none_of_the_candidates_is_said_after_one_ask_again` và
+`a_turn_off_found_by_its_name_is_said_as_before`, `a_turn_on_called_before_the_function_for_a_use_is_refused`, `a_turn_on_alone_for_a_use_or_a_run_is_refused`, `a_line_that_asks_it_on_turns_it_on`, `turn_on_and_run_it_turns_it_on_in_either_order`, `a_yes_to_the_models_own_turn_it_back_on_question_turns_nothing_on`, `a_turn_on_beside_another_skill_change_is_refused`, `a_run_just_after_its_turn_on_is_tried_again_and_never_said_off`, `a_use_while_off_offers_to_turn_it_back_on_and_turns_nothing_on`, `a_plain_yes_to_the_offer_turns_it_on_and_runs_it_once`, `a_no_to_the_offer_leaves_it_off`, `a_new_ask_in_place_of_the_yes_leaves_it_off_and_is_answered`, `a_yes_after_the_offers_wait_turns_nothing_on`, `a_yes_naming_another_skill_turns_nothing_on`, `the_offers_run_is_never_run_again_by_the_model`; `made_turn::tests::the_offer_is_taken_only_by_a_plain_yes_on_the_next_line`; và `made_turn::tests::a_turn_on_stands_only_on_a_line_that_asks_it_on`.
 
 **Liệt kê bằng giọng nói** (lamp-9adf, 15/11, bản 13162: "which skills have
 you made for me?" không gọi hàm nào và được trả lời từ vài lượt gần nhất,

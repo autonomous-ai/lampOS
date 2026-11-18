@@ -446,6 +446,8 @@ Environment=LAMP_MADE_SKILL_LOOSE=on
 Environment=LAMP_MADE_SKILL_ASKS=on
 # #6526, docs/skills.md; first builder, 17 Nov
 Environment=LAMP_MADE_SKILL_SAID=on
+# #7445, docs/skills.md "Turned off and on by voice": a turn-off by voice is never a remove
+Environment=LAMP_MADE_SKILL_OFF_SAID=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
