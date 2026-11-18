@@ -92,8 +92,14 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(90);
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
 // #7245: 10 minutes, then the make is told failed (the first builder's
-// call on #6811, 18 Nov 17:23).
-pub const MAKE_WITHIN: Duration = Duration::from_secs(10 * 60);
+// call on #6811, 18 Nov 17:23), and [`TASKS_MARGIN`] over lamp-tasks' own
+// 10 minutes, so lamp-tasks' failed answer reaches the voice before the
+// voice gives up (Twelve's P2 on #7737).
+pub const MAKE_WITHIN: Duration = Duration::from_secs(10 * 60 + TASKS_MARGIN.as_secs());
+/// How much longer the voice waits for the agent's make than lamp-tasks
+/// runs it ([`GUIDED_WRITE_WITHIN`], the line's `within_ms`): the voice
+/// counts from before the hand-over, lamp-tasks from it.
+pub const TASKS_MARGIN: Duration = Duration::from_secs(30);
 /// The guide's switch: `on`, and nothing else; off unless set.
 pub const GUIDE_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_GUIDE";
 /// With the guide, the longest one of the agent's answers is waited for: a
@@ -946,7 +952,12 @@ pub(crate) mod tests {
         assert!(WRITE_WITHIN <= MAKE_WITHIN);
         assert!(MAKE_WITHIN >= Duration::from_secs(10 * 60));
         assert!(GUIDED_WRITE_WITHIN >= Duration::from_secs(10 * 60));
-        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(12 * 60));
+        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(13 * 60));
+        // The voice waits past lamp-tasks' run by its margin, so lamp-tasks'
+        // failed answer comes first.
+        assert_eq!(GUIDED_WRITE_WITHIN, lamp_tasks::skill_make::MOST_WITHIN);
+        assert_eq!(MAKE_WITHIN, GUIDED_WRITE_WITHIN + TASKS_MARGIN);
+        assert!(TASKS_MARGIN >= Duration::from_secs(30));
         let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
         let agent = Agent {
             within: WRITE_WITHIN,
