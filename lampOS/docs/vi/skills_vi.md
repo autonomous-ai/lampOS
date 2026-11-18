@@ -3504,8 +3504,12 @@ cả hai người viết.
   stretch" (`make_no_cannot::SITTING`, `SAT_EXAMPLE`; lamp-9adf, 18/11, khi
   một yêu cầu như vậy bị tạo trên việc ai đó đứng dậy): `room/presence`
   `someone` `equals = true` với `for = "30m"` của sip-of-water, mỗi lần
-  ngồi một lần (`rearm = "leaves"`) và `cooldown = "45m"`, không bao giờ là
-  đứng dậy; quay lại bàn vẫn là lúc đến. Mô hình chọn theo ý nghĩa; khi tắt,
+  ngồi một lần (`rearm = "leaves"`), `cooldown = "45m"` và `wait = "10m"`
+  của sip-of-water (P2 của Twelve trên #7819: người đang nói chuyện đúng
+  mốc 30 phút nhận nhắc khi cuộc nói chuyện kết thúc, trong vòng mười
+  phút, thay vì mất lần ngồi đó; bước kiểm tra nói rõ "(if they're talking
+  then, once the talk ends, within 10 minutes)" và chỉ nhận `wait` trên
+  lần ngồi như vậy, có `for` và `rearm`), không bao giờ là đứng dậy; quay lại bàn vẫn là lúc đến. Mô hình chọn theo ý nghĩa; khi tắt,
   prompt như trước. Quyền
   của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
   của skill bật (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; gọi bằng lời thì

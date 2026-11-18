@@ -7472,6 +7472,7 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
             "absent_for",
             "above",
             "days",
+            "wait",
         ];
         let unknown: Vec<&String> = trigger
             .keys()
@@ -7558,6 +7559,23 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
     if trigger.contains_key("days") && topic.0 != Some(CLOCK_TOPIC) {
         return Err(its("days, only on a time of day"));
     }
+    // `wait` only on a long sitting, as sip-of-water's (Twelve's P2 on
+    // #7819): someone talking as the sitting comes due gets it once the
+    // talk ends, within the wait, never loses the sitting.
+    let waited = match trigger.get("wait") {
+        Some(wait) => Some(
+            wait.as_str()
+                .and_then(spell)
+                .filter(|_| {
+                    topic == someone(true)
+                        && lasting.is_some()
+                        && rearmed
+                        && !trigger.contains_key("absent_for")
+                })
+                .ok_or_else(|| its("wait, only on a long sitting with its for and rearm"))?,
+        ),
+        None => None,
+    };
     let above = trigger.get("above").and_then(|line| match line {
         toml::Value::Integer(line) => Some(*line as f64),
         toml::Value::Float(line) => Some(*line),
@@ -7680,9 +7698,13 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
             ),
             None => format!("When someone comes back to the desk after it was empty for {absent}"),
         },
-        (lasting, None) if topic == someone(true) => match lasting {
-            Some(lasting) => format!("When someone has been at the desk for {lasting}"),
-            None => "When someone comes to the desk".to_owned(),
+        (lasting, None) if topic == someone(true) => match (lasting, waited) {
+            (Some(lasting), Some(waited)) => format!(
+                "When someone has been at the desk for {lasting} (if they're talking then, once \
+                 the talk ends, within {waited})"
+            ),
+            (Some(lasting), None) => format!("When someone has been at the desk for {lasting}"),
+            (None, _) => "When someone comes to the desk".to_owned(),
         },
         (lasting, None) if topic == someone(false) => match lasting {
             Some(lasting) => format!("When the desk has been empty for {lasting}"),
@@ -12248,6 +12270,37 @@ mod tests {
         }
         assert!(kept_on_named(&keeping.directory, "day").is_none());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7819: a made long sitting carries sip-of-water's
+    /// `wait`, said plainly; a `wait` on any other trigger is refused.
+    #[test]
+    fn a_sittings_wait_is_said_and_only_on_a_sitting() {
+        let sitting = |rest: &str| -> toml::Value {
+            toml::from_str::<toml::Table>(&format!(
+                "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\n{rest}"
+            ))
+            .unwrap()["trigger"]
+                .clone()
+        };
+        let sat = sitting(
+            "equals = true\nfor = \"30m\"\nrearm = \"leaves\"\ncooldown = \"45m\"\n\
+             wait = \"10m\"\n",
+        );
+        let (said, _) = trigger_plainly(Some(&sat)).unwrap();
+        assert_eq!(
+            said,
+            "When someone has been at the desk for 30 minutes (if they're talking then, once the \
+             talk ends, within 10 minutes)"
+        );
+        for rest in [
+            "equals = true\nwait = \"10m\"\n",
+            "equals = true\nfor = \"30m\"\nwait = \"10m\"\n",
+            "equals = false\nfor = \"30m\"\nrearm = \"leaves\"\nwait = \"10m\"\n",
+            "equals = true\nfor = \"30m\"\nrearm = \"leaves\"\nwait = \"soon\"\n",
+        ] {
+            assert!(trigger_plainly(Some(&sitting(rest))).is_err(), "{rest}");
+        }
     }
 
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
