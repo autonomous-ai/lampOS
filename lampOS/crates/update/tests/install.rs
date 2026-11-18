@@ -9040,6 +9040,29 @@ fn a_link_a_folder_or_a_file_elsewhere_is_never_removed() {
     assert!(sysstat_removal(&bare).is_empty());
 }
 
+/// #7254 part 2, the first builder's P3: a sysstat folder it can't list is
+/// said and left, and never fails the region's boot run.
+#[test]
+fn a_kept_folder_it_cant_list_is_said_and_never_fails_the_boot_run() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(folder.parent().unwrap()).unwrap();
+    // A plain file where the folder should be: listing it fails.
+    fs::write(&folder, "not a folder").unwrap();
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
+        said.push(line.to_owned())
+    })
+    .unwrap();
+    assert!(removed.is_empty());
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0].starts_with("sysstat's kept files are left: /var/log/sysstat: "),
+        "{said:?}"
+    );
+    assert!(sysstat_removal(&lamp).is_empty());
+}
+
 /// #7254 part 2: with /etc/lampOS/sysstat-on (the owner wants sysstat),
 /// nothing is removed, and nothing is said.
 #[test]
