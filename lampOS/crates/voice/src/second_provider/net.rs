@@ -22,7 +22,7 @@ pub use chat::{
     Narrow, ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
-pub(crate) use public::{SECOND_LOOKUP_ENVIRONMENT, get_public_json_within};
+pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
 pub use stt::{Early, QUIET_HELD_ENVIRONMENT, Replies, SttStream, check as stt_check};
 pub use tts::{
