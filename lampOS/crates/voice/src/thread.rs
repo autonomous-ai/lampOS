@@ -4967,6 +4967,32 @@ mod tests {
         assert!(!read.recall(now, ROOM).unwrap().contains("Tell them"));
     }
 
+    /// #7694: a wellbeing nudge's note, with the sitting lamp-skills put
+    /// first in it (`LAMP_DESK_TIME=on`, `lamp_skills::SITTING_SLOT`), is
+    /// kept whole with its answer, so the follow-up "how long have I been
+    /// at my desk?" has the minutes the nudge was about.
+    #[test]
+    fn a_nudges_note_keeps_the_sitting_for_the_follow_up() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        let note = "(Measured: at the desk 47 minutes, since 14:12. Tell it only if asked, rounded.) \
+                    They have sat at the desk for about half an hour. Suggest a sip of water in one \
+                    short, warm line, the way a friend would: no lecture, nothing about health.";
+        assert!(note.len() <= PERSON_BYTES);
+        thread.written(1, note);
+        thread.lamp(1, "Jay, how about a sip of water?", now);
+        thread.person("How long have I been at my desk?", true, now);
+        let recent = thread.recent(now, Duration::from_secs(300), 6);
+        assert_eq!(recent[0].written.as_deref(), Some(note));
+        assert!(
+            recent[0]
+                .written
+                .as_deref()
+                .unwrap()
+                .contains("47 minutes, since 14:12")
+        );
+    }
+
     /// #1505: a thread file this build cannot read (a later build's field,
     /// or no thread file at all) is set aside beside itself, renamed and
     /// kept, never read as empty and forgotten; the thread starts empty. A

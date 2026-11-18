@@ -79,7 +79,7 @@ body = { gesture = "stretching" }
 # A warm glow with the stretch waits for the light to be given back after it
 # (the third's arbitration and leases, #940): until then a light step would
 # change the person's own light for good.
-say = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
+say = "{sitting} They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
 # group's two an hour, never within 30 minutes of each other, which

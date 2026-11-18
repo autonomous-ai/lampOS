@@ -4148,6 +4148,33 @@ impl ToolDesk {
                     }
                 );
             }
+            Route::DeskTime => {
+                // Answered at once, as the time is, and only for a line heard
+                // at the lamp: one the lamp wrote itself, a skill's say, is
+                // told nothing (#7694, never volunteered).
+                let heard = crate::attention::own_request()
+                    .load(std::sync::atomic::Ordering::Acquire)
+                    != request;
+                let told = crate::desk_time::told_now(heard);
+                let (sent, sent_us) = tell(&told);
+                self.line(
+                    lineage.session,
+                    request,
+                    &call.name,
+                    called_us,
+                    sent_us,
+                    true,
+                    sent,
+                );
+                eprintln!(
+                    "lamp-voice provider: request {request}: the model asked how long the person has sat at the desk; told {}",
+                    if told.get("at_the_desk").is_some() {
+                        "the sitting"
+                    } else {
+                        "it is not known"
+                    }
+                );
+            }
             Route::Clock => {
                 let told = crate::tools::time_now_for(self.settings.places, &call.args);
                 let (sent, sent_us) = tell(&told);

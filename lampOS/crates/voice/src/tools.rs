@@ -259,6 +259,9 @@ pub struct Settings {
     /// With it, the voice's own offer, `offer_desk_noticing`
     /// (`LAMP_SEEN_VOICE_OFFER=on`, off in the product).
     pub seen_voice_offer: bool,
+    /// The person at the desk may ask how long they have sat there
+    /// ([`crate::desk_time`], `LAMP_DESK_TIME=on`, #7694).
+    pub desk_time: bool,
     /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
@@ -356,6 +359,9 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::services::arguments(
         std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
+    ));
+    flags.extend(crate::desk_time::arguments(
+        std::env::var(crate::desk_time::ENVIRONMENT).ok().as_deref(),
     ));
     flags
 }
@@ -614,6 +620,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--services-dir must be absolute"));
         }
         settings.services = Some(PathBuf::from(folder));
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::desk_time::FLAG
+    {
+        settings.desk_time = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -984,6 +996,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
                 .filter(|tool| settings.seen_voice_offer || tool.name != crate::seen_yes::OFFER),
         );
     }
+    if settings.desk_time {
+        tools.push(crate::desk_time::tool());
+    }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
     // A recurring thing for the lamp to do is a skill to make, told in the
@@ -1069,6 +1084,7 @@ pub(crate) fn voices_own(name: &str) -> bool {
         || crate::sleep_asked::is_tool(name)
         || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
+        || crate::desk_time::is_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -1204,6 +1220,10 @@ pub enum Route {
     /// `LAMP_HARD_ASKS_TO_AGENT`): answered at once with the holding line,
     /// the agent's answer told when it comes.
     AgentAsk,
+    /// How long the person at the desk has sat there ([`crate::desk_time`],
+    /// #7694): answered here, at once, from the bus's latched value, and
+    /// only for a line heard at the lamp.
+    DeskTime,
     /// Nobody here runs that.
     Nobody,
 }
@@ -1347,6 +1367,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::devices_tools::is_stop_tool(name) {
         return if settings.devices {
             Route::DeskStop
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::desk_time::is_tool(name) {
+        return if settings.desk_time {
+            Route::DeskTime
         } else {
             Route::Nobody
         };
@@ -1591,6 +1618,8 @@ fn answer_inner(
             &mut crate::reports_stop::Bus::of_the_lamp(),
         )),
         Route::Decline => ToolAnswer::plain(declined()),
+        // Only for a line heard at the lamp: never volunteered (#7694).
+        Route::DeskTime => ToolAnswer::plain(crate::desk_time::told_now(heard)),
         Route::Sleep => {
             let onboarding = crate::sleep_asked::during_onboarding(request);
             ToolAnswer {
@@ -2843,9 +2872,12 @@ fn run_call_with_scope(
                 true,
             ),
         ),
-        Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
-            ("nobody", (unavailable(), false))
-        }
+        Route::Decline
+        | Route::Clock
+        | Route::ReportsState
+        | Route::Sleep
+        | Route::DeskTime
+        | Route::Nobody => ("nobody", (unavailable(), false)),
     };
     if scope_current(lease, request) {
         result
@@ -3609,6 +3641,7 @@ mod tests {
             seen_activity: false,
             seen_posture: false,
             seen_voice_offer: false,
+            desk_time: true,
             shutdown_from_app: false,
             services: None,
             decline: true,
@@ -3968,6 +4001,7 @@ mod tests {
                 seen_activity: false,
                 seen_posture: false,
                 seen_voice_offer: false,
+                desk_time: false,
                 shutdown_from_app: false,
                 services: None,
                 decline: true,
