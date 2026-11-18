@@ -200,8 +200,12 @@ pub struct RoomTold {
     /// ([`Self::seen_talking`]).
     held_talk: bool,
     talking_seen: Option<u64>,
-    /// `LAMP_ROOM_HELD_TALK` ([`Self::count_held_not_spoken_to`]).
+    /// `LAMP_ROOM_HELD_TALK` ([`Self::count_held_not_spoken_to`]), and the
+    /// requests it held as talk for the busy room, each until it is
+    /// closed, the newest [`HELD_KEPT`]: two judged before either closes
+    /// are each kept (the Reviewer-lead's P2 on #7636).
     held_not_spoken_to: bool,
+    held_room_talk: VecDeque<u64>,
     /// The request whose face turned to the lamp was seen not speaking it
     /// (`LAMP_TURNED_FACE_SPEAKS`, [`Self::face_not_speaking`]).
     not_speaking: Option<u64>,
@@ -245,6 +249,7 @@ impl RoomTold {
             held_talk: false,
             talking_seen: None,
             held_not_spoken_to: false,
+            held_room_talk: VecDeque::new(),
             not_speaking: None,
             carried: None,
             colleague_held: None,
@@ -574,8 +579,11 @@ impl RoomTold {
             Some(crate::attention::Verdict::Hold(why))
                 if self.held_not_spoken_to && why == crate::attention::NOT_SPOKEN_TO =>
             {
-                if self.talk_only {
-                    self.held_by_policy = Some(request);
+                if self.talk_only && !self.held_room_talk.contains(&request) {
+                    if self.held_room_talk.len() == HELD_KEPT {
+                        self.held_room_talk.pop_front();
+                    }
+                    self.held_room_talk.push_back(request);
                 }
             }
             Some(crate::attention::Verdict::Hold(_)) => self.held(request),
@@ -732,6 +740,11 @@ impl RoomTold {
         }
         if self.held_by_policy == Some(request) {
             self.held_by_policy = None;
+            self.join_the_run(now_us);
+            return Left::Held;
+        }
+        if let Some(at) = self.held_room_talk.iter().position(|held| *held == request) {
+            self.held_room_talk.remove(at);
             self.join_the_run(now_us);
             return Left::Held;
         }
@@ -2279,6 +2292,31 @@ mod tests {
             room.left_unanswered(request, at * S + S);
         }
         assert_eq!(room.at(52 * S), Room::Unknown);
+    }
+
+    /// `LAMP_ROOM_HELD_TALK` (#7332, the Reviewer-lead's P2 on #7636): two
+    /// lines held as said to nobody, both judged before either closes (the
+    /// #4175 shape [`RoomTold::held`] keeps eight for), are each held talk
+    /// for the busy room; neither ends the owner's conversation.
+    #[test]
+    fn with_the_switch_held_lines_judged_before_either_closes_end_no_conversation() {
+        use crate::attention::{NOT_SPOKEN_TO, Verdict};
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.count_held_not_spoken_to(true);
+        room.at(0);
+        room.heard(1, S);
+        room.ended(1, 2 * S);
+        room.spoke(1, 3 * S);
+        for request in [2, 3] {
+            room.heard(request, request * 5 * S);
+            room.ended(request, request * 5 * S + S / 2);
+            room.judged(request, Some(Verdict::Hold(NOT_SPOKEN_TO)), false);
+        }
+        assert_eq!(room.left_unanswered(2, 16 * S), Left::Held);
+        assert_eq!(room.left_unanswered(3, 17 * S), Left::Held);
+        assert!(!room.talked_past_the_lamp(), "the conversation goes on");
+        assert_eq!(room.left_alone_since_spoke(), 0);
     }
 
     /// `LAMP_ROOM_HELD_TALK` (#7332): a line held as said to nobody that
