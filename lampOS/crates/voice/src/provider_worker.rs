@@ -4013,6 +4013,7 @@ impl ToolDesk {
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
                         | Route::Devices(_)
+                        | Route::DeskStop
                         | Route::Sleep
                         | Route::SeenActivity(_)
                 ))
@@ -4193,6 +4194,7 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Devices(_)
+            | Route::DeskStop
             | Route::SeenActivity(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
@@ -4210,6 +4212,7 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Devices(_)
+            | Route::DeskStop
             | Route::SeenActivity(_)
             | Route::AgentAsk
             | Route::Nobody => {
@@ -4263,7 +4266,6 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
-                    | Route::Devices(_)
                     | Route::SeenActivity(_)
             )
         {

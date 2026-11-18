@@ -2104,3 +2104,13 @@ could not operate a hand control until First supplied the real reader and the
 owners' integration. First has since added the board reader above, and Fourth's
 task 21 adds the optional Voice consumer. Those additions do not establish a
 physical press, touch, acoustic Stop or Body integration result.
+
+## A touch stops the desk (#7470 S3a)
+
+With `LAMP_DEVICES=on`, a desk move in flight arms a guard in the voice
+([tools.md](tools.md), "`desk_stop`"): any contact with the lamp, its head or
+its button, read from `controls/touch` (enabled, valid, from Controls, later
+than the arming), sends `Stop` to the desk at once, once. A touch means a
+person is at the lamp and wants it still; it grants nothing else, and the
+touch keeps meaning what it meant to Controls too (a tap that stops the
+lamp's speech still does).

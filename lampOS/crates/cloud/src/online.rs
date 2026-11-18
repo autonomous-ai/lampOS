@@ -915,8 +915,11 @@ async fn session(
                                 say.line(&line);
                             }
                             for send in polled.sends {
+                                let req_id = send.data["req_id"].as_str().unwrap_or_default().to_owned();
                                 let event = me.data(&now(), send.kind, &Ok(Some(send.data))).to_string();
-                                handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                if !handed.publish(&client, account.fd_channel.as_str(), event, None) {
+                                    lamp.devices_unsent(&req_id);
+                                }
                             }
                         }
                         if texting {
