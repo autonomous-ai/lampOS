@@ -6887,6 +6887,81 @@ the same code for both writers.
   the whole answer), always, whatever the switches. Tests:
   `a_say_of_the_models_marker_is_no_quick_reaction`,
   `a_say_of_the_models_marker_is_never_kept`.
+- **A long make runs on, and its person is told when it's ready
+  (`LAMP_MAKE_MAY_RUN_ON=on`, off unless set, in no product unit; Fourteen's
+  ask on #6811, 18 Nov 17:21, and the first builder's yes at 17:23).**
+  Before it, an agent make's part ended at 120 s (`make_skill_agent::MAKE_WITHIN`
+  and lamp-tasks' `skill_make::MOST_WITHIN`): past that the person heard
+  `AGENT_LATE_TRY` and the work was thrown away. With it
+  (`crate::long_make`):
+  - **At a minute.** A voice make handed to the agent's make run (with
+    `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: a linked service's, or a quick
+    reaction's draft DeepSeek doesn't keep; the middle form's one more call
+    is the lamp's own model's, within the turn, and never runs on) with no
+    answer 60 s
+    (`long_make::RUN_ON_AFTER`) after its waiting line is let run on
+    (`long_make::let_go`): the lamp says once "This one's taking a while.
+    I'll tell you when it's ready." in place of the long-wait line, and the
+    voice turn ends, the model told it was said and to say nothing more.
+    The person is free to talk about anything. A make that answered first
+    is waited for as before. The line is one of the lamp's fixed lines
+    (`language::FIXED_LINES`), said in the owner's language; the other
+    lines are given to the model to say in the conversation's language.
+  - **It runs on** in lamp-tasks up to 10 minutes: the voice's make is
+    marked `"may_run_on":true` on its `skill_make` line, each answer given
+    300 s (`long_make::WRITE_WITHIN`) within 600 s
+    (`long_make::MAKE_WITHIN`), and lamp-tasks takes a `within_ms` up to
+    `skill_make::RUN_ON_MOST_WITHIN` (600 s) for that mark alone; every
+    other make, and the app's MAKE IT, keeps 120 s. One at a time: while one
+    runs on (its mark `long-make.json` beside `made.json` says `making`), a
+    make ask is told "I'm still making your <name> skill." (the name of
+    DeepSeek's draft, or "your skill"), nothing made.
+  - **Done.** The same checks and repairs as any agent make. A finished long
+    make is kept but stays off, `"ready_untold": true` on its `made.json`
+    entry (what the app reads of made skills, so it shows at once), and the
+    mark says `made`; it is never put on by the make.
+  - **Told to its person.** The coordinator offers it as the lamp's own
+    turn (`long_make::Tells`, admission basis `long_make_told`) only when
+    `long_make::may_tell` holds: the owner's own face seen
+    (`long_make::owner_seen_now`), no conversation going on (15 s with
+    nothing said by or to the lamp, `task_news::quiet_for_news`), not the
+    quiet hours (`run_write_yes::quiet_hours_now`), someone at the lamp; and
+    the room not busy, nothing owed. Not back today, it waits for the next
+    time, however long. The worker acts on that turn's note
+    (`long_make::told_here`): "Your <name> skill is ready." and its read-back
+    (`made_skill::on_line`), with the link ask for a service it reads that
+    isn't linked yet, as a finished make's line has it. One with code of its
+    own waits for the spoken yes, asked then
+    (`skill_write_yes::wait_for_yes_noted`, as an app make's); one that
+    clashes with a skill on the lamp is asked the clash's question
+    (`made_clash::asked`), as a finished make is. Nothing goes on and
+    nothing is cleared in the worker: only when the coordinator saw that
+    very turn played through (every word played, nobody's turn taken over
+    it, `long_make::heard_through`) does `long_make::heard` put a plain one
+    on, take `ready_untold` off and clear the mark, so it is told once.
+    Cut or talked over, it stays off and untold, and is told again at the
+    next such moment (two minutes on at the soonest).
+  - **A failure, the 10 minutes run out, or a restart** while it ran (the
+    second route's worker reads a `making` mark as it starts,
+    `long_make::after_start`; a `making` mark past 11 minutes is read as run
+    out): one plain line at the next such moment, "I couldn't finish your
+    <name> skill.", and nothing kept. Never DeepSeek's draft: a make let run
+    on that the agent made none of is said as the agent's failure.
+  - **"Is my skill ready?"** `make_skill`'s list of the person's skills
+    (`made: true`, its description naming that ask) carries `long_make`:
+    `still_making` with `minutes_so_far`, `made`, `not_made`, or
+    `none_being_made`, its name to the owner alone; the model judges the
+    ask's meaning, no word lists.
+
+  Off, every make, its lines and its limits are as before, byte for byte.
+  Tests: lamp-voice's `a_make_past_a_minute_says_its_line_once_and_frees_the_turn`,
+  `a_make_that_may_run_on_is_marked_and_given_past_two_minutes`,
+  `a_make_let_run_on_stays_off_until_its_person_is_told_then_goes_on`,
+  `a_long_make_told_ready_asks_its_clash_and_its_link`,
+  `a_make_let_run_on_that_fails_runs_out_or_restarts_keeps_nothing_and_says_so_once`,
+  `a_second_make_ask_while_one_runs_on_is_told_its_still_making`,
+  `with_the_run_on_switch_off_a_make_is_as_before` and `long_make`'s own;
+  lamp-tasks' `only_a_make_marked_may_run_on_is_given_past_two_minutes`.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
   off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's

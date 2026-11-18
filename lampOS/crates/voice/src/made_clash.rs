@@ -1241,14 +1241,14 @@ pub fn chosen(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service};
     use std::sync::Mutex;
 
     const NOW: u64 = 1_800_000_000_000;
 
-    fn forget_waiting() {
+    pub(crate) fn forget_waiting() {
         kept::waiting(Option::take);
     }
 

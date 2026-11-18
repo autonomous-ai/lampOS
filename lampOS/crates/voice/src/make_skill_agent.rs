@@ -514,6 +514,11 @@ pub fn set_made_for(request: u64) {
     MADE_FOR.with(|kept| kept.set(request));
 }
 
+/// The voice request whose turn waits on this thread's make, 0 for none.
+pub fn made_for() -> u64 {
+    MADE_FOR.with(std::cell::Cell::get)
+}
+
 /// A voice turn waiting on its make (#6749): while it is held, the make's
 /// waiting line is told to it ([`waiting_due`]), to be said in the turn
 /// itself, after its words so far. A say through the say service waits for
@@ -637,6 +642,11 @@ pub struct Agent {
     /// with no turn waiting ([`Agent::for_app`], Heron's P2 on #6788); a
     /// voice make's one answer stands, as before.
     pub repairs_if_untaken: bool,
+    /// A voice make that may run on past a minute (`LAMP_MAKE_MAY_RUN_ON`,
+    /// [`crate::long_make`]): its line carries `"may_run_on":true`, each
+    /// answer given [`crate::long_make::WRITE_WITHIN`] within
+    /// [`crate::long_make::MAKE_WITHIN`]. Off, as before.
+    pub may_run_on: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -700,14 +710,29 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
-        Some(Self {
+        let agent = Self {
             one_path: one_path_on(),
             ..Self::made_with(
                 tasks,
                 Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
                 guide_on(),
             )
-        })
+        };
+        Some(agent.running_on(crate::long_make::on()))
+    }
+
+    /// This agent, its make marked "may run on" with `on`
+    /// ([`Agent::may_run_on`]); as it is without.
+    pub fn running_on(self, on: bool) -> Self {
+        if !on {
+            return self;
+        }
+        Self {
+            within: crate::long_make::WRITE_WITHIN,
+            make_within: crate::long_make::MAKE_WITHIN,
+            may_run_on: true,
+            ..self
+        }
     }
 
     /// The agent for a make typed in the app's MAKE IT
@@ -769,6 +794,7 @@ impl Agent {
             // from its switch.
             one_path: false,
             repairs_if_untaken: false,
+            may_run_on: false,
         }
     }
 
@@ -886,6 +912,11 @@ impl Agent {
         }
         // The one run path asked for only with its switch: off, the line
         // is as above, byte for byte.
+        // Marked to run on only with `LAMP_MAKE_MAY_RUN_ON`: off, the line
+        // is as above, byte for byte.
+        if self.may_run_on {
+            line["may_run_on"] = json!(true);
+        }
         if self.one_path {
             line["one_path"] = json!(true);
             // The lamp's agent as seen here, so lamp-tasks never makes an
@@ -1115,6 +1146,7 @@ pub(crate) mod tests {
                 guide: false,
                 one_path: false,
                 repairs_if_untaken: false,
+                may_run_on: false,
             }
         }
 
@@ -1742,6 +1774,47 @@ pub(crate) mod tests {
             let off = Agent::for_app_with(Some("on"), None, value, tasks).unwrap();
             assert!(!off.one_path, "{value:?}");
         }
+    }
+
+    /// #6811 (`LAMP_MAKE_MAY_RUN_ON`): a voice make that may run on is
+    /// marked so on its line and given past its usual time, within its ten
+    /// minutes, which lamp-tasks takes for that mark (and, since #7245, for
+    /// any make, `MOST_WITHIN`); past them it is refused; without the switch
+    /// the agent and its line are as before.
+    #[test]
+    fn a_make_that_may_run_on_is_marked_and_given_past_two_minutes() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let before = tasks.agent();
+        let same = tasks.agent().running_on(false);
+        assert_eq!(
+            (same.within, same.make_within, same.may_run_on),
+            (before.within, before.make_within, false)
+        );
+        let long = tasks.agent().running_on(true);
+        assert!(long.may_run_on);
+        assert_eq!(long.within, crate::long_make::WRITE_WITHIN);
+        assert_eq!(long.make_within, crate::long_make::MAKE_WITHIN);
+        assert!(long.within > before.within);
+        assert!(long.within <= lamp_tasks::skill_make::RUN_ON_MOST_WITHIN);
+        assert_eq!(same.write("S", "B", false).unwrap(), "x");
+        assert_eq!(long.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let makes: Vec<&Value> = sent
+            .iter()
+            .filter(|line| line["op"] == "skill_make")
+            .collect();
+        assert_eq!(
+            makes[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
+        );
+        assert_eq!(makes[1]["may_run_on"], true);
+        assert_eq!(makes[1]["within_ms"], 300_000);
+        // lamp-tasks takes the marked line's time, and refuses one past its
+        // ten minutes.
+        assert!(lamp_tasks::skill_make::MakeLine::parse(makes[1].to_string().as_bytes()).is_ok());
+        let mut past = makes[1].clone();
+        past["within_ms"] = json!(600_001);
+        assert!(lamp_tasks::skill_make::MakeLine::parse(past.to_string().as_bytes()).is_err());
     }
 
     #[test]

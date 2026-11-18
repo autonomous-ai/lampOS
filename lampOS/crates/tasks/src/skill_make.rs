@@ -35,7 +35,10 @@
 //!
 //! - **The line** ([`MakeLine`]): `{"op":"skill_make","rules","within_ms"}`,
 //!   the system prompt and the brief as one text, and how long the run may
-//!   take, checked whole ([`MakeLine::parse`]); with `"guide":true` too
+//!   take (at most [`MOST_WITHIN`], 10 minutes since #7245; up to [`RUN_ON_MOST_WITHIN`], 10
+//!   minutes, for a make marked `"may_run_on":true`, lamp-voice's
+//!   `LAMP_MAKE_MAY_RUN_ON`, #6811), checked whole ([`MakeLine::parse`]);
+//!   with `"guide":true` too
 //!   (lamp-voice's `LAMP_MAKE_AGENT_GUIDE`), the lamp's skill-creator guide
 //!   is given ([`GUIDE_FILE`]).
 //! - **The guide** ([`GUIDE`], only when the line asks for it): a lamp
@@ -108,6 +111,10 @@ pub const LEAST_WITHIN: Duration = Duration::from_secs(1);
 // #7245: a gateway agent's make may take up to 10 minutes (the first
 // builder's call on #6811, 18 Nov 17:23, the owner's yes).
 pub const MOST_WITHIN: Duration = Duration::from_secs(10 * 60);
+/// The most a make marked "may run on" may be given (`"may_run_on":true`,
+/// lamp-voice's `LAMP_MAKE_MAY_RUN_ON`, #6811): ten minutes, the same as
+/// [`MOST_WITHIN`] since #7245.
+pub const RUN_ON_MOST_WITHIN: Duration = Duration::from_secs(600);
 /// The rules' file in a make's folder.
 pub const RULES_FILE: &str = "rules.md";
 /// The one file the run writes in a make's folder.
@@ -153,6 +160,12 @@ pub struct MakeLine {
     /// [`NOT_READY_LINE`] instead (Harness hasn't looked yet).
     #[serde(default)]
     pub engine: Option<String>,
+    /// #6811: lamp-voice's `LAMP_MAKE_MAY_RUN_ON` on, so the voice let the
+    /// person go after a minute and the make may run on: its `within_ms`
+    /// may be up to [`RUN_ON_MOST_WITHIN`]. Only when the line says `true`;
+    /// without it, [`MOST_WITHIN`] as before.
+    #[serde(default)]
+    pub may_run_on: bool,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -235,7 +248,12 @@ impl MakeLine {
         if make.rules.contains('\0') {
             return Err(("bad_request", "the rules have a NUL".into()));
         }
-        if !(LEAST_WITHIN..=MOST_WITHIN).contains(&make.within()) {
+        let most = if make.may_run_on {
+            RUN_ON_MOST_WITHIN
+        } else {
+            MOST_WITHIN
+        };
+        if !(LEAST_WITHIN..=most).contains(&make.within()) {
             return Err(("bad_request", "within_ms is out of its bounds".into()));
         }
         // The switches are for the guide's check alone: without the guide
@@ -3750,5 +3768,43 @@ mod tests {
             );
         }
         assert!(GATEWAY_CAN.len() <= 540, "{}", GATEWAY_CAN.len());
+    }
+
+    /// #6811 (the first builder, 18 Nov 17:23): a make marked "may run on"
+    /// may be given up to ten minutes, as every other make may since #7245
+    /// (a gateway agent's make); the mark is only `true` or `false`, and
+    /// past ten minutes either is refused.
+    #[test]
+    fn a_make_marked_may_run_on_is_given_up_to_ten_minutes() {
+        let parsed = |within_ms: u64, extra: &str| {
+            MakeLine::parse(
+                format!(r#"{{"op":"skill_make","rules":"R","within_ms":{within_ms}{extra}}}"#)
+                    .as_bytes(),
+            )
+            .map(|make| (make.may_run_on, make.within()))
+        };
+        let past = 300_000;
+        assert_eq!(parsed(past, ""), Ok((false, Duration::from_millis(past))));
+        assert_eq!(
+            parsed(past, r#","may_run_on":false"#),
+            Ok((false, Duration::from_millis(past)))
+        );
+        assert!(
+            parsed(600_001, "").is_err(),
+            "not marked: MOST_WITHIN at most"
+        );
+        assert_eq!(
+            parsed(past, r#","may_run_on":true"#),
+            Ok((true, Duration::from_millis(past)))
+        );
+        assert_eq!(
+            parsed(600_000, r#","may_run_on":true"#),
+            Ok((true, RUN_ON_MOST_WITHIN))
+        );
+        assert!(parsed(600_001, r#","may_run_on":true"#).is_err());
+        assert_eq!(parsed(600_000, ""), Ok((false, MOST_WITHIN)));
+        assert!(parsed(2_000, r#","may_run_on":"yes""#).is_err());
+        assert_eq!(RUN_ON_MOST_WITHIN, Duration::from_secs(600));
+        assert_eq!(MOST_WITHIN, Duration::from_secs(600));
     }
 }

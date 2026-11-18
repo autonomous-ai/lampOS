@@ -714,6 +714,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     (
+        crate::long_make::RUN_ON_LINE,
+        [
+            "Cái này hơi lâu một chút. Xong mình sẽ báo bạn nhé.",
+            "これは少し時間がかかりそう。できたら知らせるね。",
+            "这个要花点时间。好了我会告诉你。",
+            "이건 시간이 좀 걸려요. 다 되면 알려 드릴게요.",
+        ],
+    ),
+    (
         "Oh, hello to you too.",
         [
             "Ồ, chào bạn nha.",

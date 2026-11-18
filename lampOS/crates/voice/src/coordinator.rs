@@ -6928,6 +6928,16 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // A long make's news, told to its person at the lamp (#6811,
+    // `LAMP_MAKE_MAY_RUN_ON=on`): none with the switch off.
+    let mut long_makes = if lifetime.continuous() {
+        crate::long_make::Tells::from_environment()
+    } else {
+        None
+    };
+    // The turn telling a long make's news, and its key: acted on only once
+    // that turn was heard through (`crate::long_make::heard`).
+    let mut long_make_turn: Option<(u64, String)> = None;
     // The lamp's agent's answer to a full read is said only while the
     // owner is seen alone, looked at by the say client here
     // (`LAMP_SERVICES_TO_AGENT`, `agent_asks`).
@@ -12077,6 +12087,21 @@ fn conversation_with_gate_inner(
                 }
                 onboarding_invitation_turn = None;
             }
+            // A long make's news (#6811): its skill goes on, and it is
+            // marked told, only once its turn was heard through; cut or
+            // talked over, it stays off and is told again next time.
+            if let Some((told_in, key)) = long_make_turn.take() {
+                if crate::long_make::heard_through(
+                    told_in == turn,
+                    current.heard_through(&speaker_pending, snapshot),
+                ) {
+                    crate::long_make::heard_here(key);
+                } else {
+                    eprintln!(
+                        "lamp-voice: a long make's news was not heard through: it stays untold, its skill off (#6811)"
+                    );
+                }
+            }
             let told_news = current.news.clone();
             let heard = current.heard_news(&speaker_pending, snapshot);
             // Not heard whole, played through with gaps included (#4035):
@@ -14121,6 +14146,63 @@ fn conversation_with_gate_inner(
                 trace,
                 |state| rig.publish(state),
             )?;
+            last_publish = monotonic_us();
+        }
+        // A long make's news (#6811): "ready" with its read-back, or that
+        // it wasn't finished, said only to its person at the lamp, as the
+        // lamp's own turn: their face seen, no conversation going on (15 s
+        // with nothing said by or to the lamp), never in the quiet hours,
+        // never to an empty room; else it waits, for days if need be
+        // (`crate::long_make::may_tell`).
+        if let Some(tells) = long_makes.as_mut()
+            && !reminder_waiting
+            && crate::long_make::may_tell(
+                crate::long_make::owner_seen_now(),
+                crate::task_news::quiet_for_news(
+                    false,
+                    clock,
+                    last_turn_us,
+                    last_spoke_us,
+                    last_speech_us,
+                    reminder_quiet(
+                        clock,
+                        reminder_cycle_started_us,
+                        last_speech_us,
+                        last_capture,
+                    ),
+                ),
+                crate::run_write_yes::quiet_hours_now(),
+                presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+            )
+            && !room.busy()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            && let Some(note) =
+                tells.next(std::time::Instant::now(), crate::app_make::now_unix_ms())
+        {
+            eprintln!("lamp-voice: telling a long make's news to its person at the lamp (#6811)");
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &note,
+                false,
+                crate::long_make::BASIS,
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
+            long_make_turn = reply
+                .as_ref()
+                .zip(crate::long_make::key_of(&note))
+                .map(|(current, key)| (current.owner.turn(), key.to_owned()));
             last_publish = monotonic_us();
         }
         // News whose turn was cut short since the last tick: with
