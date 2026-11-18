@@ -5189,18 +5189,33 @@ good). A skill the person made is turned off, paused or stopped through
 `turn_on` alone: the name as heard (`made_turn::TURN_OFF`,
 `made_turn::TURN_ON`), parameters of the function the voice has, as a
 remove's. Which one a line asks is the model's judgment, never a list of
-words: the function's last sentence becomes "To turn off, pause or stop one
-they made or added: turn_off, never remove; back on: turn_on; delete:
+words: the function's last sentence becomes "To turn off, pause, stop one
+they made or added: turn_off at once, never remove; on: turn_on; delete:
 remove; run now: run; list: made; say nothing first."
-(`make_skill_local::TURN_OFF_TOLD`, 154 bytes to the 149 of the sentence
-it replaces, so every switch on still fits the link's 1,024 at 1,023),
+(`make_skill_local::TURN_OFF_TOLD`, 155 bytes to the 149 of the sentence
+it replaces, so every switch on still fits the link's 1,024, at 1,024),
 `turn_off`'s parameter says "turn off, pause or stop a skill they made or
 added (by voice, in the app or from a file), which keeps it to turn back
-on ... Never remove for this", `turn_on`'s the same of back on, and
-`remove`'s says "delete or
+on ... Never remove for this. Even one that starts only when they say its
+words is turned off this way. Call it at once. Ask nothing first.",
+`turn_on`'s the same of back on, and `remove`'s says "delete or
 remove a skill for good, never to turn one off, pause or stop it". A call
 that carries a turn-off is read before the remove, so a turn-off never
-becomes a remove. Then, in code (`made_turn::asked`):
+becomes a remove. **A turn off acts at once** (#7562's rows on lamp-9adf,
+18 Nov, second route, DeepSeek: "Lamp, turn off my space facts skill."
+was answered "Do you want it off? If yes, tell me…", "nothing running to
+switch off" for a skill started only by its words, and "Remove space
+facts?"; the product owner's 18:41 rule: turning off a named made skill
+acts at once, in one line with its undo): "at once" and the parameter's
+last sentences above, and a question about a skill (`use_skill`'s
+`about`, `skill_about::told`) carries `turning_off`
+(`skill_about::TURNING_OFF`), `made_turn::TURN_OFF_AT_ONCE`: "A line
+asking to turn off, pause or stop a skill they made or added, even one
+that starts only when they say its words, is make_skill's turn_off with
+its name alone, never remove: call it at once and ask nothing first; its
+answer gives the one line to say, with how to undo it." Only what the
+model is told changes: no words of the line are read. Then, in code
+(`made_turn::asked`):
 - **The owner's alone, heard.** A turn nobody spoke changes nothing; a line
   not the owner's (`services::owner_hears`, as a run) changes nothing and
   names no skill ("only the lamp's owner can turn a skill they made off or

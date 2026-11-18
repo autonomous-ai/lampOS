@@ -785,9 +785,14 @@ pub const REMOVE_TOLD: &str = " To delete or remove a skill, call it with remove
 /// added from a file in the app, was answered that it is done in the app,
 /// since this told of one they made alone). The verbs are given to the
 /// model, which judges the meaning; with every switch on the description
-/// still fits the link's 1,024 bytes.
-pub const TURN_OFF_TOLD: &str = " To turn off, pause or stop one they made or added: turn_off, never \
-     remove; back on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
+/// still fits the link's 1,024 bytes. A turn off is called at once (#7562's
+/// rows on lamp-9adf, 18 Nov: "turn off my space facts skill" was asked
+/// back "Do you want it off?" and "Remove space facts?"; the product
+/// owner's 18:41 rule: it acts at once, in one line with its undo): "at
+/// once" in the room of "back", 155 bytes, so every switch on fits at
+/// 1,024; the rest is told on `turn_off`'s parameter.
+pub const TURN_OFF_TOLD: &str = " To turn off, pause, stop one they made or added: turn_off at \
+     once, never remove; on: turn_on; delete: remove; run now: run; list: made; say nothing first.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -845,7 +850,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this."
+            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this. Even one that starts only when they say its words is turned off this way. Call it at once. Ask nothing first."
         });
         parameters["properties"][crate::made_turn::TURN_ON] = json!({
             "type": "string",
