@@ -4973,73 +4973,27 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   năng câu đó nhắc tới hoặc `none`, phải là chính tên kỹ năng đang chờ hoặc
   `none`, nếu không cái "có" được đọc là `new_ask`; một `yes` bị buộc mà
   không có `named` được đọc là `unclear` ("Gỡ bằng giọng nói", "Cái "có"
-  gắn với kỹ năng của nó"). Với task của kỹ năng, câu nghe được cũng được
-  đọc (#7634, lamp-9adf 07:20:43 ngày 18/11: câu "Lamp, use my look title
-  skill." bị lấy làm cái "có" cho task đang chờ của `page-title`): một câu
-  nhắc tới kỹ năng khác với kỹ năng đang chờ không bao giờ là cái "có" của
-  nó, dù mô hình nêu kỹ năng nào. Tại mỗi "skill" hoặc "skills" trong một
-  mệnh đề, code đọc các đoạn tối đa sáu từ ngay trước hoặc ngay sau nó mà
-  cả hai đầu nằm ở mép mệnh đề, một từ giới hạn hoặc "skill". Trước hoặc
-  sau một tên, ví dụ (danh sách đầy đủ nằm trong code): "my", "the",
-  "use", "run", "please", "and", và một lời đồng
-  ý nói không có dấu phẩy ("yes", "yeah", "yep", "ok", "okay", "sure",
-  "go", "with", "có", "ừ", "vâng", "được"), nên "okay page title skill" và
-  "go ahead with weather skill" vẫn là cái "có"
-  (`skill_write_yes::BEFORE_A_NAME`); chỉ sau một tên, thêm "now", "too",
-  "for", "to", "is", "instead" (`AFTER_A_NAME`). Code so khớp từng đoạn
-  theo cùng phép so khớp (`made_remove::same_name`, bỏ dấu khỏi các từ đã
-  nói trước, vì tên kỹ năng đã tạo được viết không dấu: "ừ đèn ngủ skill"
-  là `den-ngu`) với kỹ năng đang chờ và các kỹ năng
-  trên đèn (`made_remove::names_on`: các kỹ năng đã tạo và các thư mục
-  skills và pushed, chỉ đọc cho câu có "skill" khi một task đang chờ).
-  Khớp dài nhất thắng: một đoạn nêu tên một kỹ năng khác đã cài, dài hơn
-  mọi đoạn nêu tên kỹ năng đang chờ, là tên kỹ năng đó ("yes, use skill
-  page title backup" khi có `page-title-backup` trên đèn không phải cái
-  "có" của page title); nếu không, một đoạn nêu tên kỹ năng đang chờ là
-  tên của chính nó ("yes, use my lamp test email two skill", "Có, dùng
-  skill page title"). Nếu không có cả hai, các từ trước "skill", lùi về tới một từ đứng
-  trước tên hoặc đầu mệnh đề, được đọc sau khi bỏ các từ đệm ("the", "my",
-  "run", "use", "great", "chạy", "cái", "đó", "em", "cho", "làm", …,
-  `skill_write_yes::FILLERS`); từ ngay trước "skill" luôn được giữ trừ khi
-  là từ đệm hoặc từ trả lời, từ nối ("ừ", "okay", "and",
-  `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp skill". Một từ
-  đệm hoặc từ giới hạn ngay trước "skill" vẫn kết thúc một tên khi từ
-  trước nó có thể ("my morning run skill", "my quick start skill"). Không còn từ
-  nào, hoặc chỉ còn các từ trong chính tên kỹ năng đang chờ, kèm "new",
-  "old" hay "daily" bên cạnh (`DESCRIBING`), là cái "có" của nó ("Yes, run
-  my new weather skill", "the daily weather skill", "yes, the weather
-  skill" cho weather report, "Ừ, chạy cái skill đó đi", "Có, cái skill
-  đó"); còn bất kỳ từ nào khác thì là tên kỹ năng khác, có trong danh sách
-  hay không ("Lamp, use my look title skill." kể cả khi look title không
-  có trên đèn: đang được tạo, bị từ chối lúc nạp hoặc nghe nhầm; "my
-  backup page title skill"; "yes, the daily skill"). An toàn trước: một
-  cái "có" sai chạy quyền của một kỹ năng mà không có sự đồng ý, còn một lời từ chối sai chỉ bỏ
-  việc chờ. Sau "skill", khi đã đọc được các kỹ năng trên đèn, các từ
-  không nêu tên kỹ năng đã cài nào thì không là gì ("yes, run the skill
-  again"); khi không đọc được kỹ năng nào (không có trong danh sách, hoặc
-  không đọc được thư mục) các từ ngay sau nó thất bại theo hướng an toàn
-  (`skill_write_yes::other_skill_named`, được đánh dấu
-  theo từng request bởi `line_heard`). `yes` của nó được đọc là
-  `new_ask`: không giữ gì, bỏ việc chờ, và câu đó được trả lời như một yêu
-  cầu riêng (kỹ năng được nhắc tới được dùng hoặc hỏi). "yes, use my page
-  title", "Yes, use my page title skill." và một câu "Yes." đơn thuần vẫn
-  là cái "có" của page title; "Yes, and use my weather skill." khi có
-  weather trên đèn thì không. Giới hạn được chấp nhận: câu không có từ
-  "skill" thì không được đọc (chỉ `named` gắn nó, #7545); "kỹ năng" không
-  được đọc; một từ mô tả không phải từ đệm ("Yes, awesome skill.", "my old-style weather skill") thất
-  bại theo hướng an toàn. Việc chờ gỡ kỹ năng không được đọc để tìm kỹ năng khác:
-  nó giữ quy tắc riêng, một cái "có" đơn thuần ở ngay câu sau câu hỏi
-  (#7683), nên "Yes, and remove the joke time skill too." không gỡ gì.
-  Nhật ký: "… was a new ask, not an answer (a
-  yes naming look title, not page-title) …". Vòng bị buộc
+  gắn với kỹ năng của nó"). Vòng bị buộc
   chỉ được nói `approve_id`, `answer` và `named` trong form của `make_skill`, cả ba
   bắt buộc (`skill_write_yes::APPROVE_FIELDS`, #6921), nên lời gọi bị buộc
-  không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. `no` hoặc
+  không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. Với việc chờ
+  của tác vụ một kỹ năng, mô hình nêu tên kỹ năng và code chặn (#7634,
+  lamp-9adf 18/11 07:20:43: "Lamp, use my look title skill." bị lấy làm
+  cái "có" cho tác vụ của `page-title`): `named` của vòng bị buộc còn được
+  nói tên các kỹ năng trên đèn (`made_remove::names_on`, tối đa 600 byte,
+  không có nếu không đọc được) và rằng một kỹ năng được nêu mà không phải
+  kỹ năng đang hỏi, có trên đèn hay không, được đưa đúng như nghe
+  (`skill_write_yes::approve_force`). Rồi code chỉ nhận cái "có" khi
+  `named` là `none` hoặc chính kỹ năng đang chờ (`made_remove::same_name`);
+  mọi tên khác, đã cài hay chưa, là `new_ask`: không giữ gì, bỏ việc chờ,
+  và câu đó được trả lời như một yêu cầu riêng bằng một câu đơn giản. Không
+  có danh sách từ nào quyết định, nên khi mô hình sai thì kết quả nghiêng
+  về không phải cái "có". Cái "có" của khách mà mô hình nêu kỹ năng khác
+  cũng bỏ việc chờ của chủ đèn như vậy, không chấp thuận gì. Vòng bị buộc
+  của việc gỡ hay của code không được nói các kỹ năng. `no` hoặc
   `unclear` được đọc trước bước kiểm tra chủ đèn, nên của bất kỳ ai (cả
   khách) cũng kết thúc hoặc hỏi lại việc chờ của chủ đèn và không bao giờ
-  giữ một lời đồng ý; một câu của khách nêu tên kỹ năng khác (#7634) bỏ
-  việc chờ của chủ đèn như một yêu cầu mới, không chấp thuận gì; một
-  `answer` ngoài bốn giá trị này được đọc là `no`;
+  giữ một lời đồng ý; một `answer` ngoài bốn giá trị này được đọc là `no`;
   hai câu trả lời trong một dòng được xử lý theo thứ tự gọi, mỗi cái riêng.
   Journal: "the
   line after a skill's task said back whole: its first round must call

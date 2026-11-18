@@ -207,6 +207,7 @@ pub fn force() -> Force {
             name: crate::made_skill::MAKE,
             only: None,
             fields: None,
+            told: None,
         })
     })
 }

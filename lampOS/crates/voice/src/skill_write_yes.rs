@@ -130,11 +130,6 @@ pub struct Waiting {
     /// ([`round_called`]), at most [`SAID_KEPT`]: no remove is confirmed in
     /// one.
     pub other_calls: Vec<u64>,
-    /// For a skill's task's wait (#6305): later requests whose heard line
-    /// named a skill other than the waiting one ([`other_skill_named`],
-    /// #7634), with that name as said, at most [`SAID_KEPT`]. A yes in one
-    /// is never this wait's ([`answered`]).
-    pub other_named: Vec<(u64, String)>,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -275,7 +270,6 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             played: VecDeque::new(),
             answer_line: None,
             other_calls: Vec::new(),
-            other_named: Vec::new(),
         });
     });
     if remove {
@@ -774,12 +768,89 @@ pub fn approve_force() -> crate::second_provider::net::Force {
             "lamp-voice second: the line after a skill's task said back whole: its first round must call {}",
             crate::made_skill::MAKE
         );
+        // A skill's task's wait (#7634): `named` is told the skills on the
+        // lamp, so the model names another the line names; code gates.
+        let told = kept::waiting(|waiting| waiting.as_ref().is_some_and(task_wait)).then_some(
+            crate::second_provider::net::Told {
+                field: NAMED,
+                more: skills_on_told,
+            },
+        );
         Some(crate::second_provider::net::Forced {
             name: crate::made_skill::MAKE,
             only: None,
             fields: Some(&APPROVE_FIELDS),
+            told,
         })
     })
+}
+
+/// Whether `waiting` is a skill's task's wait (#6305): its grants asked,
+/// neither a made skill's code nor a remove. Only its forced round is told
+/// the skills on the lamp ([`approve_force`], #7634).
+fn task_wait(waiting: &Waiting) -> bool {
+    waiting.asks.grants.is_some() && !waiting.asks.code && !waiting.asks.remove
+}
+
+/// At most this many bytes of the skills on the lamp are told in
+/// [`NAMED`] ([`skills_on_told`]), so the forced form stays small.
+const SKILLS_ON_TOLD_BYTES: usize = 600;
+
+/// What [`NAMED`] is told on a skill's task's forced round (#7634,
+/// lamp-9adf 18 Nov 07:20:43: "Lamp, use my look title skill." was taken
+/// as the yes to `page-title`'s task): the skills on the lamp by name,
+/// bounded by [`SKILLS_ON_TOLD_BYTES`], and that a name not among them is
+/// given as heard. The model judges what the line names; code takes a yes
+/// only when `named` is [`NAMED_NONE`] or the waiting skill's ([`answered`]),
+/// so a miss fails toward no yes. None read: the same, with no list.
+fn skills_on_told() -> String {
+    let mut listed = String::new();
+    for name in installed_names() {
+        if listed.len() + name.len() + 2 > SKILLS_ON_TOLD_BYTES {
+            break;
+        }
+        if !listed.is_empty() {
+            listed.push_str(", ");
+        }
+        listed.push_str(&name);
+    }
+    let on = if listed.is_empty() {
+        String::new()
+    } else {
+        format!(" Skills on the lamp: {listed}.")
+    };
+    format!(
+        "{on} A skill they name that is not the one asked about, on the lamp or not, is given as heard."
+    )
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The skills on the lamp a test gives ([`set_installed_here`]).
+    static INSTALLED_HERE: std::cell::RefCell<Vec<String>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The skills on the lamp by name ([`crate::made_remove::names_on`]),
+/// none when they can't be read. A test build reads only
+/// [`set_installed_here`]'s.
+fn installed_names() -> Vec<String> {
+    #[cfg(test)]
+    {
+        INSTALLED_HERE.with(|here| here.borrow().clone())
+    }
+    #[cfg(not(test))]
+    {
+        crate::made_skill::Keeping::when(true)
+            .map(|keeping| crate::made_remove::names_on(&keeping))
+            .unwrap_or_default()
+    }
+}
+
+/// Test seam: the skills on the lamp that [`skills_on_told`] reads.
+#[cfg(test)]
+pub fn set_installed_here(names: Vec<String>) {
+    INSTALLED_HERE.with(|here| *here.borrow_mut() = names);
 }
 
 /// The only `make_skill` fields the forced approval round is told, all
@@ -851,23 +922,7 @@ fn name_only_line(waiting: &Waiting, request: u64) -> bool {
 /// remove, nothing removed: only the very next line can confirm it
 /// (lamp-9adf, 18 Nov, stock 14083: a make two lines after "Remove daily
 /// stretch reminder?" was taken as its yes).
-///
-/// For a skill's task's wait, a line that names another skill
-/// ([`other_skill_named`], #7634) is kept by its request, so a yes in it
-/// is never this wait's ([`answered`]).
 pub fn line_heard(request: u64, name_only: bool, line: &str) {
-    // The skills on the lamp are read only for a line said with "skill"
-    // while a skill's task waits, before the wait's lock is taken.
-    let task = kept::waiting(|waiting| {
-        waiting
-            .as_ref()
-            .is_some_and(|waiting| request > waiting.request && task_wait(waiting))
-    });
-    let installed = if task && line.to_lowercase().contains("skill") {
-        installed_names()
-    } else {
-        Vec::new()
-    };
     kept::waiting(|kept| {
         let Some(waiting) = kept.as_mut().filter(|waiting| request > waiting.request) else {
             return;
@@ -881,15 +936,6 @@ pub fn line_heard(request: u64, name_only: bool, line: &str) {
                 waiting.name_only.push(request);
             }
             return;
-        }
-        if task_wait(waiting)
-            && !waiting.other_named.iter().any(|(kept, _)| *kept == request)
-            && let Some(other) = other_skill_named(line, &waiting.asks.skill, &installed)
-        {
-            if waiting.other_named.len() == SAID_KEPT {
-                waiting.other_named.remove(0);
-            }
-            waiting.other_named.push((request, other));
         }
         if !waiting.asks.remove {
             return;
@@ -1093,262 +1139,6 @@ fn not_a_plain_yes(waiting: &Waiting, request: u64) -> Option<&'static str> {
     }
 }
 
-thread_local! {
-    /// The skills on the lamp as a test of this thread sets them
-    /// ([`set_installed_here`]); read only in a test build.
-    static INSTALLED_HERE: std::cell::RefCell<Option<Vec<String>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// The skills on the lamp, by name ([`crate::made_remove::names_on`]: the
-/// person's made ones, and the skills and pushed folders'), for
-/// [`other_skill_named`]. A test build reads only [`set_installed_here`]'s,
-/// none when unset.
-fn installed_names() -> Vec<String> {
-    if cfg!(test) {
-        return INSTALLED_HERE
-            .with(|here| here.borrow().clone())
-            .unwrap_or_default();
-    }
-    crate::made_skill::Keeping::when(true)
-        .map(|keeping| crate::made_remove::names_on(&keeping))
-        .unwrap_or_default()
-}
-
-/// The skills on the lamp for this test's thread alone.
-#[cfg(test)]
-pub fn set_installed_here(names: Option<Vec<String>>) {
-    INSTALLED_HERE.with(|here| *here.borrow_mut() = names);
-}
-
-/// Whether `waiting` is a skill's task's (#6305): grants said back, not a
-/// made skill's code or a remove.
-fn task_wait(waiting: &Waiting) -> bool {
-    waiting.asks.grants.is_some() && !waiting.asks.code && !waiting.asks.remove
-}
-
-/// Words that bound a skill's name said with "skill" ([`other_skill_named`]):
-/// what comes before a name ("my look title skill", "use page title
-/// skill"). A name may hold any of them inside it (`start-the-day`); only
-/// its ends are bounded by one.
-///
-/// A yes said without its comma bounds a name too ("okay page title
-/// skill", "go ahead with weather skill", "ừ đèn ngủ skill"; the
-/// adversarial read's P2 on #7634), and "please" before one ("please page
-/// title skill") as after it.
-const BEFORE_A_NAME: &[&str] = &[
-    "my", "the", "your", "our", "this", "that", "a", "an", "use", "run", "open", "try", "launch",
-    "start", "play", "what", "which", "yes", "yeah", "yep", "ok", "okay", "sure", "with", "go",
-    "please", "and", "then", "lamp", "có", "ừ", "vâng", "được",
-];
-
-/// Words that bound a name said after "skill", besides [`BEFORE_A_NAME`]'s
-/// ("use skill page title please").
-const AFTER_A_NAME: &[&str] = &["please", "now", "too", "for", "to", "is", "instead"];
-
-/// Words before "skill" that name no skill (#7634): what is said around a
-/// name, English and Vietnamese ("run my new weather skill", "Ừ, chạy cái
-/// skill đó đi", "Vâng, em chạy skill đi", "great skill"). Left out, what
-/// remains is read against the waiting skill's own name words
-/// ([`other_skill_named`]).
-const FILLERS: &[&str] = &[
-    "great", "nice", "the", "that", "this", "same", "my", "run", "use", "start", "open", "chạy",
-    "dùng", "mở", "bật", "cái", "đó", "này", "kia", "em", "anh", "chị", "cho", "làm",
-];
-
-/// Words said before "skill" that never end a skill's name: the yes
-/// itself and joining words ("ừ skill thời tiết", "okay skill").
-const NEVER_A_NAMES_END: &[&str] = &[
-    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "a", "an", "and", "then", "with", "có",
-    "ừ", "vâng", "được",
-];
-
-/// Whether a word right before "skill" is kept as the end of a name, even a
-/// word that comes before a name ("my role play skill", "my desk lamp
-/// skill"): any word but a filler or one that never ends a name.
-fn ends_a_name(word: &str) -> bool {
-    !FILLERS.contains(&word) && !NEVER_A_NAMES_END.contains(&word)
-}
-
-/// Where a name ends on a filler or a word that comes before a name, said
-/// right before "skill" at `at` ("my morning run skill", "my quick start
-/// skill"): at the word before that one, when that word can end a name
-/// ([`ends_a_name`]) and bounds nothing. The name then runs from there to
-/// "skill".
-fn ends_on_a_filler(words: &[String], at: usize) -> Option<usize> {
-    let last = at.checked_sub(1)?;
-    let before = last.checked_sub(1)?;
-    let content = ends_a_name(&words[before]) && !bounds(&words[before]);
-    (content && !NEVER_A_NAMES_END.contains(&words[last].as_str())).then_some(before)
-}
-
-/// Describing words before "skill" that take nothing from the waiting
-/// skill's own name beside it ("my new weather skill", "the daily weather
-/// skill"), but alone are a name ("yes, the daily skill").
-const DESCRIBING: &[&str] = &["new", "old", "daily"];
-
-/// The most words a skill's name is said in, before or after "skill".
-const NAME_WORDS: usize = 6;
-
-/// Whether `word` is "skill" or "skills".
-fn skill_word(word: &str) -> bool {
-    word == "skill" || word == "skills"
-}
-
-/// Whether `word` bounds a name's end ([`BEFORE_A_NAME`], [`AFTER_A_NAME`],
-/// or "skill" itself).
-fn bounds(word: &str) -> bool {
-    BEFORE_A_NAME.contains(&word) || AFTER_A_NAME.contains(&word) || skill_word(word)
-}
-
-/// The skill other than `skill` that a heard line names (#7634, lamp-9adf
-/// 18 Nov 07:20:43: "Lamp, use my look title skill." was taken as the yes
-/// to `page-title`'s task), with `installed` the skills on the lamp by
-/// name. Within a clause, at each "skill" or "skills":
-///
-/// - **Bounded runs.** The runs of at most [`NAME_WORDS`] words right
-///   before "skill" or right after it whose both ends sit at the clause's
-///   edge, a bounding word ([`bounds`]) or "skill": "page title backup" in
-///   "use skill page title backup", never "page title" inside it. Each is
-///   matched by the made-skill name match #7545 binds a yes with
-///   ([`crate::made_remove::same_name`]).
-/// - **The longest match wins.** A run naming an installed skill other
-///   than `skill`, longer than any naming `skill`, names that other skill
-///   (`page-title-backup`, not `page-title`). Else a run naming `skill`
-///   names its own: "yes, use my lamp test email two skill",
-///   "Có, dùng skill page title".
-/// - **Else, before "skill":** the words back to a word that comes before
-///   a name ([`BEFORE_A_NAME`]) or the clause's start, at most
-///   [`NAME_WORDS`], fillers ([`FILLERS`]) left out. None left ("Ừ, chạy
-///   cái skill đó đi", "great skill"), or only `skill`'s own name words
-///   ("Yes, run my new weather skill", "the weather skill" for weather
-///   report): its own. Any other word left names another skill, listed
-///   or not ("my look title skill", "my backup page title skill"): safety
-///   first, as a false yes runs a skill's grants without consent.
-/// - **Else, after "skill":** with the lamp's skills read, words that name
-///   no installed skill are nothing ("yes, run the skill again"); with
-///   none read (`installed` empty), the words right after it, up to a
-///   bounding word, fail closed as another's.
-///
-/// A line with no "skill" names none, nor does "kỹ năng". Spelling only:
-/// no word is judged by what it means.
-pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Option<String> {
-    let own = |run: &[String]| crate::made_remove::same_name(&run.join(" "), skill);
-    // A word as a made skill's name is written: marks off, a number word
-    // as digits ("two" is "2").
-    let said_word =
-        |word: &str| crate::made_skill::name_digits(&crate::made_remove::unmarked(word));
-    let own_words: Vec<String> = crate::made_skill::name_digits(skill)
-        .split('-')
-        .filter(|word| !word.is_empty())
-        .map(str::to_owned)
-        .collect();
-    let another = |run: &[String]| {
-        let said = run.join(" ");
-        installed
-            .iter()
-            .any(|name| name != skill && crate::made_remove::same_name(&said, name))
-    };
-    for clause in heard.split([',', ';', '.', '?', '!']) {
-        let words: Vec<String> = clause
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|word| !word.is_empty())
-            .map(str::to_lowercase)
-            .collect();
-        for at in (0..words.len()).filter(|&at| skill_word(&words[at])) {
-            let before = (at.saturating_sub(NAME_WORDS)..at)
-                .filter(|&from| from == 0 || bounds(&words[from - 1]))
-                .map(|from| &words[from..at]);
-            let after = (at + 2..=words.len().min(at + 1 + NAME_WORDS))
-                .filter(|&to| to == words.len() || bounds(&words[to]))
-                .map(|to| &words[at + 1..to]);
-            let runs: Vec<&[String]> = before.chain(after).collect();
-            let own_most = runs
-                .iter()
-                .filter(|run| own(run))
-                .map(|run| run.len())
-                .max()
-                .unwrap_or(0);
-            let other = runs
-                .iter()
-                .filter(|run| !own(run) && another(run))
-                .max_by_key(|run| run.len());
-            if let Some(other) = other
-                && other.len() > own_most
-            {
-                // Said as the name is, without a word said before it that
-                // the spelling distance lets in ("my page title backup").
-                let mut other: &[String] = other;
-                while other.len() > 1
-                    && BEFORE_A_NAME.contains(&other[0].as_str())
-                    && another(&other[1..])
-                {
-                    other = &other[1..];
-                }
-                return Some(other.join(" "));
-            }
-            // The words right before "skill", back to a word that comes
-            // before a name or the clause's start, fillers left out. None
-            // left ("Ừ, chạy cái skill đó đi"), or only the waiting skill's
-            // own name words ("my new weather skill", "the weather skill"
-            // for weather report): its own. Any other word left names
-            // another skill, listed or not ("my look title skill", "my
-            // backup page title skill"): a false refusal only lets the wait
-            // go, a false yes runs a skill's grants without consent.
-            // The word right before "skill" is part of the name unless it
-            // can't end one ([`ends_a_name`]), even a word that comes before
-            // a name ("my role play skill"): the pre-push read's false yes.
-            let kept = at
-                .checked_sub(1)
-                .filter(|&before| ends_a_name(&words[before]))
-                .or_else(|| ends_on_a_filler(&words, at));
-            let from = kept.unwrap_or(at);
-            let start = (0..from)
-                .rev()
-                .take(NAME_WORDS - (at - from))
-                .take_while(|&before| !BEFORE_A_NAME.contains(&words[before].as_str()))
-                .last()
-                .or(kept);
-            if let Some(start) = start {
-                let name = &words[start..at];
-                let left: Vec<&String> = name
-                    .iter()
-                    .filter(|word| !FILLERS.contains(&word.as_str()))
-                    .collect();
-                if !left.is_empty() {
-                    let own_word = |word: &&String| own_words.contains(&said_word(word.as_str()));
-                    if left.iter().any(own_word)
-                        && left
-                            .iter()
-                            .all(|word| own_word(word) || DESCRIBING.contains(&word.as_str()))
-                    {
-                        continue;
-                    }
-                    return Some(name.join(" "));
-                }
-            }
-            // After "skill", its own name ("use my skill page title") or,
-            // with the lamp's skills read, words naming no installed skill
-            // take nothing from the yes; with none read, the words right
-            // after it fail closed, as a name after "skill" can't be told
-            // from "again".
-            if own_most > 0 || !installed.is_empty() {
-                continue;
-            }
-            let after: Vec<&str> = words[at + 1..]
-                .iter()
-                .map(String::as_str)
-                .take(NAME_WORDS)
-                .take_while(|word| !bounds(word))
-                .collect();
-            if !after.is_empty() {
-                return Some(after.join(" "));
-            }
-        }
-    }
-    None
-}
-
 /// Whether [`approve_force`] forces a request at `now`.
 pub fn approve_forced_now(now: Instant) -> bool {
     kept::waiting(|waiting| {
@@ -1490,21 +1280,8 @@ pub fn answered(
         let spoken = crate::made_skill::spoken_name(&skill);
         // A yes, bound to the skill waiting (#7545): taken by [`approve`]
         // with every guard only when the line names that skill or none.
-        // For a skill's task, the heard line itself is read too (#7634):
-        // one that names another skill ([`line_heard`]) is never its yes,
-        // whatever skill the model named.
         let mut other = None;
-        let heard_other = waiting
-            .other_named
-            .iter()
-            .find(|(kept, _)| *kept == request)
-            .map(|(_, other)| other.clone());
-        let answer = if answer == "yes"
-            && let Some(heard_other) = heard_other
-        {
-            other = Some(heard_other);
-            NEW_ASK
-        } else if answer == "yes" {
+        let answer = if answer == "yes" {
             match named.map(str::trim).filter(|named| !named.is_empty()) {
                 Some(named)
                     if named.eq_ignore_ascii_case(NAMED_NONE)
@@ -2962,203 +2739,8 @@ mod tests {
         clear_for_test();
     }
 
-    /// #7634: what a heard line names before "skill", read against the
-    /// waiting skill by the made-skill name match.
-    #[test]
-    fn a_line_names_another_skill_only_by_a_name_said_with_skill() {
-        let other = |heard| other_skill_named(heard, "page-title", &[]);
-        let on_lamp = |heard, installed: &[&str]| {
-            let installed: Vec<String> = installed.iter().map(|name| name.to_string()).collect();
-            other_skill_named(heard, "page-title", &installed)
-        };
-        assert_eq!(
-            other("Lamp, use my look title skill."),
-            Some("look title".into())
-        );
-        assert_eq!(
-            other("Yes, and use my weather skill."),
-            Some("weather".into())
-        );
-        assert_eq!(other("yes run joke time skill"), Some("joke time".into()));
-        assert_eq!(
-            other("Yes, and use my weather skills."),
-            Some("weather".into())
-        );
-        // A name after "skill" is another's only as an installed skill's.
-        let look = ["look-title", "page-title"];
-        assert_eq!(
-            on_lamp("run skill look title", &look),
-            Some("look title".into())
-        );
-        assert_eq!(
-            on_lamp("use the skill look title please", &look),
-            Some("look title".into())
-        );
-        // The longest installed name wins over the waiting one inside it
-        // (the re-read's P1 on #7634).
-        let backup = ["page-title", "page-title-backup"];
-        assert_eq!(
-            on_lamp("yes, use skill page title backup", &backup),
-            Some("page title backup".into())
-        );
-        assert_eq!(
-            on_lamp("yes, use my page title backup skill", &backup),
-            Some("page title backup".into())
-        );
-        assert_eq!(on_lamp("yes, use my page title skill", &backup), None);
-        // With the lamp's skills read, only an installed skill's name is
-        // another's (the pre-push read's P2s on #7634): describing words
-        // before the waiting skill's name, words in another order, and
-        // Vietnamese words around "skill" take nothing from the yes.
-        let read = |heard, skill, installed: &[&str]| {
-            let installed: Vec<String> = installed.iter().map(|name| name.to_string()).collect();
-            other_skill_named(heard, skill, &installed)
-        };
-        let weather = ["weather", "timer", "page-title"];
-        for (heard, skill, installed) in [
-            ("Yes, run my new weather skill", "weather", &weather[..]),
-            ("the daily weather skill", "weather", &weather[..]),
-            (
-                "yes, the weather skill",
-                "weather-report",
-                &["weather-report", "timer"][..],
-            ),
-            ("Ừ, chạy cái skill đó đi", "page-title", &backup[..]),
-            ("Có, cái skill đó", "page-title", &backup[..]),
-            ("Vâng, em chạy skill đi", "page-title", &backup[..]),
-            ("Yes, great skill.", "page-title", &backup[..]),
-        ] {
-            assert_eq!(read(heard, skill, installed), None, "{heard}");
-        }
-        // Safety first (the coordinator's ruling on #7634): any other word
-        // before "skill" names another skill, listed or not.
-        for (heard, skill, installed, named) in [
-            ("okay timer skill", "weather", &weather[..], "timer"),
-            (
-                "Lamp, use my look title skill.",
-                "page-title",
-                &backup[..],
-                "look title",
-            ),
-            (
-                "yes, use my backup page title skill",
-                "page-title",
-                &backup[..],
-                "backup page title",
-            ),
-            ("Yes, awesome skill.", "page-title", &backup[..], "awesome"),
-            // A name ending in a word that comes before a name (the
-            // pre-push read's false yes on #7634), or a describing word
-            // alone.
-            (
-                "yes, use my role play skill",
-                "page-title",
-                &backup[..],
-                "role play",
-            ),
-            (
-                "yes, my desk lamp skill",
-                "page-title",
-                &backup[..],
-                "desk lamp",
-            ),
-            ("yes, the daily skill", "page-title", &backup[..], "daily"),
-            // A name ending on a filler (Fourteen's P2 on #7842).
-            (
-                "Yes, use my morning run skill",
-                "page-title",
-                &backup[..],
-                "morning run",
-            ),
-            (
-                "Yes, use my quick start skill",
-                "page-title",
-                &backup[..],
-                "quick start",
-            ),
-        ] {
-            assert_eq!(read(heard, skill, installed), Some(named.into()), "{heard}");
-        }
-        assert_eq!(
-            read("Lamp, use my look title skill.", "page-title", &look),
-            Some("look title".into())
-        );
-        // With none read, the same, and the words after "skill" fail closed.
-        for heard in ["Yes, run my new weather skill", "the daily weather skill"] {
-            assert_eq!(other_skill_named(heard, "weather", &[]), None, "{heard}");
-        }
-        assert_eq!(other("Ừ, chạy cái skill đó đi"), Some("đó đi".into()));
-        for (heard, named) in [
-            ("yes, use my role play skill", "role play"),
-            ("yes, my desk lamp skill", "desk lamp"),
-            ("yes, the daily skill", "daily"),
-            ("Yes, use my morning run skill", "morning run"),
-            ("Yes, use my quick start skill", "quick start"),
-        ] {
-            assert_eq!(other(heard), Some(named.into()), "{heard}");
-        }
-        for heard in [
-            "yes, that skill",
-            "yes, the skill please",
-            "yes, run it",
-            "yes, use my page title skill",
-        ] {
-            assert_eq!(other(heard), None, "{heard}");
-            assert_eq!(read(heard, "page-title", &backup), None, "{heard}");
-        }
-        // A yes said without its comma still bounds another skill's name.
-        assert_eq!(
-            other_skill_named("okay timer skill", "weather", &[]),
-            Some("timer".into())
-        );
-        assert_eq!(
-            other_skill_named("yeah đèn ngủ skill", "weather", &[]),
-            Some("đèn ngủ".into())
-        );
-        // A word after "skill" that names no installed skill is no name
-        // (the re-read's P2 on #7634), but with no skill on the lamp read,
-        // it fails closed (the final read's P3).
-        for after in [
-            "yes the skill thanks",
-            "yes, run the skill again",
-            "Có, chạy skill đi",
-            "run skill look title",
-        ] {
-            assert_eq!(on_lamp(after, &backup), None, "{after}");
-            assert!(other(after).is_some(), "{after}");
-        }
-        // A waiting skill's own name may hold the words that bound
-        // another's: only a run's ends are bounded.
-        for (heard, skill) in [
-            ("yes, use my lamp test email two skill", "lamp-test-email-2"),
-            ("yes, run the play time skill", "play-time"),
-            ("yes, use my start the day skill", "start-the-day"),
-            ("yes, the what now skill", "what-now"),
-            ("yes, use my my diary skill", "my-diary"),
-            ("yes, use skill lamp test email two", "lamp-test-email-2"),
-            ("yes, use my page title backup skill", "page-title-backup"),
-            // A yes said without its comma (the adversarial read's P2 on
-            // #7634), and a Vietnamese line against the name as a made
-            // skill's is written, without marks.
-            ("okay page title skill", "page-title"),
-            ("yeah weather skill", "weather"),
-            ("go ahead with weather skill", "weather"),
-            ("sure page title skill", "page-title"),
-            ("please page title skill", "page-title"),
-            ("ừ skill thời tiết", "thoi-tiet"),
-            ("ừ đèn ngủ skill", "den-ngu"),
-            ("vâng, dùng skill đèn ngủ", "den-ngu"),
-            ("được đèn ngủ skill", "den-ngu"),
-        ] {
-            assert_eq!(other_skill_named(heard, skill, &[]), None, "{heard}");
-            let installed = vec![skill.to_owned(), "page-title".to_owned()];
-            assert_eq!(other_skill_named(heard, skill, &installed), None, "{heard}");
-        }
-    }
-
-    /// #7634's scope: the heard line is read for another skill on a skill's
-    /// task's wait alone ([`task_wait`]). A remove's wait keeps its own
-    /// rule (#7683): "Yes, and remove the joke time skill too." after
+    /// #7634's scope: only a skill's task's wait is told the skills on the
+    /// lamp ([`task_wait`]). A remove's wait keeps its own rule (#7683): "Yes, and remove the joke time skill too." after
     /// "Remove moon fact?" is not a plain yes, so nothing is removed and the
     /// lamp says so (`remove_not_plain_next`), never #7634's new ask.
     #[test]
@@ -3183,6 +2765,57 @@ mod tests {
         let told = answered(&id, 2, Some("yes"), Some("moon fact")).unwrap();
         assert_eq!(told["next"], remove_not_plain_next("moon fact"), "{told}");
         clear_for_test();
+    }
+
+    /// #7634: the forced round of a skill's task's wait tells `named` the
+    /// skills on the lamp, and that a name not among them is given as
+    /// heard, so the model names another skill the line names; a remove's
+    /// forced round is told none of it.
+    #[test]
+    fn only_a_tasks_forced_round_is_told_the_skills_on_the_lamp() {
+        let asks = |remove: bool| Asks {
+            skill: "page-title".into(),
+            sha256: "c".repeat(64),
+            writes: Vec::new(),
+            say_back: "It uses the light.".into(),
+            grants: (!remove).then(|| vec!["light".into()]),
+            code: false,
+            remove,
+        };
+        let line = [crate::second_provider::net::Message::user("Yes.")];
+        set_installed_here(vec!["page-title".into(), "weather".into()]);
+        for remove in [false, true] {
+            clear_for_test();
+            wait_for_yes(asks(remove), 1, Instant::now());
+            lamp_said(1, "It uses the light.");
+            let forced = approve_force()(&line).expect("forced");
+            assert_eq!(forced.fields, Some(&APPROVE_FIELDS[..]));
+            let told = forced.told.map(|told| (told.field, (told.more)()));
+            if remove {
+                assert_eq!(told, None);
+            } else {
+                let (field, more) = told.expect("told");
+                assert_eq!(field, NAMED);
+                assert!(
+                    more.contains("Skills on the lamp: page-title, weather."),
+                    "{more}"
+                );
+                assert!(more.contains("given as heard"), "{more}");
+            }
+        }
+        set_installed_here(Vec::new());
+        assert!(!skills_on_told().contains("Skills on the lamp"));
+        clear_for_test();
+    }
+
+    /// The skills on the lamp told stay within [`SKILLS_ON_TOLD_BYTES`].
+    #[test]
+    fn the_skills_on_the_lamp_told_are_bounded() {
+        set_installed_here((0..200).map(|at| format!("skill-number-{at}")).collect());
+        let told = skills_on_told();
+        assert!(told.len() < SKILLS_ON_TOLD_BYTES + 120, "{}", told.len());
+        assert!(told.contains("skill-number-0,"));
+        set_installed_here(Vec::new());
     }
 
     /// #7545 on a task's wait too: photo booth's task said back, then a

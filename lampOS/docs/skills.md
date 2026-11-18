@@ -1972,71 +1972,26 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (#7545): `named`, the skill the line names or `none`, must be the
   waiting skill's own name or `none`, else the yes is read as `new_ask`;
   a forced `yes` with no `named` reads as `unclear` ("Removed by voice",
-  "A yes bound to its skill"). For a skill's task the heard line is read
-  too (#7634, lamp-9adf 18 Nov 07:20:43: "Lamp, use my look title skill."
-  was taken as the yes to `page-title`'s waiting task): a line that names
-  a skill other than the waiting one is never its yes, whatever skill the
-  model named. At each "skill" or "skills" in a clause, code reads the
-  runs of up to six words right before it or right after it whose both
-  ends sit at the clause's edge, a bounding word or "skill". Before or
-  after a name, for example (the full lists are in the code): "my", "the",
-  "use", "run", "please", "and", and a yes said without its comma ("yes", "yeah", "yep", "ok", "okay", "sure", "go",
-  "with", "có", "ừ", "vâng", "được"), so "okay page title skill" and "go
-  ahead with weather skill" are still the yes (`skill_write_yes::BEFORE_A_NAME`);
-  after a name only, also "now", "too", "for", "to", "is", "instead"
-  (`AFTER_A_NAME`). It matches each run by the same match
-  (`made_remove::same_name`, with marks taken off the words said first,
-  since a made skill's name is written without them: "ừ đèn ngủ skill"
-  names `den-ngu`) against the waiting skill and the skills on
-  the lamp (`made_remove::names_on`: the made ones and the skills and
-  pushed folders', read only for a line said with "skill" while a task
-  waits). The longest match wins: a run naming another installed skill,
-  longer than any naming the waiting one, names that skill ("yes, use
-  skill page title backup" with `page-title-backup` on the lamp is not
-  page title's yes); else a run naming the waiting skill is its own name
-  ("yes, use my lamp test email two skill", "Có, dùng skill page title").
-  With neither, the words before "skill", back to a word that comes
-  before a name or the clause's start, are read with the fillers left out
-  ("the", "my", "run", "use", "great", "chạy", "cái", "đó", "em", "cho",
-  "làm", …, `skill_write_yes::FILLERS`); the word right before "skill"
-  always stays unless a filler or a yes or joining word ("ừ", "okay",
-  "and", `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp
-  skill". A filler or bounding word right before "skill" still ends a
-  name when the word before it can ("my morning run skill", "my quick
-  start skill"). None left, or only the waiting skill's own name words, with
-  "new", "old" or "daily" beside them (`DESCRIBING`), is its yes ("Yes, run my new weather
-  skill", "the daily weather skill", "yes, the weather skill" for weather
-  report, "Ừ, chạy cái skill đó đi", "Có, cái skill đó"); any other word
-  left names another skill, listed or not ("Lamp, use my look title
-  skill." even when look title is not on the lamp: being made, refused at
-  load or misheard; "my backup page title skill"; "yes, the daily
-  skill"). Safety first: a false
-  yes runs a skill's grants without consent, a false refusal only lets
-  the wait go. After "skill", with the lamp's skills read, words that name
-  no installed skill are nothing ("yes, run the skill again"); with none
-  read (none listed, or the folders unread) the words right after it fail
-  closed
-  (`skill_write_yes::other_skill_named`, marked per request by
-  `line_heard`). Its `yes` is read as `new_ask`: nothing kept, the wait
-  let go, and the line answered as its own ask (the named skill used or
-  asked). "yes, use my page title", "Yes, use my page title skill." and a
-  plain "Yes." are still page title's yes; "Yes, and use my weather
-  skill." with weather on the lamp is not. Accepted limits: a line without
-  the word "skill" is not read (its `named` alone binds it, #7545); "kỹ
-  năng" is not read; a describing word that is not a filler ("Yes,
-  awesome skill.", "my old-style weather skill") fails closed. A
-  remove's wait is not read for another skill: it keeps its own rule, a
-  plain yes on the line right after its question (#7683), so "Yes, and
-  remove the joke time skill too." removes nothing. The
-  journal: "… was a new ask, not an answer (a yes naming look title, not
-  page-title) …". The forced round is told only
+  "A yes bound to its skill"). The forced round is told only
   `approve_id`, `answer` and `named` of `make_skill`'s form, all required
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
-  make or edit beside the answer. A `no` or `unclear` is read before the
+  make or edit beside the answer. On a skill's task's wait, the model names
+  the skill and code gates (#7634, lamp-9adf 18 Nov 07:20:43: "Lamp, use
+  my look title skill." was taken as the yes to `page-title`'s task): the
+  forced round's `named` is also told the skills on the lamp by name
+  (`made_remove::names_on`, at most 600 bytes, none if they can't be read)
+  and that a skill named that isn't the one asked about, on the lamp or
+  not, is given as heard (`skill_write_yes::approve_force`). Code then
+  takes the yes only when `named` is `none` or the waiting skill
+  (`made_remove::same_name`); any other name, installed or not, is a
+  `new_ask`: nothing kept, the wait let go, and the line answered as its
+  own ask with one plain line. No word list decides it, so a miss by the
+  model fails toward no yes. A guest's yes the model names another skill
+  lets the owner's wait go the same way, approving nothing. A remove's or
+  a code's forced round is not told the skills. A `no` or `unclear` is read before the
   owner check, so anyone's (a guest's too) ends or re-asks the owner's
-  wait and never keeps a yes; a guest's line naming another skill
-  (#7634) lets the owner's wait go as a new ask, approving nothing; an
-  `answer` outside these four reads as `no`; two answers in one line are taken in call order, each as its own.
+  wait and never keeps a yes; an `answer` outside these four reads as
+  `no`; two answers in one line are taken in call order, each as its own.
   The journal: "the line after a
   skill's task said back whole: its first round must call make_skill",
   then the approval's lines, or "the answer to NAME's say-back was no:

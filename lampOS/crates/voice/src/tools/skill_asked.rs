@@ -275,11 +275,13 @@ pub fn force(offered: Option<Offered>) -> Force {
                 name: crate::use_skill::NAME,
                 only: Some(("skill", skill)),
                 fields: None,
+                told: None,
             }),
             None => Some(Forced {
                 name: skill,
                 only: None,
                 fields: None,
+                told: None,
             }),
         }
     })
@@ -504,7 +506,8 @@ mod tests {
                 Some(Forced {
                     name: crate::use_skill::NAME,
                     only: Some(("skill", HELP)),
-                    fields: None
+                    fields: None,
+                    told: None,
                 })
             );
         }
@@ -515,7 +518,8 @@ mod tests {
             Some(Forced {
                 name: HELP,
                 only: None,
-                fields: None
+                fields: None,
+                told: None,
             })
         );
         let mut after = who.to_vec();
@@ -529,7 +533,8 @@ mod tests {
                 Some(Forced {
                     name: crate::use_skill::NAME,
                     only: Some(("skill", HELP)),
-                    fields: None
+                    fields: None,
+                    told: None,
                 }),
                 "{said}"
             );
@@ -554,7 +559,8 @@ mod tests {
             Some(Forced {
                 name: crate::use_skill::NAME,
                 only: Some(("skill", SCENE)),
-                fields: None
+                fields: None,
+                told: None,
             })
         );
         assert_eq!(wrapped(&show), None, "light show not offered");
@@ -564,7 +570,8 @@ mod tests {
             Some(Forced {
                 name: SHOW,
                 only: None,
-                fields: None
+                fields: None,
+                told: None,
             })
         );
         let mut after = movie.to_vec();

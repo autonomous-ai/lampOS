@@ -155,11 +155,8 @@ pub fn near(apart: usize, name: &str) -> bool {
 /// [`near`] the whole name ("moon fax" is moon fact). Never a run inside
 /// longer words, so "moon fact" is not "moon", nor "evening dim" "moon
 /// fact" (#7545). Spelling only: no word is judged by what it means.
-/// Marks are taken off the words said first ([`unmarked`], #7634): a made
-/// skill's name is written without them (`den-ngu`), but a Vietnamese
-/// line says "đèn ngủ".
 pub fn same_name(named: &str, name: &str) -> bool {
-    let named = words_of(&unmarked(named)).concat();
+    let named = words_of(named).concat();
     !named.is_empty() && near(distance(&named, &words_of(name).concat()), name)
 }
 
@@ -258,21 +255,6 @@ fn after_none_found(request: u64, name: &str) -> bool {
     after && !line_names(request, name)
 }
 
-/// `said` with its letters' marks taken off ("đèn ngủ" is "den ngu"), as
-/// a skill's name is written: each letter decomposed, its combining marks
-/// left out, and "đ" as "d".
-pub(crate) fn unmarked(said: &str) -> String {
-    use unicode_normalization::UnicodeNormalization;
-    said.nfd()
-        .filter(|letter| !unicode_normalization::char::is_combining_mark(*letter))
-        .map(|letter| match letter {
-            'đ' => 'd',
-            'Đ' => 'D',
-            other => other,
-        })
-        .collect()
-}
-
 /// The person's made skills (the made skills' index), each name once with
 /// its package's SHA-256, the newest kept for a name.
 fn made(keeping: &Keeping) -> Vec<(String, String)> {
@@ -307,9 +289,10 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
 }
 
 /// The skills on the lamp by name: the person's made ones ([`made`]) and
-/// the skills and pushed folders' ([`others`]), as a remove finds them. A
-/// skill's task's wait reads a line said with "skill" against them
-/// (`skill_write_yes::other_skill_named`, #7634).
+/// the skills and pushed folders' ([`others`]), as a remove finds them.
+/// The forced approval round of a skill's task's wait is told them
+/// (`skill_write_yes::approve_force`, #7634), so the model can name
+/// another skill the line names.
 pub(crate) fn names_on(keeping: &Keeping) -> Vec<String> {
     let made = made(keeping);
     let mut names: Vec<String> = made.iter().map(|(name, _)| name.clone()).collect();

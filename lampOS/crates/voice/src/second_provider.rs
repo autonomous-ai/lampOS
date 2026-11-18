@@ -11679,8 +11679,7 @@ async fn spoken(
     // (`called`, the coordinator's hearing of the name alone: "Hi Lamp",
     // "Lamp ơi"), or as the coordinator reads a line of the name alone
     // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
-    // alone, or no words at all. A skill's task's yes is never taken in a
-    // line that names another skill (#7634).
+    // alone, or no words at all.
     // Its words too: only a plain yes the code reads confirms a made
     // skill's remove (`skill_write_yes::plain_answer`, #7683), and only a
     // plain replace a clash's replace (`made_clash::line_heard`).

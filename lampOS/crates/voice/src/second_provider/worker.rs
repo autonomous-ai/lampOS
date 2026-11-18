@@ -5921,11 +5921,13 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
                 name: crate::agent_tasks::START,
                 only: Some((crate::agent_tasks::WHO, agent)),
                 fields: None,
+                told: None,
             }),
             _ => Some(crate::second_provider::net::Forced {
                 name: crate::agent_tasks::START,
                 only: None,
                 fields: None,
+                told: None,
             }),
         }
     })
@@ -5958,6 +5960,7 @@ pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
                 name: crate::known_faces::REMEMBER,
                 only: None,
                 fields: None,
+                told: None,
             },
         )
     })
@@ -5987,6 +5990,7 @@ pub(crate) fn rename_asks(
             name: crate::known_faces::REMEMBER,
             only: None,
             fields: None,
+            told: None,
         })
     })
 }
@@ -33487,6 +33491,7 @@ mod memory_observer {
                         name,
                         only: None,
                         fields: None,
+                        told: None,
                     })
             })
         };

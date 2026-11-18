@@ -169,6 +169,7 @@ pub(crate) fn force() -> crate::second_provider::net::Force {
             name: super::REMEMBER,
             only: None,
             fields: None,
+            told: None,
         })
     })
 }

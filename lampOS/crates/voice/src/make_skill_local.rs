@@ -904,7 +904,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         // for the skill waiting, matched in code.
         parameters["properties"][crate::skill_write_yes::NAMED] = json!({
             "type": "string",
-            "description": "With approve_id only: the skill their line names, or none if it names no skill. When it is the skill asked about, copy that skill's name exactly as the note gives it. A yes counts only for the skill asked about."
+            "description": "With approve_id only: the skill their line names, the one asked about or any other, or none if it names no skill. When it is the skill asked about, copy that skill's name exactly as the note gives it. A yes counts only for the skill asked about."
         });
         parameters["required"] = json!([]);
     }

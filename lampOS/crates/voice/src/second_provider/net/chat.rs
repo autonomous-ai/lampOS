@@ -194,11 +194,63 @@ pub type Force = Arc<dyn Fn(&[Message]) -> Option<Forced> + Send + Sync>;
 /// told as declared. With `fields`, the function is told only those
 /// parameters, all required (the approve round of
 /// `LAMP_SKILL_WRITE_YES`: `approve_id` and `answer`, #6921).
+/// With `told`, one of its parameters' descriptions is told more, made
+/// when the request is sent (the approve round of a skill's task: the
+/// skills on the lamp, #7634).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Forced {
     pub name: &'static str,
     pub only: Option<(&'static str, &'static str)>,
     pub fields: Option<&'static [&'static str]>,
+    pub told: Option<Told>,
+}
+
+/// What a [`Forced`] function's parameter `field` is told beyond its own
+/// description: `more`'s words, made when the request is sent.
+#[derive(Clone, Copy)]
+pub struct Told {
+    pub field: &'static str,
+    pub more: fn() -> String,
+}
+
+/// Two are the same when they tell the same parameter: the words are made
+/// only when a request is sent.
+impl PartialEq for Told {
+    fn eq(&self, other: &Self) -> bool {
+        self.field == other.field
+    }
+}
+
+impl Eq for Told {}
+
+impl std::fmt::Debug for Told {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Told").field("field", &self.field).finish()
+    }
+}
+
+/// `tool`'s parameter `told.field` told `told.more`'s words after its own
+/// description, when it has that parameter.
+fn told_more(tool: &mut lamp_gemini::Tool, told: Told) {
+    let Some(described) = tool
+        .parameters
+        .as_mut()
+        .and_then(|parameters| parameters.get_mut("properties"))
+        .and_then(|properties| properties.get_mut(told.field))
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    let more = (told.more)();
+    if more.is_empty() {
+        return;
+    }
+    let own = described
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let whole = format!("{own}{more}");
+    described.insert("description".into(), json!(whole));
 }
 
 /// `tool`'s parameters cut to `fields`, each required; a field it does
@@ -520,11 +572,19 @@ impl Chat {
             .then(|| self.force.get().and_then(|force| force(messages)))
             .flatten()
             .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
-        if let Some(Forced { name, only, fields }) = forced
+        if let Some(Forced {
+            name,
+            only,
+            fields,
+            told,
+        }) = forced
             && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
         {
             if let Some(fields) = fields {
                 kept_fields(tool, fields);
+            }
+            if let Some(told) = told {
+                told_more(tool, told);
             }
             if let Some(only) = only {
                 pinned(tool, only);
