@@ -618,6 +618,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if on(lamp, "character.set") {
                 info["character_energy_supported"] = json!(true);
             }
+            // `make_skill_most_bytes` (18 Nov): the most bytes of words
+            // `skills.make` takes, 2,000, only while `can` names it, so the
+            // app holds a lamp that doesn't say it, an older one, to 480.
+            if on(lamp, "skills.make") {
+                info[crate::make_skill::MOST_WORDS_FIELD] =
+                    json!(crate::make_skill::MOST_WORDS_BYTES);
+            }
             some(info)
         }
         "system.version" => some(lamp.versions()),
@@ -1920,6 +1927,24 @@ pub mod tests {
         lamp.make_skill_ready = true;
         let can = named(&mut lamp);
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
+    }
+
+    /// 18 Nov: `system.info` says how many bytes of words `skills.make`
+    /// takes, 2,000, only while `can` names it; so the app holds a lamp
+    /// that says nothing, an older one, to its old 480.
+    #[test]
+    fn system_info_says_the_words_bound_only_while_make_skill_is_named() {
+        let bound = |lamp: &mut Fake| {
+            let info = answer(lamp, "system.info", &Value::Null).unwrap().unwrap();
+            info.get("make_skill_most_bytes").cloned()
+        };
+        let mut lamp = lamp();
+        assert_eq!(bound(&mut lamp), None);
+        lamp.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock"));
+        assert_eq!(bound(&mut lamp), None, "not ready: not named, not said");
+        lamp.make_skill_ready = true;
+        assert_eq!(bound(&mut lamp), Some(json!(2_000)));
+        assert_eq!(crate::make_skill::MOST_WORDS_FIELD, "make_skill_most_bytes");
     }
 
     /// #1685: with only skills' lines carried (`LAMP_SKILL_MESSAGES=on`,
