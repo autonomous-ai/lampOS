@@ -336,6 +336,8 @@ so an address it gives can't stand in for another service.
 A face kept with nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric: at the lamp it is kept only with
 the speaker's own "I'm X" proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing
 asked"); from the app's photo, only a photo of one face, never added to someone already kept ("A face from a photo").
+A face the lamp already knows that gives another name ("Call me Jay.") is no new face: it still goes to the eyes'
+rename and that person's yes.
 
 ## The weather's backup service (`LAMP_WEATHER_BACKUP`)
 

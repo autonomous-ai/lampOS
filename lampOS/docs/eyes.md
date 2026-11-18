@@ -1731,7 +1731,10 @@ With the switch:
   yes to a face question, is the model told the plain reason ("I could not
   see that the face in view was the one saying it"), still asking nothing
   (`CANT_KEEP_NO_ASK`), as the eyes' own reason is told on the speaker
-  route. A rename agreed to and "Forget my face" are unchanged. A
+  route. A rename agreed to and "Forget my face" are unchanged. A face
+  the eyes' known file names at the lamp is no new face: on either route
+  its "Call me Jay." still goes to the eyes' "known as" and the rename's
+  own yes, never a no-ask "not kept" (`known_now`, #7800). A
   `remember` of their own name while nobody is known
   (`LAMP_MEMORY_PERSONAL_NEEDS_FACE` with `LAMP_NAME_LEARN_FIX`) is told to
   call `remember_my_face` at once, not to ask, with `LAMP_REMEMBER_SPEAKER`
