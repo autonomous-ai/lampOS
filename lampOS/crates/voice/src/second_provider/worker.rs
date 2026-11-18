@@ -4410,17 +4410,28 @@ pub fn serve(
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
     // A made skill said removed, turned off or on in the lamp's own result
-    // words with no `make_skill` that did it is held the same way (#7683),
-    // with a voice make offered: its names read from `made.json` as each
+    // words, untrue and with no `make_skill` that did it, is held the same
+    // way (`LAMP_SKILL_CLAIM_CHECKED=on`, #7683), with a voice make offered:
+    // the skills read from `made.json` and lamp-skills' `off` file as each
     // turn begins.
-    let made_names =
-        action_claims && std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on");
-    engine = engine.reading_made_names(made_names.then(|| {
+    let skill_claims = action_claims
+        && crate::action_claim::skill_on()
+        && std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on");
+    if skill_claims {
+        eprintln!(
+            "lamp-voice second: a reply saying a made skill was removed, turned off or on, untrue and with no make_skill that did it, is held the same way (LAMP_SKILL_CLAIM_CHECKED)"
+        );
+    } else if crate::action_claim::skill_on() {
+        eprintln!(
+            "lamp-voice second: LAMP_SKILL_CLAIM_CHECKED does nothing without LAMP_ACTION_CLAIM_CHECKED and LAMP_MAKE_SKILL"
+        );
+    }
+    engine = engine.reading_made_names(skill_claims.then(|| {
         let read: crate::second_provider::MadeNames = Arc::new(|| {
-            crate::made_skill::entries(std::path::Path::new(crate::made_skill::DIRECTORY))
-                .iter()
-                .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
-                .collect()
+            crate::action_claim::made_skills(
+                std::path::Path::new(crate::made_skill::DIRECTORY),
+                std::path::Path::new(crate::skill_about::STATE_DIR),
+            )
         });
         read
     }));
