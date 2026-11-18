@@ -8949,3 +8949,115 @@ fn the_region_unit_may_write_sysstats_drop_ins() {
         );
     }
 }
+
+/// The `systemd-run` asked for #7254 part 2's removal, as the host records it.
+fn sysstat_removal(lamp: &Lamp) -> Vec<String> {
+    lamp.host
+        .calls
+        .iter()
+        .filter(|call| call.starts_with("refresh systemd-run"))
+        .cloned()
+        .collect()
+}
+
+/// #7254 part 2: only sysstat's own daily files (`sa` or `sar` and digits)
+/// directly in /var/log/sysstat are removed, each said by name and size,
+/// through one transient unit that may write that folder only.
+#[test]
+fn only_sysstats_own_kept_files_are_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    for (name, bytes) in [
+        ("sa18", 146_028),
+        ("sar17", 672_320),
+        ("sa1", 3),
+        ("sa", 1),
+        ("saXY", 1),
+        ("sadc", 1),
+        ("sa18.bak", 1),
+        ("notes", 1),
+    ] {
+        fs::write(folder.join(name), vec![0u8; bytes]).unwrap();
+    }
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
+        said.push(line.to_owned())
+    })
+    .unwrap();
+    assert_eq!(
+        removed,
+        [
+            "/var/log/sysstat/sa1",
+            "/var/log/sysstat/sa18",
+            "/var/log/sysstat/sar17",
+        ]
+    );
+    assert_eq!(
+        sysstat_removal(&lamp),
+        [
+            "refresh systemd-run --wait --collect --quiet --property=ProtectSystem=strict \
+          --property=ReadWritePaths=/var/log/sysstat --property=NoNewPrivileges=yes \
+          /bin/rm -f -- /var/log/sysstat/sa1 /var/log/sysstat/sa18 /var/log/sysstat/sar17"
+        ]
+    );
+    assert_eq!(
+        said,
+        [
+            "sysstat's kept file removed: /var/log/sysstat/sa1 (3 bytes)",
+            "sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)",
+            "sysstat's kept file removed: /var/log/sysstat/sar17 (672320 bytes)",
+        ]
+    );
+    for name in ["sa", "saXY", "sadc", "sa18.bak", "notes"] {
+        assert!(!install::sysstat_kept_name(name), "{name}");
+    }
+}
+
+/// #7254 part 2: a link, a folder, or a file of that name anywhere else is
+/// never followed or touched; with nothing of sysstat's kept, nothing runs.
+#[test]
+fn a_link_a_folder_or_a_file_elsewhere_is_never_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(folder.join("sa02")).unwrap();
+    fs::write(folder.join("sa02").join("sa03"), "inside a folder").unwrap();
+    let elsewhere = lamp.on("/etc/lampOS/sa04");
+    fs::create_dir_all(elsewhere.parent().unwrap()).unwrap();
+    fs::write(&elsewhere, "elsewhere").unwrap();
+    std::os::unix::fs::symlink(&elsewhere, folder.join("sa01")).unwrap();
+    fs::write(lamp.on("/var/log/sa05"), "beside the folder").unwrap();
+    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |_| {}).unwrap();
+    assert!(removed.is_empty(), "{removed:?}");
+    assert!(sysstat_removal(&lamp).is_empty());
+    // No folder at all: nothing either.
+    let mut bare = Lamp::new(188, &[]);
+    assert!(
+        install::sysstat_kept_removed(&bare.root, &mut bare.host, &mut |_| {})
+            .unwrap()
+            .is_empty()
+    );
+    assert!(sysstat_removal(&bare).is_empty());
+}
+
+/// #7254 part 2: with /etc/lampOS/sysstat-on (the owner wants sysstat),
+/// nothing is removed, and nothing is said.
+#[test]
+fn with_sysstat_on_nothing_kept_is_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), "kept").unwrap();
+    let on = lamp.on(install::SYSSTAT_ON_PATH);
+    fs::create_dir_all(on.parent().unwrap()).unwrap();
+    fs::write(&on, "").unwrap();
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
+        said.push(line.to_owned())
+    })
+    .unwrap();
+    assert!(removed.is_empty());
+    assert!(said.is_empty(), "{said:?}");
+    assert!(sysstat_removal(&lamp).is_empty());
+    assert!(folder.join("sa18").exists());
+}
