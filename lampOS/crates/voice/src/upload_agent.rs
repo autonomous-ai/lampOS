@@ -688,6 +688,57 @@ pub fn capped(text: &str) -> Result<(String, made_skill::Uses), Refused> {
 /// skill may carry; off, it is refused [`NO_SERVICES`]. lamp-skills and its
 /// manage helper pass their own switch.
 pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Uses), Refused> {
+    capped_grants(text, services, false)
+}
+
+/// The grants a task for the lamp's agent made here from the person's own
+/// ask, only asked for (`crate::make_no_cannot::covered`, its card marked
+/// [`crate::make_no_cannot::ASKED_MARK`]), may carry beyond a file's: the
+/// owner's "if a skill needs a grant, give it" and the first builder's
+/// ruling of 19 Nov 00:24, each bounded to the run its phrase starts.
+pub const ASKED_GRANTS: [&str; 8] = [
+    "body",
+    "air",
+    "device",
+    "notes",
+    "look",
+    "microphone",
+    "hear",
+    "speech",
+];
+
+/// Whether `card` is a task for the lamp's agent made here from the
+/// person's own ask ([`crate::make_no_cannot::ASKED_MARK`]).
+pub fn is_asked_card(card: &str) -> bool {
+    is_agent_card(card)
+        && card
+            .lines()
+            .any(|line| line.trim() == crate::make_no_cannot::ASKED_MARK)
+}
+
+/// [`capped_with`] for the skill whose card is `card`: one made here from
+/// the person's own ask ([`is_asked_card`]) may also carry
+/// [`ASKED_GRANTS`]; any other is held to a file's grants.
+pub fn capped_card(
+    text: &str,
+    card: &str,
+    services: bool,
+) -> Result<(String, made_skill::Uses), Refused> {
+    capped_grants(text, services, is_asked_card(card))
+}
+
+/// [`capped_card`] for a task made here from the person's own ask, as it
+/// is kept ([`made_skill::keep_agent_asked`]), before its card is marked.
+pub fn capped_asked(text: &str) -> Result<(String, made_skill::Uses), Refused> {
+    capped_grants(text, crate::made_skill::agent_services_here(), true)
+}
+
+/// [`capped_with`], with [`ASKED_GRANTS`] too when `asked`.
+fn capped_grants(
+    text: &str,
+    services: bool,
+    asked: bool,
+) -> Result<(String, made_skill::Uses), Refused> {
     let table: toml::Table =
         toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
     let allowed = [
@@ -745,11 +796,12 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
             "camera",
             crate::skill_task_yes::NET.0,
         ];
+        let known = known.contains(&grant) || (asked && ASKED_GRANTS.contains(&grant));
         let service = made_skill::service_grant(grant).is_some();
         if service && !services && !seen.contains(&grant) {
             return Err(Refused::new(NO_SERVICES));
         }
-        if !(known.contains(&grant) || service) || seen.contains(&grant) {
+        if !(known || service) || seen.contains(&grant) {
             return Err(Refused::new(
                 "an agent skill's grants are the camera, the light, its voice, sounds, the internet \
                  and your linked services",
@@ -761,6 +813,7 @@ pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Us
         seen.push(grant);
         match grant {
             "light" => uses.light = true,
+            "body" => uses.body = true,
             "speak" => uses.speak = true,
             "camera" => uses.camera = true,
             _ => {}
