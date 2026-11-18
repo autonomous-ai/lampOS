@@ -663,7 +663,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   does, so no `turn_lost`, limit line or other line follows it, and it is
   still a refused turn to the coordinator. Any other line, or an ask its
   function refuses (run once, never again after the chat), hears the limit
-  as above. With `LAMP_SECOND_REFUSED_HOLD`, a spoken line held only for
+  as above. Only the relay's own word keys it (its `usage_limit` 429,
+  #7642): 429s that last `LIMIT_AFTER` without it still say the limit
+  line, but a plain ask is then the model's, its chat asked as before. With `LAMP_SECOND_REFUSED_HOLD`, a spoken line held only for
   429s is sent all the same (`model_refusing::only_rate_limited`), so the
   route can match it; any other refusal still holds it. A timer and the
   time are not done yet: their lines carry a time and can't be rendered
