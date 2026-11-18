@@ -160,6 +160,101 @@ pub fn same_name(named: &str, name: &str) -> bool {
     !named.is_empty() && near(distance(&named, &words_of(name).concat()), name)
 }
 
+/// What the model is told of a remove that found a skill on the line right
+/// after a remove that found none, when that line doesn't name it
+/// ([`after_none_found`]).
+pub const NONE_FOUND_BEFORE: &str = "the remove just asked found no skill they made, and this line names no other: nothing to remove";
+
+/// A remove that found no skill the person made ([`Found::Nothing`] or
+/// [`Found::NotMade`]): its request, and the first later line heard after
+/// it ([`line_heard`]). Nothing waits for a yes after it; this only keeps
+/// a yes on the next line from picking another skill.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct NoneFound {
+    request: u64,
+    next_line: Option<u64>,
+}
+
+#[cfg(not(test))]
+mod kept {
+    use super::NoneFound;
+    use std::sync::Mutex;
+    static NONE_FOUND: Mutex<Option<NoneFound>> = Mutex::new(None);
+    static LINE: Mutex<Option<(u64, String)>> = Mutex::new(None);
+    pub fn none_found<R>(f: impl FnOnce(&mut Option<NoneFound>) -> R) -> R {
+        f(&mut NONE_FOUND
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+    pub fn line<R>(f: impl FnOnce(&mut Option<(u64, String)>) -> R) -> R {
+        f(&mut LINE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+}
+
+/// Tests: each test thread has its own.
+#[cfg(test)]
+mod kept {
+    use super::NoneFound;
+    use std::cell::RefCell;
+    thread_local! {
+        static NONE_FOUND: RefCell<Option<NoneFound>> = const { RefCell::new(None) };
+        static LINE: RefCell<Option<(u64, String)>> = const { RefCell::new(None) };
+    }
+    pub fn none_found<R>(f: impl FnOnce(&mut Option<NoneFound>) -> R) -> R {
+        NONE_FOUND.with(|cell| f(&mut cell.borrow_mut()))
+    }
+    pub fn line<R>(f: impl FnOnce(&mut Option<(u64, String)>) -> R) -> R {
+        LINE.with(|cell| f(&mut cell.borrow_mut()))
+    }
+}
+
+/// The second route asks the model the person's line `line` of `request`
+/// (more than the lamp's name): kept, in memory only and never journalled,
+/// until the next, so a remove on the line right after one that found
+/// nothing is asked only when that line names the skill found
+/// ([`after_none_found`]). A second line after that remove ends it.
+pub fn line_heard(request: u64, line: &str) {
+    kept::line(|kept| *kept = Some((request, line.to_owned())));
+    kept::none_found(|none| {
+        let Some(found) = none.as_mut().filter(|found| request > found.request) else {
+            return;
+        };
+        match found.next_line {
+            None => found.next_line = Some(request),
+            Some(next) if request > next => *none = None,
+            Some(_) => {}
+        }
+    });
+}
+
+/// Whether the person's own line of `request` ([`line_heard`]) names the
+/// skill `name`, by spelling, as a remove's name is found ([`apart`],
+/// [`near`]): "remove btc price then" does, "Yes, remove it." doesn't.
+fn line_names(request: u64, name: &str) -> bool {
+    kept::line(|kept| {
+        kept.as_ref()
+            .is_some_and(|(line_of, line)| *line_of == request && near(apart(line, name), name))
+    })
+}
+
+/// A remove in `request` that found the person's skill `name`, on the line
+/// right after a remove that found none, or in its turn (lamp-9adf, 18 Nov, the first
+/// builder's ruling: "remove the bitcoin warning skill" found nothing, then
+/// "Yes, remove it." had the model remove `btc-price`, an older skill,
+/// asked "Remove btc price?", and the next line was taken as its yes).
+/// Asked only when that line names it itself; else nothing is asked and
+/// nothing waits. Any remove ends what the one before found.
+fn after_none_found(request: u64, name: &str) -> bool {
+    let after = kept::none_found(|none| {
+        none.take().is_some_and(|found| {
+            // Its own line too: a second remove in the same turn, the
+            // model's guess, is no ask of the person's either.
+            request >= found.request && found.next_line.is_none_or(|next| next == request)
+        })
+    });
+    after && !line_names(request, name)
+}
+
 /// The person's made skills (the made skills' index), each name once with
 /// its package's SHA-256, the newest kept for a name.
 fn made(keeping: &Keeping) -> Vec<(String, String)> {
@@ -349,6 +444,29 @@ pub fn asked(
             Found::Nothing => "nothing near",
         }
     );
+    // A remove that found none of theirs leaves nothing waiting, and a yes
+    // on the next line never picks another skill (the first builder's
+    // ruling, 18 Nov): only a line that names the one found asks it.
+    match &found {
+        Found::Nothing | Found::NotMade { .. } => kept::none_found(|none| {
+            *none = Some(NoneFound {
+                request,
+                next_line: None,
+            });
+        }),
+        Found::Made { name, .. } if after_none_found(request, name) => {
+            eprintln!(
+                "lamp-voice: request {request}: a remove right after one that found nothing, its line not naming the skill found: nothing asked (#6960)"
+            );
+            return json!({
+                "error": NONE_FOUND_BEFORE,
+                "next": "Say plainly, in a few words, that nothing is removed: the skill they \
+                         asked to remove isn't one they made, so you won't pick another. If they \
+                         want one removed, they can say its name. Call nothing."
+            });
+        }
+        _ => kept::none_found(|none| *none = None),
+    }
     // Asked once at most, and only when a name would be said.
     let mut owner_hears = Some(owner_hears);
     let mut hears = None;
@@ -709,6 +827,8 @@ pub(crate) mod tests {
         let id = id_of(&asked(ask("moon-fax", 1), &keeping, owner, now));
         yes::lamp_said(1, "Remove moon fact?");
         assert!(yes::approve_forced_now(now), "the next line must answer it");
+        // "Yes, remove it.": the line right after the question, a plain yes.
+        yes::line_heard(2, false, 3);
         assert_eq!(yes::answered(&id, 2, Some("yes"), Some("moon fax")), None);
         assert_eq!(
             crate::make_skill_local::not_owners_yes_refused(&id, || true),
@@ -840,6 +960,7 @@ pub(crate) mod tests {
             let now = Instant::now();
             let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
             yes::lamp_said(1, "Remove moon fact?");
+            yes::line_heard(2, false, 1);
             let told = yes::answered(&id, 2, Some("yes"), named);
             assert_eq!(told.is_none(), taken, "{named:?}: {told:?}");
             if named.is_none() {
@@ -929,12 +1050,16 @@ pub(crate) mod tests {
         );
         assert!(!yes::awaited(now));
         for heard in ["weather report", "moon-fax"] {
+            // Each asked in its own words: a remove after one that found
+            // nothing is asked only when its line names the skill.
+            line_heard(1, &format!("remove the {heard} skill"));
             let told = asked(ask(heard, 1), &keeping, || false, now);
             assert_eq!(told["error"], NO_MADE, "{heard}: {told}");
             let next = told["next"].as_str().unwrap();
             assert!(!next.contains("moon fact"), "{heard}: {next}");
             assert!(!yes::awaited(now));
         }
+        line_heard(1, "remove the moon fact skill");
         let told = asked(ask("moon fact", 1), &keeping, || panic!("asked whose"), now);
         assert_eq!(told["remove"], "moon-fact", "{told}");
         let _ = std::fs::remove_dir_all(&root);
