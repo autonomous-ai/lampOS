@@ -4402,15 +4402,19 @@ started or running (`action_claim::SKILL_SAID`, `BARE_SKILL_SAID`), closing at
 its sentence's end and never on a '?', is held only when both hold:
 (a) its subject, whole (`action_claim::claim_subject`: the words before "is",
 "was" or "has", or after "I" and its verb, in the first clause that holds the
-claim's verb, "the", "my", "your", "skill" and "app" left out; "the stretch
+claim's verb, "the", "my", "your", "skill" and "app" left out at its edges
+only ("walk the dog" stays whole); "the stretch
 reminder" is not "stretch"), is one of the person's MADE skills (`made.json`,
 `made_remove::names`) by its exact name, compared lower case with spaces,
 hyphens and underscores dropped (`action_claim::made_named`: "moon time",
 "moon-time" and `moon_time` are one); and (b) the turn has no call of its kind
 for that skill (`action_claim::backs_skill`): removed, turned off or turned on
 need a `make_skill` whose argument, compared the same way, holds that subject
-("moon time scale" holds "moon time"), or a yes (`approve_id`); started or
-running need a `make_skill` `run` or a `use_skill` `skill` that holds it. A
+("moon time scale" holds "moon time") or is near it as the call itself finds
+the skill (`made_remove::apart_any` and `near`: "cloud fax" turns CloudFact
+off, "the moon fax" moon-fact said "Moonfact"), or a yes (`approve_id`);
+started or running need a `make_skill` `run` or a `use_skill` `skill` that
+holds it or is near it the same way. A
 made skill said made is never held: it is there.
 Held, it is asked once more with the same note, then said as "Sorry, I didn't
 do that. Could you ask me again?". A made skill said off that `lamp-skills`'
@@ -4423,7 +4427,7 @@ function has another name ("the guard mode skill is started" beside
 "CloudFact was never actually made.". A light call beside "Moon time is
 removed." backs nothing, so it is held. The names and the off ones are read
 once a judged turn from the lamp's own files. Only English replies are read,
-and only the reply's opening sentence. Tests:
+and only the sentence that holds the claim ("Okay. Moon time is removed." reads its second). Tests:
 `action_claim::tests::a_made_skill_said_removed_with_no_make_is_a_claim`,
 `a_claim_naming_no_made_skill_is_none`,
 `a_made_skill_said_on_or_off_is_judged_by_its_state`,
@@ -4446,7 +4450,7 @@ removed line after it stands. Like the worded claims it never judges a line
 the person asked as a question, whose reply may tell a true state. "You have
 three skills.", "I can make a skill for that." and "CloudFact was never
 actually made." are no claims. Only English replies are read, and only the
-reply's opening sentence. Tests:
+sentence that holds the claim ("Okay. Moon time is removed." reads its second). Tests:
 `action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
 `talk_about_skills_is_no_skill_claim`,
 `second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,

@@ -162,9 +162,10 @@
 //! with spaces, hyphens and underscores dropped ([`made_named`]), and (b)
 //! the turn has no call of its kind for that skill ([`backs_skill`]):
 //! removed, turned off or turned on need a `make_skill` whose argument holds
-//! that name ("moon time scale" holds "moon time") or a yes
-//! (`approve_id`); started or running a `make_skill` `run` or `use_skill`
-//! `skill` that holds it. A made skill said made is never held (it is
+//! that name ("moon time scale" holds "moon time") or is near it as the
+//! call finds the skill ([`holds_the_name`]: "cloud fax" for CloudFact), or
+//! a yes (`approve_id`); started or running a `make_skill` `run` or
+//! `use_skill` `skill` that holds it or is near it the same way. A made skill said made is never held (it is
 //! there), nor one said off that the off file shows off already, or on that
 //! it shows on: true states. Everything else stands: core and installed skills,
 //! near names, bare states naming no made skill ("Okay, the stove is turned
@@ -1071,14 +1072,16 @@ pub fn skill_claim(reply: &str, ended: bool, known: &KnownSkills) -> Option<Opti
 /// about, its whole subject ([`claim_subject`], equal to a made skill's
 /// name when the claim was held): [`flat`] inside `arg`'s ("moon time
 /// scale" holds "moon time"), or near it as the call itself found the
-/// skill (`made_remove::apart` and `near`: "cloud fax" turns CloudFact off,
-/// "moon fax" runs moon fact; the coordinator's P1 on 718c0112dd).
+/// skill (`made_remove::apart_any` and `near`, over runs of every length so
+/// a subject written as fewer words than the made name still meets the run
+/// the call matched: "cloud fax" turns CloudFact off, "the moon fax" turns
+/// moon-fact off said "Moonfact"; the coordinator's P1 on 718c0112dd).
 fn holds_the_name(reply: &str, arg: &str) -> bool {
     let subject = claim_subject(reply).join(" ");
     let flat_subject = flat(&subject);
     !flat_subject.is_empty()
         && (flat(arg).contains(&flat_subject)
-            || crate::made_remove::near(crate::made_remove::apart(arg, &subject), &subject))
+            || crate::made_remove::near(crate::made_remove::apart_any(arg, &subject), &subject))
 }
 
 /// Whether `reply` asks for a skill's change: a remove, a turn off or on,
@@ -5001,6 +5004,17 @@ pub(crate) mod tests {
             off_said,
             false,
             [(crate::made_skill::MAKE, &far)],
+            &[]
+        ));
+        // Said as one word for the two-word made name (the fourth read's
+        // P2 on 81d772dbcb): the call's run "moon fax" still backs it.
+        let fax = serde_json::json!({ "turn_off": "the moon fax" });
+        let one_word = "Moonfact is turned off.";
+        assert!(stands_on(
+            Claim::Skill,
+            one_word,
+            false,
+            [(crate::made_skill::MAKE, &fax)],
             &[]
         ));
         let run_said = "I've started the moon fact skill.";

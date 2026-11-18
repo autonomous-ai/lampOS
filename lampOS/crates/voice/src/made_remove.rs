@@ -140,6 +140,19 @@ pub fn apart(asked: &str, name: &str) -> usize {
         .fold(whole, usize::min)
 }
 
+/// [`apart`] over runs of `asked`'s words of every length, not only the
+/// name's: a claim's subject may be written as fewer words than the made
+/// name ("Moonfact" for "moon-fact"), so the run the call matched to the
+/// made name is among these whatever the subject's word count (#7601).
+pub fn apart_any(asked: &str, name: &str) -> usize {
+    let asked = words_of(asked);
+    let wanted = words_of(name).concat();
+    (1..=asked.len())
+        .flat_map(|len| asked.windows(len))
+        .map(|run| distance(&run.concat(), &wanted))
+        .fold(distance(&asked.concat(), &wanted), usize::min)
+}
+
 /// Whether `apart` letters from the skill `name` is near enough: at most a
 /// quarter of its letters (a short name only as it is written).
 pub fn near(apart: usize, name: &str) -> bool {

@@ -1559,15 +1559,19 @@ dạng câu hỏi, câu trả lời mở đầu, trần hoặc sau một lời d
 bao giờ với dấu '?', chỉ bị giữ khi cả hai điều sau đúng: (a) toàn bộ chủ ngữ
 của câu (`action_claim::claim_subject`: các từ trước "is", "was" hay "has",
 hoặc sau "I" và động từ, trong mệnh đề đầu tiên có động từ của câu nói, bỏ
-"the", "my", "your", "skill" và "app"; "the stretch reminder" không phải
+"the", "my", "your", "skill" và "app" chỉ ở hai đầu ("walk the dog" giữ
+nguyên); "the stretch reminder" không phải
 "stretch") đúng là tên một kỹ năng người dùng ĐÃ TẠO (`made.json`,
 `made_remove::names`), so sánh chữ thường và bỏ khoảng trắng, gạch nối, gạch
 dưới (`action_claim::made_named`: "moon time", "moon-time" và `moon_time` là
 một); và (b) lượt không có lời gọi đúng loại cho kỹ năng đó
 (`action_claim::backs_skill`): gỡ, tắt hay bật cần một `make_skill` có đối số,
-so sánh cùng cách, chứa chủ ngữ đó ("moon time scale" chứa "moon time"), hoặc
-một lời đồng ý (`approve_id`); khởi động hay đang chạy cần `run` của
-`make_skill` hay `skill` của `use_skill` chứa tên đó. Một kỹ năng đã tạo được
+so sánh cùng cách, chứa chủ ngữ đó ("moon time scale" chứa "moon time") hoặc
+gần nó theo đúng cách lời gọi tìm ra kỹ năng (`made_remove::apart_any` và
+`near`: "cloud fax" tắt CloudFact, "the moon fax" tắt moon-fact được nói là
+"Moonfact"), hoặc một lời đồng ý (`approve_id`); khởi động hay đang chạy cần
+`run` của `make_skill` hay `skill` của `use_skill` chứa tên đó hoặc gần nó
+cùng cách. Một kỹ năng đã tạo được
 nói là đã tạo thì không bao giờ bị giữ: nó vẫn ở đó. Khi bị giữ, mô hình được
 hỏi lại một lần với cùng ghi chú, rồi đèn nói "Sorry, I didn't do that. Could
 you ask me again?". Một kỹ năng đã tạo được nói là đã tắt mà tệp `off` của
@@ -1580,8 +1584,7 @@ guard mode skill is started" bên cạnh `keep_watch`), "You have three
 skills.", "I can make a skill for that." và "CloudFact was never actually
 made.". Một lời gọi đèn bên cạnh "Moon time is removed." không xác nhận gì,
 nên câu đó bị giữ. Tên và các kỹ năng đã tắt được đọc một lần mỗi lượt được
-xét, từ các tệp của chính đèn. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu mở
-đầu. Kiểm thử:
+xét, từ các tệp của chính đèn. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu có lời nói đó ("Okay. Moon time is removed." đọc câu thứ hai). Kiểm thử:
 `action_claim::tests::a_made_skill_said_removed_with_no_make_is_a_claim`,
 `a_claim_naming_no_made_skill_is_none`,
 `a_made_skill_said_on_or_off_is_judged_by_its_state`,
@@ -1603,7 +1606,7 @@ lời gọi `make_skill` có `approve_id`, nên câu "đã gỡ" sau đó đư�
 lời nói theo cách riêng, nó không bao giờ xét một câu người dùng hỏi dạng câu
 hỏi, vì câu trả lời có thể kể một trạng thái đúng. "You have three skills.",
 "I can make a skill for that." và "CloudFact was never actually made." không
-phải lời nói đã làm. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu mở đầu. Kiểm
+phải lời nói đã làm. Chỉ đọc câu trả lời tiếng Anh, và chỉ câu có lời nói đó ("Okay. Moon time is removed." đọc câu thứ hai). Kiểm
 thử: `action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
 `talk_about_skills_is_no_skill_claim`,
 `second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
