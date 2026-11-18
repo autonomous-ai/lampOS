@@ -100,6 +100,25 @@ pub const NOT_ACTED: &str = "nothing was made: it wasn't clear what to make";
 /// What the model is told to do of a make not acted on.
 pub const NOT_ACTED_NEXT: &str = "Nothing was made. Ask nothing, ask them to repeat nothing, and \
                                   never say a skill was made. Call nothing.";
+/// What `make_skill`'s description adds with this switch (#7828's
+/// DEFAULT-ON, fix 1: on lamp-9adf's second route the model still asked
+/// "Do you want me to make it again?" and "Did you mean…? Say the word"
+/// before calling): a make or a remove is called at once, never asked
+/// first, and the line it is told carries the undo. Short: with every
+/// switch the lamp's unit sets on, the description stays within the
+/// link's 1,024 bytes; the rest is told on the remove's parameter
+/// ([`REMOVE_AT_ONCE_TOLD`]).
+pub const AT_ONCE_TOLD: &str =
+    " Make or remove at once, never asking first, even of one they have: your line gives the undo.";
+
+/// What the remove's parameter adds with this switch (fix 1: "Which one —
+/// the flip a coin skill, or the blue head-pat glow?" to "remove it"):
+/// called at once, never a "did you mean" or a yes; which one is asked
+/// only when two skills they made fit the words alike, never of "it",
+/// which the conversation's note of what was just made names.
+pub const REMOVE_AT_ONCE_TOLD: &str = " Call it at once, never asking first or for a yes; ask \
+     which only when two skills they made fit the words alike, never of \"it\".";
+
 /// Why a skill with code of its own isn't put on for anyone but the owner.
 pub const NOT_OWNERS_CODE: &str =
     "only the lamp's owner can put on a skill that runs its own code, by asking for it";
