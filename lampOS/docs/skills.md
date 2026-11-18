@@ -4781,11 +4781,15 @@ code (`made_remove::asked`):
     after it or not), then one of the lamp's own result words for it
     (`action_claim::SKILL_REMOVED`: "is removed", from `removed_next`;
     `SKILL_OFF`: "is off", and `SKILL_ON`: "is on again", from `made_turn`,
-    and "is on", a clash's), or with a clash's "I removed" before the name,
-    closing at its sentence's end and never on a '?', is a claim
-    (`action_claim::skill_claim`). Only a name of two words or more is
-    judged (a hyphen in its folder's name): a one-word name ("music",
-    "light") is a common noun as often as a skill. Structure only, never a
+    "is on now", from a code make's yes, and "is on", a clash's), or with a
+    clash's "I removed" before the name, closing at its sentence's end and
+    never on a '?', is a claim (`action_claim::skill_claim`), after a
+    "Done" opening too ("Done, planet fact is removed." is bound to planet
+    fact, not taken as any call's line). For off and on only a name of two
+    words or more is judged (a hyphen in its folder's name): a one-word
+    name ("music", "light") is a common noun as often as a skill. "Removed"
+    is judged for a one-word name too ("Pomodoro is removed."), as a
+    removed skill has no true state to tell. Structure only, never a
     list of words for meaning: the names are the lamp's records, the words
     its own lines'. "Planet fact is still there.", "Is planet fact
     removed?", and a skill no longer listed are none. On a line asked as a
@@ -4793,7 +4797,10 @@ code (`made_remove::asked`):
   - **Bound to its own skill and kind** (`action_claim::skill_stands`,
     Twelve's and El's P2s on #7730). Each `make_skill` outcome is kept with
     the made skill's own name (`after_forget::status`: `removed`, a remove's
-    yes or a clash's replace; `turned_off`; `turned_on`). "X is removed."
+    yes or a clash's replace; `turned_off`; `turned_on`, a turn on, or a
+    put-on: a make's or a clash's keep or replace `{"made": X, "on":
+    true}`, and a code make's yes, whose answer now names its skill the
+    same way). "X is removed."
     stands only beside a `removed` of X in the turn: a remove that only
     asked its question, or the removal of another skill, backs nothing.
   - **A true state is never held.** "X is off." stands only when X is off
@@ -4803,7 +4810,9 @@ code (`made_remove::asked`):
     fact is off, so it didn't run." after a run refused as it isn't on the
     lamp, "Planet fact is on, and rain joke is off." to "Can you tell me
     which skills are on?", and "Planet fact is off." to "Tell me about
-    planet fact." while it is off are said as they are. A skill removed in
+    planet fact." while it is off are said as they are, as are "Okay,
+    planet fact is on now." after a code make's yes and "Moon fact is on."
+    after a clash's keep. A skill removed in
     an earlier turn is gone from `made.json`, so its name is never read.
   - **Held, asked again once.** A claim that doesn't stand is not said, and
     the model is asked again once with `action_claim::SKILL_NOTE` (nothing
@@ -4812,9 +4821,11 @@ code (`made_remove::asked`):
     a second claim, or one in the last round, is said as "Sorry, I didn't do
     that. Could you ask me again?". Said in the round of its own
     `make_skill` (the forced yes round's "Okay, planet fact is removed."
-    beside its `approve_id`), the words ran ahead of the call: not said, no
-    note, and the next round says the lamp's result from its answer, as a
-    forget's words do. The journal: "its reply claims a skill removed action
+    beside its `approve_id`, a turn or a clash's choice), the words ran
+    ahead of the call: not said, no note, and the next round says the
+    lamp's result from its answer, as a forget's words do. Beside a call
+    that changes no skill (a list, or a remove that only asks its question)
+    they are held with the note. The journal: "its reply claims a skill removed action
     no call made … (LAMP_ACTION_CLAIM_CHECKED, a made skill's change in the
     lamp's own result words)", or "its reply says a made skill's change
     before its make_skill ran: not said … no note
@@ -4884,7 +4895,10 @@ change said with no call (#7683),
 `a_real_remove_on_the_yes_is_said`, `a_skill_named_in_passing_is_said`,
 `words_beside_their_own_remove_call_are_never_told_not_done`,
 `another_skills_turn_backs_no_claim`, `a_true_off_after_a_refused_run_is_said`,
-`a_true_state_told_with_no_call_is_said`.
+`a_true_state_told_with_no_call_is_said`, `a_code_makes_yes_backs_its_on`,
+`a_clash_keep_backs_its_on`,
+`a_remove_said_done_beside_an_ask_only_call_is_noted`,
+`a_one_word_skill_said_removed_is_held`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

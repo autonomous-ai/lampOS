@@ -1701,7 +1701,9 @@ pub fn approve(
             } else {
                 CODE_ON_TASK_WAITS_NEXT
             };
-            json!({ "approved": true, "on": true, "task": task, "next": next })
+            // Named as a make names what it put on, so a true "X is on now"
+            // after it stands (`after_forget::status`, #7730).
+            json!({ "approved": true, "made": waiting.asks.skill, "on": true, "task": task, "next": next })
         }
         // A skill's task (#6305): its grants and folder kept, as said.
         Ok(result) if waiting.asks.grants.is_some() => {

@@ -1817,12 +1817,17 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
     viết, có hoặc không có "the" phía trước hay "skill" phía sau), rồi đến
     một trong các từ kết quả của chính đèn cho nó
     (`action_claim::SKILL_REMOVED`: "is removed", từ `removed_next`;
-    `SKILL_OFF`: "is off", và `SKILL_ON`: "is on again", từ `made_turn`, và
-    "is on", của một xung đột), hoặc bằng "I removed" của một xung đột trước
-    tên, kết thúc ở cuối câu và không bao giờ bằng '?', là một lời khẳng
-    định (`action_claim::skill_claim`). Chỉ xét tên có từ hai từ trở lên
-    (có dấu gạch nối trong tên thư mục): tên một từ ("music", "light") cũng
-    hay là danh từ chung như là tên kỹ năng. Chỉ dựa vào cấu trúc, không bao
+    `SKILL_OFF`: "is off", và `SKILL_ON`: "is on again", từ `made_turn`,
+    "is on now", từ cái "có" của một lần tạo kỹ năng có mã, và "is on", của
+    một xung đột), hoặc bằng "I removed" của một xung đột trước tên, kết
+    thúc ở cuối câu và không bao giờ bằng '?', là một lời khẳng định
+    (`action_claim::skill_claim`), cả sau lời mở đầu "Done" ("Done, planet
+    fact is removed." được gắn với planet fact, không bị coi là dòng của bất
+    kỳ lời gọi nào). Với tắt và bật, chỉ xét tên có từ hai từ trở lên (có
+    dấu gạch nối trong tên thư mục): tên một từ ("music", "light") cũng hay
+    là danh từ chung như là tên kỹ năng. "Đã gỡ" được xét cả với tên một từ
+    ("Pomodoro is removed."), vì một kỹ năng đã gỡ không có trạng thái đúng
+    nào để báo. Chỉ dựa vào cấu trúc, không bao
     giờ là danh sách từ để đoán nghĩa: tên là hồ sơ của đèn, các từ là của
     chính các dòng của đèn. "Planet fact is still there.", "Is planet fact
     removed?", và một kỹ năng không còn trong danh sách không phải. Trên một
@@ -1831,7 +1836,10 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
     (`action_claim::skill_stands`, P2 của Twelve và El trên #7730). Mỗi kết
     quả của `make_skill` được giữ kèm tên riêng của kỹ năng đã tạo
     (`after_forget::status`: `removed`, cái "có" của việc gỡ hay việc thay
-    thế của một xung đột; `turned_off`; `turned_on`). "X is removed." chỉ
+    thế của một xung đột; `turned_off`; `turned_on`, một lần bật lại, hay
+    một lần đưa lên: `{"made": X, "on": true}` của một lần tạo hay của việc
+    giữ cả hai hoặc thay thế trong một xung đột, và cái "có" của một lần tạo
+    kỹ năng có mã, mà câu trả lời giờ ghi tên kỹ năng theo cùng cách). "X is removed." chỉ
     đứng được bên cạnh một `removed` của X trong lượt: một lần gỡ chỉ mới
     hỏi câu hỏi, hay việc gỡ một kỹ năng khác, không chứng thực gì.
   - **Một trạng thái đúng không bao giờ bị giữ lại.** "X is off." chỉ đứng
@@ -1842,7 +1850,9 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
     didn't run." sau một lần chạy bị từ chối vì nó không có trên đèn,
     "Planet fact is on, and rain joke is off." cho "Can you tell me which
     skills are on?", và "Planet fact is off." cho "Tell me about planet
-    fact." khi nó đang tắt đều được nói như vậy. Một kỹ năng đã gỡ ở lượt
+    fact." khi nó đang tắt đều được nói như vậy, cũng như "Okay, planet fact
+    is on now." sau cái "có" của một lần tạo kỹ năng có mã và "Moon fact is
+    on." sau khi giữ cả hai trong một xung đột. Một kỹ năng đã gỡ ở lượt
     trước không còn trong `made.json`, nên tên nó không bao giờ được đọc.
   - **Bị giữ lại, hỏi lại một lần.** Lời khẳng định không đứng được thì
     không được nói, và mô hình được hỏi lại một lần với
@@ -1851,9 +1861,11 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
     chưa làm); lần khẳng định thứ hai, hay một lần ở vòng cuối, được nói là
     "Sorry, I didn't do that. Could you ask me again?". Nói trong vòng có
     chính lời gọi `make_skill` của nó ("Okay, planet fact is removed." của
-    vòng "có" bị ép, bên cạnh `approve_id`), lời đã đi trước lời gọi: không
-    được nói, không có ghi chú, và vòng sau nói kết quả của đèn từ câu trả
-    lời của nó, như lời của một lần quên. Journal: "its reply claims a skill
+    vòng "có" bị ép, bên cạnh `approve_id`, một lần tắt/bật hay lựa chọn của
+    một xung đột), lời đã đi trước lời gọi: không được nói, không có ghi
+    chú, và vòng sau nói kết quả của đèn từ câu trả lời của nó, như lời của
+    một lần quên. Bên cạnh một lời gọi không đổi kỹ năng nào (liệt kê, hay
+    một lần gỡ chỉ mới hỏi câu hỏi), lời bị giữ lại kèm ghi chú. Journal: "its reply claims a skill
     removed action no call made … (LAMP_ACTION_CLAIM_CHECKED, a made
     skill's change in the lamp's own result words)", hoặc "its reply says a
     made skill's change before its make_skill ran: not said … no note
@@ -1924,7 +1936,10 @@ thay đổi được nói khi không có lời gọi (#7683),
 `a_real_remove_on_the_yes_is_said`, `a_skill_named_in_passing_is_said`,
 `words_beside_their_own_remove_call_are_never_told_not_done`,
 `another_skills_turn_backs_no_claim`, `a_true_off_after_a_refused_run_is_said`,
-`a_true_state_told_with_no_call_is_said`.
+`a_true_state_told_with_no_call_is_said`, `a_code_makes_yes_backs_its_on`,
+`a_clash_keep_backs_its_on`,
+`a_remove_said_done_beside_an_ask_only_call_is_noted`,
+`a_one_word_skill_said_removed_is_held`.
 
 **Tắt và bật lại bằng giọng nói** (#7445, chỉ khi bật
 `LAMP_MADE_SKILL_OFF_SAID`: trên lamp-9adf, bản 13252, "Lamp, turn off the
