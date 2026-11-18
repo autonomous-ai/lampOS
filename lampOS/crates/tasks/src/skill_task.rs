@@ -1587,12 +1587,20 @@ fn run_on_token(
         Err(refused) => return refused,
     };
     run.write = write;
-    // An end before the run's deadline and lamp-tasks' stop lets the says
-    // its script already asked finish, so they count (#6071); at either,
-    // they stop at once, as before.
+    // The end of a run that ended well (a run that tells, its agent's
+    // answer kept, which a runner keeps only then), before its deadline and
+    // lamp-tasks' stop, lets the says its script already asked finish, so
+    // they count (#6071). Any other end, a failure's, a deadline's, a
+    // stop's, or a drop's, stops them at once, as before.
     let until = std::time::Instant::now() + run.deadline;
-    let settle = || !runner.stopping() && std::time::Instant::now() < until;
-    let ran = runner.run(&run, &|| ending.end_settled(settle()));
+    let settle = |run: &SkillRun| {
+        tells
+            && run.answer.get().is_some()
+            && !runner.stopping()
+            && std::time::Instant::now() < until
+    };
+    let ran = runner.run(&run, &|| ending.end_settled(settle(&run)));
+    let settle_at_end = ran.is_ok() && settle(&run);
     let began = run.started.load(Ordering::Acquire);
     // Kept empty (a make's runner's `answer.md` left empty, as a lone
     // dash): carried empty, so lamp-skills holds it to the run's says
@@ -1623,7 +1631,7 @@ fn run_on_token(
     drop(fresh);
     drop(run);
     drop(minted);
-    ending.end_settled(ran.is_ok() && settle());
+    ending.end_settled(settle_at_end);
     let said = ending.said.get();
     drop(ending);
     match ran {
@@ -4342,6 +4350,11 @@ impl HandOvers {
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         self.runner.stop_on(stop.clone());
+        // A net or held run's runner knows the stop too, so its run's end
+        // never waits on its says while lamp-tasks stops (#6071).
+        for runner in [&self.net, &self.held].into_iter().flatten() {
+            runner.stop_on(stop.clone());
+        }
         self.runner.prepare();
         let served = std::thread::Builder::new()
             .name("tasks-skill-task".into())
@@ -4798,7 +4811,8 @@ mod tests {
     }
 
     impl Runner for FakeRunner<'_> {
-        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        /// Ends the token itself as it ends, as the lamp's runners do.
+        fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
             if self.starts {
                 run.started.store(true, Ordering::Release);
             }
@@ -4820,19 +4834,22 @@ mod tests {
             self.seen
                 .borrow_mut()
                 .push((run.prompt.clone(), run.env.clone(), live));
+            end_token();
             self.result.clone()
         }
     }
 
     /// A run whose agent ended well with its answer, as the Harness runner
-    /// keeps it, and the words each run was given.
+    /// keeps it (then ends the token, as its session's close does), and
+    /// the words each run was given.
     struct Answering(&'static str, RefCell<Vec<String>>);
 
     impl Runner for Answering {
-        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
             run.started.store(true, Ordering::Release);
             self.1.borrow_mut().push(run.prompt.clone());
             let _ = run.answer.set(self.0.into());
+            end_token();
             Ok(0)
         }
 
@@ -4929,10 +4946,37 @@ mod tests {
             json!({"ok": true, "id": 0, "answer": "-", "says": 1, "said": 0})
         );
         assert_eq!(told(None), json!({"ok": true, "id": 0, "answer": "-"}));
-        // A run that failed: its end stops its says at once.
+        // A run that failed, its runner ending the token as it ends: its
+        // end stops its says at once.
         let tokens = FakeTokens::default();
         let failed = runner(&tokens, Err("x".into()));
         let _ = answer(&line(|_| {}), true, skills(), &tokens, &failed);
+        assert_eq!(*tokens.settled.borrow(), [false]);
+        // lamp-tasks stopping: a run that ended well ends plain too.
+        struct Stopping(Answering);
+        impl Runner for Stopping {
+            fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+                self.0.run(run, end_token)
+            }
+
+            fn answers(&self) -> bool {
+                true
+            }
+
+            fn stopping(&self) -> bool {
+                true
+            }
+        }
+        let tokens = FakeTokens::default();
+        let ran = Stopping(Answering("Heads.", RefCell::default()));
+        let _ = answer_agent(
+            &line(|_| {}),
+            true,
+            skills(),
+            &tokens,
+            &ran,
+            &Agent::default(),
+        );
         assert_eq!(*tokens.settled.borrow(), [false]);
     }
 

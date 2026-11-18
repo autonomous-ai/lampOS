@@ -2939,16 +2939,24 @@ for each run, and is answered once the run ends
   `answer.md`) when the run's own script already spoke through
   lamp-control's `say` (Heron's P3 on #7591). A dash is not taken on
   trust (#6071). lamp-control counts each run token's `say` lines (never
-  a sound's cue or clip): `says`, taken for the voice, and `said`, of
-  those, spoken whole (outcome `spoken`). A run's script that says and
+  a sound's cue or clip): `says`, those the voice took (it began saying
+  it, its `begun`, or spoke it whole; never one it refused, couldn't be
+  reached for, or one stopped while queued), and `said`, of those, spoken
+  whole (outcome `spoken`); an outcome after the run's end read the counts
+  counts nowhere. A run's script that says and
   exits is still heard: its last connection closing leaves the says it
   asked to finish (`Parts::run_gone`), where a computer's are stopped as
-  before. lamp-tasks ends a run that ended well, before its deadline and
-  lamp-tasks' stop (`Runner::stopping`), with `{"end": {"run", "settle":
-  true}}`: the token ends at once, and the says already asked are let
-  finish, up to 15 s (`SETTLE_SAYS`; lamp-tasks waits up to 20 s,
-  `SETTLE_WAIT`), then counted and what is left cancelled; at its deadline
-  or a stop the end is plain and they stop at once (docs/control.md, "It
+  before. lamp-tasks ends a run that ended well (a run that tells, its
+  agent's answer kept, which a runner keeps only for a good end), before
+  its deadline and lamp-tasks' stop (`Runner::stopping`, which the net and
+  held runners are told too), with `{"end": {"run", "settle": true}}`: the
+  token ends and its connections close at once, the says already asked,
+  a still-connected script's included, are let finish, up to 15 s
+  (`SETTLE_SAYS`; lamp-tasks waits up to 20 s, `SETTLE_WAIT`), then counted
+  and what is left cancelled. A failed run's end, a deadline's, a stop's
+  or a drop's is plain, and they stop at once. A known cost: the one-run
+  slot stays taken while a settled end waits, so a run asked in those
+  seconds (15 at most) is refused `busy`, as any second run is (docs/control.md, "It
   ends with the run"). The ended run's answer carries the counts beside
   the agent's (`{"ok":true,"id":N,"answer":"-","says":N,"said":N}`,
   `Tokens::end_said`; left out when the end didn't answer, lamp-control
@@ -2969,8 +2977,9 @@ for each run, and is answered once the run ends
   `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
   `an_empty_answer_md_is_carried_empty_with_its_says`; lamp-control's
   `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
-  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`, and
-  the door's `{"end": {"settle": true}}` in `tests/door.rs`; lamp-skills'
+  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`,
+  `a_say_the_voice_never_took_is_not_counted`, and the door's
+  `a_settled_end_lets_a_still_connected_runs_say_finish_and_counts_it`; lamp-skills'
   `task::tests::a_dash_after_a_say_tells_nothing`,
   `a_dash_after_a_cut_say_tells_nothing_more`,
   `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`. On

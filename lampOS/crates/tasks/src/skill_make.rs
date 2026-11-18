@@ -1282,9 +1282,22 @@ pub struct MakeHermes {
     /// it runs, named to the namespace script by
     /// [`crate::egress::EGRESS_ENV`]. None: no way out but the model's.
     pub egress: Option<crate::egress::Grant>,
+    /// lamp-tasks' stop ([`Runner::stop_on`]): a run's end then stops its
+    /// says at once ([`Runner::stopping`], #6071).
+    pub stopping: std::sync::OnceLock<Arc<AtomicBool>>,
 }
 
 impl Runner for MakeHermes {
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        let _ = self.stopping.set(stop);
+    }
+
+    fn stopping(&self) -> bool {
+        self.stopping
+            .get()
+            .is_some_and(|stop| stop.load(Ordering::Acquire))
+    }
+
     fn ready(&self) -> Result<(), String> {
         self.hermes.ready()?;
         let has = |path: &Path, line: &str| {
@@ -1449,6 +1462,20 @@ impl NetRunner {
 }
 
 impl Runner for NetRunner {
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        if let Some(harness) = &self.one_path {
+            Runner::stop_on(harness.as_ref(), stop.clone());
+        }
+        self.make.stop_on(stop);
+    }
+
+    fn stopping(&self) -> bool {
+        match self.by_one_path() {
+            Some(harness) => harness.stopping(),
+            None => self.make.stopping(),
+        }
+    }
+
     /// By the one run path, what the wrapper and namespace script carry is
     /// checked at the run's start, with the default agent then known
     /// ([`crate::skill_task::takes_net_runs`]); else the make's net runner's
@@ -1501,6 +1528,7 @@ fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant
         ns: PathBuf::from(NS),
         agent_ns: PathBuf::from(crate::skill_task::AGENT_NS),
         egress,
+        stopping: std::sync::OnceLock::new(),
     }
 }
 

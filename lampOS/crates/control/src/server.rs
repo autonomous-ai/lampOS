@@ -227,6 +227,10 @@ pub struct Shared {
     /// Why the lamp ended a connection (a revoke, a change of grants), by connection:
     /// said in the close frame, so the computer's SDK can log why it was cut off.
     close_reasons: Mutex<HashMap<u64, &'static str>>,
+    /// The clients of runs ended with their says let finish
+    /// ([`Shared::end_run_settled`]), until counted: a connection of theirs
+    /// the end closes leaves its says to finish too (#6071).
+    settling: Mutex<std::collections::HashSet<String>>,
     /// Whether the camera's, the microphone's and the speaker's streams are usable on
     /// this lamp now (wired, and the owner's switch on): what `{"features": true}` says.
     features: Mutex<Features>,
@@ -383,8 +387,16 @@ impl Shared {
     /// what is left then is cancelled. The wait is this answer's alone, a
     /// look at the says each [`SETTLE_TICK`], never the voice's.
     pub async fn end_run_settled(&self, run: &str) -> Value {
+        // Marked before its connections close, so their close leaves its
+        // says to finish (`Parts::run_gone`), never cancels them.
+        let client = crate::runs::run_client(run);
+        self.settling
+            .lock()
+            .expect("settling")
+            .insert(client.clone());
         let ended = self.door.lock().expect("door").end_run(run, None);
         let Some(ended) = ended else {
+            self.settling.lock().expect("settling").remove(&client);
             return json!({"ended": false});
         };
         self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
@@ -405,6 +417,7 @@ impl Shared {
             tokio::time::sleep(SETTLE_TICK).await;
         }
         let said = self.finish_run(&ended, self.now_us(), "ended, its says let finish");
+        self.settling.lock().expect("settling").remove(&client);
         json!({"ended": true, "said": said.spoken, "says": said.asked})
     }
 
@@ -448,6 +461,7 @@ impl Shared {
             cue_busy: std::sync::atomic::AtomicBool::new(false),
             listening: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
+            settling: Mutex::default(),
             features: Mutex::new(Features::default()),
         })
     }
@@ -697,6 +711,7 @@ impl Shared {
                 cue_busy: std::sync::atomic::AtomicBool::new(false),
                 listening: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
+                settling: Mutex::default(),
                 features: Mutex::new(Features::default()),
             }
         })
@@ -1914,7 +1929,8 @@ async fn connection<S>(
         // A skill run's, while its run goes on: its says are let finish
         // (#6071), so a script that said a line and exited is heard.
         if !still_open {
-            let run = shared.door.lock().expect("door").is_run_client(client, now);
+            let run = shared.settling.lock().expect("settling").contains(client)
+                || shared.door.lock().expect("door").is_run_client(client, now);
             let mut parts = shared.parts.lock().expect("parts");
             if run {
                 parts.run_gone(client, now);

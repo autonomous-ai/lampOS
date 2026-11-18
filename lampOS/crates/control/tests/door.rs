@@ -2795,6 +2795,7 @@ fn the_owners_yes() -> Arc<FakeYes> {
                 Err("the skill changed since the owner said yes: ask again"),
             ),
             ("empty", Ok(vec![])),
+            ("talker", Ok(vec![lamp_control::protocol::Grant::Speak])),
         ]
         .into(),
     ))
@@ -3799,4 +3800,77 @@ async fn a_peer_in_no_apps_unit_or_for_an_app_not_installed_or_with_apps_off_is_
             Ok(mut socket) => assert!(agent_next(&mut socket).await.is_none(), "{file}"),
         }
     }
+}
+
+/// #6071: a run's end that lets its says finish (`"settle": true`), sent
+/// while the run's script is still connected (Harness ends the token before
+/// it stops the run), closes that connection without cutting its say: the
+/// voice is never sent a cancel, the say is spoken, and the end counts it.
+#[tokio::test]
+async fn a_settled_end_lets_a_still_connected_runs_say_finish_and_counts_it() {
+    let dir = std::env::temp_dir().join(format!(
+        "lamp-control-door-settle-voice-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let say = dir.join("say.sock");
+    let voice = tokio::net::UnixListener::bind(&say).unwrap();
+    let parts =
+        lamp_control::parts::Lamp::new(None, None, Some(say), "boot".into(), Arc::new(|_, _| {}));
+    let lamp = lamp_with("settle", Box::new(parts)).await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "talker", "r9").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "say", "text": "Heads."}).to_string(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(agent_next(&mut socket).await.unwrap()["ok"], true);
+    let (stream, _) = tokio::time::timeout(Duration::from_secs(5), voice.accept())
+        .await
+        .expect("the door asks the voice")
+        .unwrap();
+    let mut stream = tokio::io::BufReader::new(stream);
+    let mut line = String::new();
+    stream.read_line(&mut line).await.unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&line).unwrap()["text"],
+        "Heads."
+    );
+    stream
+        .get_mut()
+        .write_all(b"{\"event\":\"begun\",\"at_us\":1}\n")
+        .await
+        .unwrap();
+    // The voice says it while the run ends: no cancel comes, then it is
+    // spoken whole.
+    let speaks = async {
+        let mut next = String::new();
+        let cancel =
+            tokio::time::timeout(Duration::from_millis(500), stream.read_line(&mut next)).await;
+        assert!(
+            cancel.is_err() || next.is_empty(),
+            "the say was cut: {next}"
+        );
+        stream
+            .get_mut()
+            .write_all(b"{\"outcome\":\"spoken\"}\n")
+            .await
+            .unwrap();
+    };
+    let (settled, ()) = tokio::join!(
+        admin(&lamp, json!({"end": {"run": "r9", "settle": true}})),
+        speaks
+    );
+    assert_eq!(settled, json!({"ended": true, "said": 1, "says": 1}));
+    assert!(
+        agent_next(&mut socket).await.is_none(),
+        "its connection closed"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }

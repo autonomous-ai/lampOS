@@ -2653,7 +2653,7 @@ hơn), rồi "There's more; ask me if you want it." (`task::MORE_LINE`). Agent
 hoặc `answer.md` trống) khi skill đã tự nói điều đó, thì không nói gì (P3
 của Heron trên #7591). Một dấu gạch ngang (hoặc
 `answer.md` trống) được đối chiếu với các câu nói của lần chạy theo số đếm
-trong câu trả lời của lamp-tasks (`says` của lamp-control, đã nhận để nói,
+trong câu trả lời của lamp-tasks (`says` của lamp-control, những câu giọng nói đã nhận, bắt đầu hoặc nói trọn,
 và `said`, đã nói trọn; `task::told_of_run`, #6071; docs/vi/tasks_vi.md):
 sau một câu đã nói trọn thì không nói gì (`skill:<name>: a dash after N
 says: nothing told`); sau các câu đã nhận nhưng bị cắt thì không nói thêm

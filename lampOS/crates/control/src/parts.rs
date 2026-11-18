@@ -102,11 +102,15 @@ const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
 /// longer listed was stopped.
 type Says = Arc<std::sync::Mutex<HashMap<String, HashMap<u64, Option<UnixStream>>>>>;
 
-/// Each client's `say` lines taken for the voice, and how many of them it
-/// spoke whole (its outcome `spoken`, a `done` `finished`), read once and
-/// let go when a skill run ends ([`Parts::said`]): a run's dash-only
-/// answer is trusted only when its run said something (#6071). Counts
-/// only, never words.
+/// Each client's `say` lines the voice took (it began saying it, its
+/// `begun`, or spoke it whole), and how many of them it spoke whole (its
+/// outcome `spoken`, a `done` `finished`), read once and let go when a
+/// skill run ends ([`Parts::said`]): a run's dash-only answer is trusted
+/// only when its run said something (#6071). A say the voice refused or
+/// never began, or one stopped while queued, is never taken. A client's
+/// entry is made as it asks a say, and a count comes only into an entry
+/// still there: a say whose run's end already read it counts nowhere.
+/// Counts only, never words.
 type SaidCounts = Arc<std::sync::Mutex<HashMap<String, crate::session::Said>>>;
 
 /// How long the voice's first answer to a `turn.end` or a `listen` may
@@ -1155,26 +1159,37 @@ impl Lamp {
             .or_default()
             .insert(number, None);
         // A `say` (words, never a sound's cue or clip) counts for its run's
-        // end, taken now and spoken whole once its outcome says so
-        // ([`SaidCounts`]).
+        // end once the voice takes it ([`SaidCounts`]): its entry made now.
         let said = line.get("text").is_some().then(|| Arc::clone(&self.said));
         if let Some(said) = &said {
             said.lock()
                 .expect("said")
                 .entry(client.clone())
-                .or_default()
-                .asked += 1;
+                .or_default();
         }
         // Off the door's lock, connecting included (the Reviewer-lead's P3
         // on #3805: a voice whose backlog is full must not hold every
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
+            // Taken once: when the voice began it, or spoke it whole.
+            let taken = std::sync::atomic::AtomicBool::new(false);
+            let take = || {
+                if let Some(said) = &said
+                    && !taken.swap(true, std::sync::atomic::Ordering::AcqRel)
+                {
+                    count_said(said, &client, |counts| counts.asked += 1);
+                }
+            };
             let attempt =
                 |line: &Value| match ask_voice_for_say(&path, line, &says, &client, number) {
                     Ok(Some(stream)) => {
                         let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
-                        outcome(BufReader::new(stream))
+                        outcome_with(BufReader::new(stream), |event| {
+                            if event["event"] == "begun" {
+                                take();
+                            }
+                        })
                     }
                     Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
                     Err(error) => (
@@ -1195,14 +1210,11 @@ impl Lamp {
             }
             let (how, why) = result;
             forget_say(&says, &client, number);
-            if how == "finished"
-                && let Some(said) = said
-            {
-                said.lock()
-                    .expect("said")
-                    .entry(client.clone())
-                    .or_default()
-                    .spoken += 1;
+            if how == "finished" {
+                take();
+                if let Some(said) = &said {
+                    count_said(said, &client, |counts| counts.spoken += 1);
+                }
             }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -1211,6 +1223,14 @@ impl Lamp {
             events(&client, done);
         });
         Ok(json!({"to": "voice"}))
+    }
+}
+
+/// Counts a say of `client` into its entry, only while it is there
+/// ([`SaidCounts`]).
+fn count_said(said: &SaidCounts, client: &str, count: impl FnOnce(&mut crate::session::Said)) {
+    if let Some(counts) = said.lock().expect("said").get_mut(client) {
+        count(counts);
     }
 }
 
@@ -1274,7 +1294,9 @@ fn forget_say(says: &Says, client: &str, number: u64) {
 /// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
 /// and harness-reviewer's P2 on #3805): `spoken` is `finished`; `dropped`,
 /// `expired`, `refused` and no outcome at all are `dropped`, the voice's
-/// own word and why in `why`.
+/// own word and why in `why`. The say's own reads it with its `begun`
+/// ([`outcome_with`]); this, the tests'.
+#[cfg(test)]
 fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
     outcome_with(reader, |_| {})
 }
@@ -2460,10 +2482,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// #6071: a run's says the voice spoke whole are counted for its end
-    /// and read once (`Parts::said`): a say spoken counts, a say dropped
-    /// and a sound's hum don't, another client's count is its own, and a
-    /// count read is let go.
+    /// #6071: a run's says are counted for its end and read once
+    /// (`Parts::said`): a say spoken whole is taken and spoken; one begun
+    /// and then cut is taken alone; one the voice refused or dropped before
+    /// it began, and a sound's hum, count nothing; another client's count
+    /// is its own, and a count read is let go, a late outcome counting
+    /// nowhere.
     #[test]
     fn a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once() {
         let dir = dir("say-said");
@@ -2475,8 +2499,10 @@ mod tests {
             Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
         let voice = std::thread::spawn(move || {
             for answer in [
-                r#"{"outcome":"spoken"}"#,
+                "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"spoken\"}",
+                r#"{"outcome":"refused","why":"quiet hours"}"#,
                 r#"{"outcome":"dropped","why":"expired"}"#,
+                "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"dropped\",\"why\":\"stopped by its asker\"}",
                 r#"{"outcome":"spoken"}"#,
                 r#"{"outcome":"spoken"}"#,
             ] {
@@ -2501,8 +2527,10 @@ mod tests {
         for (n, (client, asked)) in [
             ("c_run", r#"{"id":1,"op":"say","text":"Heads."}"#),
             ("c_run", r#"{"id":2,"op":"say","text":"Tails."}"#),
-            ("c_run", r#"{"id":3,"op":"sound","name":"hum"}"#),
-            ("c_other", r#"{"id":4,"op":"say","text":"Hi."}"#),
+            ("c_run", r#"{"id":3,"op":"say","text":"Late."}"#),
+            ("c_run", r#"{"id":4,"op":"say","text":"Again."}"#),
+            ("c_run", r#"{"id":5,"op":"sound","name":"hum"}"#),
+            ("c_other", r#"{"id":6,"op":"say","text":"Hi."}"#),
         ]
         .into_iter()
         .enumerate()
@@ -2516,6 +2544,41 @@ mod tests {
         assert_eq!(lamp.said("c_run"), said(0, 0), "read once");
         assert_eq!(lamp.said("c_other"), said(1, 1));
         assert_eq!(lamp.said("c_nobody"), said(0, 0));
+        // An outcome after its count was read counts nowhere, and makes no
+        // entry again.
+        count_said(&lamp.said, "c_run", |counts| counts.spoken += 1);
+        assert!(!lamp.said.lock().unwrap().contains_key("c_run"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a say the voice can't be reached for, or refuses, is never
+    /// taken: its run's end reads no say, so a lone dash is told its
+    /// fallback.
+    #[test]
+    fn a_say_the_voice_never_took_is_not_counted() {
+        let dir = dir("say-untaken");
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        // No voice listening at all.
+        let mut lamp = Lamp::new(
+            None,
+            None,
+            Some(dir.join("none.sock")),
+            "boot".into(),
+            events,
+        );
+        lamp.act("c_run", 1, &op(r#"{"id":1,"op":"say","text":"Heads."}"#), 0)
+            .unwrap();
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(told.lock().unwrap()[0].1["how"], "dropped");
+        assert_eq!(lamp.said("c_run"), crate::session::Said::default());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -2591,7 +2654,8 @@ mod tests {
         assert_eq!(voice.join().unwrap(), [false, true]);
         let said = |asked, spoken| crate::session::Said { asked, spoken };
         assert_eq!(lamp.said("c_run"), said(1, 1));
-        assert_eq!(lamp.said("c_app"), said(1, 0));
+        // Stopped while queued, before the voice began it: never taken.
+        assert_eq!(lamp.said("c_app"), said(0, 0));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

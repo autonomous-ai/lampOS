@@ -27,8 +27,10 @@ use crate::rate::{Class, Rates};
 
 /// What the lamp's parts do for the door: each action, each piece of state,
 /// and a client's `stop`.
-/// A client's `say` lines ([`Parts::said`]): `asked`, taken for the voice;
-/// `spoken`, of those, spoken whole. Counts only, never words.
+/// A client's `say` lines ([`Parts::said`]): `asked`, those the voice took
+/// (began saying, or spoke whole; never one it refused or one stopped
+/// while queued); `spoken`, of those, spoken whole. Counts only, never
+/// words.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Said {
     pub asked: u64,

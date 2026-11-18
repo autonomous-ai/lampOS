@@ -81,11 +81,14 @@ Token kết thúc cùng lần chạy: `{"end": {"run": RUN_ID}}` (lamp-tasks, kh
 chạy kết thúc) đóng các kết nối của nó, dừng những gì nó còn đang yêu cầu và
 chấm dứt token, trả lời `{"ended": true, "said": N, "says": M}` cho một lần
 chạy đang chạy (`{"ended": false}` nếu không có): `says` là số dòng `say` của
-lần chạy đã nhận để nói, `said` là số đã nói trọn (kết quả `spoken`; tiếng
-hum hay clip không tính), đếm theo client trong bộ nhớ và đọc một lần lúc kết
+lần chạy mà giọng nói đã nhận (đã bắt đầu nói, `begun`, hoặc nói trọn; không
+bao giờ là câu bị từ chối, không tới được, hay bị dừng khi còn chờ), `said`
+là số đã nói trọn (kết quả `spoken`; tiếng hum hay clip không tính; kết quả
+đến sau khi số đếm đã được đọc thì không tính), đếm theo client trong bộ nhớ và đọc một lần lúc kết
 thúc (`Parts::said`, #6071). Với `"settle": true` (lamp-tasks, cho lần chạy
 kết thúc tốt trước hạn chót), token chấm dứt ngay nhưng các câu nói đã yêu cầu
-được nói hết, tối đa 15 giây (`SETTLE_SAYS`), rồi mới đếm và hủy phần còn lại;
+được nói hết, kể cả của kết nối mà chính lần kết thúc đó đóng (client của lần
+chạy được đánh dấu là đang chờ trước, nên việc đóng đi theo đường run-gone), tối đa 15 giây (`SETTLE_SAYS`), rồi mới đếm và hủy phần còn lại;
 việc chờ chỉ thuộc câu trả lời đó, không bao giờ chặn giọng nói. Kết nối cuối
 của một lần chạy đóng khi lần chạy còn đang chạy thì các câu nói của nó không bị
 hủy (`Parts::run_gone`), để script nói rồi thoát vẫn được nghe; của một máy tính
