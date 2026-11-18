@@ -9880,6 +9880,111 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #7742, lamp-9adf 18 Nov 21:37: an OpenClaw make's own code granted
+    /// `net`, kept and said back, then put on after the owner's yes. The
+    /// manage helper is another process, with no make on its thread: its
+    /// check (`put_on_cap`, `put_on_scripts`, as lamp-skills'
+    /// `install_made` runs them) on the very files the voice packed lets
+    /// it on with `LAMP_TASK_NET` and `LAMP_TASK_NET_GATEWAY` on in its
+    /// unit, and refuses `net` with the gateway switch off.
+    #[test]
+    fn with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper() {
+        if made_skill::a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        net_make_here(Some(true));
+        crate::skill_task_yes::set_gateway_net_here(Some(true));
+        made_skill::set_code_at_once_here(Some(false));
+        let (root, mut keeping) = keeping("net-gateway-put-on");
+        // The pack keeps a copy of the folder it packed: the helper's bytes.
+        let packed = root.join("packed");
+        std::fs::write(
+            &keeping.program,
+            format!(
+                "#!/bin/sh\nname=$(basename \"$4\")\ncp -R \"$4\" '{}'\n\
+                 printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+                packed.display()
+            ),
+        )
+        .unwrap();
+        keeping.installed = root.join("skills");
+        let toml = CODE_TOML
+            .replace("grants = [\"camera\"]", "grants = [\"net\", \"speak\"]")
+            .replace("take a photo", "fetch the Bitcoin price from the web");
+        let main = net_code_main();
+        let answer = format!(
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+        );
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("openclaw"),
+            std::sync::Arc::new(move |_: &str| Some(answer.clone())),
+        );
+        let agent = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        let (url, served) = service_sent(vec![(200, "internet: the Bitcoin price".to_owned())]);
+        let told = make_with_by(
+            0,
+            None,
+            BITCOIN,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&agent),
+        );
+        served.join().unwrap();
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        let entry = &made_skill::entries(&keeping.directory)[0];
+        assert_eq!(entry["uses"]["grants"], json!(["net", "speak"]), "{entry}");
+        // The helper's check, on its own thread with its unit's switches.
+        let helper = |gateway: bool| {
+            let packed = packed.clone();
+            std::thread::spawn(move || {
+                crate::skill_task_yes::set_net_here(Some(true));
+                made_skill::set_scripts_here(Some(true));
+                crate::skill_task_yes::set_gateway_net_here(Some(gateway));
+                let mut files = Vec::new();
+                let mut folders = vec![packed.clone()];
+                while let Some(folder) = folders.pop() {
+                    for entry in std::fs::read_dir(&folder).unwrap() {
+                        let path = entry.unwrap().path();
+                        if path.is_dir() {
+                            folders.push(path);
+                        } else {
+                            let name = path.strip_prefix(&packed).unwrap();
+                            let name = name.to_str().unwrap().to_owned();
+                            files.push((name, std::fs::read(&path).unwrap()));
+                        }
+                    }
+                }
+                let toml = std::fs::read_to_string(packed.join("skill.toml")).unwrap();
+                made_skill::put_on_cap(&toml)
+                    .and_then(|(_, uses)| {
+                        made_skill::put_on_scripts(
+                            &toml,
+                            &uses,
+                            files
+                                .iter()
+                                .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+                        )
+                    })
+                    .map_err(|refused| refused.0)
+            })
+            .join()
+            .unwrap()
+        };
+        assert_eq!(helper(true), Ok(()));
+        // The gateway switch off in the helper: `net` is still refused.
+        assert!(helper(false).is_err());
+        crate::skill_task_yes::set_gateway_net_here(None);
+        made_skill::set_code_at_once_here(None);
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #7742, lamp-c0a4 18 Nov 20:06: on OpenClaw with
     /// `LAMP_TASK_NET_GATEWAY` on, DeepSeek answered a web make ("every 3
     /// minutes while I'm here ... the current bitcoin price") not with
