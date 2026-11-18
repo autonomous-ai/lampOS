@@ -408,6 +408,8 @@ fn paint<S: FrameSink>(
         return Ok(());
     }
     let mut ring = open()?;
+    // The face begins: told once, off the painting (#7757, `LAMP_DID_RING`).
+    crate::did_ring::told(crate::did_ring::Face::Asleep);
     let began = Instant::now();
     while !stop.load(Ordering::SeqCst) {
         let since = began.elapsed();

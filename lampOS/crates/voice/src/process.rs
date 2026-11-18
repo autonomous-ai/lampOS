@@ -1260,6 +1260,10 @@ fn worker_command(
             role,
             var(crate::did_history::ENVIRONMENT).as_deref(),
         ))
+        .envs(did_ring_worker_environment(
+            role,
+            var(crate::did_ring::ENVIRONMENT).as_deref(),
+        ))
         .envs(app_triggers_worker_environment(
             role,
             var(crate::app_triggers::ENVIRONMENT).as_deref(),
@@ -2302,6 +2306,18 @@ fn did_keep_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::did_history::ENVIRONMENT, "on"))
+}
+
+// The ring's own faces told on `lamp/did` (#7757, `did_ring::ENVIRONMENT`):
+// the exact `on`, to the two workers that show them, the ring and the
+// privacy indicator; the voice itself reads it for the asleep face. No other
+// worker gets it.
+fn did_ring_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "ring" | "privacy") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::did_ring::ENVIRONMENT, "on"))
 }
 
 // A final line that is a running app's trigger is told to that app
@@ -3626,6 +3642,13 @@ mod tests {
                         "LAMP_DID_KEEP",
                         ["second"].as_slice(),
                     ),
+                    // The ring's own faces told on lamp/did: the ring and
+                    // privacy workers (#7757).
+                    (
+                        did_ring_worker_environment,
+                        "LAMP_DID_RING",
+                        ["ring", "privacy"].as_slice(),
+                    ),
                     // A final line that is a running app's trigger told to
                     // it: the second route alone (#7415 piece 6).
                     (
@@ -3948,6 +3971,7 @@ mod tests {
                     crate::told_when_asked::ENVIRONMENT,
                     crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
                     crate::did_history::ENVIRONMENT,
+                    crate::did_ring::ENVIRONMENT,
                     crate::app_triggers::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
@@ -4462,6 +4486,7 @@ mod tests {
             (
                 "ring",
                 vec![
+                    "LAMP_DID_RING=on",
                     "LAMP_NIGHT_ASLEEP_FACE=on",
                     "LAMP_SHUTDOWN=on",
                     "LAMP_UNPLUG=on",

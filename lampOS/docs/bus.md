@@ -853,5 +853,9 @@ is known (done, cut, or refused at once); a skill made on the lamp is told as
 keeps only dids published by the names in `did_history::TELLERS`: `skills`
 and `body`; the body's dids have a share of at most 100 of the 200 kept, its own oldest dropped first, so with the presence on they never push the skills' out. The body tells (`LAMP_DID_BODY=on`) what it chooses: a shift at rest
 and the turn to a call, once each ends, from its publishing thread and at most one
-in 2 s, with fixed words and a clip's name as the reason. The other parts (the
-voice, the ring) tell their own actions in small PRs of their own.
+in 2 s, with fixed words and a clip's name as the reason. The ring tells (`LAMP_DID_RING=on`, source `ring`, a share of at most 20 of the 200)
+the four faces it shows on its own as each begins: the asleep face, the night's
+sleep face, the unplug picture and the physical-mute red breath, once each, from
+a thread of its own and at most one in 2 s, with a fixed sentence as the reason
+(the privacy one records only that the lamp was private). The voice's own
+actions are told in a small PR of their own.
