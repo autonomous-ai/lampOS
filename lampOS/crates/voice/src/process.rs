@@ -4309,6 +4309,12 @@ mod tests {
                     "off"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
                     "4"
+                } else if name == crate::care_line::ENVIRONMENT {
+                    "on"
+                } else if name == crate::care_line::REGION_ENVIRONMENT {
+                    "VN"
+                } else if name == crate::care_line::FILE_ENVIRONMENT {
+                    "/etc/lampOS/voice/care-lines.json"
                 } else {
                     "a-secret"
                 },
@@ -4396,6 +4402,9 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
+                    "LAMP_CARE_LINE=on",
+                    "LAMP_CARE_LINES_FILE=/etc/lampOS/voice/care-lines.json",
+                    "LAMP_CARE_REGION=VN",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
