@@ -898,8 +898,19 @@ redone alone; it goes with `all`. A call that names no step, or a step the
 walk doesn't know, reopens nothing and tells the model to ask which,
 naming the step IDs in the `order` (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
-reopened every step). Skipping one step is `setup_step … skipped`; skipping
-the rest is that for each step.
+reopened every step). The step may be said as it is spoken, not only as
+its ID (lamp-06c1, 18 Nov ~12:20-12:55: "where", "sitting", "where you
+sit" and "who you are" four times were each refused, and the owner said it
+again and again): the name is lowercased and trimmed, spaces and hyphens
+become `_`, and a leading "the " and a trailing " step" go, so "the who
+you are step" is `who_you_are`. A few clear names are taken too:
+"where", "sit", "sitting", "seat" and "where i sit" are `where_you_sit`;
+"who", "name", "my name" and "who i am" are `who_you_are`; "pet" and
+"head" are `touch`; "voice", "sound" and "how i sound" are
+`how_you_sound`. `all` is still taken only exactly, so a whole redo stays
+explicit, and any other name reopens nothing as above. The IDs are still
+not put in the schema as an enum (#5499, above). Skipping one step is
+`setup_step … skipped`; skipping the rest is that for each step.
 
 ## Where it is kept
 
