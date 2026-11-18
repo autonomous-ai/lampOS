@@ -760,6 +760,46 @@ fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Durati
         EASE_OUT.mul_f32(along),
     )
 }
+/// The least an ease out moves a joint a step, so that one its clip never
+/// moved (a pace of nothing) still comes home: 5 counts a second.
+const EASE_LEAST: f32 = 0.1;
+
+/// One step of an ease out (`easing_out`): from offsets `from`, moving
+/// `speed` a step, back to nothing over `EASE_OUT` or longer, `steps` steps
+/// in. No joint moves more a step than `pace` (#7749: a hand's yield passes
+/// `GESTURE_STEP`; a shift at rest its clip's own pace or the speed it had,
+/// whichever is more, so it only slows and never snaps back). The ease is
+/// stretched so its curve's peak, 1.5 times the offset over the span, keeps
+/// under that; and it ends only once every joint is home. True once over.
+fn ease_out_step(
+    now_at: &mut [f32; 5],
+    steps: u32,
+    from: [f32; 5],
+    speed: [f32; 5],
+    pace: [f32; 5],
+) -> bool {
+    let least = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
+    let span = (0..5).fold(least, |span, index| {
+        span.max(1.5 * from[index].abs() / pace[index].max(EASE_LEAST))
+    });
+    let t = (steps as f32 / span).min(1.0);
+    // Hermite: from `from` at the speed it had to nothing at rest.
+    let (stays, carries) = (
+        2.0 * t * t * t - 3.0 * t * t + 1.0,
+        t * t * t - 2.0 * t * t + t,
+    );
+    for (index, at) in now_at.iter_mut().enumerate() {
+        let wanted = from[index] * stays + speed[index] * span * carries;
+        let most = pace[index].max(EASE_LEAST);
+        *at += (wanted - *at).clamp(-most, most);
+    }
+    if t >= 1.0 && now_at.iter().all(|at| at.abs() < 0.5) {
+        *now_at = [0.0; 5];
+        return true;
+    }
+    false
+}
+
 /// While a gesture plays, and for half a second after, a joint of the head
 /// may be this far from its goal and read this load before the gesture is
 /// dropped; the shoulder and the elbow may be this far from theirs. A quick
@@ -6935,7 +6975,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut yielding = false;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
-    let mut easing_out: Option<(u32, [f32; 5], [f32; 5])> = None;
+    let mut easing_out: Option<(u32, [f32; 5], [f32; 5], [f32; 5])> = None;
     let mut gesture_moved = [0.0f32; 5];
     // The gesture waiting stood a folded lamp up; and what to say of a
     // gesture asked from outside, on the next glimpse.
@@ -7207,19 +7247,55 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // to rest as a hand's yield eases a gesture (`easing_out`, over
         // `EASE_OUT`), so it is taken within seconds of the send. A gesture
         // asked of it (`playing` not a shift) plays to its end first.
-        if level != energy && playing.is_some_and(|(clip, _)| idle::is_move(clip)) {
+        // Its ease only slows (the first builder's 02:14 on #7749): no joint
+        // faster than the clip's own pace or than it was moving.
+        if level != energy
+            && let Some((clip, _)) = playing.filter(|(clip, _)| idle::is_move(clip))
+        {
             playing = None;
-            easing_out = Some((0, gesture_now, gesture_moved));
+            let pace = clip.pace(TICK);
+            easing_out = Some((
+                0,
+                gesture_now,
+                gesture_moved,
+                std::array::from_fn(|index| pace[index].max(gesture_moved[index].abs())),
+            ));
             eprintln!(
                 "lamp-body: step {}: energy level {level} asked: the shift at rest eases to rest",
                 report.steps
             );
         }
+        // #7749: an unprompted gesture waiting (a shift, Expression's
+        // `lively`, anything asked at idle priority) is dropped on a new
+        // level rather than played first.
+        if level != energy
+            && let Some((old, _)) =
+                pending.filter(|(old, _)| idle::is_move(old) || pending_by.0 == Priority::Idle)
+        {
+            gesture_fates.push_told(
+                (old.name, "dropped: a new energy level"),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
+        }
+        // The head may be moving (a rest glance, the mood's pose, talk): the
+        // level waits only while a joint is faster than the new level lets
+        // it go, so the cap never drops under it (#7749: waiting for a head under
+        // 1 count a second, nothing playing or waiting, held levels 19-22 s
+        // on lamp-52e6 on 2026-11-19). The head's
+        // roll keeps level 1's pace whatever the level (`ROLL_SPEED`).
+        let next_speed = base.at(level).speed;
         if level != energy
             && playing.is_none()
             && easing_out.is_none()
             && pending.is_none()
-            && velocity.iter().all(|speed| speed.abs() < 1.0)
+            && velocity
+                .iter()
+                .enumerate()
+                .all(|(index, speed)| index == 1 || speed.abs() <= next_speed)
             && stand_velocity == 0.0
         {
             energy = level;
@@ -7566,7 +7642,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 );
                 playing = None;
                 yielding = true;
-                easing_out = Some((0, gesture_now, gesture_moved));
+                easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
             }
             // One still waiting goes too, so it never begins after the ease
             // out only to end a step later under the same hand.
@@ -8035,7 +8111,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         }
                         playing = None;
                         yielding = true;
-                        easing_out = Some((0, gesture_now, gesture_moved));
+                        easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
                     }
                     if let Some((old, _)) = pending.filter(|(old, _)| from_outside(old)) {
                         gesture_fates.push_told(
@@ -8279,21 +8355,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         let before = gesture_now;
         match easing_out.as_mut().filter(|_| playing.is_none()) {
-            Some((steps, from, speed)) => {
+            Some((steps, from, speed, pace)) => {
                 *steps += 1;
-                let span = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
-                let t = (*steps as f32 / span).min(1.0);
-                // Hermite: from `from` at the speed it had to nothing at rest.
-                let (stays, carries) = (
-                    2.0 * t * t * t - 3.0 * t * t + 1.0,
-                    t * t * t - 2.0 * t * t + t,
-                );
-                for (index, now_at) in gesture_now.iter_mut().enumerate() {
-                    let wanted = from[index] * stays + speed[index] * span * carries;
-                    *now_at += (wanted - *now_at).clamp(-GESTURE_STEP[index], GESTURE_STEP[index]);
-                }
-                if t >= 1.0 {
-                    gesture_now = [0.0; 5];
+                if ease_out_step(&mut gesture_now, *steps, *from, *speed, *pace) {
                     easing_out = None;
                 }
             }
