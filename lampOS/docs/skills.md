@@ -1036,10 +1036,12 @@ voice's thread keeps a written note with its answer (its first 300 bytes, so
 the slot goes first). The voice's `desk_time` function goes with the same
 switch ([second-voice.md](second-voice.md)).
 
-- **Who has it.** Sip of water (both its notes), Stretch break and Rest your
-  eyes begin their note with it. It is filled only for a skill whose
-  `[permissions] topics` name `room/activity`, from that topic's newest value
-  that still lasts with a sitting under way.
+- **Who has it.** Any skill whose plain note holds `{sitting}`: a skill opts
+  in by writing it, with no list of skills in the code. It is filled only for
+  a core skill whose `[permissions] topics` name `room/activity`, from that
+  topic's newest value that still lasts with a sitting under way; in any other
+  skill it is dropped. Today Sip of water (both its notes), Stretch break and
+  Rest your eyes begin their note with it.
 - **What it says.** The whole minutes, and with the local clock known
   (`Engine::clock`), the clock time the sitting began; never the eyes' state
   label, and only the current sitting, which the eyes begin again when
