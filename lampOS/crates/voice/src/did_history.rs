@@ -16,11 +16,13 @@ use std::time::Duration;
 /// `on`, and nothing else.
 pub const ENVIRONMENT: &str = "LAMP_DID_KEEP";
 /// The publishers whose dids are kept, by the name they publish under, each
-/// added with its own part's PR (#7757): lamp-skills, and the body
-/// (`LAMP_DID_BODY`). Never "any".
-pub const TELLERS: [&str; 2] = ["skills", BODY];
+/// added with its own part's PR (#7757): lamp-skills, the body
+/// (`LAMP_DID_BODY`) and the ring (`LAMP_DID_RING`). Never "any".
+pub const TELLERS: [&str; 3] = ["skills", BODY, RING];
 /// The body's publishing name, whose dids have a share of their own.
 const BODY: &str = "body";
+/// The ring's publishing name ([`crate::did_ring::SOURCE`]).
+const RING: &str = "ring";
 /// The most actions kept.
 pub const MOST: usize = 200;
 /// The most of them the body's own may be (#7757): with `LAMP_BODY_PRESENCE`
@@ -28,6 +30,28 @@ pub const MOST: usize = 200;
 /// would push the skills' dids out of a shared first-in first-out. Its oldest
 /// goes first; the skills' keep at least `MOST - BODY_MOST`.
 pub const BODY_MOST: usize = 100;
+/// The most of them the ring's own may be: it tells a few faces a day.
+pub const RING_MOST: usize = 20;
+
+/// Which part told a did: the share it is kept under.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Part {
+    Skills,
+    Body,
+    Ring,
+}
+
+impl Part {
+    /// The part that publishes under `source`, if it is one of the named.
+    pub fn of(source: &str) -> Option<Self> {
+        match source {
+            "skills" => Some(Self::Skills),
+            BODY => Some(Self::Body),
+            RING => Some(Self::Ring),
+            _ => None,
+        }
+    }
+}
 /// How long an action is kept, in microseconds on the capture clock.
 pub const WITHIN_US: u64 = 3_600_000_000;
 
@@ -38,44 +62,60 @@ pub fn on() -> bool {
 
 #[derive(Debug, Default)]
 pub struct DidHistory {
-    /// Oldest first, each with whether the body told it.
-    entries: VecDeque<(LampDid, bool)>,
+    /// Oldest first, each with the part that told it.
+    entries: VecDeque<(LampDid, Part)>,
 }
 
 impl DidHistory {
     /// Keep `did`, told at `now_us`: older than an hour, or the 201st, goes.
     /// A did that fails its own check is not kept.
     pub fn keep(&mut self, did: LampDid, now_us: u64) {
-        self.keep_from(did, false, now_us);
+        self.keep_part(did, Part::Skills, now_us);
     }
 
-    /// The same, saying whether the body told it: the body's share is at most
-    /// [`BODY_MOST`], its own oldest dropped first, and past [`MOST`] in all
-    /// the oldest of the part over its share goes (the skills' share is
-    /// `MOST - BODY_MOST`), so neither can push the other out.
-    pub fn keep_from(&mut self, did: LampDid, from_body: bool, now_us: u64) {
+    /// The same, saying which part told it: the body's share is at most
+    /// [`BODY_MOST`] and the ring's [`RING_MOST`], each part's own oldest
+    /// dropped first; the parts that are not skills hold at most
+    /// `BODY_MOST` of the whole between them, so past [`MOST`] their oldest
+    /// goes (the body's before the ring's) and the skills keep at least
+    /// `MOST - BODY_MOST`: no part can push another out.
+    pub fn keep_part(&mut self, did: LampDid, part: Part, now_us: u64) {
         if did.check().is_err() {
             return;
         }
-        self.entries.push_back((did, from_body));
-        while self.entries.iter().filter(|(_, body)| *body).count() > BODY_MOST {
-            if let Some(oldest) = self.entries.iter().position(|(_, body)| *body) {
-                self.entries.remove(oldest);
+        self.entries.push_back((did, part));
+        for (own, most) in [(Part::Body, BODY_MOST), (Part::Ring, RING_MOST)] {
+            while self.count(own) > most {
+                if let Some(oldest) = self.entries.iter().position(|(_, kept)| *kept == own) {
+                    self.entries.remove(oldest);
+                }
             }
         }
         self.trim(now_us);
     }
 
+    fn count(&self, part: Part) -> usize {
+        self.entries
+            .iter()
+            .filter(|(_, kept)| *kept == part)
+            .count()
+    }
+
     fn trim(&mut self, now_us: u64) {
         while self.entries.len() > MOST {
-            let others = self.entries.iter().filter(|(_, body)| !*body).count();
-            // Past its share, the skills' oldest goes; else the body's.
-            let drop_others = others > MOST - BODY_MOST;
-            let oldest = self
-                .entries
-                .iter()
-                .position(|(_, body)| *body != drop_others);
-            match oldest {
+            let others = self.entries.len() - self.count(Part::Skills);
+            // Past their share together, the body's oldest goes, then the
+            // ring's; else the skills'.
+            let drop = if others > BODY_MOST {
+                if self.count(Part::Body) > 0 {
+                    Part::Body
+                } else {
+                    Part::Ring
+                }
+            } else {
+                Part::Skills
+            };
+            match self.entries.iter().position(|(_, kept)| *kept == drop) {
                 Some(at) => self.entries.remove(at),
                 None => self.entries.pop_front(),
             };
@@ -148,7 +188,9 @@ fn watch_into(
                 if !TELLERS.contains(&message.header.source.as_str()) {
                     continue;
                 }
-                let from_body = message.header.source == BODY;
+                let Some(part) = Part::of(&message.header.source) else {
+                    continue;
+                };
                 let Ok(did) = message.parse::<LampDid>() else {
                     continue;
                 };
@@ -156,7 +198,7 @@ fn watch_into(
                     return;
                 };
                 if let Ok(mut history) = kept.lock() {
-                    history.keep_from(did, from_body, lamp_ipc::monotonic_us());
+                    history.keep_part(did, part, lamp_ipc::monotonic_us());
                 }
             }
         })
