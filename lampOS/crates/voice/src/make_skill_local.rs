@@ -689,7 +689,11 @@ pub fn tool() -> lamp_gemini::Tool {
     // agrees to its say-back.
     let code = made_skill::scripts_on();
     if code {
-        description.push_str(CODE_TOLD);
+        description.push_str(if crate::make_no_asks::on() {
+            CODE_AT_ONCE_TOLD
+        } else {
+            CODE_TOLD
+        });
     }
     // A made skill removed by voice (#6960), run now (lamp-9adf, 15 Nov),
     // and those made listed: the same function, its `remove`, `run` or
@@ -732,6 +736,12 @@ pub fn tool() -> lamp_gemini::Tool {
 /// the example ask is the `request`'s ([`CODE_REQUEST_TOLD`]).
 pub const CODE_TOLD: &str = " A made skill may carry its own Python script, run by its task once \
      the person agrees; never say the lamp can't run a script.";
+
+/// [`CODE_TOLD`] with `LAMP_MAKE_NO_ASKS` on: nothing waits for the
+/// person's agreement, so none is promised; shorter, so the description
+/// stays within the link's 1,024 bytes.
+pub const CODE_AT_ONCE_TOLD: &str = " A made skill may carry its own Python script, run by its \
+     task; never say the lamp can't run a script.";
 
 /// What the `request` parameter's description adds with a made skill's
 /// code on (#6749 B): an ask its own script answers, passed whole.
@@ -837,6 +847,14 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, given alone with no request. Never to hear what it sends or uses."
     });
+    // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`,
+    // [`crate::make_no_asks::undo`]): the model judges the words.
+    if crate::make_no_asks::on() {
+        parameters["properties"][crate::make_no_asks::UNDO] = json!({
+            "type": "string",
+            "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request."
+        });
+    }
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
@@ -1164,6 +1182,20 @@ fn make_with_by(
     if made.is_err() {
         crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
     }
+    // `LAMP_MAKE_NO_ASKS`: an unsure line is not acted on, and nothing is
+    // asked: no "could you say it again?".
+    if crate::make_no_asks::on()
+        && let Err(Refused(why, _)) = &made
+        && why == made_skill::UNRELATED
+    {
+        eprintln!(
+            "lamp-voice: request {made_in}: a skill wasn't made: not what was asked; nothing asked (LAMP_MAKE_NO_ASKS)"
+        );
+        return json!({
+            "error": crate::make_no_asks::NOT_ACTED,
+            "next": crate::make_no_asks::NOT_ACTED_NEXT
+        });
+    }
     // A made skill the judge said isn't what was asked (#7621): the person
     // is asked again in the lamp's own words alone, never told its name.
     if let Err(Refused(why, _)) = &made
@@ -1182,6 +1214,16 @@ fn make_with_by(
         .as_ref()
         .ok()
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
+    // `LAMP_MAKE_NO_ASKS` (the first builder, 18:41): on at once, code too,
+    // a clash replaced, and one line with its undo; nothing asked.
+    if let Ok(kept) = &made
+        && let Some(told) = made_no_asks(made_in, kept, keeping, needs.as_deref())
+    {
+        if let (Some(asked), true) = (asked, told["on"] == true) {
+            asked.made(&kept.name, &told, now_unix_ms);
+        }
+        return told;
+    }
     // A skill made by voice that clashes with one on the lamp (#6593: the
     // same trigger, both using the light or both moving the head) is not
     // put on: the person is asked, of every skill it clashes with, to
@@ -1268,6 +1310,73 @@ fn make_with_by(
         asked.made_with(&made.name, &told, now_unix_ms, yes);
     }
     told
+}
+
+/// A made skill `made` with `LAMP_MAKE_NO_ASKS` ([`crate::make_no_asks`]):
+/// one that clashes, made by voice with no code of its own, replaces the
+/// others ([`crate::make_no_asks::replaced`]); any other goes on at once
+/// ([`crate::make_no_asks::put_on`]), code only on the owner's ask
+/// ([`owners_make`]). Its line kept for a cut turn. None with the switch
+/// off, or for a skill that sends, which keeps its yes.
+fn made_no_asks(
+    made_in: u64,
+    made: &Made,
+    keeping: &Keeping,
+    needs: Option<&[Value]>,
+) -> Option<Value> {
+    if !crate::make_no_asks::on() || !crate::make_no_asks::keeps_no_yes(made) {
+        return None;
+    }
+    if made_in != 0 && !made.uses.code && !made.uses.agent_task {
+        let clashes = crate::made_clash::found(keeping, made);
+        if !clashes.is_empty() {
+            let others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
+            let (told, line) = crate::make_no_asks::replaced(keeping, made, &others);
+            MADE_LINE.with(|kept| kept.replace(Some(line)));
+            return Some(told);
+        }
+    }
+    let (on, line) = crate::make_no_asks::put_on(keeping, made, || owners_make(made_in))?;
+    let told = crate::make_no_asks::made_told(made, &on, &line, needs);
+    MADE_LINE.with(|kept| kept.replace(Some(line)));
+    Some(told)
+}
+
+/// Whether the line that asked for this thread's make is the owner's,
+/// asked only for one with code of its own (`LAMP_MAKE_NO_ASKS`): set by
+/// [`answer`] for its make, taken once.
+type OwnerAsk = Box<dyn FnOnce() -> bool>;
+
+thread_local! {
+    static MAKE_OWNER: std::cell::RefCell<Option<OwnerAsk>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+thread_local! {
+    /// [`owners_make`] as a test of this thread sets it.
+    static OWNER_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// [`owners_make`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_owner_here(owner: Option<bool>) {
+    OWNER_HERE.with(|here| here.set(owner));
+}
+
+/// Whether the make in the voice's request `made_in` was the owner's ask,
+/// as a yes to it was held (`services::owners_yes_of`): no request of the
+/// voice's (`made_in` 0) is the app's, its owner's; a voice make whose
+/// owner [`answer`] didn't say is no one's.
+fn owners_make(made_in: u64) -> bool {
+    #[cfg(test)]
+    if let Some(owner) = OWNER_HERE.with(std::cell::Cell::get) {
+        return owner;
+    }
+    made_in == 0
+        || MAKE_OWNER
+            .with(|owner| owner.borrow_mut().take())
+            .is_some_and(|ask| ask())
 }
 
 /// How long a voice make's ask is held once its skill is made and on
@@ -3520,6 +3629,14 @@ pub fn answer(
             }
         }
     }
+    // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`):
+    // the model's judgment of "remove it", "keep the old one" or "put it
+    // back", never a list of words.
+    if crate::make_no_asks::on()
+        && let Some(asked) = call.args[crate::make_no_asks::UNDO].as_str()
+    {
+        return crate::make_no_asks::undo_here(asked, request, heard, lease);
+    }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
     if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
@@ -3604,6 +3721,12 @@ pub fn answer(
         .is_none_or(|request| request.trim().is_empty())
     {
         eprintln!("lamp-voice: request {request}: a skill wasn't made: the call had no request");
+        if crate::make_no_asks::on() {
+            return serde_json::json!({
+                "error": NO_REQUEST,
+                "next": crate::make_no_asks::NOT_ACTED_NEXT
+            });
+        }
         return serde_json::json!({
             "error": NO_REQUEST,
             "next": "Ask them, in a few words, what the skill should do and when. Call nothing now."
@@ -3616,7 +3739,19 @@ pub fn answer(
         return crate::tools::unavailable();
     };
     let request_words = call.args["request"].as_str().unwrap_or_default();
-    make_in(request, request_words, &keeping, own_chat, now_unix_ms)
+    // Whose ask it was, asked only for a make with code of its own
+    // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's.
+    if crate::make_no_asks::on() {
+        let owner = crate::services::owner_of(lease);
+        MAKE_OWNER.with(|asked| {
+            *asked.borrow_mut() = Some(Box::new(move || {
+                crate::services::owners_yes_of(request, heard, owner)
+            }));
+        });
+    }
+    let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
+    MAKE_OWNER.with(|asked| asked.borrow_mut().take());
+    told
 }
 
 #[cfg(test)]
@@ -4270,17 +4405,17 @@ light = { dim = 1 }
     const REQUEST: &str = "make me a skill that dims the light at 10 pm";
 
     /// #7621: the line heard on c0a4, transcribed whole.
-    const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
+    pub(crate) const FOURTEEN: &str = "Lamp, make a skill: every day at four fifteen in the morning, look \
                             up the title of the example dot com web page and tell me what it says.";
     /// The moon-time DeepSeek made from an old ask in `request`.
-    const MOON_TIME: &str = "```skill.toml\nasks = [\"moon time\"]\nkind = \"installable\"\n\
+    pub(crate) const MOON_TIME: &str = "```skill.toml\nasks = [\"moon time\"]\nkind = \"installable\"\n\
                              version = \"1.0.0\"\n[permissions]\nspeak = true\n[[do]]\nsay = { \
                              text = \"The moon is moving away from Earth, a little more each \
                              year.\" }\n```\n\n```SKILL.md\n---\nname: moon-time\ndescription: \
                              A moon fact.\n---\n\n# Moon time\n```\n";
 
     /// What a voice make with Fourteen's line should have asked.
-    const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
+    pub(crate) const FOURTEEN_ASK: &str = "every day at 4:15 in the morning, look up the title of the \
                                 example.com web page and tell me what it says";
 
     /// #7621, its switch on: moon-time, with no word of Fourteen's line, is
@@ -7484,7 +7619,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         task = { task = \"take a photo\", run = \"scripts/main.py\" }\n";
     pub(crate) const CODE_CARD: &str =
         "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
-    const CODE_REQUEST: &str = "make me a photo booth that takes a photo when I sit down";
+    pub(crate) const CODE_REQUEST: &str =
+        "make me a photo booth that takes a photo when I sit down";
 
     /// #6526, with `LAMP_MADE_SKILL_SAID` off: the making model is told a
     /// skill can't hear what is said, as before, and never of a said start;

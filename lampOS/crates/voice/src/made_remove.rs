@@ -579,7 +579,10 @@ pub fn asked_here(
     let Some(keeping) = Keeping::when(true) else {
         return crate::tools::unavailable();
     };
-    asked(
+    if crate::make_no_asks::on() {
+        made_skill::drop_gone(&keeping);
+    }
+    asked_or_removed(
         Ask {
             name,
             request,
@@ -588,8 +591,34 @@ pub fn asked_here(
         },
         &keeping,
         || crate::services::owner_hears(request, heard, lease),
-        Instant::now(),
+        || crate::services::owners_yes_now(request, heard, lease),
+        |skill| crate::made_clash::remove_by_helper(&keeping.manage, skill),
     )
+}
+
+/// A remove asked in `ask`: with `LAMP_MAKE_NO_ASKS` (the first builder,
+/// 18:45), removed at once on the owner's ask (`owners`), by `remove`, and
+/// kept aside to put back, with no question
+/// (`make_no_asks::remove_asked`); off, asked once and its yes awaited, as
+/// [`asked`] does (`owner_hears`).
+pub fn asked_or_removed(
+    ask: Ask<'_>,
+    keeping: &Keeping,
+    owner_hears: impl FnOnce() -> bool,
+    owners: impl FnOnce() -> bool,
+    remove: impl FnOnce(&str) -> Result<(), String>,
+) -> Value {
+    if crate::make_no_asks::on() {
+        return crate::make_no_asks::remove_asked(
+            ask.name,
+            ask.request,
+            ask.heard,
+            keeping,
+            owners,
+            remove,
+        );
+    }
+    asked(ask, keeping, owner_hears, Instant::now())
 }
 
 /// The person's yes to the remove `asks` waited for: the made skill of
