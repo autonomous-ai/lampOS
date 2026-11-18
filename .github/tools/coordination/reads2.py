@@ -22,6 +22,11 @@
 # 4 Nov 04:1x: a READ-OK on an earlier head with the same patch (a plain rebase; the caller passes those heads, lib.sh's
 # coord_same_patch) counts as one on the head, as it does for one read. #5043's two reads were on e05764f95b; rebased
 # to 91ccaf30bb, the same patch, it sat out "short 0" from 00:42.
+#
+# 18 Nov (Jarvis's ask on #6543, #7551 and #7506 rebased three times for docs rows): a head the caller passes as
+# "code:<sha>" has the head's code but other .md lines (lib.sh's code_patch_of). A READ-OK on it counts only when at
+# least one reader has read the head's own patch: one reader's restate covers the merged docs, and the other's earlier
+# read still covers the code. With no read of the head's own patch, such READ-OKs count for nothing.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -143,7 +148,10 @@ def two_reads(items, heads, writers, queue=None, pr=None, commits=(), always=Fal
     always: two reads are asked of every PR, whatever it says (13 Nov, the lead: two real readers). Returns "none",
     "met N" or "short N"."""
     heads = [heads] if isinstance(heads, str) else list(heads)
-    asked = always or queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = set()
+    code_heads = [h[len("code:"):] for h in heads if h.startswith("code:")]
+    heads = [h for h in heads if not h.startswith("code:")]
+    # Each reader: whether one of their READ-OKs is on the head's own patch (True) or only on its code (False).
+    asked = always or queue_asks(queue, heads, pr, writers, commits); signed = {}; unsigned = {}
     for c in items:
         body = c["body"].lstrip()
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
@@ -157,12 +165,19 @@ def two_reads(items, heads, writers, queue=None, pr=None, commits=(), always=Fal
         if re.match(r"\**TWO READS\b", body) or (READ_ASK.search(body.split("\n", 1)[0]) and body_asks(body)):
             asked = True
         mk = parse_marker(body)
-        if not mk or mk[0] != "READ-OK" or not mk[1] or not any(h.startswith(mk[1]) for h in heads):
+        if not mk or mk[0] != "READ-OK" or not mk[1]:
+            continue
+        whole = any(h.startswith(mk[1]) for h in heads)
+        if not whole and not any(h.startswith(mk[1]) for h in code_heads):
             continue
         login = c["login"].lower(); name = signer(body).lower()
-        if name: signed.setdefault(login, set()).add(name)
-        else: unsigned.add(login)
-    n = sum(len(s) for s in signed.values()) + len(unsigned - set(signed))
+        if name:
+            readers = signed.setdefault(login, {}); readers[name] = readers.get(name, False) or whole
+        else:
+            unsigned[login] = unsigned.get(login, False) or whole
+    people = [w for readers in signed.values() for w in readers.values()]
+    people += [w for login, w in unsigned.items() if login not in signed]
+    n = len(people) if any(people) else 0
     return "none" if not asked else ("met %d" % n if n >= 2 else "short %d" % n)
 
 

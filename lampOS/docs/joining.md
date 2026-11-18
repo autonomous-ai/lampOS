@@ -844,7 +844,9 @@ runs on the PM's machine, one bot at a time. A pull request is carried when:
 - it is not a draft and is into `lamp-voice`;
 - its newest `READ-OK` names its head, or a head with the **same patch**
   (a plain rebase keeps a read, and TWO READS count the reads on an earlier
-  head with the same patch);
+  head with the same patch). When a rebase changed only the pull request's
+  own `.md` lines, **one** reader's restate at the new head is enough: the
+  other reader's earlier read still counts for the unchanged code;
 - its ARM64 and clippy runs are green, and a lamp test has passed where one
   was needed;
 - it has its **lamp row** (below); and

@@ -162,5 +162,99 @@ class SamePatch(unittest.TestCase):
         self.assertEqual(reads("--pr-commits", commits), "short 1")
         self.assertEqual(reads(), "none")
 
+class DocsRows(unittest.TestCase):
+    """18 Nov (Jarvis's ask on #6543): P1 changes code and a docs row; P2 is P1 with its own docs row merged (code the
+    same, .md lines not); P3 is P1 with a code change. Readers: Reader A and Reader B, on two logins."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.work = os.path.join(self.tmp, "work")
+        origin = os.path.join(self.tmp, "origin.git")
+        self.env = dict(os.environ, REPO_DIR=self.work, TOOLS_DIR=HERE, LAMP_COORD_STATE=os.path.join(self.tmp, "state"))
+        run(["git", "init", "-q", "--bare", origin], self.tmp)
+        run(["git", "init", "-q", "-b", "lamp-voice", self.work], self.tmp)
+        for a in (("config", "user.email", "t@example.invalid"), ("config", "user.name", "t"), ("remote", "add", "origin", origin)):
+            self.git(*a)
+        self.write("code.rs", "fn a() {}\n"); self.write("docs/switches.md", "| A | off |\n| B | off |\n")
+        self.commit("base")
+        self.git("push", "-q", "origin", "lamp-voice")
+        self.git("checkout", "-q", "-b", "pr")
+        self.write("code.rs", "fn a() { b(); }\n"); self.write("docs/switches.md", "| A | off |\n| B | off |\n| C | off, #1 |\n")
+        self.P1 = self.commit("the change")
+        self.write("docs/switches.md", "| A | off |\n| B | off |\n| C | off, #1 and #2 |\n")
+        self.P2 = self.commit("its row merged with another train's")
+        self.git("checkout", "-q", "-b", "pr3", self.P1)
+        self.write("code.rs", "fn a() { b(); c(); }\n")
+        self.P3 = self.commit("a code change")
+        self.git("fetch", "-q", "origin")
+        self.writers = os.path.join(self.tmp, "writers.txt")
+        with open(self.writers, "w") as f:
+            f.write("writer-a\nwriter-b\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def git(self, *a):
+        return run(["git", *a], self.work).stdout
+
+    def write(self, f, body):
+        p = os.path.join(self.work, f)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w") as fh:
+            fh.write(body)
+
+    def commit(self, msg):
+        self.git("add", "-A"); self.git("commit", "-q", "-m", msg)
+        return self.git("rev-parse", "HEAD").strip()
+
+    def jsonl(self, name, items):
+        p = os.path.join(self.tmp, name)
+        with open(p, "w") as f:
+            f.write("".join(json.dumps(x) + "\n" for x in items))
+        return p
+
+    def same_patch(self, *args):
+        return run(["zsh", "-c", 'source "$TOOLS_DIR/lib.sh"; coord_same_patch "$@"', "zsh", *args], self.work, self.env).stdout.split()
+
+    def ok(self, login, who, sha):
+        return {"login": login, "body": "READ-OK %s\n%s, 10:00, the read." % (sha, who)}
+
+    def reads(self, head, comments):
+        c = self.jsonl("c.jsonl", comments)
+        heads = self.same_patch(head, c)
+        lines = "".join(json.dumps(x) + "\n" for x in [{"login": "", "body": "A change.", "pr_body": True}] + comments)
+        return run([sys.executable, "-I", READS2, "--always", "--writers", self.writers, *heads], self.work, input=lines).stdout.strip()
+
+    def test_a_read_on_the_same_code_with_other_docs_is_offered_as_code(self):
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
+        self.assertEqual(self.same_patch(self.P2, c), [self.P2, "code:" + self.P1])
+
+    def test_a_read_before_a_code_change_is_not(self):
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
+        self.assertEqual(self.same_patch(self.P3, c), [self.P3])
+
+    def test_a_queue_sha_is_never_offered_as_code(self):
+        c = self.jsonl("c.jsonl", [])
+        q = self.jsonl("q.jsonl", [{"login": "writer-a", "body": "READ ASK " + self.P1[:10] + "\nTWO READS."}])
+        self.assertEqual(self.same_patch(self.P2, c, q), [self.P2])
+
+    def test_one_restate_beside_a_read_of_the_same_code_is_two_reads(self):
+        both = [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-b", "Reader B", self.P1),
+                self.ok("writer-b", "Reader B", self.P2)]
+        self.assertEqual(self.reads(self.P2, both), "met 2")
+
+    def test_reads_of_the_code_alone_count_for_nothing(self):
+        both = [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-b", "Reader B", self.P1)]
+        self.assertEqual(self.reads(self.P2, both), "short 0")
+
+    def test_one_reader_on_both_heads_is_one_reader(self):
+        self.assertEqual(self.reads(self.P2, [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-a", "Reader A", self.P2)]),
+                         "short 1")
+
+    def test_a_code_change_still_needs_two_restates(self):
+        both = [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-b", "Reader B", self.P3)]
+        self.assertEqual(self.reads(self.P3, both), "short 1")
+
+
 if __name__ == "__main__":
     unittest.main()
