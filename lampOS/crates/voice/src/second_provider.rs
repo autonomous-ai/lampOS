@@ -4562,6 +4562,18 @@ pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
 
 /// Why the answer to the lamp's name alone is held back in the night's
 /// sleep ([`Engine::resting_through_sounds`]).
+/// Why a line is held near the end of the lamp's day ([`day_alone_held`]).
+const DAY_NEAR_HELD: &str = "the lamp's day is nearly used, and the line reached it only as the conversation going on, not from the one it was talking with: not sent only to be judged (LAMP_VOICE_DAY_SHED)";
+
+/// Whether a line is held near the end of the lamp's day (#7664): the day
+/// at or past `day_shed::NEAR`, and the line let out only as the
+/// conversation going on, told [`worker::CONVERSATION_ALONE`]. The caller's
+/// own follow-up ([`worker::FOLLOW_UP_NOTE`]) and a line with any other
+/// sign it was said to the lamp (no note) are never held.
+fn day_alone_held(level: crate::day_shed::Level, note: Option<&str>) -> bool {
+    level.sheds() && note == Some(worker::CONVERSATION_ALONE)
+}
+
 const NIGHT_REST_HELD: &str = "only the lamp's name, and the lamp asleep for the night: it stirs and is not woken by its own answer (LAMP_REST_THROUGH_SOUNDS)";
 
 /// Whether Expression's state says the night's sleep rests through sounds:
@@ -10497,6 +10509,26 @@ async fn spoken(
         && shared.night_rest.as_ref().is_some_and(|night| night())
     {
         heeded = Some(NIGHT_REST_HELD);
+    }
+    // `LAMP_VOICE_DAY_SHED` (#7664): near the end of the lamp's day, a line
+    // let out only as the conversation going on, by someone other than the
+    // one the lamp was talking with (`worker::CONVERSATION_ALONE`, never the
+    // caller's own follow-up), is held, not sent to the model only to be
+    // judged. A named line, a turn, a tap, a face or the caller's follow-up
+    // still goes: the owner's own talk is never shed.
+    if heeded.is_none()
+        && !echoed
+        && !held
+        && !empty
+        && day_alone_held(
+            crate::day_shed::worker_level(),
+            shared
+                .conversation_alone
+                .as_ref()
+                .and_then(|note| note(request)),
+        )
+    {
+        heeded = Some(DAY_NEAR_HELD);
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {
@@ -17596,10 +17628,14 @@ async fn answer(
                             && round == 1
                             && let Some((status, word)) = refusal
                         {
-                            let limited = shared
-                                .down
-                                .as_ref()
-                                .and_then(|down| down.refused(status, word.is_some()));
+                            let limited = shared.down.as_ref().and_then(|down| {
+                                // A spent day read on the relay's answers
+                                // (`LAMP_VOICE_DAY_SHED`, #7664) is its word
+                                // too: the limit at the first 429.
+                                let spent = crate::day_shed::worker_level()
+                                    == crate::day_shed::Level::Spent;
+                                down.refused(status, word.is_some() || spent)
+                            });
                             if let Some(lasted) = limited {
                                 say_limit(shared, (request, heard, named), lasted, word.flatten())
                                     .await?;

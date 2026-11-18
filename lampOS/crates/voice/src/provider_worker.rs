@@ -513,6 +513,16 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (second_seems, flags) = crate::seems_told::take(flags);
     let (second_doing, flags) = crate::doing_told::take(flags);
     let (health_facts, flags) = crate::health_told::take(flags);
+    // `LAMP_VOICE_DAY_SHED` (#7664): the relay's share of the day read on
+    // every answer, and kept for the coordinator.
+    let (day_shed, flags) = crate::day_shed::take(flags);
+    if day_shed {
+        crate::day_shed::start_worker();
+        eprintln!(
+            "lamp-voice second: the lamp's day is read on the relay's answers, and what nobody asked for is shed near its end ({})",
+            crate::day_shed::ENVIRONMENT
+        );
+    }
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
     let (mut tools, flags) = crate::tools::take(flags)?;
