@@ -57,10 +57,10 @@ Environment=LAMP_SKILL_DEFAULT_AGENT=on
 # lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
 Environment=LAMP_OPENCLAW_ON_LAMP=on
 # V1's tool grants for the lamp's OpenClaw (#7245; platform runtimes/openclaw/service_setup.go lines 136, 237-250):
-# lamp-tasks merges tools.profile=full, tools.exec {host gateway, security full, ask off}, tools.elevated and
-# agents.defaults elevatedDefault=full, sandbox.mode=off into openclaw.json at every start, inside openclaw-ns, and a
-# gateway make gets the guide's lamp-skills pack check. On in the product (owner: "whatever V1 gave, we give");
-# off restores exec.mode=ask, byte for byte.
+# lamp-tasks merges tools.profile=full, tools.exec {host gateway, mode full} (V1's security full + ask off), tools.elevated
+# and agents.defaults elevatedDefault=full, sandbox.mode=off into openclaw.json at every start, inside openclaw-ns, and a
+# gateway make gets the guide's lamp-skills pack check. On in the product (owner: "whatever V1 gave, we give"; 18 Nov:
+# the lamp is one user's, OpenClaw unrestricted on it); off restores exec.mode=ask, byte for byte.
 Environment=LAMP_OPENCLAW_V1_TOOLS=on
 # An OpenClaw task's own steps on the bus (#7267, docs/tasks.md "An agent's steps"): each tool call, its result's first
 # 120 bytes, the agent's reply and an error, read from its session in OpenClaw's SQLite every second (read-only),

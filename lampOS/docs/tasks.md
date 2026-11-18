@@ -2837,9 +2837,10 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   design source is the platform's `runtimes/openclaw/service_setup.go`,
   line 136 and lines 237-250; the keys and values are V1's:
   - `tools.profile`: `"full"`;
-  - `tools.exec`: `host: "gateway"`, `security: "full"`, `ask: "off"`.
-    Its `mode` is taken out: OpenClaw 2026.11.2 refuses `mode` beside
-    `security` or `ask` in one exec object;
+  - `tools.exec`: `host: "gateway"`, `mode: "full"`, which is exactly V1's
+    `security: "full"`, `ask: "off"` in OpenClaw 2026.11.2. `security` and
+    `ask` are taken out, as OpenClaw refuses `mode` beside either and the
+    stable rollback target writes `mode` (below);
   - `tools.elevated`: `enabled: true`, `allowFrom.webchat: ["*"]`. V1 keys
     this by its messaging channel. A Harness turn on the gateway comes in
     on OpenClaw's own `webchat` channel. Other channels are kept;
@@ -2851,12 +2852,14 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   `gateway` block and any other key stay. The gateway takes `tools` hot and
   reads `agents` on each turn, so it needs no restart. `openclaw-ns` and its
   binds are unchanged, so the namespace still limits what a command can
-  see. With the switch `off`, `tools.exec` asks again as `security:
-  "allowlist"` and `ask: "on-miss"` (exactly OpenClaw's `mode: "ask"`) and
-  V1's values are taken out. `tools.exec.mode` itself is never written and
-  is always taken out: an older lamp-tasks (a rollback) writes `host`,
-  `security` and `ask` and never removes `mode`, and OpenClaw refuses a
-  file with both (exit 78, the gateway down; seen on lamp-c0a4, #7245). The skill-start launcher's allow-list entry ("One exec approval",
+  see. With the switch `off`, `tools.exec.mode` is `"ask"` again and V1's
+  values are taken out, so the file is byte for byte what it was before
+  #7245. With it on, V1's `security: "full"`, `ask: "off"` is written as
+  its exact `mode: "full"`. Either way `security` and `ask` are never
+  written and are always taken out: OpenClaw refuses `mode` beside either
+  (exit 78, the gateway down), and today's stable lamp-tasks, the rollback
+  target, inserts `mode: "ask"` and removes nothing else, so only a
+  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 

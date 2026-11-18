@@ -2959,9 +2959,10 @@ là phần của một coder khác trong #6226; thiết kế:
   cho nấy." Nguồn thiết kế là `runtimes/openclaw/service_setup.go` của
   platform, dòng 136 và các dòng 237-250. Khóa và giá trị là của V1:
   - `tools.profile`: `"full"`;
-  - `tools.exec`: `host: "gateway"`, `security: "full"`, `ask: "off"`.
-    `mode` bị bỏ đi, vì OpenClaw 2026.11.2 từ chối `mode` đi cùng
-    `security` hay `ask` trong một object exec;
+  - `tools.exec`: `host: "gateway"`, `mode: "full"`, đúng bằng
+    `security: "full"`, `ask: "off"` của V1 trong OpenClaw 2026.11.2.
+    `security` và `ask` bị bỏ đi, vì OpenClaw từ chối `mode` đi cùng một
+    trong hai và đích rollback stable ghi `mode` (bên dưới);
   - `tools.elevated`: `enabled: true`, `allowFrom.webchat: ["*"]`. V1 đặt
     khóa này theo kênh nhắn tin của nó. Lượt Harness trên gateway đi vào
     qua kênh riêng `webchat` của OpenClaw. Các kênh khác được giữ;
@@ -2974,12 +2975,14 @@ là phần của một coder khác trong #6226; thiết kế:
   `tools` ngay khi đang chạy và đọc `agents` ở mỗi lượt, nên không cần khởi
   động lại. `openclaw-ns` và các bind của nó không đổi, nên namespace vẫn
   giới hạn những gì một lệnh nhìn thấy. Khi công tắc là `off`,
-  `tools.exec` lại hỏi trước bằng `security: "allowlist"` và `ask:
-  "on-miss"` (đúng bằng `mode: "ask"` của OpenClaw) và các giá trị của V1 bị
-  bỏ đi. Bản thân `tools.exec.mode` không bao giờ được ghi và luôn bị bỏ đi:
-  lamp-tasks cũ hơn (khi rollback) ghi `host`, `security` và `ask` mà không
-  bỏ `mode`, và OpenClaw từ chối file có cả hai (exit 78, gateway chết; thấy
-  trên lamp-c0a4, #7245). Mục cho phép của launcher
+  `tools.exec.mode` lại là `"ask"` và các giá trị của V1 bị bỏ đi, nên file
+  giống hệt từng byte như trước #7245. Khi bật, `security: "full"`, `ask:
+  "off"` của V1 được ghi bằng đúng `mode: "full"` tương đương. Dù bật hay
+  tắt, `security` và `ask` không bao giờ được ghi và luôn bị bỏ đi: OpenClaw
+  từ chối `mode` đi cùng một trong hai (exit 78, gateway chết), và lamp-tasks
+  stable hôm nay, đích rollback, chèn `mode: "ask"` mà không bỏ gì khác, nên
+  chỉ file có riêng `mode` mới qua được rollback (#7245, thấy trên
+  lamp-c0a4). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 

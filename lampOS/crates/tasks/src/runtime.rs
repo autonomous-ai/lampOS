@@ -7074,9 +7074,10 @@ mod tests {
             json!(["/var/lib/lampOS/skills"])
         );
         // #7245: V1's tool grants, on by default.
-        assert_eq!(config["tools"]["exec"]["security"], "full");
-        assert_eq!(config["tools"]["exec"]["ask"], "off");
-        assert_eq!(config["tools"]["exec"].get("mode"), None);
+        // V1's `security: full, ask: off` as its exact `mode` (#7737's P1).
+        assert_eq!(config["tools"]["exec"]["mode"], "full");
+        assert_eq!(config["tools"]["exec"].get("security"), None);
+        assert_eq!(config["tools"]["exec"].get("ask"), None);
         assert_eq!(
             set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
