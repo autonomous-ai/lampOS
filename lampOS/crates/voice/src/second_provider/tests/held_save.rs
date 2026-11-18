@@ -618,3 +618,116 @@ async fn past_setup_a_yes_to_the_read_back_with_no_call_keeps_nothing() {
     .await;
     assert_eq!(sent, Vec::<Value>::new());
 }
+
+/// The memory owner's rule ("the mouth (seen-speaking) check gates forget
+/// only, never remember or keep"), with `LAMP_KEEP_QUIETLY_ONE_FACE`: a
+/// held setup face save is let go by a plain yes to the face on a line held
+/// only by a face's gap or carried in their conversation, when the line is
+/// theirs by the face-in-view rule (`keep_quietly::saw`). On lamp-06c1 (18
+/// Nov, requests 72 and 73) the owner's yes, their face the one face in
+/// view and the line carried, dropped it as a gap's line. Off, another face
+/// seen speaking it, another voice, a keep-only carry (no one known), a
+/// written turn, or another known person alone in view (B's yes to A's
+/// held save, Twelve's P3 on #7735): it stays dropped.
+#[tokio::test]
+async fn a_held_setup_saves_yes_on_their_one_face_line_runs_with_the_switch() {
+    use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+    // The held save keeps "Walter"; the scope's known person is Walter
+    // unless the case says another's.
+    const NAME: &str = "Walter";
+    const OTHER: &str = "Setup One Face B";
+    let said = Said {
+        this: "Yes.".to_owned(),
+        before: vec![
+            ("My name is Walter.".to_owned(), READ_BACK.to_owned()),
+            ("Yes, that's my name.".to_owned(), FACE_QUESTION.to_owned()),
+        ],
+    };
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let engine = engine.reading_said_from(Arc::new(move || said.clone()));
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(7_301_000);
+    #[derive(Clone, Copy, PartialEq)]
+    enum Line {
+        Carried,
+        Gap,
+        KeepOnly,
+    }
+    let take =
+        |on: bool, line: Line, who: &str, speakers: &[&str], other_voice: bool, heard: bool| {
+            crate::keep_quietly::set_one_face_for_test(on);
+            let person = crate::remember::person_id(who);
+            let request = NEXT.fetch_add(2, std::sync::atomic::Ordering::Relaxed) + 1;
+            let key = RequestKey {
+                worker: lamp_turn_owner::BootId::new([73; 16]).unwrap(),
+                session: 1,
+                request,
+            };
+            let scope = match line {
+                Line::Carried | Line::KeepOnly => RequestScope::new(key, ScopeSnapshot::of(who)),
+                Line::Gap => RequestScope::new(key, ScopeSnapshot::held_of(who)),
+            };
+            let lease = scope.lease();
+            match line {
+                Line::Carried => assert!(lease.carry_conversation(&person)),
+                Line::KeepOnly => assert!(lease.carry_keep_only(&person)),
+                Line::Gap => {}
+            }
+            let speakers: Vec<String> = speakers.iter().map(|id| (*id).to_owned()).collect();
+            crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                request,
+                speakers: speakers.clone(),
+                ..Default::default()
+            });
+            let alone = crate::keep_quietly::alone(
+                &speakers,
+                line == Line::Gap,
+                line != Line::Gap,
+                !other_voice,
+            );
+            crate::keep_quietly::saw(request, &person, &speakers, None, alone);
+            let now = Instant::now();
+            *engine.shared.held_save.lock().unwrap() = Some(HeldSave {
+                call: call("c1", REMEMBER, json!({"name": NAME})),
+                request: request - 1,
+                session: Some(1),
+                at: now,
+            });
+            let taken = take_held_save(&engine.shared, request, heard, Some(&lease), now);
+            *engine.shared.held_save.lock().unwrap() = None;
+            crate::keep_quietly::set_one_face_for_test(false);
+            matches!(taken, Some(SetupSave::Runs(_)))
+        };
+    assert!(!take(false, Line::Carried, NAME, &[], false, true), "off");
+    assert!(
+        take(true, Line::Carried, NAME, &[], false, true),
+        "carried, their one face"
+    );
+    assert!(
+        take(true, Line::Gap, NAME, &[], false, true),
+        "a gap, their one face"
+    );
+    assert!(
+        !take(true, Line::Carried, NAME, &["f9"], false, true),
+        "another face seen"
+    );
+    assert!(
+        !take(true, Line::Carried, NAME, &[], true, true),
+        "another voice"
+    );
+    assert!(
+        !take(true, Line::KeepOnly, NAME, &[], false, true),
+        "no one known"
+    );
+    assert!(
+        !take(true, Line::Carried, NAME, &[], false, false),
+        "a written turn"
+    );
+    assert!(
+        !take(true, Line::Carried, OTHER, &[], false, true),
+        "carried, another known person's one face"
+    );
+    assert!(
+        !take(true, Line::Gap, OTHER, &[], false, true),
+        "a gap, another known person's one face"
+    );
+}

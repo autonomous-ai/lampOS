@@ -1822,7 +1822,14 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   as theirs (LAMP_KEEP_QUIETLY_ONE_FACE)"). The room's scope, an unknown or
   another face seen speaking it, a second face in view, another voice and a
   written turn stay ask-first; the heard-words check below still holds; and
-  the one-face forget's yes is unchanged. On lamp-06c1 (build 13706,
+  the one-face forget's yes is unchanged. A held setup face save's plain
+  yes to the face on such a line, its scope held by a face's gap or
+  carried, runs it too (`second_provider::theirs_by_face`, the memory
+  owner's rule: the mouth check gates forget only), when the scope's known
+  person is the one the save keeps (`known_faces::memory_person` of its
+  name); another known person's line, or another face seen speaking it,
+  still drops it (lamp-06c1, stable 14100, 18 Nov, requests
+  72 and 73: the owner's yes dropped as a gap's line, no face saved). On lamp-06c1 (build 13706,
   13:57:56) the owner's face alone in 34 of 34 looks, the line carried, had
   a quiet keep refused as not seen. With the switch, in a known person's own
   scope, on a line seen said by them:

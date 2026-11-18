@@ -1557,7 +1557,11 @@ With the switch:
     right?" "Yes, that's my name." made no call and kept no face). A yes
     no face was seen saying, even with no face in view, still runs it
     (the lead, 9 Nov: the owner may not face the lamp; when the eyes then
-    find no face, the model is told it was not kept, and why). A plain
+    find no face, the model is told it was not kept, and why). With
+    `LAMP_KEEP_QUIETLY_ONE_FACE=on`, a line held by a face's gap or carried
+    does not drop it when it is theirs by the face-in-view rule and the
+    scope's known person is the one the save keeps
+    (`second_provider::theirs_by_face`, memory.md). A plain
     yes dropped for the second face is told to the model as a face not
     kept, and why, so it makes up no reason of its own (lamp-52e6, 5 Nov,
     Fifth's run B on #5415: "I need to know who you are first"). With nothing held, while "who you are"

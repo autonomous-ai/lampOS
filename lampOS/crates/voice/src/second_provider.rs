@@ -15141,11 +15141,21 @@ fn take_held_save(
     let said = said_window(shared);
     let verdict = crate::known_faces::held_save_verdict(&name, &said);
     let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
+    // A yes on a line held only by a face's gap, or carried in their
+    // conversation (its scope held), is theirs with
+    // `LAMP_KEEP_QUIETLY_ONE_FACE` by the face-in-view rule
+    // ([`theirs_by_face`]): the memory owner's rule, "mouth detection only
+    // blocks the forget and nothing else". On lamp-06c1 (18 Nov, request
+    // 73) the owner's yes, their face the one face in view and the line
+    // carried, dropped the save held in request 72 as a gap's line. The
+    // scope's person must be the one the save keeps (Twelve's P3 on #7735):
+    // known person B alone in view can't say the yes to A's held save.
+    let save_by_face = held_by_gap(scope) && theirs_by_face(scope, request, &name);
     // Only a second face drops a plain yes the model should hear about.
     let mut told = false;
     let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
         "too late"
-    } else if held_by_gap(scope) {
+    } else if held_by_gap(scope) && !save_by_face {
         "a line held only by a face's gap"
     } else if held.session.is_some() && scope.map(|scope| scope.key().session) != held.session {
         "not the same session"
@@ -15165,6 +15175,19 @@ fn take_held_save(
             crate::known_faces::HeldSaveVerdict::Runs
                 if !called || crate::known_faces::face_agreed(&name, &said) =>
             {
+                if save_by_face {
+                    let how = if seen_speaking
+                        .as_ref()
+                        .is_some_and(|line| !line.speakers.is_empty())
+                    {
+                        "their face was seen saying it"
+                    } else {
+                        "no face was seen saying it, their face the one face in view or the line carried"
+                    };
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save on a line theirs by the face: {how} (LAMP_KEEP_QUIETLY_ONE_FACE)"
+                    );
+                }
                 if called {
                     eprintln!(
                         "lamp-voice second: request {request}: their yes to the face runs the setup face save held in request {}",
@@ -15209,6 +15232,33 @@ fn take_held_save(
         );
     }
     told.then_some(SetupSave::Dropped(why))
+}
+
+/// Whether request `request`'s line, its scope held (a face's gap, or
+/// carried in their conversation), is its known person's by the
+/// face-in-view rule, with `LAMP_KEEP_QUIETLY_ONE_FACE` on: no face seen
+/// speaking it but theirs, their known face the one face in view through
+/// it or the line carried in their conversation, and no other voice heard
+/// (`keep_quietly::saw`, the quiet keep's own record, #7495), when that
+/// person is the one the held save keeps by `name` (its letters joined, as
+/// [`crate::known_faces::held_save_verdict`] judges it). An unknown
+/// speaker, a keep-only carry (the room's), another face seen speaking it,
+/// another voice, another known person and a written turn never are. Off:
+/// never.
+fn theirs_by_face(
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    request: u64,
+    name: &str,
+) -> bool {
+    let joined = crate::known_faces::letters_as_word(name);
+    let saved = crate::known_faces::memory_person(joined.as_deref().unwrap_or(name));
+    crate::keep_quietly::one_face_on()
+        && scope
+            .and_then(crate::memory_scope::ScopeLease::scope)
+            .and_then(crate::memory_scope::ScopeSnapshot::person)
+            .is_some_and(|person| {
+                person == saved && crate::keep_quietly::seen_saying(request, person)
+            })
 }
 
 /// What becomes of a setup face save on a turn ([`take_held_save`]).
