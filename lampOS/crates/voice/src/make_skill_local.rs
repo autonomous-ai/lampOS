@@ -200,6 +200,55 @@ fn system_for(reads: bool, agent: bool) -> String {
     system_net(reads, agent, crate::make_no_cannot::net_by_agent())
 }
 
+/// What the make's model is told of what only the internet tells, with
+/// `LAMP_TASK_NET` on ([`system_net`]): answered
+/// [`crate::make_no_cannot::NEEDS_NET`], a task the lamp sets up itself.
+fn net_told() -> String {
+    format!(
+        "What only the internet tells at the time it runs (the weather or a forecast, the news, \
+         a web lookup, a price, anything from the internet) is no step and no code of a skill's \
+         own: the lamp's agent looks it up each time, in a task the lamp sets up itself and \
+         reads back for the person's yes. A request that needs it, whenever it runs, is answered \
+         with one line and no blocks: {needs_net} and what it looks up, in a few plain words \
+         (\"{needs_net} the weather forecast\"); never {cannot} for it, and never a say telling \
+         the person to look it up themselves.",
+        needs_net = crate::make_no_cannot::NEEDS_NET,
+        cannot = made_skill::CANNOT,
+    )
+}
+
+/// [`net_told`] for a make on a gateway agent whose run granted `net`
+/// reaches the web from its own skill-start fence (#7742,
+/// [`net_code_by`]): its own code fetches it, granted `net`.
+fn net_code_told() -> String {
+    format!(
+        "What only the internet tells at the time it runs (the weather or a forecast, the news, \
+         a web lookup, a price, anything from the internet) is the skill's own code on this \
+         lamp, as told at the end, with \"{net}\" in its grants: its script fetches it over \
+         https with Python's standard library alone (urllib.request; the lamp gives the run its \
+         web proxy, and it reaches only the public web on ports 80 and 443), and prints what it \
+         found in a sentence or two, which comes back as the lamp's task news. \"{net}\" never \
+         sits beside camera, microphone, speech, notes, look or a linked service's grant. Never \
+         {cannot} for it, never {needs_net} for it, and never a say telling the person to look \
+         it up themselves.",
+        net = crate::skill_task_yes::NET.0,
+        needs_net = crate::make_no_cannot::NEEDS_NET,
+        cannot = made_skill::CANNOT,
+    )
+}
+
+/// Whether a make handed to the lamp's agent `engine` may write its own
+/// code granted `net` (#7742): OpenClaw, a gateway agent whose run's
+/// script reaches the web from its own skill-start fence, with
+/// `LAMP_TASK_NET_GATEWAY` on (`skill_task_yes::gateway_net_on`) and the
+/// `internet:` make on ([`crate::make_no_cannot::net_by_agent`]). Else the
+/// make is told and checked as before.
+pub(crate) fn net_code_by(engine: &str) -> bool {
+    engine == "OpenClaw"
+        && crate::skill_task_yes::gateway_net_on()
+        && crate::make_no_cannot::net_by_agent()
+}
+
 /// [`system_for`], with what only the internet tells answered
 /// [`crate::make_no_cannot::NEEDS_NET`] (`net`,
 /// [`crate::make_no_cannot::net_by_agent`]: `LAMP_TASK_NET` on) or the
@@ -317,15 +366,9 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
              below gives, like a summary of mail or calendar content no read below gives. A \
              request that needs it is answered the same way, one line and no blocks: {cannot} \
              \"{cant_yet}\" and what, in plain words (\"{cant_yet} summing up your mail.\"); \
-             never a say telling the person to check, look up or read it themselves. What only \
-             the internet tells at the time it runs (the weather or a forecast, the news, a web \
-             lookup, a price, anything from the internet) is no step and no code of a skill's \
-             own: the lamp's agent looks it up each time, in a task the lamp sets up itself and \
-             reads back for the person's yes. A request that needs it, whenever it runs, is \
-             answered with one line and no blocks: {needs_net} and what it looks up, in a few \
-             plain words (\"{needs_net} the weather forecast\"); never {cannot} for it, and never \
-             a say telling the person to look it up themselves.",
-            needs_net = crate::make_no_cannot::NEEDS_NET,
+             never a say telling the person to check, look up or read it themselves. \
+             {internet}",
+            internet = net_told(),
         )
     } else {
         format!(
@@ -3204,6 +3247,25 @@ fn made_and_journaled_by(
         // What only the internet tells (`LAMP_TASK_NET` on): never handed
         // to the agent to write, which is told the same rules; made one
         // task for it below ([`net_made`]).
+        // On a gateway agent whose run granted `net` reaches the web from
+        // its own skill-start fence (#7742): handed to it to write as code
+        // of the skill's own, granted `net`.
+        Some((agent, engine)) if needs_net.get() && net_code_by(engine) => {
+            eprintln!(
+                "lamp-voice: a skill made here: DeepSeek said it needs the internet: handed to \
+                 the agent ({engine}) to write as code granted net"
+            );
+            handed_to_agent(
+                Before::Asked(Box::new(made)),
+                request,
+                &brief,
+                agent,
+                engine,
+                &kept,
+                &models_cannot,
+                &deepseek_repaired,
+            )
+        }
         Some(_) if needs_net.get() => {
             eprintln!(
                 "lamp-voice: a skill made here: DeepSeek said it needs the internet: not handed \
@@ -3598,6 +3660,20 @@ fn handed_to_agent(
     // checks (the Reviewer-lead on #6439).
     let hidden = placeholders(&own_accounts());
     let system = hide(&system(), &hidden);
+    // On a gateway agent whose run granted `net` reaches the web from its
+    // own skill-start fence (#7742): what only the internet tells is the
+    // skill's own code granted `net`, told and checked so while it makes.
+    let net_code = net_code_by(engine);
+    let system = if net_code {
+        eprintln!(
+            "lamp-voice: a skill made here: the agent ({engine}) may write code granted net: \
+             its run reaches the web from its own skill-start fence"
+        );
+        system.replacen(&net_told(), &net_code_told(), 1)
+    } else {
+        system
+    };
+    let _net_code = net_code.then(made_skill::NetCode::on);
     // Its `internet:` line taken as the prompt it was given says.
     let net = crate::make_no_cannot::net_by_agent();
     // The waiting line with the first hand-over only, and never when the
@@ -10480,6 +10556,86 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(helper.join().unwrap()["install_made"].is_string());
         assert!(!told.to_string().contains("PRIVATE-DETAIL-7"), "{told}");
         assert_bitcoin_kept(&told, &keeping);
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7742: with `LAMP_TASK_NET_GATEWAY` on and OpenClaw the lamp's
+    /// agent (a gateway agent whose run granted `net` reaches the web from
+    /// its own skill-start fence), DeepSeek's `internet:` is handed to the
+    /// agent, whose rules tell it to write the skill's own code granted
+    /// `net` (never `internet:`); its answer, a task step whose script
+    /// fetches over https, is kept granted `net` and waits for the yes to
+    /// its code, as any made code does. DeepSeek's own prompt is as before;
+    /// with the switch off, or on Hermes, nothing changes.
+    #[test]
+    fn with_gateway_net_an_openclaw_make_writes_its_own_code_granted_net() {
+        if made_skill::a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        net_make_here(Some(true));
+        crate::skill_task_yes::set_gateway_net_here(Some(true));
+        made_skill::set_code_at_once_here(Some(false));
+        let (root, keeping) = keeping("net-gateway-code");
+        let toml = CODE_TOML
+            .replace("grants = [\"camera\"]", "grants = [\"net\"]")
+            .replace("take a photo", "fetch the Bitcoin price from the web");
+        let main = "import json\nimport urllib.request\n\n\
+                    with urllib.request.urlopen(\"https://api.coinbase.com/v2/prices/BTC-USD/spot\", timeout=20) as reply:\n    \
+                    price = json.load(reply)[\"data\"][\"amount\"]\n\
+                    print(f\"Bitcoin is {price} US dollars.\")\n";
+        let answer = format!(
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+        );
+        let rules_seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let tasks = {
+            let rules_seen = rules_seen.clone();
+            crate::make_skill_agent::tests::stub(
+                Some("openclaw"),
+                std::sync::Arc::new(move |rules: &str| {
+                    rules_seen.lock().unwrap().push(rules.to_owned());
+                    Some(answer.clone())
+                }),
+            )
+        };
+        let agent = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        let (url, served) = service_sent(vec![(200, "internet: the Bitcoin price".to_owned())]);
+        let told = make_with_by(
+            0,
+            None,
+            BITCOIN,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&agent),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (1, 1), "{told}");
+        // DeepSeek is told as before; the agent the code way alone.
+        assert!(sent[0].contains(&net_told()), "{}", sent[0]);
+        let rules = rules_seen.lock().unwrap()[0].clone();
+        assert!(rules.contains(&net_code_told()), "{rules}");
+        assert!(!rules.contains(&net_told()), "{rules}");
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        let entry = &made_skill::entries(&keeping.directory)[0];
+        assert_eq!(entry["uses"]["grants"], json!(["net"]), "{entry}");
+        assert_ne!(entry["on"], true, "{entry}");
+        // Off on this thread once the make is done: code a model wrote is
+        // never granted `net` outside it.
+        assert!(!made_skill::net_code_here_for_tests());
+        // The switch off, or Hermes: never the code way.
+        assert!(net_code_by("OpenClaw"));
+        assert!(!net_code_by("Hermes"));
+        crate::skill_task_yes::set_gateway_net_here(Some(false));
+        assert!(!net_code_by("OpenClaw"));
+        crate::skill_task_yes::set_gateway_net_here(None);
+        made_skill::set_code_at_once_here(None);
         net_make_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
