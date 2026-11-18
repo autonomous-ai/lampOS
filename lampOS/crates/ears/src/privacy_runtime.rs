@@ -12,8 +12,8 @@ use lamp_ears::{
     privacy::{Capture, CaptureOwner, Emission, LeaseGate, PublicationGate},
 };
 use lamp_msgs::{
-    Audio, Diagnostic, Level, MicrophonePrivacy, RoomSound, SoundClasses, SuddenSound, Voice,
-    VoiceState,
+    Audio, BodySound, Diagnostic, Level, MicrophonePrivacy, OwnVoiceEvidence, RoomSound,
+    SoundClasses, SuddenSound, Voice, VoiceState,
 };
 use std::{
     io,
@@ -114,6 +114,9 @@ struct Shared {
     pcm: lamp_ears::pcm::SharedMailbox,
     publication: PublicationGate,
     speaking: AtomicBool,
+    /// The voice's state is fresh and says the lamp is not speaking: the one
+    /// evidence of a quiet lamp (a stale or missing state is not).
+    voice_quiet: AtomicBool,
     stop: AtomicBool,
 }
 
@@ -124,6 +127,7 @@ impl Shared {
             pcm: lamp_ears::pcm::SharedMailbox::new(export),
             publication: PublicationGate::default(),
             speaking: AtomicBool::new(false),
+            voice_quiet: AtomicBool::new(false),
             stop: AtomicBool::new(false),
         }
     }
@@ -222,6 +226,9 @@ fn connected(
         )),
         None => None,
     };
+    // `ears/body` (#7685): made when the first body sound is to be told, so a
+    // lamp with the switch off declares nothing.
+    let mut body_publisher = None;
     let mut audio = None;
     let mut audio_retry = lamp_ears::pcm::ExportRetry::default();
     let mut looked = 0;
@@ -377,21 +384,40 @@ fn connected(
                         SoundClasses::Unavailable { .. } => now,
                     };
                     publisher.publish_json(at_us, &classified.classes)?;
+                    // Under the same authority and age bound as the scores
+                    // they came from: no body sound outlives its privacy.
+                    for heard in classified.body.iter().filter(|heard| heard.check().is_ok()) {
+                        if body_publisher.is_none() {
+                            body_publisher = Some(bus.publisher_declared(
+                                BodySound::TOPIC,
+                                &BodySound::declaration(),
+                                NAME,
+                            )?);
+                        }
+                        if let Some(publisher) = body_publisher.as_mut() {
+                            publisher.publish_json(heard.at_us, heard)?;
+                        }
+                    }
                 }
             }
         }
         let now = lamp_ipc::monotonic_us();
         if now.saturating_sub(looked) >= 100_000 {
             looked = now;
-            let speaking = bus.latest(VoiceState::TOPIC)?.is_some_and(|message| {
+            let state = bus.latest(VoiceState::TOPIC)?.and_then(|message| {
                 unix_ms()
                     .checked_sub(message.header.at_unix_ms)
                     .is_some_and(|age| age < 3_000)
-                    && message
-                        .parse::<VoiceState>()
-                        .is_ok_and(|state| state.state == Voice::Speaking)
+                    .then(|| message.parse::<VoiceState>().ok())
+                    .flatten()
             });
+            let speaking = state
+                .as_ref()
+                .is_some_and(|state| state.state == Voice::Speaking);
             shared.speaking.store(speaking, Ordering::Release);
+            shared
+                .voice_quiet
+                .store(state.is_some() && !speaking, Ordering::Release);
         }
         thread::park_timeout(TICK);
     }
@@ -420,6 +446,7 @@ fn pump(
         );
         shared.revoke();
         shared.speaking.store(false, Ordering::Release);
+        shared.voice_quiet.store(false, Ordering::Release);
         if !shared.stop.load(Ordering::Acquire) {
             thread::park_timeout(Duration::from_millis(250));
         }
@@ -438,6 +465,7 @@ fn start_classes(
     route: Option<&str>,
     room_sounds: &Path,
     model: Option<String>,
+    body: bool,
     shared: &Arc<Shared>,
 ) -> io::Result<(
     Option<lamp_ears::classes::Handoff>,
@@ -474,7 +502,11 @@ fn start_classes(
         .spawn(move || {
             let model = lamp_ears::classes::model_from(model.as_deref())
                 .inspect_err(|error| log(&format!("ears/classes says invalid_model: {error}")))
-                .ok();
+                .ok()
+                .map(|model| model.with_body_sounds(body));
+            // A person's body sounds (#7685), told one by one: only with the
+            // switch, and a class with no measured bar is never told.
+            let mut detector = body.then(lamp_ears::body_sounds::Detector::new);
             lamp_ears::classes::serve(
                 intake,
                 &worker_shared.publication,
@@ -483,7 +515,32 @@ fn start_classes(
                 model
                     .as_ref()
                     .map(|model| |features: &[f32]| model.score(features)),
-                |classified| {
+                |mut classified| {
+                    // The body scores come from the model's last patch, not
+                    // from the message: `ears/classes` never carries them.
+                    let body_scores = model.as_ref().and_then(|model| model.take_body());
+                    if let (
+                        Some(detector),
+                        Some(body_scores),
+                        SoundClasses::Scored {
+                            window, own_voice, ..
+                        },
+                    ) = (detector.as_mut(), body_scores, &classified.classes)
+                    {
+                        // A window the lamp did not speak into is `unknown`
+                        // (the ears cannot tell quiet from a stale state);
+                        // only a fresh voice state that says "not speaking"
+                        // makes it clear. A stale or missing one is speaking.
+                        let voice = match own_voice {
+                            OwnVoiceEvidence::Unknown
+                                if worker_shared.voice_quiet.load(Ordering::Acquire) =>
+                            {
+                                OwnVoiceEvidence::Clear
+                            }
+                            other => *other,
+                        };
+                        classified.body = detector.feed(&body_scores, voice, window.end_us);
+                    }
                     // A stalled pump drops results; they would go stale.
                     let _ = send_classes.try_send(classified);
                 },
@@ -577,6 +634,7 @@ pub(super) fn run(arguments: &Arguments) -> io::Result<()> {
         std::env::var("LAMP_PRIVACY_CONTROLS").ok().as_deref(),
         Path::new(lamp_ears::classes::ROOM_SOUNDS_FILE),
         std::env::var("LAMP_EARS_CLASSES_MODEL").ok(),
+        lamp_ears::body_sounds::enabled(std::env::var("LAMP_EARS_BODY_SOUNDS").ok().as_deref()),
         &shared,
     )?;
     let pump_shared = shared.clone();
@@ -746,9 +804,15 @@ mod tests {
     fn classes_start_nothing_unless_the_switch_is_on() {
         let shared = Arc::new(Shared::new(false));
         for switch in [None, Some(""), Some("off"), Some("ON"), Some("on ")] {
-            let (handoff, receiver) =
-                start_classes(switch, Some("on"), Path::new("/nonexistent"), None, &shared)
-                    .unwrap();
+            let (handoff, receiver) = start_classes(
+                switch,
+                Some("on"),
+                Path::new("/nonexistent"),
+                None,
+                false,
+                &shared,
+            )
+            .unwrap();
             assert!(handoff.is_none() && receiver.is_none(), "{switch:?}");
         }
         assert_eq!(
@@ -778,7 +842,7 @@ mod tests {
             (Some("off"), yes),
         ] {
             let (handoff, receiver) =
-                start_classes(Some("on"), route, &file, None, &shared).unwrap();
+                start_classes(Some("on"), route, &file, None, false, &shared).unwrap();
             assert!(
                 handoff.is_none() && receiver.is_none(),
                 "{route:?} {file:?}"
