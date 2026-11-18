@@ -212,6 +212,25 @@ pub fn set_loose_here(on: Option<bool>) {
     LOOSE_HERE.with(|here| here.set(on));
 }
 
+thread_local! {
+    /// [`remind_told`] as a test of this thread sets it.
+    static REMIND_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether the brief tells the repeating reminder step (#7245): with the
+/// agent's guide on (`make_skill_agent::guide_on`), the make the guide and
+/// its examples teach it to.
+pub fn remind_told() -> bool {
+    REMIND_HERE
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(crate::make_skill_agent::guide_on)
+}
+
+/// [`remind_told`] for the calling thread alone, for tests.
+pub fn set_remind_here(on: Option<bool>) {
+    REMIND_HERE.with(|here| here.set(on));
+}
+
 /// The least cooldown of a made skill that speaks with [`LOOSE_ENVIRONMENT`]
 /// on: a minute, as often as the person asked, never every moment.
 pub const LEAST_LOOSE_SAY_COOLDOWN_SECS: u64 = 60;
@@ -1579,6 +1598,17 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     // the longest brief stays within [`MOST_BRIEF_BYTES`]. With the
     // person's own words on too ([`ASKS_ENVIRONMENT`]), both stand there,
     // written short so the longest brief with all on still fits.
+    // #7245: the repeating reminder step (`remind every`) and a repeat
+    // while someone stays, only with the agent's guide on (First's P2 on
+    // #7737): off, DeepSeek's makes are given today's brief. A one-off
+    // reminder (`in`, `at`) is never taught: it stays the lamp's Schedule.
+    let remind = if remind_told() {
+        ", or remind = { every = \"30m\" (15m-24h), words } (actions = \
+         [\"repeat_reminder\"]); again every N minutes while someone stays: a held \
+         trigger, no rearm, cooldown N"
+    } else {
+        ""
+    };
     let trigger = if asks_on() && said_on() {
         "one [trigger] listed, [said]/asks as above"
     } else if asks_on() {
@@ -1597,10 +1627,7 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
          during = {{ from = \"HH:MM\", to = \"HH:MM\" }} if asked; \
          [ask] policy = \"nudge\" or listed; [[do]] only steps asked: light = \
          {{ colour, level 1-5, for }}, body = {{ gesture }}, say = {{ text }} (exact \
-         words, asker's language) or cue = \"hum\", or remind = {{ in = \"25m\", at = \"HH:MM\" or every = \"30m\" \
-         (15m-24h), words }} (actions = [\"set_timer\"], [\"set_reminder\"] or \
-         [\"repeat_reminder\"]), by its words too; again every N minutes while someone \
-         stays: a held trigger, no rearm, cooldown N.{read}{code} SKILL.md: \
+         words, asker's language) or cue = \"hum\"{remind}.{read}{code} SKILL.md: \
          front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
     ))
@@ -3813,13 +3840,13 @@ pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
 /// rests (the first builder's yes on #6059, 22:44). Asked for, or off, the
 /// manners are set as before.
 pub fn mannered_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
-    let set_limits = limits || !loose_on();
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
     let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) else {
         return text.to_owned();
     };
+    let set_limits = limits || !loose_on();
     if table.contains_key("tool") {
         return text.to_owned();
     }
@@ -11271,6 +11298,25 @@ light = { dim = 1 }
 
     fn answer(toml: &str, card: &str) -> String {
         format!("Here it is.\n\n```skill.toml\n{toml}```\n\n```markdown SKILL.md\n{card}```\n")
+    }
+
+    /// #7245 (First's P2 on #7737): the brief tells the repeating
+    /// reminder step only with the agent's guide on, and never a one-off
+    /// (`in`, `at`), which stays the lamp's Schedule.
+    #[test]
+    fn the_brief_tells_remind_every_only_with_the_guide() {
+        set_remind_here(Some(false));
+        let off = brief_for("remind me to drink water", false, false).unwrap();
+        assert!(!off.contains("remind ="), "{off}");
+        set_remind_here(Some(true));
+        let on = brief_for("remind me to drink water", false, false).unwrap();
+        assert!(on.contains("remind = { every"), "{on}");
+        assert!(on.contains("repeat_reminder"), "{on}");
+        assert!(
+            !on.contains("set_timer") && !on.contains("set_reminder"),
+            "{on}"
+        );
+        set_remind_here(None);
     }
 
     /// The brief and the longest request fit in [`MOST_BRIEF_BYTES`], so a

@@ -3,7 +3,7 @@ version = "1.0.0"
 
 [permissions]
 speak = true
-topics = ["humans/faces/tracked"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
 
 # Again every 30 minutes while a face is at the lamp: a held trigger, no
 # rearm, its cooldown the repeat.
@@ -12,6 +12,26 @@ topic = "humans/faces/tracked"
 when = "present"
 for = "1m"
 cooldown = "30m"
+
+# A nudge's guards, as the lamp's sip of water has them: never on top of
+# the lamp's own words, mid-conversation or with the head down.
+[[while]]
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[while]]
+topic = "room/activity"
+field = "state"
+not_equals = "head_down"
+unknown = "holds"
 
 [ask]
 policy = "nudge"

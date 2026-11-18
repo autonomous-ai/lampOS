@@ -11,15 +11,23 @@ Take the intent from the person's words in rules.md alone: there is no one to
 ask. Answer for yourself:
 
 1. What should the lamp do? Any step format.md lists (a light, a light show,
-   a gesture, words said, a cue, a reminder or timer set in the lamp's
+   a gesture, words said, a cue, a repeating reminder set in the lamp's
    schedule with `remind`, its own code keeping a note, and every other step
    there), as rules.md allows.
 2. When should it do it? The one trigger rules.md lists that fits, with the
    times of day only when the person named them. Again and again ("every 30
    minutes", "every minute while I'm here"): a trigger that holds, such as a
    face at the lamp, with no rearm and its cooldown the repeat (at least a
-   minute), as examples/water-while-here shows. Once later ("in 25 minutes",
-   "at 22:00"): a `remind` step, as examples/break-timer shows.
+   minute), as examples/water-while-here shows. A one-off reminder or timer
+   ("in 25 minutes", "at 22:00") is no skill: the lamp's own reminders set
+   it, so leave it out on rules.md's left-out line.
+   A nudge (it speaks up with no one asking: a trigger, not words) holds
+   back as the lamp's own sip of water does, as examples/break-timer and
+   water-while-here show: `[[while]]` the voice not `speaking` for 30 s and
+   `resting` for 5 s (never on its own words or mid-conversation), the room
+   not `head_down`, those topics in `[permissions]`; and once a sitting
+   (`rearm = "leaves"`) unless they asked for a repeat. The lamp sets its
+   other manners itself.
 3. What did they ask that the form can't do? Leave it out and name it on
    rules.md's left-out line; never invent a field.
 
@@ -36,10 +44,10 @@ What a skill can do, all of it in format.md and examples/:
   desk, a long sitting, a sound, a touch, a clock time, named weekdays.
 - **Again every N minutes while it holds**: a held trigger, no rearm, its
   cooldown the repeat; examples/water-while-here.
-- **A reminder or timer**: `remind = { in | at | every, words }`: once in
-  25 minutes, at 22:00, or again every 30 minutes (15 m to 24 h) whoever is
-  there; started by words or a trigger; examples/break-timer,
-  water-breaks.
+- **A repeating reminder**: `remind = { every, words }`: again every 30
+  minutes (15 m to 24 h) whoever is there; started by words or a trigger;
+  examples/water-breaks. Once in or at a time is the lamp's reminders', not
+  a skill's.
 - **Its own code**: a `task` step running scripts/main.py, Python with the
   lamp's `lampos` SDK. Any call sdk.md lists may be used: light, say,
   gesture, events (`lamp.on`), leases, notes, the device, the air, the
@@ -57,6 +65,10 @@ show (`show`, in a skill started by its words alone) or a `task` step's code
 
 The examples are forms only: never take their names, words, asks or what
 they say; the skill's name and words come from this person's request.
+
+sdk.md's `phrase.heard` is for a paired computer's program; a made skill is
+started by its own words with `asks`, never by listening for phrases in its
+code.
 
 A skill does nothing that would surprise the person who asked for it.
 

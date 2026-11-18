@@ -1066,8 +1066,14 @@ sau:
    lời là `committed`, không bao giờ ghi lời nhắc. Lời gọi không nêu người gọi,
    nên lời nhắc là của phòng: nói với ai đang ở bên đèn khi đến giờ. Nó không
    đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Agent tạo kỹ năng (#7245)
-   được dạy bước này trong `guide.md`, `format.md` và các ví dụ `break-timer`,
-   `water-breaks`.
+   chỉ được dạy `every` của bước này trong `guide.md`, `format.md` và ví dụ
+   `water-breaks`; `in` hay `at` một lần vẫn là của Schedule, không bao giờ
+   dạy như một kỹ năng, và brief của giọng nói chỉ nêu `every` khi bật
+   `LAMP_MAKE_AGENT_GUIDE` (`made_skill::remind_told`), nên lần tạo của
+   DeepSeek giữ brief như hôm nay. Hướng dẫn dạy một lời nhắc tự phát các
+   chốt chặn của sip-of-water (`[[while]]` voice/state không speaking và đang
+   resting, room/activity không head_down, một lần mỗi lần ngồi), như các ví
+   dụ `break-timer` và `water-while-here`.
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
@@ -2415,8 +2421,15 @@ cả hai người viết.
   thư mục dù lần tạo kết thúc thế nào ([tasks_vi.md](tasks_vi.md), "Một lần
   tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). OpenClaw chỉ
   chạy được skill-start, nên lần chạy của nó bỏ `lamp-skills pack` của
-  hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` được
-  chuyển nguyên văn tới phương án dự phòng của #7234. Nhật ký ghi "the
+  hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` đầu
+  tiên không nêu giới hạn thật nào của đèn (`made_skill::real_limit`) được
+  hỏi lại một lần, trích lại lý do cùng những gì một kỹ năng làm được
+  (`make_skill_local::cannot_asked_again`, `CANNOT_AGAIN_CAN`), chỉ khi
+  còn ít nhất 40 giây thời gian của agent (`CANNOT_AGAIN_LEAST`), lượt đó
+  không quá phần còn lại; lý do không bao giờ được ghi nhật ký (#7245: mô
+  hình rẻ của OpenClaw trả lời `cannot:` 4 trên 5 lần tạo trên lamp-c0a4,
+  18/11). Một `cannot:` thứ hai được chuyển nguyên văn tới phương án dự
+  phòng của #7234. Nhật ký ghi "the
   lamp's agent is OpenClaw: handed over on the one run path". Trên đèn
   hoàn toàn không có agent (không có target `lamp`; #7375), lần tạo
   DeepSeek giữ được vẫn là kết quả và các lời từ chối của chính brief giữ
@@ -2518,12 +2531,16 @@ cả hai người viết.
   draft/NAME` (đúng `pack` mà giọng nói dùng để giữ một kỹ năng tự tạo;
   `/opt` hiện trong namespace của lần tạo, và gói được ghi vào `/tmp` riêng
   của lần chạy), sửa theo lời của kiểm tra tối đa hai lần, rồi ghi
-  `answer.md` như luật nói. Mỗi câu trả lời có 90 giây
-  (`make_skill_agent::GUIDED_WRITE_WITHIN`), bằng khi không có hướng dẫn
-  (`WRITE_WITHIN`), trong 120 giây của agent. Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
+  `answer.md` như luật nói. Mỗi câu trả lời có 10 phút
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`, #7245, quyết định của builder
+  đầu tiên trên #6811; 90 giây khi không có hướng dẫn, `WRITE_WITHIN`),
+  trong 10 phút 30 giây của agent (`MAKE_WITHIN`, hơn của lamp-tasks 30
+  giây, `TASKS_MARGIN`). Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
   bị từ chối được gửi lại kèm lời của kiểm tra (`REPAIR_MARK`) tối đa thêm
   2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thêm một câu trả
-  lời vẫn vừa 120 giây, và câu vẫn bị từ chối được nói là không tạo được,
+  lời vẫn vừa thời gian của agent (nên với hướng dẫn, mà một lần chạy đã
+  viết nháp, kiểm tra và sửa hai lần, lần sửa của giọng nói hiếm khi bắt
+  đầu), và câu vẫn bị từ chối được nói là không tạo được,
   như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
   `process::second_route_worker_environment` chuyển cho), và với MAKE IT
@@ -2572,9 +2589,9 @@ cả hai người viết.
   giây trên Orange Pi đó, khoảng 13 giây trước khi phiên của Hermes bắt
   đầu, và một lần tạo gmail không có script mất 30 giây trên một đèn khác;
   90 giây chừa khoảng một phút cho việc tạo sau khi Hermes đã chạy. Một lần
-  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 120 giây của agent
-  (`make_skill_agent::MAKE_WITHIN`, không đổi), nên chỉ có lần sửa sau một
-  câu trả lời đầu trong vòng 30 giây.
+  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 10 phút 30 giây của
+  agent (`make_skill_agent::MAKE_WITHIN`, #7245; trước là 120 giây), nên
+  khi không có hướng dẫn các lần sửa có chỗ.
   Agent không trả lời trong 90 giây, lỗi, hay không có câu trả lời đầu: kỹ
   năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
   của DeepSeek, vốn không được sửa (khi đèn có agent DeepSeek không được sửa
@@ -2609,9 +2626,10 @@ cả hai người viết.
   long-wait line is said". Không câu nào lặp lại. Qua dịch vụ nói (không có
   lượt giọng nói nào chờ lần tạo) chỉ nói câu chờ, không bao giờ nói câu chờ
   lâu: không có lượt thì không có dáng suy nghĩ để giữ. Một lần tạo hết giờ
-  (`make_skill_agent::MAKE_WITHIN`, 120 giây) nói câu chờ lâu ở khoảng 90
-  giây và câu báo thất bại ở khoảng 120 giây: hai câu cách nhau khoảng 30
-  giây, đúng như thiết kế, không phải lỗi. Từ lúc nói xong câu chờ
+  (`make_skill_agent::MAKE_WITHIN`, 10 phút 30 giây từ #7245) nói câu chờ
+  lâu ở khoảng 90 giây và câu báo thất bại ở cuối; giữa hai câu chỉ có dáng
+  suy nghĩ (nhả lượt sau câu chờ lâu là của #7774, một cách duy nhất, không
+  thêm ở đây). Từ lúc nói xong câu chờ
   tới khi có kết quả, đèn hiện dáng suy nghĩ: âm thanh của mỗi câu chờ gửi
   xong là lượt sinh của nó kết thúc (`GenerationComplete`, rồi
   `MakeWaiting`), nên phần phát dừng lại, vòng đèn và thân đèn chuyển sang
