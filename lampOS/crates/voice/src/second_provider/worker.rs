@@ -4732,6 +4732,17 @@ pub fn serve(
                 }
             }
         }
+        // Held desk talk makes a busy room (`LAMP_ROOM_HELD_TALK=on`, #7332).
+        if std::env::var(crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line held as said to nobody is talk for the busy room, its run and its clock, and ends no conversation (LAMP_ROOM_HELD_TALK)"
+            );
+            if let Ok(mut room) = crate::room_told::room().lock() {
+                room.count_held_not_spoken_to(true);
+            }
+        }
         // At a desk, a face turned to the lamp is no sign, and a
         // conversation goes on only shortly after its words
         // (`LAMP_NAME_OR_FOLLOW_UP=on`).

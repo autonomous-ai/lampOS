@@ -2504,6 +2504,8 @@ fn second_route_worker_environment(
         // Inside a live back-and-forth the doubt goes to the person (#7332).
         crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
         crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+        // Held desk talk makes a busy room (#7332).
+        crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
@@ -2806,6 +2808,7 @@ mod tests {
             crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
             crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
             crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+            crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
@@ -3874,6 +3877,7 @@ mod tests {
                     || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
                     || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
                     || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
+                    || name == crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
@@ -4087,6 +4091,7 @@ mod tests {
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
+                    "LAMP_ROOM_HELD_TALK=on",
                     "LAMP_SAID_TO_ME=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",

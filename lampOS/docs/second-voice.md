@@ -4501,6 +4501,28 @@ after a take-over, but now for every turn:
   follow-up no face was seen speaking renews the caller's call too`.
   Latency: none, bookkeeping at the verdict. Test (fails with the switch
   off): `a_no_face_follow_up_renews_the_call`.
+- **Held desk talk makes a busy room, with `LAMP_ROOM_HELD_TALK=on`**
+  (off unless set, #7332; the first builder on #7570 at 07:14 on 18 Nov).
+  The room turns busy after three lines left alone as talk inside a
+  minute (`room_told.rs`, `BUSY_RUN`, `BUSY_WITHIN_US`). With only talk
+  counted (`LAMP_SPOKEN_TO`) a line the rule held as said to nobody
+  (`attention::NOT_SPOKEN_TO`) was no talk, and it counted only through
+  `LAMP_NAME_OR_FOLLOW_UP`, off in the product; so two people talking at
+  a desk, every line held, never turned the room busy, and the busy-room
+  paths (`LAMP_BUSY_NO_FACE_RENEWS` among them) rarely acted. With the
+  switch such a line is talk for the busy room, its run and its end
+  clock, as a line the Policy held as not the lamp's is
+  (`RoomTold::count_held_not_spoken_to`, `judged`); it ends no
+  conversation (`talked_past_the_lamp`), a held line the lamp then
+  carries or answers is no talk, and nothing else of
+  `LAMP_NAME_OR_FOLLOW_UP` comes with it. Its cost: a lone voice's held
+  lines count too, so one person talking to themselves, three lines in a
+  minute, turns the room busy. Journal at start: `a line held as said to
+  nobody is talk for the busy room`. Latency: none, bookkeeping at the
+  verdict. Tests (the first fails with the switch off):
+  `with_the_switch_held_not_spoken_to_lines_make_the_room_busy`,
+  `with_the_switch_a_held_line_carried_or_answered_is_no_talk`. Not yet
+  shown on a lamp: the first builder's row on lamp-52e6.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay
