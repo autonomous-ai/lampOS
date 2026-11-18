@@ -1170,6 +1170,18 @@ fn ends_a_name(word: &str) -> bool {
     !FILLERS.contains(&word) && !NEVER_A_NAMES_END.contains(&word)
 }
 
+/// Where a name ends on a filler or a word that comes before a name, said
+/// right before "skill" at `at` ("my morning run skill", "my quick start
+/// skill"): at the word before that one, when that word can end a name
+/// ([`ends_a_name`]) and bounds nothing. The name then runs from there to
+/// "skill".
+fn ends_on_a_filler(words: &[String], at: usize) -> Option<usize> {
+    let last = at.checked_sub(1)?;
+    let before = last.checked_sub(1)?;
+    let content = ends_a_name(&words[before]) && !bounds(&words[before]);
+    (content && !NEVER_A_NAMES_END.contains(&words[last].as_str())).then_some(before)
+}
+
 /// Describing words before "skill" that take nothing from the waiting
 /// skill's own name beside it ("my new weather skill", "the daily weather
 /// skill"), but alone are a name ("yes, the daily skill").
@@ -1288,7 +1300,8 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
             // a name ("my role play skill"): the pre-push read's false yes.
             let kept = at
                 .checked_sub(1)
-                .filter(|&before| ends_a_name(&words[before]));
+                .filter(|&before| ends_a_name(&words[before]))
+                .or_else(|| ends_on_a_filler(&words, at));
             let from = kept.unwrap_or(at);
             let start = (0..from)
                 .rev()
@@ -3050,6 +3063,19 @@ mod tests {
                 "desk lamp",
             ),
             ("yes, the daily skill", "page-title", &backup[..], "daily"),
+            // A name ending on a filler (Fourteen's P2 on #7842).
+            (
+                "Yes, use my morning run skill",
+                "page-title",
+                &backup[..],
+                "morning run",
+            ),
+            (
+                "Yes, use my quick start skill",
+                "page-title",
+                &backup[..],
+                "quick start",
+            ),
         ] {
             assert_eq!(read(heard, skill, installed), Some(named.into()), "{heard}");
         }
@@ -3066,10 +3092,17 @@ mod tests {
             ("yes, use my role play skill", "role play"),
             ("yes, my desk lamp skill", "desk lamp"),
             ("yes, the daily skill", "daily"),
+            ("Yes, use my morning run skill", "morning run"),
+            ("Yes, use my quick start skill", "quick start"),
         ] {
             assert_eq!(other(heard), Some(named.into()), "{heard}");
         }
-        for heard in ["yes, that skill", "yes, the skill please", "yes, run it"] {
+        for heard in [
+            "yes, that skill",
+            "yes, the skill please",
+            "yes, run it",
+            "yes, use my page title skill",
+        ] {
             assert_eq!(other(heard), None, "{heard}");
             assert_eq!(read(heard, "page-title", &backup), None, "{heard}");
         }

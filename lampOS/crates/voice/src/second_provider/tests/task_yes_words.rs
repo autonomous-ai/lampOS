@@ -647,8 +647,8 @@ fn a_skill_not_listed_named_before_skill_is_still_no_yes() {
 }
 
 /// The pre-push read's false yes on #7634: an unlisted name ending in a
-/// word that comes before a name ("play", "lamp"), or a describing word
-/// alone, is another skill, with the lamp's skills read or none read.
+/// word that comes before a name ("play", "lamp") or a filler ("run",
+/// "start"), or a describing word alone, is another skill, with the lamp's skills read or none read.
 #[test]
 fn a_name_ending_in_a_bounding_word_is_still_no_yes() {
     for installed in [
@@ -659,6 +659,9 @@ fn a_name_ending_in_a_bounding_word_is_still_no_yes() {
             "yes, use my role play skill",
             "yes, my desk lamp skill",
             "yes, the daily skill",
+            // A name ending on a filler (Fourteen's P2 on #7842).
+            "Yes, use my morning run skill",
+            "Yes, use my quick start skill",
         ] {
             let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
             yes::set_installed_here(installed.clone());

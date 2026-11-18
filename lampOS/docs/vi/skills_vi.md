@@ -4980,7 +4980,8 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   nó, dù mô hình nêu kỹ năng nào. Tại mỗi "skill" hoặc "skills" trong một
   mệnh đề, code đọc các đoạn tối đa sáu từ ngay trước hoặc ngay sau nó mà
   cả hai đầu nằm ở mép mệnh đề, một từ giới hạn hoặc "skill". Trước hoặc
-  sau một tên: "my", "the", "use", "run", "please", "and", và một lời đồng
+  sau một tên, ví dụ (danh sách đầy đủ nằm trong code): "my", "the",
+  "use", "run", "please", "and", và một lời đồng
   ý nói không có dấu phẩy ("yes", "yeah", "yep", "ok", "okay", "sure",
   "go", "with", "có", "ừ", "vâng", "được"), nên "okay page title skill" và
   "go ahead with weather skill" vẫn là cái "có"
@@ -5001,7 +5002,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   "run", "use", "great", "chạy", "cái", "đó", "em", "cho", "làm", …,
   `skill_write_yes::FILLERS`); từ ngay trước "skill" luôn được giữ trừ khi
   là từ đệm hoặc từ trả lời, từ nối ("ừ", "okay", "and",
-  `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp skill". Không còn từ
+  `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp skill". Một từ
+  đệm hoặc từ giới hạn ngay trước "skill" vẫn kết thúc một tên khi từ
+  trước nó có thể ("my morning run skill", "my quick start skill"). Không còn từ
   nào, hoặc chỉ còn các từ trong chính tên kỹ năng đang chờ, kèm "new",
   "old" hay "daily" bên cạnh (`DESCRIBING`), là cái "có" của nó ("Yes, run
   my new weather skill", "the daily weather skill", "yes, the weather
@@ -5034,7 +5037,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. `no` hoặc
   `unclear` được đọc trước bước kiểm tra chủ đèn, nên của bất kỳ ai (cả
   khách) cũng kết thúc hoặc hỏi lại việc chờ của chủ đèn và không bao giờ
-  giữ một lời đồng ý; một `answer` ngoài bốn giá trị này được đọc là `no`;
+  giữ một lời đồng ý; một câu của khách nêu tên kỹ năng khác (#7634) bỏ
+  việc chờ của chủ đèn như một yêu cầu mới, không chấp thuận gì; một
+  `answer` ngoài bốn giá trị này được đọc là `no`;
   hai câu trả lời trong một dòng được xử lý theo thứ tự gọi, mỗi cái riêng.
   Journal: "the
   line after a skill's task said back whole: its first round must call

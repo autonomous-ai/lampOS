@@ -1979,8 +1979,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   model named. At each "skill" or "skills" in a clause, code reads the
   runs of up to six words right before it or right after it whose both
   ends sit at the clause's edge, a bounding word or "skill". Before or
-  after a name: "my", "the", "use", "run", "please", "and", and a yes said
-  without its comma ("yes", "yeah", "yep", "ok", "okay", "sure", "go",
+  after a name, for example (the full lists are in the code): "my", "the",
+  "use", "run", "please", "and", and a yes said without its comma ("yes", "yeah", "yep", "ok", "okay", "sure", "go",
   "with", "có", "ừ", "vâng", "được"), so "okay page title skill" and "go
   ahead with weather skill" are still the yes (`skill_write_yes::BEFORE_A_NAME`);
   after a name only, also "now", "too", "for", "to", "is", "instead"
@@ -2001,7 +2001,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   "làm", …, `skill_write_yes::FILLERS`); the word right before "skill"
   always stays unless a filler or a yes or joining word ("ừ", "okay",
   "and", `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp
-  skill". None left, or only the waiting skill's own name words, with
+  skill". A filler or bounding word right before "skill" still ends a
+  name when the word before it can ("my morning run skill", "my quick
+  start skill"). None left, or only the waiting skill's own name words, with
   "new", "old" or "daily" beside them (`DESCRIBING`), is its yes ("Yes, run my new weather
   skill", "the daily weather skill", "yes, the weather skill" for weather
   report, "Ừ, chạy cái skill đó đi", "Có, cái skill đó"); any other word
@@ -2032,8 +2034,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
   make or edit beside the answer. A `no` or `unclear` is read before the
   owner check, so anyone's (a guest's too) ends or re-asks the owner's
-  wait and never keeps a yes; an `answer` outside these four reads as
-  `no`; two answers in one line are taken in call order, each as its own.
+  wait and never keeps a yes; a guest's line naming another skill
+  (#7634) lets the owner's wait go as a new ask, approving nothing; an
+  `answer` outside these four reads as `no`; two answers in one line are taken in call order, each as its own.
   The journal: "the line after a
   skill's task said back whole: its first round must call make_skill",
   then the approval's lines, or "the answer to NAME's say-back was no:
