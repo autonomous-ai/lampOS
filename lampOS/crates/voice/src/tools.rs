@@ -2634,6 +2634,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the skills made or turned in their conversation (#7660,
+            // `crate::just_made`), on the same mark and rule.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::just_made::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {

@@ -5340,51 +5340,73 @@ becomes a remove. Then, in code (`made_turn::asked`):
   just made." was answered "I found no skill of yours with a name like
   'water skill'"; after a make of "daily stretch reminder", "Hmm, actually,
   turn off the skill you just made." listed all 25 of theirs; "turn it back
-  on" got "Yes?"). A `make_skill` call that made a skill
-  (`just_made::after_make`) or turned one off or on
+  on" got "Yes?"). With `LAMP_MADE_SKILL_OFF_SAID` on
+  (`made_skill::off_said_on`), a `make_skill` call
+  that made a skill (`just_made::after_make`) or turned one off or on
   (`just_made::after_turn`) keeps its name in this process's memory, for
   the line's person when it is the owner's (`services::owner_of`; in the
-  private room whoever speaks): another person's make never counts. While
-  their conversation lasts (no gap of `just_made::KEPT_FOR`, 10 minutes,
-  the thread's own `REMEMBERED_FOR`, between their lines), each heard line
-  of theirs on the second route is told one note
+  private room whoever speaks): another person's make never counts. Each
+  make or turn is told for `just_made::KEPT_FOR`, 10 minutes (the thread's
+  own `REMEMBERED_FOR`), after it was done; the person's lines never carry
+  it on. Each heard line of theirs on the second route is told one note
   (`just_made::note`): "(For you to know, not to answer: in this
   conversation with them, newest first, the lamp turned water reminder off
   (just now); made daily stretch reminder (4 minutes ago). When their line
   means a skill of theirs without saying its name, it means the newest of
-  these that fits what they ask: call make_skill with that name, as if they
-  had said it, and never list their skills for it. ... When none of these
-  fits, ask which skill they mean.)", at most 3 skills, each by the last
-  done with it. With more than one made in the conversation, it adds "ask
-  once which they mean, naming them (A or B), and call nothing" for a line
-  that means one made without saying which. In the per-turn notes, never in
-  `make_skill`'s description, which keeps its bytes. A turn whose name finds
-  none and offers `candidates` gives those made or turned in this
+  these that fits what they ask, as if they had said that name: to turn it
+  off, turn it on or remove it, call make_skill with turn_off, turn_on or
+  remove and that name; to use or run it, call it as for any skill, by its
+  own function, by use_skill with that name, or by make_skill with run and
+  that name, never a second make of it. Never list their skills for it. ... When their line means a skill of theirs and none of these fits,
+  ask which skill they mean. A line about anything else, the light, music
+  or a timer, is answered as it is: no question about skills, and no skill
+  turned on for it.)", at most 3 skills, each by the last done with it.
+  With more than one made in the conversation, it adds "ask once which they
+  mean, naming them (A or B), and call nothing" for a line that means one
+  made without saying which. In the per-turn notes, never in
+  `make_skill`'s description, which keeps its bytes. A turn whose name
+  finds none and offers `candidates` gives those made or turned in this
   conversation first, each marked `in_this_conversation` ("made just now",
-  "turned off 2 minutes ago"), and tells the model to choose the newest that
-  fits (and to ask which when more than one made fits); with nothing made or
-  turned in the conversation, it is told "None of theirs was made, turned
-  off or turned on in this conversation: ... ask which skill they mean and
-  call nothing; never choose one for them." (`just_made::candidates`). The
-  turn itself is as before: the owner's alone, its own answer, no yes. The
-  note adds no gate of its own: the model's `turn_on` of the skill it names
-  runs on its judgment, so "turn it back on" turns it on, and "use the one
-  you just made" while it is off calls its function, which the lamp turns
-  on and runs in the same turn with "Water reminder was off, so I turned it
-  on. Say 'turn it off' to undo." (#7562, `made_turn::on_for_ask`). No
-  word lists: which one a line means is the model's to judge. A skill no
-  longer in the made skills' index is left out of the note; nothing is told
-  with the switch off, for anyone else's line, or with nothing made or
-  turned. No file and no round trip. Tests: `just_made::tests::*`
+  "turned off 2 minutes ago"), and tells the model to choose the newest
+  that fits (and to ask which when more than one made fits); with nothing
+  made or turned in the conversation, it is told "None of theirs was made,
+  turned off or turned on in this conversation: ... ask which skill they
+  mean and call nothing; never choose one for them."
+  (`just_made::candidates`). The turn itself is as before: the owner's
+  alone, its own answer, no yes. The note adds no gate of its own: the
+  model's `turn_on` of the skill it names runs on its judgment, so "turn it
+  back on" turns it on, and "use the one you just made" while it is off
+  calls its function or `use_skill` with its name, which the lamp turns on
+  and runs in the same turn with "Water reminder was off, so I turned it
+  on. Say 'turn it off' to undo." (#7562, `made_turn::on_for_ask`,
+  `made_run::use_skill_off_here`). No word lists: which one a line
+  means is the model's to judge. A skill no longer in the made skills'
+  index is never named (`just_made::still_kept`): one removed since, or
+  every one once a factory reset emptied the made skills' folder (the
+  memory itself goes when `lamp-voice` restarts). The owner's "forget
+  everything", marked by the second route's guard and with their memory
+  emptied, clears it, as their voice print goes
+  (`just_made::forget_with_everything`, beside the others in
+  `tools.rs`). The note is the model's alone, a system note "not to
+  answer": no tool answer and nothing said carries it, and an owner line
+  about anything else is answered as it is. Nothing is told with the
+  switch off, for anyone else's line, or with nothing made or turned within
+  the 10 minutes; with the switch off nothing is kept. No file and no
+  round trip. Tests: `just_made::tests::*`
   (`a_make_then_the_skill_you_just_made_is_told_by_name_and_turned_off`,
   `turn_it_back_on_right_after_means_the_one_just_turned_off`,
   `two_makes_in_the_conversation_ask_which_naming_both`,
   `no_make_in_the_conversation_asks_and_never_guesses`,
   `another_persons_make_doesnt_count`,
-  `a_conversation_quiet_too_long_is_over`) and
-  `second_provider::tests::just_made_note`
+  `a_make_is_told_for_ten_minutes_after_it_never_carried_on_by_lines`,
+  `a_failed_make_keeps_nothing_and_the_switch_off_tells_nothing`,
+  `a_skill_removed_since_is_not_named`,
+  `what_one_thread_keeps_another_reads`, `forget_everything_clears_it`)
+  and `second_provider::tests::just_made_note`
   (`turn_it_back_on_after_the_note_turns_it_on`,
-  `use_the_one_you_just_made_turns_it_on_and_runs_it_with_the_undo_line`).
+  `use_the_one_you_just_made_turns_it_on_and_runs_it_with_the_undo_line`,
+  `run_the_one_you_just_made_calls_its_function_never_a_second_make`,
+  `ten_owner_lines_about_other_things_say_nothing_of_the_skill`).
 - **Made or added alike** (#7594: on lamp-9adf, 17 Nov 23:1x, "Lamp, turn
   off my btc price skill", one added from a `SKILL.md` in the app, was
   answered "I can't turn skills off myself, that's done in the app", since

@@ -28,6 +28,8 @@ struct Went {
     ran: Vec<(String, Value)>,
     /// What each refused or answered call told the model, by call id.
     told: Vec<(String, String)>,
+    /// What was said, as `said:` labels.
+    said: Vec<String>,
 }
 
 /// What was done with water reminder in the owner's conversation before
@@ -42,7 +44,8 @@ enum Before {
 /// Each line of `heard` in its own request (1, 2, ...) of one engine in the
 /// private room, with the switch on, answered with the model's `rounds` in
 /// order, after `before` in the owner's conversation. Water reminder's
-/// function answers that it is off until a `turn_on` turned it on.
+/// function answers that it is off, after a turn-off, until a `turn_on`
+/// turned it on.
 fn went(before: Before, heard: &[&str], rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
     crate::made_skill::set_off_said_here(Some(true));
     crate::person::set_private_room_for_test(Some(true));
@@ -69,7 +72,7 @@ fn went(before: Before, heard: &[&str], rounds: Vec<Vec<net::Result<ChatEvent>>>
     });
     let ran: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
     let seen = ran.clone();
-    let on = Arc::new(AtomicBool::new(false));
+    let on = Arc::new(AtomicBool::new(matches!(before, Before::Made)));
     let tools: ToolRunner = Arc::new(move |_, _, name, args| {
         let answer = if name == FUNCTION {
             if on.load(Ordering::Relaxed) {
@@ -105,17 +108,19 @@ fn went(before: Before, heard: &[&str], rounds: Vec<Vec<net::Result<ChatEvent>>>
         Arc::new(Instant::now),
     )
     .announcing(false);
-    tokio::runtime::Builder::new_current_thread()
+    let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
+            let mut labels = Vec::new();
             for request in 1..=heard.len() as u64 {
                 engine.submit(start(request));
                 engine.submit(audio(request, 1));
                 engine.submit(end(request));
-                turn_within(&mut engine, Duration::from_secs(5)).await;
+                labels.extend(turn_within(&mut engine, Duration::from_secs(5)).await);
             }
+            labels
         });
     crate::made_skill::set_off_said_here(None);
     crate::person::set_private_room_for_test(None);
@@ -145,6 +150,10 @@ fn went(before: Before, heard: &[&str], rounds: Vec<Vec<net::Result<ChatEvent>>>
         notes,
         ran: ran.lock().unwrap().clone(),
         told,
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
     }
 }
 
@@ -279,4 +288,91 @@ fn use_the_one_you_just_made_turns_it_on_and_runs_it_with_the_undo_line() {
     assert!(told.contains("Time for a glass of water."), "{told}");
     assert!(!told.contains(crate::made_turn::FUNCTION_OFF), "{told}");
     assert!(!told.contains("Want me"), "{told}");
+}
+
+/// Heron's P2 on #7715: "Run the one you just made." right after a make:
+/// the note says a use calls the skill as any skill (its own function,
+/// `use_skill` or `make_skill` `run`), never a second make, and the model
+/// following it runs water reminder, with no second make.
+#[test]
+fn run_the_one_you_just_made_calls_its_function_never_a_second_make() {
+    let went = went(
+        Before::Made,
+        &["Run the one you just made."],
+        vec![
+            calls("c1", FUNCTION, json!({})),
+            saying("Time for a glass of water."),
+        ],
+    );
+    let notes = told_notes(&went, 0);
+    assert!(
+        notes.first().is_some_and(|note| {
+            note.contains("the lamp made water reminder (just now)")
+                && note.contains(
+                    "to use or run it, call it as for any skill, by its own function, by \
+                     use_skill with that name, or by make_skill with run and that name, never a \
+                     second make of it",
+                )
+        }),
+        "{went:?}"
+    );
+    let names: Vec<&str> = went.ran.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, [FUNCTION], "{went:?}");
+    assert!(
+        told_for(&went, "c1").contains("Time for a glass of water."),
+        "{went:?}"
+    );
+}
+
+/// The first builder, 20:55 on #7715: the note never rides into answers
+/// about anything else. After a make, ten owner lines about other things
+/// are each told it only as a system note "not to answer", which says a
+/// line about anything else is answered as it is; no line runs a call,
+/// and nothing said names the skill. By construction the lamp's own code
+/// puts the note in no tool answer and nothing said: it is the model's to
+/// read, and only these notes carry it.
+#[test]
+fn ten_owner_lines_about_other_things_say_nothing_of_the_skill() {
+    let lines = [
+        ("What time is it?", "It's ten past nine."),
+        ("Turn it off.", "Okay, the light is off."),
+        ("Turn the light on.", "The light is on."),
+        ("Play some music.", "I can't play music yet."),
+        ("How's the weather?", "It's sunny and 30 degrees."),
+        ("Set a timer for five minutes.", "Done, five minutes."),
+        ("Tell me a joke.", "A lamp went to school to get brighter."),
+        ("What's two plus two?", "Four."),
+        ("Make it warmer.", "The light is warmer now."),
+        ("Thanks, that's all.", "You're welcome."),
+    ];
+    let heard: Vec<&str> = lines.iter().map(|(line, _)| *line).collect();
+    let went = went(
+        Before::Made,
+        &heard,
+        lines.iter().map(|(_, answer)| saying(answer)).collect(),
+    );
+    assert_eq!(went.notes.len(), lines.len(), "{went:?}");
+    for at in 0..lines.len() {
+        let notes = told_notes(&went, at);
+        assert_eq!(notes.len(), 1, "line {at}: {went:?}");
+        assert!(notes[0].contains("not to answer"), "{}", notes[0]);
+        assert!(
+            notes[0].contains(
+                "A line about anything else, the light, music or a timer, is answered as it is: \
+                 no question about skills, and no skill turned on for it."
+            ),
+            "{}",
+            notes[0]
+        );
+    }
+    assert!(went.ran.is_empty(), "{went:?}");
+    assert!(went.told.is_empty(), "{went:?}");
+    assert_eq!(went.said.len(), lines.len(), "{went:?}");
+    for said in &went.said {
+        let said = said.to_lowercase();
+        assert!(
+            !said.contains("water") && !said.contains("reminder") && !said.contains("skill"),
+            "{said}"
+        );
+    }
 }
