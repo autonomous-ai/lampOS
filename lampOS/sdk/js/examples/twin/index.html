@@ -28,6 +28,14 @@
   details label { display: grid; grid-template-columns: 70px 1fr 60px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
   details input[type=number] { width: 100%; }
   #ring { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+  .joint .reach { color: var(--soft); font-size: 12px; font-variant-numeric: tabular-nums; min-height: 1.3em; }
+  .joint .reach.held { color: #e0902f; }
+  .joint .track { position: relative; }
+  .joint .track .shade { position: absolute; top: 0; bottom: 0; pointer-events: none; background: rgba(217, 83, 79, .28); border-radius: 3px; }
+  #reachbox p { font-size: 12px; margin: 0 0 6px; }
+  #reachline { color: #e0902f; }
+  #reachlabel, #reachnote { color: var(--soft); }
+  #reachlabel select { max-width: 100%; background: var(--panel, #222); color: inherit; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
   .load { height: 4px; background: var(--line); border-radius: 2px; margin: 4px 0 2px; overflow: hidden; }
   .load > i { display: block; height: 100%; width: 0; background: var(--accent, #e0902f); transition: width .15s; }
   .load.high > i { background: #d9534f; }
@@ -72,6 +80,11 @@
 <div id="view"><div id="status">loading the lamp…</div></div>
 <aside id="side">
   <h1>Lamp twin</h1>
+  <div id="reachbox" hidden>
+    <p id="reachline"></p>
+    <p id="reachlabel"><label>masses: <select id="reachpick" aria-label="which masses the limits are judged with"></select></label></p>
+    <p id="reachnote"></p>
+  </div>
   <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span><span id="speaking">speaking</span></p>
   <div id="joints"></div>
   <details>
@@ -108,9 +121,12 @@ const log = (text) => {
 };
 
 // Calibration: kept in this browser only, and starting from the model's.
-const saved = (() => { try { return JSON.parse(localStorage.getItem('twin-cal') || '{}'); } catch { return {}; } })();
+// A saved calibration belongs to the model it was made against: when the model's signs or zeros change (the head's pitch sign
+// did, 18 Nov) a calibration kept from before is dropped, not applied on top (it would turn a corrected joint the old way again).
+const modelSig = JSON.stringify(model.joints.map((j) => [j.name, j.sign, j.zero_deg, j.axis]));
+const saved = (() => { try { const kept = JSON.parse(localStorage.getItem('twin-cal') || '{}'); return kept.sig === modelSig ? kept.cal ?? {} : {}; } catch { return {}; } })();
 const cal = Object.fromEntries(model.joints.map((j) => [j.name, { zero_deg: saved[j.name]?.zero_deg ?? j.zero_deg, sign: saved[j.name]?.sign ?? j.sign }]));
-const keep = () => { try { localStorage.setItem('twin-cal', JSON.stringify(cal)); } catch { /* private window */ } };
+const keep = () => { try { localStorage.setItem('twin-cal', JSON.stringify({ sig: modelSig, cal })); } catch { /* private window */ } };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -210,7 +226,8 @@ for (const name of model.chain) {
   const row = document.createElement('div');
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
-    <input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}">
+    <div class="track"><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
+    <div class="reach"></div>
     <div class="load" title="load the body reads on this joint"><i></i></div>
     <div class="facts">servo ${joint.servo} · ${joint.bus}</div>`;
   const slider = row.querySelector('input');
@@ -218,15 +235,23 @@ for (const name of model.chain) {
   let sentAt = 0;
   slider.addEventListener('pointerdown', () => (dragging = true));
   slider.addEventListener('pointerup', () => (dragging = false));
+  // The thumb cannot enter the shaded part: whatever moves it (a drag, an arrow key, a typed value) is held inside what the reach map
+  // allows this joint now, here and again at the server (the second wall).
+  const held = () => {
+    const kept = clampToRange(Number(slider.value), reachNow?.ranges?.[name]);
+    if (kept !== Number(slider.value)) slider.value = kept;
+    return kept;
+  };
   slider.addEventListener('input', () => {
-    wanted[name] = Number(slider.value);
+    const deg = held();
+    wanted[name] = deg;
     const now = performance.now();
     if (now - sentAt < 40) return; // 25 a second at most
     sentAt = now;
-    send({ type: 'drag', joint: name, deg: Number(slider.value) });
+    send({ type: 'drag', joint: name, deg });
   });
-  slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: Number(slider.value) }));
-  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
+  slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: held() }));
+  rows[name] = { row, slider, reach: row.querySelector('.reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -395,16 +420,70 @@ loadPanel({
   say: (text) => { status.textContent = text; status.style.color = '#d9534f'; },
   wait,
 });
+// <reach-clamp>
+// A value held inside the range the reach map allows (`[low, high]`, degrees), as a number: the slider's own value is rounded to its
+// step, which could leave it a hair outside, so what is sent and drawn is this. No range (not mapped, or no safe pose here): as it is.
+function clampToRange(value, range) {
+  if (!Array.isArray(range) || !Number.isFinite(range[0]) || !Number.isFinite(range[1])) return value;
+  return Math.min(range[1], Math.max(range[0], value));
+}
+// </reach-clamp>
+// What the reach map allows a joint now: said under its slider, and the slider's track shaded outside it. The slider runs
+// -180..180 and its thumb stays a little inside the track at the ends, so the shading is a close guide, not exact to a pixel.
+let reachNow = null;
+function showReach(name) {
+  const row = rows[name];
+  if (!row || row.reach.classList.contains('held')) return;
+  const range = reachNow?.ranges?.[name];
+  const mapped = reachNow && reachNow.ranges && name in reachNow.ranges;
+  row.shades.forEach((el) => { el.hidden = true; });
+  if (!reachNow) { row.reach.textContent = ''; return; }
+  if (!mapped) { row.reach.textContent = reachNow.ranges ? 'not in the map: free' : ''; return; }
+  if (!range) { row.reach.textContent = 'here the map has no safe pose for it: only moves toward safe go'; return; }
+  const sign = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
+  row.reach.textContent = `allowed here: ${sign(range[0])}° to ${sign(range[1])}°`;
+  const at = (deg) => `${((deg + 180) / 360) * 100}%`;
+  row.shades[0].hidden = false; row.shades[0].style.left = '0'; row.shades[0].style.width = at(range[0]);
+  row.shades[1].hidden = false; row.shades[1].style.left = at(range[1]); row.shades[1].style.right = '0';
+}
 function connect() {
   ws = new WebSocket(`ws://${location.host}${withToken('/live')}`);
   ws.onopen = () => { log('connected'); window.dispatchEvent(new CustomEvent('twin-open')); };
   ws.onclose = () => { log('disconnected; retrying'); setTimeout(connect, 1000); };
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
-    if (data.type === 'said') return log(data.text);
+    if (data.type === 'said') {
+      // A goal the reach map held is said under its slider too, for a few seconds.
+      const held = /^reach map: (\w+) /.exec(data.text);
+      if (held && rows[held[1]]) {
+        const row = rows[held[1]];
+        row.reach.textContent = data.text.replace(/^reach map: /, '');
+        row.reach.classList.add('held');
+        clearTimeout(row.heldTimer);
+        row.heldTimer = setTimeout(() => { row.reach.classList.remove('held'); showReach(held[1]); }, 6000);
+      }
+      return log(data.text);
+    }
     if (data.type === 'result' || data.type === 'event' || data.type === 'picture' || data.type === 'audio' || data.type === 'hear') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
     if (data.type !== 'state') return;
     const { joints = {}, lamp = {} } = data.state;
+    reachNow = data.state.reach ?? null;
+    const box = document.getElementById('reachbox');
+    box.hidden = !reachNow;
+    if (reachNow) {
+      document.getElementById('reachline').textContent = `${reachNow.virtual ? 'virtual lamp (not linked)' : 'lamp linked'}, reach map on (${reachNow.shrink} counts of margin)`;
+      const pick = document.getElementById('reachpick');
+      const key = JSON.stringify(reachNow.choices);
+      if (pick.dataset.key !== key) {
+        pick.dataset.key = key;
+        pick.replaceChildren(...reachNow.choices.map((c) => Object.assign(document.createElement('option'), { value: c.name, textContent: c.label })));
+        pick.onchange = () => send({ type: 'reach_map', name: pick.value });
+      }
+      if (document.activeElement !== pick) pick.value = reachNow.name;
+      document.getElementById('reachlabel').hidden = reachNow.choices.length < 2;
+      document.getElementById('reachnote').textContent = `${reachNow.label}. Limits stop at contacts (parts against parts, and the table) and at each servo's span from the old runtime's calibration (its own stored limits are not read). Cables are not modelled.`;
+    }
+    for (const name of Object.keys(rows)) showReach(name);
     for (const [name, joint] of Object.entries(joints)) {
       const row = rows[name];
       if (!row) continue;

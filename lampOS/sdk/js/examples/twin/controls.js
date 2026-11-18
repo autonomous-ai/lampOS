@@ -167,8 +167,10 @@ export const CONTROLS = [
       return `lamp.followHand({ forMs: ${a.for_ms} }).start()`;
     } },
   { id: 'joints', group: 'Body', needs: ['body'], moves: true, ops: ['joints', 'lease.take', 'lease.release'], shows: [], label: 'Joints (yaw, pitch)', fields: [number('yaw', -180, 180, 10), number('pitch', -90, 90, 5), number('within_ms', 0, 5000, 1000, { integer: true })],
-    run: async ({ lamp, release }, a) => {
-      const targets = { yaw: a.yaw, pitch: a.pitch };
+    run: async (ctx, a) => {
+      const { lamp, release } = ctx;
+      // With a reach map (`--reach-map`), the goals are checked against it first: the call below says what was sent.
+      const targets = ctx.reach ? ctx.reach({ yaw: a.yaw, pitch: a.pitch }) : { yaw: a.yaw, pitch: a.pitch };
       await release();
       await lamp.withLease(['body'], (lease) => lamp.joints(lease, a.within_ms, targets, { wait: true }));
       return `lamp.withLease(['body'], (lease) => lamp.joints(lease, ${a.within_ms}, ${q(targets)}, { wait: true }))`;

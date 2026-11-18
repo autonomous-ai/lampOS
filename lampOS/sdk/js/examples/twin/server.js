@@ -29,10 +29,19 @@ import { FakeLamp } from 'lampos/testing';
 import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt } from './controls.js';
 import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
+import { loadReachMap, rangesDeg, restrict, restrictAll } from './reach-guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
 const port = Number(options.port ?? 8737);
+// `--reach-map PATH`: the page checks every goal for the arm and the head against this reach map (tools/reach, `query.py --export`;
+// examples/twin/reach-map-4ace.json is one) before it sends it. The page only: the lamp's own limits are unchanged. `--reach-shrink N`
+// takes N counts (default 48: the 3D grid overshot the exact march by 40 at the stand) off each end of what the map allows.
+// `--reach-map A.json,B.json` loads several maps (the first is the one in use; the page can switch, each says what masses it was judged with).
+const reachMaps = options['reach-map'] ? options['reach-map'].split(',').map((path) => ({ map: loadReachMap(path), name: path.split('/').pop().replace(/\.json$/, '') })) : null;
+let reachAt = 0;
+const reachMapNow = () => reachMaps?.[reachAt]?.map ?? null;
+const reachShrink = Number(options['reach-shrink'] ?? 48);
 const token = newToken();
 // `--lan`: the page is served on this computer's network address too (not only 127.0.0.1), still only with the
 // token in the URL. `--stim-dir DIR` (with `--lamp-sim PATH`) is the try-it app: a panel that drives the lamp
@@ -83,7 +92,10 @@ const ringShows = () => {
     return { pixels: ring.pixels, ...(typeof ring.on === 'boolean' ? { on: ring.on } : {}), ...(typeof ring.colour === 'string' ? { colour: ring.colour } : {}), ...(Number.isInteger(ring.level) ? { level: ring.level } : {}), ...(typeof ring.pattern === 'string' ? { pattern: ring.pattern } : {}) };
   } catch { return null; /* no ring file yet, or half written: the one colour shows */ }
 };
-const withRing = (state) => {
+// With a reach map, every state carries what the map allows each joint now, for the page to draw beside the sliders.
+const withReach = (state) => (reachMaps ? { ...state, reach: { on: true, virtual: options.fake === true, shrink: reachShrink, name: reachMaps[reachAt].name, label: reachMaps[reachAt].map.label ?? '', choices: reachMaps.map((m) => ({ name: m.name, label: m.map.label ?? m.name })), ranges: rangesDeg(reachMapNow(), state.joints, { shrink: reachShrink }) } } : state);
+const withRing = (state) => withReach(withRingShows(state));
+const withRingShows = (state) => {
   if (!ringFile) return state;
   const ring = ringShows();
   if (!ring) return state;
@@ -130,9 +142,16 @@ async function drag(joint, deg) {
     }
     clearTimeout(letGo);
     letGo = setTimeout(release, 3_000);
-    const target = Math.max(-180, Math.min(180, deg));
+    let target = Math.max(-180, Math.min(180, deg));
+    if (reachMapNow()) {
+      const checked = restrict(reachMapNow(), lastRaw?.joints, joint, target, { shrink: reachShrink });
+      if (checked.note) tell({ type: 'said', text: `reach map: ${checked.note}` });
+      target = checked.deg;
+    }
+    // The virtual lamp's own arm (and roll) is this page's simulation: the lamp's `joints` op takes only yaw and pitch today.
+    if (options.fake && !['yaw', 'pitch'].includes(joint)) { sim?.aim(joint, target); return; }
     await lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) });
-    sim?.aim(joint, deg);
+    sim?.aim(joint, target);
   } catch (error) {
     if (!(error instanceof LampError)) throw error;
     tell({ type: 'said', text: `refused: ${error.code}: ${error.message}` });
@@ -187,7 +206,7 @@ async function press(message, page) {
       if (real && control.moves && !page?.movesOk) throw refuse('this moves the real lamp: say yes to "this moves the real lamp" on the page first');
       // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
       const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
-      const call = await control.run({ lamp, release, listenFor, show, mode, audio: audioTo(page, id) }, checked(control.fields, args, mode));
+      const call = await control.run({ lamp, release, listenFor, show, mode, audio: audioTo(page, id), reach: reachMaps && ((targets) => { const r = restrictAll(reachMapNow(), lastRaw?.joints, targets, { shrink: reachShrink }); for (const note of r.notes) tell({ type: 'said', text: `reach map: ${note}` }); return r.targets; }) }, checked(control.fields, args, mode));
       said(id, call, true, 'taken');
     } else {
       const stimulus = real ? undefined : findStimulus(name);
@@ -365,6 +384,15 @@ wss.on('connection', (page) => {
     }
     // On a real lamp the sliders move the real body only after the page said yes to "this moves the real lamp", and with the grant.
     if (message.type === 'moves_ok' && real) page.movesOk = true;
+    // The page's choice among the loaded reach maps (which masses the limits are judged with): for every page, the next state carries it.
+    if (message.type === 'reach_map' && reachMaps) {
+      const at = reachMaps.findIndex((m) => m.name === message.name);
+      if (at >= 0 && at !== reachAt) {
+        reachAt = at;
+        tell({ type: 'said', text: `reach map: now ${reachMaps[at].map.label || reachMaps[at].name}` });
+        if (lastRaw) { last = withRing(lastRaw); tell({ type: 'state', state: last }); }
+      }
+    }
     if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
@@ -450,7 +478,11 @@ async function fakeBody() {
   await Lamp.pair(fakeLamp.code, fakeLamp.host, { pin: fakeLamp.pin, port: fakeLamp.port, keyring });
   const lamp = await Lamp.connect(undefined, { keyring });
   const at = Object.fromEntries(NAMES.map((name) => [name, 0]));
-  const goal = { ...at, shoulder: 35, elbow: -60 };
+  // `--fake-arm SHOULDER,ELBOW` (degrees from the folded arm) starts the simulated arm there: the stand is about 49.5,46.1.
+  const [armShoulder, armElbow] = (options['fake-arm'] ?? '35,-60').split(',').map(Number);
+  if (![armShoulder, armElbow].every(Number.isFinite)) throw new Error('--fake-arm takes SHOULDER,ELBOW in degrees');
+  Object.assign(at, { shoulder: armShoulder, elbow: armElbow });
+  const goal = { ...at };
   const sim = { aim: (joint, deg) => (goal[joint] = deg) };
   const colours = ['warm', 'orange', 'pink', 'purple', 'blue', 'cyan', 'green', 'yellow'];
   let tick = 0;
