@@ -3769,6 +3769,54 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.
 
+## Việc một kỹ năng trên đèn đã làm thì được đề nghị dùng nó (`LAMP_MAKE_CORE_OFFER=on`, tắt)
+
+Tắt nếu không đặt `LAMP_MAKE_CORE_OFFER=on`, chưa có trong unit sản phẩm
+nào (#7747: trên lamp-9adf ba lời nhắc uống nước tạo bằng giọng nói nằm cạnh
+kỹ năng lõi `sip-of-water`, không cái nào có các điều kiện giữ của nó; người
+dùng xin một lời nhắc uống nước tốt hơn và nhận được cái thứ hai, kém hơn).
+`lamp-voice` chỉ truyền đúng `on` cho worker `second`
+(`process::second_route_worker_environment`). Khi bật
+(`crate::make_core_offer`):
+
+- **Mô hình phán xét, trước khi tạo gì.** Một lần gọi `make_skill` bằng
+  giọng nói có `request` và không có `new_skill` thì chưa tạo gì. Mô hình
+  được cho biết, mỗi cái một dòng, mọi kỹ năng trên đèn mà người dùng không
+  tự tạo (lõi, từ Store hay được đẩy lên: tên, mô tả trong `SKILL.md` cắt ở
+  200 byte, bật hay tắt, đọc như `skill_about::skills`) và được hỏi liệu
+  có cái nào đã làm đúng việc được xin: cùng loại lời nhắc hay hành động,
+  vào cùng loại thời điểm. Đó là phán xét của mô hình, không bao giờ là
+  danh sách từ (phán quyết của chủ sở hữu, 13/11). Đèn không có kỹ năng
+  nào như vậy, hoặc không đọc được, thì tạo ngay như trước.
+- **Không cái nào làm việc đó** ("remind me to call mum at 3"): mô hình gọi
+  lại ngay với cùng request và `new_skill` true, và việc tạo tiếp tục như
+  trước. Việc này tốn thêm một vòng của chính mô hình giọng nói khi tạo;
+  phần đọc là hai thư mục cục bộ và ba bản ghi, không có socket.
+- **Có một cái làm việc đó** ("remind me to drink water every hour"): không
+  tạo gì, không bao giờ âm thầm thay thế. Đèn nói kỹ năng đó đã làm việc
+  này. Cái đang tắt (tắt bằng giọng nói hay trong app) được đề nghị bật
+  lên; cái đang bật thì được nói nó làm gì, và người dùng được hỏi họ có
+  còn muốn một kỹ năng mới không.
+- **Đồng ý** bật nó là `make_skill` với `core_on`, chỉ có tên: chỉ khi nghe
+  thấy, chỉ câu của chủ sở hữu (`services::owner_hears`), và chỉ kỹ năng
+  đã được đề nghị trong 5 phút gần nhất, khớp theo tên thư mục hoặc lời
+  nói ra ("Sip of water", "a sip of water"). Trình quản lý bật nó bằng
+  chính `{"on": NAME}` của nó, như công tắc trong app.
+- **Từ chối mà vẫn muốn cái mới** là cùng request với `new_skill`: tạo như
+  đã xin, và lời đề nghị được bỏ.
+- **Chưa có: đổi thời gian của kỹ năng lõi.** #7747 muốn một lời đồng ý đổi
+  các thiết lập kỹ năng lõi cho phép (khoảng cách, giờ, số lần tối đa một
+  ngày). Hôm nay chưa kỹ năng lõi nào có thiết lập mà giọng nói được ghi,
+  nên mô hình được bảo không bao giờ đề nghị hay nói đã đổi; việc đó cần
+  một bản ghi thiết lập trong `lamp-skills` trước.
+
+MAKE IT trong app không đổi. Khi tắt, tham số và câu trả lời của
+`make_skill` giống hệt từng byte như trước. Kiểm thử: `make_core_offer::tests`
+(`a_make_with_a_core_skill_on_the_lamp_is_offered_not_made`,
+`a_yes_turns_the_offered_core_skill_on`,
+`a_new_skill_still_wanted_is_made_as_asked_and_the_offer_let_go`,
+`the_switch_off_changes_nothing`).
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

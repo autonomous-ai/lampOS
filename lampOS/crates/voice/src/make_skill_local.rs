@@ -874,6 +874,8 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "enum": crate::made_clash::CHOICES,
         "description": "With clash_id only: replace the other skill or skills, keep them all (they may take turns), or cancel, as the person chose in any words."
     });
+    // A skill on the lamp offered in place of a make (#7747).
+    crate::make_core_offer::with_parameters(&mut parameters);
     if code {
         let request = format!(
             "{}{CODE_REQUEST_TOLD}",
@@ -3986,6 +3988,13 @@ pub fn answer(
     {
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
     }
+    // A skill on the lamp offered in place of a make, turned on by the
+    // person's yes (#7747, `LAMP_MAKE_CORE_OFFER`).
+    if crate::make_core_offer::on()
+        && let Some(name) = call.args[crate::make_core_offer::CORE_ON].as_str()
+    {
+        return crate::make_core_offer::turned_on_here(name, request, heard, lease);
+    }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
     if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
@@ -4087,6 +4096,12 @@ pub fn answer(
     let Some(keeping) = Keeping::when(true) else {
         return crate::tools::unavailable();
     };
+    // What a skill on the lamp already does is offered, not made again
+    // (#7747, `LAMP_MAKE_CORE_OFFER`): the model judges, then makes with
+    // `new_skill` when none does or the person still wants one.
+    if let Some(offered) = crate::make_core_offer::before_make_here(&call.args, request, skills) {
+        return offered;
+    }
     let request_words = call.args["request"].as_str().unwrap_or_default();
     // Whose ask it was, asked only for a make with code of its own
     // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's.
