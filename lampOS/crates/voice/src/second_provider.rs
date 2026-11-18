@@ -887,6 +887,11 @@ pub const BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_FOLLOW_UP_RENEWS"
 /// [`worker::Heeding::renewing_no_face_follow_ups`], #7332).
 pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
 
+/// A line held as said to nobody is talk for the busy room
+/// (`LAMP_ROOM_HELD_TALK=on`,
+/// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
+pub const ROOM_HELD_TALK_ENVIRONMENT: &str = "LAMP_ROOM_HELD_TALK";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
