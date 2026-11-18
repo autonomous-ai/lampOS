@@ -5798,6 +5798,61 @@ the same code for both writers.
   go in the rules: each is a placeholder there
   (`own1.lamp@example.invalid`), put back in the agent's answer before the
   checks.
+- **Only a quick reaction stays DeepSeek's (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
+  off unless set, in no product unit; the first builder's ruling on #6811,
+  18 Nov 16:23, and the wider route he said yes to at 16:34).** DeepSeek
+  drafts as before. Its draft is kept only when it is a quick reaction
+  (`made_skill::quick_reaction`, by its start and its step kinds alone,
+  never a word): started by the person's own act (words they name,
+  `asks` or a `[said]` start; a `[trigger]` on `controls/*`, a touch, a pat
+  or the button; or no trigger, run only when asked), with only `light`,
+  `body`, a `say` of exact words or the hum, and no `task`, no `[[while]]`
+  and no `grants`. Any other draft (the clock, someone at the desk, a face,
+  what the sitter is doing, any other sensor, a guard, a read, a write, a
+  task) is never kept: the make goes to the lamp's agent with the same
+  brief, the "about a minute" line said as for any hand-over, and the
+  journal says `a skill made here: not a quick reaction (on room/presence):
+  made by the agent (Hermes), DeepSeek's draft not kept`. The agent is told,
+  after the rules and in every repair's rules, sip-of-water's guards as its
+  template (`made_skill::BEHAVIOUR_TEMPLATE`, 986 bytes; the rules with the
+  longest brief go from 7,789 to 8,777 bytes, within lamp-tasks' 48 KiB, and
+  the brief is unchanged, within `MOST_BRIEF_BYTES`): `[[while]]` on
+  `voice/state` `not_equals = "speaking"` for 30 s and `equals = "resting"`
+  for 5 s, on `room/activity` `state not_equals = "head_down"` with
+  `unknown = "holds"`, `rearm = "leaves"`, `most_a_day`, the `wellbeing`
+  budget, `[active]` hours, `[quiet]` nights, `[rest] after_ignored = 2`
+  and one short, warm line of exact words (a made skill's say is said as
+  written, never a note for the voice to word). The agent making none (no
+  answer in its time, busy, its run failed, no make run) is said plainly in
+  its own failure words (`make_skill_agent::not_made_try`) and nothing is
+  kept: never DeepSeek's unguarded draft. With no agent on the lamp at all
+  (#7375's `missing`), "this lamp has no agent set up to make it"; with the
+  agent not known (lamp-tasks' targets unread, or an engine no make run
+  takes), DeepSeek's as before. A `cannot:` answer (a one-off reminder is
+  the lamp's own timer, never a make), the internet's line and a
+  linked-service make keep their routes. The two guards: a `[[while]]` on
+  `voice/state` or `room/activity` read as above is said plainly ("never in
+  the middle of a conversation or with your head down",
+  `made_skill::guards_said`) and granted in `[permissions] topics` by the
+  lamp (`topic_granted`), and no made-skill cap counts topics (none has
+  since #6066), so they count toward nothing; any other `[[while]]`, or a
+  guard topic read another way, is a part of its own, unsaid as before. A
+  skill on a presence or person topic (`made_skill::BEHAVIOUR_TOPICS`)
+  keeps the lamp's manners even with `LAMP_MADE_SKILL_LOOSE` on (marked
+  `limits: asked`). Who made it is the lamp's line alone: `made_with:
+  deepseek`, `hermes` or `openclaw` on the card after `made_by`, and
+  `"made_with"` in its `made.json` entry; one the model wrote is dropped, as
+  `made_by` is, switch on or off. Off, every make is byte for byte as
+  before. Tests: `a_quick_reaction_is_a_persons_act_with_only_light_body_or_words`,
+  `with_the_switch_only_a_quick_reaction_stays_deepseeks`,
+  `with_the_switch_an_agent_making_none_keeps_nothing_and_says_so`,
+  `with_the_switch_a_one_off_reminder_never_reaches_the_agents_make`,
+  `with_the_switch_off_a_presence_draft_is_deepseeks_as_before`,
+  `the_template_and_the_longest_brief_fit_the_agents_rules`,
+  `the_templates_guards_are_said_plainly_and_any_other_while_is_not`,
+  `made_with_is_the_lamps_line_for_each_engine_and_the_models_is_dropped`,
+  and lamp-skills' `a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker`
+  (the real checker and the manage helper).
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
   off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's
