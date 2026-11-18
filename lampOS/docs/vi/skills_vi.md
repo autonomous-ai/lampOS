@@ -3324,6 +3324,62 @@ ngôn ngữ khác bước kiểm tra được bỏ qua và ghi nhật ký. `lamp
 đúng `on` cho worker `provider` và `second`. Khi tắt, mọi lần tạo giống hệt
 từng byte như trước.
 
+## Không hỏi gì (`LAMP_MAKE_NO_ASKS=on`, tắt)
+
+Tắt nếu không đặt `LAMP_MAKE_NO_ASKS=on`, chưa có trong unit sản phẩm nào
+(người xây dựng đầu tiên, 18/11 lúc 18:41, theo chủ sản phẩm: "A made skill
+is made and said in one line, with an undo ('Made it, say "remove it" to
+undo'), never read back for a yes. Offers become the action plus that one
+line. An unsure line is simply not acted on, with no 'did you say…?'"; và
+lúc 18:45: việc xóa kỹ năng tự tạo không nằm trong ngoại lệ). Chỉ "quên hết"
+và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_asks`):
+
+- **Tạo xong, bật, một câu.** Một lần tạo bằng giọng nói, thường hay có code
+  riêng, được bật ngay và mô hình giọng nói được bảo nói một câu ngắn bằng
+  ngôn ngữ của cuộc trò chuyện, giữ nguyên tên kỹ năng, thêm nhiều nhất một
+  vế ngắn về việc nó sẽ làm, không có câu hỏi: "Made evening dim. Say
+  'remove it' to undo." Code được bật bằng chính đường của lời đồng ý
+  (`make_skill_local::code_on_at_once`: đúng gói đó theo SHA-256, lời đồng ý
+  cho tác vụ được ghi cho đúng các quyền mà code giữ), bất kể quyền nào,
+  nhưng chỉ khi `LAMP_MADE_SCRIPTS=on` và chỉ khi chính chủ đèn yêu cầu, được
+  giữ như lời đồng ý bằng giọng nói trước đây (`services::owners_yes_of`);
+  lần tạo code của người khác được giữ nhưng không bật, và nói rõ lý do. Giới
+  hạn, bước kiểm tra gói, các quyền, `LAMP_TASK_NET` và namespace chạy không
+  đổi. MAKE IT trong app cũng vậy, yêu cầu từ app là của chủ đèn. Kỹ năng có
+  gửi đi (một lần ghi, hoặc code nhắn tin tới điện thoại) vẫn đọc lại và chờ
+  đồng ý, vì `lamp-services` gửi theo lời đồng ý đó. Kỹ năng của agent
+  (`LAMP_MAKE_NO_CANNOT`) được bật ngay và vẫn đọc lại tác vụ trước lần chạy
+  đầu.
+- **Trùng thì thay thế.** Một lần tạo bằng giọng nói trùng với kỹ năng trên
+  đèn (`made_clash::found`) được bật, rồi từng kỹ năng kia được tắt qua
+  `{"off": NAME}` của trình quản lý, như công tắc trong app, không bao giờ bị
+  xóa: "Made evening dim and replaced your old rest glow. Say 'keep the old
+  one' to undo." Bật không được thì không tắt gì. Không chờ lựa chọn nào.
+- **Xóa ngay.** `remove` của `make_skill`, tên được so với các kỹ năng chính
+  người dùng tạo như trước (`made_remove::found`), xóa kỹ năng khi chủ đèn
+  yêu cầu (`services::owners_yes_now`) mà không hỏi: trình quản lý gỡ nó
+  khỏi đèn, rồi nó được cất riêng 7 ngày, mục chỉ mục trong `undo.json` và
+  gói trong `undo/` trong thư mục kỹ năng tự tạo: "Removed moon fact. Say
+  'put it back' to undo." Nhiều kỹ năng có tên giống nhau, một kỹ năng họ
+  không tạo, hay không có kỹ năng nào, thì không xóa gì và không hỏi gì.
+- **Hoàn tác.** Khi bật, `make_skill` nhận `undo`: "last", hoặc tên kỹ năng
+  như đã nghe; một câu có phải là yêu cầu hoàn tác hay không là do mô hình
+  phán đoán ("remove it", "keep the old one", "put it back"), không bao giờ
+  dùng danh sách từ. Chỉ chủ đèn. Một lần tạo trong vòng 10 phút thì bị xóa
+  (và cất riêng); một lần thay thế trong vòng 10 phút thì bật lại các kỹ năng
+  cũ rồi xóa kỹ năng mới; một lần xóa trong vòng 7 ngày thì được đưa lại vào
+  chỉ mục và bật, kỹ năng có code bằng chính đường của lời đồng ý. Sau 7
+  ngày gói được cất sẽ bị xóa.
+- **Không chắc thì không làm.** Lần tạo bị đánh giá là không đúng điều được
+  yêu cầu (`LAMP_MADE_UNRELATED_REFUSED`), hoặc lời gọi không có yêu cầu,
+  không tạo gì và không hỏi gì: không có "Could you say it again?".
+- **Không bao giờ nói "bật" khi đang tắt.** Bật không được thì nói một câu
+  rõ ràng kèm lý do ("I made it but couldn't put it on: …"), và không để
+  lại gì để hoàn tác.
+
+`lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
+mọi lần tạo và xóa giống hệt từng byte như trước.
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

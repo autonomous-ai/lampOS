@@ -85,7 +85,7 @@ pub const GOES_ON_WITHIN: Duration = Duration::from_secs(30);
 pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// The longest the helper is waited for: its own 4 s for the skills
 /// folder, and the install, while the person waits for the answer.
-const PUT_ON_WAIT: Duration = Duration::from_secs(8);
+pub(crate) const PUT_ON_WAIT: Duration = Duration::from_secs(8);
 /// Why a kept skill isn't on when the manage helper isn't there to ask
 /// ([`put_on_within`]): never asked, so it never puts it on.
 pub const NOT_REACHED: &str = "the lamp's skills couldn't be reached";
@@ -9482,7 +9482,7 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
 }
 
 /// An index entry as the [`Made`] it keeps, its package still there.
-fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
+pub(crate) fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
     let package = directory.join(entry["package"].as_str()?);
     package.is_file().then(|| Made {
         name: entry["name"].as_str().unwrap_or_default().to_owned(),
@@ -9751,6 +9751,12 @@ pub fn writes_of(directory: &Path, sha256: &str) -> Vec<Value> {
         .find(|entry| entry["sha256"] == sha256)
         .and_then(|entry| entry["writes"].as_array().cloned())
         .unwrap_or_default()
+}
+
+/// The made skills' index written whole (`crate::make_no_asks`: a skill
+/// removed with no yes kept aside, or put back).
+pub(crate) fn write_entries(directory: &Path, entries: &[Value]) -> io::Result<()> {
+    write_index(directory, entries)
 }
 
 /// The index written whole beside it and moved over it.
