@@ -201,6 +201,9 @@ pub struct Shared {
     /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
     /// [`crate::task_yes`]): none, and the yes requests are refused.
     task_yes: Mutex<Option<PathBuf>>,
+    /// The owner's yeses to apps and what lamp-control holds of them
+    /// ([`crate::app_yes`]), in memory only.
+    apps: Mutex<(crate::app_yes::Yeses, crate::app_yes::Live)>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
@@ -382,6 +385,7 @@ impl Shared {
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
             task_yes: Mutex::new(None),
+            apps: Mutex::default(),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -628,6 +632,7 @@ impl Shared {
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
+                apps: Mutex::default(),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -1714,11 +1719,12 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
         // that may record the person's yes to a skill's task.
         let from_the_voice =
             crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
+        let peer = crate::app_yes::peer_of(stream.peer_cred().ok().and_then(|peer| peer.pid()));
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line, from_the_voice);
+                let answer = admin_answer(&shared, &line, from_the_voice, peer);
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -1740,7 +1746,12 @@ fn grant_names(grants: &[Grant]) -> String {
         .join(", ")
 }
 
-fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
+fn admin_answer(
+    shared: &Shared,
+    line: &str,
+    from_the_voice: bool,
+    peer: crate::app_yes::Peer,
+) -> Value {
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
@@ -1755,6 +1766,23 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
         wall_ms(),
     ) {
         return answer;
+    }
+    // The owner's yes to an app, and what lamp-cloud reads of apps (#7415).
+    {
+        let mut apps = shared.apps.lock().expect("apps");
+        let (yeses, live) = &mut *apps;
+        let place = crate::app_yes::Place::product(folder.as_deref());
+        if let Some(answer) = crate::app_yes::answer(
+            yeses,
+            live,
+            &place,
+            &asked,
+            peer,
+            crate::app_yes::on(),
+            std::time::Instant::now(),
+        ) {
+            return answer;
+        }
     }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
@@ -1921,7 +1949,7 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
             "listening": shared.listening.load(Ordering::Relaxed),
         });
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check or task_yes_forget"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state or app_settings_set"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
