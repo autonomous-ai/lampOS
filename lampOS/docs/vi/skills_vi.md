@@ -3073,6 +3073,19 @@ cả hai người viết.
     cần thêm gì: "I can make that as a task for the lamp's agent once you
     tell me when it should run, …" (`make_no_cannot::no_when`, chỗ nối cho
     `asks` nói ra của kỹ năng được tạo, `LAMP_MADE_SKILL_ASKS`).
+  - **Trên OpenClaw khi `LAMP_TASK_NET_GATEWAY=on` nữa (#7742), code riêng
+    của kỹ năng được tạo có thể được cấp `net`.** Script của lần chạy đó ra
+    web công khai từ hàng rào skill-start của chính nó, nên một lần tạo
+    `internet:` được giao cho OpenClaw viết thành code có `net`
+    (`make_skill_local::net_code_by`). Theo quyết định của chủ đèn ngày
+    18/11, `made_skill::code_held` và `put_on_scripts` khi đó cho phép `net`
+    cùng code riêng của kỹ năng được tạo, bất kể ai viết, cả lúc lưu lẫn lúc
+    manage helper của lamp-skills bật nó sau lời đồng ý; vì vậy
+    `LAMP_TASK_NET_GATEWAY=on` có trong `lamp-voice`, `lamp-tasks` và
+    `lamp-skills-manage@` (lamp-9adf, 18/11 21:37: thiếu nó, helper từ chối
+    kỹ năng bitcoin-price đã lưu với "a grant the lamp doesn't have: net").
+    Khi tắt, `net` chỉ đi cùng `scripts/agent.py` của chính đèn. Test:
+    `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`.
   - **Một yêu cầu không quyền nào đáp ứng được** được nói lý do bằng lời
     thường, nêu thiếu gì rồi dừng, không bao giờ chỉ là "I couldn't make
     that one." (`Uncovered::line`). Không câu nào bảo người dùng làm điều họ
