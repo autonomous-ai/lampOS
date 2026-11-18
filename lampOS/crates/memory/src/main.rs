@@ -240,6 +240,28 @@ mod tests {
         }
     }
 
+    /// A8 (#6852): the product unit opens the app's narrow socket in memory's
+    /// own runtime folder, for `lampos`, lamp-cloud's group, which memory's
+    /// user is in, so it may give the socket that group.
+    #[test]
+    fn the_product_unit_opens_the_forget_socket_for_lamp_clouds_group() {
+        let unit = include_str!("../../../deploy/product/lamp-memory.service");
+        let start = unit
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        let parsed = arguments(&start.split_whitespace().skip(1).collect::<Vec<_>>())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            parsed.forget,
+            Some(("/run/lampos-memory/forget.sock".into(), "lampos".into()))
+        );
+        assert!(unit.contains("\nRuntimeDirectory=lampos-memory\n"));
+        assert!(unit.contains("\nRuntimeDirectoryMode=0755\n"));
+        assert!(unit.contains("\nSupplementaryGroups=lampos\n"));
+    }
+
     #[test]
     fn a_relative_path_an_unknown_option_or_a_bad_number_is_refused() {
         let paths = ["--dir", "/m", "--socket", "/s"];
