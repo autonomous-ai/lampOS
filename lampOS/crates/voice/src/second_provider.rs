@@ -17526,6 +17526,9 @@ async fn answer(
         // note of a turn's candidates still unchosen, and whether the turn
         // was asked once more for them already.
         let mut turned_on_now = false;
+        // The made skill the model's own `turn_on` turned on in this turn:
+        // its run now after is said with the undo line (#7562's request 9).
+        let mut model_on: Option<String> = None;
         let mut turn_unchosen: Option<String> = None;
         let mut turn_unchosen_asked = false;
         // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
@@ -20316,8 +20319,9 @@ async fn answer(
                 // and run it", or the lamp's own above; lamp-skills reads
                 // its `off` file again within 2 s): run again after a short
                 // wait, at most `RERUNS` times; still off, told it was just
-                // turned on, never that it is off.
-                if turned_on_now && crate::made_turn::ran_turned_off(&answer.told) {
+                // turned on, never that it is off. So for `make_skill`'s run
+                // now of it, refused `made_run::STOPPED` (#7562's request 9).
+                if turned_on_now && crate::made_turn::still_off(&call.name, &answer.told) {
                     for _ in 0..crate::made_turn::RERUNS {
                         tokio::time::sleep(crate::made_turn::RERUN_AFTER).await;
                         eprintln!(
@@ -20333,13 +20337,24 @@ async fn answer(
                             context_epoch,
                         )
                         .await;
-                        if !crate::made_turn::ran_turned_off(&answer.told) {
+                        if !crate::made_turn::still_off(&call.name, &answer.told) {
                             break;
                         }
                     }
-                    if crate::made_turn::ran_turned_off(&answer.told) {
+                    if crate::made_turn::still_off(&call.name, &answer.told) {
                         answer.told = crate::made_turn::just_on();
                     }
+                }
+                // The run now of the skill the model's own `turn_on` turned
+                // on in this turn (#7562's row on lamp-9adf, 18 Nov, request
+                // 9: "tell me a space fact with my space facts skill" was a
+                // turn on, then, told so, its run): said with the undo line.
+                if let Some(told) = crate::made_run::ran_after_turn_on(
+                    model_on.as_deref(),
+                    &call.name,
+                    &answer.told,
+                ) {
+                    answer.told = told;
                 }
                 // Turned on for the ask: said with one line and its undo,
                 // and never run again in this turn.
@@ -20355,6 +20370,9 @@ async fn answer(
                     turn_unchosen = None;
                     if answer.told["off"] == false {
                         turned_on_now = true;
+                        model_on = answer.told[crate::made_turn::TURN_ON]
+                            .as_str()
+                            .map(str::to_owned);
                     }
                 }
                 // The skill the heard words named, run: a model's call of it

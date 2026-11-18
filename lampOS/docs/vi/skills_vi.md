@@ -2292,6 +2292,19 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   run it" bật nó, theo thứ tự nào cũng vậy; một lần chạy được gọi sau khi
   bật trong cùng lượt đi tới kỹ năng và được thử lại như trên. Khi công tắc
   tắt, hoặc lượt không được nghe, câu trả lời của hàm được giữ nguyên.
+- **Lệnh chạy ngay cũng bật nó lên** (dòng thử của #7562 trên lamp-9adf,
+  18/11: "Lamp, use my space facts skill." là lời gọi `make_skill` với `run`
+  của mô hình, bị từ chối `made_run::STOPPED`, "it is turned off or
+  snoozed"). Khi công tắc bật, `made_run::asked_turning` bật một kỹ năng có
+  trong tệp `off` của lamp-skills qua chính `turn_on` của `make_skill`
+  (`made_turn::asked_here`, như `on_for_ask`), chạy nó, thử lại như trên, và
+  trả lời `made_run::told_turned_on`: vẫn là một lần chạy, cùng câu hoàn tác
+  (`made_turn::undo_line`). Một kỹ năng đang tạm hoãn (snooze), không có
+  trong tệp `off`, không bao giờ được bật và vẫn là "didn't run now". Một
+  lời gọi có cả `turn_on` và `run` là lần chạy; câu trả lời của `turn_on`
+  bảo mô hình gọi `run` khi câu nói xin dùng nó, và một lần chạy sau
+  `turn_on` của chính mô hình cho kỹ năng đó trong lượt cũng kèm câu hoàn
+  tác. Khi công tắc tắt, giữ như trước.
 - **Chỉ nói đã tắt hay đã bật lại sau lời gọi đã làm việc đó** (dòng thử
   của #7562 trên lamp-9adf, 18/11 lúc 10:57: "Lamp, turn off my bitcoin
   price skill." không tìm thấy gì gần btc price và đưa ra các kỹ năng của
