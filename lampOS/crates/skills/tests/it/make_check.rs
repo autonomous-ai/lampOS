@@ -166,7 +166,7 @@ fn the_gateway_makes_inline_skill_toml_packs() {
 /// (`lamp_tasks::skill_make::MAKE_EXAMPLES`) packs with the real
 /// `lamp-skills pack`, as a skill made on this lamp with
 /// `LAMP_MADE_SKILL_ASKS` on: an example can never be one the check
-/// refuses. It names each of its three kinds once.
+/// refuses. It names each of its seven skills once, in order.
 #[test]
 fn every_gateway_make_example_packs() {
     let dir = tempfile::tempdir().unwrap();
@@ -182,13 +182,24 @@ fn every_gateway_make_example_packs() {
             names.push(name);
         }
     }
-    assert_eq!(names, ["desk-light", "traffic-light", "fruit-notes"]);
+    assert_eq!(
+        names,
+        [
+            "desk-light",
+            "stretch-break",
+            "coin-flip",
+            "water-while-here",
+            "break-timer",
+            "breathing-coach",
+            "water-breaks",
+        ]
+    );
     let on = [(lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned())];
     for name in names {
         assert!(packs(&examples.join(name), &out, &on), "{name}");
     }
-    // Off, a show in a skill its words start is refused, as before.
-    assert!(!packs(&examples.join("traffic-light"), &out, &[]));
+    // Off, a skill its own words start is refused, as before.
+    assert!(!packs(&examples.join("desk-light"), &out, &[]));
 }
 
 /// #7245: a made skill's light show, its own words alone starting it,
