@@ -10,6 +10,8 @@
 //! install or remove, the rule for a staged package, and the launcher.
 //!
 //! Nothing here stores or compares a uid: a dynamic user's is not stable.
+pub mod ask;
+pub mod client;
 pub mod effects;
 pub mod entry;
 pub mod facts;
@@ -19,7 +21,10 @@ pub mod lock;
 pub mod manage;
 pub mod name;
 pub mod package;
+pub mod peer;
+pub mod real;
 pub mod remove;
+pub mod skills_reader;
 pub mod staging;
 pub mod state;
 pub mod sweep;

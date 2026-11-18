@@ -8,15 +8,23 @@ publish.workspace = true
 # The pure parts of the apps' manage helper (#7415, piece 2): what an app's
 # name, entry and units may be, the remove order and the start-up sweep over
 # a fake `Effects`, the staging-path rule, the launcher. No binary, no unit
-# file and no root yet: nothing here is wired to a lamp.
+# file; the binary (`lamp-apps asked`, `lamp-apps start-all`) is run by units
+# that land with piece C.
 [dependencies]
 libc = "0.2"
+# Nine's FORMAT 2 reader (piece 1): the signature and every file checked there.
+lamp-skills = { path = "../skills" }
+rustix = { version = "=1.1.5", features = ["net", "process", "fs"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
+lamp-update = { path = "../update" }
+ring = "0.17"
+tar = { version = "0.4", default-features = false }
+base64 = "0.22"
 
 [lints]
 workspace = true
