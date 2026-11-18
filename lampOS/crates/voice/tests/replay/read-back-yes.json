@@ -189,14 +189,15 @@
 ,
 {
   "case": "7705c-B2-r9",
-  "source": "out-7705a-1118-190518 journal-B2 request 9, eyes-B2.txt; row-7705c B2: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the yes in another voice, journaled held: no face seen speaking it; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "source": "out-7705a-1118-190518 journal-B2 request 9, eyes-B2.txt; row-7705c B2: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the yes in another voice, journaled held: no face seen speaking it; line_s from the kit's yes mark + 0.4 s and the clip's length. The kit's 0.25 s sample has the mouth unread through the line (read no only from 0.75 s), so the replay finds no face read silent and holds it on the face looking away; lamp-voice, reading every frame, read it silent",
   "line_s": [
     0.23,
     0.71
   ],
   "words": 1,
   "going_on": true,
-  "expect": "held: no face seen speaking it",
+  "expect": "held: looking away in a conversation",
+  "journal": "held: no face seen speaking it",
   "eyes": [
     "S 0.00 1 0.1 19.9 -1.1 y n unknown resting",
     "S 0.25 1 0.1 20.6 -2.0 y n unknown resting",
