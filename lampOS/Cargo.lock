@@ -1985,6 +1985,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-apps"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "tempfile",
+]
+
+[[package]]
 name = "lamp-audio"
 version = "0.1.0"
 dependencies = [
