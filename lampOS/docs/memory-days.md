@@ -412,7 +412,9 @@ gone: old links do not tell use from exposure, so "avoid those" may stay,
 and a mixed evidence exchange goes whole. `forget_all` and `forget_person`
 still remove the whole scope, and every forget invalidates session notes
 and queued writes as before. Exchanges that use remember/forget still stay
-out of the journal. Test:
+out of the journal; with `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on` a `remember`
+that kept nothing and holds nothing gives its exchange back (memory.md,
+"Asking it to keep or forget something is not itself kept"). Test:
 `days::tests::targeted_forget_keeps_unrelated_exchanges_shown_the_fact`. In
 Vietnamese: [memory-days_vi.md](vi/memory-days_vi.md).
 

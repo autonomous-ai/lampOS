@@ -6007,16 +6007,30 @@ fn room_facts(socket: &Path, within: Duration) -> Option<lamp_msgs::Rules> {
 /// The request used a function that keeps or forgets, or its line was held
 /// only by a known face's gap (`LAMP_FACE_GAP_HOLD`): its exchange stays out
 /// of the journal. Marking a request again keeps one entry, so a long
-/// answer marked at each piece pushes no other request out.
-pub fn keep_out(request: u64) {
+/// answer marked at each piece pushes no other request out. True only when
+/// this call marked it: it was not kept out before.
+pub fn keep_out(request: u64) -> bool {
+    let Ok(mut kept_out) = KEPT_OUT.lock() else {
+        return false;
+    };
+    if kept_out.contains(&request) {
+        return false;
+    }
+    if kept_out.len() == 16 {
+        kept_out.pop_front();
+    }
+    kept_out.push_back(request);
+    true
+}
+
+/// Undoes the [`keep_out`] of `request`, so its exchange is journalled as
+/// if no memory call had kept it out: with
+/// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`, a `remember` that kept nothing
+/// (`tools::keep_back_if_kept_nothing`). The exchange keeps the scope and
+/// person it carries; only the mark goes.
+pub fn keep_back(request: u64) {
     if let Ok(mut kept_out) = KEPT_OUT.lock() {
-        if kept_out.contains(&request) {
-            return;
-        }
-        if kept_out.len() == 16 {
-            kept_out.pop_front();
-        }
-        kept_out.push_back(request);
+        kept_out.retain(|kept| *kept != request);
     }
 }
 
@@ -27072,6 +27086,41 @@ mod tests {
             assert_eq!(sources, vec![index as u64 + 10]);
         }
         assert!(work.try_recv().is_err());
+    }
+
+    /// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`: a request kept out and then
+    /// given back ([`keep_back`]) is journalled in the scope and for the
+    /// person its exchange carries, never another's; [`keep_out`] says
+    /// whether it marked the request.
+    #[test]
+    fn a_kept_out_exchange_given_back_keeps_its_own_person() {
+        // Requests no other test names.
+        let (back, still) = (u64::MAX - 170, u64::MAX - 171);
+        assert!(keep_out(back));
+        assert!(!keep_out(back), "marked once");
+        assert!(keep_out(still));
+        keep_back(back);
+        assert!(!kept_out(back));
+        assert!(kept_out(still));
+        let done = |request, whose: &str| FinishedExchange {
+            request,
+            age: Duration::from_secs(3),
+            heard: "My haircut is on Thursday.".to_owned(),
+            said: "Nice.".to_owned(),
+            whose: Some(whose.to_owned()),
+        };
+        let (jobs, work) = sync_channel(4);
+        hand_on(
+            vec![done(back, "p-hers"), done(still, "p-hers")],
+            NOW,
+            &jobs,
+        );
+        let Ok(Job::Exchange { person, heard, .. }) = work.try_recv() else {
+            panic!("the given-back exchange is journalled")
+        };
+        assert_eq!(person.as_deref(), Some("p-hers"));
+        assert_eq!(heard, "My haircut is on Thursday.");
+        assert!(work.try_recv().is_err(), "the one still kept out is not");
     }
 
     #[test]

@@ -289,6 +289,30 @@ thấy thì không giữ gì, như trước, nên lời "có" về cách viết 
 ý ghi nhớ. Trước đây lamp giữ "They said: … renunculus" trong khi nói
 "ranunculus", và không hỏi.
 
+Câu có gọi `remember` hay `forget` không vào nhật ký: nó bị đánh dấu ở ngoài
+(`remember::keep_out`) trước khi lệnh chạy. Với
+`LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on` (chỉ đường thứ hai; tắt nếu không đặt),
+một `remember` mà chính nó đánh dấu câu ở ngoài, rồi được trả lời là không giữ
+gì và không giữ chờ lời "có" nào (`remembered` không phải true, không có
+`held`: các lần từ chối giữ lặng lẽ của `keep_quietly::unheard`,
+`remember::heard::yes_alone`, `needs_face::NOT_KEPT`, hay lời từ chối của chính bộ nhớ), thì bỏ dấu ấy
+(`remember::keep_back`, quyết định sau khi lệnh trả lời, trong
+`tools::keep_back_if_kept_nothing`). Câu được ghi vào nhật ký như thể chưa từng
+gọi `remember`, trong phạm vi và cho người mà câu mang theo, không bao giờ cho
+người khác. Trên lamp-06c1 ngày 17/11 (bản 13894), buổi gieo dữ liệu ban đêm mất
+câu cắt tóc theo cách này: lệnh giữ lặng lẽ bị từ chối vì mắt không thấy người
+ấy nói, và câu đã bị đánh dấu ở ngoài, nên không còn ở đâu cả. Không đổi: một
+lệnh giữ đã giữ hay đang chờ lời "có" (nên không gì bị lưu hai lần), mọi lệnh
+quên, câu đã bị đánh dấu ở ngoài trước lệnh (một lệnh giữ hay quên khác trong
+cùng yêu cầu, câu giữ qua khoảng trống hay câu được mang tiếp, lời nhắc viết),
+lệnh giữ đang chờ chạy theo lời "có" của người ấy, lệnh không có câu trả lời
+(bộ nhớ có thể đã giữ), và phạm vi không còn hiện hành. Câu riêng của một
+vị khách bị `needs_face::NOT_KEPT` từ chối thì vào nhật ký của căn phòng, như
+lời nói thường. Nhật ký ghi một dòng,
+không có lời nào. Đường Live không đổi. Chi tiết:
+[memory.md](../memory.md), "Asking it to keep or forget something is not
+itself kept".
+
 ## Truy xuất theo khoảng ngày
 
 `LAMP_MEMORY_RECALL_V2=on` (#2176; tắt nếu không đặt, chỉ với client Days, cả
