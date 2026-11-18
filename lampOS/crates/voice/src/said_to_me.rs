@@ -179,7 +179,9 @@ impl Said {
 /// The pose as the journal says it: `pitch <degrees>|unread, looking
 /// true|false|unread, <n> looks`.
 pub fn pose(pitch: Option<f32>, looking: Option<bool>, looks: usize) -> String {
-    let pitch = pitch.map_or("unread".to_owned(), |pitch| format!("{:.0}", pitch.to_degrees()));
+    let pitch = pitch.map_or("unread".to_owned(), |pitch| {
+        format!("{:.0}", pitch.to_degrees())
+    });
     let looking = looking.map_or("unread".to_owned(), |looking| looking.to_string());
     format!("pitch {pitch}, looking {looking}, {looks} looks")
 }

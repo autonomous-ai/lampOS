@@ -2908,14 +2908,30 @@ mod tests {
         look(&eyes, 1, Yes, 0.8, Some(false));
         look(&eyes, 2, Yes, 0.0, Some(true));
         let to = from + EVERY * 3;
-        assert_eq!(eyes.speaker_pose_between(from, to, true), (Some(0.7), Some(false), 3));
-        assert_eq!(eyes.turned_pose_between(from, to), (None, None), "not turned");
+        assert_eq!(
+            eyes.speaker_pose_between(from, to, true),
+            (Some(0.7), Some(false), 3)
+        );
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (None, None),
+            "not turned"
+        );
         let unread = SpeakingFaces::default();
         look(&unread, 0, Unknown, 0.7, None);
-        assert_eq!(unread.speaker_pose_between(from, to, true), (Some(0.7), None, 1));
+        assert_eq!(
+            unread.speaker_pose_between(from, to, true),
+            (Some(0.7), None, 1)
+        );
         // Another voice in the conversation: the lone face's pose is not read.
-        assert_eq!(unread.speaker_pose_between(from, to, false), (None, None, 0));
-        assert_eq!(eyes.speaker_pose_between(from, to, false), (Some(0.7), Some(false), 3));
+        assert_eq!(
+            unread.speaker_pose_between(from, to, false),
+            (None, None, 0)
+        );
+        assert_eq!(
+            eyes.speaker_pose_between(from, to, false),
+            (Some(0.7), Some(false), 3)
+        );
         let still = SpeakingFaces::default();
         look(&still, 0, No, 0.7, Some(false));
         assert_eq!(still.speaker_pose_between(from, to, true), (None, None, 0));
