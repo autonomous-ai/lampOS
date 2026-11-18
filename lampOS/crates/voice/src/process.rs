@@ -2494,6 +2494,8 @@ fn second_route_worker_environment(
         crate::remember::doubted::UNDOES_ENVIRONMENT,
         // A keep with a near spelling of a heard word asks first (C37).
         crate::remember::heard::NEAR_ENVIRONMENT,
+        // A remember that kept nothing gives its line back to the journal.
+        crate::tools::REFUSED_KEEP_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
@@ -2819,6 +2821,7 @@ mod tests {
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::remember::heard::NEAR_ENVIRONMENT,
+            crate::tools::REFUSED_KEEP_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
@@ -3893,6 +3896,7 @@ mod tests {
                     || name == crate::dont_know::ENVIRONMENT
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
                     || name == crate::remember::heard::NEAR_ENVIRONMENT
+                    || name == crate::tools::REFUSED_KEEP_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
@@ -4160,6 +4164,7 @@ mod tests {
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on",
                     "LAMP_REGION_FILE=/var/lib/lampos-cloud/region",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
