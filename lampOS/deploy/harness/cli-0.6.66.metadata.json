@@ -1,0 +1,15 @@
+{
+  "cli": {
+    "version": "0.6.66",
+    "cli": {
+      "url": "https://cdn.autonomous.ai/harness/cli/0.6.66/cli.js",
+      "sha256": "4124152709934966c9c5b446fbe92fc19e3beddf4947af8996ba7786f1ed6002",
+      "size": 12431774
+    },
+    "notify": {
+      "url": "https://cdn.autonomous.ai/harness/cli/0.6.66/notify.mjs",
+      "sha256": "b2d6dca43ef37cd3893d22b28d24245f14c3f8b7ac1b2e976d1f8c09f2f2f4ce",
+      "size": 123693
+    }
+  }
+}

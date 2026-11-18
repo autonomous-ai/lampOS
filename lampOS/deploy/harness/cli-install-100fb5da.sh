@@ -25,12 +25,13 @@
 #
 # What the CLI RUNS is a short list — tmux (its only terminal backend), `ps`, and on a Linux desktop
 # the clipboard helper for the active display — and step 1 checks exactly that list. Everything else
-# here (Homebrew, apt, curl/tar/sed/awk/sha256sum) is only a way of obtaining one of those or of
-# downloading a runtime, and is looked at only when the thing it obtains is missing: a Mac with tmux
-# never hears about Homebrew, and the download tools are checked only when something is downloaded.
-# On a Mac without tmux, Homebrew is used if it is already there; otherwise tmux comes the way Node
-# does — a checksum-verified MANAGED build from our manifest into ~/.harness/runtime, no compiler,
-# no package manager and no password (see cli/scripts/build-managed-tmux.sh).
+# here (a Homebrew prefix, apt, curl/tar/sed/awk/sha256sum) is only a way of obtaining one of those or
+# of downloading a runtime, and is looked at only when the thing it obtains is missing: a Mac with tmux
+# on PATH never hears about Homebrew, and the download tools are checked only when something is
+# downloaded. On a Mac without tmux on PATH, a tmux Homebrew already installed is used from its
+# prefix's bin, and Homebrew itself is never run; otherwise tmux comes the way Node does — a
+# checksum-verified MANAGED build from our manifest into ~/.harness/runtime, no compiler, no package
+# manager and no password (see cli/scripts/build-managed-tmux.sh).
 # Desktop mode (`--desktop`) trusts the app's own host pre-flight and skips step 1; host mode
 # (`--host`) is the app handing step 1 to a real terminal for its password prompts and stops after it.
 # The runtime's absolute path is baked into the launcher, so a Finder launch — where PATH is
@@ -250,7 +251,7 @@ install_hn() {
     return 1
   fi
   chmod 755 "$tui_staging"
-  if ! "$tui_staging" --version >/dev/null 2>&1; then
+  if ! "$tui_staging" --version </dev/null >/dev/null 2>&1; then
     echo "  ✗ hn does not run on this computer." >&2
     rm -f "$tui_staging"
     return 1
@@ -311,7 +312,7 @@ install_managed_grid() {
   fi
   chmod 555 "$grid_target/bin/grid" "$grid_target/bin" 2>/dev/null || true
   # Its update check off, as the daemon keeps it: this binary is the pin, not grid's to replace.
-  if ! GRID_NO_UPDATE_CHECK=1 "$grid_target/bin/grid" --version >/dev/null 2>&1; then
+  if ! GRID_NO_UPDATE_CHECK=1 "$grid_target/bin/grid" --version </dev/null >/dev/null 2>&1; then
     echo "  ✗ The managed grid does not run on this computer: $grid_target/bin/grid" >&2
     return 1
   fi
@@ -331,11 +332,14 @@ require_command() {
   }
 }
 
+# Every program this script starts that might read its stdin gets /dev/null: under `curl … | sh -s` the
+# script is sh's stdin, and on 2026-11-17 `brew` read part of it, so the install stopped without a word.
+# sudo asks for a password on the tty, not on stdin.
 apt_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
-    apt-get "$@"
+    apt-get "$@" </dev/null
   elif command -v sudo >/dev/null 2>&1; then
-    sudo apt-get "$@"
+    sudo apt-get "$@" </dev/null
   else
     echo "✗ Installing system packages needs root access, but sudo is unavailable." >&2
     return 1
@@ -352,7 +356,7 @@ install_with_apt() {
 }
 
 tmux_runs() {
-  command -v tmux >/dev/null 2>&1 && tmux -V >/dev/null 2>&1
+  command -v tmux >/dev/null 2>&1 && tmux -V </dev/null >/dev/null 2>&1
 }
 
 # The managed tmux for this Mac: download, verify, unpack under ~/.harness/runtime, record it in
@@ -413,7 +417,7 @@ install_managed_tmux() {
     rm -rf "$tmux_staging"
     trap - EXIT INT TERM
   fi
-  "$tmux_target/bin/tmux" -V >/dev/null 2>&1 || {
+  "$tmux_target/bin/tmux" -V </dev/null >/dev/null 2>&1 || {
     echo "✗ The managed tmux does not run on this computer: $tmux_target/bin/tmux" >&2
     exit 22
   }
@@ -431,29 +435,17 @@ case "$(uname -s)" in
     if tmux_runs; then
       : # tmux runs. How it got here is nobody's business, and nothing else is looked at.
     else
-      # A Homebrew installed for a different shell is still installed — and if it is here at all,
-      # its tmux is preferred: it is what the owner already maintains. The prefixes are overridable
-      # so a test (or an unusual install) can say where, or that there is none.
-      if ! command -v brew >/dev/null 2>&1; then
-        for brew_prefix in ${HARNESS_HOMEBREW_PREFIXES:-/opt/homebrew /usr/local}; do
-          if [ -x "$brew_prefix/bin/brew" ]; then
-            eval "$("$brew_prefix/bin/brew" shellenv 2>/dev/null || true)"
-            break
-          fi
-        done
-      fi
-      if command -v brew >/dev/null 2>&1; then
-        echo "▸ Installing tmux via Homebrew"
-        # --force-bottle: use Homebrew's prebuilt bottle if there is one, and fail FAST if there is
-        # not, rather than dragging the person into a from-source build. Homebrew stopped shipping
-        # Intel (x86_64) bottles in 2025, so on an Intel Mac `brew install tmux` would otherwise
-        # compile tmux + its deps and demand the Command Line Tools — the exact slow, password-and-
-        # compiler path the managed build exists to avoid. When no bottle is available this returns
-        # non-zero and the managed download below takes over.
-        brew install --force-bottle tmux || echo "▸ No Homebrew tmux bottle for this Mac; using the managed build instead."
-      fi
-      # No Homebrew, or a Homebrew that could not (no bottle): the managed build. Nothing to compile,
-      # nothing to ask a password for — the same checksum-verified download Node gets in step 2.
+      # Homebrew is never run: on 2026-11-17 `brew install tmux` updated Homebrew, ran its cleanup and
+      # replaced openssl on a new user's Mac. A tmux Homebrew already installed is still used, found in
+      # its prefix's bin, which a Finder launch's PATH lacks; the prefixes are overridable so a test
+      # (or an unusual install) can say where, or that there is none.
+      for brew_prefix in ${HARNESS_HOMEBREW_PREFIXES:-/opt/homebrew /usr/local}; do
+        [ -x "$brew_prefix/bin/tmux" ] || continue
+        export PATH="$brew_prefix/bin:$PATH"
+        if tmux_runs; then break; fi
+      done
+      # No Homebrew tmux that runs: the managed build. Nothing to compile, nothing to ask a password
+      # for — the same checksum-verified download Node gets in step 2.
       tmux_runs || install_managed_tmux
     fi
     ;;
@@ -517,7 +509,7 @@ tmux_runs || {
   echo "✗ tmux is required but did not pass verification." >&2
   exit 22
 }
-echo "✓ tmux ready ($(tmux -V))"
+echo "✓ tmux ready ($(tmux -V </dev/null))"
 if [ "$INSTALL_MODE" = "host" ]; then
   ensure_path_rc
   echo "✓ Host requirements ready."
@@ -545,7 +537,7 @@ fi
 
 # Prints the major version of $1, or nothing when it cannot be run.
 node_major() {
-  "$1" -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || true
+  "$1" -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' </dev/null 2>/dev/null || true
 }
 
 node_is_usable() {
@@ -566,7 +558,7 @@ if [ -n "$NODE_BIN" ]; then
     exit 1
   fi
   if ! node_is_usable "$NODE_BIN"; then
-    echo "✗ HARNESS_NODE_BINARY is older than Node 22: $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo unknown))" >&2
+    echo "✗ HARNESS_NODE_BINARY is older than Node 22: $NODE_BIN ($("$NODE_BIN" -v </dev/null 2>/dev/null || echo unknown))" >&2
     exit 1
   fi
 fi
@@ -578,7 +570,7 @@ if [ -z "$NODE_BIN" ] && [ -r "$CURRENT_NODE_FILE" ]; then
     "$RUNTIME_DIR"/*)
       if node_is_usable "$managed_node"; then
         NODE_BIN="$managed_node"
-        echo "▸ Using the managed Node runtime already installed ($("$NODE_BIN" -v))"
+        echo "▸ Using the managed Node runtime already installed ($("$NODE_BIN" -v </dev/null))"
       fi
       ;;
   esac
@@ -767,7 +759,7 @@ if [ "$INSTALL_MODE" != "host" ]; then
     echo "▸ Installing the managed grid into $RUNTIME_DIR"
     install_managed_grid || echo "  · grid will be set up the first time a grid feature is used"
   fi
-  "$NODE_BIN" "$HOME/.harness/cli/cli.js" dsh builtins || echo "  · Core harnesses will be prepared on the next start"
+  "$NODE_BIN" "$HOME/.harness/cli/cli.js" dsh builtins </dev/null || echo "  · Core harnesses will be prepared on the next start"
 fi
 
 # 3c. hn's binary (the standalone install; Desktop's CLI fetches it on the first `hn`).
@@ -792,7 +784,7 @@ if [ "$INSTALL_MODE" = "standalone" ] && [ "$NEW_COMPUTER" = 1 ] \
   # The mark hn's first start takes (tui/src/first_run.rs): OpenCode with a task typed, not a shell.
   mkdir -p "$HOME/.harness/tui" && : > "$HOME/.harness/tui/first-run" || true
   echo "▸ Downloading OpenCode, the free coding agent hn starts with"
-  ( curl -fsSL --connect-timeout 20 https://opencode.ai/install | bash -s -- --no-modify-path ) >/dev/null 2>&1 &
+  ( curl -fsSL --connect-timeout 20 https://opencode.ai/install | bash -s -- --no-modify-path ) </dev/null >/dev/null 2>&1 &
   download=$!
   waited=0
   while kill -0 "$download" 2>/dev/null && [ "$waited" -lt 180 ]; do sleep 1; waited=$((waited + 1)); done
@@ -802,7 +794,7 @@ if [ "$INSTALL_MODE" = "standalone" ] && [ "$NEW_COMPUTER" = 1 ] \
     # Run once, `--version` only, as the desktop does: macOS checks a new binary on its first run
     # (3.9 s against 0.4 s after, fresh VM, 2026-10-09), which would be hn's first pane's. Never
     # longer than 20 s.
-    "$HOME/.opencode/bin/opencode" --version >/dev/null 2>&1 &
+    "$HOME/.opencode/bin/opencode" --version </dev/null >/dev/null 2>&1 &
     warm=$!
     ( sleep 20; kill "$warm" 2>/dev/null ) >/dev/null 2>&1 &
     watchdog=$!
@@ -816,10 +808,10 @@ fi
 
 # 5. Final verification. Use the launcher by absolute path because this process cannot update its
 #    parent shell's PATH. Installation never authenticates or starts the adapter implicitly.
-"$NODE_BIN" --version >/dev/null 2>&1 || { echo "✗ Managed Node verification failed." >&2; exit 30; }
-"$LAUNCHER" version >/dev/null 2>&1 || { echo "✗ Harness CLI verification failed." >&2; exit 31; }
+"$NODE_BIN" --version </dev/null >/dev/null 2>&1 || { echo "✗ Managed Node verification failed." >&2; exit 30; }
+"$LAUNCHER" version </dev/null >/dev/null 2>&1 || { echo "✗ Harness CLI verification failed." >&2; exit 31; }
 if [ "$INSTALL_MODE" = "standalone" ]; then
-  tmux -V >/dev/null 2>&1 || { echo "✗ tmux verification failed." >&2; exit 32; }
+  tmux -V </dev/null >/dev/null 2>&1 || { echo "✗ tmux verification failed." >&2; exit 32; }
 fi
 
 # The wordmark, as the sign the install is done. `printf '%s\n'` on purpose: the art holds
@@ -840,7 +832,7 @@ print_logo() {
 # CLI — the app takes the person through sign-in itself, so it gets the one line and not the guide.
 # One line of it: `harness version` prints the version alone today, and a notice it might add
 # tomorrow must not land inside this sentence.
-installed_version="$("$LAUNCHER" version 2>/dev/null | head -n 1 || true)"
+installed_version="$("$LAUNCHER" version </dev/null 2>/dev/null | head -n 1 || true)"
 
 # An agent that installed Harness (Claude Code, Codex, any that sets AI_AGENT) reads what to run next and what only
 # the person can do, in the shape every agent command ends with (docs/design/2026-10-15-agent-experience.md). Its
@@ -865,7 +857,7 @@ if [ "$INSTALL_MODE" = "desktop" ]; then
 else
   print_logo
   echo "  ✓ harness${installed_version:+ $installed_version} installed."
-  hn_version="$("$TUI_BIN" --version 2>/dev/null | head -n 1 | cut -d' ' -f1-2 || true)"
+  hn_version="$("$TUI_BIN" --version </dev/null 2>/dev/null | head -n 1 | cut -d' ' -f1-2 || true)"
   if [ -n "$hn_version" ]; then echo "  ✓ ${hn_version} installed."; fi
   echo ""
   # An agent reads from the top: what is for it comes first, then the person's guide.
