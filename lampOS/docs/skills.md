@@ -1995,28 +1995,33 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   skill page title backup" with `page-title-backup` on the lamp is not
   page title's yes); else a run naming the waiting skill is its own name
   ("yes, use my lamp test email two skill", "Có, dùng skill page title").
-  With neither, words after "skill" are ignored ("yes, run the skill
-  again", "Có, chạy skill đi" are still the yes), and the words before
-  it, back to a word that comes before a name or the clause's start, name
-  another skill when they are two words or more, or one that is not a
-  filler ("great", "nice", "same", "new", "old", "chạy", "dùng", "mở",
-  "bật", …, `skill_write_yes::FILLERS`): "use my look title skill" names
-  look title even when it was refused at load and is not listed
+  With neither, and the lamp's skills read, the line names no other
+  skill: words before or after "skill" that name no installed skill take
+  nothing from the yes ("Yes, run my new weather skill", "the daily
+  weather skill", "Ừ, chạy cái skill đó đi", "Có, cái skill đó", "yes,
+  run the skill again"). With none read (none listed, or the folders
+  unread) it fails closed: the words before "skill", back to a word that
+  comes before a name or the clause's start, name another skill unless a
+  run of them is the waiting skill's own name ("my new weather skill" for
+  weather) or they are one filler ("great", "nice", "same", "new", "old",
+  "chạy", "dùng", "mở", "bật", …, `skill_write_yes::FILLERS`); with none
+  before it, the words right after "skill" do
   (`skill_write_yes::other_skill_named`, marked per request by
   `line_heard`). Its `yes` is read as `new_ask`: nothing kept, the wait
   let go, and the line answered as its own ask (the named skill used or
   asked). "yes, use my page title", "Yes, use my page title skill." and a
   plain "Yes." are still page title's yes; "Yes, and use my weather
-  skill." is not. Accepted limits: a line without the word "skill" is not
-  read (its `named` alone binds it, #7545); "kỹ năng" is not read; a name
-  after "skill" counts only as an installed skill's, so "run skill look
-  title" with look title not on the lamp is left to `named` (but with no
-  skill on the lamp read at all, the words right after "skill" fail
-  closed, read as another skill's name); one word
-  before "skill" that is not a filler ("Yes, awesome skill.") fails
-  closed, read as another skill's name; and a remove's wait is not read
-  on purpose, so "Yes, and remove the joke time skill too." still removes
-  the one asked about (El's P2 on #7561). The
+  skill." with weather on the lamp is not. Accepted limits: a line without
+  the word "skill" is not read (its `named` alone binds it, #7545); "kỹ
+  năng" is not read; with the skills read, a skill that is not listed
+  (one refused at load and gone from the folders) is no other skill, so
+  "use my look title skill" is left to `named`, and words in another
+  order than an installed name ("my backup page title skill" with
+  `page-title-backup`) are no match; with none read, one word before
+  "skill" that is not a filler ("Yes, awesome skill.") fails closed. A
+  remove's wait is not read for another skill: it keeps its own rule, a
+  plain yes on the line right after its question (#7683), so "Yes, and
+  remove the joke time skill too." removes nothing. The
   journal: "… was a new ask, not an answer (a yes naming look title, not
   page-title) …". The forced round is told only
   `approve_id`, `answer` and `named` of `make_skill`'s form, all required

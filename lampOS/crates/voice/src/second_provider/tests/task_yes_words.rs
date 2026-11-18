@@ -401,9 +401,15 @@ fn a_line_naming_another_skill_is_never_the_yes_to_a_tasks_wait() {
 
 /// The skills on the lamp beside page-title, for #7634's lines.
 fn on_the_lamp() -> Vec<String> {
-    ["page-title", "page-title-backup", "look-title", "weather"]
-        .map(String::from)
-        .to_vec()
+    [
+        "page-title",
+        "page-title-backup",
+        "look-title",
+        "weather",
+        "timer",
+    ]
+    .map(String::from)
+    .to_vec()
 }
 
 /// #7634: "yes" with another skill's name after it ("Yes, and use my
@@ -421,7 +427,7 @@ fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
         ("yes, use the skill look title", yes::NAMED_NONE),
         // The longest installed name wins (the re-read's P1 on #7634).
         ("yes, use skill page title backup", "page-title"),
-        ("yes, use my backup page title skill", "page-title"),
+        ("yes, use my page title backup skill", "page-title"),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
         yes::set_installed_here(Some(on_the_lamp()));
@@ -457,6 +463,13 @@ fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
         ("yes the skill thanks", "page-title"),
         ("yes, run the skill again", yes::NAMED_NONE),
         ("Có, chạy skill đi", yes::NAMED_NONE),
+        // Words before or around "skill" that name no skill on the lamp
+        // (the pre-push read's P2s on #7634).
+        ("Ừ, chạy cái skill đó đi", yes::NAMED_NONE),
+        ("Có, cái skill đó", yes::NAMED_NONE),
+        ("Vâng, em chạy skill đi", yes::NAMED_NONE),
+        ("Yes, run my new page title skill", "page title"),
+        ("the daily page title skill", "page title"),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
         yes::set_installed_here(Some(on_the_lamp()));
@@ -571,6 +584,43 @@ fn a_yes_said_without_its_comma_is_still_its_skills_yes() {
     );
     assert_eq!(went.approved, 0, "{:?}", went.ran);
     assert_eq!(went.ran[0].2["approved"], false, "{:?}", went.ran);
+    yes::set_installed_here(None);
+    task_yes::set_on_here(None);
+}
+
+/// The pre-push read's P2 on #7634: describing words before the waiting
+/// skill's own name are still its yes ("Yes, run my new weather skill",
+/// "the daily weather skill"), and "the weather skill" is weather report's
+/// yes when no skill named weather is on the lamp.
+#[test]
+fn describing_words_before_its_own_name_are_still_its_yes() {
+    for (heard, waiting, installed) in [
+        (
+            "Yes, run my new weather skill",
+            "weather",
+            vec!["weather", "timer"],
+        ),
+        (
+            "the daily weather skill",
+            "weather",
+            vec!["weather", "timer"],
+        ),
+        (
+            "yes, the weather skill",
+            "weather-report",
+            vec!["weather-report", "timer"],
+        ),
+    ] {
+        let task = task_named(waiting);
+        let id = said_back_unasked_as(task.clone(), Some(&task_yes::line(&task)));
+        yes::set_installed_here(Some(installed.into_iter().map(String::from).collect()));
+        let went = went(
+            heard,
+            vec![answers_naming(&id, "yes", yes::NAMED_NONE), said("Okay.")],
+        );
+        assert_eq!(went.ran[0].2["approved"], true, "{heard}: {:?}", went.ran);
+        assert_eq!(went.approved, 1, "{heard}");
+    }
     yes::set_installed_here(None);
     task_yes::set_on_here(None);
 }
