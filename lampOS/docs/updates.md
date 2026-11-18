@@ -235,11 +235,21 @@ and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
 from the first customer lamps on (26 Oct), and since #6256 (F2) through its
 CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
 stable build on the CDN"), so a lamp in China, which can't reach GitHub,
-updates too. There is no GitHub fallback: the updater reads one feed. No
-round switches its own unit, so a lamp installed before keeps the GitHub
-stable feed. `lamp-update install` still fetches the models it lacks from
-the URLs `deploy/product/models.json` compiles in (GitHub); a round takes
-them from the manifest, which the mirror points at the CDN. A lamp in a home gets a build only
+updates too. There is no GitHub fallback for the feed: the updater reads
+one. No round switches its own unit, so a lamp installed before keeps the
+GitHub stable feed. A model has two sources (#7709, `install::model_urls`):
+`lamp-update install` and `lamp-keeper prepare` ask for a model of
+`deploy/product/models.json` (a GitHub release URL) at the CDN's
+sequence-free copy `lampos/models/<release>/<name>` first, then at GitHub; a
+round takes the manifest's URL, which the mirror points at
+`lampos/stable/<sequence>/models/...`, and falls back to that model's GitHub
+release. The URL the manifest or `models.json` names is always asked as
+before, with a whole fetch's waits and asks again: for a lamp in China the
+CDN is the only way. Only the sequence-free copy put in front of a GitHub
+URL is asked once, given 5 s (`MIRROR_QUICK`) to connect and begin
+answering. On a missing file, no answer or a file that does not match its
+size and SHA-256 (never taken) the next URL is asked. The journal
+says which URL served each model. A lamp in a home gets a build only
 once it is promoted here, never each lamp-voice publish, and a lamp the image
 makes starts on the promoted build. Until a first promotion the feed is absent
 and such a lamp keeps the build it has. This tool does not install anything on
