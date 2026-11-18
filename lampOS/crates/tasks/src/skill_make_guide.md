@@ -66,7 +66,9 @@ What a skill can do, all of it in format.md and examples/:
 - **The internet, when rules.md allows `net`**: what only the web knows at
   the time it runs (a price, the weather, the news, a search) is the skill's
   own code granted `net` beside `speak`: `grants = ["net", "speak"]`, and
-  scripts/main.py fetches it and says it with `lamp.say`;
+  scripts/main.py fetches it, says it with `lamp.say`, then prints only
+  `Said aloud through the lamp.`: the lamp's agent that ran it sees that,
+  ends its answer with a dash, and the person hears it once;
   examples/exchange-rate. Light, body, sound, air and device may join them.
   Use Python's own `urllib.request` (no packages to install), a public HTTPS
   API that needs no key, a `timeout` of 15 s or less, and a plain spoken
