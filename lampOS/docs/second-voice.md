@@ -2856,17 +2856,27 @@ lamp stops spending it on what nobody asked for. Off unless
   says each change of level once: `the lamp's day is 0.85 used: what
   nobody asked for is shed`.
 - **From 0.8 (`NEAR`), what nobody asked for is shed:**
-  - A line let out only as the conversation going on, by someone other
-    than the one the lamp was talking with (`worker::CONVERSATION_ALONE`),
-    is held, not sent to the model only to be judged (`DAY_NEAR_HELD`).
-    The caller's own follow-up (`worker::FOLLOW_UP_NOTE`), a named line,
-    a turn, a tap and a face still go: the owner's own talk is never shed.
+  - A line let out only as the conversation going on
+    (`worker::CONVERSATION_ALONE`) that is surely someone else's (its voice
+    print under 0.30 against the caller's, or a face not the caller's seen
+    speaking it, not turned to the lamp: `Heeding::surely_someone_elses`) is
+    held, not sent to the model only to be judged (`DAY_NEAR_HELD`). With
+    nothing seen or heard to tell the speakers apart it is the same person
+    and goes, so the owner's follow-up with no face read speaking is never
+    held. The caller's own follow-up (`worker::FOLLOW_UP_NOTE`), a named
+    line, a turn, a tap and a face still go.
   - In the coordinator, a say the model must word waits for a new day or
     its own expiry (`Says::take_near_day_end`): a skill's note, an
     add-on's quoted line, a made skill's line, a text not said as it is.
-    A reminder the person set, the onboarding, fixed words, sounds and a
-    line that answers the owner's own run go on.
-  - News of handed-over work is not told until the day opens again.
+    The shed take only ever takes what `Says::take` takes; a kind left to
+    its own taker (a sound, an exact line, a skill's `from` ask, a
+    computer's turn) is taken there as before. A reminder the person set,
+    the onboarding, fixed words, sounds, every line of a skill the owner's
+    voice ran now (`made_run::answers_now`, whatever its words) and the
+    lamp's agent's lines (`say::AGENT_SKILL`: its answer and its fixed
+    lines answer the owner's own ask) go on.
+  - News of handed-over work is told as before: it answers work the person
+    asked for.
   - Nothing is said about being near the limit.
 - **At 1.0 (`SPENT`)**, the same, and the first 429 says the usage limit at
   once (above), not after `LIMIT_AFTER`.
