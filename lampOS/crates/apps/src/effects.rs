@@ -8,6 +8,8 @@ pub const SYSTEMCTL: &str = "/usr/bin/systemctl";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verb {
     Start,
+    /// Starts it, or restarts it if it runs: an update's way to load new code.
+    Restart,
     Stop,
     ResetFailed,
 }
@@ -16,6 +18,7 @@ impl Verb {
     pub fn word(self) -> &'static str {
         match self {
             Verb::Start => "start",
+            Verb::Restart => "restart",
             Verb::Stop => "stop",
             Verb::ResetFailed => "reset-failed",
         }
@@ -39,6 +42,43 @@ pub trait Effects {
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String>;
     /// A short wait between two `unit_empty` asks.
     fn pause(&mut self) {}
+}
+
+/// Whether a unit has no process left, from what `systemctl show
+/// --property=ControlGroup --value` said and the unit's `cgroup.events`
+/// (`populated 0` covers its children too). A failed `show`, a path that is
+/// not a cgroup's, or an events file that cannot be read or understood is an
+/// error and never "empty": a failed read must not let a remove delete the
+/// data under a running app. A unit with no cgroup (never started, or gone)
+/// and an events file that is gone are empty.
+pub fn judge_unit_empty(
+    show_succeeded: bool,
+    show_stdout: &str,
+    events: &dyn Fn(&str) -> std::io::Result<String>,
+) -> Result<bool, String> {
+    if !show_succeeded {
+        return Err("systemctl show failed".into());
+    }
+    let group = show_stdout.trim();
+    if group.is_empty() {
+        return Ok(true);
+    }
+    if !group.starts_with('/') || group.split('/').any(|part| part == "..") || group.contains('\n')
+    {
+        return Err(format!("not a cgroup path: {group:?}"));
+    }
+    match events(group) {
+        Ok(text) => match text
+            .lines()
+            .find_map(|line| line.strip_prefix("populated "))
+        {
+            Some("0") => Ok(true),
+            Some("1") => Ok(false),
+            other => Err(format!("cgroup.events says {other:?}")),
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(format!("{group}: {error}")),
+    }
 }
 
 /// The real thing, for the helper itself (piece B, not wired in A).
@@ -65,15 +105,12 @@ impl Effects for RealEffects {
             .env_clear()
             .output()
             .map_err(|error| format!("{SYSTEMCTL}: {error}"))?;
-        let group = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        if group.is_empty() || group.contains("..") || !group.starts_with('/') {
-            return Ok(true);
-        }
-        match std::fs::read_to_string(format!("/sys/fs/cgroup{group}/cgroup.procs")) {
-            Ok(procs) => Ok(procs.trim().is_empty()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
-            Err(error) => Err(format!("{group}: {error}")),
-        }
+        judge_unit_empty(
+            output.status.success(),
+            &String::from_utf8_lossy(&output.stdout),
+            &|group| std::fs::read_to_string(format!("/sys/fs/cgroup{group}/cgroup.events")),
+        )
+        .map_err(|why| format!("{unit}: {why}"))
     }
 
     fn pause(&mut self) {

@@ -1,6 +1,9 @@
 //! Where an app's parts are, in one place so a test can put them under a
 //! temporary folder.
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 #[derive(Clone, Debug)]
 pub struct Layout {
@@ -14,6 +17,8 @@ pub struct Layout {
     pub state: PathBuf,
     /// `/var/lib/lampos-apps-staging`: the folder lamp-cloud puts a package in (lampos's).
     pub staging: PathBuf,
+    /// How long a second asker waits for the apps lock before it is told busy.
+    pub lock_wait: Duration,
 }
 
 impl Layout {
@@ -24,6 +29,7 @@ impl Layout {
             private: "/var/lib/private/lampOS/apps".into(),
             state: "/var/lib/lampos-apps-state".into(),
             staging: "/var/lib/lampos-apps-staging".into(),
+            lock_wait: Duration::from_secs(4),
         }
     }
 
@@ -35,6 +41,7 @@ impl Layout {
             private: root.join("var/lib/private/apps"),
             state: root.join("state"),
             staging: root.join("staging"),
+            lock_wait: Duration::from_millis(300),
         }
     }
 }
