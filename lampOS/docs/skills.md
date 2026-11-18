@@ -4648,6 +4648,49 @@ code (`made_remove::asked`):
   taken as the yes, and mail count was removed. The journal: "the line
   after NAME's question was a new ask, not an answer: nothing kept, the
   wait dropped".
+- **Only a plain yes, on the next line, decided in code** (the first
+  builder's rule, 18 Nov). On lamp-9adf (stock 14083) "Remove daily
+  stretch reminder?" was followed by "Lamp, also make one that plays a
+  soft chime when I come back to my desk.", the model's forced answer was
+  `yes`, and the skill was removed before the chime was made. Whatever
+  the model answers, a `yes` removes only when, in code
+  (`skill_write_yes::not_a_plain_yes`): its line is the remove's answer
+  line, the first line after the question that was more than the lamp's
+  name (`skill_write_yes::line_heard`, `Waiting::answer_line`; an
+  `unclear` asks the question again, and the line after that is the
+  answer line then); that line has at most
+  `skill_write_yes::PLAIN_YES_MOST` (3) words past the lamp's name
+  (`skill_write_yes::line_words`: "yes", "go ahead", "yes, remove it");
+  and no round of that request calls anything but a wait's answer
+  (`skill_write_yes::round_called`, told each round's calls before any
+  runs). A bound on length and on the calls made, never a list of words:
+  "Yes, and make me a skill that …" and "Sure, play some music." fail on
+  length, "Yes, play music." with the play called beside the yes on its
+  calls. Otherwise nothing is removed, the wait is dropped, and the model
+  is told to say first that it left NAME as it is, then do anything else
+  the line asked (`skill_write_yes::remove_not_plain_next`). A second line
+  after the question that is more than the name drops a wait still open,
+  so a yes two lines later finds nothing waiting. A call the model makes
+  in a later round of the same turn, after a plain yes was taken, is not
+  seen before the remove runs: the length bound is what keeps such a line
+  out. The journal: "a yes to removing NAME not taken: WHY: nothing
+  removed, the wait dropped (#6960)", or "a remove's question was not
+  confirmed on the line right after it: dropped, nothing removed (#6960)".
+- **A remove that found nothing leaves nothing to say yes to** (the first
+  builder's ruling, 18 Nov). On lamp-9adf "Lamp, remove the bitcoin
+  warning skill." found nothing; "Yes, remove it." had the model remove
+  `btc-price`, an older skill, by its exact name ("Remove btc price?"),
+  and "Which of my skills use the internet?" was taken as that yes. A
+  remove that finds none of theirs, or one they didn't make, waits for
+  nothing; the second route keeps the person's next line in memory only
+  (`made_remove::line_heard`, never journalled), and a remove in that
+  turn or on that next line that finds one of theirs is asked only when
+  the line names it itself, by the same spelling match as a remove's name
+  (`made_remove::apart`, `near`): "Oh, remove the moon fact skill then."
+  asks it, "Yes, remove it." does not (`made_remove::NONE_FOUND_BEFORE`:
+  the model says nothing is removed and that they can say its name). The
+  journal: "a remove right after one that found nothing, its line not
+  naming the skill found: nothing asked (#6960)".
 - **Removed only on the yes.** `yes` takes it off: one that is on, its
   folder in the skills folder gone on as that very package (its
   `.package.json`'s SHA-256 the one kept), through the manage helper's own
@@ -4663,11 +4706,10 @@ code (`made_remove::asked`):
   SHA-256 is said not removed. Taken off but `made.json` not written, the
   lamp says NAME "is off the lamp, but still listed among the skills they
   made", and the journal says so too (`"still_listed"`). The lamp says "NAME is removed."
-  (`skill_write_yes::removed_next`); if the same line asked for more
-  ("Yes, and remove the joke one too", El's P2 on #7561), the model does
-  that in the same turn, as for any line, so it is never lost: another
-  remove gets its own question and wait, and nothing more is removed
-  without its own yes. `no` keeps it and ends the wait ("NAME
+  (`skill_write_yes::removed_next`). A line that asks for more ("Yes, and
+  remove the joke one too", El's P2 on #7561) is no plain yes (above), so
+  nothing is removed; the model still does the rest in the same turn, so
+  it is never lost: another remove gets its own question and wait. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
 - **No extra round trip.** The match reads two local folders and the made
@@ -4701,7 +4743,14 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `the_forced_round_may_answer_that_the_line_is_a_new_ask`,
 `a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
 `a_yes_naming_another_skill_removes_nothing_and_is_answered`,
-`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; and
+`a_yes_with_a_second_remove_removes_nothing_and_asks_the_other`,
+`a_make_line_after_the_remove_question_removes_nothing`,
+`a_yes_and_a_make_removes_nothing`, `sure_play_some_music_removes_nothing`,
+`a_question_after_the_remove_question_removes_nothing`,
+`a_yes_whose_round_calls_something_else_removes_nothing`,
+`a_yes_two_lines_after_the_question_removes_nothing`,
+`a_yes_after_a_remove_that_found_nothing_removes_nothing`,
+`a_line_naming_a_skill_after_a_remove_that_found_nothing_asks_it`; and
 `made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
 `a_yes_naming_another_skill_removes_nothing`,
 `a_yes_is_taken_only_for_the_asked_skill`,
