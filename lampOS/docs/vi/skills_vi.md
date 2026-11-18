@@ -2388,14 +2388,12 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   with run and that name, never a second make of it. Never list their
   skills for it. If more than one fits and their line doesn't say which,
   ask once, short, naming only those that fit so one word answers it, as in
-  "The water one or the stretch one?", and call nothing. If none fits, say
-  plainly, in a few words, that they have no skill like that, and ask
-  nothing: never which one they mean. A line about anything else, the
+  "The water one or the stretch one?", and call nothing. If none of these fits, the line is about another of theirs or something else: call make_skill with what they said, as for any skill, and never say from this note that they have no skill like that. A line about anything else, the
   light, music or a timer, is answered as it is: no question about skills,
   and no skill turned on for it.)", tối đa 3 kỹ năng, mỗi kỹ năng theo việc
   làm sau cùng với nó. Câu "more than one" (`just_made::ASK_WHICH`) chỉ
   được nói khi ghi chú nêu tên hơn một kỹ năng; câu "none"
-  (`just_made::NONE_FITS`) thì luôn có. Đây là phán quyết của người xây
+  (`just_made::NOTE_NONE_FITS`) thì luôn có: một câu không khớp kỹ năng nào trong ghi chú được chuyển cho `make_skill`, nơi tìm trong mọi kỹ năng của họ, nên ghi chú không bao giờ nói họ không có kỹ năng như vậy (P2 của Thirteen trên #7715). Đây là phán quyết của người xây
   dựng đầu tiên trên #7715 (23:14, "keep the one question, worded to be
   quick"): chỉ một ứng viên thì làm luôn, không bao giờ hỏi; nhiều ứng viên
   thì hỏi một lần, nêu tên, để một từ là trả lời được; không có ứng viên

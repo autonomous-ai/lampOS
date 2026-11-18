@@ -25,8 +25,9 @@
 //!   first builder's ruling on #7715, 23:14): the one that fits is acted
 //!   on, never asked; more than one that fits is asked once, naming them so
 //!   one word answers it ("The water one or the stretch one?",
-//!   [`ASK_WHICH`]); none that fits is said plainly, that they have no skill
-//!   like that, never a question ([`NONE_FITS`]). A line about anything
+//!   [`ASK_WHICH`]); none that fits goes to `make_skill`, which finds it
+//!   among all of theirs or says plainly there's none like it, never a
+//!   question ([`NOTE_NONE_FITS`], [`NONE_FITS`]). A line about anything
 //!   else is answered as it is. In the per-turn notes, never in
 //!   `make_skill`'s description, which stays within its bytes.
 //! - **Candidates, this conversation's first.** A turn whose name found none
@@ -243,11 +244,20 @@ pub const ASK_WHICH: &str = "If more than one fits and their line doesn't say wh
 pub const NONE_FITS: &str = "If none fits, say plainly, in a few words, that they have no skill \
      like that, and ask nothing: never which one they mean.";
 
+/// What the model is told by the note when none of the skills it names fits
+/// the line: the note lists only this conversation's, so the line may mean
+/// another of theirs, which `make_skill` finds among all of them (and says
+/// so when none is like it); never "no skill like that" from the note
+/// (Thirteen's P2 on #7715).
+pub const NOTE_NONE_FITS: &str = "If none of these fits, the line is about another of theirs or \
+     something else: call make_skill with what they said, as for any skill, and never say from \
+     this note that they have no skill like that.";
+
 /// The note a heard line of the person's is told at `now` of what the lamp
 /// made and turned in their conversation (`events`, oldest first): none
 /// when nothing was. Which of these a line means is the model's to judge:
 /// one that fits is acted on, more than one asked once ([`ASK_WHICH`],
-/// only when it names more than one), none said plainly ([`NONE_FITS`]).
+/// only when it names more than one), none left to `make_skill` ([`NOTE_NONE_FITS`]).
 pub fn note(events: &[Event], now: Instant) -> Option<String> {
     let newest = newest(events);
     if newest.is_empty() {
@@ -271,7 +281,7 @@ pub fn note(events: &[Event], now: Instant) -> Option<String> {
          make_skill with turn_off, turn_on or remove and that name; to use or run it, call it as \
          for any skill, by its own function, by use_skill with that name, or by make_skill with \
          run and that name, never a second make of it. Never list their skills for it.{which} \
-         {NONE_FITS} A line about anything else, the light, music or a timer, is answered as it \
+         {NOTE_NONE_FITS} A line about anything else, the light, music or a timer, is answered as it \
          is: no question about skills, and no skill turned on for it.)",
         done.join("; ")
     ))
@@ -581,7 +591,8 @@ mod tests {
             "{told}"
         );
         assert!(!told.contains(ASK_WHICH), "{told}");
-        assert!(told.contains(NONE_FITS), "{told}");
+        assert!(told.contains(NOTE_NONE_FITS), "{told}");
+        assert!(!told.contains(NONE_FITS), "{told}");
         // "It" about the light is no skill's: never a question about skills.
         assert!(
             told.contains(
@@ -818,7 +829,7 @@ mod tests {
         assert!(ASK_WHICH.contains("call nothing"), "{ASK_WHICH}");
         // Still one that fits is acted on, and none said plainly.
         assert!(told.contains("If only one fits"), "{told}");
-        assert!(told.contains(NONE_FITS), "{told}");
+        assert!(told.contains(NOTE_NONE_FITS), "{told}");
         let answer = kept_from_turn(offered_three(), Some(OWNER), now + Duration::from_secs(41));
         let marked = answer[CANDIDATES]
             .as_array()
@@ -894,11 +905,18 @@ mod tests {
         assert!(next.contains("ask nothing and call nothing"), "{next}");
         assert!(!next.contains("ask which"), "{next}");
         assert!(!next.contains(ASK_WHICH), "{next}");
-        // One made: the note and the marked candidates say none fitting
-        // is said plainly.
+        // One made: the note sends a line none of its skills fits to
+        // make_skill, which looks among all of theirs (Thirteen's P2 on
+        // #7715: "turn off the morning one" may mean yesterday's); only the
+        // candidates, all of theirs, say none like that plainly.
         kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
         let told = heard(OWNER, now + Duration::from_secs(5)).unwrap();
-        assert!(told.contains(NONE_FITS), "{told}");
+        assert!(told.contains(NOTE_NONE_FITS), "{told}");
+        assert!(
+            NOTE_NONE_FITS.contains("call make_skill with what they said"),
+            "{NOTE_NONE_FITS}"
+        );
+        assert!(!told.contains(NONE_FITS), "{told}");
         assert!(!told.contains("ask which"), "{told}");
         let answer = kept_from_turn(offered_three(), Some(OWNER), now + Duration::from_secs(6));
         let next = answer["next"].as_str().unwrap();
