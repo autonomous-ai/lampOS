@@ -129,9 +129,12 @@ pub const WAITING_LINE: &str = "Let me think about that a little longer.";
 /// of [`BEGUN_LINES`]: the model may say it.
 pub const MAKE_OPENING: &str = "I'll make it now.";
 /// With the one run path ([`ONE_PATH_ENVIRONMENT`], #7371): the waiting
-/// line says how long, as an agent's make takes about a minute (lamp-c0a4,
-/// 16 Nov: 63 s from the waiting line to the result).
-pub const ONE_PATH_WAITING_LINE: &str = "This takes about a minute. I'm on it.";
+/// line says how long. An agent's make takes about a minute warm (lamp-c0a4,
+/// 16 Nov: 63 s from the waiting line to the result) and about three cold
+/// (lamp-c0a4, 18 Nov: 184 s after a gateway restart), so it promises a few
+/// minutes and that the lamp says when it is done, never "about a minute".
+pub const ONE_PATH_WAITING_LINE: &str =
+    "This can take a few minutes. I'll tell you when it's ready.";
 /// With the one run path: said once, never again, when the make still has
 /// no answer [`LONG_WAIT_AFTER`] after its waiting line (#7371).
 pub const LONG_WAIT_LINE: &str = "It's taking a bit longer, but I'm still on it.";
@@ -1662,7 +1665,9 @@ pub(crate) mod tests {
             "Let me think about that a little longer."
         );
         assert_eq!(waiting_line(true), ONE_PATH_WAITING_LINE);
-        assert!(ONE_PATH_WAITING_LINE.contains("about a minute"));
+        // A cold make takes about three minutes: the line never promises one.
+        assert!(ONE_PATH_WAITING_LINE.contains("a few minutes"));
+        assert!(!ONE_PATH_WAITING_LINE.contains("about a minute"));
         assert_ne!(LONG_WAIT_LINE, ONE_PATH_WAITING_LINE);
         assert_eq!(LONG_WAIT_AFTER, Duration::from_secs(85));
         assert!(LONG_WAIT_AFTER < MAKE_WITHIN);
