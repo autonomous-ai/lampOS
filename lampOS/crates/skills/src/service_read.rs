@@ -780,6 +780,112 @@ pub fn tell_news(lines: &[String], room: &mut impl Room) -> String {
     tell_within(lines, NEWS_WAIT, true, room)
 }
 
+/// How long one skill's failure line, once said, keeps that skill's next
+/// ones from being said as news (the first builder's 08:55 on #7588): a
+/// trigger skill failing every ten minutes tells its owner once, not each
+/// time.
+pub const FAILED_ONCE_WITHIN: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// When each skill's failure line was last taken to be said, unix ms
+/// ([`tell_failed_once`]). In memory only: a restart may tell one once
+/// more. Entries older than [`FAILED_ONCE_WITHIN`] are dropped at each
+/// take, so it holds at most the skills that failed in that time.
+pub struct FailedTold {
+    last: Mutex<std::collections::BTreeMap<String, u64>>,
+}
+
+/// The lamp's one [`FailedTold`].
+pub static FAILED_TOLD: FailedTold = FailedTold::new();
+
+impl FailedTold {
+    pub const fn new() -> Self {
+        Self {
+            last: Mutex::new(std::collections::BTreeMap::new()),
+        }
+    }
+
+    fn last(&self) -> std::sync::MutexGuard<'_, std::collections::BTreeMap<String, u64>> {
+        self.last
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Takes `skill`'s turn at `now_ms`, in one step so two failures of it
+    /// at once tell it once: false when its failure line was taken within
+    /// [`FAILED_ONCE_WITHIN`].
+    fn take(&self, skill: &str, now_ms: u64) -> bool {
+        let within = FAILED_ONCE_WITHIN.as_millis() as u64;
+        let mut last = self.last();
+        last.retain(|_, at| now_ms.saturating_sub(*at) < within);
+        if last.contains_key(skill) {
+            return false;
+        }
+        last.insert(skill.to_owned(), now_ms);
+        true
+    }
+
+    /// Gives back the turn [`Self::take`] took at `taken_ms` when its line
+    /// wasn't said, so the next failure is told; a later turn is kept.
+    fn give_back(&self, skill: &str, taken_ms: u64) {
+        let mut last = self.last();
+        if last.get(skill) == Some(&taken_ms) {
+            last.remove(skill);
+        }
+    }
+
+    /// `skill`'s failure line said at `now_ms` in the asking conversation:
+    /// it counts as its once.
+    fn said(&self, skill: &str, now_ms: u64) {
+        self.last().insert(skill.to_owned(), now_ms);
+    }
+}
+
+impl Default for FailedTold {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// [`tell_failed`] for `skill`, its failure line said as news at most once
+/// in [`FAILED_ONCE_WITHIN`] (the first builder's 08:55 on #7588). In the
+/// asking conversation (`asking`) it is always said, and that counts as its
+/// once. As news it is said only when no failure line of `skill`'s was in
+/// that time; its turn is given back when the news isn't said (the owner
+/// not seen within [`NEWS_WAIT`], quiet hours). Per skill: another skill's
+/// failure is told on its own. The journal's words.
+pub fn tell_failed_once(
+    told: &FailedTold,
+    skill: &str,
+    line: &str,
+    asking: bool,
+    room: &mut impl Room,
+) -> String {
+    let mut not_answered = None;
+    if asking {
+        match room.answer(line) {
+            Ok(()) => {
+                told.said(skill, room.now_ms());
+                return "said in the asking conversation".into();
+            }
+            Err(why) => not_answered = Some(why),
+        }
+    }
+    let now = room.now_ms();
+    let news = if told.take(skill, now) {
+        let news = tell_news(&[line.to_owned()], room);
+        if !news.starts_with("told") {
+            told.give_back(skill, now);
+        }
+        news
+    } else {
+        "not said: a failure of this skill was told within six hours".to_owned()
+    };
+    match not_answered {
+        Some(why) => format!("not said in the asking conversation ({why}), so as news: {news}"),
+        None => news,
+    }
+}
+
 /// Lines said behind a read's gate, turn and wait, the gate judged again
 /// before each line: waiting at most `within`, and given up at quiet hours
 /// when `quiet_drops`.
@@ -1247,6 +1353,101 @@ mod tests {
         assert_eq!(tell_failed(line, false, &mut night), "skipped: quiet hours");
         assert!(night.said.is_empty());
         assert_eq!(night.now, 1_000, "not waited for");
+    }
+
+    /// The first builder's 08:55 on #7588: a trigger skill refused three
+    /// times in an hour, the owner in view each time, is told once; another
+    /// skill's failure is told on its own; past six hours it is told again.
+    #[test]
+    fn a_trigger_refused_three_times_in_an_hour_is_told_once() {
+        let told = FailedTold::new();
+        let line = "Fig facts couldn't run this time.";
+        let mut said = Vec::new();
+        for minute in [0, 20, 40] {
+            let mut lamp = Lamp::new(vec![alone()], json!({}));
+            lamp.now = 1_000 + minute * 60_000;
+            said.push(tell_failed_once(&told, "fig-facts", line, false, &mut lamp));
+        }
+        assert_eq!(
+            said,
+            [
+                "told 1",
+                "not said: a failure of this skill was told within six hours",
+                "not said: a failure of this skill was told within six hours",
+            ]
+        );
+        let mail = "Mail count couldn't run this time.";
+        let mut other = Lamp::new(vec![alone()], json!({}));
+        other.now = 1_000 + 50 * 60_000;
+        assert_eq!(
+            tell_failed_once(&told, "mail-count", mail, false, &mut other),
+            "told 1",
+            "another skill is told on its own"
+        );
+        let mut later = Lamp::new(vec![alone()], json!({}));
+        later.now = 1_000 + FAILED_ONCE_WITHIN.as_millis() as u64;
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, false, &mut later),
+            "told 1",
+            "six hours on, told again"
+        );
+    }
+
+    /// A failure line not said (nobody seen within the half hour, or quiet
+    /// hours) gives its turn back, so the next one is told; one asked by
+    /// voice in its conversation is always said, and counts as the once.
+    #[test]
+    fn a_failure_not_said_gives_its_turn_back_and_the_asking_one_is_always_said() {
+        let told = FailedTold::new();
+        let line = "Fig facts couldn't run this time.";
+        let nobody = Seen {
+            faces: Some(0),
+            owner_in_view: false,
+            ..alone()
+        };
+        let mut empty = Lamp::new(vec![nobody], json!({}));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, false, &mut empty),
+            "skipped: the owner not in view"
+        );
+        let quiet = Seen {
+            quiet: true,
+            ..alone()
+        };
+        let mut night = Lamp::new(vec![quiet], json!({}));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, false, &mut night),
+            "skipped: quiet hours"
+        );
+        let mut seen = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, false, &mut seen),
+            "told 1",
+            "the turns not said were given back"
+        );
+        // Within the six hours, asked by voice: said in its conversation.
+        let mut asked = Lamp::new(vec![talking()], json!({}));
+        asked.answers = Some(Ok(()));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, true, &mut asked),
+            "said in the asking conversation"
+        );
+        assert_eq!(asked.said, [format!("answer: {line}")]);
+        // A voice ask with no conversation to answer falls to news, and the
+        // limit holds there too.
+        let mut gone = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, true, &mut gone),
+            "not said in the asking conversation (no conversation to answer here), so as news: \
+             not said: a failure of this skill was told within six hours"
+        );
+        // The conversation's line counted as the once: a trigger's next.
+        let mut trigger = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(
+            tell_failed_once(&told, "fig-facts", line, false, &mut trigger),
+            "not said: a failure of this skill was told within six hours"
+        );
+        assert!(trigger.said.is_empty());
     }
 
     /// #7894 (lamp-52e6, 19 Nov 09:52: a mail check's answer held "not

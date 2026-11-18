@@ -6246,7 +6246,15 @@ fn tell_its_run(
         }
     }
     let told = match &failed {
-        Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
+        // At most once in six hours a skill, but always in the asking
+        // conversation (the first builder's 08:55 on #7588).
+        Some(line) => lamp_skills::service_read::tell_failed_once(
+            &lamp_skills::service_read::FAILED_TOLD,
+            skill,
+            line,
+            asking,
+            room,
+        ),
         None => {
             lamp_skills::service_read::tell_answer(&lines, asker(asked_at, owners, unix_ms()), room)
         }

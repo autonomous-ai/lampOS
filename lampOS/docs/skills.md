@@ -2122,7 +2122,16 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   the lamp's one read turn; below, #7894) and is said once, the next time
   the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
   (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
-  quiet hours`), never held through them. A run now asked by voice whose
+  quiet hours`), never held through them. **A skill's failure is said as
+  news at most once in six hours** (`service_read::tell_failed_once`,
+  `FAILED_ONCE_WITHIN`, per skill; the first builder's 08:55 on #7588): a
+  trigger skill failing every ten minutes tells its owner once, not each
+  time (`not said: a failure of this skill was told within six hours`).
+  A line that wasn't said (nobody seen in the half hour, quiet hours)
+  gives its turn back, so the next is told; another skill's failure is
+  told on its own; one said in the asking conversation is always said and
+  counts as the once. Kept in memory only, so a restart may tell one once
+  more. A run now asked by voice whose
   answer, what its agent found or its failure, is ready within five
   minutes of the ask has its quiet lifted for five minutes more, with
   `LAMP_TOLD_WHEN_ASKED` or with this switch on (`quiet_ask`,
