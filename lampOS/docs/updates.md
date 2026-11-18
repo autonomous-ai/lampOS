@@ -304,8 +304,9 @@ verifies its signature with the trusted public key using that locally built
 `lamp-update check` before anything else is fetched. It then downloads every file, unit
 and model the signed manifest names from the build's own releases and checks
 each size and SHA-256. It copies them to `lampos/stable/<sequence>/files/`
-and `lampos/stable/<sequence>/models/<release>/<name>`. A folder of one
-sequence is never overwritten: an object already there with the same bytes is
+and `lampos/stable/<sequence>/models/<release>/<name>`, and each model once
+more to `lampos/models/<release>/<name>`, a path no sequence names (#7709).
+Neither is ever overwritten: an object already there with the same bytes is
 left alone, one with other bytes fails the job. It then rewrites `files_url`
 and each model's `url` to those copies, signs the manifest again with the
 same key (same sequence, commit and channel; nothing else changes) and puts it

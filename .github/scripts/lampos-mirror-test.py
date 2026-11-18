@@ -228,6 +228,38 @@ class RewriteTests(unittest.TestCase):
         with self.assertRaises(M.Refused):
             M.expected_models(value, moved)
 
+    def test_each_model_is_also_copied_to_its_sequence_free_path(self):
+        # lamp-update asks lampos/models/<tag>/<file> before GitHub (#7709).
+        value = manifest()
+        _, _, moved = self.rewrite()
+        files = M.expected_files(value)
+        models = M.expected_models(value, moved)
+        stage = Path("stage")
+        sources = {url: Path(f"m{number}") for number, url in enumerate(sorted(models))}
+        copies = M.planned_copies(SEQUENCE, stage, files, sources, moved, models)
+        paths = [path for _, path, _ in copies]
+        self.assertEqual(paths, [
+            f"lampos/stable/{SEQUENCE}/files/lamp-4ace.lamp-air.service", f"lampos/stable/{SEQUENCE}/files/lamp-update",
+            f"lampos/stable/{SEQUENCE}/models/models-2026-10-16/a.onnx", f"lampos/stable/{SEQUENCE}/models/models-2026-10-16/pack.tgz",
+            "lampos/models/models-2026-10-16/a.onnx", "lampos/models/models-2026-10-16/pack.tgz",
+        ])
+        for local, path, info in copies:
+            if path.startswith("lampos/models/"):
+                url = MODELS + path.rsplit("/", 1)[1]
+                self.assertEqual((local, info), (sources[url], models[url]))
+            M.guard(f"gs://{BUCKET}/{path}", BUCKET)
+
+    def test_a_different_model_at_its_sequence_free_path_fails_and_is_kept(self):
+        with tempfile.TemporaryDirectory() as folder:
+            local = Path(folder) / "a.onnx"
+            local.write_bytes(b"new")
+            path = "lampos/models/models-2026-10-16/a.onnx"
+            fake = FakeGcloud({path: b"old"})
+            with self.assertRaises(M.Refused):
+                M.Store(BUCKET, fake).put_immutable(local, path, Path(folder))
+            self.assertEqual(fake.objects[path], b"old")
+            self.assertEqual(fake.writes(), [])
+
 
 class RunTests(unittest.TestCase):
     ENV = {"LAMPOS_CDN_MIRROR": "on", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": M.REPO, "GITHUB_EVENT_NAME": "workflow_dispatch",
