@@ -1340,7 +1340,10 @@ impl Runner for MakeHermes {
 /// make's runner: what its agent wrote to its own folder's [`ANSWER_FILE`]
 /// kept as its answer ([`SkillRun::answer`]), read as a make's answer is
 /// ([`answer_in`]: a regular file, never through a link, not empty, at most
-/// [`MOST_ANSWER_BYTES`]). Nothing for any other run.
+/// [`MOST_ANSWER_BYTES`]). Its file left empty, or not written, as its
+/// words ask when the skill already said it aloud ([`crate::skill_task::tell_file_line`]),
+/// is kept as an empty answer, as a lone dash is: lamp-skills holds it to
+/// the run's says spoken (#6071). Nothing for any other run.
 pub(crate) fn keep_told_answer(run: &SkillRun) {
     let Some(folder) = run.start_in.as_deref().filter(|_| run.tells) else {
         return;
@@ -1357,6 +1360,17 @@ pub(crate) fn keep_told_answer(run: &SkillRun) {
     );
     if let Some(answer) = answer {
         let _ = run.answer.set(answer);
+    } else if left_empty(&folder.join(ANSWER_FILE)) {
+        let _ = run.answer.set(String::new());
+    }
+}
+
+/// Whether a run's [`ANSWER_FILE`] at `path` was left empty: none there,
+/// or a regular file of no bytes (never a link, nor one too long to read).
+fn left_empty(path: &Path) -> bool {
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta.is_file() && meta.len() == 0,
+        Err(error) => error.kind() == std::io::ErrorKind::NotFound,
     }
 }
 
@@ -1825,8 +1839,12 @@ mod tests {
         );
         assert_eq!(ran(false, "exit 0"), (Ok(0), None));
         assert!(matches!(ran(true, "exit 3"), (Err(_), None)));
-        // Left empty (the skill already said it aloud): nothing to tell.
-        assert_eq!(ran(true, &format!(": > {ANSWER_FILE}")), (Ok(0), None));
+        // Left empty (the skill already said it aloud): kept empty, as a
+        // lone dash, held in lamp-skills to the run's says spoken (#6071).
+        assert_eq!(
+            ran(true, &format!(": > {ANSWER_FILE}")),
+            (Ok(0), Some(String::new()))
+        );
         // 3,000 bytes are kept whole (lamp-tasks carries at most
         // `MOST_TOLD_BYTES`, lamp-skills says about 400 characters of it);
         // past the 20 KiB read, none, as a make's answer.

@@ -404,25 +404,43 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   Agent được bảo để trống câu trả lời (một dấu gạch ngang, hoặc
   `answer.md` trống) khi script của lần chạy đã tự nói qua `say` của
   lamp-control (P3 của Heron trên #7591). Dấu gạch ngang không được tin
-  suông (#6071): lamp-control đếm số dòng `say` của mỗi token lần chạy mà
-  giọng nói đã nói trọn (kết quả `spoken`, không tính tiếng hum hay clip),
-  và trả lời `end` của lần chạy bằng số đó (`{"ended": true, "said": N}`,
-  docs/control.md, "It ends with the run"), đọc một lần. Câu trả lời của
-  lần chạy đã kết thúc mang số đó bên cạnh câu trả lời của agent
-  (`{"ok":true,"id":N,"answer":"-","said":N}`, `Tokens::end_said`; bỏ đi
-  khi `end` không được trả lời, lamp-control không tới được). lamp-skills
-  chỉ im lặng với một dấu gạch ngang khi `said` lớn hơn 0; không có câu nào
-  được nói, hoặc không biết, thì nó nói "<Tên skill> ran, but had nothing
-  to say." (`task::told_of_run`, `task::no_say_line`) qua cùng cổng đó, ghi
-  nhật ký `skill:<name>: a dash with no say: told a fallback` (dấu gạch
-  được tin: `skill:<name>: a dash after N says: nothing told`). Trên
-  lamp-9adf, 19/11 02:44, lần chạy `flip-a-coin` trên Hermes trả lời một
-  dấu gạch ngang mà không có câu nói nào, và người dùng không nghe gì.
-  Không có công tắc: đây là sửa lỗi. Test:
+  suông (#6071). lamp-control đếm các dòng `say` của mỗi token lần chạy
+  (không tính tiếng hum hay clip): `says`, đã nhận để nói, và `said`,
+  trong số đó, đã nói trọn (kết quả `spoken`). Script của lần chạy nói rồi
+  thoát vẫn được nghe: kết nối cuối của nó đóng thì các câu nói nó đã yêu
+  cầu vẫn được nói hết (`Parts::run_gone`), còn của một máy tính thì vẫn bị
+  dừng như trước. lamp-tasks kết thúc một lần chạy kết thúc tốt, trước hạn
+  chót và trước khi lamp-tasks dừng (`Runner::stopping`), bằng `{"end":
+  {"run", "settle": true}}`: token chấm dứt ngay, các câu nói đã yêu cầu
+  được nói hết, tối đa 15 giây (`SETTLE_SAYS`; lamp-tasks chờ tối đa 20
+  giây, `SETTLE_WAIT`), rồi được đếm và phần còn lại bị hủy; ở hạn chót hay
+  khi dừng thì `end` thường và chúng dừng ngay (docs/control.md, "It ends
+  with the run"). Câu trả lời của lần chạy đã kết thúc mang các số đếm bên
+  cạnh câu trả lời của agent
+  (`{"ok":true,"id":N,"answer":"-","says":N,"said":N}`,
+  `Tokens::end_said`; bỏ đi khi `end` không được trả lời, lamp-control
+  không tới được). Lần chạy qua runner của việc làm skill mà `answer.md`
+  để trống hoặc không viết được mang `"answer": ""`
+  (`skill_make::keep_told_answer`), coi như dấu gạch; lần chạy mà runner
+  không giữ câu trả lời nào vẫn không mang gì. lamp-skills
+  (`task::told_of_run`): dấu gạch sau một câu đã nói trọn thì không nói gì
+  (`skill:<name>: a dash after N says: nothing told`); sau các câu đã nhận
+  mà không câu nào nói trọn (bị cắt ở hạn chót hay khi dừng) cũng không
+  nói thêm (`skill:<name>: a dash with a cut say`); không câu nào được
+  nhận, hoặc không biết, thì nói "<Tên skill> ran, but had nothing to
+  say." (`task::no_say_line`) qua cùng cổng đó (`skill:<name>: a dash with
+  no say: told a fallback`). Trên lamp-9adf, 19/11 02:44, lần chạy
+  `flip-a-coin` trên Hermes trả lời một dấu gạch ngang và người dùng không
+  nghe gì: `lamp.say` của script trả về ngay khi được nhận (`wait=False`),
+  và việc script thoát đóng kết nối, làm hủy câu nói. Không có công tắc:
+  đây là sửa lỗi. Test:
   `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
-  của lamp-control
+  `an_empty_answer_md_is_carried_empty_with_its_says`; của lamp-control
   `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
-  của lamp-skills `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`, và
+  `{"end": {"settle": true}}` của cửa trong `tests/door.rs`; của
+  lamp-skills `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_dash_after_a_cut_say_tells_nothing_more`,
   `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`.
   Trên lamp-9adf, 17/11
   (build 13929, `LAMP_TASK_NET=on`), một `btc-price` tải lên được cấp

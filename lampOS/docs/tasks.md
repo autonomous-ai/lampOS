@@ -2938,24 +2938,41 @@ for each run, and is answered once the run ends
   it." The agent is asked to leave its answer empty (a dash, or an empty
   `answer.md`) when the run's own script already spoke through
   lamp-control's `say` (Heron's P3 on #7591). A dash is not taken on
-  trust (#6071): lamp-control counts each run token's `say` lines its
-  voice spoke whole (outcome `spoken`, never a sound's cue or clip), and
-  answers the run's `end` with that count (`{"ended": true, "said": N}`,
-  docs/control.md, "It ends with the run"), read once. The ended run's
-  answer carries it beside the agent's (`{"ok":true,"id":N,"answer":"-",
-  "said":N}`, `Tokens::end_said`; left out when the end didn't answer,
-  lamp-control unreachable). lamp-skills says nothing of a dash only when
-  `said` is above 0; with none spoken, or none known, it tells "<Skill
-  name> ran, but had nothing to say." (`task::told_of_run`,
-  `task::no_say_line`) through the same gate, journaled as
-  `skill:<name>: a dash with no say: told a fallback` (a dash trusted:
-  `skill:<name>: a dash after N says: nothing told`). On lamp-9adf, 19 Nov
-  02:44, `flip-a-coin`'s run on Hermes answered a lone dash with no say
-  heard, and the person heard nothing. No switch: a bug fix. Tests:
+  trust (#6071). lamp-control counts each run token's `say` lines (never
+  a sound's cue or clip): `says`, taken for the voice, and `said`, of
+  those, spoken whole (outcome `spoken`). A run's script that says and
+  exits is still heard: its last connection closing leaves the says it
+  asked to finish (`Parts::run_gone`), where a computer's are stopped as
+  before. lamp-tasks ends a run that ended well, before its deadline and
+  lamp-tasks' stop (`Runner::stopping`), with `{"end": {"run", "settle":
+  true}}`: the token ends at once, and the says already asked are let
+  finish, up to 15 s (`SETTLE_SAYS`; lamp-tasks waits up to 20 s,
+  `SETTLE_WAIT`), then counted and what is left cancelled; at its deadline
+  or a stop the end is plain and they stop at once (docs/control.md, "It
+  ends with the run"). The ended run's answer carries the counts beside
+  the agent's (`{"ok":true,"id":N,"answer":"-","says":N,"said":N}`,
+  `Tokens::end_said`; left out when the end didn't answer, lamp-control
+  unreachable). A make's runner's run whose `answer.md` was left empty or
+  not written is carried with `"answer": ""` (`skill_make::keep_told_answer`),
+  held as a dash; a run whose runner kept no answer still carries none.
+  lamp-skills (`task::told_of_run`): a dash after a say spoken tells
+  nothing (`skill:<name>: a dash after N says: nothing told`); after says
+  taken but none spoken whole (cut at the deadline or a stop) nothing more
+  either (`skill:<name>: a dash with a cut say`); with none taken, or none
+  known, it tells "<Skill name> ran, but had nothing to say."
+  (`task::no_say_line`) through the same gate (`skill:<name>: a dash with
+  no say: told a fallback`). On lamp-9adf, 19 Nov 02:44, `flip-a-coin`'s
+  run on Hermes answered a lone dash and the person heard nothing: its
+  script's `lamp.say` returns once taken (`wait=False`), and its exit
+  closed its connection, which cancelled the say. No switch: a bug fix.
+  Tests:
   `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
-  lamp-control's
+  `an_empty_answer_md_is_carried_empty_with_its_says`; lamp-control's
   `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
-  lamp-skills' `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`, and
+  the door's `{"end": {"settle": true}}` in `tests/door.rs`; lamp-skills'
+  `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_dash_after_a_cut_say_tells_nothing_more`,
   `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`. On
   lamp-9adf, 17 Nov (build 13929,
   `LAMP_TASK_NET=on`), an uploaded `btc-price` granted `speak` and `net`

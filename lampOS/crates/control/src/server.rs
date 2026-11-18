@@ -345,24 +345,67 @@ impl Shared {
     }
 
     /// Ends a run: its connections close, what it asked for that still goes
-    /// stops, as its `stop` would. How many of its says the voice spoke
-    /// whole (`Parts::said`), for a run that was going.
-    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> Option<u64> {
+    /// stops, as its `stop` would. Its says ([`crate::session::Said`]), for
+    /// a run that was going.
+    fn end_run(
+        &self,
+        run: &str,
+        serial: Option<u64>,
+        now: u64,
+        why: &str,
+    ) -> Option<crate::session::Said> {
         let ended = self.door.lock().expect("door").end_run(run, serial)?;
-        // How many of its says the voice spoke whole, read once, before
-        // what it still asked for is stopped (#6071).
+        self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
+        Some(self.finish_run(&ended, now, why))
+    }
+
+    /// An ended run's says, read once before what it still asked for is
+    /// stopped (`Parts::said`, then `Parts::gone`, #6071); the journal
+    /// says their counts only.
+    fn finish_run(&self, ended: &crate::runs::Run, now: u64, why: &str) -> crate::session::Said {
         let said = {
             let mut parts = self.parts.lock().expect("parts");
             let said = parts.said(&ended.client);
             parts.gone(&ended.client, now);
             said
         };
-        self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
         eprintln!(
-            "lamp-control: run {run} of skill {}: {why}, its says spoken: {said}",
-            ended.skill
+            "lamp-control: run {} of skill {}: {why}, its says: {} taken, {} spoken whole",
+            ended.run, ended.skill, said.asked, said.spoken
         );
-        Some(said)
+        said
+    }
+
+    /// `{"end": {"run", "settle": true}}`, lamp-tasks' end of a run that
+    /// ended well (#6071): its token ends and its connections close at
+    /// once, as any end's, and what it asked for stops, but the says it
+    /// already asked are let finish, at most [`SETTLE_SAYS`], then counted;
+    /// what is left then is cancelled. The wait is this answer's alone, a
+    /// look at the says each [`SETTLE_TICK`], never the voice's.
+    pub async fn end_run_settled(&self, run: &str) -> Value {
+        let ended = self.door.lock().expect("door").end_run(run, None);
+        let Some(ended) = ended else {
+            return json!({"ended": false});
+        };
+        self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
+        self.parts
+            .lock()
+            .expect("parts")
+            .run_gone(&ended.client, self.now_us());
+        let until = tokio::time::Instant::now() + SETTLE_SAYS;
+        loop {
+            let pending = self
+                .parts
+                .lock()
+                .expect("parts")
+                .says_pending(&ended.client);
+            if pending == 0 || tokio::time::Instant::now() >= until {
+                break;
+            }
+            tokio::time::sleep(SETTLE_TICK).await;
+        }
+        let said = self.finish_run(&ended, self.now_us(), "ended, its says let finish");
+        json!({"ended": true, "said": said.spoken, "says": said.asked})
     }
 
     /// Ends every run whose time has come.
@@ -370,16 +413,8 @@ impl Shared {
         let now = self.now_us();
         let ended = self.door.lock().expect("door").sweep_runs(now);
         for run in ended {
-            {
-                let mut parts = self.parts.lock().expect("parts");
-                let _ = parts.said(&run.client);
-                parts.gone(&run.client, now);
-            }
             self.close_client(&run.client, crate::runs::CLOSED_ENDED);
-            eprintln!(
-                "lamp-control: run {} of skill {}: its time is up",
-                run.run, run.skill
-            );
+            let _ = self.finish_run(&run, now, "its time is up");
         }
     }
 
@@ -1876,8 +1911,16 @@ async fn connection<S>(
             .expect("open")
             .values()
             .any(|open| open.client.as_deref() == Some(client));
+        // A skill run's, while its run goes on: its says are let finish
+        // (#6071), so a script that said a line and exited is heard.
         if !still_open {
-            shared.parts.lock().expect("parts").gone(client, now);
+            let run = shared.door.lock().expect("door").is_run_client(client, now);
+            let mut parts = shared.parts.lock().expect("parts");
+            if run {
+                parts.run_gone(client, now);
+            } else {
+                parts.gone(client, now);
+            }
         }
     }
     shared.tell(changes);
@@ -1920,6 +1963,23 @@ async fn connection<S>(
 ///   there is not read as the door's being open;
 ///
 /// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
+/// The longest a run's end waits for the says it already asked to finish
+/// (`Shared::end_run_settled`, #6071): a line or two said aloud.
+pub const SETTLE_SAYS: Duration = Duration::from_secs(15);
+/// How often that wait looks at the run's says.
+const SETTLE_TICK: Duration = Duration::from_millis(50);
+
+/// The run of an admin `{"end": {"run", "settle": true}}`, a run's end
+/// that lets its says finish; none for any other line.
+fn settling_end(line: &str) -> Option<String> {
+    let asked: Value = serde_json::from_str(line).ok()?;
+    let end = asked.get("end")?;
+    if end.get("settle") != Some(&json!(true)) {
+        return None;
+    }
+    end.get("run")?.as_str().map(str::to_owned)
+}
+
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
     loop {
         let Ok((stream, _)) = listener.accept().await else {
@@ -1939,7 +1999,12 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line, from_the_voice, peer);
+                // A run's end that lets its says finish waits here, off
+                // every other admin line (#6071).
+                let answer = match settling_end(&line) {
+                    Some(run) => shared.end_run_settled(&run).await,
+                    None => admin_answer(&shared, &line, from_the_voice, peer),
+                };
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -2161,10 +2226,10 @@ fn admin_answer(
     }
     if let Some(end) = asked.get("end") {
         return match end["run"].as_str() {
-            // `said`: its says the voice spoke whole, for a run that was
-            // going (#6071).
+            // Its says (#6071), for a run that was going: `says` taken for
+            // the voice, `said` spoken whole.
             Some(run) => match shared.end_run(run, None, now, "ended") {
-                Some(said) => json!({"ended": true, "said": said}),
+                Some(said) => json!({"ended": true, "said": said.spoken, "says": said.asked}),
                 None => json!({"ended": false}),
             },
             None => json!({"error": "end: a run, as text"}),

@@ -2896,8 +2896,9 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
     let ended = admin(&lamp, json!({"end": {"run": "r2"}})).await;
     assert_eq!(ended["ended"], true, "{ended}");
-    // Its says the voice spoke whole (#6071): none here.
+    // Its says taken and spoken whole (#6071): none here.
     assert_eq!(ended["said"], 0, "{ended}");
+    assert_eq!(ended["says"], 0, "{ended}");
     assert!(
         agent_next(&mut open).await.is_none(),
         "the run's connection closed with it"
@@ -2908,6 +2909,19 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     assert_eq!(
         admin(&lamp, json!({"end": {"run": "r2"}})).await["ended"],
         false
+    );
+    // An end that lets its says finish (#6071) ends the token as any end,
+    // at once with no say waiting, and says the counts.
+    let minted = mint(&lamp, "booth", "r3").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let settled = admin(&lamp, json!({"end": {"run": "r3", "settle": true}})).await;
+    assert_eq!(settled, json!({"ended": true, "said": 0, "says": 0}));
+    let mut late = agent_connect(&path).await.unwrap();
+    let hello = run_hello(&mut late, Some(&token)).await;
+    assert_eq!(hello["error"]["code"], "no_grant", "{hello}");
+    assert_eq!(
+        admin(&lamp, json!({"end": {"run": "r3", "settle": true}})).await,
+        json!({"ended": false})
     );
 }
 

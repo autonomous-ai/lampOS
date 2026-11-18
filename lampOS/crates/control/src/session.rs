@@ -27,6 +27,14 @@ use crate::rate::{Class, Rates};
 
 /// What the lamp's parts do for the door: each action, each piece of state,
 /// and a client's `stop`.
+/// A client's `say` lines ([`Parts::said`]): `asked`, taken for the voice;
+/// `spoken`, of those, spoken whole. Counts only, never words.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Said {
+    pub asked: u64,
+    pub spoken: u64,
+}
+
 pub trait Parts {
     /// Does `op` for `client`, request `re`: what the reply adds, or why
     /// the part refused. An action that ends later says so with a `done`
@@ -68,11 +76,24 @@ pub trait Parts {
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
     }
-    /// How many of `client`'s `say` lines the voice spoke whole since it
-    /// was last asked, the count let go: read once as a skill run ends
+    /// `client`'s `say` lines taken for the voice and spoken whole since
+    /// last asked, the counts let go: read once as a skill run ends
     /// (lamp-control's admin `end`, #6071). Never cleared by [`Parts::gone`],
-    /// since a run's connection may close before its end. 0 by default.
-    fn said(&mut self, _client: &str) -> u64 {
+    /// since a run's connection may close before its end. None by default.
+    fn said(&mut self, _client: &str) -> Said {
+        Said::default()
+    }
+    /// A skill run's `client` whose last connection closed while its run
+    /// goes on: as [`Parts::gone`], but the says it already asked are left
+    /// to finish, so a script that said a line and exited is still heard
+    /// (#6071). Its run's end ([`Parts::gone`]) cancels what is left. As
+    /// [`Parts::gone`] by default.
+    fn run_gone(&mut self, client: &str, now_us: u64) {
+        self.gone(client, now_us);
+    }
+    /// How many of `client`'s says still wait on the voice. None by
+    /// default.
+    fn says_pending(&self, _client: &str) -> usize {
         0
     }
     /// Whether a `gesture`, `move` or feeling's move gets a `done` once
@@ -737,6 +758,11 @@ impl Door {
             self.clients.end_run(&run.client);
         }
         ended
+    }
+
+    /// Whether `client` is a skill run's that is live at `now_us`.
+    pub fn is_run_client(&self, client: &str, now_us: u64) -> bool {
+        self.runs.of_client(client, now_us).is_some()
     }
 
     /// The run `token` holds now.

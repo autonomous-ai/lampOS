@@ -2651,14 +2651,16 @@ dựng đầu tiên trên #7591: một người trả lời bằng một hai câ
 hơn), rồi "There's more; ask me if you want it." (`task::MORE_LINE`). Agent
 được bảo trả lời nói ngắn, một đến ba câu, và để trống (một dấu gạch ngang,
 hoặc `answer.md` trống) khi skill đã tự nói điều đó, thì không nói gì (P3
-của Heron trên #7591). Một dấu gạch ngang chỉ im lặng khi câu trả lời của
-lamp-tasks cho biết các câu nói của lần chạy đã được nói (`"said": N` lớn
-hơn 0, số dòng `say` của token lần chạy mà giọng nói của lamp-control đã
-nói trọn); không có, hoặc không biết, thì nó nói "<Tên skill> ran, but had
-nothing to say." (`task::told_of_run`, #6071; docs/vi/tasks_vi.md), ghi
-nhật ký `skill:<name>: a dash with no say: told a fallback`, hoặc `a dash
-after N says: nothing told`. Lần chạy kết thúc mà không nói gì và không có
-lời từ chối nào được nói để lại `do.task: nothing told`. Skill không cần `speak`: lời đồng ý của chủ cho quyền
+của Heron trên #7591). Một dấu gạch ngang (hoặc
+`answer.md` trống) được đối chiếu với các câu nói của lần chạy theo số đếm
+trong câu trả lời của lamp-tasks (`says` của lamp-control, đã nhận để nói,
+và `said`, đã nói trọn; `task::told_of_run`, #6071; docs/vi/tasks_vi.md):
+sau một câu đã nói trọn thì không nói gì (`skill:<name>: a dash after N
+says: nothing told`); sau các câu đã nhận nhưng bị cắt thì không nói thêm
+(`a dash with a cut say`); không câu nào được nhận, hoặc không biết, thì
+nói "<Tên skill> ran, but had nothing to say." (`a dash with no say: told
+a fallback`). Lần chạy kết thúc mà không nói gì và không có lời từ chối
+nào được nói để lại `do.task: nothing told`. Skill không cần `speak`: lời đồng ý của chủ cho quyền
 đọc đã bao gồm việc này. Nhật ký chỉ ghi số câu đã nói (`do.task: what its
 agent found: told N`), và trước đó câu trả lời của lamp-tasks mang theo bao
 nhiêu câu trả lời của agent, chỉ độ dài (`do.task: lamp-tasks' answer
