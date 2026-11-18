@@ -44,11 +44,25 @@ pub const TO_FACE_SAVE: &str = "lamp-voice provider: a remember of the speaker's
 /// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-74ff the owner's
 /// "my name is ..." came back NOT_KEPT while the eyes held their face as
 /// nobody's. The face save takes a fresh look and the eyes judge the face.
+#[cfg(test)]
 pub(crate) fn withheld(
     call: &ToolCall,
     person: Option<&str>,
     on: bool,
     to_face: bool,
+) -> Option<Value> {
+    withheld_as(call, person, on, to_face, false)
+}
+
+/// [`withheld`], with `no_ask` (`LAMP_FACE_NO_ASK`, the first builder
+/// 18:50): the face save is called at once, nothing asked
+/// ([`face_save_note`]).
+pub(crate) fn withheld_as(
+    call: &ToolCall,
+    person: Option<&str>,
+    on: bool,
+    to_face: bool,
+    no_ask: bool,
 ) -> Option<Value> {
     let text = call.args.get("text").and_then(Value::as_str);
     let personal = call.name == super::REMEMBER && text.is_some_and(super::about_someone);
@@ -61,7 +75,7 @@ pub(crate) fn withheld(
             .filter(|name| !name.is_empty());
         if to_face && (name.is_some() || crate::known_faces::gives_a_name(text)) {
             eprintln!("{TO_FACE_SAVE}");
-            return json!({"remembered": false, "note": face_save_note(name.as_deref())});
+            return json!({"remembered": false, "note": face_save_note(name.as_deref(), no_ask)});
         }
         eprintln!("{SKIPPED_REMEMBER}");
         json!({"remembered": false, "note": NOT_KEPT})
@@ -72,8 +86,21 @@ pub(crate) fn withheld(
 /// ([`withheld`]): to ask them whether to keep their face under it, by the
 /// name when it reads. A name is no yes to keeping a face, so the save runs
 /// only on their yes (`known_faces::ASK_FACE_FIRST`, the first builder on
-/// #7331).
-fn face_save_note(name: Option<&str>) -> String {
+/// #7331). With `no_ask` (`LAMP_FACE_NO_ASK`) nothing is asked: the save
+/// is called now, and its answer says whether the face was kept.
+fn face_save_note(name: Option<&str>, no_ask: bool) -> String {
+    if no_ask {
+        let call = match name {
+            Some(name) => format!("call {} with name \"{name}\"", crate::known_faces::REMEMBER),
+            None => format!(
+                "call {} with the name they gave",
+                crate::known_faces::REMEMBER
+            ),
+        };
+        return format!(
+            "Not kept as a memory: this is their own name, and the lamp keeps a name with their face. Don't say it wasn't kept, and ask them nothing: {call} now, so the lamp looks at them and keeps their face under it, and say only what it answers."
+        );
+    }
     let (ask, call) = match name {
         Some(name) => (
             format!("\"Shall I remember your face as {name}?\""),
@@ -250,6 +277,35 @@ mod tests {
             None
         );
         assert!(!TO_FACE_SAVE.contains("Ada"));
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the first builder 18:50): their own name given
+    /// while nobody is known goes to the face save at once, nothing asked;
+    /// off, the face question as before.
+    #[test]
+    fn with_no_ask_a_name_goes_to_the_face_save_unasked() {
+        let call = remember("my name is Ada");
+        let told = withheld_as(&call, None, true, true, true).unwrap();
+        let note = told["note"].as_str().unwrap();
+        assert!(note.contains("ask them nothing"), "{note}");
+        assert!(
+            note.contains(&format!(
+                "call {} with name \"Ada\" now",
+                crate::known_faces::REMEMBER
+            )),
+            "{note}"
+        );
+        assert!(!note.contains("Shall I"), "{note}");
+        let off = withheld_as(&call, None, true, true, false).unwrap();
+        assert!(
+            off["note"]
+                .as_str()
+                .unwrap()
+                .contains("\"Shall I remember your face as Ada?\"")
+        );
+        // Not their own name: not kept, as before.
+        let told = withheld_as(&remember("Her name is Linh."), None, true, true, true).unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
     }
 
     #[test]

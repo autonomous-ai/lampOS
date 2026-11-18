@@ -1255,6 +1255,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A name the face paths lost on lamp-74ff kept (`LAMP_NAME_LEARN_FIX`,
         // #7331): only with names checked.
         name_learn_fix: settings.names_checked && crate::known_faces::name_learn_fix_on(),
+        // A new face past setup kept with nothing asked (`LAMP_FACE_NO_ASK`,
+        // the first builder 18:50): only with names checked.
+        face_no_ask: settings.names_checked && crate::known_faces::face_no_ask_on(),
     }
 }
 
@@ -3413,6 +3416,7 @@ mod tests {
             record: false,
             rename_yes: false,
             name_learn_fix: false,
+            face_no_ask: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {

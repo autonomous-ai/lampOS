@@ -5695,11 +5695,12 @@ fn run_for_guarded(
     }
     // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
     // while nobody is known, on either memory client.
-    if let Some(told) = needs_face::withheld(
+    if let Some(told) = needs_face::withheld_as(
         call,
         person,
         needs_face::on(),
         crate::known_faces::name_learn_fix_on(),
+        crate::known_faces::face_no_ask_on(),
     ) {
         return (told, true);
     }
