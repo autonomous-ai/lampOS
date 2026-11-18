@@ -6183,6 +6183,19 @@ the same code for both writers.
   internet", and waiting for the spoken yes. Its run gets its way out only
   with that kept yes, as any `net` run (docs/tasks.md). Off, the prompt is
   as before, byte for byte.
+- **On OpenClaw with `LAMP_TASK_NET_GATEWAY=on` too (#7742), a made
+  skill's own code may be granted `net`.** Such a run's script reaches the
+  public web from its own skill-start fence, so an `internet:` make is
+  handed to OpenClaw to write as code granted `net`
+  (`make_skill_local::net_code_by`). By the owner's ruling of 18 Nov,
+  `made_skill::code_held` and `put_on_scripts` then allow `net` beside a
+  made skill's own code whoever wrote it, as it is kept and as lamp-skills'
+  manage helper puts it on after the person's yes; so
+  `LAMP_TASK_NET_GATEWAY=on` is set in `lamp-voice`, `lamp-tasks` and
+  `lamp-skills-manage@` (lamp-9adf, 18 Nov 21:37: the helper, without it,
+  refused a kept bitcoin-price skill "a grant the lamp doesn't have: net").
+  The switch off, `net` stays only beside the lamp's own `scripts/agent.py`.
+  Test: `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
@@ -6209,7 +6222,8 @@ the same code for both writers.
   `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); `net` with
   `LAMP_TASK_NET=on`, asked for or on a trigger (the owner's ruling of 17
   Nov), and only beside the lamp's own `scripts/agent.py`
-  (`made_skill::code_held`, `put_on_scripts`); the camera only
+  (`made_skill::code_held`, `put_on_scripts`), or beside a made skill's own
+  code with `LAMP_TASK_NET_GATEWAY=on` too (#7742, above); the camera only
   for a task asked for by its phrase, run right then, as a regular made
   skill may have it (`ASKED_CAMERA`; the first builder's ruling on #7261),
   never on a trigger (`WATCHING_GRANTS`: the camera and `look`); never the

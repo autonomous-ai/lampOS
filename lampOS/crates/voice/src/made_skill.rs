@@ -5008,7 +5008,8 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
 /// its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
 /// [`GRANTS`] (none when it has no list), each once, and `net` beside them
 /// for the lamp's own task for its agent ([`agent_task`]) with
-/// `LAMP_TASK_NET` on. No write beside it:
+/// `LAMP_TASK_NET` on, and for its own code with `LAMP_TASK_NET_GATEWAY`
+/// on too (#7742). No write beside it:
 /// the person's yes is to its code, not to a send. Its grants, or why not.
 fn code_held(
     table: &toml::Table,
@@ -5078,13 +5079,18 @@ fn code_held(
             // A linked service's grant, only for a service task for the
             // lamp's agent (`LAMP_AGENT_SERVICES`, #6432's ruling).
             let service = agent_services_here() && service_grant(grant).is_some();
-            // The internet, only for the lamp's own task for its agent
-            // with `LAMP_TASK_NET` on, on its trigger too (the owner's
-            // ruling, 17 Nov); its run reaches the web only with the
-            // owner's kept yes. Never for code a model wrote.
+            // The internet, with `LAMP_TASK_NET` on, for the lamp's own
+            // task for its agent, on its trigger too (the owner's ruling,
+            // 17 Nov); its run reaches the web only with the owner's kept
+            // yes. With `LAMP_TASK_NET_GATEWAY` on too, for a made skill's
+            // own code, whoever wrote it (the owner's ruling, 18 Nov,
+            // #7742): kept and put on alike, so the manage helper, with no
+            // make on its thread, puts on what the voice kept.
             let net = grant == crate::skill_task_yes::NET.0
                 && crate::skill_task_yes::net_on()
-                && (agent_task(table) || net_code_here());
+                && (agent_task(table)
+                    || net_code_here()
+                    || crate::skill_task_yes::gateway_net_on());
             if !service && !net && !GRANTS.iter().any(|(name, _)| *name == grant) {
                 eprintln!(
                     "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
@@ -8596,13 +8602,15 @@ pub fn put_on_scripts<'a>(
     }
     // The internet only for the lamp's own task for its agent: its one
     // script the lamp's own, byte for byte, never code a model wrote at
-    // that path ([`agent_script_only`]).
+    // that path ([`agent_script_only`]); with `LAMP_TASK_NET_GATEWAY` on,
+    // for a made skill's own code too (#7742).
     if uses
         .grants
         .iter()
         .any(|grant| grant == crate::skill_task_yes::NET.0)
         && !agent_script_only(&scripts)
         && !net_code_here()
+        && !crate::skill_task_yes::gateway_net_on()
     {
         return Err(scripts_not_held("the internet for code of its own"));
     }
