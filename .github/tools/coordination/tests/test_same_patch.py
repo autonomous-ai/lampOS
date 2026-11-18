@@ -259,6 +259,23 @@ class DocsRows(unittest.TestCase):
         c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
         self.assertEqual(self.same_patch(p4, c), [p4])
 
+    def test_a_non_markdown_file_in_docs_is_code(self):
+        # 15:2x (the Reviewer-lead's P2 on #7710): docs/ also holds what the product and the SDKs use (the model the
+        # sim ships, the protocol schemas), so only Markdown there is docs.
+        self.git("checkout", "-q", "-b", "pr5", self.P1)
+        self.write("docs/lamp.model.json", "{\"joints\": 4}\n")
+        p5 = self.commit("a model file under docs")
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
+        self.assertEqual(self.same_patch(p5, c), [p5])
+
+    def test_a_skills_readme_is_code(self):
+        # 15:2x (the Reviewer-lead's P2 on #7710): the product installs some skills' README.md onto the lamp.
+        self.git("checkout", "-q", "-b", "pr6", self.P1)
+        self.write("skills/head-pat/README.md", "Pat its head.\n")
+        p6 = self.commit("a skill's README")
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
+        self.assertEqual(self.same_patch(p6, c), [p6])
+
     def test_a_docs_only_pr_is_never_offered_as_code(self):
         # 15:1x (the Reviewer-lead's P2 on #7710): with no code at all, any docs rewrite would match.
         self.git("checkout", "-q", "-b", "docs-only", "origin/lamp-voice")
