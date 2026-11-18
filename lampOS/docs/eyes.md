@@ -995,6 +995,23 @@ this room" until someone asks to be recognised.
       anyone who asks when they've been at the desk, by name
       (`known_faces::ASK_TO_NAME`); they can also say so, or take it back,
       in their own words later.
+    - **Nothing asked** (`LAMP_FACE_NO_ASK=on`; the first builder 19:47,
+      18 Nov: `ASK_TO_NAME` is in the no-asks rule). Past setup, a
+      remembering that would carry that question carries none: the voice
+      sends the eyes `visits_yes` for the name just kept, as a yes would
+      (the eyes take it only for that face at the lamp now), and in the
+      question's place the model says once "I'll mention you stopped by.
+      Say 'keep my visits private' to undo." (`known_faces::VISITS_UNDO`,
+      `no_ask_visits`), after the visits line when visits are counted. If
+      the eyes don't take it, nothing is asked and the undo is not said.
+      "Keep my visits private" is the existing no,
+      `dont_tell_others_i_was_here`, whose description names it with the
+      switch on. Faces kept from a photo are never at the lamp as they are
+      kept, so they get no yes this way. The setup walk's visits ask, after
+      its first save (`at_setup`), is the setup walk's own part, worked on
+      apart from this switch: it is asked there as before, with or without
+      it. Off, the question as before
+      (`known_faces::tests::with_no_ask_being_named_is_taken_and_the_undo_said_once`).
     - **A yes only from the named person's own scope** (Third on #1997).
       It's taken only when the request's admitted scope
       (`memory_scope::ScopeLease`) is that person's, and not narrowed to the
