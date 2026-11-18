@@ -10251,6 +10251,41 @@ fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
         .collect()
 }
 
+/// #7245: with V1's tools switched off (`LAMP_OPENCLAW_V1_TOOLS=off`), a
+/// gateway make's words name no check, as before V1's tools.
+#[test]
+fn a_gateway_make_without_v1s_tools_is_given_no_check() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER"},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let mut gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    assert!(gateway.checked, "on unless off");
+    gateway.checked = false;
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    let news = calls_of_verb(&rig, "new");
+    let task = news[0]["args"][9].as_str().unwrap();
+    assert!(task.contains("rules.md"), "{task}");
+    assert!(
+        !task.contains("lamp-skills"),
+        "no check without V1's tools: {task}"
+    );
+}
+
 /// #7245 (lamp-c0a4, 16 Nov 17:53: Harness's hand-over took 40 of 90 s): a
 /// gateway make's turn gets its whole deadline from the hand-over, so a slow
 /// `harness new` still leaves the agent its time to answer.
@@ -10331,9 +10366,14 @@ fn a_one_path_make_on_a_gateway_default_is_one_harness_new_then_closed_and_gone(
         task.contains("rules.md") && task.contains("answer.md"),
         "{task}"
     );
+    // V1's tools on (LAMP_OPENCLAW_V1_TOOLS unset, the product's): the
+    // guide's check, run from the make's folder.
     assert!(
-        !task.contains("lamp-skills"),
-        "no check on a gateway: {task}"
+        task.contains(&format!(
+            "cd {} && /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME",
+            folder.display()
+        )),
+        "the check on a gateway with V1's tools: {task}"
     );
     let closes = calls_of_verb(&rig, "close");
     assert_eq!(closes.len(), 1, "closed once");

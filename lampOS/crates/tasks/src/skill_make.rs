@@ -283,12 +283,19 @@ pub const CHECK_OUT: &str = "/tmp/lamp-check";
 /// [`CHECK_PROGRAM`] alone and fixed at most twice, then the answer
 /// written as the rules say, to [`ANSWER_FILE`] alone.
 pub fn guided_prompt(folder: &Path) -> String {
+    guided_prompt_with(folder, "")
+}
+
+/// [`guided_prompt`], the check's command after `before` (empty for
+/// Hermes's make, byte for byte; a gateway make's `cd` and switches,
+/// [`gateway_checked_prompt`]).
+fn guided_prompt_with(folder: &Path, before: &str) -> String {
     format!(
         "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
          lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
          then {rules}, and follow both; {rules} wins where they differ. Draft the skill in \
          {folder}/draft/NAME and check it with the lamp's own check, run from this folder as \
-         {check} pack --out {out} draft/NAME, fixing what it says at most twice. Then write the \
+         {before}{check} pack --out {out} draft/NAME, fixing what it says at most twice. Then write the \
          answer exactly as {rules} says (the fenced blocks, or its one line when the skill can't \
          be made), and nothing else, to the file {answer} in this folder. Write no file outside \
          this folder but the check's own under {out}, install nothing and run no other command.",
@@ -301,11 +308,28 @@ pub fn guided_prompt(folder: &Path) -> String {
     )
 }
 
-/// #7245: the guide as a gateway agent's make is given it ([`GUIDE`]
-/// without its check, section 3): a gateway agent's exec allow-list
-/// (OpenClaw's) holds only the skill-start launcher, so the guide's
-/// `lamp-skills pack` ([`CHECK_PROGRAM`]) can't run there. The voice's
-/// own checks and repairs of the answer still apply.
+/// #7245: a gateway make's words with the check, V1's tools on
+/// ([`MakeGateway::checked`]): [`guided_prompt`]'s, the check's command
+/// run as `cd <folder> && [switches] lamp-skills pack ...`, since an
+/// OpenClaw exec starts in the agent's workspace, not the make's folder,
+/// and the line's check switches ([`CheckSwitches::env`]) can't reach the
+/// gateway's environment otherwise. In OpenClaw's namespace `/opt` is not
+/// hidden, so [`CHECK_PROGRAM`] runs as in Hermes's; its package goes to
+/// the namespace's own writable `/tmp` ([`CHECK_OUT`]).
+pub fn gateway_checked_prompt(folder: &Path, switches: &CheckSwitches) -> String {
+    let mut before = format!("cd {} && ", folder.display());
+    for (name, value) in switches.env() {
+        before.push_str(&format!("{name}={value} "));
+    }
+    guided_prompt_with(folder, &before)
+}
+
+/// #7245: the guide as a gateway agent's make is given it without V1's
+/// tools ([`MakeGateway::checked`] off): [`GUIDE`] without its check,
+/// section 3: with only the skill-start launcher in OpenClaw's exec
+/// allow-list, the guide's `lamp-skills pack` ([`CHECK_PROGRAM`]) can't
+/// run there. The voice's own checks and repairs of the answer still
+/// apply.
 pub fn gateway_guide() -> String {
     match (GUIDE.find("## 3. "), GUIDE.find("## 4. ")) {
         (Some(check), Some(answer)) if check < answer => format!(
@@ -352,8 +376,25 @@ pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
 /// most `within`, started in its folder: no home, no switches, no token,
 /// no script (nothing for the skill-start launcher to claim).
 pub fn gateway_run(folder: &Path, within: Duration, guide: bool) -> SkillRun {
+    gateway_run_with(folder, within, guide, false, &CheckSwitches::default())
+}
+
+/// [`gateway_run`], with the guide's check in its words when `checked`
+/// and `guide` ([`gateway_checked_prompt`], V1's tools on), the line's
+/// `switches` on its command; the run's own environment stays empty.
+pub fn gateway_run_with(
+    folder: &Path,
+    within: Duration,
+    guide: bool,
+    checked: bool,
+    switches: &CheckSwitches,
+) -> SkillRun {
     let mut run = make_run(folder, within);
-    run.prompt = gateway_prompt(folder, guide);
+    run.prompt = if guide && checked {
+        gateway_checked_prompt(folder, switches)
+    } else {
+        gateway_prompt(folder, guide)
+    };
     run.env = Vec::new();
     run
 }
@@ -556,14 +597,28 @@ fn put_with(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder
 }
 
 /// #7245: a gateway agent's make's folder in `work`, `make-<run id>`,
-/// 0700, with the rules ([`without_check`]) and, when `guide`, the
-/// gateway's guide ([`gateway_guide`]), each 0600: no home, as the gateway
-/// agent runs in its own.
-fn put_for_gateway(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder> {
+/// 0700, with the rules and, when `guide`, the guide, each 0600: no home,
+/// as the gateway agent runs in its own. With V1's tools (`checked`) the
+/// rules and [`GUIDE`] whole, the check in both, as Hermes's make has
+/// them; without, the rules [`without_check`] and [`gateway_guide`].
+fn put_for_gateway(
+    work: &Path,
+    rules: &str,
+    guide: bool,
+    checked: bool,
+) -> std::io::Result<MadeFolder> {
     let made = fresh_folder(work, FOLDER_HEAD)?;
-    file_in(&made.fd, RULES_FILE, &without_check(rules))?;
+    if checked {
+        file_in(&made.fd, RULES_FILE, rules)?;
+    } else {
+        file_in(&made.fd, RULES_FILE, &without_check(rules))?;
+    }
     if guide {
-        file_in(&made.fd, GUIDE_FILE, &gateway_guide())?;
+        if checked {
+            file_in(&made.fd, GUIDE_FILE, GUIDE)?;
+        } else {
+            file_in(&made.fd, GUIDE_FILE, &gateway_guide())?;
+        }
     }
     Ok(made)
 }
@@ -1061,7 +1116,7 @@ fn answer_on_gateway(
     if let Err(why) = gateway.ready() {
         return refusal(not_started(&why), &why);
     }
-    let folder = match put_for_gateway(work, &make.rules, make.guide) {
+    let folder = match put_for_gateway(work, &make.rules, make.guide, gateway.checked) {
         Ok(folder) => folder,
         Err(error) => {
             return refusal(
@@ -1071,7 +1126,14 @@ fn answer_on_gateway(
         }
     };
     started();
-    let run = gateway_run(&folder.path, make.within(), make.guide);
+    let switches = make.switches.clone().unwrap_or_default();
+    let run = gateway_run_with(
+        &folder.path,
+        make.within(),
+        make.guide,
+        gateway.checked,
+        &switches,
+    );
     let ran = gateway.run(&run, &|| {});
     drop(folder);
     match ran {
@@ -1168,6 +1230,11 @@ pub struct MakeGateway {
     pub pick: Box<dyn Fn() -> Result<MakeAgent, String> + Send + Sync>,
     /// The make's one turn ([`MakeTurn`], the seam).
     pub turn: Arc<dyn MakeTurn + Send + Sync>,
+    /// Whether the make gets the guide's `lamp-skills pack` check (#7245):
+    /// with V1's tools on in OpenClaw's config
+    /// (`crate::openclaw_config::V1_TOOLS_SWITCH`, read from lamp-tasks'
+    /// environment), the gateway runs it as Hermes's make does.
+    pub checked: bool,
 }
 
 impl MakeGateway {
@@ -1198,6 +1265,11 @@ impl MakeGateway {
                 )),
             }),
             turn: runner,
+            checked: crate::openclaw_config::v1_tools_on(
+                std::env::var(crate::openclaw_config::V1_TOOLS_SWITCH)
+                    .ok()
+                    .as_deref(),
+            ),
         }
     }
 }
@@ -2965,6 +3037,58 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// #7245, V1's tools on (`MakeGateway::checked`): a gateway make's
+    /// folder holds the rules and the guide whole, the check in both, as
+    /// Hermes's make has them; its words run that check, from its folder
+    /// and with the line's switches, and nothing else; off, as before.
+    #[test]
+    fn a_gateway_make_with_v1s_tools_gets_the_check() {
+        let rules = format!("a\n  {CHECK_PROGRAM} pack --out x draft/A\nb\n");
+        let work = tempfile::tempdir().unwrap();
+        let made = put_for_gateway(work.path(), &rules, true, true).unwrap();
+        let read = |name: &str| std::fs::read_to_string(made.path.join(name)).unwrap();
+        assert_eq!(read(RULES_FILE), rules);
+        assert_eq!(read(GUIDE_FILE), GUIDE);
+        assert!(read(GUIDE_FILE).contains("lamp-skills pack --out /tmp/lamp-check draft/NAME"));
+        let other = tempfile::tempdir().unwrap();
+        let plain = put_for_gateway(other.path(), &rules, true, false).unwrap();
+        let read = |name: &str| std::fs::read_to_string(plain.path.join(name)).unwrap();
+        assert_eq!(read(RULES_FILE), "a\nb\n");
+        assert_eq!(read(GUIDE_FILE), gateway_guide());
+
+        let folder = Path::new("/w/make-1");
+        let none = CheckSwitches::default();
+        let words = gateway_checked_prompt(folder, &none);
+        assert!(
+            words.contains(&format!(
+                "run from this folder as cd /w/make-1 && {CHECK_PROGRAM} pack --out {CHECK_OUT} draft/NAME,"
+            )),
+            "{words}"
+        );
+        assert!(words.contains("run no other command"), "{words}");
+        assert!(!words.contains("run no command"), "{words}");
+        assert_eq!(
+            words.replace("cd /w/make-1 && ", ""),
+            guided_prompt(folder),
+            "Hermes's words, the check run from the folder"
+        );
+        let both = CheckSwitches {
+            agent_services: Switch::On,
+            skill_writes: Switch::On,
+        };
+        assert!(gateway_checked_prompt(folder, &both).contains(&format!(
+            "cd /w/make-1 && LAMP_AGENT_SERVICES=on LAMP_SKILL_WRITES=on {CHECK_PROGRAM} pack"
+        )));
+        let run = gateway_run_with(folder, Duration::from_secs(5), true, true, &both);
+        assert_eq!(run.prompt, gateway_checked_prompt(folder, &both));
+        assert!(run.env.is_empty() && run.script.as_os_str().is_empty());
+        // Off, or with no guide: today's words.
+        let off = gateway_run_with(folder, Duration::from_secs(5), true, false, &both);
+        assert_eq!(off.prompt, gateway_prompt(folder, true));
+        let unguided = gateway_run_with(folder, Duration::from_secs(5), false, true, &none);
+        assert_eq!(unguided.prompt, prompt(folder));
     }
 
     /// #7245: a gateway agent's make never gets the guide's check, which

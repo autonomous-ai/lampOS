@@ -16,8 +16,22 @@
 //! - `agents.defaults.workspace`: the lamp's own work folder
 //!   (`runtime::LAMP_PROJECT`), where OpenClaw reads its `AGENTS.md`, the
 //!   lamp's guidance, and its tools run, as Hermes works in it;
-//! - `tools.exec.mode` = [`EXEC_MODE`]: OpenClaw asks before a command
-//!   not allowed already (Hermes' `approvals.mode: manual`);
+//! - with [`V1_TOOLS_SWITCH`] on (the product's, #7245): V1's tool grants,
+//!   mirrored from the platform's `runtimes/openclaw/service_setup.go`
+//!   (lines 136 and 237-250, the design source): `tools.profile` =
+//!   `full`; `tools.exec` = `{host: gateway, security: full, ask: off}`
+//!   (its `mode` taken out: OpenClaw 2026.11.2 refuses `mode` beside
+//!   `security` or `ask` in one exec object); `tools.elevated.enabled` =
+//!   `true` with `allowFrom.`[`ELEVATED_CHANNEL`] = `["*"]` (V1 keys it by
+//!   its messaging channel; a Harness turn comes in on OpenClaw's own
+//!   `webchat`), the other channels kept; `agents.defaults.elevatedDefault`
+//!   = `full`; `agents.defaults.sandbox.mode` = `off`. So the lamp's
+//!   OpenClaw runs a command headless as V1's did, with no ask nobody can
+//!   answer; its namespace (`openclaw-ns`) still bounds what it sees;
+//! - with it off: `tools.exec.mode` = [`EXEC_MODE`], OpenClaw asking
+//!   before a command not allowed already (Hermes' `approvals.mode:
+//!   manual`), and V1's values above taken out where they are V1's, so the
+//!   file is today's again;
 //! - with [`SKILLS_SWITCH`] on, [`SKILLS_DIR`] in `skills.load.extraDirs`:
 //!   OpenClaw reads the lamp's own skills where they are, read-only, never
 //!   copied into its state; the dirs a person added there are kept;
@@ -62,6 +76,18 @@ pub const PLUGINS_ALLOW: [&str; 2] = ["openai", "memory-core"];
 /// The switch for the lamp's skills in OpenClaw, as `LAMP_HERMES_SKILLS`
 /// for Hermes: on unless `off` ([`skills_on`]).
 pub const SKILLS_SWITCH: &str = "LAMP_OPENCLAW_SKILLS";
+/// The kill switch for V1's tool grants (#7245): on unless `off`
+/// ([`v1_tools_on`]), on in the product's lamp-tasks unit.
+pub const V1_TOOLS_SWITCH: &str = "LAMP_OPENCLAW_V1_TOOLS";
+/// The channel `tools.elevated.allowFrom` names with V1's tools on:
+/// OpenClaw's own internal channel (its `INTERNAL_MESSAGE_CHANNEL`), the
+/// one a Harness turn on the gateway comes in on.
+pub const ELEVATED_CHANNEL: &str = "webchat";
+
+/// Whether [`V1_TOOLS_SWITCH`] is on: anything but `off` exactly.
+pub fn v1_tools_on(value: Option<&str>) -> bool {
+    value != Some("off")
+}
 
 /// Whether [`SKILLS_SWITCH`] is on: anything but `off` exactly, the
 /// product's default being on.
@@ -110,15 +136,87 @@ fn same_path(left: &str, right: &str) -> bool {
     left.trim_end_matches('/') == right.trim_end_matches('/')
 }
 
+/// `key` taken out of `map` when it holds `value`, V1's.
+fn take(map: &mut Map<String, Value>, key: &str, value: &Value) {
+    if map.get(key) == Some(value) {
+        map.remove(key);
+    }
+}
+
+/// `key` taken out of `map` when it is an empty object.
+fn take_empty(map: &mut Map<String, Value>, key: &str) {
+    if map
+        .get(key)
+        .and_then(Value::as_object)
+        .is_some_and(Map::is_empty)
+    {
+        map.remove(key);
+    }
+}
+
+/// V1's tool grants (`runtimes/openclaw/service_setup.go`, lines 136 and
+/// 237-250) in `root`, or with `on` false taken out where they are V1's,
+/// with `tools.exec.mode` = [`EXEC_MODE`] as before #7245.
+fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
+    let defaults = object(
+        object(root, "agents", "agents")?,
+        "defaults",
+        "agents.defaults",
+    )?;
+    if on {
+        defaults.insert("elevatedDefault".into(), json!("full"));
+        object(defaults, "sandbox", "agents.defaults.sandbox")?.insert("mode".into(), json!("off"));
+    } else {
+        take(defaults, "elevatedDefault", &json!("full"));
+        if let Some(sandbox) = defaults.get_mut("sandbox").and_then(Value::as_object_mut) {
+            take(sandbox, "mode", &json!("off"));
+        }
+        take_empty(defaults, "sandbox");
+    }
+    let tools = object(root, "tools", "tools")?;
+    if on {
+        tools.insert("profile".into(), json!("full"));
+        let exec = object(tools, "exec", "tools.exec")?;
+        // OpenClaw refuses `mode` beside `security` or `ask`.
+        exec.remove("mode");
+        exec.insert("host".into(), json!("gateway"));
+        exec.insert("security".into(), json!("full"));
+        exec.insert("ask".into(), json!("off"));
+        let elevated = object(tools, "elevated", "tools.elevated")?;
+        elevated.insert("enabled".into(), json!(true));
+        object(elevated, "allowFrom", "tools.elevated.allowFrom")?
+            .insert(ELEVATED_CHANNEL.into(), json!(["*"]));
+    } else {
+        take(tools, "profile", &json!("full"));
+        let exec = object(tools, "exec", "tools.exec")?;
+        take(exec, "host", &json!("gateway"));
+        // Left beside `mode`, they would make the file one OpenClaw refuses.
+        exec.remove("security");
+        exec.remove("ask");
+        exec.insert("mode".into(), json!(EXEC_MODE));
+        if let Some(elevated) = tools.get_mut("elevated").and_then(Value::as_object_mut) {
+            if let Some(from) = elevated.get_mut("allowFrom").and_then(Value::as_object_mut) {
+                take(from, ELEVATED_CHANNEL, &json!(["*"]));
+            }
+            take_empty(elevated, "allowFrom");
+            take(elevated, "enabled", &json!(true));
+        }
+        take_empty(tools, "elevated");
+    }
+    Ok(())
+}
+
 /// `openclaw.json`'s text with the lamp's keys merged in, on the
-/// forwarder's `port`, with `workspace` the lamp's work folder and the
-/// lamp's skills when `skills`. The text given back unchanged when nothing
-/// changes, so a second merge is idle.
+/// forwarder's `port`, with `workspace` the lamp's work folder, the
+/// lamp's skills when `skills` and V1's tool grants when `v1` ([`v1_tools`]).
+/// The text given back unchanged when nothing changes, so a second merge
+/// is idle.
 pub fn merge_config(
     text: &str,
     port: u16,
     workspace: &Path,
     skills: bool,
+    v1: bool,
 ) -> Result<String, Refused> {
     let workspace = workspace
         .to_str()
@@ -148,8 +246,7 @@ pub fn merge_config(
         .insert("primary".into(), json!(format!("{PROVIDER}/{MODEL}")));
     defaults.insert("workspace".into(), json!(workspace));
 
-    let tools = object(root, "tools", "tools")?;
-    object(tools, "exec", "tools.exec")?.insert("mode".into(), json!(EXEC_MODE));
+    v1_tools(root, v1)?;
 
     // Only an allow list not there yet: a person's own is theirs.
     let plugins = object(root, "plugins", "plugins")?;
@@ -191,11 +288,20 @@ pub fn merge_config(
 
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
-/// written when it can't be merged.
-pub fn write(state_dir: &Path, port: u16, workspace: &Path, skills: bool) -> io::Result<bool> {
+/// written when it can't be merged. Run at every lamp-tasks start, so an
+/// existing lamp's file gets V1's tools (or loses them) on its next start
+/// or update, its model, workspace and every other key kept; the gateway
+/// takes `tools` hot and reads `agents` per turn, with no restart.
+pub fn write(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
     let text = read_or_empty(&path)?;
-    let merged = merge_config(&text, port, workspace, skills).map_err(|refused| {
+    let merged = merge_config(&text, port, workspace, skills, v1).map_err(|refused| {
         io::Error::other(format!(
             "OpenClaw's {CONFIG_FILE} is not merged: {}",
             refused.0
@@ -240,8 +346,11 @@ mod tests {
 }
 "#;
 
+    /// What lamp-tasks wrote from [`INSTALLED`] before #7245 (bda127adf1).
+    const TODAY_INSTALLED: &str = include_str!("openclaw_config_today.json");
+
     fn merged(text: &str, skills: bool) -> Value {
-        serde_json::from_str(&merge_config(text, 7741, Path::new(WORKSPACE), skills).unwrap())
+        serde_json::from_str(&merge_config(text, 7741, Path::new(WORKSPACE), skills, true).unwrap())
             .unwrap()
     }
 
@@ -267,7 +376,19 @@ mod tests {
             "lampos/deepseek-flash"
         );
         assert_eq!(value["agents"]["defaults"]["workspace"], WORKSPACE);
-        assert_eq!(value["tools"]["exec"]["mode"], "ask");
+        assert_eq!(
+            value["tools"],
+            json!({
+                "profile": "full",
+                "exec": {"host": "gateway", "security": "full", "ask": "off"},
+                "elevated": {"enabled": true, "allowFrom": {"webchat": ["*"]}},
+            })
+        );
+        assert_eq!(value["agents"]["defaults"]["elevatedDefault"], "full");
+        assert_eq!(
+            value["agents"]["defaults"]["sandbox"],
+            json!({"mode": "off"})
+        );
         assert_eq!(
             value["skills"]["load"]["extraDirs"],
             json!(["/var/lib/lampOS/skills"])
@@ -306,17 +427,71 @@ mod tests {
             assert_eq!(value["models"], fresh["models"]);
             assert_eq!(value["agents"], fresh["agents"]);
         }
-        assert!(merge_config("{\"plugins\": []}", 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(merge_config("{\"plugins\": []}", 7741, Path::new(WORKSPACE), true, true).is_err());
+    }
+
+    /// #7245: V1's tool grants (`runtimes/openclaw/service_setup.go`,
+    /// lines 136 and 237-250) on an existing lamp's file, the one written
+    /// before: today's `exec.mode: ask` goes (OpenClaw refuses it beside
+    /// `security`/`ask`), the model, workspace, gateway and a person's own
+    /// keys stay.
+    #[test]
+    fn an_existing_lamps_file_gets_v1s_tools_and_keeps_its_keys() {
+        let before = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        let mut old: Value = serde_json::from_str(&before).unwrap();
+        old["tools"]["exec"]["askFallback"] = json!("deny");
+        old["tools"]["elevated"] = json!({"allowFrom": {"telegram": ["42"]}});
+        old["agents"]["defaults"]["sandbox"] = json!({"mode": "all", "scope": "agent"});
+        let value = merged(&old.to_string(), true);
+        assert_eq!(value["gateway"], old["gateway"]);
+        assert_eq!(value["models"], old["models"]);
+        assert_eq!(
+            value["agents"]["defaults"]["model"],
+            old["agents"]["defaults"]["model"]
+        );
+        assert_eq!(value["agents"]["defaults"]["workspace"], WORKSPACE);
+        assert_eq!(
+            value["tools"]["exec"],
+            json!({"host": "gateway", "security": "full", "ask": "off", "askFallback": "deny"})
+        );
+        assert_eq!(
+            value["tools"]["elevated"],
+            json!({"enabled": true, "allowFrom": {"telegram": ["42"], "webchat": ["*"]}})
+        );
+        assert_eq!(
+            value["agents"]["defaults"]["sandbox"],
+            json!({"mode": "off", "scope": "agent"})
+        );
+        assert!(v1_tools_on(None) && v1_tools_on(Some("on")) && v1_tools_on(Some("x")));
+        assert!(!v1_tools_on(Some("off")));
+    }
+
+    /// #7245's kill switch: off writes today's file byte for byte (the
+    /// text before #7245, its `tools` only `exec.mode: ask`), and turns a
+    /// file written with V1's tools back into that one.
+    #[test]
+    fn with_the_v1_tools_switch_off_the_file_is_todays() {
+        let off = |text: &str| merge_config(text, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        assert_eq!(off(INSTALLED), TODAY_INSTALLED);
+        let on = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_ne!(on, TODAY_INSTALLED);
+        assert_eq!(off(&on), TODAY_INSTALLED);
+        assert_eq!(
+            off(""),
+            off(&merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap())
+        );
     }
 
     #[test]
     fn merging_twice_changes_nothing() {
-        for text in [INSTALLED, "", "{}"] {
-            let once = merge_config(text, 7741, Path::new(WORKSPACE), true).unwrap();
-            assert_eq!(
-                merge_config(&once, 7741, Path::new(WORKSPACE), true).unwrap(),
-                once
-            );
+        for v1 in [true, false] {
+            for text in [INSTALLED, "", "{}"] {
+                let once = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                assert_eq!(
+                    merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                    once
+                );
+            }
         }
     }
 
@@ -376,16 +551,19 @@ mod tests {
             "{\"models\": {\"providers\": \"x\"}}",
             "{\"agents\": {\"defaults\": 1}}",
             "{\"tools\": {\"exec\": true}}",
+            "{\"tools\": {\"elevated\": []}}",
+            "{\"tools\": {\"elevated\": {\"allowFrom\": 1}}}",
+            "{\"agents\": {\"defaults\": {\"sandbox\": \"x\"}}}",
             "{\"skills\": {\"load\": {\"extraDirs\": \"/a\"}}}",
             "{\"skills\": {\"load\": {\"extraDirs\": [1]}}}",
             "{\"plugins\": true}",
         ] {
             assert!(
-                merge_config(text, 7741, Path::new(WORKSPACE), true).is_err(),
+                merge_config(text, 7741, Path::new(WORKSPACE), true, true).is_err(),
                 "{text:?}"
             );
         }
-        assert!(merge_config("{}", 7741, Path::new("relative"), true).is_err());
+        assert!(merge_config("{}", 7741, Path::new("relative"), true, true).is_err());
     }
 
     #[test]
@@ -393,15 +571,15 @@ mod tests {
         let state = tempfile::tempdir().unwrap();
         let path = state.path().join(CONFIG_FILE);
         fs::write(&path, INSTALLED).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
-        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
+        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains("kept-gateway-token"));
         assert!(!text.contains("AUTONOMOUS_API_KEY") && !text.contains("campaign-api"));
         let mode = fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
         fs::write(&path, "{\"models\": []}").unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "{\"models\": []}");
     }
 
@@ -412,7 +590,7 @@ mod tests {
         let target = elsewhere.path().join(CONFIG_FILE);
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(&target, state.path().join(CONFIG_FILE)).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "{}");
     }
 

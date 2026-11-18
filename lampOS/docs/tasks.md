@@ -2832,6 +2832,30 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
   (`AGENTS.md`) is written, as for Hermes.
+- **V1's tool grants (`LAMP_OPENCLAW_V1_TOOLS`, on, #7245).** The owner's
+  decision: "follow V1, so skills get made: whatever V1 gave, we give." The
+  design source is the platform's `runtimes/openclaw/service_setup.go`,
+  line 136 and lines 237-250; the keys and values are V1's:
+  - `tools.profile`: `"full"`;
+  - `tools.exec`: `host: "gateway"`, `security: "full"`, `ask: "off"`.
+    Its `mode` is taken out: OpenClaw 2026.11.2 refuses `mode` beside
+    `security` or `ask` in one exec object;
+  - `tools.elevated`: `enabled: true`, `allowFrom.webchat: ["*"]`. V1 keys
+    this by its messaging channel. A Harness turn on the gateway comes in
+    on OpenClaw's own `webchat` channel. Other channels are kept;
+  - `agents.defaults.elevatedDefault`: `"full"`;
+  - `agents.defaults.sandbox.mode`: `"off"`.
+
+  The merge runs at every lamp-tasks start, so a lamp that has the old file
+  gets these keys on its next start or update. Its model, workspace,
+  `gateway` block and any other key stay. The gateway takes `tools` hot and
+  reads `agents` on each turn, so it needs no restart. `openclaw-ns` and its
+  binds are unchanged, so the namespace still limits what a command can
+  see. With the switch `off`, `tools.exec.mode` is `"ask"` again and V1's
+  values are taken out, so the file is byte for byte what it was before
+  #7245. The skill-start launcher's allow-list entry ("One exec approval",
+  below) stays. A skill's run still execs it, and `security: "full"` allows
+  that exec too, so a run needs no grant of its own.
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
@@ -3806,9 +3830,23 @@ path, with no second runner:
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its
   deadline or an error.
-- **No `lamp-skills pack` in the run:** OpenClaw's exec allow-list holds
-  only skill-start, so a gateway make skips the guide's check step; the
-  voice still puts the answer through its whole check and repairs.
+- **The `lamp-skills pack` check in the run (#7245):** with V1's tools on
+  (`LAMP_OPENCLAW_V1_TOOLS`, on in the product, "OpenClaw's settings on the
+  lamp" above), a gateway make is given the same files as Hermes's make:
+  the rules whole and the guide whole, the check step included. Its prompt
+  is Hermes's `guided_prompt` with one difference. The check is run as `cd
+  <make folder> && [LAMP_AGENT_SERVICES=on] [LAMP_SKILL_WRITES=on]
+  /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check
+  draft/NAME`. The `cd` is there because an OpenClaw exec starts in the
+  agent's workspace. The switches are there because the gateway's
+  environment can't carry the line's check switches. Inside `openclaw-ns`,
+  `/opt` is not hidden, `/tmp` is the namespace's own writable tmpfs and
+  the make folder is writable. The skills folder and `/run/lampos-skills`
+  are shown read-only, as in Hermes's namespace, so the check reads and
+  writes what it does there. With the switch `off`, a gateway make skips
+  the check as before: `skill_make::gateway_guide` and `without_check`,
+  and words that run no command. Either way, the voice still puts the
+  answer through its whole check and repairs.
 - **A `cannot:` answer** goes back to the voice as written, for #7234's
   fallback.
 - **An answer said in chat (`skill_make::make_answer`, #7245, #7427):**
@@ -4427,8 +4465,10 @@ file:
   allow-list add for /usr/local/lib/lampos/skill-start did not succeed in
   120000 ms (the first: …, the second: …); the next run tries again") and does not hold the run, but the start
   is not kept, so the next run reads and adds again. With
-  OpenClaw's stock `tools.exec.mode: "ask"`, a headless
-  turn's exec is denied without this entry. A denied exec still ends the turn as
+  OpenClaw's stock `tools.exec.mode: "ask"` (V1's tools off), a headless
+  turn's exec is denied without this entry. With V1's tools on (#7245,
+  `security: "full"`, `ask: "off"`), the exec is allowed anyway; the entry
+  is kept for a lamp with them off. A denied exec still ends the turn as
   `stopped`, so the fail-closed check above tells a denied run from a
   done one.
 - **lamp-update shows the run what it needs.** With
