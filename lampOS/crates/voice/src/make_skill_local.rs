@@ -849,7 +849,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         });
         parameters["properties"][crate::made_turn::TURN_ON] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, given alone with no request."
+            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, given alone with no request. To use or run one that is off, call run instead: it turns it on itself."
         });
     }
     // The skills the person made, listed by voice ([`crate::made_list`]):
@@ -3974,6 +3974,14 @@ pub fn answer(
     // `LAMP_MADE_SKILL_OFF_SAID`): read before the remove, so a call that
     // carries a turn-off is never a remove.
     if made_skill::off_said_on() {
+        // A turn on with a run now in the same call (#7562's row on
+        // lamp-9adf, 18 Nov, request 9) is the run now, which turns a skill
+        // turned off on itself ([`crate::made_run::asked_turning`]).
+        if call.args[crate::made_turn::TURN_ON].is_string()
+            && let Some(name) = call.args[crate::made_run::RUN].as_str()
+        {
+            return crate::made_run::asked_here(name, request, heard, lease, skills);
+        }
         for (key, off) in [
             (crate::made_turn::TURN_OFF, true),
             (crate::made_turn::TURN_ON, false),
