@@ -855,6 +855,21 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request."
         });
     }
+    // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`,
+    // [`crate::made_remake`]): the person's own ask (never an offer's
+    // answer: remade without asking), and a remade one's old version put
+    // back.
+    if crate::made_remake::on() {
+        parameters["properties"][crate::made_remake::REMAKE_OLD] = json!({
+            "type": "string",
+            "enum": crate::made_remake::ANSWERS,
+            "description": "Given alone, only when the person themselves asks you to remake or update their old skills, in any words."
+        });
+        parameters["properties"][crate::made_remake::PUT_BACK] = json!({
+            "type": "string",
+            "description": "Only when the person asks to put back the old version of a skill the lamp remade: its name as they said it, given alone."
+        });
+    }
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
@@ -3322,6 +3337,40 @@ fn handed_to_agent(
     }
 }
 
+/// An old made skill remade in the middle form (`crate::made_remake`,
+/// `LAMP_REMAKE_OLD_SKILLS`; the first builder's 19:50 ruling on #6811):
+/// `request`, the skill's own kept description, written by the lamp as one
+/// task for its agent exactly as a new make judged no quick reaction is
+/// ([`agent_task`]): the trigger its own model picks in one more call
+/// (`chat`), one `do.task` of the request's words, and sip-of-water's
+/// guards (`crate::make_no_cannot::skill_text`, taken while a remake runs:
+/// `made_skill::reactions_on`). Kept from `from` as made by `engine`, the
+/// agent that does its task ([`made_skill::MADE_WITH`]), through the same
+/// checks and repairs. No DeepSeek draft is asked for, and the agent is
+/// never asked to write it. Why not, in the lamp's own words.
+pub(crate) fn remade_as_task(
+    request: &str,
+    keeping: &Keeping,
+    from: &str,
+    engine: &str,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+) -> Result<Made, String> {
+    let began = std::time::Instant::now();
+    let chat = Arc::new(chat);
+    let asked = made_skill::Asked {
+        request,
+        own: own_accounts_now(),
+        heard: None,
+        judge: None,
+        made_with: made_skill::MadeWith::of_engine(engine),
+    };
+    let kept = |answer: Result<String, String>| match answer {
+        Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
+        Err(_) => Err(Refused(made_skill::MODEL_SILENT.into(), None)),
+    };
+    agent_task(request, &chat, began, &kept, (from, keeping)).map_err(|Refused(why, _)| why)
+}
+
 std::thread_local! {
     /// The voice turn waiting on this thread's make, while it waits: gone
     /// once the turn was cut (`second_provider::worker::made_running`).
@@ -3764,6 +3813,16 @@ pub fn answer(
         && let Some(asked) = call.args[crate::make_no_asks::UNDO].as_str()
     {
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
+    }
+    // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`): the
+    // owner's own ask, or a remade one's old put back.
+    if crate::made_remake::on() {
+        if let Some(answer) = call.args[crate::made_remake::REMAKE_OLD].as_str() {
+            return crate::made_remake::answered_here(answer, request, heard, lease);
+        }
+        if let Some(name) = call.args[crate::made_remake::PUT_BACK].as_str() {
+            return crate::made_remake::put_back_here(name, request, heard, lease);
+        }
     }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
@@ -10008,6 +10067,55 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
         assert!(made_with_of(&keeping, "deepseek-draft").is_none());
         made_skill::set_asks_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// An old skill remade (`crate::made_remake`, `LAMP_REMAKE_OLD_SKILLS`)
+    /// takes the middle form a new make judged no quick reaction takes (the
+    /// first builder's 19:50 ruling): one call to the lamp's own model for
+    /// its trigger, one task step of its own kept words, sip-of-water's
+    /// guards, no say; no judgement, no DeepSeek draft, the agent never
+    /// asked to write it; kept under the old skill's own name, `made_with`
+    /// the agent's, even with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off.
+    #[test]
+    fn an_old_skill_is_remade_as_its_trigger_and_one_task_with_the_guards() {
+        made_skill::set_reactions_here(Some(false));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-middle");
+        const WATER: &str = "When someone sits at the desk a long while, suggest a sip of water.";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        let (url, served) = service_sent(vec![(
+            200,
+            trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+        )]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("water");
+            remade_as_task(WATER, &keeping, "local:remake:1", "Hermes", chat_at(url))
+        }
+        .unwrap();
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert!(
+            sent[0].contains("You choose, for a lamp, when a skill runs and what it needs"),
+            "{}",
+            sent[0]
+        );
+        assert_eq!(made.name, "water");
+        assert!(made.uses.code && made.uses.agent_task, "{:?}", made.uses);
+        let table = one_task_of(
+            &copy,
+            &crate::make_no_cannot::task_words(WATER),
+            crate::make_no_cannot::RUN,
+        );
+        assert_eq!(table["trigger"]["topic"].as_str(), Some("room/presence"));
+        assert_eq!(
+            table["while"].as_array().map(Vec::len),
+            Some(3),
+            "{table:?}"
+        );
+        assert_eq!(made_with_of(&keeping, "water").as_deref(), Some("hermes"));
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);

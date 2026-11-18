@@ -11431,6 +11431,12 @@ async fn spoken(
         .chain(linked)
         // A made skill's sends since the last told (#6066), once each.
         .chain(crate::skill_writes_told::note_for(request))
+        // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`):
+        // the line once remade, to the owner alone.
+        .chain(crate::made_remake::note_for(
+            request,
+            crate::services::owner_of(scope.as_ref()).is_some(),
+        ))
         // A skill said back and waiting for its yes (#6066, #6305, #6307):
         // its id, as this route's history keeps no call's answer.
         .chain(crate::skill_write_yes::waiting_note(

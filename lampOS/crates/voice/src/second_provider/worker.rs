@@ -3063,6 +3063,9 @@ pub fn serve(
     if let Some(folder) = services_folder.clone() {
         crate::skill_writes_told::start(folder, std::path::Path::new(crate::made_skill::DIRECTORY));
     }
+    // Old skills remade in the middle form, without asking
+    // (`LAMP_REMAKE_OLD_SKILLS=on`): the pass, one at a time while idle.
+    crate::made_remake::start();
     if services_on {
         if let Some(bus) = files
             .bus_root

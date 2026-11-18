@@ -421,8 +421,14 @@ thread_local! {
     static REACTIONS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
-/// Whether only a quick reaction is made by DeepSeek in this process.
+/// Whether only a quick reaction is made by DeepSeek in this process. On
+/// too while an old skill is remade on this thread (`crate::made_remake`,
+/// `LAMP_REMAKE_OLD_SKILLS`): its make is the route's, its guards taken and
+/// who made it written, whatever this switch says.
 pub fn reactions_on() -> bool {
+    if REMAKE_AS.with(|remake| remake.borrow().is_some()) {
+        return true;
+    }
     if let Some(on) = REACTIONS_HERE.with(std::cell::Cell::get) {
         return on;
     }
@@ -9297,6 +9303,11 @@ fn free_name(
     toml: &str,
     most: usize,
 ) -> Result<String, Refused> {
+    // An old skill remade in the middle form (`crate::made_remake`):
+    // kept under its own name, to replace it once it passes.
+    if let Some(name) = REMAKE_AS.with(|remake| remake.borrow().clone()) {
+        return Ok(name);
+    }
     drop_gone(keeping);
     if !name_taken(keeping, installed, name) {
         return Ok(name.to_owned());
@@ -9330,6 +9341,35 @@ fn free_name(
 
 /// The most numbers [`free_name`] tries after a taken name.
 const MOST_NAME_TRIES: u32 = 99;
+
+std::thread_local! {
+    /// The name an old made skill is remade under on this thread
+    /// (`crate::made_remake`), while its make runs.
+    static REMAKE_AS: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Whether an old made skill is being remade on this thread
+/// (`crate::made_remake`).
+pub(crate) fn remaking_here() -> bool {
+    REMAKE_AS.with(|remake| remake.borrow().is_some())
+}
+
+/// While held, a skill kept on this thread takes `name` (`crate::made_remake`:
+/// an old skill remade under its own name), never a free one.
+pub(crate) struct RemakeAs;
+
+impl RemakeAs {
+    pub(crate) fn set(name: &str) -> Self {
+        REMAKE_AS.with(|remake| *remake.borrow_mut() = Some(name.to_owned()));
+        Self
+    }
+}
+
+impl Drop for RemakeAs {
+    fn drop(&mut self) {
+        REMAKE_AS.with(|remake| *remake.borrow_mut() = None);
+    }
+}
 
 /// A marked `SKILL.md` ([`card_marked`]) with its front matter's `name:`
 /// line saying `name`.
@@ -10253,7 +10293,8 @@ pub fn writes_of(directory: &Path, sha256: &str) -> Vec<Value> {
 }
 
 /// The made skills' index written whole (`crate::make_no_asks`: a skill
-/// removed with no yes kept aside, or put back).
+/// removed with no yes kept aside, or put back; `crate::made_remake`'s
+/// replace and undo).
 pub(crate) fn write_entries(directory: &Path, entries: &[Value]) -> io::Result<()> {
     write_index(directory, entries)
 }
