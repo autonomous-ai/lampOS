@@ -88,7 +88,7 @@ base to head, fits in a 0.45 m box). Nothing new needs modelling.
   desktop shell (Tauri, or a Rust webview) with the same page; native window = packaging only.
 - Tech: the twin's own (plain JS ES modules + three.js); JS is already in the repo.
 - Risks found: (1) lamp.model.json says zero and sign are CAD guesses "until measured on a lamp":
-  the sign of shoulder/elbow/pitch must be checked against a real lamp's pose (a [hand-off] with
+  the sign of shoulder/elbow must be checked (the pitch's -1 is measured: lamp-52e6's folded head met its base at 2,010 counts, 18 Nov) against a real lamp's pose (a [hand-off] with
   eyes.sh on lamp-75c9: command a pose, compare its photo with the render); until then the
   view could fold the wrong way for a joint. (2) How far the model moves depends on the body
   config copied for the virtual lamp (question 7): the dev lamps now give apps about 90% of their
