@@ -791,6 +791,7 @@ mod tests {
             skills: skills.clone(),
             on: true,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(
             kept.grants("bitcoin-daily").unwrap(),
