@@ -3744,8 +3744,9 @@ struct DownLine {
     /// begun and no other refusal since, and when this run last said
     /// [`DOWN_LINE_LIMIT`] (#7346).
     refused_since: Mutex<Option<(tokio::time::Instant, Option<tokio::time::Instant>)>>,
-    /// When [`Self::refused`] last took a refusal for the usage limit, with
-    /// no round begun since.
+    /// When [`Self::refused`] last took a refusal for the usage limit in
+    /// the service's own word (not 429s that last), with no round begun
+    /// since.
     limited_at: Mutex<Option<tokio::time::Instant>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
@@ -3855,9 +3856,10 @@ impl DownLine {
         }
         let now = tokio::time::Instant::now();
         let lasted = now.duration_since(since.get_or_insert((now, None)).0);
-        let limited = word || lasted >= LIMIT_AFTER;
-        self.set_limited(limited.then_some(now));
-        limited.then_some(lasted)
+        // Only the service's own word keys the local asks (#7642: no
+        // two-minute guess); the timed run still says the limit line.
+        self.set_limited(word.then_some(now));
+        (word || lasted >= LIMIT_AFTER).then_some(lasted)
     }
 
     /// A chat round began: the 429s, if any, have passed.
@@ -17929,8 +17931,11 @@ async fn answer(
                             });
                             if let Some(lasted) = limited {
                                 // `LAMP_LIMIT_LOCAL_ASKS`: a plain light or
-                                // volume ask is done with no model instead.
+                                // volume ask is done with no model instead,
+                                // only on the service's own usage-limit
+                                // word, not 429s that last (#7642).
                                 if limit_local
+                                    && word.is_some()
                                     && limit_addressed
                                     && limit_local_ask(
                                         shared,

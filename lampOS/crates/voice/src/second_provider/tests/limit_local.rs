@@ -314,3 +314,39 @@ async fn a_plain_ask_at_the_limit_is_answered_within_the_budget() {
         while !matches!(engine.next().await, ProviderOutput::TurnFailed { .. }) {}
     }
 }
+
+/// #7642: only the service's own usage-limit word keys the local asks, with
+/// no two-minute guess. Plain 429s that last [`LIMIT_AFTER`] still say the
+/// limit line (#7346), but a plain ask then is not done without the model,
+/// and the next line asks the chat.
+#[tokio::test]
+async fn plain_429s_that_last_do_not_key_the_local_asks() {
+    let plain = || vec![Err(net::Error::Status(429))];
+    let (mut engine, script, ran) = engine(
+        true,
+        &[
+            "What time is it?",
+            "Make it brighter.",
+            "Make it brighter.",
+            "Make it brighter.",
+        ],
+        vec![answered(), plain(), plain(), answered()],
+        Duration::ZERO,
+    )
+    .await;
+    sent_with_down(&mut engine, 1).await;
+    sent_with_down(&mut engine, 2).await;
+    tokio::time::pause();
+    tokio::time::advance(LIMIT_AFTER + Duration::from_secs(10)).await;
+    tokio::time::resume();
+    let lasted = sent_with_down(&mut engine, 3).await;
+    assert!(
+        lasted.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "429s past the bound still say the limit: {lasted:?}"
+    );
+    assert!(names(&ran).is_empty(), "nothing run: {lasted:?}");
+    let next = sent_with_down(&mut engine, 4).await;
+    assert!(next.contains(&"complete".to_owned()), "{next:?}");
+    assert!(names(&ran).is_empty(), "the model's: {next:?}");
+    assert_eq!(script.asked.lock().unwrap().len(), 4, "its chat was asked");
+}
