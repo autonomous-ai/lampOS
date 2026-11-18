@@ -36,6 +36,11 @@ pub const DAY_US: u64 = 86_400_000_000;
 /// The longest reminder's words, as a made skill's say
 /// (`lamp_voice::made_skill::MOST_SAY_TEXT_CHARS`).
 pub const MOST_WORDS_CHARS: usize = 120;
+/// The shortest `every`, as the schedule keeps one (`lamp-schedule`'s
+/// `MIN_EVERY_MINUTES`).
+pub const LEAST_EVERY_MINUTES: u32 = 15;
+/// The longest `every`: a day (`MAX_EVERY_MINUTES`).
+pub const MOST_EVERY_MINUTES: u32 = 1440;
 /// The shortest `in`: a minute.
 pub const LEAST_IN_SECS: u64 = 60;
 /// The longest `in`: a day.
@@ -57,6 +62,9 @@ pub struct RemindFile {
     /// A duration from the run, `"20m"`, 1 m to 24 h.
     #[serde(rename = "in")]
     after: Option<String>,
+    /// #7245: again and again, `"30m"`, whole minutes from 15 m to 24 h:
+    /// one repeating reminder (`repeat_reminder`, `every = "interval"`).
+    every: Option<String>,
     /// What is said when it comes due: fixed text ([`plain_words`]).
     words: String,
 }
@@ -68,6 +76,8 @@ pub enum When {
     At(String),
     /// This many seconds from the run (`set_timer`).
     In(u64),
+    /// Every this many minutes (`repeat_reminder`, `interval`).
+    Every(u32),
 }
 
 /// A remind step, as loaded.
@@ -86,8 +96,22 @@ impl RemindFile {
                  sentences, with no web address, quotes, braces, backticks or control characters"
             )
         })?;
-        let when = match (self.at, self.after) {
-            (Some(at), None) => {
+        let when = match (self.at, self.after, self.every) {
+            (None, None, Some(every)) => {
+                let us =
+                    crate::duration_us(&every).map_err(|why| format!("remind.every: {why}"))?;
+                let minutes = us / 60_000_000;
+                if us % 60_000_000 != 0
+                    || !(u64::from(LEAST_EVERY_MINUTES)..=u64::from(MOST_EVERY_MINUTES))
+                        .contains(&minutes)
+                {
+                    return Err(format!(
+                        "remind.every {every:?}: whole minutes, from 15m to 24h"
+                    ));
+                }
+                When::Every(minutes as u32)
+            }
+            (Some(at), None, None) => {
                 if !clock_time(&at) {
                     return Err(format!(
                         "remind.at {at:?} is not a time of day: HH:MM, from 00:00 to 23:59"
@@ -95,7 +119,7 @@ impl RemindFile {
                 }
                 When::At(at)
             }
-            (None, Some(after)) => {
+            (None, Some(after), None) => {
                 let us = crate::duration_us(&after).map_err(|why| format!("remind.in: {why}"))?;
                 let seconds = us / 1_000_000;
                 if us % 1_000_000 != 0 || !(LEAST_IN_SECS..=MOST_IN_SECS).contains(&seconds) {
@@ -105,7 +129,7 @@ impl RemindFile {
                 }
                 When::In(seconds)
             }
-            _ => return Err("remind names one of at or in, not both".into()),
+            _ => return Err("remind names one of at, in or every".into()),
         };
         Ok(Remind { when, words })
     }
@@ -118,6 +142,7 @@ impl Remind {
         match self.when {
             When::At(_) => "set_reminder",
             When::In(_) => "set_timer",
+            When::Every(_) => "repeat_reminder",
         }
     }
 
@@ -127,6 +152,9 @@ impl Remind {
         match &self.when {
             When::At(time) => json!({ "text": self.words, "time": time }),
             When::In(seconds) => json!({ "text": self.words, "seconds": seconds }),
+            When::Every(minutes) => {
+                json!({ "text": self.words, "every": "interval", "minutes": minutes })
+            }
         }
     }
 
@@ -135,6 +163,7 @@ impl Remind {
         match &self.when {
             When::At(time) => json!({ "at": time, "words": self.words }),
             When::In(seconds) => json!({ "in_s": seconds, "words": self.words }),
+            When::Every(minutes) => json!({ "every_min": minutes, "words": self.words }),
         }
     }
 
@@ -143,6 +172,7 @@ impl Remind {
         match &self.when {
             When::At(time) => format!("remind at {time}"),
             When::In(seconds) => format!("remind in {seconds} s"),
+            When::Every(minutes) => format!("remind every {minutes} min"),
         }
     }
 }
@@ -383,6 +413,33 @@ mod tests {
         ] {
             assert_eq!(plain_words(bad), None, "{bad:?}");
         }
+    }
+
+    #[test]
+    fn every_is_one_repeating_reminder() {
+        let file = |every: &str| RemindFile {
+            at: None,
+            after: None,
+            every: Some(every.into()),
+            words: "Drink some water.".into(),
+        };
+        let remind = file("30m").step().unwrap();
+        assert_eq!(remind.when, When::Every(30));
+        assert_eq!(remind.action(), "repeat_reminder");
+        assert_eq!(
+            remind.args(),
+            json!({"text": "Drink some water.", "every": "interval", "minutes": 30})
+        );
+        for bad in ["5m", "90s", "25h"] {
+            assert!(file(bad).step().is_err(), "{bad}");
+        }
+        let both = RemindFile {
+            at: Some("22:00".into()),
+            after: None,
+            every: Some("30m".into()),
+            words: "Drink some water.".into(),
+        };
+        assert!(both.step().is_err());
     }
 
     #[test]

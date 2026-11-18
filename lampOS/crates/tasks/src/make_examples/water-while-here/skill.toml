@@ -1,0 +1,20 @@
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+speak = true
+topics = ["humans/faces/tracked"]
+
+# Again every 30 minutes while a face is at the lamp: a held trigger, no
+# rearm, its cooldown the repeat.
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"
+for = "1m"
+cooldown = "30m"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+say = { text = ["Time for a sip of water.", "A glass of water would be good about now.", "Water break: one sip."] }

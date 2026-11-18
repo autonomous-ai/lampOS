@@ -2481,6 +2481,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::GUIDE_ENVIRONMENT,
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+        // Every make straight to that agent (#7245).
+        crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).

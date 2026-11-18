@@ -10,14 +10,53 @@ guide differ, rules.md wins.
 Take the intent from the person's words in rules.md alone: there is no one to
 ask. Answer for yourself:
 
-1. What should the lamp do? Only the steps rules.md lists (a light, a gesture,
-   words said, a cue, and any other it offers).
+1. What should the lamp do? Any step format.md lists (a light, a light show,
+   a gesture, words said, a cue, a reminder or timer set in the lamp's
+   schedule with `remind`, its own code keeping a note, and every other step
+   there), as rules.md allows.
 2. When should it do it? The one trigger rules.md lists that fits, with the
-   times of day only when the person named them.
+   times of day only when the person named them. Again and again ("every 30
+   minutes", "every minute while I'm here"): a trigger that holds, such as a
+   face at the lamp, with no rearm and its cooldown the repeat (at least a
+   minute), as examples/water-while-here shows. Once later ("in 25 minutes",
+   "at 22:00"): a `remind` step, as examples/break-timer shows.
 3. What did they ask that the form can't do? Leave it out and name it on
    rules.md's left-out line; never invent a field.
 
-If rules.md says a skill like this can't be made, answer its one line and stop.
+Answer rules.md's cannot line only when the request needs something rules.md
+names a skill can't yet do (hearing, knowing who someone is, sending); a light
+show, a note, its own code, a repeat, a reminder and facts you know are steps,
+never limits. Read format.md before any cannot.
+
+What a skill can do, all of it in format.md and examples/:
+
+- **Started by words** (`asks = ["..."]`): the person says them to the lamp;
+  examples/desk-light, coin-flip, breathing-coach.
+- **Started by an event or a time of day** (`[trigger]`): someone at the
+  desk, a long sitting, a sound, a touch, a clock time, named weekdays.
+- **Again every N minutes while it holds**: a held trigger, no rearm, its
+  cooldown the repeat; examples/water-while-here.
+- **A reminder or timer**: `remind = { in | at | every, words }`: once in
+  25 minutes, at 22:00, or again every 30 minutes (15 m to 24 h) whoever is
+  there; started by words or a trigger; examples/break-timer,
+  water-breaks.
+- **Its own code**: a `task` step running scripts/main.py, Python with the
+  lamp's `lampos` SDK. Any call sdk.md lists may be used: light, say,
+  gesture, events (`lamp.on`), leases, notes, the device, the air, the
+  camera, and more. Its `grants` name what the code uses: body, light,
+  speak, look, hear, sound, air, device, camera, microphone, notes, speech,
+  or a linked service's `<code>-read` / `<code>-write`. Light, speak and body
+  go on at once; the others the owner says yes to once. Loops, waits and
+  several steps in one script are fine; examples/breathing-coach.
+
+A skill's `[[do]]` steps all start together, never one after another: a
+light's `for` holds that light, it does not wait. Colours in turn are a light
+show (`show`, in a skill started by its words alone) or a `task` step's code
+(any skill, a trigger or a repeat too): `await lamp.light(...)`, then
+`await asyncio.sleep(...)`, in order.
+
+The examples are forms only: never take their names, words, asks or what
+they say; the skill's name and words come from this person's request.
 
 A skill does nothing that would surprise the person who asked for it.
 
@@ -28,8 +67,12 @@ letters, digits and hyphens. Write in it, as rules.md says:
 
 - skill.toml: kind, version, permissions, the trigger, ask and its steps.
 - SKILL.md: front matter with name (NAME, the same as the folder) and a
-  one-line description, then a few plain lines on what it does and when.
-- scripts/ only when rules.md offers code, and only the files it allows.
+  one-line description, and always made: here (as the examples show; the
+  check needs it), then a few plain lines on what it does and when.
+- scripts/main.py for a task step's code, as rules.md allows, using any
+  call in sdk.md.
+- shows/NAME.toml only for a light show: every frame written out in order, as
+  rules.md says. Within 30 frames and a minute nothing is left out.
 
 ## 3. Check it with the lamp's own check
 

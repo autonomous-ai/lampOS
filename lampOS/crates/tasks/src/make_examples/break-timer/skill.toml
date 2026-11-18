@@ -1,0 +1,19 @@
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+topics = ["humans/faces/tracked"]
+actions = ["set_timer"]
+
+# Once each time someone sits down at the lamp, a timer for a break.
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"
+for = "2m"
+rearm = "leaves"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+remind = { in = "25m", words = "Time for a short break." }

@@ -5579,6 +5579,35 @@ the same code for both writers.
   go in the rules: each is a placeholder there
   (`own1.lamp@example.invalid`), put back in the agent's answer before the
   checks.
+- **A light show in a made skill (#7245, with `LAMP_MADE_SKILL_ASKS`
+  on).** The making rules tell the model a skill started by its asks alone
+  may play a light show (`make_skill_local::SHOWS_RULES`): one
+  `[[do]]` step `show = "NAME"`, `light = true`, and one more fenced block
+  named ```` ```shows/NAME.toml ```` of 2 to 30 `[[light]]` frames (level
+  1 to 5, 2 s to 20 s each, a minute in all), colours in turn or repeated
+  written out frame by frame. A blink or a flash in such a skill is a show
+  of its colour alternating level 5 and level 1 at 2 s frames, the faster
+  flashing said as left out (`BLINK_SHOWS`); elsewhere, and with the
+  switch off, `BLINK` as before, byte for byte. The voice takes at most
+  `made_skill::MOST_SHOWS` (2) show blocks, each at most
+  `MOST_SHOW_BYTES` (4 KiB) of plain text named `shows/NAME.toml`, each
+  played by a step and each step's file written, at most 30 frames
+  (`shows_held`, refused for a repair with `SHOWS_NOT_HELD`); it writes
+  them into the skill's folder beside `skill.toml`, so `lamp-skills pack`
+  reads every frame with its own show check and the package's SHA-256
+  covers them, and the manage helper holds them again as it puts the
+  skill on (`put_on_scripts`). lamp-skills plays a show in a skill its
+  own words alone start (no trigger), as in one its tool starts. With the
+  switch off a `shows/` block is a file a made skill can't have, as
+  before. A gateway agent's make folder (OpenClaw, `put_for_gateway`) also
+  holds `format.md`, this build's whole `docs/skill-format.md`
+  (`lamp_tasks::skill_make::FORMAT`), and `examples/`, three complete
+  skills (`MAKE_EXAMPLES`, from `crates/tasks/src/make_examples/`: a light
+  and a say on its asks, a three-colour show, a notes task with its
+  script), each packed by the real `lamp-skills pack` in a test; its words
+  name both (`GATEWAY_CAN`, about 300 bytes, now only what to read and do) and that a show is a
+  ```` ```shows/NAME.toml ```` block of the answer, within Harness's
+  3,000-byte task bound (`MAX_PROMPT_BYTES`, 2,000 before #7245). Hermes's make folder and words are unchanged.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
   off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's

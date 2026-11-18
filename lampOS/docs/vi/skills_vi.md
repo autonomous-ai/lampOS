@@ -2435,6 +2435,36 @@ cả hai người viết.
   (người nhận của chính họ khi ghi) không bao giờ nằm trong luật: mỗi địa
   chỉ là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu
   trả lời của agent trước khi kiểm tra.
+- **Màn trình diễn ánh sáng trong kỹ năng tự tạo (#7245, khi bật
+  `LAMP_MADE_SKILL_ASKS`).** Luật tạo kỹ năng cho mô hình biết một kỹ năng
+  chỉ khởi động bằng `asks` của nó có thể phát một màn trình diễn ánh sáng
+  (`make_skill_local::SHOWS_RULES`): một bước `[[do]]` `show = "NAME"`,
+  `light = true`, và thêm một khối có rào tên
+  ```` ```shows/NAME.toml ```` gồm 2 đến 30 khung `[[light]]` (mức 1 đến 5,
+  mỗi khung 2 s đến 20 s, tổng tối đa một phút); các màu nối tiếp hay lặp
+  lại được viết ra từng khung. Nháy hay chớp trong kỹ năng như vậy là một
+  màn trình diễn màu đó xen kẽ mức 5 và mức 1, mỗi khung 2 s, phần chớp
+  nhanh hơn được nói là bị bỏ ra (`BLINK_SHOWS`); ở chỗ khác, và khi tắt
+  công tắc, vẫn là `BLINK` như trước, từng byte. Giọng nói nhận tối đa
+  `made_skill::MOST_SHOWS` (2) khối show, mỗi khối tối đa
+  `MOST_SHOW_BYTES` (4 KiB) văn bản thuần tên `shows/NAME.toml`, mỗi tệp
+  được một bước phát và tệp của mỗi bước đều có, tối đa 30 khung
+  (`shows_held`, bị từ chối để sửa với `SHOWS_NOT_HELD`); nó ghi chúng vào
+  thư mục kỹ năng cạnh `skill.toml`, nên `lamp-skills pack` đọc từng khung
+  bằng kiểm tra show của chính nó và SHA-256 của gói bao gồm chúng, và
+  helper quản lý kiểm tra lại khi bật kỹ năng (`put_on_scripts`).
+  lamp-skills phát show trong kỹ năng chỉ do lời của nó khởi động (không
+  trigger), như kỹ năng do tool khởi động. Khi tắt công tắc, một khối
+  `shows/` là tệp mà kỹ năng tự tạo không được có, như trước. Thư mục tạo
+  kỹ năng của agent gateway (OpenClaw, `put_for_gateway`) còn có
+  `format.md`, toàn bộ `docs/skill-format.md` của bản build này
+  (`lamp_tasks::skill_make::FORMAT`), và `examples/`, ba kỹ năng hoàn
+  chỉnh (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu
+  nói theo `asks`, một show ba màu, một task ghi chú với script của nó),
+  mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
+  nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
+  ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
+  của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
 - **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
   nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần

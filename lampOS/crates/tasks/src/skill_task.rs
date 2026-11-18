@@ -3499,10 +3499,19 @@ impl Runner for HarnessRunner {
         // lamp-tasks is: Harness closes an idle pane an agent started after
         // 30 min, so as an agent each run keeps its own.
         // OpenClaw's only: a Hermes default keeps the per-run path.
+        // A make (#7245, the owner 18 Nov 13:4x) is typed into the same
+        // kept pane: its runner is built before the pane is, so it reads
+        // the lamp's one session here; a fresh `new` per make spent 73 s
+        // before OpenClaw began on lamp-c0a4.
+        let one_session = self.one_session.clone().or_else(|| {
+            self.makes
+                .then(|| crate::one_session::LAMP.get().cloned())
+                .flatten()
+        });
         if by_start
             && harness.config.as_person
             && crate::one_session::shares(engine)
-            && let Some(one) = &self.one_session
+            && let Some(one) = &one_session
             && let Some(ended) = self.run_in_one_session(
                 one,
                 &cli,
@@ -3877,7 +3886,10 @@ impl HarnessRunner {
         }
         // Never typed while agent main may not exec the launcher: its exec
         // would be denied headless and the run end as never started.
-        if let Err(why) = self.skill_start_allowed.check() {
+        // A make runs no skill script, so it needs no launcher.
+        if !self.makes
+            && let Err(why) = self.skill_start_allowed.check()
+        {
             eprintln!("tasks: {}: not typed into the one session: {why}", run.run);
             return Some(Err(why.into()));
         }
@@ -3914,6 +3926,13 @@ impl HarnessRunner {
                     began.elapsed().as_millis(),
                     crate::one_session::nth(turns)
                 );
+                if self.makes {
+                    eprintln!(
+                        "tasks: make: handed to {} in the lamp's kept session in {} ms",
+                        engine.argument(),
+                        began.elapsed().as_millis()
+                    );
+                }
             }
             // Never a second session: the run fails, in words.
             Sent::NotTyped(why) => {
@@ -3957,6 +3976,28 @@ impl HarnessRunner {
         let took = began.elapsed().as_secs();
         let agent = "the lamp's default agent";
         Some(match ended {
+            Ended::Answered(answer) if self.makes => {
+                eprintln!(
+                    "{}",
+                    run_line(&run.run, "idle", took, &AgentSeen::Started(agent.into()))
+                );
+                // As the per-run make: its folder's `answer.md`, else a
+                // make's answer in its chat (#7427).
+                if let Some((text, from)) =
+                    crate::skill_make::make_answer(&started.folder, Some((answer.as_str(), false)))
+                {
+                    if from == crate::skill_make::AnswerFrom::Chat {
+                        eprintln!(
+                            "[lamp-tasks] skill task {}: the make's answer was taken from the agent's chat (no {}), {} bytes",
+                            run.run,
+                            crate::skill_make::ANSWER_FILE,
+                            text.len()
+                        );
+                    }
+                    let _ = run.answer.set(text);
+                }
+                Ok(0)
+            }
             Ended::Answered(answer) => {
                 eprintln!(
                     "{}",

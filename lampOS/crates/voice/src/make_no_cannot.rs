@@ -801,6 +801,7 @@ pub fn asked_files(
         card,
         left_out: None,
         scripts: vec![(crate::upload_agent::INSTRUCTIONS.to_owned(), instructions)],
+        shows: Vec::new(),
     }
 }
 

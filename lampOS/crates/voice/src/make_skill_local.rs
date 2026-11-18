@@ -31,6 +31,9 @@ use std::{sync::Arc, time::Duration};
 
 /// The longest one answer is waited for, from the request to its end.
 pub const WRITE_WITHIN: Duration = Duration::from_secs(30);
+/// Every make straight to the lamp's agent (#7245): `on`, and nothing
+/// else; off unless set.
+pub const AGENT_FIRST_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_FIRST";
 /// The most times a refused answer goes back to the model with what was
 /// refused (the owner, 10 Nov: "re-run it yourself until it works"; one,
 /// before: lamp-74ff's "come back to my desk" failed its one repair).
@@ -129,6 +132,30 @@ const BLINK: &str = "A light never blinks or flashes: for a blink or a flash, wr
      pattern = { kind = \"pulse\" } } (a pulse needs level 2 to 5 and plays once), and say \
      the blinking as left out. { out = true } only turns the light off: beside it only over \
      and until.";
+
+/// [`BLINK`] with a made skill's light shows (#7245, told with
+/// [`made_skill::ASKS_ENVIRONMENT`] on, as [`SHOWS_RULES`] is): a blink or a
+/// flash in a skill started by its asks alone is a show alternating levels
+/// at 2 s frames, the fastest a frame may be, the faster flashing said as
+/// left out; elsewhere one pulse step, as [`BLINK`] says.
+const BLINK_SHOWS: &str = "A light never blinks or flashes faster than a show's 2s frame: for \
+     a blink or a flash in a skill started by its asks alone, write a show (below) of its colour \
+     alternating level 5 and level 1, for = \"2s\" each, as long as asked up to a minute, and \
+     say the faster flashing as left out; in any other skill, one colour step with a soft \
+     pulse, light = { colour = \"green\", level = 3, for = \"5s\", pattern = { kind = \
+     \"pulse\" } }, and say the blinking as left out. { out = true } only turns the light off: \
+     beside it only over and until.";
+
+/// A made skill's light show (#7245, lamp-skills' #1679 format), told with
+/// [`made_skill::ASKS_ENVIRONMENT`] on: lamp-skills plays a show only in a
+/// skill a person asks for, its tool or its own words alone.
+pub const SHOWS_RULES: &str = "A skill started by its asks alone (below) may play a light show: one \
+     [[do]] step show = \"traffic-light\", light = true in [permissions], and one more fenced \
+     block named ```shows/traffic-light.toml of 2 to 30 [[light]] frames played in turn, each \
+     colour = \"green\", level = 3 (1 to 5), for = \"3s\" (2s to 20s) and an optional \
+     pattern as a light step's, a minute in all at most. Colours in turn, or repeated \
+     (\"green, then yellow, then red, three seconds each, five times\"), are one show with \
+     every frame written out in order; what is past a minute is said as left out.";
 
 /// The check's lines a repair carries when the answer was [`EXAMPLE`]
 /// given back: what the model is told, once.
@@ -274,7 +301,7 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
     // Its can't-yet example, with writes on, is then the room's talk alone.
     let cant_example = match cant_example {
         "hearing what is said" if made_skill::said_on() || made_skill::asks_on() => {
-            "hearing what is said in the room"
+            "a camera view from another room"
         }
         other => other,
     };
@@ -310,6 +337,32 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
              you.\"); never a say telling the person to check, look up or read it themselves."
         )
     };
+    // #7245 (lamp-c0a4, 18 Nov: OpenClaw's model answered `cannot:` 4 of 5
+    // makes of a notes skill): its own code and, with notes on, a note
+    // named among what a skill may do, before the cannot rule; with notes
+    // on, a note or code checked before a cannot, and what the maker knows
+    // now no lookup. Off, as before, byte for byte.
+    let notes = made_skill::notes_on() && made_skill::scripts_on();
+    let own = match (made_skill::scripts_on(), notes) {
+        (true, true) => "its own code (a script), a note it keeps, ",
+        (true, false) => "its own code (a script), ",
+        (false, _) => "",
+    };
+    let check_steps = match notes {
+        true => format!(" {CHECK_STEPS}"),
+        false => String::new(),
+    };
+    let found_out = match made_skill::notes_on() {
+        true => format!("{found_out} {KNOWN_NOW}"),
+        false => found_out,
+    };
+    // #7245: with asks on, a skill started by them may play a light show,
+    // so a blink is a show. Off, as before, byte for byte.
+    let (blink, steps) = if made_skill::asks_on() {
+        (BLINK_SHOWS, format!("\n{SHOWS_RULES}"))
+    } else {
+        (BLINK, String::new())
+    };
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
@@ -317,8 +370,8 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          the form only: never answer with it. A reminder at a time or every so often is the \
          lamp's own timer, not a skill; a skill runs at a time only each day or on named \
          days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
-         the request asks with the light, the head, a few exact words it says, its hum, or \
-         {may_also}, on one of the triggers below. {more} {BLINK} To speak, a skill has speak = \
+         the request asks with the light, the head, a few exact words it says, its hum, \
+         {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
@@ -336,11 +389,11 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
-         me every hour to stand up'.\" {found_out} Never stand something \
+         me every hour to stand up'.\"{check_steps} {found_out} Never stand something \
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
-         {services}{code}{said}"
+         {services}{code}{steps}{said}"
     )
 }
 
@@ -352,7 +405,7 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
 /// #6071's design), and that the lamp says it back and waits for the
 /// person's yes.
 fn code_rules() -> String {
-    let grants: Vec<&str> = made_skill::GRANTS.iter().map(|(name, _)| *name).collect();
+    let grants = made_skill::grants_told();
     format!(
         "A skill may also run code of its own, for what no step or trigger above does (a photo \
          booth, for one); never for what a step does. Then add up to {most} more fenced blocks, \
@@ -378,6 +431,17 @@ fn code_rules() -> String {
         grants = grants.join(", "),
     )
 }
+
+/// What the making model knows now is no lookup (#7245, lamp-c0a4, 18 Nov:
+/// "knowing facts about apples on my own" answered `cannot:`), with
+/// [`made_skill::NOTES_ENVIRONMENT`] on.
+const KNOWN_NOW: &str = "What you know now (facts, a poem, a joke, a list) is no lookup: write it \
+                         into the say or the code yourself, as fixed text, never cannot for that.";
+
+/// The end of the cannot rule with notes on (#7245): a note or code is a
+/// step too.
+const CHECK_STEPS: &str =
+    "A note or code of its own counts as a step: check them before you write cannot.";
 
 /// What the making model is told of a made skill's notes (#7245), with
 /// [`made_skill::NOTES_ENVIRONMENT`] on: a note is what the skill keeps and
@@ -2616,10 +2680,20 @@ fn made_and_journaled_by(
         let line = kept_line(&made, false, began.elapsed().as_millis());
         return (plain_unless_cannot(made, false), line);
     }
-    if let (Some((agent, engine)), Some(service)) = (engine, service) {
+    // `LAMP_MAKE_AGENT_FIRST=on` (#7245, the owner 18 Nov 14:0x): every
+    // make goes straight to the lamp's agent, DeepSeek asked only when the
+    // agent gives no answer; off unless set.
+    let straight = service
+        .map(|service| format!("it asks for a linked service ({service})"))
+        .or_else(|| {
+            std::env::var(AGENT_FIRST_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
+                .then(|| format!("{AGENT_FIRST_ENVIRONMENT} is on"))
+        });
+    if let (Some((agent, engine)), Some(why)) = (engine, straight) {
         eprintln!(
-            "lamp-voice: a skill made here: it asks for a linked service ({service}): straight \
-             to the agent ({engine}), DeepSeek not asked"
+            "lamp-voice: a skill made here: {why}: straight to the agent ({engine}), DeepSeek \
+             not asked"
         );
         let made = handed_to_agent(
             Before::NotAsked(Box::new(|| kept(ask(Arc::clone(&chat), brief.clone())))),
@@ -3069,13 +3143,14 @@ fn handed_to_agent(
     // The waiting line with the first hand-over only, and never when the
     // turn was cut already (Twelve's P3 on #6439).
     let waiting = std::cell::Cell::new(!turn_cut());
-    let write = |brief: &str| {
+    let write_by = |agent: &crate::make_skill_agent::Agent, brief: &str| {
         agent
             .write(&system, brief, waiting.replace(false))
             .map(|text| shown(&text, &hidden))
             .map_err(|why| why.to_string())
             .and_then(|text| whole(text, net).map_err(|why| why.to_string()))
     };
+    let write = |brief: &str| write_by(agent, brief);
     // Not taken by the agent: DeepSeek's one answer stands for a voice
     // make, and gets its repairs for the app's (Heron's P2 on #6788).
     let stands = match (agent.repairs_if_untaken, &deepseek) {
@@ -3121,8 +3196,12 @@ fn handed_to_agent(
             return agent_side(untaken(deepseek), &why, models_cannot);
         }
     };
+    let first = kept(Ok(first));
+    let first = cannot_asked_again(first, agent, began, models_cannot, |agent, again| {
+        kept(write_by(agent, &format!("{brief}\n\n{again}")))
+    });
     let (made, _) = repaired(
-        kept(Ok(first)),
+        first,
         request,
         " by the agent",
         agent.most_repairs(),
@@ -3149,6 +3228,59 @@ fn handed_to_agent(
         )),
         made => made,
     }
+}
+
+/// The least of the agent's make time ([`crate::make_skill_agent::MAKE_WITHIN`])
+/// left for [`cannot_asked_again`]'s one more round.
+const CANNOT_AGAIN_LEAST: Duration = Duration::from_secs(40);
+
+/// What the agent is told with its `cannot:` asked again.
+const CANNOT_AGAIN_CAN: &str = "The lamp can do that: a skill keeps notes with lamp.notes.set \
+     and reads them back with lamp.notes.get, writes facts, jokes or lines asked for into its \
+     code or a say as fixed text, and is started by its own asks.";
+
+/// The agent's first answer `made` on the one run path (#7245, lamp-c0a4,
+/// 18 Nov: OpenClaw's cheap model answered `cannot:` 4 of 5 makes with a
+/// reason of its own making): a `cannot:` (`models_cannot`) naming none
+/// of the lamp's real limits ([`made_skill::real_limit`]) is asked once
+/// more through `again`, its reason quoted back, while at least
+/// [`CANNOT_AGAIN_LEAST`] of the agent's make time is left, that round
+/// given no more than what is left. A second `cannot:` is taken as
+/// today; a real limit's is never asked again.
+fn cannot_asked_again(
+    made: Result<Made, Refused>,
+    agent: &crate::make_skill_agent::Agent,
+    began: std::time::Instant,
+    models_cannot: &std::cell::Cell<bool>,
+    again: impl FnOnce(&crate::make_skill_agent::Agent, &str) -> Result<Made, Refused>,
+) -> Result<Made, Refused> {
+    let Err(Refused(why, None)) = &made else {
+        return made;
+    };
+    if !agent.one_path || !models_cannot.get() || made_skill::real_limit(why) {
+        return made;
+    }
+    let left = agent.make_within.saturating_sub(began.elapsed());
+    if left < CANNOT_AGAIN_LEAST {
+        eprintln!("lamp-voice: a made skill's cannot: no time left to ask again");
+        return made;
+    }
+    // The reason may echo the person's words: never journaled
+    // ([`made_skill::MODELS_CANNOT_JOURNALED`], Second's HOLD on #5985).
+    eprintln!(
+        "lamp-voice: a made skill's cannot asked again once: its reason names no limit of the \
+         lamp's (told, not journaled)"
+    );
+    let within = crate::make_skill_agent::Agent {
+        within: agent.within.min(left),
+        ..agent.clone()
+    };
+    again(
+        &within,
+        &format!(
+            "You answered cannot: {why}. {CANNOT_AGAIN_CAN} Make the skill now, as rules.md says."
+        ),
+    )
 }
 
 std::thread_local! {
@@ -3676,6 +3808,13 @@ pub(crate) mod tests {
             // lamp-c0a4, 18 Nov 10:04: OpenClaw answered `cannot: ...
             // writing to a file you can open` for "a file I can open".
             "made this way with a note, never answered cannot",
+            // lamp-c0a4, 18 Nov: OpenClaw answered `cannot:` "knowing facts
+            // about apples on my own" for three facts asked for.
+            KNOWN_NOW,
+            // Its own code and a note named among what a skill may do,
+            // before the cannot rule, and checked before a cannot.
+            "its hum, its own code (a script), a note it keeps, or",
+            CHECK_STEPS,
         ] {
             assert!(on.contains(part), "{part}: {on}");
         }
@@ -3685,8 +3824,34 @@ pub(crate) mod tests {
         made_skill::set_asks_here(Some(false));
         assert!(!system_for(false, false).contains(heard));
         made_skill::set_asks_here(Some(true));
-        assert!(system_for(false, false).contains(heard));
+        let asks = system_for(false, false);
+        assert!(asks.contains(heard));
+        // The may-do list before the cannot rule; the room's talk no more
+        // the cannot's example, which the model copied word for word.
+        let may = asks.find("a note it keeps, or").unwrap();
+        assert!(may < asks.find("A skill can't yet").unwrap(), "{asks}");
+        assert!(may < asks.find(CHECK_STEPS).unwrap(), "{asks}");
+        // The example with writes on (with them off, "sending a message").
+        made_skill::set_writes_here(Some(true));
+        let writes = system_for(false, false);
+        made_skill::set_writes_here(None);
+        assert!(writes.contains("I can't do that yet: a camera view from another room."));
+        assert!(!writes.contains("I can't do that yet: hearing what is said in the room."));
         made_skill::set_asks_here(None);
+        // Off, none of #7245's lines.
+        made_skill::set_notes_here(Some(false));
+        let off = system_for(false, false);
+        for part in [KNOWN_NOW, CHECK_STEPS, "a note it keeps"] {
+            assert!(!off.contains(part), "{part}: {off}");
+        }
+        assert!(
+            off.contains("its hum, its own code (a script), or"),
+            "{off}"
+        );
+        // The notes grant told only with notes on.
+        assert!(!off.contains("microphone, notes"), "{off}");
+        made_skill::set_notes_here(Some(true));
+        assert!(system_for(false, false).contains("microphone, notes, speech"));
         assert!(
             made_skill::script_sdk().ends_with("await lamp.close(); last, asyncio.run(main())")
         );
@@ -6939,6 +7104,110 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #7245's one run path agent, its `make_within` as given.
+    fn one_path_agent(
+        tasks: &crate::make_skill_agent::tests::StubTasks,
+        make_within: Duration,
+    ) -> crate::make_skill_agent::Agent {
+        crate::make_skill_agent::Agent {
+            one_path: true,
+            make_within,
+            ..tasks.agent()
+        }
+    }
+
+    /// A made-up reason, as OpenClaw's model gave on lamp-c0a4 (18 Nov).
+    const MADE_UP_CANNOT: &str =
+        "cannot: I can't do that yet: knowing facts about apples on my own.";
+
+    /// #7245: the agent's `cannot:` naming no real limit of the lamp's is
+    /// asked once more, its reason quoted back, and the skill it then
+    /// makes is kept: two rounds.
+    #[test]
+    fn a_made_up_cannot_is_asked_again_once_and_its_skill_kept() {
+        let (root, keeping) = keeping("agent-cannot-again");
+        let tasks = agent_answering(vec![Some(MADE_UP_CANNOT.to_owned()), Some(good())]);
+        let (url, served) = service(vec![(200, faces())]);
+        let agent = one_path_agent(&tasks, crate::make_skill_agent::MAKE_WITHIN);
+        let told = made_by(&keeping, url, Some(&agent), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 2);
+        let rules = handed_rules(&tasks);
+        assert!(
+            rules[1]
+                .0
+                .contains("You answered cannot: I can't do that yet: knowing facts about apples"),
+            "{}",
+            rules[1].0
+        );
+        assert!(rules[1].0.contains(CANNOT_AGAIN_CAN), "{}", rules[1].0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7245: a `cannot:` naming a real limit (a look-up on the web) is
+    /// never asked again; two made-up ones are refused after two rounds;
+    /// with under [`CANNOT_AGAIN_LEAST`] left, never asked again.
+    #[test]
+    fn a_real_limits_or_second_cannot_or_one_with_no_time_left_is_refused_as_today() {
+        let cases = [
+            (
+                "real",
+                vec![Some(
+                    "cannot: I can't do that yet: looking up the web.".to_owned(),
+                )],
+                crate::make_skill_agent::MAKE_WITHIN,
+                1,
+            ),
+            (
+                "twice",
+                vec![
+                    Some(MADE_UP_CANNOT.to_owned()),
+                    Some(MADE_UP_CANNOT.to_owned()),
+                ],
+                crate::make_skill_agent::MAKE_WITHIN,
+                2,
+            ),
+            (
+                "late",
+                vec![Some(MADE_UP_CANNOT.to_owned()), Some(good())],
+                CANNOT_AGAIN_LEAST - Duration::from_secs(1),
+                1,
+            ),
+        ];
+        for (name, answers, make_within, rounds) in cases {
+            let (root, keeping) = keeping(&format!("agent-cannot-{name}"));
+            let tasks = agent_answering(answers);
+            let (url, served) = service(vec![(200, faces())]);
+            let agent = one_path_agent(&tasks, make_within);
+            let told = made_by(&keeping, url, Some(&agent), NOW);
+            assert!(told.get("made").is_none(), "{name}: {told}");
+            assert!(
+                told.to_string()
+                    .contains(crate::make_skill_agent::CANNOT_LINE),
+                "{name}: {told}"
+            );
+            assert_eq!(served.join().unwrap(), 1, "{name}");
+            assert_eq!(tasks.hand_overs(), rounds, "{name}");
+            assert!(made_skill::entries(&keeping.directory).is_empty(), "{name}");
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        // Hearing the room is a real limit with asks off alone.
+        let heard = "I can't do that yet: hearing what is said in the room";
+        made_skill::set_asks_here(Some(false));
+        assert!(made_skill::real_limit(heard));
+        made_skill::set_asks_here(Some(true));
+        assert!(!made_skill::real_limit(heard));
+        made_skill::set_asks_here(None);
+        for made_up in [
+            "knowing facts about apples on my own",
+            "writing notes and reading them back",
+            "writing to a file you can open",
+        ] {
+            assert!(!made_skill::real_limit(made_up), "{made_up}");
+        }
+    }
+
     /// The person's own addresses never reach the agent's rules file: each
     /// is a placeholder there, put back in its answer.
     #[test]
@@ -7138,6 +7407,51 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// failed every repair. The model is told how a blink is written and
     /// what `out` is, and a skill written so is kept (lamp-skills loads the
     /// same step: `a_blink_asked_of_a_made_skill_is_a_pulse_and_never_an_out_with_a_colour`).
+    /// #7245: with asks on, the making model is told a light show (its
+    /// step, its ```shows/NAME.toml block, its frames' bounds, colours in
+    /// turn as one show) before the asks' rules, and a blink as a show
+    /// alternating levels at 2 s frames; off, neither, and the blink is
+    /// one pulse step, byte for byte as before.
+    #[test]
+    fn with_asks_on_a_light_show_is_told_and_a_blink_is_a_show() {
+        made_skill::set_asks_here(Some(false));
+        let off = system_with(false);
+        assert!(
+            !off.contains(SHOWS_RULES) && !off.contains(BLINK_SHOWS),
+            "{off}"
+        );
+        assert!(off.contains(BLINK), "{off}");
+        made_skill::set_asks_here(Some(true));
+        let on = system_with(false);
+        assert!(on.contains(&format!("\n{SHOWS_RULES}\n")), "{on}");
+        assert!(on.ends_with(made_skill::ASKS_RULES), "{on}");
+        assert!(
+            on.contains(&format!(
+                "{} {BLINK_SHOWS} To speak",
+                made_skill::MORE_STEPS
+            )),
+            "{on}"
+        );
+        assert!(!on.contains(BLINK), "{on}");
+        for part in [
+            "show = \"traffic-light\"",
+            "```shows/traffic-light.toml of 2 to 30 [[light]] frames",
+            "for = \"3s\" (2s to 20s)",
+            "a minute in all at most",
+            "every frame written out in order",
+        ] {
+            assert!(SHOWS_RULES.contains(part), "{part}");
+        }
+        for part in [
+            "alternating level 5 and level 1, for = \"2s\" each",
+            "say the faster flashing as left out",
+            "in any other skill, one colour step with a soft pulse",
+        ] {
+            assert!(BLINK_SHOWS.contains(part), "{part}");
+        }
+        made_skill::set_asks_here(None);
+    }
+
     #[test]
     fn the_system_prompt_says_how_a_light_blinks_and_that_out_only_turns_it_off() {
         for reads in [true, false] {
@@ -7791,7 +8105,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "at most 8 KiB each and 16 KiB in all",
             "task = { task = \"what the code does",
             "grants = [ ... ]",
-            "body, light, speak, look, hear, sound, air, device, camera, microphone, notes, speech",
+            "body, light, speak, look, hear, sound, air, device, camera, microphone, speech",
             "waits for the person's yes before it runs any code",
         ] {
             assert!(on.contains(part), "{part}: {on}");

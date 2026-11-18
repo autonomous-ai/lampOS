@@ -15,10 +15,11 @@ use std::{collections::BTreeMap, fmt, io};
 
 pub const MAX_TASKS: usize = 16;
 pub const MAX_OBSERVATIONS: usize = 4;
-/// A task's text, at most: 2,000 bytes, room for a made skill's brief, the
-/// person's request and the lamp's check of a first try (#2813, the first
-/// builder on #3126, 23 Oct 13:07). A spoken or typed ask never nears it.
-pub const MAX_PROMPT_BYTES: usize = 2000;
+/// A task's text, at most: room for a made skill's brief, the person's
+/// request and the lamp's check of a first try (#2813, the first builder on
+/// #3126, 23 Oct 13:07: 2,000). #7245, 18 Nov: 3,000, the user's call, room
+/// for the make's reading list. A spoken or typed ask never nears it.
+pub const MAX_PROMPT_BYTES: usize = 3000;
 pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
@@ -6126,8 +6127,9 @@ mod tests {
                 "bad_text"
             );
         }
-        // At the bound, in bytes, it is taken (2,000 since #2813).
-        assert_eq!(MAX_PROMPT_BYTES, 2000);
+        // At the bound, in bytes, it is taken (2,000 since #2813; #7245,
+        // 18 Nov: 3,000, the user's call, room for the make's reading list).
+        assert_eq!(MAX_PROMPT_BYTES, 3000);
         engine
             .handle(
                 &preparation(&engine, &"é".repeat(MAX_PROMPT_BYTES / 2)),

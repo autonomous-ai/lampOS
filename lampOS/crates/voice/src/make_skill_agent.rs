@@ -91,14 +91,17 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(90);
 /// The longest the agent's part of a make goes on, its repairs included: a
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
-pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
+// #7245 (the owner, 18 Nov 14:5x): 45 minutes, then the make is told failed.
+pub const MAKE_WITHIN: Duration = Duration::from_secs(45 * 60);
 /// The guide's switch: `on`, and nothing else; off unless set.
 pub const GUIDE_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_GUIDE";
 /// With the guide, the longest one of the agent's answers is waited for: a
 /// draft, its check and up to two fixes in one run, within lamp-tasks'
 /// most (`lamp_tasks::skill_make::MOST_WITHIN`, 120 s) and the agent's
 /// [`MAKE_WITHIN`].
-pub const GUIDED_WRITE_WITHIN: Duration = Duration::from_secs(90);
+// #7245 (the owner, 18 Nov 14:5x): no short cut on the agent's make; it is
+// waited for up to 45 minutes, then told failed (180 s before).
+pub const GUIDED_WRITE_WITHIN: Duration = Duration::from_secs(45 * 60);
 /// With the guide, the most times an answer the voice's check refused goes
 /// back to the agent with the check's words.
 pub const GUIDED_MOST_REPAIRS: usize = 2;
@@ -939,7 +942,7 @@ pub(crate) mod tests {
         assert_eq!(WRITE_WITHIN, Duration::from_secs(90));
         assert!(WRITE_WITHIN <= lamp_tasks::skill_make::MOST_WITHIN);
         assert!(WRITE_WITHIN <= MAKE_WITHIN);
-        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(240));
+        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(47 * 60));
         let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
         let agent = Agent {
             within: WRITE_WITHIN,
@@ -1217,7 +1220,7 @@ pub(crate) mod tests {
         );
         assert_eq!(tasks.guided().most_repairs(), GUIDED_MOST_REPAIRS);
         // Within lamp-tasks' most and the agent's part.
-        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= 120) };
+        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= lamp_tasks::skill_make::MOST_WITHIN.as_secs()) };
         const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= MAKE_WITHIN.as_secs()) };
     }
 

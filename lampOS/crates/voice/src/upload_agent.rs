@@ -626,6 +626,7 @@ pub fn files_with(card: &str, asks: &[String]) -> Result<(Files, Vec<String>), R
             card: lamps_card,
             left_out: None,
             scripts: vec![(INSTRUCTIONS.to_owned(), card)],
+            shows: Vec::new(),
         },
         grants,
     ))

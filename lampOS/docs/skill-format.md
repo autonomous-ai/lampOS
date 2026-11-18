@@ -199,7 +199,7 @@ it) or `if_choice` (the tool's values it runs for).
 | `look` (`at = "face"`) | `body = { look_at = "face" }` | `body`, and `humans/faces/tracked` in `topics` (the protocol asks `body` and `look`) |
 | (none) | `body = { mood = "reading", for, toward }`: the reading pose | `body` |
 | `light` | `light = "NAME"` (`lights/NAME.toml`) or `light = { colour, level 1–5, for ≤ 10m, pattern, … }` | `light` |
-| (none) | `show = "NAME"`: `shows/NAME.toml`, 2 to 30 frames, 60 s at most | `light` |
+| (none) | `show = "NAME"`: `shows/NAME.toml`, 2 to 30 frames, 60 s at most; only in a skill its tool, or its own words (`asks`, `LAMP_MADE_SKILL_ASKS`), alone starts | `light` |
 | `express` | (none yet: a feeling is the `feelings` skill's, #3691) | `body` and `light` |
 | `say` | `say = "a note the model speaks from"`, `say = { note = "…" }`, or `say = { text = "said as it is" }`, each with `priority` (0 to 8) and `expires` (1 s to 1 h); `text` or `note` may be a list of 2 to 16 different lines, one said each run (#3997); a `note` may name one number field every trigger running it tests, `{drank_seen}`, filled as a whole number or dropped; any other brace is said as written, and refused only for a new skill ([skills.md](skills.md), "A number from the reading in a note"); a `note` may add `may_end_unsaid = true` (#6543): the voice lets it go, unsaid, once someone talks or the face leaves before it begins, and the run is given back | `speak` |
 | `sound` | `sound = "NAME"`: `sounds/NAME.wav`; not with a tool | `speak` |
@@ -207,6 +207,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `look = true`: the full look's picture to the model; tool only | `camera` (format 1's `look` still gives it: "The camera", below) |
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
+| (none) | `remind = { in = "25m", words = "…" }`, `remind = { at = "22:00", words = "…" }` or `remind = { every = "30m", words = "…" }`: one timer, reminder or repeating reminder (every 15 m to 24 h, until cancelled by voice) set in the lamp's schedule, said when due; its words fixed (at most 120 characters, one or two sentences); at most 3 a day, none stacked; never in a skill with a tool | `actions = ["set_timer"]` for `in`, `["set_reminder"]` for `at`, `["repeat_reminder"]` for `every` |
 | (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,

@@ -34,9 +34,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const MAX_PROMPT_BYTES: usize = 2000;
+/// A task's text, at most (`engine::MAX_PROMPT_BYTES`): #7245, 18 Nov:
+/// 3,000, the user's call, room for the make's reading list (2,000 before).
+pub const MAX_PROMPT_BYTES: usize = 3000;
 /// The most a task takes in a request line once JSON-escaped (P3 on #3239):
-/// a control character escapes to 6 bytes, so 2,000 of them would overflow
+/// a control character escapes to 6 bytes, so 3,000 of them would overflow
 /// the 8,192-byte line. Twice the raw bound, so that quotes, backslashes,
 /// newlines and tabs, at 2 bytes each, still fit.
 pub const MAX_ENCODED_PROMPT_BYTES: usize = 2 * MAX_PROMPT_BYTES;

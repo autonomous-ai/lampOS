@@ -161,3 +161,88 @@ fn the_gateway_makes_inline_skill_toml_packs() {
     assert!(!under.starts_with("asks"));
     assert!(!packs(&made("desk-glow-under", &under), &out, &on));
 }
+
+/// #7245: each example skill a gateway make's folder holds
+/// (`lamp_tasks::skill_make::MAKE_EXAMPLES`) packs with the real
+/// `lamp-skills pack`, as a skill made on this lamp with
+/// `LAMP_MADE_SKILL_ASKS` on: an example can never be one the check
+/// refuses. It names each of its three kinds once.
+#[test]
+fn every_gateway_make_example_packs() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let examples = dir.path().join("examples");
+    let mut names: Vec<&str> = Vec::new();
+    for (path, text) in lamp_tasks::skill_make::MAKE_EXAMPLES {
+        let file = examples.join(path);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, text).unwrap();
+        let name = path.split('/').next().unwrap();
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    assert_eq!(names, ["desk-light", "traffic-light", "fruit-notes"]);
+    let on = [(lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned())];
+    for name in names {
+        assert!(packs(&examples.join(name), &out, &on), "{name}");
+    }
+    // Off, a show in a skill its words start is refused, as before.
+    assert!(!packs(&examples.join("traffic-light"), &out, &[]));
+}
+
+/// #7245: a made skill's light show, its own words alone starting it,
+/// packs exactly when lamp-skills' own show check takes it: 15 frames of
+/// 3 s (45 s) do; 31 frames, a 1 s frame, a level of 6, or a trigger
+/// beside its words, don't.
+#[test]
+fn a_made_skills_light_show_packs_only_as_the_show_check_takes_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let on = [(lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned())];
+    let toml = "asks = [\"traffic light\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\n\
+                [permissions]\nlight = true\n\n[[do]]\nshow = \"traffic-light\"\n";
+    let show = |frames: usize, lasting: &str, level: u8| {
+        (0..frames)
+            .map(|at| {
+                let colour = ["green", "yellow", "red"][at % 3];
+                format!(
+                    "[[light]]\ncolour = \"{colour}\"\nlevel = {level}\nfor = \"{lasting}\"\n\n"
+                )
+            })
+            .collect::<String>()
+    };
+    let made = |name: &str, toml: &str, frames: &str| {
+        let folder = draft(dir.path(), name, toml, false);
+        fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: A traffic light show.\nmade: here\n---\n"),
+        )
+        .unwrap();
+        fs::create_dir_all(folder.join("shows")).unwrap();
+        fs::write(folder.join("shows/traffic-light.toml"), frames).unwrap();
+        folder
+    };
+    assert!(packs(&made("traffic", toml, &show(15, "3s", 4)), &out, &on));
+    assert!(packs(&made("flash", toml, &show(5, "2s", 5)), &out, &on));
+    for (name, frames) in [
+        ("many", show(31, "2s", 4)),
+        ("fast", show(3, "1s", 4)),
+        ("bright", show(3, "3s", 6)),
+    ] {
+        assert!(!packs(&made(name, toml, &frames), &out, &on), "{name}");
+    }
+    let triggered = toml.replace(
+        "[[do]]",
+        "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\n[[do]]",
+    );
+    let triggered = triggered.replace(
+        "light = true\n",
+        "light = true\ntopics = [\"room/presence\"]\n",
+    );
+    assert!(!packs(
+        &made("triggered", &triggered, &show(3, "3s", 4)),
+        &out,
+        &on
+    ));
+}
