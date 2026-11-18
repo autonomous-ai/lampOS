@@ -715,3 +715,39 @@ child. `privacy_worker` also starts workers, but it is built only on Linux. Each
 so those still run beside each other and every other test. The assertions and
 the sends are unchanged. Linux makes a socket close-on-exec as it creates it,
 and under `cargo nextest` each test is its own process.
+
+## Replaying saved lamp journals
+
+[#7772](https://github.com/autonomous-ai/lampOS/issues/7772): a row on a lamp
+waits for the lamp; a replay of what a row kit already saved runs in seconds
+in CI. `crates/voice/src/replay.rs` (test only) reads every case in
+`crates/voice/tests/replay/*.json` and feeds it the way the second route's
+worker does (`Heeding::not_said_to_me`): the eyes' looks into a
+`SpeakingFaces`, `said_to_me::Line::with_eyes` over the line's window (the
+worker builds its own line through `with_eyes` too, so the replay runs the
+product's reads, not a copy), then `said_to_me::judge` inside
+`said_to_me::awaiting_yes`. Run it with `cargo test -p lamp-voice --lib replay`.
+
+A case carries no words and no names:
+
+| Field | Meaning |
+|-------|---------|
+| `case`, `source` | A name, and the kit's out dir, journal and request it came from |
+| `line_s` | The line's start and end, in seconds on the eyes sample's clock |
+| `words`, `question`, `named` | Its word count, a `?` in it, the lamp's name heard in its sound |
+| `going_on`, `turned`, `yes_awaited` | In a live conversation's window; a face turned to the lamp (the worker's `signs.turned`); the lamp waits for a yes or no of its own asking |
+| `lamp_asked`, `another_voice` | The lamp's own question waits for its answer (the worker's `signs.lamp_asked`); another voice in the conversation, so the lone face's pose gives none (#7726). Both default to `false` |
+| `eyes` | The kit's eyes sample lines as saved: `S <s> <faces> <area> <yaw deg> <pitch deg> <facing> <looking> <speaking> <voice state>` (the largest face only) |
+| `expect` | `answered`, or the journal's `held: <reason>` (`said_to_me::Held::reason`) |
+| `journal` | What the lamp journaled, when it differs from `expect` |
+| `pending` | `"#N"`: what an open PR changes; the case must still differ today, and that PR drops `pending` in its diff |
+
+What the replay does not cover, so those changes still need a row: audio (the
+speech-to-text word count, a short sound against a line, where the line's
+window falls on the lamp's clock), the eyes model's own reads (the sample is
+what the eyes published), the yaw-based `turned` sign and the name heard in
+the sound (both inputs here), bystanders (the sample keeps the largest face),
+and what the engine does after the verdict (a held rename run or dropped in
+`remember.rs`). The kit's sample is every 0.25 s from its own subscriber,
+while lamp-voice reads every frame: a mouth read `yes` between two samples
+is missing from the replay, and such a case says `journal` beside `expect`.

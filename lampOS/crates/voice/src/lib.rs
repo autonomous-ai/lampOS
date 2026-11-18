@@ -168,6 +168,8 @@ pub mod remark_about_it;
 pub mod remarks;
 pub mod remember;
 pub mod reminders;
+#[cfg(test)]
+mod replay;
 pub mod reports_stop;
 pub mod requested_audio;
 pub mod resend;
