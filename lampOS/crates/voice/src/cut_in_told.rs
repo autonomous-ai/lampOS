@@ -54,9 +54,13 @@ pub const FLAG: &str = "--cut-in-told";
 /// What the model is told beside a request that cut in over its answer.
 pub const NOTE: &str = "(They cut in: they spoke while you were speaking, and you stopped there. This time your first words are a short, natural sign that you heard them, such as \"Oh, sure —\", and then the answer to what they said: for this reply the rule against acknowledgments does not hold. For example, cut in with \"What's two plus two?\", say \"Oh, sure — it's four.\" If all they said is to stop or wait, such as \"stop\", \"pause\", \"wait\" or \"hold on\", with nothing else asked, say only a short \"Okay, I'll stop.\" in the language of the conversation, and nothing more. Never apologise at length. Go back to what you were saying only if they ask you to; then first say in a few words where you were, and go on from where you stopped, not from the start.)";
 
-/// [`NOTE`] without its sentence on a line that only asks to stop or wait,
-/// for a cut-in that says a stop word and asks more (#7285, [`note`]).
-pub const ASKED_MORE: &str = "(They cut in: they spoke while you were speaking, and you stopped there. This time your first words are a short, natural sign that you heard them, such as \"Oh, sure —\", and then the answer to what they said: for this reply the rule against acknowledgments does not hold. For example, cut in with \"What's two plus two?\", say \"Oh, sure — it's four.\" Never apologise at length. Go back to what you were saying only if they ask you to; then first say in a few words where you were, and go on from where you stopped, not from the start.)";
+/// For a cut-in that says a stop word and asks more (#7285, [`note`]): only
+/// the facts of [`NOTE`], with no stop sentence and no first words to say,
+/// so the ask reads as a plain ask. Told the "first words" sentence and its
+/// spoken example, "Hold on, hey Lamp, make the light a little warmer." over
+/// a story got no call in about 35 of 146 core gate tries, against about 3
+/// of 131 for the same ask with no cut-in (#7285, w2).
+pub const ASKED_MORE: &str = "(They cut in: they spoke while you were speaking, and you stopped there. Go back to what you were saying only if they ask you to; then first say in a few words where you were, and go on from where you stopped, not from the start.)";
 
 /// The second route's note for a cut-in whose words are `heard`.
 ///
@@ -161,13 +165,19 @@ mod tests {
     /// stop sentence; a stop alone, or a line with no stop word, the whole.
     #[test]
     fn a_stop_word_with_an_ask_is_not_told_to_only_stop() {
-        assert_eq!(
-            NOTE.replace(
-                " If all they said is to stop or wait, such as \"stop\", \"pause\", \"wait\" or \"hold on\", with nothing else asked, say only a short \"Okay, I'll stop.\" in the language of the conversation, and nothing more.",
-                ""
-            ),
-            ASKED_MORE
-        );
+        // Only the facts: no stop sentence, no first words, no example.
+        for not_told in [
+            "Okay, I'll stop.",
+            "your first words",
+            "Oh, sure",
+            "apologise",
+        ] {
+            assert!(!ASKED_MORE.contains(not_told), "{not_told}");
+        }
+        assert!(ASKED_MORE.starts_with(
+            "(They cut in: they spoke while you were speaking, and you stopped there."
+        ));
+        assert!(ASKED_MORE.contains("Go back to what you were saying only if they ask you to"));
         // One predicate decides a bare stop (`wait_words::only_a_stop`, the
         // answer wait's too): a stop with a name, filler or a short time is
         // told the whole note, a stop with anything else said is not.

@@ -14337,6 +14337,39 @@ async fn a_mid_story_hold_on_with_an_ask_is_not_told_to_only_stop() {
     );
 }
 
+/// #7285 w2: the same cut-in ask over a story went with no call about 35
+/// times in 146 core gate tries, the same ask with no cut-in about 3 in 131.
+/// Its request reads like a plain ask: the last note before the words is
+/// [`crate::cut_in_told::ASKED_MORE`], with no "first words" opener or
+/// spoken example, and the request forces no tool (no `tool_choice`).
+#[tokio::test]
+async fn a_cut_in_ask_over_a_story_reads_like_a_plain_ask() {
+    let w2 = "Hold on, hey Lamp, make the light a little warmer.";
+    let told = asked_with(
+        w2,
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    let asked = &told[0];
+    assert_eq!(asked.last(), Some(&Message::user(w2)));
+    assert_eq!(
+        asked[asked.len() - 2],
+        Message::system(crate::cut_in_told::ASKED_MORE),
+        "{asked:?}"
+    );
+    assert!(
+        !asked.iter().any(|message| message
+            .words()
+            .is_some_and(|words| words.contains("your first words") || words.contains("Oh, sure"))),
+        "{asked:?}"
+    );
+    let chat = net::Chat::deepseek("deepseek-chat", "k", Arc::new(Vec::new), false).unwrap();
+    assert_eq!(chat.wire(asked).2.get("tool_choice"), None);
+}
+
 /// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
 /// begun over the lamp's audible answer is told it cut in, beside its
 /// words, as the Live route tells it; not without the switch, and the

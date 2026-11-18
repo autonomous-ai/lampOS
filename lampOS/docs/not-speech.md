@@ -487,7 +487,12 @@ as a person would:
   does not read as bare, so "Hold on a second, Lamp." still gets it):
   told it, that line was answered "Okay, I'll stop." with no call 8 times
   in 29 core gates (#7285). "Hold on, I'm thinking." says more than the
-  stop, so it is answered as said ("Sure, take your time.").
+  stop, so it is answered as said ("Sure, take your time."). `ASKED_MORE`
+  keeps only the facts (they cut in, it stopped, it goes back only if
+  asked), without the first words ("Oh, sure —") and their example below,
+  so the ask reads as a plain ask: told them, that same line got no call
+  in about 35 of 146 core gate tries, the same ask with no cut-in about 3
+  in 131 (#7285, w2).
 - **Any other cut-in:** the reply's first words are a few that show it was
   heard ("Oh, sure —"), then the answer, with one example ("Oh, sure — it's
   four."), and the note says the character's rule against repetitive
