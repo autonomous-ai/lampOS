@@ -6507,9 +6507,14 @@ fn made_running_ended(
     });
     async move {
         let _turn = turn;
-        answered
+        // Cut before the make answers: a long make's `making` mark is
+        // written now, not only when it ends (`LAMP_MAKE_MAY_RUN_ON`).
+        let cut = crate::long_make::CutAtDrop::new(request);
+        let answer = answered
             .await
-            .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()))
+            .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()));
+        cut.answered();
+        answer
     }
 }
 

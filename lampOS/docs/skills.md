@@ -6917,7 +6917,10 @@ the same code for both writers.
     all the same (`long_make::to_agent`, `long_make::cut`), so it goes
     through the same gate and is never put on or said through the say
     service with none (El's P2 on #7774); DeepSeek's quick reactions keep
-    the cut-turn path. One at a time: while one runs on (its mark in
+    the cut-turn path. Its `making` mark is written at the cut, by a guard
+    the waiting turn holds (`long_make::CutAtDrop`), not only when the make
+    ends, so a mute, sleep or worker restart in between tells it as not
+    finished, never loses it untold (Heron's P3 on #7774). One at a time: while one runs on (its mark in
     `long-make.json` beside `made.json` says `making`), a make ask is told
     "I'm still making your <name> skill." (the name of DeepSeek's draft, or
     "your skill"), nothing made. Each make's news keeps a mark of its own
@@ -6939,15 +6942,19 @@ the same code for both writers.
     `task_news::quiet_for_news`), not the quiet hours
     (`run_write_yes::quiet_hours_now`), someone at the lamp; and the room
     not busy, nothing owed. Not back today, it waits for the next time,
-    however long. Each telling is offered at most three times
+    however long. While a yes is still awaited (an earlier telling's
+    read-back, or a quick make's, `skill_write_yes::awaited`) or a clash's
+    choice is still asked (`made_clash::awaited`), a telling would replace
+    that wait and strand its skill off, so the worker says nothing, keeps
+    its mark and gives its offer back, and it is told at a later chance
+    (Heron's P2 on #7774). Each telling is offered at most three times
     (`long_make::MOST_OFFERS`, two minutes apart at the soonest, counted in
     `long-make-offers.json` so a restart doesn't begin it again); then it is
     left to `ready_untold` in the app's list and to "Is my skill ready?",
     the skill off. The worker acts on that turn's note
     (`long_make::told_here`): one line, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), never read back
-    and no yes asked, code of its own or not (the first builder, 18 Nov
-    18:41), with the link ask for a service it reads that isn't linked yet,
+    Say 'remove it' to undo." (`long_make::ready_on_line`), no yes asked
+    (the first builder, 18 Nov 18:41), with the link ask for a service it reads that isn't linked yet,
     as a finished make's line has it. One with code while the lamp runs no
     skill's code (`LAMP_MADE_SCRIPTS` off) is said ready and off, why
     plainly, never on. One with code that keeps its yes as a finished
@@ -6989,7 +6996,12 @@ the same code for both writers.
     let run on that the agent made none of is said as the agent's failure.
     A finished skill removed in the app before it was told (made, or not
     put on) has its mark
-    dropped quietly, never told "couldn't finish".
+    dropped quietly, never told "couldn't finish". A known limit: after a
+    worker restart the make's run in lamp-tasks isn't stopped, and may go
+    on up to `long_make::WRITE_WITHIN` (300 s) for its answer, which is
+    then thrown away; meanwhile lamp-tasks refuses a new make `busy`, so an
+    ask made again at once, after "I couldn't finish", can fail until it
+    ends.
   - **"Is my skill ready?"** `make_skill`'s list of the person's skills
     (`made: true`, its description naming that ask) carries `long_make`:
     `still_making` with `minutes_so_far`, `made`, `made_not_on`,
@@ -7011,7 +7023,10 @@ the same code for both writers.
   `a_long_make_not_put_on_once_heard_is_told_why`,
   `a_long_make_on_already_is_told_with_nothing_asked_again`,
   `a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded`,
-  `a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly` and
+  `a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly`,
+  `a_second_code_make_waits_for_the_firsts_yes_before_it_is_told`,
+  `a_long_make_is_not_told_over_a_quick_makes_awaited_yes`,
+  `a_long_make_is_not_told_over_an_open_clash_ask` and
   `long_make`'s own;
   lamp-tasks' `only_a_make_marked_may_run_on_is_given_past_two_minutes`.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
