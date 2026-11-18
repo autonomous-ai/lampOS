@@ -65,3 +65,24 @@ fn a_path_that_is_not_a_cgroup_path_is_an_error() {
         assert!(judge_unit_empty(true, stdout, &ok).is_err(), "{stdout:?}");
     }
 }
+
+#[test]
+fn the_admin_socket_is_waited_for_and_given_up_on() {
+    use lamp_apps::client::wait_for_path;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("admin.sock");
+    // Never there: every look is made, a pause between each, then no.
+    let mut pauses = 0;
+    assert!(!wait_for_path(&path, 4, || pauses += 1));
+    assert_eq!(pauses, 3);
+    // There from the third look: the wait ends at once.
+    let mut pauses = 0;
+    let there = path.clone();
+    assert!(wait_for_path(&path, 10, || {
+        pauses += 1;
+        if pauses == 2 {
+            std::fs::write(&there, b"").unwrap();
+        }
+    }));
+    assert_eq!(pauses, 2);
+}
