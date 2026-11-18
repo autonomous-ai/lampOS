@@ -2424,7 +2424,8 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// reads it and in no other: a made skill started by its own words
 /// (`LAMP_MADE_SKILL_ASKS`, #7233) in lamp-voice, which makes it, and the
 /// four that load it (lamp-skills, its manage helper, lamp-cloud's skills
-/// page and lamp-control's token), so such a skill is never refused at
+/// page and lamp-control's token), and lamp-tasks for an agent make's own
+/// `lamp-skills pack` check (#7245), so such a skill is never refused at
 /// install, not loaded or listed as not loaded; a made skill not on never
 /// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
 /// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
@@ -2441,6 +2442,8 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
                 "lamp-skills-manage@.service",
                 "lamp-cloud.service",
                 "lamp-control.service",
+                // #7245: an agent make's own lamp-skills pack check.
+                "lamp-tasks.service",
             ],
         ),
         (
@@ -4686,6 +4689,8 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     let on = |line: &str| service.iter().filter(|said| **said == line).count();
     assert_eq!(on("Environment=LAMP_TASKS_KEPT_SESSION=on"), 1);
     assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 1);
+    // #7245: the agent make's own pack check takes a skill its words start.
+    assert_eq!(on("Environment=LAMP_MADE_SKILL_ASKS=on"), 1);
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the

@@ -73,6 +73,8 @@ Environment=LAMP_TASKS_RESUME_CLOSED=on
 Environment=LAMP_TASKS_ONE_SESSION=on
 # The one session as Harness's kept session (openharness#4393, #7507; docs/switches.md).
 Environment=LAMP_TASKS_KEPT_SESSION=on
+# #7245: an agent make's own lamp-skills pack check takes a skill started by its words (docs/switches.md).
+Environment=LAMP_MADE_SKILL_ASKS=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks

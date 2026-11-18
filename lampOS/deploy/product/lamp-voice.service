@@ -438,7 +438,7 @@ Environment=LAMP_AGENT_SERVICES=on
 # what the check refuses is left out and said, no limits added unless asked, a say as often as asked (at least a
 # minute); passed to the provider and second routes. The same line in lamp-skills and lamp-skills-manage@.
 Environment=LAMP_MADE_SKILL_LOOSE=on
-# #7233, docs/skills.md; also in lamp-skills, -manage@, -cloud, -control
+# #7233, docs/skills.md; also in lamp-skills, -manage@, -cloud, -control, -tasks
 Environment=LAMP_MADE_SKILL_ASKS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
