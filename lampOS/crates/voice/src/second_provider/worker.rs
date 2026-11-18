@@ -4356,7 +4356,7 @@ pub fn serve(
     let limit_local = crate::second_provider::limit_local::on();
     if limit_local && language.is_none() {
         eprintln!(
-            "lamp-voice second: at the usage limit, a plain light or volume ask is done without the model (LAMP_LIMIT_LOCAL_ASKS)"
+            "lamp-voice second: at the usage limit, a plain light or volume ask, or the time, is done without the model (LAMP_LIMIT_LOCAL_ASKS)"
         );
     } else if limit_local {
         eprintln!(

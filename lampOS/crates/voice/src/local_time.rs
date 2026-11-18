@@ -701,6 +701,19 @@ pub fn now_here() -> Result<Option<String>, &'static str> {
     Ok(said(&file, now))
 }
 
+/// The hour (0 to 23) and minute now where the lamp stands, for the time
+/// said at the usage limit with no model (#7642); nothing when the clock
+/// is known not to be set or no zone can be read.
+pub(crate) fn clock_here() -> Option<(i64, i64)> {
+    if unset_here() {
+        return None;
+    }
+    let (file, now) = here()?;
+    let local = now.checked_add(i64::from(offset_at(&file, now)?))?;
+    let seconds = local.rem_euclid(86_400);
+    Some((seconds / 3_600, seconds % 3_600 / 60))
+}
+
 /// [`now_here`] naming whose time it is, for `LAMP_TIME_PLACES`: with the
 /// switch, every answer of the function says its place, its own one too
 /// (the reviewer on #1589), so the model never gives it as another's.
