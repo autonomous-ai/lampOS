@@ -2308,9 +2308,10 @@ mod tests {
         room.heard(1, S);
         room.ended(1, 2 * S);
         room.spoke(1, 3 * S);
+        // Each judged while still open, so neither is closed by the next
+        // one's start: both are pending at once.
         for request in [2, 3] {
             room.heard(request, request * 5 * S);
-            room.ended(request, request * 5 * S + S / 2);
             room.judged(request, Some(Verdict::Hold(NOT_SPOKEN_TO)), false);
         }
         assert_eq!(room.left_unanswered(2, 16 * S), Left::Held);
