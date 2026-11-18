@@ -2293,7 +2293,6 @@ impl Says {
     }
 }
 
-
 /// Whether `request` is one a person asked for, which the care hold
 /// (`LAMP_CARE_LINE`, #7689) lets through: the shutdown's last words, the
 /// lamp's agent's answer to the owner's ask, a made skill's run the owner
