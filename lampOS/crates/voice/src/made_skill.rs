@@ -2509,6 +2509,41 @@ pub(crate) fn agent_script_only(scripts: &[(String, String)]) -> bool {
     )
 }
 
+thread_local! {
+    /// While a make on a gateway agent with its own way out for a `net` run
+    /// is checked (#7742, `make_skill_local`'s hand-over with
+    /// `skill_task_yes::gateway_net_on`): whether its own code may be
+    /// granted `net`, as its script then reaches the public web from its
+    /// own skill-start fence. Off everywhere else.
+    static NET_CODE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`NET_CODE`] is on on this thread.
+fn net_code_here() -> bool {
+    NET_CODE.with(std::cell::Cell::get)
+}
+
+/// [`net_code_here`], for another module's tests.
+#[cfg(test)]
+pub(crate) fn net_code_here_for_tests() -> bool {
+    net_code_here()
+}
+
+/// [`NET_CODE`] on for as long as it lives, then as it was.
+pub(crate) struct NetCode(bool);
+
+impl NetCode {
+    pub(crate) fn on() -> Self {
+        Self(NET_CODE.with(|kept| kept.replace(true)))
+    }
+}
+
+impl Drop for NetCode {
+    fn drop(&mut self) {
+        NET_CODE.with(|kept| kept.set(self.0));
+    }
+}
+
 /// [`AGENT_SCRIPT`] set for as long as it lives, then as it was.
 struct AgentScript(Option<bool>);
 
@@ -5011,7 +5046,7 @@ fn code_held(
             // owner's kept yes. Never for code a model wrote.
             let net = grant == crate::skill_task_yes::NET.0
                 && crate::skill_task_yes::net_on()
-                && agent_task(table);
+                && (agent_task(table) || net_code_here());
             if !service && !net && !GRANTS.iter().any(|(name, _)| *name == grant) {
                 eprintln!(
                     "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
@@ -8527,6 +8562,7 @@ pub fn put_on_scripts<'a>(
         .iter()
         .any(|grant| grant == crate::skill_task_yes::NET.0)
         && !agent_script_only(&scripts)
+        && !net_code_here()
     {
         return Err(scripts_not_held("the internet for code of its own"));
     }

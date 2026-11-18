@@ -249,6 +249,14 @@ pub const SERVICE_GRANTS: &[&str] = &[
 /// `net` is no grant. Either way every run stays [`NET_ENV`] `run`. lamp-skills, its manage
 /// helper, lamp-control and the voice read the same switch.
 pub const NET_SWITCH: &str = "LAMP_TASK_NET";
+/// The switch for a run granted [`NET_GRANT`] on a gateway agent
+/// (OpenClaw, #7742; `on` exactly, off unless set, on in the product's
+/// lamp-tasks and lamp-voice): with it and [`NET_SWITCH`] on, such a run
+/// gets its own egress socket as a Hermes run's, and the skill-start
+/// launcher's fence holds its script in a network of its own with a relay
+/// to that socket alone ([`crate::gateway::FENCE_NET_EDITS`]). Off, it is
+/// refused as before: the gateway's turns share its namespaces.
+pub const GATEWAY_NET_SWITCH: &str = "LAMP_TASK_NET_GATEWAY";
 /// The task grant that gives the run the public web: never lamp-control's own,
 /// so never in a one-run token; checked by the owner's yes as any grant.
 pub const NET_GRANT: &str = "net";
@@ -2542,6 +2550,12 @@ pub struct HarnessRunner {
     /// can't take it: such a run is refused in words ([`net_refused`]),
     /// nothing made or started.
     pub egress: Option<crate::egress::Grant>,
+    /// With [`GATEWAY_NET_SWITCH`] on, the skill-start launcher a gateway
+    /// agent's run granted `net` goes through (#7742,
+    /// [`crate::skill_start::LAUNCHER`] on a lamp): read for its fence's
+    /// relay line ([`crate::gateway::FENCE_NET_LINE`]) before the run's
+    /// egress socket is made. None: such a run is refused as before.
+    pub gateway_net: Option<PathBuf>,
 }
 
 /// lamp-tasks' Harness project in `home`, `~/harnesses/lamp-tasks`
@@ -2583,6 +2597,15 @@ pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
         && script.contains(crate::egress::NS_SKILL_LINE)
         && script.contains(crate::egress::NS_OWN_SKILL_LINE)
         && script.contains(crate::skill_make::ONE_PATH_NS_MAKE_LINES)
+}
+
+/// Whether the skill-start launcher at `launcher` (a byte copy of
+/// lamp-tasks) has the fence that gives a run granted `net` its way out
+/// (#7742): its bytes hold [`crate::gateway::FENCE_NET_LINE`]. An older
+/// copy, or none, does not.
+pub fn fence_takes_net(launcher: &Path) -> bool {
+    let line = crate::gateway::FENCE_NET_LINE.as_bytes();
+    std::fs::read(launcher).is_ok_and(|bytes| bytes.windows(line.len()).any(|at| at == line))
 }
 
 /// How every refusal of a run granted `net` begins (#7200): an answer
@@ -2703,9 +2726,7 @@ impl HarnessRunner {
             Err(why)
         };
         if gateway {
-            return refused(format!(
-                "the lamp's default agent ({name}) runs its turns in its gateway's namespaces, which no one run can be held in"
-            ));
+            return self.gateway_way_out(run, name, until);
         }
         let Some(grant) = &self.egress else {
             return refused(format!("{NET_SWITCH} is off in lamp-tasks"));
@@ -2736,6 +2757,51 @@ impl HarnessRunner {
         Ok(Some(served))
     }
 
+    /// [`Self::way_out`] for a gateway agent (`name`, #7742): its turns run
+    /// in its gateway's namespaces, shared by every turn, but the run's
+    /// script runs only in the skill-start launcher's fence, a network of
+    /// its own per run. With [`GATEWAY_NET_SWITCH`] on
+    /// ([`Self::gateway_net`]), [`NET_SWITCH`] on and an installed launcher
+    /// whose fence starts the run's relay ([`crate::gateway::FENCE_NET_LINE`]),
+    /// the run's egress socket `skill-<run id>` is made as a Hermes run's,
+    /// served until `until`, and named in the run's grant for its fence;
+    /// else refused in words, nothing made.
+    fn gateway_way_out(
+        &self,
+        run: &SkillRun,
+        name: &str,
+        until: std::time::Instant,
+    ) -> Result<Option<crate::egress::Served>, String> {
+        let refused = |why: String| {
+            let why = net_refused(&why);
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            Err(why)
+        };
+        let Some(launcher) = &self.gateway_net else {
+            return refused(format!(
+                "the lamp's default agent ({name}) runs its turns in its gateway's namespaces, which no one run can be held in"
+            ));
+        };
+        let Some(grant) = &self.egress else {
+            return refused(format!("{NET_SWITCH} is off in lamp-tasks"));
+        };
+        if !fence_takes_net(launcher) {
+            return refused(format!(
+                "the lamp's default agent ({name}) runs its script through a skill-start launcher whose fence gives no run its way out: lamp-update's round hasn't copied this lamp-tasks to {}",
+                launcher.display()
+            ));
+        }
+        let socket = format!("{RUN_FOLDER_PREFIX}{}", run.run);
+        let served = grant
+            .open_for(&socket, until, &run.folder)
+            .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
+        eprintln!(
+            "[lamp-tasks] skill task {}: granted net: its egress socket {socket}.sock made for the lamp's default agent ({name}), its skill-start fence relays to it alone",
+            run.run
+        );
+        Ok(Some(served))
+    }
+
     /// The lamp's: runs in `home`'s `~/harnesses/lamp-tasks`
     /// (`runtime::MACHINES_PROJECT`), token files in
     /// [`crate::run_token_file::RUNS_DIR`], held by [`HERMES`].
@@ -2759,6 +2825,7 @@ impl HarnessRunner {
             skill_start_allowed: crate::gateway::SkillStartAllowed::lamp(),
             makes: false,
             egress: None,
+            gateway_net: None,
         }
     }
 
@@ -3508,8 +3575,13 @@ impl Runner for HarnessRunner {
         let prompt = match &token {
             None => run.prompt.clone(),
             Some(token) if by_start => {
-                let (live, prompt) =
-                    crate::gateway::open_start(&self.starts, &started.folder, run, token.secret())?;
+                let (live, prompt) = crate::gateway::open_start(
+                    &self.starts,
+                    &started.folder,
+                    run,
+                    token.secret(),
+                    _way_out.as_ref().map(crate::egress::Served::path),
+                )?;
                 started.live = Some(live);
                 prompt
             }
@@ -4252,6 +4324,14 @@ impl HandOvers {
         // runner (#7200); with the path off, from the make's net runner.
         if net {
             runner.egress = Some(crate::egress::Grant::lamp());
+        }
+        // A gateway agent's run granted `net` (#7742): its way out at the
+        // skill-start launcher's fence, with its switch on.
+        if net && net_on(std::env::var(GATEWAY_NET_SWITCH).ok().as_deref()) {
+            eprintln!(
+                "[lamp-tasks] skill task: a gateway agent's net run is on ({GATEWAY_NET_SWITCH}=on): its own egress socket, relayed in its skill-start fence"
+            );
+            runner.gateway_net = Some(PathBuf::from(crate::skill_start::LAUNCHER));
         }
         let runner = std::sync::Arc::new(runner);
         let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
@@ -6920,6 +7000,7 @@ mod tests {
             skill_start_allowed: allowed_read(true),
             makes: false,
             egress: None,
+            gateway_net: None,
         }
     }
 

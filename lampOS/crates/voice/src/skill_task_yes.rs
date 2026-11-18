@@ -216,6 +216,34 @@ pub fn set_net_here(on: Option<bool>) {
     NET_HERE.with(|here| here.set(on));
 }
 
+/// The switch for a run granted [`NET`] on a gateway agent (OpenClaw,
+/// #7742), in lamp-tasks (`lamp_tasks::skill_task::GATEWAY_NET_SWITCH`)
+/// and the voice: `on` only. With it and [`NET_ENVIRONMENT`] on, such a
+/// run's script reaches the public web from its own skill-start fence, so
+/// a make on OpenClaw may write a task whose own script fetches from the
+/// web (`make_skill_local`); off, as before.
+pub const GATEWAY_NET_ENVIRONMENT: &str = "LAMP_TASK_NET_GATEWAY";
+
+thread_local! {
+    /// [`GATEWAY_NET_ENVIRONMENT`] as a test of this thread sets it.
+    static GATEWAY_NET_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a gateway agent's run granted [`NET`] is on in this process:
+/// [`GATEWAY_NET_ENVIRONMENT`] `on` and [`net_on`].
+pub fn gateway_net_on() -> bool {
+    net_on()
+        && GATEWAY_NET_HERE
+            .with(std::cell::Cell::get)
+            .unwrap_or_else(|| std::env::var(GATEWAY_NET_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`GATEWAY_NET_ENVIRONMENT`] for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_gateway_net_here(on: Option<bool>) {
+    GATEWAY_NET_HERE.with(|here| here.set(on));
+}
+
 /// [`GRANTS`], and [`NET`] while [`net_on`].
 fn known() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
     GRANTS.iter().chain(net_on().then_some(&NET))
