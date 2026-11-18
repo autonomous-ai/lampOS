@@ -1157,6 +1157,8 @@ pub enum Route {
     /// ([`crate::devices_tools`]): waits for the cloud, so it runs off the
     /// turn like the other slow routes.
     Devices(crate::devices_tools::Read),
+    /// The desk stopped ([`crate::devices_tools::run_stop`]): no yes, from anyone.
+    DeskStop,
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -1299,6 +1301,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::seen_yes::is_tool(name) {
         return if settings.seen_activity {
             Route::SeenActivity(settings.seen_posture)
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::devices_tools::is_stop_tool(name) {
+        return if settings.devices {
+            Route::DeskStop
         } else {
             Route::Nobody
         };
@@ -2703,6 +2712,21 @@ fn run_call_with_scope(
                 told
             },
         ),
+        Route::DeskStop => ("the devices", {
+            let mut cache = crate::devices_tools::CACHE
+                .lock()
+                .map(|cache| cache.clone())
+                .unwrap_or_default();
+            let told = crate::devices_tools::run_stop(
+                &mut crate::devices_tools::Bus::of_the_lamp(),
+                &mut cache,
+                crate::devices_tools::STOP_WITHIN,
+            );
+            if let Ok(mut kept) = crate::devices_tools::CACHE.lock() {
+                *kept = cache;
+            }
+            told
+        }),
         Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(

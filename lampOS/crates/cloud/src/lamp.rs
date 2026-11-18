@@ -1046,6 +1046,12 @@ impl Lamp for Real {
         }
     }
 
+    fn devices_unsent(&mut self, req_id: &str) {
+        if let Some(link) = self.devices.as_mut() {
+            link.unsent(req_id);
+        }
+    }
+
     fn devices_down(&mut self, kind: &str, data: &Value, now_ms: u64) -> bool {
         match (self.devices.as_mut(), self.bus.as_ref()) {
             (Some(link), Some(bus)) => {
