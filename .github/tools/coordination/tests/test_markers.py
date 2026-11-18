@@ -87,6 +87,13 @@ class Parsing(unittest.TestCase):
             self.assertEqual(parse_marker(body)[:2], ("HOLD", "136b22c459"), last)
             self.assertEqual(parse_marker("Ten, 10:00: one P2, in the docs " + last + "\n**HOLD** 136b22c459 x")[:2],
                              ("HOLD", "136b22c459"), last)
+            # Heron's second P2: a comment typed in a browser ends its lines in CRLF.
+            self.assertEqual(parse_marker("Ten, 10:00: one P2, in the docs " + last + "\r\nHOLD 136b22c459 x")[:2],
+                             ("HOLD", "136b22c459"), last)
+            self.assertEqual(parse_marker("Ten, 10:00: one P2, in the docs " + last + " \r\n\r\nHOLD 136b22c459")[:2],
+                             ("HOLD", "136b22c459"), last)
+        # A lifting word on the HOLD's own line still means no HOLD, with a tab too.
+        self.assertIsNone(parse_marker("Seventh, 10:00: this lifts\tHOLD `136b22c459` on the old head."))
 
     def test_bracketed_and_quoted_markers_do_not_count(self):
         self.assertIsNone(parse_marker("Friday, to Reviewer-two (HOLD 3e741c2201): new head"))
