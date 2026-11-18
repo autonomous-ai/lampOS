@@ -4013,8 +4013,9 @@ gone ([switches.md](switches.md)). What happens:
      With `LAMP_MADE_NOTES=on` (#7245) it also names
      `lamp.notes.set(key, value)` and `lamp.notes.get(key)` (grant `notes`,
      `made_skill::SCRIPT_NOTES_SDK`): a small note kept in lamp-control's
-     notes store under the skill's own client (`runs::skill_notes_client`),
-     which its next run reads back; never a file the person opens. The
+     notes store under the skill's own client (`runs::skill_notes_client`;
+     lamp-control keeps every skill's runs' notes there, switch or not,
+     #7775), which its next run reads back; never a file the person opens. The
      prompt says that the SDK has those two calls, so such a skill can be
      made, and, with `LAMP_MADE_SKILL_ASKS` on too, that a skill started
      by the person's own words is started by its asks, not by hearing the

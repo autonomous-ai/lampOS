@@ -770,7 +770,9 @@ sau:
      `lamp.notes.set(key, value)` và `lamp.notes.get(key)` (quyền `notes`,
      `made_skill::SCRIPT_NOTES_SDK`): một ghi chú nhỏ giữ trong kho notes
      của lamp-control dưới client riêng của kỹ năng
-     (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
+     (`runs::skill_notes_client`; lamp-control giữ ghi chú của mọi lần chạy
+     của mọi kỹ năng ở đó, có bật công tắc hay không, #7775), lần chạy sau
+     đọc lại được; không bao giờ
      là một tệp người dùng mở được. Lời nhắc nói rõ SDK có hai lệnh đó, nên
      kỹ năng như vậy làm được, và khi `LAMP_MADE_SKILL_ASKS` cũng bật, một
      kỹ năng khởi động bằng chính lời người dùng nói là khởi động bằng
