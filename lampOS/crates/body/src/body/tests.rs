@@ -21649,3 +21649,111 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         "on: cool, a new line stands it"
     );
 }
+
+/// #7749: the level asked at `at`, alternating 5 and 2 every 7 s.
+fn level_every_seven(at: Duration) -> u8 {
+    if (at.as_secs() / 7) % 2 == 0 { 5 } else { 2 }
+}
+
+/// #7749: someone there, a new level sent every 7 s for 8 min, shifts at
+/// rest playing: each send is taken within 5 s, a shift found playing
+/// eased to rest for it; and no shift begins while a level waits.
+#[test]
+fn a_new_energy_level_ends_a_shift_at_rest_and_is_taken_within_five_seconds() {
+    let (report, shifts, folding, _, _) = at_rest_with(
+        true,
+        true,
+        8,
+        |at| Asked {
+            present: true,
+            energy: level_every_seven(at),
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    assert_eq!(folding, None);
+    let sends: Vec<Duration> = (2..68).map(|k| Duration::from_secs(7 * k)).collect();
+    // Some sends found a shift playing, so the shift's end is what is tried.
+    assert!(
+        sends
+            .iter()
+            .any(|send| shifts.iter().any(|(from, to, _)| from < send && send < to)),
+        "{shifts:?}"
+    );
+    for send in sends {
+        let wanted = level_every_seven(send);
+        let taken = report
+            .energy_levels
+            .iter()
+            .find(|(at, level)| *at >= send && *level == wanted)
+            .map(|(at, _)| *at);
+        assert!(
+            taken.is_some_and(|at| at - send <= Duration::from_secs(5)),
+            "sent {send:?}: taken {taken:?}, {shifts:?}"
+        );
+        let taken = taken.unwrap();
+        assert!(
+            !shifts
+                .iter()
+                .any(|(from, _, _)| send <= *from && *from < taken),
+            "sent {send:?}, taken {taken:?}: a shift began while it waited, {shifts:?}"
+        );
+    }
+}
+
+/// #7749: a nod asked at 1 s and a new level sent at 1.3 s: the nod plays
+/// to its end step for step as with no level sent, and the level is taken
+/// only after it.
+#[test]
+fn a_new_energy_level_never_cuts_a_gesture_asked_of_it() {
+    let nod = |later: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+        let time = clock.time.clone();
+        let seen = clock.time.clone();
+        let asked_once = std::cell::Cell::new(false);
+        let mut gestures = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            gesture_limits(),
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Speaking, 60)),
+            move || {
+                let now = time.get();
+                let ask = now >= Duration::from_secs(1) && !asked_once.replace(true);
+                Asked {
+                    gesture: ask.then_some(&crate::clips::NOD),
+                    energy: if now >= Duration::from_millis(1_300) {
+                        later
+                    } else {
+                        1
+                    },
+                    ..Asked::default()
+                }
+            },
+            |glimpse| gestures.push((seen.get(), glimpse.gesture)),
+        );
+        let nodding: Vec<Duration> = gestures
+            .iter()
+            .filter(|(_, name)| *name == Some("nod"))
+            .map(|(at, _)| *at)
+            .collect();
+        (report, nodding)
+    };
+    let (_, alone) = nod(1);
+    let (report, sent) = nod(3);
+    assert!(!alone.is_empty());
+    assert_eq!(sent, alone);
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 3)
+        .map(|(at, _)| *at);
+    assert!(
+        taken.is_some_and(|at| at > *sent.last().unwrap()),
+        "{taken:?} {sent:?}"
+    );
+}

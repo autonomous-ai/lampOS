@@ -1344,7 +1344,12 @@ ROW on lamp-52e6 is to come (#7301).
 With `LAMP_BODY_ENERGY=on` (off unless exactly `on`; on in the product, set on Body, Expression, Skills and Voice together: lamp-52e6, row-6893h, 15 Nov, level 5 PASS, #6893) the body reads the character's
 energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
 (`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
-keeps the last level, not 1. Off, the body never reads it and runs at level 1. Level 1 is today exactly:
+keeps the last level, not 1. A new level is taken once the lamp is settled: no gesture playing or
+waiting, the pose still, the stand up or down. A shift at rest found playing does not keep it waiting:
+it is eased to rest over 0.7 s (`EASE_OUT`, as a hand's yield eases a gesture), and no shift begins
+while a level waits, so the level is taken within 5 s of the send. A gesture asked of it (a skill, a
+nod while talking, a turn to a voice) is never cut for a level; the level waits for its end (#7749).
+Off, the body never reads it and runs at level 1. Level 1 is today exactly:
 the limits and the stand pace the unit gives (`Limits::at(1)` returns them unchanged, a test pins it
 against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
 under what the unit gives:
