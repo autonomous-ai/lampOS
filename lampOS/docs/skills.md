@@ -6883,7 +6883,12 @@ the same code for both writers.
   (`make_no_cannot::SITTING`, `SAT_EXAMPLE`; lamp-9adf, 18 Nov, where such
   an ask was made on someone getting up): `room/presence` `someone`
   `equals = true` with sip-of-water's `for = "30m"`, once a sitting
-  (`rearm = "leaves"`) and `cooldown = "45m"`, never a getting up; coming
+  (`rearm = "leaves"`), `cooldown = "45m"` and sip-of-water's
+  `wait = "10m"` (Twelve's P2 on #7819: someone talking at the 30-minute
+  mark gets it once the talk ends, within ten minutes, rather than losing
+  the sitting; the make's check says it, "(if they're talking then, once
+  the talk ends, within 10 minutes)", and takes a `wait` only on such a
+  sitting, with its `for` and `rearm`), never a getting up; coming
   back to the desk stays an arrival. The model judges which by meaning;
   off, its prompt is as before. Its grants are
   `make_no_cannot`'s (`net` only with `LAMP_TASK_NET`), it needs skills'

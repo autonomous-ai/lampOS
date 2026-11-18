@@ -12215,10 +12215,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         const BACK: &str = "Lamp, make a skill that tells me the news when I come back to my desk.";
         let sat = format!(
             "field = \"someone\"\nequals = true\nfor = \"{}\"\nrearm = \"{}\"\n\
-             cooldown = \"{}\"\n",
+             cooldown = \"{}\"\nwait = \"{}\"\n",
             sip["for"].as_str().unwrap(),
             sip["rearm"].as_str().unwrap(),
             sip["cooldown"].as_str().unwrap(),
+            sip["wait"].as_str().unwrap(),
         );
         let back = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n\
                     absent_for = \"5m\"\n";
@@ -12268,7 +12269,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert_eq!(trigger["field"].as_str(), Some("someone"), "{table:?}");
             assert_eq!(trigger["equals"].as_bool(), Some(true), "{table:?}");
             if request == STRETCH {
-                for key in ["for", "rearm", "cooldown"] {
+                for key in ["for", "rearm", "cooldown", "wait"] {
                     assert_eq!(trigger.get(key), sip.get(key), "{key}: {table:?}");
                 }
                 assert!(!trigger.contains_key("when"), "{table:?}");

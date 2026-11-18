@@ -432,14 +432,17 @@ const EXAMPLE_ASKED: &str = "every morning at eight, tell me a joke";
 /// The sitting the lamp's own sip-of-water fires on, told the one more
 /// call with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (lamp-9adf, 18 Nov:
 /// "remind me to stretch when I've been sitting a long while" was made on
-/// someone getting up): sip-of-water's `for`, its once-a-sitting `rearm`
-/// and its `cooldown`, on the desk's presence, the one sitting a made
-/// trigger can say (`made_skill`'s check takes no `near` or `gap` on the
-/// faces). The model judges by meaning which one a request is.
+/// someone getting up): sip-of-water's `for`, its once-a-sitting `rearm`,
+/// its `cooldown` and its `wait` (someone talking at the mark gets it once
+/// the talk ends, within ten minutes: Twelve's P2 on #7819), on the desk's
+/// presence, the one sitting a made trigger can say (`made_skill`'s check
+/// takes no `near` or `gap` on the faces). The model judges by meaning
+/// which one a request is.
 const SITTING: &str = " Someone has sat at the desk a long while, as the lamp's own \
 sip-of-water fires: \"room/presence\", \"someone\", equals true, for = \"30m\" (or the while the \
 request names), rearm = \"leaves\" (once a sitting, again only after they have left), \
-cooldown = \"45m\"; a long sitting is never a getting up, which runs only as they stand. \
+cooldown = \"45m\", wait = \"10m\" (talking when the time comes: once the talk ends, within ten \
+minutes); a long sitting is never a getting up, which runs only as they stand. \
 Someone coming back to the desk is an arrival, never the desk left.";
 
 /// One whole answer for a long sitting ([`SITTING`]), shown to the model
@@ -457,6 +460,7 @@ equals = true
 for = \"30m\"
 rearm = \"leaves\"
 cooldown = \"45m\"
+wait = \"10m\"
 ```";
 
 /// The request [`SAT_EXAMPLE`] is for.
@@ -1522,7 +1526,9 @@ mod tests {
     /// long while" was made on someone getting up. With
     /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more call is told the
     /// sitting as sip-of-water fires on it, its `for`, its once-a-sitting
-    /// `rearm` and its `cooldown`, with a whole answer for a sat-a-while
+    /// `rearm`, its `cooldown` and its `wait` (someone talking at the mark
+    /// gets it once the talk ends, within ten minutes, never loses the
+    /// sitting: Twelve's P2 on #7819), with a whole answer for a sat-a-while
     /// ask, beside the arrival and the leaving; the model still judges by
     /// meaning. Off, the prompt is as before.
     #[test]
@@ -1538,7 +1544,7 @@ mod tests {
         assert!(told.contains(SAT_EXAMPLE_ASKED), "{told}");
         assert!(told.contains(made_skill::TRIGGER_MEANINGS), "{told}");
         let sip = sip_of_waters_trigger();
-        for key in ["for", "rearm", "cooldown"] {
+        for key in ["for", "rearm", "cooldown", "wait"] {
             let line = format!("{key} = \"{}\"", sip[key].as_str().unwrap());
             assert!(told.contains(&line), "{line}: {told}");
         }
@@ -1556,7 +1562,7 @@ mod tests {
         assert_eq!(trigger["topic"].as_str(), Some("room/presence"));
         assert_eq!(trigger["field"].as_str(), Some("someone"));
         assert_eq!(trigger["equals"].as_bool(), Some(true));
-        for key in ["for", "rearm", "cooldown"] {
+        for key in ["for", "rearm", "cooldown", "wait"] {
             assert_eq!(trigger.get(key), sip.get(key), "{key}");
         }
     }
