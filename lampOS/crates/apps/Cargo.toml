@@ -1,0 +1,19 @@
+[package]
+name = "lamp-apps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The pure parts of the apps' manage helper (#7415, piece 2): what an app's
+# name, entry and units may be, the remove order and the start-up sweep over
+# a fake `Effects`, the staging-path rule, the launcher. No binary, no unit
+# file and no root yet: nothing here is wired to a lamp.
+[dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
