@@ -16,6 +16,10 @@ const MAY_NAME_IT: &[(&str, &str)] = &[
         "tells each outward run it makes (LAMP_DID_PUBLISH)",
     ),
     (
+        "body",
+        "tells what the body chooses to do, once it ends (LAMP_DID_BODY)",
+    ),
+    (
         "voice",
         "keeps the last hour in memory for the look-up (LAMP_DID_KEEP)",
     ),

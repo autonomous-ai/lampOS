@@ -2857,6 +2857,12 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 bus.let_go, bus.gestures_let_go
             );
         }
+        if bus.dids_let_go() > 0 {
+            eprintln!(
+                "lamp-body: {} lamp/did messages were let go: no more than one in two seconds",
+                bus.dids_let_go()
+            );
+        }
         match &result.body {
             Some(report) => bus.stopped(&report.stop),
             None => bus.stopped(&Stop::Refused {
