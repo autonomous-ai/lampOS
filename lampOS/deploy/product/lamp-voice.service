@@ -316,6 +316,8 @@ Environment=LAMP_OTHER_LANGUAGE=sorry
 Environment=LAMP_NAME_IN_PASSING=ignored
 # LAMP_SPOKEN_TO: its why and rules are its row in docs/switches.md (#828).
 Environment=LAMP_SPOKEN_TO=on
+# LAMP_ROOM_HELD_TALK: #7332; a desk of two people talking, every line held, never turned the room busy. Its rules are its row in docs/switches.md.
+Environment=LAMP_ROOM_HELD_TALK=on
 # Inside a live back-and-forth a follow-up the model lets pass still renews the call for the caller's next line, and the
 # next line is told it is theirs (#7332: lamp-74ff, 16 Nov, three of the owner's lines in 26 s held). Caller's face only.
 Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
