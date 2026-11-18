@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// `on` takes [`KINDS`], beside `LAMP_CLOUD` and `LAMP_SETTINGS_CHANGE`.
 pub const ENVIRONMENT: &str = "LAMP_APP_MONITOR";
@@ -60,6 +60,16 @@ pub const SEALED_V: u64 = 1;
 /// it, so it is bounded short.
 pub const WAIT: Duration = Duration::from_secs(2);
 
+/// `monitor.set` answers on once lamp-peek is started, a moment before it
+/// binds its admin socket (#6401: a link asked 43 ms too early on
+/// lamp-0c89). A socket that is not there yet, or not yet taking
+/// connections, is tried again every [`RETRY_EVERY`] for this long before
+/// the link is refused.
+pub const STARTING: Duration = Duration::from_secs(3);
+
+/// How often a socket not there yet is tried again within [`STARTING`].
+pub const RETRY_EVERY: Duration = Duration::from_millis(100);
+
 /// A code lasts this long on lamp-peek (`lamp_peek::monitor::CODE_LASTS`).
 pub const CODE_LASTS_MS: u64 = 5 * 60 * 1_000;
 
@@ -76,6 +86,8 @@ pub struct Place {
     /// The backend's device id, as every reply's `id` says it.
     pub device_id: String,
     pub wait: Duration,
+    /// How long a socket not there yet is waited for ([`STARTING`]).
+    pub starting: Duration,
 }
 
 /// Whether the kinds are taken: `LAMP_CLOUD`, `LAMP_SETTINGS_CHANGE` and
@@ -98,6 +110,7 @@ impl Place {
             admin: ADMIN_SOCKET.into(),
             device_id: device_id.to_owned(),
             wait: WAIT,
+            starting: STARTING,
         })
     }
 
@@ -161,7 +174,7 @@ pub fn link_saying(
     if !place.on() {
         return Err(OFF.to_owned());
     }
-    let code = ask(&place.admin, place.wait).map_err(|why| {
+    let code = ask(&place.admin, place.wait, place.starting).map_err(|why| {
         say(&format!("{LINK_KIND} from the app: lamp-peek {why}"));
         UNREACHED.to_owned()
     })?;
@@ -192,9 +205,24 @@ pub fn link_saying(
     }))
 }
 
-/// One code from lamp-peek's admin socket: 64 hex digits on one line.
-fn ask(socket: &Path, wait: Duration) -> Result<String, String> {
-    let stream = UnixStream::connect(socket).map_err(|error| format!("not reached: {error}"))?;
+/// One code from lamp-peek's admin socket: 64 hex digits on one line. A
+/// socket missing or refusing is tried again for `starting`, as lamp-peek
+/// just switched on binds it a moment later; any other failure, at once.
+fn ask(socket: &Path, wait: Duration, starting: Duration) -> Result<String, String> {
+    let until = Instant::now() + starting;
+    let stream = loop {
+        match UnixStream::connect(socket) {
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
+                ) && Instant::now() < until =>
+            {
+                std::thread::sleep(RETRY_EVERY)
+            }
+            connected => break connected.map_err(|error| format!("not reached: {error}"))?,
+        }
+    };
     stream
         .set_read_timeout(Some(wait))
         .map_err(|error| format!("not reached: {error}"))?;
@@ -243,6 +271,7 @@ mod tests {
             admin,
             device_id: "d-42".into(),
             wait: WAIT,
+            starting: STARTING,
         };
         (place, connections)
     }
@@ -383,6 +412,7 @@ mod tests {
             admin: admin.clone(),
             device_id: "d-42".into(),
             wait: WAIT,
+            starting: STARTING,
         };
         std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
         let late = std::thread::spawn(move || {
@@ -415,12 +445,42 @@ mod tests {
         });
         assert_eq!(refused, Err(UNREACHED.to_owned()));
         assert_eq!(lines, ["monitor.link from the app: lamp-peek gave no code"]);
-        // lamp-peek not running: its socket is gone.
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// lamp-peek that never comes up, its socket gone or left behind by
+    /// one that stopped: refused as before once `starting` has passed, the
+    /// reason in the journal.
+    #[test]
+    fn lamp_peek_not_running_is_refused_once_the_start_wait_passes() {
+        let dir = folder("gone");
+        let (mut place, _) = place(&dir, CODE);
+        place.starting = Duration::from_millis(300);
+        std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
+        // Gone: no socket at all.
         std::fs::remove_file(&place.admin).unwrap();
-        assert_eq!(
-            link_saying(&place, "lamp-ab12", &asked("r-1"), 0, &mut |_| {}),
-            Err(UNREACHED.to_owned())
-        );
+        // Left behind: a socket file nobody listens on.
+        let stale = dir.join("stale.sock");
+        drop(UnixListener::bind(&stale).unwrap());
+        for (admin, kind) in [
+            (place.admin.clone(), std::io::ErrorKind::NotFound),
+            (stale, std::io::ErrorKind::ConnectionRefused),
+        ] {
+            let error = UnixStream::connect(&admin).unwrap_err();
+            assert_eq!(error.kind(), kind);
+            place.admin = admin;
+            let mut lines = Vec::new();
+            let began = Instant::now();
+            let refused = link_saying(&place, "lamp-ab12", &asked("r-1"), 0, &mut |line| {
+                lines.push(line.to_owned())
+            });
+            assert!(began.elapsed() >= place.starting);
+            assert_eq!(refused, Err(UNREACHED.to_owned()));
+            assert_eq!(
+                lines,
+                [format!("monitor.link from the app: lamp-peek not reached: {error}")]
+            );
+        }
         let _ = std::fs::remove_dir_all(dir);
     }
 }
