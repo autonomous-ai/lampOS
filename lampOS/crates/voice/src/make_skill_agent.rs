@@ -128,9 +128,12 @@ pub fn waiting_line(one_path: bool) -> &'static str {
         WAITING_LINE
     }
 }
-/// What the lamp says when the agent's own answer is `cannot:`: never the
-/// agent's words.
-pub const CANNOT_LINE: &str = "I couldn't make that one.";
+/// What the lamp says when the agent's own answer is `cannot:` and the
+/// lamp's own model gave no `cannot:` reason before it: never the agent's
+/// words, but one plain sentence with why (lamp-9adf, 17 Nov 18:2x: the
+/// bare line was said doubled and with no reason).
+pub const CANNOT_LINE: &str =
+    "I couldn't make that one: the lamp's agent found no way for a skill to do it.";
 /// How long the waiting line may wait to be said: past it, it is old.
 const WAITING_WITHIN_MS: u64 = 15_000;
 /// How long the line may take to send.
@@ -745,7 +748,8 @@ pub(crate) mod tests {
     /// `engine` (none for no target; "old" for a build with no make
     /// socket; "not_held_off" for one whose run can't be held off;
     /// "no_namespace" for one whose wrapper has no make-home line; "busy"
-    /// for one making another; "run_failed" for a run that failed;
+    /// for one making another; [`BUSY_AFTER_ONE`] for one that makes the
+    /// first and is busy for each after it; "run_failed" for a run that failed;
     /// [`UNANSWERED`] for one that answers its targets `ok:false`), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
@@ -808,6 +812,10 @@ pub(crate) mod tests {
     /// `ok:false` (#7375): whether the lamp has an agent is not known.
     pub(crate) const UNANSWERED: &str = "unanswered";
 
+    /// The stub's engine for a tasks part that answers its first make and
+    /// is busy with another for each make after it.
+    pub(crate) const BUSY_AFTER_ONE: &str = "busy_after_one";
+
     /// An agent whose tasks part has no socket at all (down or
     /// restarting, #7375), in a folder of its own.
     pub(crate) fn no_socket() -> (Folder, Agent) {
@@ -839,9 +847,10 @@ pub(crate) mod tests {
         if engine != Some("old") {
             sockets.push(MAKE_SOCKET_NAME);
         }
+        let makes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         for name in sockets {
             let listener = UnixListener::bind(dir.path().join(name)).unwrap();
-            let (sent, answers) = (sent.clone(), answers.clone());
+            let (sent, answers, makes) = (sent.clone(), answers.clone(), makes.clone());
             std::thread::spawn(move || {
                 for stream in listener.incoming() {
                     let Ok(mut stream) = stream else { return };
@@ -860,7 +869,7 @@ pub(crate) mod tests {
                             Some(engine) => {
                                 let engine = match engine {
                                     "old" | "not_held_off" | "no_namespace" | "busy"
-                                    | "run_failed" | "not_ready" => "hermes",
+                                    | "run_failed" | "not_ready" | BUSY_AFTER_ONE => "hermes",
                                     engine => engine,
                                 };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
@@ -880,6 +889,12 @@ pub(crate) mod tests {
                             ) =>
                         {
                             json!({"ok":false,"error":engine.unwrap(),"message":"no"})
+                        }
+                        "skill_make"
+                            if engine == Some(BUSY_AFTER_ONE)
+                                && makes.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0 =>
+                        {
+                            json!({"ok":false,"error":"busy","message":"no"})
                         }
                         "skill_make" => {
                             let _ = writeln!(stream, "{}", json!({"ok":true,"started":true}));

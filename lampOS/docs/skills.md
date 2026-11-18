@@ -5301,7 +5301,7 @@ the same code for both writers.
   the person hears, by voice and in the app's `not_kept`, the agent's line
   in place of the tip to ask for one thing (`NOT_MADE_TRY`,
   `NOT_KEPT_TRY`) or DeepSeek's `cannot:` of what the agent could make:
-  "The lamp's agent is busy; ask me again in a minute."
+  "Another skill is being made right now; ask me again in a minute."
   (`made_skill::AGENT_BUSY_TRY`), "The lamp's agent didn't answer in time;
   try again." (`AGENT_LATE_TRY`), or "The lamp's agent couldn't make it
   just now; try again." (`AGENT_FAILED_TRY`); no agent after all
@@ -5311,7 +5311,20 @@ the same code for both writers.
   make run here (`NoMakeRun`) is not the agent's failure: DeepSeek's
   stands as it is. So does a skill DeepSeek made after all, a lamp reason
   of its own (it can't do that yet, they already have it) and the brief's
-  own refusals. With no Hermes agent on the lamp nothing changes: DeepSeek makes
+  own refusals. When the agent was busy, a refusal it would have taken
+  over is said as busy, whatever DeepSeek answered: its `cannot:` but for
+  a brief's own refusal that stays DeepSeek's (`stays_deepseeks`), or a
+  check's refusal it would have written again (lamp-9adf, 17 Nov 18:19, a
+  busy hand-over said as "I couldn't make that: I couldn't make that
+  one."). A lamp reason that stands whoever writes the skill
+  (`made_skill::lamps_own_reason`: they already have it, its name is taken
+  with no free one, the lamp has nothing that reads it, or what the
+  lamp's check says a skill can't do yet but for `ECHOES_THE_ASK`) stands
+  even while the agent is busy, so asking for a skill they already have
+  is told "You already have that skill: ..." (Heron's P3 on #7555; test
+  `a_lamps_own_reason_stands_while_the_agent_is_busy`). A repair the agent doesn't answer
+  (busy, late, failed) is said the same way, never "the lamp's model
+  didn't answer". With no Hermes agent on the lamp nothing changes: DeepSeek makes
   it alone with its repairs. Either switch off, every make tries DeepSeek
   first, as before.
 - **The brief's own refusals stay DeepSeek's.** A DeepSeek `cannot:` whose
@@ -5379,10 +5392,31 @@ the same code for both writers.
   internet", and waiting for the spoken yes. Its run gets its way out only
   with that kept yes, as any `net` run (docs/tasks.md). Off, the prompt is
   as before, byte for byte.
+- **A skill that only says it can't is never kept.** The prompt keeps "I
+  can't do that yet:" for its one-line `cannot:` answer, never a say's
+  words. A made skill whose every step is a say beginning with that head
+  or with `cannot:` (`made_skill::says_it_cannot`, the prompt's own head,
+  never a word list) is read as the model's `cannot:` with that say's words
+  (`made_skill::cannot_in_a_say`, in the make's `kept`, by DeepSeek or the
+  agent): it goes to the agent, or with `LAMP_MAKE_NO_CANNOT=on` becomes
+  its task, and off is refused with those words ("I can't do that yet:
+  checking the gold price for you."). A say that itself begins with
+  `cannot:` is read without that head, so the person never hears
+  "cannot:" (Heron's P3 on #7555; test
+  `a_say_that_begins_cannot_is_never_spoken_with_its_head`). Such a say beside other steps is
+  refused by the check (`made_skill::SAYS_IT_CANNOT`) and repaired to
+  leave that part out. On lamp-9adf, 17 Nov, "tell me the gold price every
+  evening at six" was kept as one say of it, said each evening.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
-  its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
-  with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
-  make becomes one task for the agent (below).
+  DeepSeek's own `cannot:` reason when its answer before the hand-over was
+  one, in one sentence ("I couldn't make that: a skill can't reach ..."),
+  else its own line with why, "I couldn't make that one: the lamp's agent
+  found no way for a skill to do it." (`make_skill_agent::CANNOT_LINE`).
+  A line that already says it couldn't be made is never headed again
+  (`made_skill::not_made_line`; lamp-9adf, 17 Nov: "I couldn't make that: I
+  couldn't make that one."). With `LAMP_MAKE_NO_CANNOT=on` its words are
+  dropped all the same and the make becomes one task for the agent
+  (below).
 - **No "couldn't" with `LAMP_MAKE_NO_CANNOT=on`** (the owner, 16 Nov:
   "Every task must be doable; no 'couldn't' here"; #7234;
   `crate::make_no_cannot`; off unless `on`, lamp-voice alone reads it, in
@@ -5756,8 +5790,9 @@ the same code for both writers.
   No waiting line is said: the app shows the ask as `making`. A kept
   skill goes on at once as every MAKE IT does (one with code of its own as
   before, `app_make::put_on_line`), and a skill not made is said and told
-  to the app as before; the agent's own `cannot:` is "I couldn't make that
-  one.". With the switch off, no tasks part or no Hermes, it stays
+  to the app as before; the agent's own `cannot:` is DeepSeek's own
+  `cannot:` reason when it gave one, else "I couldn't make that one: the
+  lamp's agent found no way for a skill to do it.". With the switch off, no tasks part or no Hermes, it stays
   DeepSeek's as before, with its repairs. With Hermes but the make not
   taken by the agent (no make run: no make socket, `no_namespace` or
   `not_held_off`; lamp-tasks `busy` with a voice make; or no first answer

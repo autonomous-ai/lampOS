@@ -70,7 +70,8 @@
 //! - **The answers**: `{"ok":true,"started":true}` once the run is about
 //!   to start (so the voice says its waiting line only then), then
 //!   `{"ok":true,"answer"}`; or one refusal: `off`, `bad_request`,
-//!   `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
+//!   `too_long`, `busy` (a make runs), `full` (every connection held, no
+//!   make running), `not_held_off`, `no_namespace`, `run_failed` or
 //!   `no_answer`.
 //! - **The socket** ([`MakeHandOvers`]): with `LAMP_SKILL_TASKS` on (the
 //!   switch lamp-update's namespace edits are written with), `serve` binds
@@ -116,6 +117,11 @@ pub const FOLDER_HEAD: &str = "make-";
 pub const NO_ANSWER: &str = "the lamp's Hermes wrote no answer";
 /// What a second make is told while one runs.
 pub const BUSY: &str = "a skill is already being made on this lamp; one is made at a time";
+/// What a make is told when every connection the socket holds
+/// ([`MOST_CONNECTIONS`]) is taken while no make runs (each still sending
+/// its line or taking its answer): never [`BUSY`], which the voice says as
+/// another skill being made (Heron's P3 on #7555).
+pub const FULL: &str = "the lamp's skill make is answering other callers; try again";
 /// How long a connection has to send its line, and to take each answer.
 pub const LINE_WAIT: Duration = Duration::from_secs(5);
 /// The most connections read or answered at once.
@@ -1566,7 +1572,19 @@ impl MakeHandOvers {
             }
             if open.fetch_add(1, Ordering::AcqRel) >= MOST_CONNECTIONS {
                 open.fetch_sub(1, Ordering::AcqRel);
-                write_answer(&stream, &refusal("busy", BUSY));
+                // `busy` only while a make runs; every connection held
+                // with none running is `full` (Heron's P3 on #7555).
+                let refused = match running.load(Ordering::Acquire) {
+                    true => refusal("busy", BUSY),
+                    false => {
+                        eprintln!(
+                            "[lamp-tasks] skill make: refused full, {MOST_CONNECTIONS} connections \
+                             held and no make running"
+                        );
+                        refusal("full", FULL)
+                    }
+                };
+                write_answer(&stream, &refused);
                 continue;
             }
             let held = Counted(open.clone());
@@ -2881,6 +2899,52 @@ mod tests {
         .start(false, Arc::default())
         .unwrap();
         assert!(off.is_none() && !socket.exists());
+    }
+
+    /// Heron's P3 on #7555: the socket's connections all held while no make
+    /// runs (each still sending its line) was answered `busy`, which the
+    /// voice says as "Another skill is being made" with none being made.
+    /// It is `full` then; `busy` only while a make runs.
+    #[test]
+    fn every_connection_held_with_no_make_running_is_full_not_busy() {
+        let dir = tempfile::Builder::new()
+            .prefix("tmf-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let socket = dir.path().join("skill-make.sock");
+        let work = dir.path().join("work");
+        std::fs::create_dir(&work).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let handle = MakeHandOvers {
+            socket: socket.clone(),
+            work,
+            runner: Arc::new(writing(Some("A"))),
+            one_path: None,
+            caller: |_| true,
+        }
+        .start(true, stop.clone())
+        .unwrap()
+        .expect("on binds");
+        // Connections that have sent no line yet, every one the socket
+        // holds: no make runs.
+        let held: Vec<UnixStream> = (0..MOST_CONNECTIONS)
+            .map(|_| UnixStream::connect(&socket).unwrap())
+            .collect();
+        std::thread::sleep(ACCEPT_TICK * 5);
+        let refused = UnixStream::connect(&socket).unwrap();
+        refused
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        let mut answer = String::new();
+        BufReader::new(&refused).read_line(&mut answer).unwrap();
+        let answer: Value = serde_json::from_str(&answer).unwrap();
+        assert_eq!(answer["error"], "full", "{answer}");
+        assert_eq!(answer["message"], FULL, "{answer}");
+        assert!(!FULL.contains("being made"), "{FULL}");
+        drop(held);
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
     }
 
     /// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on in
