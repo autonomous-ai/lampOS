@@ -3514,19 +3514,22 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// `LAMP_OPENCLAW_ON_LAMP` (#6226): OpenClaw's settings written at the
 /// part's start ([`crate::openclaw_config::write`]) under `state_dir`, for
 /// lamp-cloud's forwarder, with the lamp's work folder under `home` its
-/// workspace and the lamp's skills when `skills`. Run as `lampos`,
-/// OpenClaw's own user. One journal line; no token is in the file.
-pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
+/// workspace, the lamp's skills when `skills` and V1's tool grants when
+/// `v1` (`LAMP_OPENCLAW_V1_TOOLS`, #7245). Run as `lampos`, OpenClaw's own
+/// user, at every start, so an existing lamp's file is brought up to date
+/// on its next start or update. One journal line; no token is in the file.
+pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool, v1: bool) -> String {
     let workspace = lamp_folder(home);
-    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills) {
+    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills, v1) {
         Ok(changed) => format!(
-            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}",
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}{}",
             if changed { "written" } else { "unchanged" },
             if skills {
                 ""
             } else {
                 ", the lamp's skills off"
-            }
+            },
+            if v1 { "" } else { ", V1's tools off" }
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
     }
@@ -4925,9 +4928,14 @@ pub fn serve<C: Clock>(
                 .ok()
                 .as_deref(),
         );
+        let v1 = crate::openclaw_config::v1_tools_on(
+            std::env::var(crate::openclaw_config::V1_TOOLS_SWITCH)
+                .ok()
+                .as_deref(),
+        );
         eprintln!(
             "{}",
-            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
+            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills, v1)
         );
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
@@ -7031,7 +7039,7 @@ mod tests {
         .unwrap();
         let home = dir.path().join("home");
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         let config: Value =
@@ -7050,13 +7058,17 @@ mod tests {
             config["skills"]["load"]["extraDirs"],
             json!(["/var/lib/lampOS/skills"])
         );
+        // #7245: V1's tool grants, on by default.
+        assert_eq!(config["tools"]["exec"]["security"], "full");
+        assert_eq!(config["tools"]["exec"]["ask"], "off");
+        assert_eq!(config["tools"]["exec"].get("mode"), None);
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
         );
         fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
         assert!(
-            set_up_openclaw(&state, &home, true)
+            set_up_openclaw(&state, &home, true, true)
                 .starts_with("tasks: OpenClaw's settings not written:")
         );
     }

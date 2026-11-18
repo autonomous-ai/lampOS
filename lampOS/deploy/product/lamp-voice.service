@@ -396,6 +396,8 @@ Environment=LAMP_MAKE_SKILL_AGENT=on
 # On the one run path too (#7245): a make DeepSeek fails goes to the lamp's agent when lamp-tasks says it takes
 # runs, OpenClaw as well as Hermes, through `harness new <engine>` (docs/tasks.md). Off: Hermes only, as before.
 Environment=LAMP_MAKE_AGENT_ONE_PATH=on
+# #7245, docs/skills.md: a make on the agent gets the skill guide too (with V1's tools on in lamp-tasks, its lamp-skills pack check)
+Environment=LAMP_MAKE_AGENT_GUIDE=on
 # #7270, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_NOT_ON_TOLD=on
 Environment=LAMP_APP_MAKE_SKILL=on

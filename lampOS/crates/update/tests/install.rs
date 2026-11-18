@@ -2406,6 +2406,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
         for line in [
             "Environment=LAMP_MAKE_SKILL_AGENT=on",
             "Environment=LAMP_MAKE_AGENT_ONE_PATH=on",
+            "Environment=LAMP_MAKE_AGENT_GUIDE=on",
             "Environment=LAMP_MAKE_SKILL=on",
             "Environment=LAMP_TASKS_DIR=/run/lampos-tasks",
         ] {
