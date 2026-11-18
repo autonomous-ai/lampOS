@@ -152,6 +152,34 @@ fn a_snoozed_skill_stays_snoozed_across_a_restart() {
     assert!(stuffy(&mut engine, 1_820, 6_100).is_empty());
 }
 
+/// A `[stop.done]` rest (#7753) is kept across a restart as a snooze is,
+/// and keeps its chance too: told "just did it" at 2,900 s for 10 minutes,
+/// the 50-minute chance at 3,000 s waits, the program restarts at 3,100 s,
+/// and it comes when the rest ends, at 3,500 s, not a sitting later (with
+/// `rearm = "leaves"`, a chance spent is the sitting's).
+#[test]
+fn a_just_drank_rest_keeps_its_chance_across_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let stop = "rearm = \"leaves\"\n\
+                [stop]\ntool = \"stop_sip\"\nabout = \"When someone asks to stop the sip nudge.\"\n\
+                [stop.done]\nhow = \"just_drank\"\nfor = \"10m\"\nabout = \"they just had a drink\"";
+    let (mut engine, file) = keeping(dir.path(), skill(dir.path(), stop));
+    assert!(stuffy(&mut engine, 0, 2_890).is_empty());
+    engine
+        .tool(
+            "stop_sip",
+            &serde_json::json!({"how": "just_drank"}),
+            2_900_000_000,
+        )
+        .unwrap();
+    assert!(stuffy(&mut engine, 2_900, 3_090).is_empty());
+    drop(engine);
+    let (mut engine, read) = restarted(skill(dir.path(), stop), &file, BOOT, 3_100);
+    assert_eq!(read, 1, "its hold kept");
+    assert!(engine.stopped("sip", 3_100_000_000), "still resting");
+    assert_eq!(stuffy(&mut engine, 3_100, 4_000), [3_500]);
+}
+
 /// A wellbeing-shaped nudge on stuffy air: `name`, after `for_m` minutes,
 /// again `cooldown_m` after its run, in the group `wellbeing` (two an
 /// hour, 30 minutes apart), `top` added before its trigger.

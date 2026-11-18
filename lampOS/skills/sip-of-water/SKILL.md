@@ -31,6 +31,11 @@ What it says and when:
   tomorrow morning or turns it off until you ask for it again. The four
   wellbeing nudges share that one function: it stops the one that came
   last, unless you ask for all of them, and the lamp says which.
+- "I just had water" (or any drink) rests this nudge alone for 30
+  minutes, for when the lamp can't see you drink; if its time comes
+  meanwhile, it comes once the 30 minutes are up. "I haven't had water
+  yet" or "I'll have some later" rests nothing. The other nudges are as
+  before.
 
 With the lamp's `LAMP_NUDGES_PRESENT` switch on (#5207, off unless set), it
 comes after 30 minutes at the desk, and again each 45 minutes while you

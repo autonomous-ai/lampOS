@@ -13992,6 +13992,237 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     assert!(!engine.stopped("sip-of-water", at));
 }
 
+/// Faces at the desk every 30 s from `from` up to `to` minutes, nobody
+/// there between `to` and `back`, then at the desk again up to `end`: the
+/// runs that did something, by their minute and skill.
+fn sat_and_nudged(
+    engine: &mut Engine,
+    from: u64,
+    to: u64,
+    back: u64,
+    end: u64,
+) -> Vec<(u64, String)> {
+    let mut nudged = Vec::new();
+    for half in from * 2..=end * 2 {
+        let minute = half / 2;
+        let faces = if minute >= to && minute < back {
+            r#"{"faces":[]}"#.to_owned()
+        } else {
+            let left = if half % 2 == 0 { 0.3 } else { 0.5 };
+            format!(
+                r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+                left + 0.3
+            )
+        };
+        for run in engine.observe(
+            "humans/faces/tracked",
+            half * 30_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if !run.calls.is_empty() {
+                nudged.push((minute, run.skill));
+            }
+        }
+    }
+    nudged
+}
+
+/// c6972988862: "I just had water", for a person whose drinks the eyes
+/// can't see. A sip of water's `[stop.done]` gives the wellbeing group's
+/// one `wellbeing_nudges` a fourth way, `just_drank`, with what it means;
+/// the other wellbeing skills declare none.
+#[test]
+fn wellbeing_nudges_takes_just_drank_for_the_water_nudge_alone() {
+    let names = [
+        "comfort-break",
+        "meal-check",
+        "quiet-focus",
+        "rest-your-eyes",
+        "sip-of-water",
+        "sit-back",
+        "stand-up",
+        "wind-down",
+    ];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    for skill in &skills {
+        let done = skill.stop.as_ref().unwrap().done.as_ref();
+        if skill.name == "sip-of-water" {
+            let done = done.unwrap();
+            assert_eq!(done.how, "just_drank");
+            assert_eq!(done.for_us, 30 * 60_000_000);
+        } else {
+            assert!(done.is_none(), "{}", skill.name);
+        }
+    }
+    let tools = tools_file(&skills);
+    let how = &tools["tools"][0]["parameters"]["properties"]["how"];
+    assert_eq!(tools["tools"][0]["name"], "wellbeing_nudges");
+    assert_eq!(
+        how["enum"],
+        serde_json::json!(["snooze", "off", "on", "just_drank"])
+    );
+    assert!(
+        how["description"]
+            .as_str()
+            .unwrap()
+            .ends_with("; just_drank: they say they already had a drink (water, tea, anything), not a question or plan (\"not yet\", \"later\"): no water nudge for 30 minutes, the others as before"),
+        "{how}"
+    );
+    // With LAMP_USE_SKILL_SUMMARY on the model sees the shared `when`
+    // first, so it names a drink too (the reviewer's P2 on #7753), in every
+    // wellbeing skill alike, whichever is first in folder order.
+    let summary = lamp_skills::tools_file_summary(&skills, false, false, true);
+    let when = summary["when"]["wellbeing_nudges"].as_str().unwrap();
+    assert!(when.contains("or told they just had a drink"), "{when}");
+    for skill in &skills {
+        assert_eq!(
+            skill.stop.as_ref().unwrap().when.as_deref(),
+            Some(when),
+            "{}",
+            skill.name
+        );
+    }
+    // A `[stop.done]` is checked as it loads.
+    for (done, error) in [
+        (
+            "how = \"snooze\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"Drank\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"9drank\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"drank\"\nfor = \"10s\"\nabout = \"x\"",
+            "[stop.done] for is 1m to 6h",
+        ),
+        (
+            "how = \"drank\"\nfor = \"7h\"\nabout = \"x\"",
+            "[stop.done] for is 1m to 6h",
+        ),
+        (
+            "how = \"drank\"\nfor = \"30m\"\nabout = \" \"",
+            "[stop.done] about",
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = skill_with(
+            dir.path(),
+            "sip",
+            &format!(
+                "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+                 [stop]\ntool = \"stuffy_nudges\"\nabout = \"When asked.\"\n[stop.done]\n{done}\n\
+                 [[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+            ),
+        );
+        let refused = load(&folder).unwrap_err().to_string();
+        assert!(refused.contains(error), "{done}: {refused}");
+    }
+}
+
+/// c6972988862: after "I just had water", a sip of water starts nothing
+/// itself for 30 minutes, then may: a chance that came meanwhile is kept
+/// and comes when the rest ends (the reviewer's P2 on #7753), not spent
+/// for the sitting. Rest your eyes and the rest are as before, with or
+/// without `all`, and a longer snooze is kept, and spends as a snooze.
+#[test]
+fn just_drank_rests_the_water_nudge_30_minutes_and_no_other() {
+    let skills = |names: &[&str]| -> Vec<lamp_skills::Skill> {
+        names
+            .iter()
+            .map(|name| load(&skills_root().join(name)).unwrap())
+            .collect()
+    };
+    let resting = |engine: &mut Engine| {
+        engine.clock(0, 0, 36_000_000);
+        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    };
+    // A sitting from 10:00, "I just had water" at 10 minutes: no sip at 30,
+    // its chance kept until the rest ends at 40, when it comes; away at 45,
+    // back at 50, and the next sitting's 30 minutes, at 80, are within its
+    // 45-minute cooldown.
+    let mut engine = Engine::new(skills(&["sip-of-water"]), true);
+    resting(&mut engine);
+    let mut nudged = sat_and_nudged(&mut engine, 0, 10, 10, 10);
+    let at = 10 * 60_000_000;
+    let told = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank"}),
+            at,
+        )
+        .unwrap();
+    assert!(
+        lamp_skills::told(&told.calls)["next"]
+            .as_str()
+            .unwrap()
+            .contains("no sip of water nudge for the next 30 minutes"),
+        "{told:?}"
+    );
+    assert!(engine.stopped("sip-of-water", at + 30 * 60_000_000 - 1));
+    assert!(!engine.stopped("sip-of-water", at + 30 * 60_000_000));
+    nudged.extend(sat_and_nudged(&mut engine, 10, 45, 50, 120));
+    assert_eq!(nudged, [(40, "sip-of-water".to_owned())]);
+
+    // With the other wellbeing nudges, "I just had water" a minute into
+    // the sitting: only the water nudge rests, with `all` too, and its
+    // chance at 30 minutes comes when the rest ends, at 31, not a sitting
+    // later (before #7753's fix, no sip in the whole 100 minutes). Rest
+    // your eyes, due at 45 with the group's hour spent, comes once it is
+    // free.
+    let mut engine = Engine::new(
+        skills(&["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]),
+        true,
+    );
+    resting(&mut engine);
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank", "all": true}),
+            60_000_000,
+        )
+        .unwrap();
+    assert!(engine.stopped("sip-of-water", 60_000_000));
+    for other in ["rest-your-eyes", "stand-up", "wind-down"] {
+        assert!(!engine.stopped(other, 60_000_000), "{other}");
+    }
+    let nudged = sat_and_nudged(&mut engine, 0, 100, 100, 100);
+    assert_eq!(
+        nudged,
+        [
+            (31, "sip-of-water".to_owned()),
+            (91, "rest-your-eyes".to_owned())
+        ]
+    );
+
+    // A snooze until tomorrow morning is not shortened to 30 minutes.
+    let mut engine = Engine::new(skills(&["rest-your-eyes", "sip-of-water"]), true);
+    resting(&mut engine);
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze", "all": true}),
+            0,
+        )
+        .unwrap();
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("sip-of-water", 31 * 60_000_000));
+}
+
 /// #1685: a `[stop]` may be shared only by skills of one `[budget]` group;
 /// one of another group, or a skill's own `tool` by the name, is refused as
 /// any taken name is.
