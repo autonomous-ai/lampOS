@@ -2399,7 +2399,7 @@ fn run_scoped_into(
     }
     let mut told = run_speaker(socket, call, switches, line, request, lease, replaced);
     if switches.face_no_ask && !switches.at_setup {
-        told = no_ask_speaker(told, call, line, request);
+        told = no_ask_speaker(socket, told, call, line, request);
     }
     record_told(socket, call, told, switches, person, line)
 }
@@ -2788,9 +2788,12 @@ fn run_switched(
     // ([`run_speaker`]); here nothing is kept and nothing is asked (the
     // first builder 21:13), even with `LAMP_NAME_LEARN_FIX` on, only the
     // plain reason said to their own ask for their face ([`no_ask_unkept`]).
+    // Not while the eyes' known file names a face at the lamp: a known
+    // face's "Call me Jay." still goes to the eyes' "known as" and the
+    // rename's own yes, as above (Heron's and Migrate's HOLDs on #7800).
     let lamp_before = said.before.last().map(|(_, lamp)| lamp.as_str());
     let new_face = checked && call.name == REMEMBER && !replacing && !setup && !corrected;
-    if new_face && switches.face_no_ask {
+    if new_face && switches.face_no_ask && known_now(&known_file_of(socket)).is_none() {
         return (no_ask_unkept(Some(name), &said.this, lamp_before), true);
     }
     if new_face
@@ -2983,7 +2986,11 @@ fn no_ask_unkept(name: Option<&str>, this: &str, lamp_before: Option<&str>) -> V
 /// ([`crate::remember_speaker::NOT_SEEN`], [`NOT_OWN_NAME`]), which ask
 /// them to look and say it again, are told as [`no_ask_unkept`]: nothing
 /// asked. Their words are the request's own when seen, else the turn's.
+/// Never a rename (`replace`) or a face the eyes' known file names at the
+/// lamp: a known speaker's "Call me Jay." keeps its own answer, never a
+/// "not kept" (Heron's and Migrate's HOLDs on #7800).
 fn no_ask_speaker(
+    socket: &Path,
     told: (Value, bool),
     call: &ToolCall,
     line: Option<&crate::speaking_faces::LineSeen>,
@@ -2993,6 +3000,10 @@ fn no_ask_speaker(
     if !error
         .is_some_and(|error| error == crate::remember_speaker::NOT_SEEN || error == NOT_OWN_NAME)
     {
+        return told;
+    }
+    let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    if replace || known_now(&known_file_of(socket)).is_some() {
         return told;
     }
     let window = crate::thread::THREAD
@@ -6451,6 +6462,48 @@ mod tests {
             None,
             &mut None,
         );
+        assert!(!refused_here(&told), "{told}");
+        assert_eq!(
+            rename_asked(&told),
+            Some(Some("Walter".to_owned())),
+            "{told}"
+        );
+        assert_eq!(
+            sent.join().unwrap(),
+            vec![json!({"remember": "Jay", "one_face": true, "replace": false})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// `LAMP_FACE_NO_ASK` with a face the eyes' known file names at the
+    /// lamp (Heron's and Migrate's HOLDs on #7800): "Call me Jay." is no new
+    /// face kept unasked; it reaches the eyes, whose "known as" answer holds
+    /// the rename for that person's yes (#7653), never [`NOT_KEPT_NO_ASK`].
+    #[test]
+    fn with_no_ask_a_known_face_giving_another_name_still_reaches_the_rename() {
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Jay"}),
+        };
+        let (socket, sent) = eyes(vec![json!({"error": "known_as", "known_as": "Walter"})]);
+        std::fs::write(known_file_of(&socket), "Walter\n").unwrap();
+        let switches = FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_no_ask: true,
+            ..FaceSwitches::default()
+        };
+        let (told, _) = run_switched(
+            &socket,
+            &save,
+            switches,
+            &Said::now("Call me Jay."),
+            None,
+            &mut None,
+        );
+        assert_ne!(told["error"], NOT_KEPT_NO_ASK, "{told}");
         assert!(!refused_here(&told), "{told}");
         assert_eq!(
             rename_asked(&told),
