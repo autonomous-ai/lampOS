@@ -882,7 +882,10 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     if crate::make_no_asks::on() {
         parameters["properties"][crate::make_no_asks::UNDO] = json!({
             "type": "string",
-            "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" or \"put NAME back\" after one was removed, never a new make): \"last\", or the skill's name as they said it, given alone with no request."
+            "description": format!(
+                "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request.{}",
+                crate::make_no_asks::UNDO_RESTORE_TOLD
+            )
         });
         let remove = format!(
             "{}{}",
@@ -1187,18 +1190,6 @@ fn make_with_by(
     linked: impl FnOnce() -> Option<Vec<String>>,
     agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
-    // A make naming a skill they removed, kept aside, puts it back, never
-    // making a new one (`LAMP_MAKE_NO_ASKS`, #7828's fix 2: "Put the flip
-    // a coin skill back" made it again), on the owner's ask. By voice only.
-    if made_in != 0
-        && let Some(told) = crate::make_no_asks::put_back_named(
-            keeping,
-            &[request, heard.unwrap_or_default()],
-            || owners_make(made_in),
-        )
-    {
-        return told;
-    }
     // One ask makes one skill: a call for an ask made or being made a
     // moment ago, carried into the next line after its turn was cut, makes
     // nothing again ([`OneAsk`]). By voice only: `made_in` 0 is no
@@ -1423,21 +1414,28 @@ fn made_no_asks(
         return Some(words_refused(keeping, made, why));
     }
     if replaces {
-        let clashes = crate::made_clash::found(keeping, made);
-        let mut others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
-        for (skill, _) in words {
-            if !others.contains(&skill) {
-                others.push(skill);
-            }
-        }
-        if !others.is_empty() {
+        let off = crate::make_no_asks::turned_off_here();
+        // Those its words would start are turned off before it goes on;
+        // any not turned off (the `off` file unreadable, the helper's
+        // refusal) refuses it as before, never on beside them (Heron's P3 2
+        // on #7836).
+        let first = match crate::make_no_asks::words_turned_off(keeping, &words, off.as_ref()) {
+            Ok(first) => first,
+            Err(why) => return Some(words_refused(keeping, made, &why)),
+        };
+        let others: Vec<String> = crate::made_clash::found(keeping, made)
+            .into_iter()
+            .map(|clash| clash.name)
+            .filter(|name| !words.iter().any(|(skill, _)| skill == name))
+            .collect();
+        if !others.is_empty() || !first.is_empty() {
             // Only skills on are replaced, and only on the owner's ask
             // (Twelve's P1 on #7783); anyone else's goes on beside them.
             let (told, line) = crate::make_no_asks::clashed(
                 keeping,
                 made,
-                &others,
-                crate::make_no_asks::turned_off_here().as_ref(),
+                (&others, &first),
+                off.as_ref(),
                 || owner.unwrap_or_else(|| owners_make(made_in)),
             );
             // No clash waits here: put on, or not, as it is told.

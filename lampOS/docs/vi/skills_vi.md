@@ -3905,7 +3905,8 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    nghe "I couldn't make that one. Try asking for one thing…"): "I couldn't
    make that: the words “take a photo” would start both test note and
    another skill, photo booth, so neither would start; say other words for
-   test note.", dù công tắc `LAMP_MAKE_NO_ASKS` bật hay tắt. Khi bật, một
+   test note.", chỉ khi công tắc `LAMP_MAKE_NO_ASKS` bật (P3 1 của Heron
+   trên #7836: khi tắt, người dùng nghe như trước). Khi bật, một
    cụm trùng với kỹ năng chính người dùng tạo thì thay thế nó (xem "Không
    hỏi gì").
 4. **Nói lại kèm các từ** (`made_skill::plainly`): "When you say “send my
@@ -4073,10 +4074,15 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   thêm từ tệp, đẩy lên, kỹ năng tự tạo còn giữ mà chưa bật) vẫn từ chối
   như trước. Sau đó (`make_skill_local::made_no_asks`,
   `made_skill::own_asks_taken`), khi chính chủ đèn yêu cầu, các kỹ năng đó
-  được thay thế cùng với trùng trigger nếu có, như trên: "Made coin flip
-  and replaced your old flip a coin. Say 'keep the old one' to undo." Lần
-  tạo của người khác bị từ chối với cùng lý do và không giữ lại gì
-  (`made_skill::forget_unput`).
+  đang bật được tắt trước (`make_no_asks::words_turned_off`), rồi kỹ năng
+  mới được bật, và chúng được thay thế cùng với trùng trigger nếu có, như
+  trên: "Made coin flip and replaced your old flip a coin. Say 'keep the
+  old one' to undo." Lần tạo của người khác bị từ chối với cùng lý do và
+  không giữ lại gì (`made_skill::forget_unput`); lần tạo mà kỹ năng cũ
+  không tắt được (không đọc được tệp `off` của lamp-skills, hoặc trình
+  quản lý từ chối, những kỹ năng đã tắt trước đó được bật lại) cũng vậy,
+  không bao giờ bật bên cạnh nó (P3 2 của Heron trên #7836). Bật không
+  được thì chúng được bật lại.
 - **Xóa ngay.** `remove` của `make_skill`, tên được so với các kỹ năng chính
   người dùng tạo như trước (`made_remove::found`), xóa kỹ năng khi chủ đèn
   yêu cầu (`services::owners_yes_now`) mà không hỏi: trình quản lý gỡ nó
@@ -4100,22 +4106,22 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   đường của lời đồng ý khi `LAMP_MADE_SCRIPTS=on`; khi tắt thì nó được đưa
   lại nhưng vẫn tắt, và nói rõ lý do. Bản ghi của một lần thay thế vẫn còn
   sau khi kỹ năng mới của nó bị xóa.
-- **Kỹ năng đã xóa được nêu tên lại thì được đưa lại, không bao giờ tạo
-  mới** (DEFAULT-ON của #7828, sửa 2: trên lamp-9adf "Put the flip a coin
-  skill back", vừa bị xóa, được gọi như một lần tạo và tạo ra kỹ năng
-  mới). Trước khi một lần tạo bằng giọng nói hỏi mô hình tạo bất cứ điều
-  gì (`make_no_asks::put_back_named`, từ
-  `make_skill_local::make_with_by`), lời của nó, `request` của mô hình và
-  câu đã nghe, được so với các kỹ năng họ đã xóa và đang cất riêng trong
-  vòng 7 ngày (`make_no_asks::kept_named`), theo cách viết như tên của
-  một lần xóa (`made_remove::apart`, `made_remove::near`), không bao giờ
-  bằng danh sách từ: chỉ kỹ năng gần nhất, một tên nằm trong một tên khác
-  được nói đúng như viết thì là phần của tên kia ("bring back my moon fact
-  skill" là moon fact, không phải moon). Khi chủ đèn yêu cầu, nó được đưa
-  lại và bật, như "put it back": "flip a coin is back on.", với
-  `{"made": NAME, "on": true, "put_back": true}`. Hai kỹ năng đang cất gần
-  như nhau, một kỹ năng mà tên đã có lại trong danh sách, hay yêu cầu của
-  người khác, thì là một lần tạo như trước.
+- **Kỹ năng đã xóa được xin lại theo tên là hoàn tác, không bao giờ là một
+  lần tạo** (DEFAULT-ON của #7828, sửa 2: trên lamp-9adf "Put the flip a
+  coin skill back", vừa bị xóa, được gọi như một lần tạo và tạo ra kỹ năng
+  mới). Mô tả của `undo` nói "When the person asks to put back or restore
+  a skill they removed, call it with that skill, and never make it again."
+  (`make_no_asks::UNDO_RESTORE_TOLD`); một câu có xin điều đó hay không là
+  do mô hình phán đoán. Tên đưa cho `undo` được so với mọi kỹ năng mà các
+  bản ghi nêu, như tên của một lần xóa (`made_remove::named_alone`: gần
+  theo cách viết, khi `LAMP_MADE_SKILL_OFF_SAID` bật thì không bao giờ là
+  tên có số khác, một tên nằm trong một tên khác được nói đúng như viết
+  thì là phần của tên kia), nên "flip a coin" đưa lại flip a coin kể cả
+  khi flip a coin 2 bị xóa sau nó: "flip a coin is back on.", với
+  `{"made": NAME, "on": true, "put_back": true}`. Nhiều kỹ năng gần như
+  nhau, hoặc không có, thì không hoàn tác gì. Một lần tạo không bao giờ
+  đưa lại kỹ năng (P2 của Heron trên #7836: "make a water reminder" đã đưa
+  lại water reminder 2): lời của nó đi tới mô hình tạo như mọi lần tạo.
 - **Nơi cất, chính xác.** Mọi bản ghi việc đã làm được giữ 7 ngày, gói của
   kỹ năng đã xóa đi cùng bản ghi của nó; nhiều nhất 50 kỹ năng đã xóa và
   100 bản ghi tất cả, cũ nhất ra trước, gói đi cùng. `lamp-voice` dọn nó khi
@@ -4138,8 +4144,8 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   they have: your line gives the undo." (`make_no_asks::AT_ONCE_TOLD`);
   tham số `remove` thêm "Call it at once, never asking first or for a yes;
   ask which only when two skills they made fit the words alike, never of
-  "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` nêu "put NAME back"
-  bên cạnh "put it back", không bao giờ là một lần tạo mới. Với mọi công
+  "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
+  `make_no_asks::UNDO_RESTORE_TOLD`. Với mọi công
   tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
   các tham số trong 4.096 byte.
 
