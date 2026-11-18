@@ -2966,6 +2966,8 @@ fn second_route_worker_environment(
         crate::make_queue::ENVIRONMENT,
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
+        // Only a quick reaction made by DeepSeek, any other by the agent (#6811).
+        crate::made_skill::REACTIONS_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
         // What a skill on the lamp already does offered, not made (#7747).
         crate::make_core_offer::ENVIRONMENT,
@@ -3308,6 +3310,7 @@ mod tests {
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::make_queue::ENVIRONMENT,
+            crate::made_skill::REACTIONS_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
             crate::make_core_offer::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
@@ -4476,6 +4479,7 @@ mod tests {
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_queue::ENVIRONMENT
                     || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
+                    || name == crate::made_skill::REACTIONS_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::make_core_offer::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
@@ -4686,6 +4690,7 @@ mod tests {
                     "LAMP_MAKE_CORE_OFFER=on",
                     "LAMP_MAKE_NO_CANNOT=on",
                     "LAMP_MAKE_QUEUE=on",
+                    "LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",

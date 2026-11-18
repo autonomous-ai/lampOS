@@ -3322,6 +3322,7 @@ fn made_and_journaled_by(
                 line,
                 ask: &judge_ask,
             }),
+        made_with: made_skill::MadeWith::DeepSeek,
     };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
@@ -3337,7 +3338,10 @@ fn made_and_journaled_by(
     // with no linked service ([`web_task_for_agent`]) needs the internet,
     // as its `internet:` line does. Never the agent's own answers.
     let web_task_held = std::cell::Cell::new(false);
-    let kept = |answer: Result<String, String>| {
+    // Each answer kept as made by its engine (`asked`'s `made_with`,
+    // [`made_skill::MADE_WITH`]): DeepSeek's by [`kept`], the agent's by
+    // `agent_kept` below.
+    let kept_by = |answer: Result<String, String>, asked: &made_skill::Asked<'_>| {
         models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
         needs_net.set(
             net && matches!(&answer, Ok(text) if crate::make_no_cannot::says_needs_net(text)
@@ -3356,7 +3360,7 @@ fn made_and_journaled_by(
                     Some(EXAMPLE_GIVEN_BACK.into()),
                 ))
             }
-            Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
+            Ok(text) => made_skill::keep_asked(&text, false, from, keeping, asked),
 
             Err(why) => {
                 eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
@@ -3364,6 +3368,7 @@ fn made_and_journaled_by(
             }
         }
     };
+    let kept = |answer: Result<String, String>| kept_by(answer, &asked);
     // With the switch and an agent on the lamp, DeepSeek gets one try and
     // no repairs; what it doesn't make goes to the agent, which gets the
     // repairs. Without either, DeepSeek's repairs stay as they are; for
@@ -3381,6 +3386,15 @@ fn made_and_journaled_by(
     // failed (lamp-tasks down, restarting, slow or refusing) is not known
     // to be no agent: DeepSeek makes it alone, as before. Off, as before.
     let missing = matches!(seen, Some((agent, (None, true))) if agent.one_path);
+    // The agent's answers kept as its own (#6811, [`made_skill::MADE_WITH`],
+    // written with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on alone).
+    let agent_asked = made_skill::Asked {
+        made_with: engine.map_or(made_skill::MadeWith::DeepSeek, |(_, engine)| {
+            made_skill::MadeWith::of_engine(engine)
+        }),
+        ..asked.clone()
+    };
+    let agent_kept = |answer: Result<String, String>| kept_by(answer, &agent_asked);
     let unknown = matches!(seen, Some((agent, (None, false))) if agent.one_path);
     if missing {
         eprintln!(
@@ -3436,6 +3450,35 @@ fn made_and_journaled_by(
             })
         })
         .flatten();
+    // A make the agent was handed first, as it stands after it: judged not
+    // what was asked (#7621) asked again; else the internet's task and the
+    // model's cannot as any make's.
+    let agents_made = |made: Result<Made, Refused>| {
+        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (made, line);
+        }
+        let made = net_made(
+            made,
+            &needs_net,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping),
+        );
+        let made = no_cannot(
+            made,
+            &models_cannot,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping),
+        );
+        let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
+        (plain_unless_cannot(made, models_cannot.get()), line)
+    };
     if missing && let Some(service) = service {
         eprintln!(
             "lamp-voice: a skill made here: it asks for a linked service ({service}): no agent \
@@ -3464,47 +3507,71 @@ fn made_and_journaled_by(
             Before::NotAsked(Box::new(|| kept(ask(Arc::clone(&chat), brief.clone())))),
             request,
             &brief,
-            agent,
-            engine,
-            &kept,
+            (agent, engine),
+            &agent_kept,
             &models_cannot,
             &deepseek_repaired,
+            None,
         );
-        // Judged not what was asked (#7621): asked again as it stands.
-        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
-            let line = kept_line(&made, false, began.elapsed().as_millis());
-            return (made, line);
-        }
-        let made = net_made(
-            made,
-            &needs_net,
-            request,
-            &chat,
-            began,
-            &kept,
-            (from, keeping),
-        );
-        let made = no_cannot(
-            made,
-            &models_cannot,
-            request,
-            &chat,
-            began,
-            &kept,
-            (from, keeping),
-        );
-        let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
-        return (plain_unless_cannot(made, models_cannot.get()), line);
+        return agents_made(made);
     }
     // On a lamp whose agent writes a web make as code (#7742): DeepSeek is
     // told a task for the agent is only for a linked service, and its
     // answer as one for the web is held as needing the internet.
     let net_code = engine.is_some_and(|(_, engine)| net_code_by(engine));
-    web_task_held.set(net_code);
-    let mut made = kept(match net_code {
+    let first = match net_code {
         true => ask_net_code(Arc::clone(&chat), brief.clone()),
         false => ask(Arc::clone(&chat), brief.clone()),
-    });
+    };
+    // With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (#6811, the first
+    // builder's ruling and the wider route he said yes to at 16:34): a
+    // draft that is no quick reaction ([`made_skill::quick_reaction`]:
+    // started by the person's own act, with only the light, a gesture, its
+    // words or its hum) is never kept. It goes to the lamp's agent with the
+    // same brief and sip-of-water's guards as its template; the agent
+    // making none, it is said so plainly and nothing is kept, never
+    // DeepSeek's unguarded draft. A `cannot:` (a one-off reminder among
+    // them, the lamp's own timer's), the internet's line or what can't be
+    // read keeps its own route. With no agent on the lamp (`missing`),
+    // told so; an agent not known, DeepSeek's as before.
+    let route = made_skill::reactions_on()
+        .then(|| {
+            first
+                .as_ref()
+                .ok()
+                .and_then(|text| made_skill::not_a_reaction(text))
+        })
+        .flatten();
+    if let Some(why) = route {
+        if let Some((agent, engine)) = engine {
+            eprintln!(
+                "lamp-voice: a skill made here: not a quick reaction ({why}): made by the agent \
+                 ({engine}), DeepSeek's draft not kept"
+            );
+            let made = handed_to_agent(
+                Before::Drafted,
+                request,
+                &brief,
+                (agent, engine),
+                &agent_kept,
+                &models_cannot,
+                &deepseek_repaired,
+                Some(made_skill::BEHAVIOUR_TEMPLATE),
+            );
+            return agents_made(made);
+        }
+        if missing {
+            eprintln!(
+                "lamp-voice: a skill made here: not a quick reaction ({why}): no agent on the \
+                 lamp to make it: told so, DeepSeek's draft not kept"
+            );
+            let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (plain_unless_cannot(made, false), line);
+        }
+    }
+    web_task_held.set(net_code);
+    let mut made = kept(first);
     web_task_held.set(false);
     // Judged not what was asked (#7621): no repair, no agent, asked again.
     if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
@@ -3530,11 +3597,11 @@ fn made_and_journaled_by(
                 Before::Asked(Box::new(made)),
                 request,
                 &brief,
-                agent,
-                engine,
-                &kept,
+                (agent, engine),
+                &agent_kept,
                 &models_cannot,
                 &deepseek_repaired,
+                None,
             )
         }
         Some(_) if needs_net.get() => {
@@ -3579,11 +3646,11 @@ fn made_and_journaled_by(
                 Before::Asked(Box::new(made)),
                 request,
                 &brief,
-                agent,
-                engine,
-                &kept,
+                (agent, engine),
+                &agent_kept,
                 &models_cannot,
                 &deepseek_repaired,
+                None,
             )
         }
         Some(_) => {
@@ -3810,6 +3877,10 @@ fn plain_unless_cannot(made: Result<Made, Refused>, models_cannot: bool) -> Resu
 enum Before<'a> {
     Asked(Box<Result<Made, Refused>>),
     NotAsked(Box<dyn FnOnce() -> Result<Made, Refused> + 'a>),
+    /// A draft that is no quick reaction (#6811, with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on): never kept, so nothing
+    /// stands, and the agent making none is said so plainly.
+    Drafted,
 }
 
 impl Before<'_> {
@@ -3819,6 +3890,7 @@ impl Before<'_> {
         match self {
             Self::Asked(made) => *made,
             Self::NotAsked(ask) => ask(),
+            Self::Drafted => Err(Refused(made_skill::AGENT_FAILED_TRY.to_owned(), None)),
         }
     }
 
@@ -3827,6 +3899,7 @@ impl Before<'_> {
         match self {
             Self::Asked(_) => "DeepSeek's one answer, given no repairs, stands as not made",
             Self::NotAsked(_) => "DeepSeek is asked once, given no repairs",
+            Self::Drafted => "nothing is kept, DeepSeek's draft being no quick reaction",
         }
     }
 }
@@ -3920,18 +3993,25 @@ fn handed_to_agent(
     deepseek: Before<'_>,
     request: &str,
     brief: &str,
-    agent: &crate::make_skill_agent::Agent,
-    engine: &str,
+    (agent, engine): (&crate::make_skill_agent::Agent, &str),
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     models_cannot: &std::cell::Cell<bool>,
     deepseek_repaired: &impl Fn(Result<Made, Refused>, Duration) -> Result<Made, Refused>,
+    template: Option<&str>,
 ) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
     // The person's own addresses never go in the agent's rules file: each
     // stands there as a placeholder, put back in its answer before the
-    // checks (the Reviewer-lead on #6439).
+    // checks (the Reviewer-lead on #6439). A make that is no quick
+    // reaction (#6811) is told sip-of-water's guards after the rules
+    // (`template`, [`made_skill::BEHAVIOUR_TEMPLATE`]), in every answer's
+    // rules, its repairs' too.
     let hidden = placeholders(&own_accounts());
-    let system = hide(&system(), &hidden);
+    let system = match template {
+        Some(template) => format!("{}\n\n{template}", system()),
+        None => system(),
+    };
+    let system = hide(&system, &hidden);
     // On a gateway agent whose run granted `net` reaches the web from its
     // own skill-start fence (#7742): what only the internet tells is the
     // skill's own code granted `net`, told and checked so while it makes.
@@ -3962,13 +4042,14 @@ fn handed_to_agent(
     // Not taken by the agent: DeepSeek's one answer stands for a voice
     // make, and gets its repairs for the app's (Heron's P2 on #6788).
     let stands = match (agent.repairs_if_untaken, &deepseek) {
-        (false, _) => deepseek.journaled(),
+        (_, Before::Drafted) | (false, _) => deepseek.journaled(),
         (true, Before::Asked(_)) => "DeepSeek gets its repairs, as without the agent",
         (true, Before::NotAsked(_)) => "DeepSeek is asked, with its repairs, as without the agent",
     };
     let untaken = |deepseek: Before<'_>| {
+        let drafted = matches!(deepseek, Before::Drafted);
         let made = deepseek.stands();
-        if !agent.repairs_if_untaken {
+        if drafted || !agent.repairs_if_untaken {
             return made;
         }
         eprintln!("lamp-voice: a skill made here: not taken by the agent: DeepSeek's repairs");
@@ -4001,6 +4082,14 @@ fn handed_to_agent(
             // `cannot:` is still DeepSeek's (`models_cannot`); said as the
             // agent's own failure ([`agent_side`]), after DeepSeek's repairs
             // for the app's.
+            // A draft that was no quick reaction (#6811): nothing kept, and
+            // the agent's own failure said plainly.
+            if matches!(deepseek, Before::Drafted) {
+                return Err(Refused(
+                    crate::make_skill_agent::not_made_try(&why).to_owned(),
+                    None,
+                ));
+            }
             return agent_side(untaken(deepseek), &why, models_cannot);
         }
     };
@@ -7101,6 +7190,7 @@ light = { dim = 1 }
             own,
             heard: Some(WRITE_EXAMPLE_ASKED),
             judge: None,
+            made_with: made_skill::MadeWith::DeepSeek,
         };
         let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
         assert_eq!(made.uses.writes, ["gmail"]);
@@ -11446,5 +11536,219 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(system(), system_net(made_skill::reads_on(), false, true));
         assert!(whole("internet: the price".to_owned(), true).is_ok());
         net_make_here(None);
+    }
+
+    /// A make's answer of `toml` and a card named `name`, as a model
+    /// writes it, for the quick-reaction route's tests (#6811).
+    fn route_answer(toml: &str, name: &str) -> String {
+        format!(
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\ndescription: A test \
+             skill.\n---\n\n# Test\n\nA test skill.\n```\n"
+        )
+    }
+
+    /// A made skill with a say on `trigger`, the lamp's voice granted.
+    fn say_on(topic: &str, trigger: &str) -> String {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\n\
+             [permissions]\nspeak = true\ntopics = [\"{topic}\"]\n\n[trigger]\n{trigger}\
+             cooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nsay = {{ text = \"Time \
+             for a sip of water.\" }}\n"
+        )
+    }
+
+    /// Someone at the desk half an hour, then a line: DeepSeek's draft
+    /// with no guards.
+    fn presence_say() -> String {
+        say_on(
+            "room/presence",
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\nfor = \"30m\"\n\
+             rearm = \"ends\"\n",
+        )
+    }
+
+    /// A pat on the head, a nod: a quick reaction.
+    fn pat_nod() -> String {
+        "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"body\"]\n\n[permissions]\n\
+         body = true\ntopics = [\"controls/pet\"]\n\n[trigger]\ntopic = \"controls/pet\"\n\
+         field = \"ended\"\nequals = false\nrearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n\
+         [[do]]\nbody = { gesture = \"nod\" }\n"
+            .to_owned()
+    }
+
+    /// The made index's `made_with` of the skill `name`, if it has one.
+    fn made_with_of(keeping: &Keeping, name: &str) -> Option<String> {
+        made_skill::entries(&keeping.directory)
+            .iter()
+            .find(|entry| entry["name"] == name)
+            .and_then(|entry| entry[made_skill::MADE_WITH].as_str().map(str::to_owned))
+    }
+
+    /// The first builder's ruling on #6811 (18 Nov 16:23) and the wider
+    /// route he said yes to at 16:34, with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: a draft that is no quick
+    /// reaction (someone at the desk, 8 am) is never kept; the make goes
+    /// to the lamp's agent with the same brief and sip-of-water's guards,
+    /// and the agent's is kept, `made_with: hermes`. A pat that nods, or a
+    /// phrase that glows, stays DeepSeek's, `made_with: deepseek`.
+    #[test]
+    fn with_the_switch_only_a_quick_reaction_stays_deepseeks() {
+        made_skill::set_reactions_here(Some(true));
+        let (root, keeping) = keeping("reactions-route");
+        let guarded = made_skill::behaviour_template_toml()
+            .replace("One short, warm line.", "Time for a sip of water.");
+        let eight = say_on(
+            "clock/local",
+            "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"08:00\", to = \"08:01\" }\n",
+        );
+        for (at, (draft, name)) in [(presence_say(), "sip-at-desk"), (eight, "morning-line")]
+            .into_iter()
+            .enumerate()
+        {
+            let tasks = agent_answering(vec![Some(route_answer(&guarded, name))]);
+            let (url, served) = service(vec![(200, route_answer(&draft, "deepseek-draft"))]);
+            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + at as u64);
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!(served.join().unwrap(), 1);
+            assert_eq!(tasks.hand_overs(), 1);
+            let rules = handed_rules(&tasks);
+            assert!(
+                rules[0].0.contains(made_skill::BEHAVIOUR_TEMPLATE),
+                "the template beside the rules"
+            );
+            assert!(!rules[0].0.contains("deepseek-draft"));
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+            assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        }
+        // A phrase the person names that turns the light green
+        // (`LAMP_MADE_SKILL_ASKS`, on in the product).
+        made_skill::set_asks_here(Some(true));
+        let phrase = "asks = [\"green light please\"]\nkind = \"installable\"\n\
+                      version = \"1.0.0\"\nneeds = [\"light\"]\n\n[permissions]\nlight = true\n\n\
+                      [[do]]\nlight = { colour = \"green\", level = 3 }\n"
+            .to_owned();
+        for (at, (draft, name)) in [(pat_nod(), "pat-nod"), (phrase, "green-phrase")]
+            .into_iter()
+            .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) = service(vec![(200, route_answer(&draft, name))]);
+            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + 10 + at as u64);
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!(served.join().unwrap(), 1);
+            assert_eq!(tasks.hand_overs(), 0);
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("deepseek"));
+        }
+        made_skill::set_asks_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
+    /// as before, the agent never asked and no `made_with` written.
+    #[test]
+    fn with_the_switch_off_a_presence_draft_is_deepseeks_as_before() {
+        made_skill::set_reactions_here(Some(false));
+        let (root, keeping) = keeping("reactions-off");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert_eq!(made_with_of(&keeping, "sip-at-desk"), None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder at 16:34 on #6811: a make the route sends to the
+    /// agent that the agent doesn't make (silent past its time, busy) is
+    /// said so plainly, in the agent's own failure words, and nothing is
+    /// kept: never DeepSeek's quick, unguarded draft. With no agent on the
+    /// lamp, told so.
+    #[test]
+    fn with_the_switch_an_agent_making_none_keeps_nothing_and_says_so() {
+        made_skill::set_reactions_here(Some(true));
+        let (root, keeping) = keeping("reactions-failed");
+        let silent = agent_answering(vec![None]);
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&silent.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_LATE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(silent.hand_overs(), 1);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // No agent known on the lamp (no lamp target, the one path off):
+        // the route has no agent to send it to, so DeepSeek's, as before.
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&none.agent()), NOW + 1);
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(none.hand_overs(), 0);
+        assert_eq!(
+            told["made"], "sip-at-desk",
+            "no agent known: DeepSeek's, as before"
+        );
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder at 16:34 on #6811: a one-off reminder is never a
+    /// make. Should the make be called for one, DeepSeek's answer is the
+    /// lamp's own timer's `cannot:`, which the route never hands to the
+    /// agent's make.
+    #[test]
+    fn with_the_switch_a_one_off_reminder_never_reaches_the_agents_make() {
+        made_skill::set_reactions_here(Some(true));
+        let (root, keeping) = keeping("reactions-reminder");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![(
+            200,
+            "cannot: I can't do that yet: a reminder at a time. Ask me for a reminder instead, \
+             like 'remind me every hour to stand up'."
+                .to_owned(),
+        )]);
+        let told = make_with_by(
+            0,
+            None,
+            "remind me at 3 to call Mum",
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811, point 2: the template the agent is told beside its rules,
+    /// with the longest brief, fits lamp-tasks' rules bound; the brief
+    /// itself is unchanged, within its own.
+    #[test]
+    fn the_template_and_the_longest_brief_fit_the_agents_rules() {
+        let longest = made_skill::brief(&"w".repeat(made_skill::MOST_REQUEST_BYTES)).unwrap();
+        assert!(longest.len() <= made_skill::MOST_BRIEF_BYTES);
+        let before = format!("{}\n\n{longest}\n", system());
+        let after = format!(
+            "{}\n\n{}\n\n{longest}\n",
+            system(),
+            made_skill::BEHAVIOUR_TEMPLATE
+        );
+        eprintln!(
+            "rules {} bytes, with the template {} (template {}, brief {})",
+            before.len(),
+            after.len(),
+            made_skill::BEHAVIOUR_TEMPLATE.len(),
+            longest.len()
+        );
+        assert!(after.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES);
     }
 }
