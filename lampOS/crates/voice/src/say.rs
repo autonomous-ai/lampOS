@@ -3347,7 +3347,7 @@ pub fn decode_sound(bytes: &[u8]) -> Result<Vec<i16>, String> {
 
 /// The same format and amplitude checks with a caller-owned duration bound.
 /// Autonomous cues retain their three-second limit.
-pub(crate) fn decode_sound_with_limit(bytes: &[u8], most_frames: u32) -> Result<Vec<i16>, String> {
+pub fn decode_sound_with_limit(bytes: &[u8], most_frames: u32) -> Result<Vec<i16>, String> {
     let reader = hound::WavReader::new(Cursor::new(bytes)).map_err(|_| "not a WAV file")?;
     let spec = reader.spec();
     if spec.channels != 1
