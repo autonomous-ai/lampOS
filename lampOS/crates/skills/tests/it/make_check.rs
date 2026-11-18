@@ -195,7 +195,13 @@ fn every_gateway_make_example_packs() {
             "water-breaks",
         ]
     );
-    let on = [(lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned())];
+    // With the internet switch too, as a gateway make whose agent may
+    // write net code is checked (#7742): the exchange-rate example is
+    // granted `net`.
+    let on = [
+        (lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned()),
+        (lamp_tasks::skill_task::NET_SWITCH, "on".to_owned()),
+    ];
     for name in names {
         assert!(packs(&examples.join(name), &out, &on), "{name}");
     }
