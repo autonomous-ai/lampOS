@@ -10909,6 +10909,40 @@ pub(crate) fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
     })
 }
 
+/// The kept skill whose SHA-256 is `sha256`, on or not, its package still
+/// there (`crate::long_make`).
+pub fn kept_by_sha256(directory: &Path, sha256: &str) -> Option<Made> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256)
+        .and_then(|entry| made_of(directory, &entry))
+}
+
+/// The kept skill `sha256`'s index entry given `key` as `value`, or `key`
+/// taken off with none (`crate::long_make::READY_UNTOLD`).
+pub fn mark(directory: &Path, sha256: &str, key: &str, value: Option<Value>) {
+    let mut entries = index(directory);
+    let mut found = false;
+    for entry in &mut entries {
+        if entry["sha256"] == sha256
+            && let Some(entry) = entry.as_object_mut()
+        {
+            found = true;
+            match &value {
+                Some(value) => {
+                    entry.insert(key.to_owned(), value.clone());
+                }
+                None => {
+                    entry.remove(key);
+                }
+            }
+        }
+    }
+    if found && let Err(error) = write_index(directory, &entries) {
+        eprintln!("lamp-voice: a made skill's {key} was not kept: {error}");
+    }
+}
+
 /// The kept skill on the lamp whose name is `asked` ([`name_asked`]), to
 /// read it back (`make_skill_local::read_back`); none when no skill kept
 /// here and put on has that name.
