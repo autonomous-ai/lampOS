@@ -272,6 +272,7 @@ pub fn reply(
                     || kind == crate::settings::PREVIEW_KIND
                     || kind == crate::settings::WIFI_KIND
                     || crate::services::connector_kind(&kind).is_some()
+                    || kind == crate::apps::INSTALL_KIND
                     || crate::upload::id_of(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
@@ -362,6 +363,9 @@ struct Handed {
     /// The services' results the connection took before their ack, oldest
     /// first, to go again (`crate::services`).
     services_lost: Vec<crate::settings::Outcome>,
+    /// The apps' results and pushes the connection took before their ack,
+    /// to go again (`crate::apps`).
+    apps_lost: Vec<crate::settings::Outcome>,
     /// The results of skills added from a file the connection took before
     /// their ack, to go again (`crate::upload`).
     uploads_lost: Vec<crate::settings::Outcome>,
@@ -389,6 +393,9 @@ enum Tagged {
     /// A service's result, said again if it is lost before its ack
     /// (`crate::services`).
     Service(crate::settings::Outcome),
+    /// An app's install result or push (`crate::apps`), said again if it is
+    /// lost before its ack.
+    Apps(crate::settings::Outcome),
     /// A skill added from a file's result (`crate::upload`), said again if
     /// it is lost before its ack: the backend deletes the file on it.
     Upload(crate::settings::Outcome),
@@ -526,6 +533,10 @@ impl Handed {
                     self.services_lost.push(outcome);
                     None
                 }
+                Tagged::Apps(outcome) => {
+                    self.apps_lost.push(outcome);
+                    None
+                }
                 Tagged::Upload(outcome) => {
                     self.uploads_lost.push(outcome);
                     None
@@ -591,6 +602,10 @@ fn dropped(
     let services = std::mem::take(&mut handed.services_lost);
     if let Some(shared) = lamp.services() {
         shared.owe(services);
+    }
+    let apps = std::mem::take(&mut handed.apps_lost);
+    if let Some(shared) = lamp.apps() {
+        shared.owe(apps);
     }
     let unasked = std::mem::take(&mut handed.unasked_lost);
     if !unasked.is_empty() {
@@ -793,6 +808,8 @@ async fn session(
         let changes = lamp.changes();
         // The services' results (Queue #4710), the same way, with their switch.
         let services = lamp.services();
+        // The apps' install results and pushes (#7415 piece 4), with their switch.
+        let apps = lamp.apps();
         // Skills added from a file: their results go on the same tick.
         let uploads = lamp.upload();
         // The desk and Hydrate bridge (#7470), with its switch.
@@ -816,7 +833,7 @@ async fn session(
                         back_to_tcp = true;
                         break None;
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || apps.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -982,6 +999,21 @@ async fn session(
                                     say.line(&outcome.journal());
                                 } else {
                                     services.owe(vec![outcome]);
+                                }
+                            }
+                        }
+                        // An app's install result, and its `app.stopped` and
+                        // `app.panel` pushes: only kinds and status in the
+                        // journal. The watcher looks on a thread of its own.
+                        if connected && let Some(apps) = &apps {
+                            apps.watch(std::time::Instant::now());
+                            for outcome in apps.take() {
+                                let reply = outcome.reply(&me, &now()).to_string();
+                                let tag = Tagged::Apps(outcome.clone());
+                                if handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
+                                    say.line(&outcome.journal());
+                                } else {
+                                    apps.owe(vec![outcome]);
                                 }
                             }
                         }
