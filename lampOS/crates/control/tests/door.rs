@@ -3647,7 +3647,7 @@ async fn app_socket(
 ) -> std::path::PathBuf {
     let path = lamp.dir.join(file);
     let apps = lamp.dir.join("apps");
-    install_app(&apps, "demo", json!(["speak", "light"]));
+    install_app(&apps, "demo", json!(["speak", "light", "hear"]));
     lamp.shared.set_task_yes_folder(lamp.dir.clone());
     let listener = tokio::net::UnixListener::bind(&path).unwrap();
     tokio::spawn(server::serve_app_as(
@@ -3684,7 +3684,7 @@ async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() 
     assert_eq!(hello["version"], "2.0.1", "{hello}");
     let mut grants: Vec<String> = serde_json::from_value(hello["grants"].clone()).unwrap();
     grants.sort();
-    assert_eq!(grants, ["light", "speak"], "{hello}");
+    assert_eq!(grants, ["hear", "light", "speak"], "{hello}");
     let settings = app_ask(&mut socket, json!({"id": 2, "op": "app.settings.get"})).await;
     assert_eq!(settings["settings"], json!({"loud": 7}), "{settings}");
     let panel = json!({"id": 3, "op": "app.panel.set", "title": "Lesson", "lines": ["one"]});
@@ -3709,6 +3709,36 @@ async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() 
     // It is no paired computer.
     let listed = admin(&lamp, json!({"clients": true})).await;
     assert!(listed["clients"].as_array().unwrap().is_empty(), "{listed}");
+    // Phrases it listens for, replace-whole, are the door's own: heard on the
+    // bus, told as the phrase and never the words.
+    let set = json!({"id": 7, "op": "phrases.set", "phrases": ["start the lesson"]});
+    let set = app_ask(&mut socket, set).await;
+    assert_eq!(set["ok"], true, "{set}");
+    assert_eq!(set["phrases"], 1, "{set}");
+    assert!(set.get("events").is_none(), "{set}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "ok start the lesson now please".into(),
+    )]);
+    let heard = agent_next(&mut socket).await.unwrap();
+    assert_eq!(heard["ev"], "phrase.heard", "{heard}");
+    assert_eq!(heard["phrase"], "start the lesson", "{heard}");
+    // Too short is the door's refusal; none unsubscribes.
+    let short = app_ask(
+        &mut socket,
+        json!({"id": 8, "op": "phrases.set", "phrases": ["hi"]}),
+    )
+    .await;
+    assert_eq!(short["error"]["code"], "bad_request", "{short}");
+    let none = app_ask(
+        &mut socket,
+        json!({"id": 9, "op": "phrases.set", "phrases": []}),
+    )
+    .await;
+    assert_eq!(none["phrases"], 0, "{none}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "start the lesson".into(),
+    )]);
+    assert!(agent_next(&mut socket).await.is_none());
     // A second connection of the app: its panel stays until the last one goes.
     drop(socket);
 }
