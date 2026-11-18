@@ -472,6 +472,8 @@ fn an_offer_is_committed_before_handoff_and_fresh_renewals_keep_the_same_token()
     let mut consumer = consumer(disk.clone());
     let first = begin(&mut consumer, &engine, &socket);
     assert_eq!(first.text, TEXT);
+    // Set as a duration from now: Schedule's `kind` is a timer (#7642).
+    assert!(first.timer);
     assert!(first.fresh(lamp_ipc::monotonic_us()));
     assert_eq!(
         consumer

@@ -239,6 +239,11 @@ pub(crate) struct Offer {
     /// heard part of it, so it is said as a repeat ("Again: …"), once.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub again: bool,
+    /// A timer, by Schedule's `kind` for the item, not a reminder: at the
+    /// usage limit it is rung with its own fixed line
+    /// (`LAMP_LIMIT_LOCAL_ASKS`, #7642). Sent only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub timer: bool,
 }
 impl Offer {
     /// Said late enough to be kept as said and to wait for a pause in the

@@ -96,8 +96,10 @@ async fn engine_going_on(
             .lock()
             .unwrap()
             .is_none()
-            || (on && engine.shared.fixed_clips.kept("Brighter.").is_none())
-            || (on && engine.shared.fixed_clips.kept(last_piece).is_none())
+            || (on
+                && ["Brighter.", LIMIT_TIMER_DONE, LIMIT_REMINDER_DUE, last_piece]
+                    .iter()
+                    .any(|line| engine.shared.fixed_clips.kept(line).is_none()))
         {
             tokio::task::yield_now().await;
         }
@@ -444,5 +446,84 @@ fn the_time_is_said_from_pieces_rendered_at_start() {
                 assert!(rendered.contains(&piece), "{hour}:{minute}: {piece}");
             }
         }
+    }
+}
+
+/// A due timer (`timer`) or reminder, said by this route.
+fn due(request: u64, timer: bool) -> ProviderInput {
+    ProviderInput::Reminder {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: "Tea".into(),
+        late: false,
+        late_by_ms: None,
+        also: Vec::new(),
+        again: false,
+        ids: Vec::new(),
+        timer,
+    }
+}
+
+/// #7642 (V2's ruling A): at the known limit a due timer is rung with
+/// "Your timer is done." and a reminder with "You have a reminder.", from
+/// their clips, with no chat asked, and each turn ends answered with that
+/// audio, so the coordinator completes it as said (no ring again, and no
+/// attempt lost to the no-audio retries); told as the lamp's own words, so
+/// it ends no refusal.
+#[tokio::test]
+async fn at_the_known_limit_a_due_timer_or_reminder_is_rung_with_its_own_line() {
+    let (engine, script, _) = engine(
+        true,
+        &["Lamp, what's the weather?"],
+        vec![limited()],
+        Duration::ZERO,
+    )
+    .await;
+    let mut engine = engine.saying_reminders(true);
+    let refused = sent_with_down(&mut engine, 1).await;
+    assert!(
+        refused.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
+        "{refused:?}"
+    );
+    for (request, timer, line) in [
+        (2, true, LIMIT_TIMER_DONE),
+        (3, false, LIMIT_REMINDER_DUE),
+    ] {
+        engine.submit(due(request, timer));
+        let rung = turn(&mut engine).await;
+        assert!(rung.contains(&format!("audio:{}", line.len())), "{rung:?}");
+        assert!(rung.contains(&format!("own_words:{request}")), "{rung:?}");
+        assert_eq!(rung.last().unwrap(), "complete", "{rung:?}");
+    }
+    assert_eq!(script.asked.lock().unwrap().len(), 1, "no chat asked");
+}
+
+/// #7642: the limit not known yet, a due timer's own chat refused with the
+/// relay's `usage_limit` is rung with its line all the same, ending
+/// answered. With the switch off it is as before: nothing said, the turn
+/// failed, for the consumer to offer again.
+#[tokio::test]
+async fn a_due_timer_refused_by_the_limit_is_rung_and_without_the_switch_is_not() {
+    for on in [true, false] {
+        let (engine, script, _) = engine(on, &[], vec![limited()], Duration::ZERO).await;
+        let mut engine = engine.saying_reminders(true);
+        engine.submit(due(1, true));
+        let rung = turn(&mut engine).await;
+        let ended = rung.last().cloned().unwrap_or_default();
+        if on {
+            assert!(
+                rung.contains(&format!("audio:{}", LIMIT_TIMER_DONE.len())),
+                "{rung:?}"
+            );
+            assert_eq!(ended, "complete", "{rung:?}");
+        } else {
+            assert!(
+                !rung.iter().any(|label| label.starts_with("audio:")),
+                "{rung:?}"
+            );
+            assert!(ended.starts_with("failed:"), "{rung:?}");
+        }
+        assert_eq!(script.asked.lock().unwrap().len(), 1);
     }
 }
