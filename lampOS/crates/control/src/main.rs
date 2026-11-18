@@ -645,6 +645,26 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),
             }
         }
+        // The installed apps' socket, behind LAMP_STORE_APPS: one socket, the
+        // peer known by its cgroup (docs/apps.md, "The app socket").
+        if lamp_control::app_yes::on() {
+            let path = PathBuf::from(
+                option(arguments, "--app-socket")
+                    .or_else(|| std::env::var(lamp_control::app_socket::ENVIRONMENT).ok())
+                    .unwrap_or_else(|| lamp_control::app_socket::SOCKET.to_owned()),
+            );
+            match lamp_control::app_socket::bind(&path) {
+                Ok(listener) => {
+                    eprintln!("lamp-control: installed apps may use {}", path.display());
+                    tokio::spawn(server::serve_app(
+                        listener,
+                        PathBuf::from(lamp_control::app_yes::APPS_DIR),
+                        shared.clone(),
+                    ));
+                }
+                Err(error) => eprintln!("lamp-control: the app socket {}: off: {error}", path.display()),
+            }
+        }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;
