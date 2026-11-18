@@ -21996,7 +21996,11 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
 
 /// #7749: the level asked at `at`, alternating 5 and 2 every 7 s.
 fn level_every_seven(at: Duration) -> u8 {
-    if (at.as_secs() / 7) % 2 == 0 { 5 } else { 2 }
+    if (at.as_secs() / 7).is_multiple_of(2) {
+        5
+    } else {
+        2
+    }
 }
 
 /// #7749: someone there, a new level sent every 7 s for 8 min, shifts at

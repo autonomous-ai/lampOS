@@ -764,6 +764,10 @@ fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Durati
 /// moved (a pace of nothing) still comes home: 5 counts a second.
 const EASE_LEAST: f32 = 0.1;
 
+/// An ease out under way: steps since it began, the offsets then, how far
+/// they moved in the step before, and each joint's pace, counts a step.
+type EaseOut = (u32, [f32; 5], [f32; 5], [f32; 5]);
+
 /// One step of an ease out (`easing_out`): from offsets `from`, moving
 /// `speed` a step, back to nothing over `EASE_OUT` or longer, `steps` steps
 /// in. No joint moves more a step than `pace` (#7749: a hand's yield passes
@@ -6975,7 +6979,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut yielding = false;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
-    let mut easing_out: Option<(u32, [f32; 5], [f32; 5], [f32; 5])> = None;
+    let mut easing_out: Option<EaseOut> = None;
     let mut gesture_moved = [0.0f32; 5];
     // The gesture waiting stood a folded lamp up; and what to say of a
     // gesture asked from outside, on the next glimpse.
