@@ -193,6 +193,10 @@ pub const WATCH_EVERY: Duration = Duration::from_secs(15);
 pub const PANEL_EVERY: Duration = Duration::from_secs(60);
 /// The most a manifest in a package may be.
 pub const MOST_MANIFEST: u64 = 64 * 1024;
+/// An install or a remove of the app is under way.
+pub const UNDER_WAY: &str = "the app is being installed or removed: try again in a moment";
+/// The install broke off without an answer of its own.
+pub const FELL_OVER: &str = "the install stopped unexpectedly: try again";
 /// Another install is under way.
 pub const BUSY: &str = "another app is being installed: try again in a moment";
 
@@ -300,7 +304,7 @@ impl Apps {
         let name = self.installed(data)?;
         let marks = self.backend.marks(&name);
         if marks.removing || marks.installing {
-            return Err("the app is being installed or removed: try again in a moment".into());
+            return Err(UNDER_WAY.into());
         }
         let line = if kind == START_KIND {
             Wire::start(&name)
@@ -318,6 +322,10 @@ impl Apps {
     /// installed version and package; then the helper, which spends it.
     fn remove(&self, data: &Value) -> Result<Value, String> {
         let name = self.installed(data)?;
+        let marks = self.backend.marks(&name);
+        if marks.removing || marks.installing {
+            return Err(UNDER_WAY.into());
+        }
         let package = self
             .backend
             .package(&name)
@@ -350,10 +358,10 @@ impl Apps {
     fn settings_get(&self, data: &Value) -> Result<Value, String> {
         let name = self.installed(data)?;
         let manifest = self.backend.manifest(&name).ok_or(NOT_INSTALLED)?;
-        let values = match self.backend.control(&Wire::state(&name)) {
-            Ok(kept) => kept.get("settings").cloned().unwrap_or(Value::Null),
-            Err(_) => Value::Null,
-        };
+        // A lamp-control that is not there is said, not shown as "nothing set".
+        let kept = self.backend.control(&Wire::state(&name))?;
+        refused(&kept)?;
+        let values = kept.get("settings").cloned().unwrap_or(Value::Null);
         Ok(json!({
             "id": name,
             "settings": manifest.get("settings").cloned().unwrap_or(json!([])),
@@ -581,7 +589,15 @@ impl Apps {
         std::thread::spawn(move || {
             // The slot is freed even if the install panics.
             let _slot = Slot(under_way);
-            let result = install_run(&*backend, &asked).map(Some);
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                install_run(&*backend, &asked)
+            }))
+            .unwrap_or_else(|_| {
+                // The phone is told, and the staged file (if one was made) goes.
+                backend.unstage(&backend.staging().join(format!("{}.tar", asked.sha256)));
+                Err(FELL_OVER.into())
+            })
+            .map(Some);
             if let Ok(mut done) = done.lock() {
                 done.push(Outcome {
                     kind: INSTALL_KIND.to_owned(),
@@ -883,9 +899,9 @@ impl Backend for Real {
                 .filter_map(|grant| grant.as_str().map(str::to_owned))
                 .collect(),
             net: record["net"].as_bool().unwrap_or(false),
-            logs: self
-                .manifest(name)
-                .is_some_and(|manifest| manifest["logs"].as_bool().unwrap_or(false)),
+            // The helper's record, as the helper reads it (an old record has
+            // none: no logs), so the yes and the helper's key agree.
+            logs: record["logs"].as_bool().unwrap_or(false),
         })
     }
 
@@ -1307,16 +1323,13 @@ pub mod tests {
 
     /// lamp-control is a server, not a dependency, so its `key_of` is read as
     /// text (as lamp-apps reads the door's grants): the seven fields it takes,
-    /// and that a remove's key has none of grants, `net` and `logs`. On a
-    /// lamp-voice without `app_yes.rs` yet (#7714) there is nothing to compare
-    /// with, and it says so.
+    /// and that a remove's key has none of grants, `net` and `logs`. It fails if
+    /// `app_yes.rs` is not there: since #7714 the key is always in the tree.
     #[test]
     fn the_yes_record_is_what_lamp_controls_key_of_takes() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../control/src/app_yes.rs");
-        let Ok(source) = std::fs::read_to_string(path) else {
-            eprintln!("skipped: lamp-control's app_yes.rs is not here yet (#7714)");
-            return;
-        };
+        let source = std::fs::read_to_string(path)
+            .expect("lamp-control's app_yes.rs (#7714) must be here: the key is read from it");
         let at = source.find("const FIELDS: [&str; 7] = [").expect(
             "key_of's FIELDS: lamp-control's key changed, so this record must change with it",
         );
@@ -1737,27 +1750,155 @@ pub mod tests {
         let asked = Instant::now();
         apps.watch(start + Duration::from_secs(20));
         assert!(
-            asked.elapsed() < Duration::from_millis(10),
+            // The look sleeps 500 ms inside control(): a waiting tick would
+            // take ~400 ms, so 100 ms is far from both and safe on a busy runner.
+            asked.elapsed() < Duration::from_millis(100),
             "watch waited {:?}",
             asked.elapsed()
         );
     }
 
     #[test]
-    fn a_panicking_install_gives_its_slot_back() {
+    fn a_panicking_install_gives_its_slot_back_says_so_and_clears_the_staged_file() {
         let mut fake = Fake::default();
         fake.apps.push(Fake::app("x1"));
+        let fake = std::sync::Arc::new(fake);
         let apps = Apps::new(Box::new(Trouble {
-            inner: Shared(std::sync::Arc::new(fake)),
+            inner: Shared(fake.clone()),
             slow: false,
         }));
-        let good = json!({"id": "x1", "url": "https://store.example/x.tar", "sha256": "a".repeat(64), "version": "1.0.0"});
+        let good = json!({"id": "x1", "url": "https://store.example/x.tar", "sha256": "a".repeat(64), "version": "1.0.0", "request_id": "r1"});
         apps.install(&good).unwrap();
         let end = Instant::now() + Duration::from_secs(5);
-        while apps.under_way.load(Ordering::Acquire) != 0 {
-            assert!(Instant::now() < end, "the slot was never given back");
+        let mut told = Vec::new();
+        while told.is_empty() {
+            assert!(Instant::now() < end, "no answer after a panic");
             std::thread::sleep(Duration::from_millis(5));
+            told = apps.take();
         }
+        assert_eq!(told[0].kind, INSTALL_KIND);
+        assert_eq!(told[0].request_id.as_deref(), Some("r1"));
+        assert_eq!(told[0].result.as_ref().unwrap_err(), FELL_OVER);
+        let lines = fake.lines.lock().unwrap().clone();
+        assert!(
+            lines.iter().any(
+                |l| l.starts_with("unstage ") && l.contains(&format!("{}.tar", "a".repeat(64)))
+            ),
+            "{lines:?}"
+        );
+        assert_eq!(apps.under_way.load(Ordering::Acquire), 0);
         assert!(apps.install(&good).is_ok(), "the next install is not BUSY");
+    }
+
+    #[test]
+    fn a_remove_is_refused_while_an_install_or_remove_is_under_way() {
+        for marks in [
+            Marks {
+                removing: true,
+                ..Marks::default()
+            },
+            Marks {
+                installing: true,
+                ..Marks::default()
+            },
+        ] {
+            let mut fake = Fake::default();
+            let mut app = Fake::app("x1");
+            app.2 = marks;
+            fake.apps.push(app);
+            let fake = std::sync::Arc::new(fake);
+            let apps = Apps::new(Box::new(Shared(fake.clone())));
+            let err = apps.answer(REMOVE_KIND, &json!({"id": "x1"})).unwrap_err();
+            assert_eq!(err, UNDER_WAY);
+            assert!(
+                fake.lines.lock().unwrap().is_empty(),
+                "nothing asked: {:?}",
+                fake.lines.lock().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn settings_get_says_a_lamp_control_that_refuses_and_does_not_show_nothing_set() {
+        let mut fake = Fake::default();
+        fake.apps.push(Fake::app("x1"));
+        fake.control_answer = Some(json!({"refused": "apps are off on this lamp"}));
+        // app_state is answered by the fake's own branch: use a line it does not know.
+        let fake = std::sync::Arc::new(fake);
+        let apps = Apps::new(Box::new(Refusing(Shared(fake))));
+        let err = apps
+            .answer(SETTINGS_GET_KIND, &json!({"id": "x1"}))
+            .unwrap_err();
+        assert!(err.contains("off on this lamp"), "{err}");
+    }
+
+    /// A backend whose lamp-control always refuses.
+    struct Refusing(Shared);
+
+    impl Backend for Refusing {
+        fn names(&self) -> Vec<String> {
+            self.0.names()
+        }
+        fn manifest(&self, n: &str) -> Option<Value> {
+            self.0.manifest(n)
+        }
+        fn marks(&self, n: &str) -> Marks {
+            self.0.marks(n)
+        }
+        fn unit(&self, n: &str) -> Unit {
+            self.0.unit(n)
+        }
+        fn package(&self, n: &str) -> Option<Package> {
+            self.0.package(n)
+        }
+        fn helper(&self, l: &Value) -> Result<Value, String> {
+            self.0.helper(l)
+        }
+        fn control(&self, _: &Value) -> Result<Value, String> {
+            Ok(json!({"refused": "apps are off on this lamp"}))
+        }
+        fn download(&self, u: &str, m: u64) -> Result<Vec<u8>, String> {
+            self.0.download(u, m)
+        }
+        fn staging(&self) -> PathBuf {
+            self.0.staging()
+        }
+        fn stage(&self, p: &Path, b: &[u8]) -> Result<(), String> {
+            self.0.stage(p, b)
+        }
+        fn unstage(&self, p: &Path) {
+            self.0.unstage(p)
+        }
+    }
+
+    #[test]
+    fn the_installed_packages_logs_are_the_helpers_records_not_the_manifests() {
+        let dir = tempfile::tempdir().unwrap();
+        let current = dir.path().join("x1").join("current");
+        std::fs::create_dir_all(&current).unwrap();
+        // The manifest says logs; the helper's record (an earlier build's) has none.
+        std::fs::write(current.join(MANIFEST_FILE), r#"{"logs": true}"#).unwrap();
+        let record = |logs: &str| {
+            format!(
+                r#"{{"version":"1.0.0","grants":[],"net":false,{logs}"sha256":"{}"}}"#,
+                "c".repeat(64)
+            )
+        };
+        let real = Real {
+            layout: lamp_apps::layout::Layout {
+                code: dir.path().to_owned(),
+                data: dir.path().to_owned(),
+                private: dir.path().to_owned(),
+                state: dir.path().to_owned(),
+                staging: dir.path().to_owned(),
+                lock_wait: Duration::from_secs(1),
+            },
+            helper: "/nowhere".into(),
+            control: "/nowhere".into(),
+        };
+        std::fs::write(current.join(RECORD_FILE), record("")).unwrap();
+        assert!(!real.package("x1").unwrap().logs);
+        std::fs::write(current.join(RECORD_FILE), record(r#""logs":true,"#)).unwrap();
+        assert!(real.package("x1").unwrap().logs);
     }
 }
