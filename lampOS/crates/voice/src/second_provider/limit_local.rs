@@ -20,11 +20,11 @@ pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// Words an ask may hold that change nothing about which ask it is.
-const FILLER: [&str; 26] = [
-    "hey", "hi", "ok", "okay", "lamp", "lamb", "please", "can", "could", "would", "will", "you",
-    "the", "a", "an", "it", "just", "now", "thanks", "thank", "so", "your", "for", "me", "be",
-    "to",
+/// Words an ask may hold that change nothing about which ask it is. The
+/// lamp's name and a greeting are read as `attention` reads a call.
+const FILLER: [&str; 20] = [
+    "please", "can", "could", "would", "will", "you", "the", "a", "an", "it", "just", "now",
+    "thanks", "thank", "so", "your", "for", "me", "be", "to",
 ];
 /// Words that ask for a change, any of them.
 const VERBS: [&str; 6] = ["make", "turn", "switch", "set", "go", "change"];
@@ -41,6 +41,9 @@ pub(crate) fn matched(said: &str) -> Option<(&'static str, Value)> {
     if said.contains('?') {
         return None;
     }
+    // Called by name as the second route reads a call: then each word
+    // written for the name ("Lampy", "Lynn") is the name, not the ask.
+    let named = crate::attention::called(said) || crate::attention::called_by_name_on(said, true);
     let lower = said.to_lowercase();
     let words: Vec<&str> = lower
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
@@ -57,7 +60,10 @@ pub(crate) fn matched(said: &str) -> Option<(&'static str, Value)> {
             verb = true;
         } else if A_LITTLE.contains(&word) {
             little = true;
-        } else if !FILLER.contains(&word) {
+        } else if !(FILLER.contains(&word)
+            || crate::attention::is_greeting(word)
+            || (named && crate::attention::written_for_the_name(word)))
+        {
             rest.push(word);
         }
     }
@@ -170,6 +176,34 @@ mod tests {
             ("Turn the light on and the volume up.", None),
             ("I said the lights were brighter yesterday.", None),
             ("", None),
+            // The name and a greeting, read as a call reads them (#7612:
+            // asks said with the name were not done at the limit).
+            (
+                "Hey Lamp, make it brighter.",
+                Some(("light_brighter", json!({}))),
+            ),
+            ("hey lamb quieter", Some(("volume_down", json!({})))),
+            (
+                "Hey, Lamp. Turn the light red.",
+                Some(("light_colour", json!({"colour": "red"}))),
+            ),
+            ("Hello Lamp, quieter.", Some(("volume_down", json!({})))),
+            (
+                "Hey Lampy, make it brighter.",
+                Some(("light_brighter", json!({}))),
+            ),
+            (
+                "Lynn, turn the light red.",
+                Some(("light_colour", json!({"colour": "red"}))),
+            ),
+            (
+                "Make it brighter, Lamp.",
+                Some(("light_brighter", json!({}))),
+            ),
+            ("Hey Lamp, is the light on?", None),
+            ("Hey Lampy, what time is it", None),
+            // A word written for the name, not said as one, stays a word.
+            ("Make the plan brighter.", None),
         ];
         for (said, want) in cases {
             assert_eq!(&matched(said), want, "{said:?}");

@@ -3,6 +3,18 @@
 //! acting part's own line; anything else is the limit as before.
 use super::*;
 
+/// A line at the limit that is no plain ask is journaled by its word count
+/// alone: none of its words reach the journal.
+#[test]
+fn an_unmatched_line_is_journaled_by_its_word_count_only() {
+    let line = limit_local_unmatched_line(7, "Hey Lamp, what's the weather like?");
+    assert_eq!(
+        line,
+        "lamp-voice second: request 7: limit_local: no plain ask matched (6 words)"
+    );
+    assert!(!line.to_lowercase().contains("weather"));
+}
+
 /// What lamp-actions answers (`lamp_actions::Outcome::line_for`, with
 /// `LAMP_SHORT_DONE`): a done step with its line, a refusal for the
 /// cooler step.
