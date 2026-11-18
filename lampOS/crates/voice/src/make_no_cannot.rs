@@ -413,6 +413,39 @@ during = { from = \"08:00\", to = \"08:01\" }
 /// The request [`EXAMPLE`] is for.
 const EXAMPLE_ASKED: &str = "every morning at eight, tell me a joke";
 
+/// The sitting the lamp's own sip-of-water fires on, told the one more
+/// call with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (lamp-9adf, 18 Nov:
+/// "remind me to stretch when I've been sitting a long while" was made on
+/// someone getting up): sip-of-water's `for`, its once-a-sitting `rearm`
+/// and its `cooldown`, on the desk's presence, the one sitting a made
+/// trigger can say (`made_skill`'s check takes no `near` or `gap` on the
+/// faces). The model judges by meaning which one a request is.
+const SITTING: &str = " Someone has sat at the desk a long while, as the lamp's own \
+sip-of-water fires: \"room/presence\", \"someone\", equals true, for = \"30m\" (or the while the \
+request names), rearm = \"leaves\" (once a sitting, again only after they have left), \
+cooldown = \"45m\"; a long sitting is never a getting up, which runs only as they stand. \
+Someone coming back to the desk is an arrival, never the desk left.";
+
+/// One whole answer for a long sitting ([`SITTING`]), shown to the model
+/// with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: sip-of-water's sitting.
+const SAT_EXAMPLE: &str = "name: shoulder-roll
+grants: speak
+```skill.toml
+[permissions]
+topics = [\"room/presence\"]
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"30m\"
+rearm = \"leaves\"
+cooldown = \"45m\"
+```";
+
+/// The request [`SAT_EXAMPLE`] is for.
+const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind me to stretch";
+
 /// One whole answer for a task only asked for, shown to the model.
 const ASKED_EXAMPLE: &str = "name: desk-photo
 grants: camera, speak
@@ -427,12 +460,18 @@ const ASKED_EXAMPLE_ASKED: &str =
 /// With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`),
 /// where a make judged no quick reaction comes here first, it also refuses
 /// a reminder as the make's own brief does ([`reminder_rule`], the
-/// Reviewer-lead's P2 on #7764); off, as before.
+/// Reviewer-lead's P2 on #7764), and is told sip-of-water's sitting beside
+/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]);
+/// off, as before.
 pub fn system() -> String {
-    let reminder = if made_skill::reactions_on() {
-        reminder_rule()
+    let (reminder, sitting, sat_example) = if made_skill::reactions_on() {
+        (
+            reminder_rule(),
+            SITTING,
+            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE}\n"),
+        )
     } else {
-        String::new()
+        (String::new(), "", String::new())
     };
     format!(
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
@@ -448,13 +487,13 @@ pub fn system() -> String {
          [[trigger]]); else, when it runs only when the person asks for it or says something \
          to the lamp (\"when I say send my test note\"), no block but a line asks: and the \
          few words they will say, as they said them or, when they named none, a short phrase \
-         for the task, several joined by |. When it runs: {triggers} Add no time of day the \
+         for the task, several joined by |. When it runs: {triggers}{sitting} Add no time of day the \
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
          words (\"needs: paying for things\").{reminder} A whole answer, \
          for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
-         {ASKED_EXAMPLE}\n",
+         {ASKED_EXAMPLE}\n{sat_example}",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
     )
@@ -1447,6 +1486,56 @@ mod tests {
             read("cannot: I can't do that yet: checking the weather."),
             Err(NOT_THE_FORM.to_owned())
         );
+    }
+
+    /// sip-of-water's own `[trigger]`, as the lamp ships it.
+    fn sip_of_waters_trigger() -> toml::Table {
+        let shipped: toml::Table =
+            toml::from_str(include_str!("../../../skills/sip-of-water/skill.toml")).unwrap();
+        shipped["trigger"].as_table().unwrap().clone()
+    }
+
+    /// lamp-9adf, 18 Nov: "remind me to stretch when I've been sitting a
+    /// long while" was made on someone getting up. With
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more call is told the
+    /// sitting as sip-of-water fires on it, its `for`, its once-a-sitting
+    /// `rearm` and its `cooldown`, with a whole answer for a sat-a-while
+    /// ask, beside the arrival and the leaving; the model still judges by
+    /// meaning. Off, the prompt is as before.
+    #[test]
+    fn with_reactions_on_the_prompt_carries_sip_of_waters_sitting() {
+        made_skill::set_reactions_here(Some(false));
+        let before = system();
+        assert!(!before.contains(SAT_EXAMPLE), "{before}");
+        assert!(!before.contains("sip-of-water"), "{before}");
+        made_skill::set_reactions_here(Some(true));
+        let told = system();
+        made_skill::set_reactions_here(None);
+        assert!(told.contains(SAT_EXAMPLE), "{told}");
+        assert!(told.contains(SAT_EXAMPLE_ASKED), "{told}");
+        assert!(told.contains(made_skill::TRIGGER_MEANINGS), "{told}");
+        let sip = sip_of_waters_trigger();
+        for key in ["for", "rearm", "cooldown"] {
+            let line = format!("{key} = \"{}\"", sip[key].as_str().unwrap());
+            assert!(told.contains(&line), "{line}: {told}");
+        }
+        // The example is an answer the lamp keeps, its trigger
+        // sip-of-water's sitting on the desk's presence.
+        let Ok(Answer::Skill {
+            when: When::Trigger(block),
+            ..
+        }) = read(SAT_EXAMPLE)
+        else {
+            panic!("{SAT_EXAMPLE}")
+        };
+        let block: toml::Table = toml::from_str(&block_kept(&block).unwrap()).unwrap();
+        let trigger = block["trigger"].as_table().unwrap();
+        assert_eq!(trigger["topic"].as_str(), Some("room/presence"));
+        assert_eq!(trigger["field"].as_str(), Some("someone"));
+        assert_eq!(trigger["equals"].as_bool(), Some(true));
+        for key in ["for", "rearm", "cooldown"] {
+            assert_eq!(trigger.get(key), sip.get(key), "{key}");
+        }
     }
 
     #[test]
