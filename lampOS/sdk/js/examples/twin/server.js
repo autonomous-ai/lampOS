@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
+import { limitsOf } from './reach.js';
 import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt, stopRainbow } from './controls.js';
 import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
@@ -127,12 +128,28 @@ if (ringFile) {
     tell({ type: 'state', state: last });
   }, 100).unref();
 }
+// What the body will do with each joint (`get body`'s min_deg / max_deg), read at the start and again when it changes (standing or
+// folded moves the head's reach): the page draws the reach and warns past it, and never blocks (reach.js). A lamp that says none: none.
+let limits = null;
+async function readLimits() {
+  if (!bodyGrant) return;
+  try {
+    const next = limitsOf(await lamp.bodyInfo());
+    if (JSON.stringify(next) === JSON.stringify(limits)) return;
+    limits = next;
+    tell({ type: 'limits', joints: next });
+  } catch { /* an older lamp, or the body not heard from yet: no band, as before */ }
+}
+if (bodyGrant) {
+  readLimits();
+  setInterval(readLimits, 5_000).unref();
+}
 console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}` : 'no body grant: the twin draws the lamp at rest and its body rows are drawn off');
 
 // One lease at a time, taken at the first drag and given back 3 s after the last.
 let lease = null;
 let letGo = null;
-async function drag(joint, deg) {
+async function drag(joint, deg, final = false) {
   if (!NAMES.includes(joint) || !Number.isFinite(deg)) return;
   try {
     if (!lease) {
@@ -150,14 +167,24 @@ async function drag(joint, deg) {
     }
     // The virtual lamp's own arm (and roll) is this page's simulation: the lamp's `joints` op takes only yaw and pitch today.
     if (options.fake && !['yaw', 'pitch'].includes(joint)) { sim?.aim(joint, target); return; }
-    await lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) });
+    // The lamp's answer to the move, said to the pages (the body's `done`: reached, `clamped`, or `dropped` with its why): the slider
+    // only asks, and the body may cut or refuse what it asks (roll is held to a count either way on a product lamp). Only the page's
+    // last ask of a drag (`final`, the slider let go) waits for it, so a drag leaves no wait behind per step; a lamp that sends no `done`
+    // is not waited on for more than 6 s.
+    const mine = (asks[joint] = (asks[joint] ?? 0) + 1);
+    const pending = lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) }, { wait: final });
     sim?.aim(joint, target);
+    const done = await (final ? Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 6_000).unref())]) : pending);
+    if (final && done?.how && mine === asks[joint]) {
+      tell({ type: 'joint_done', joint, how: done.how, why: done.why, clamped: done.clamped === true, ...(typeof done[joint] === 'number' ? { [joint]: done[joint] } : {}) });
+    }
   } catch (error) {
     if (!(error instanceof LampError)) throw error;
     tell({ type: 'said', text: `refused: ${error.code}: ${error.message}` });
     if (error.code === 'no_lease') lease = null;
   }
 }
+const asks = {};
 async function release() {
   // A following the panel started (a row that follows the hand) holds the body lease too: let it go, so every row
   // that needs the body (a look, a move) finds it free.
@@ -260,6 +287,7 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
+  '/reach.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./reach.js'))],
   // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving; `grants`
   // are hello's; each row says if it is `disabled` (describe). `camera`/`microphone` say the picture or the sound may show.
   ...(tryPanel ? { '/try.json': ['application/json', () => JSON.stringify({
@@ -375,6 +403,7 @@ wss.on('connection', (page) => {
   // A frame over the cap (or a broken one) closes that page's socket; it must not end the twin.
   page.on('error', () => page.terminate());
   if (last) page.send(JSON.stringify({ type: 'state', state: last }));
+  if (limits) page.send(JSON.stringify({ type: 'limits', joints: limits }));
   page.on('message', (data) => {
     let message;
     try {
@@ -393,7 +422,7 @@ wss.on('connection', (page) => {
         if (lastRaw) { last = withRing(lastRaw); tell({ type: 'state', state: last }); }
       }
     }
-    if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg));
+    if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg), message.final === true);
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
     if (message.type === 'hear') hearing(page, message);
