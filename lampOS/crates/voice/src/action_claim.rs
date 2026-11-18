@@ -5035,7 +5035,9 @@ pub(crate) mod tests {
     #[test]
     fn a_subject_keeps_inner_words_and_ends_at_a_dash_or_ellipsis() {
         let names = known();
-        let walk = "Okay, the walk the dog skill is removed.";
+        // A `*` takes at most ANY_WORDS (3) words, so the line names the
+        // three-word skill bare; its inner "the" stays in the subject.
+        let walk = "Okay, walk the dog skill is removed.";
         assert_eq!(claim_subject(walk), ["walk", "the", "dog"]);
         assert_eq!(
             claim_on(walk, true, false, false, false, Some(&names)),
