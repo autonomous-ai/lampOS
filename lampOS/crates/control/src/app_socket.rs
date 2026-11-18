@@ -227,32 +227,58 @@ pub fn answer(
     })
 }
 
+/// What an app's frame becomes before the door parses it.
+#[derive(Debug, PartialEq)]
+pub enum PhrasesSet {
+    /// Not a `phrases.set`: the door's own to parse.
+    NotOurs,
+    /// A `phrases.set` as the door's own op, and how many phrases it set.
+    Door(String, usize),
+    /// A `phrases.set` refused here, in words: the reply to send.
+    Refused(Value),
+}
+
 /// An app's `phrases.set` (`{"id", "op": "phrases.set", "phrases": [text…]}`,
 /// replace-whole) as the door's own op: a `subscribe` to `phrase.heard` with
-/// the phrases, or, for none, an `unsubscribe` of it. The text to hand the
-/// door and how many phrases were set; a frame that is no `phrases.set`, or a
-/// malformed one, is handed on as it came (the door refuses it in its own
-/// words) with `None`.
-pub fn phrases_set_as_subscribe(text: &str) -> (String, Option<usize>) {
-    let as_is = || (text.to_owned(), None);
+/// the phrases, or, for none, an `unsubscribe` of it. One with another field,
+/// phrases that are not a list of text, or a phrase twice (as the schema's
+/// `uniqueItems` says) is refused `bad_request` here in its own words, never
+/// handed to the door's parser, which would name the door's ops.
+pub fn phrases_set_as_subscribe(text: &str) -> PhrasesSet {
     let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text) else {
-        return as_is();
+        return PhrasesSet::NotOurs;
     };
     if frame.get("op").and_then(Value::as_str) != Some("phrases.set") {
-        return as_is();
+        return PhrasesSet::NotOurs;
     }
-    let (Some(id), Some(Value::Array(phrases))) = (frame.get("id"), frame.get("phrases")) else {
-        return as_is();
+    let Some(id) = frame.get("id").and_then(Value::as_u64) else {
+        return PhrasesSet::NotOurs;
     };
-    if frame.len() != 3 || phrases.iter().any(|phrase| !phrase.is_string()) {
-        return as_is();
+    let refuse = |why: &str| PhrasesSet::Refused(refuse(id, ErrorCode::BadRequest, why));
+    if frame
+        .keys()
+        .any(|key| !matches!(key.as_str(), "id" | "op" | "phrases"))
+    {
+        return refuse("phrases.set takes only phrases");
+    }
+    let Some(Value::Array(phrases)) = frame.get("phrases") else {
+        return refuse("phrases: a list of text");
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for phrase in phrases {
+        let Some(phrase) = phrase.as_str() else {
+            return refuse("phrases: a list of text");
+        };
+        if !seen.insert(phrase) {
+            return refuse("phrases: no phrase twice");
+        }
     }
     let door = if phrases.is_empty() {
         json!({"id": id, "op": "unsubscribe", "events": ["phrase.heard"]})
     } else {
         json!({"id": id, "op": "subscribe", "events": ["phrase.heard"], "phrases": phrases})
     };
-    (door.to_string(), Some(phrases.len()))
+    PhrasesSet::Door(door.to_string(), phrases.len())
 }
 
 /// The door's answer to a [`phrases_set_as_subscribe`]d frame, as the app's:
