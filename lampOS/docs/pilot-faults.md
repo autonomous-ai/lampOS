@@ -350,6 +350,26 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   plug:device_speaker is busy at start; waiting up to 20 s for it, as the
   microphone waits for its own`, then, once open, `the speaker was busy for
   9.2 s at start; opened on try 185`. Its holder is not looked up.
+- **A worker slow to say ready on a loaded cold boot.** On lamp-c0a4 on
+  2026-11-18 (stable 14008, about 07:17) the voice exited twice within
+  about 67 s of a cold boot with `worker readiness timed out`: a worker
+  missed `WORKER_STARTUP_TIMEOUT`, 3 s from its spawn to its ready, while
+  the board was heavily loaded (1-minute load 7.9 at 31 s; containerd
+  35.7 s and lircd 13 s in `systemd-analyze blame`) (#7224). The timeout
+  names the role and how long it waited (`worker readiness timed out
+  (capture after 3012 ms)`). With `LAMP_VOICE_YOUNG_BOOT_GRACE=on` (off
+  unless set, read by the process that spawns the worker), a worker
+  spawned while the system has been up less than 2 min
+  (`YOUNG_BOOT`, on `CLOCK_BOOTTIME`) has 10 s for its first ready
+  (`YOUNG_BOOT_STARTUP_TIMEOUT`) instead of 3 s; a role already ready
+  once in that process, or started later, has 3 s. Ready still gates the
+  start, so nothing is said to be ready before the worker can take input,
+  and no unit is ordered after slow ones, which would delay every boot. A
+  speaker busy at start gets its 20 s on top of its own bound, so 20 s
+  plus 10 s with the grace. The journal says once per worker given it
+  `lamp-voice: capture was given the young-boot grace (system up 31 s):
+  readiness bound 10 s`. Off, the bound and the journal are as before.
+  Off Linux there is no boot clock read, so no start is young.
 - **The privacy worker's lease lapsing in the muted wait after boot.** On
   lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
   at 15.82, `schedule-consumer: due reminders available` at 15.89, then
