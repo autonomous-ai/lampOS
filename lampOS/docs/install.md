@@ -1138,7 +1138,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    other files, so a lamp in a home gets these the way the region's do:
    `lamp-region.service` runs `update/current`'s `lamp-update region` at every
    boot, which writes them too. They reach it at its first boot after a
-   round. What sysstat has already kept stays (#7254's second part).
+   round. **What sysstat already kept** (#7254's second part, the lead's yes on #7570;
+   `install::sysstat_kept_removed`, from `lamp-update region` only) goes at the
+   same boot run: every plain file named `sa` or `sar` and digits directly in
+   `/var/log/sysstat` (`sa18`, `sar17`), each said first by name and size
+   (`sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)`).
+   A link, a folder or any other name is never followed or touched. With
+   `/etc/lampOS/sysstat-on` there, nothing is removed. `lamp-region.service`
+   may write only `/etc`, and no round changes that unit in a home
+   (`round::installed_units` passes over it), so the removal is one transient
+   unit of its own: `systemd-run --wait --collect` with `ProtectSystem=strict`,
+   `ReadWritePaths=/var/log/sysstat` and `NoNewPrivileges=yes`, running
+   `/bin/rm -f --` on exactly those paths. Once they are gone it finds nothing
+   and runs nothing.
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does

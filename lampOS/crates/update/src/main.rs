@@ -438,10 +438,14 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
     // sysstat's collection off (#7254), this unit being the one a lamp in a
     // home runs from `update/current` at every boot.
     let sysstat = install::sysstat_quiet(Path::new("/"), &mut System, &mut changed, &mut say);
+    // What sysstat already kept (#7254 part 2), at every boot, as the
+    // drop-ins are: a lamp in a home gets this through this unit only.
+    // Each file is said by name and size as it goes, so nothing more here.
+    let kept = install::sysstat_kept_removed(Path::new("/"), &mut System, &mut say).map(|_| ());
     for line in &changed {
         println!("{line}");
     }
-    servers.and(sysstat)
+    servers.and(sysstat).and(kept)
 }
 
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {

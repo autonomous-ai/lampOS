@@ -1013,6 +1013,90 @@ pub fn sysstat_quiet(
     Ok(())
 }
 
+/// Where sysstat keeps what it collected (#7254 part 2).
+pub const SYSSTAT_KEPT: &str = "/var/log/sysstat";
+
+/// Whether `name` is one of sysstat's own daily files: `sa` or `sar` and
+/// digits only (`sa18`, `sar31`), never anything else in its folder.
+pub fn sysstat_kept_name(name: &str) -> bool {
+    let digits = name
+        .strip_prefix("sar")
+        .or_else(|| name.strip_prefix("sa"))
+        .unwrap_or("");
+    !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// The files sysstat already kept on the RAM log disk (#7254 part 2, the
+/// lead's yes on #7570): with collection off ([`sysstat_quiet`]) they only
+/// take room the journal needs (`/var/log` is 47 MB; past 75 % the base
+/// cuts the journal to 5 MB). Only plain files named as
+/// [`sysstat_kept_name`] directly in [`SYSSTAT_KEPT`] are removed, each said
+/// by name and size first; a link, a folder or anything else is never
+/// followed or touched. With [`SYSSTAT_ON_PATH`] there (its owner wants
+/// sysstat), nothing is removed. `lamp-region.service` may write only
+/// `/etc`, and no round changes that unit in a home, so the removal is one
+/// transient unit of its own (`systemd-run --wait --collect`), writing only
+/// that folder, naming the exact paths. Run at every boot by `lamp-update
+/// region`; once they are gone it finds nothing and runs nothing. Returns
+/// the paths it asked to remove.
+pub fn sysstat_kept_removed(
+    root: &Path,
+    host: &mut dyn Host,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
+    if fs::symlink_metadata(on(root, SYSSTAT_ON_PATH)).is_ok() {
+        return Ok(Vec::new());
+    }
+    let folder = on(root, SYSSTAT_KEPT);
+    let entries = match fs::read_dir(&folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("{SYSSTAT_KEPT}: {error}")),
+    };
+    let mut kept: Vec<(String, u64)> = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("{SYSSTAT_KEPT}: {error}"))?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !sysstat_kept_name(&name) {
+            continue;
+        }
+        // The entry itself, never what a link names.
+        let Ok(meta) = fs::symlink_metadata(entry.path()) else {
+            continue;
+        };
+        if meta.file_type().is_file() {
+            kept.push((format!("{SYSSTAT_KEPT}/{name}"), meta.len()));
+        }
+    }
+    if kept.is_empty() {
+        return Ok(Vec::new());
+    }
+    kept.sort();
+    for (path, bytes) in &kept {
+        say(&format!(
+            "sysstat's kept file removed: {path} ({bytes} bytes)"
+        ));
+    }
+    let paths: Vec<String> = kept.into_iter().map(|(path, _)| path).collect();
+    let mut argv = vec![
+        "systemd-run",
+        "--wait",
+        "--collect",
+        "--quiet",
+        "--property=ProtectSystem=strict",
+        "--property=ReadWritePaths=/var/log/sysstat",
+        "--property=NoNewPrivileges=yes",
+        "/bin/rm",
+        "-f",
+        "--",
+    ];
+    argv.extend(paths.iter().map(String::as_str));
+    if let Err(why) = host.refresh(&argv) {
+        say(&format!("sysstat's kept files were not removed: {why}"));
+    }
+    Ok(paths)
+}
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
