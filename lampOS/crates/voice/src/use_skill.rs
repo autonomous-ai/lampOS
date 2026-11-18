@@ -477,6 +477,29 @@ fn properties(skill: &Tool) -> impl Iterator<Item = (&String, &Value)> {
         .flatten()
 }
 
+/// With `LAMP_MADE_SKILL_OFF_SAID` on, the one skill of `skills` whose
+/// function's name is `named` as a skill's name is written
+/// (`made_skill::name_asked`: lower case, underscores, spaces and dashes
+/// alike, no "my" before it or "skill" after it), each number said as a
+/// word or as digits the same (`made_skill::name_digits`: "three" is `3`,
+/// "twenty" is `20`): #7562's rows on lamp-9adf, 18 Nov, "use my good
+/// morning three skill" was told no skill has that name. A name
+/// normalisation, never a meaning: none when no skill or more than one is
+/// so named, and off, none.
+fn named_loosely<'a>(named: &str, skills: &'a [Tool]) -> Option<&'a Tool> {
+    if !crate::made_skill::off_said_on() {
+        return None;
+    }
+    let loose = |name: &str| crate::made_skill::name_digits(&crate::made_skill::name_asked(name));
+    let named = loose(named);
+    if named.is_empty() {
+        return None;
+    }
+    let mut found = skills.iter().filter(|skill| loose(&skill.name) == named);
+    let skill = found.next()?;
+    found.next().is_none().then_some(skill)
+}
+
 /// `call`, a call of `use_skill`, as the call of the skill it names, with its
 /// choice and yes-or-no under the skill's own parameters' names, for the
 /// skill to run as when it is called itself. What the model is told
@@ -485,8 +508,12 @@ fn properties(skill: &Tool) -> impl Iterator<Item = (&String, &Value)> {
 /// the skill would refuse it.
 pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
     let named = call.args.get("skill").and_then(Value::as_str);
-    let Some(skill) = named.and_then(|named| skills.iter().find(|skill| skill.name == named))
-    else {
+    let Some(skill) = named.and_then(|named| {
+        skills
+            .iter()
+            .find(|skill| skill.name == named)
+            .or_else(|| named_loosely(named, skills))
+    }) else {
         return Err(json!({
             "error": format!(
                 "There is no skill named {}. Your skills are {}.",
@@ -986,6 +1013,54 @@ mod tests {
             400
         );
         assert!(cut(&installed(), &none()).is_empty());
+    }
+
+    /// #7562's rows on lamp-9adf, 18 Nov: "use my good morning three skill"
+    /// was answered that no skill has that name in a few ms. With
+    /// `LAMP_MADE_SKILL_OFF_SAID` on, a skill named as it is written, its
+    /// numbers said as words or digits ("three" is `3`, "twenty" is `20`)
+    /// and its underscores as spaces or dashes, is that skill when it is
+    /// the one such; "good morning" alone beside several names nothing.
+    /// Off, the exact name alone, as before.
+    #[test]
+    fn a_skill_named_with_its_number_as_a_word_is_that_skill() {
+        let skills = vec![
+            skill("good_morning_1", "Says good morning.", None),
+            skill("good_morning_2", "Says good morning again.", None),
+            skill("good_morning_3", "Says good morning a third way.", None),
+            skill("alarm_20", "Rings at eight.", None),
+        ];
+        crate::made_skill::set_off_said_here(Some(true));
+        for said in [
+            "good_morning_3",
+            "good morning three",
+            "good_morning_three",
+            "Good Morning 3",
+            "good-morning-3",
+        ] {
+            let found = translate(&call(json!({ "skill": said })), &skills)
+                .unwrap_or_else(|told| panic!("{said}: {told}"));
+            assert_eq!(found.name, "good_morning_3", "{said}");
+        }
+        let twenty = translate(&call(json!({"skill": "alarm twenty"})), &skills).unwrap();
+        assert_eq!(twenty.name, "alarm_20");
+        let some = translate(&call(json!({"skill": "good morning"})), &skills).unwrap_err();
+        assert!(
+            some["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("There is no skill named good morning."),
+            "{some}"
+        );
+        crate::made_skill::set_off_said_here(Some(false));
+        assert!(translate(&call(json!({"skill": "good morning three"})), &skills).is_err());
+        assert_eq!(
+            translate(&call(json!({"skill": "good_morning_3"})), &skills)
+                .unwrap()
+                .name,
+            "good_morning_3"
+        );
+        crate::made_skill::set_off_said_here(None);
     }
 
     #[test]

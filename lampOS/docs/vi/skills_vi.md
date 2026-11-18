@@ -2239,6 +2239,27 @@ thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
   nhau, hay không có cái nào gần, đều được nói ra, như khi chạy. Một kỹ
   năng hiện không có trên đèn, hoặc thư mục của nó ở đó không phải gói đã
   tạo, được nói là không tắt/bật, và vì sao.
+- **Số nói bằng chữ hay bằng chữ số** (các dòng thử của #7562 trên
+  lamp-9adf, 18/11: "use my good morning three skill" không tìm thấy
+  `good-morning-3`, và `use_skill` đáp rằng không có kỹ năng nào tên đó
+  trong 2 đến 6 ms). Số trong tên vốn đã giống nhau khi nói bằng chữ hay
+  chữ số (`made_skill::name_digits`, từ không đến mười chín, các số chục,
+  "twenty one" là `21`), nhưng `made_remove::found` lấy thêm một tên gần vì
+  nó chứa các từ của một tên mà sau đó bị bỏ như một phần của tên được
+  nêu: "good morning three" bên cạnh good morning và good morning 2 bị hỏi
+  là good morning 2 hay 3, và việc chạy kỹ năng đang tắt qua `use_skill`
+  (`made_run::off_named`) không tìm thấy gì. Khi bật công tắc, một tên gần
+  chỉ được lấy thêm cho một tên gần nhất còn đứng sau bước đó, nên một tên
+  nói trọn vẹn là đúng kỹ năng đó; "good morning" bên cạnh ba kỹ năng kia
+  vẫn hỏi là cái nào. Và chính `use_skill` (`use_skill::translate`), khi
+  không hàm nào có đúng tên được đưa, lấy một hàm duy nhất có tên giống như
+  cách viết tên kỹ năng (`made_skill::name_asked`: chữ thường, gạch dưới,
+  khoảng trắng và gạch ngang như nhau, bỏ "my" và "skill"), số thành chữ
+  số (`use_skill::named_loosely`): "good morning three" là
+  `good_morning_3`, "alarm twenty" là `alarm_20`; không lấy gì khi có hai
+  hàm trở lên như vậy, như "good morning" bên cạnh `good_morning_1` đến
+  `_3`. Chỉ là chuẩn hóa tên, không bao giờ là nghĩa; khi tắt công tắc, cả
+  hai như trước.
 - **Không có cái nào gần: đưa ra kỹ năng của họ để gọi lại** (dòng thử
   của #7562 trên lamp-9adf, 18/11 lúc 01:3x: "turn my bitcoin price skill
   back on" không tìm thấy gì gần btc price, và mô hình, không được cho biết

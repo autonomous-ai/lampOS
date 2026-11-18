@@ -5224,6 +5224,26 @@ model is told changes: no words of the line are read. Then, in code
   (`made_remove::found`); one they didn't make, several as near, or none
   near are said so, as for a run. One not on the lamp now, or whose folder
   there is not the package made, is said not turned, and why.
+- **A number said as a word or as digits** (#7562's rows on lamp-9adf,
+  18 Nov: "use my good morning three skill" didn't find `good-morning-3`,
+  and `use_skill` answered that no skill has that name in 2 to 6 ms). A
+  name's numbers were already the same said as words or digits
+  (`made_skill::name_digits`, zero to nineteen, the tens, "twenty one" as
+  `21`), but `made_remove::found` took in a near name for holding the
+  words of one that was then dropped as the named one's part: "good
+  morning three" beside good morning and good morning 2 was asked which of
+  good morning 2 and 3, and `use_skill`'s off-skill run
+  (`made_run::off_named`) found none. With the switch on, a near name is
+  taken in only for a nearest one still standing after that step, so a
+  name said whole is that skill alone; "good morning" beside the three
+  still asks which. And `use_skill` itself (`use_skill::translate`), when
+  no function has the exact name given, takes the one function whose name
+  is the same as a skill's name is written (`made_skill::name_asked`:
+  lower case, underscores, spaces and dashes alike, no "my" or "skill"),
+  its numbers as digits (`use_skill::named_loosely`): "good morning
+  three" is `good_morning_3`, "alarm twenty" `alarm_20`; none when two or
+  more are, as "good morning" beside `good_morning_1` to `_3`. A name
+  normalisation only, never a meaning; off, both as before.
 - **None near: theirs offered to call again** (#7562's row on lamp-9adf,
   18 Nov 01:3x: "turn my bitcoin price skill back on" found nothing near
   btc price, and the model, told of no other, called it the lamp's own
