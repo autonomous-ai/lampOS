@@ -661,6 +661,7 @@ mod tests {
                 picked.clone()
             }),
             turn,
+            checked: false,
         }));
         asks.default_engine = Box::new(move || default);
         asks
