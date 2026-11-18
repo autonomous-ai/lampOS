@@ -1966,6 +1966,10 @@ pub struct BodyReport {
     pub expression_steps: u64,
     /// Times it shifted by itself while standing at rest.
     pub idles: u32,
+    /// Each energy level taken and when (#7749), for the tests: the
+    /// journal says it as `energy level N`.
+    #[serde(skip)]
+    pub energy_levels: Vec<(Duration, u8)>,
     /// Under `Limits::look_at_name`, calls taken.
     pub calls: u32,
     /// Under `--overload release`, each time it let go.
@@ -5614,6 +5618,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         gestures_dropped: 0,
         expression_steps: 0,
         idles: 0,
+        energy_levels: Vec::new(),
         calls: 0,
         released: Vec::new(),
         tipping: Tipping::default(),
@@ -7198,8 +7203,21 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // under a joint still moving: no gesture playing or waiting, the
         // pose's filter still and the arm up or down.
         let level = crate::energy::taken(asked_now.energy);
+        // #7749: a new level ends a shift at rest it finds playing, eased
+        // to rest as a hand's yield eases a gesture (`easing_out`, over
+        // `EASE_OUT`), so it is taken within seconds of the send. A gesture
+        // asked of it (`playing` not a shift) plays to its end first.
+        if level != energy && playing.is_some_and(|(clip, _)| idle::is_move(clip)) {
+            playing = None;
+            easing_out = Some((0, gesture_now, gesture_moved));
+            eprintln!(
+                "lamp-body: step {}: energy level {level} asked: the shift at rest eases to rest",
+                report.steps
+            );
+        }
         if level != energy
             && playing.is_none()
+            && easing_out.is_none()
             && pending.is_none()
             && velocity.iter().all(|speed| speed.abs() < 1.0)
             && stand_velocity == 0.0
@@ -7223,6 +7241,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 up.seconds = crate::energy::stand_seconds(seconds, level);
             }
             idler.share = crate::energy::of(level).idle_share;
+            report.energy_levels.push((now, level));
             eprintln!(
                 "lamp-body: step {}: energy level {level}: {} counts a second",
                 report.steps, limits.speed
@@ -7887,7 +7906,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else if playing.is_none() {
             match idle_due {
                 None => idle_due = Some(now + idler.gap()),
-                Some(due) if now >= due && settled && standing.is_some_and(|up| up.idle) => {
+                // #7749: none begins while a new energy level waits.
+                Some(due)
+                    if now >= due
+                        && settled
+                        && level == energy
+                        && standing.is_some_and(|up| up.idle) =>
+                {
                     // An arm a hand holds is not swayed into the hand.
                     let arm_free = stalls[3..].iter().all(|stall| stall.hold.is_none());
                     let tilts = limits.stand_roll > limits.roll;
