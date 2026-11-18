@@ -873,3 +873,128 @@ fn a_make_naming_a_skill_kept_aside_puts_it_back() {
     set_here(None);
     let _ = fs::remove_dir_all(&root);
 }
+
+/// A made skill started by the words "flip a coin", named coin flip.
+fn coin_flip() -> String {
+    "```skill.toml\nasks = [\"flip a coin\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\
+     needs = [\"light\"]\n\n[permissions]\nlight = true\n\n[[do]]\nlight = { colour = \
+     \"blue\" }\n```\n\n```SKILL.md\n---\nname: coin-flip\ndescription: Glows blue when you \
+     say flip a coin.\n---\n\n# Coin flip\n\nIt glows blue.\n```\n"
+        .to_owned()
+}
+
+/// What a make of [`coin_flip`] beside `others` on the lamp answers, made
+/// in `name`'s folder, on the owner's ask or not (`owner`): what it was
+/// told, the line kept for its turn, the manage helper's asks, and the
+/// made skills listed after.
+fn coin_flip_made(
+    name: &str,
+    others: impl FnOnce(&Keeping),
+    owner: bool,
+    helped: usize,
+) -> (Value, Option<String>, Vec<Value>, Vec<String>) {
+    const COIN: &str = "make a skill that glows blue when I say flip a coin";
+    set_owner_here(Some(owner));
+    let (root, keeping) = keeping(name);
+    set_state_here(Some(root.join("state")));
+    others(&keeping);
+    let (url, served) = service(vec![(200, coin_flip())]);
+    let asked = helper(&keeping.manage, helped);
+    let told = make_with(7, Some(COIN), COIN, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1, "{told}");
+    let said = take_said_line();
+    // Bounded: a helper never asked as many times as waited for gives
+    // what it was asked by then, never hangs the test.
+    let (send, got) = std::sync::mpsc::channel();
+    std::thread::spawn(move || send.send(asked.join()));
+    let asked = match got.recv_timeout(std::time::Duration::from_secs(5)) {
+        Ok(Ok(asked)) => asked,
+        _ => Vec::new(),
+    };
+    let listed = names(&keeping);
+    set_state_here(None);
+    set_owner_here(None);
+    let _ = fs::remove_dir_all(&root);
+    (told, said, asked, listed)
+}
+
+/// Fix 3 of #7828's DEFAULT-ON (lamp-9adf, 19 Nov: "a skill made here
+/// wasn't kept in 35501 ms: the words “flip a coin” would start both coin
+/// flip and another skill, flip a coin, so neither would start; say other
+/// words for coin flip", and the person heard "I couldn't make that one.
+/// Try asking for one thing…"): with the switch on, a make whose words
+/// clash with a skill the owner made replaces it on the owner's ask, as a
+/// trigger clash does, with its undo; anyone else's, and a clash with a
+/// skill they didn't make (the lamp's own, one added from a file), is
+/// refused as before, and the line said is the real reason, switch on or
+/// off.
+#[test]
+fn a_words_clash_with_their_own_skill_replaces_it_and_any_other_says_why() {
+    set_here(Some(true));
+    made_skill::set_asks_here(Some(true));
+    let why = "the words “flip a coin” would start both coin flip and another skill, flip a \
+               coin, so neither would start; say other words for coin flip";
+    let refused_line = format!("I couldn't make that: {why}.");
+    // Their own, on the owner's ask: replaced, one line with its undo.
+    let theirs =
+        |keeping: &Keeping| crate::made_remove::tests::made_here(keeping, &[("flip-a-coin", true)]);
+    let (told, said, asked, listed) = coin_flip_made("no-asks-words-own", theirs, true, 2);
+    let line = "Made coin flip and replaced your old flip a coin. Say 'keep the old one' to undo.";
+    assert_eq!(told["replaced"], json!(["flip-a-coin"]), "{told}");
+    assert_eq!(told["on"], true, "{told}");
+    assert_eq!(quoted(told["next"].as_str().unwrap()), line);
+    assert_eq!(said.as_deref(), Some(line));
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+    assert_eq!(asked[1], json!({ "off": "flip-a-coin" }));
+    assert_eq!(listed, ["flip-a-coin", "coin-flip"]);
+    // Anyone else's ask, the lamp's own skill, one added from a file, and
+    // the switch off: refused, the real reason said, nothing kept.
+    let core = |keeping: &Keeping| {
+        let folder = keeping.installed.join("flip-a-coin");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(
+            folder.join("skill.toml"),
+            "kind = \"installable\"\nversion = \"1.0.0\"\n",
+        )
+        .unwrap();
+    };
+    let added = |keeping: &Keeping| {
+        crate::made_remove::tests::made_here(keeping, &[("flip-a-coin", true)]);
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries[0]["added"] = json!("file");
+        made_skill::write_entries(&keeping.directory, &entries).unwrap();
+    };
+    type Others = Box<dyn FnOnce(&Keeping)>;
+    let cases: [(&str, Others, bool, bool); 4] = [
+        ("guest", Box::new(theirs), false, true),
+        ("core", Box::new(core), true, true),
+        ("added", Box::new(added), true, true),
+        ("off", Box::new(theirs), true, false),
+    ];
+    for (case, others, owner, on) in cases {
+        set_here(Some(on));
+        let (told, said, asked, listed) =
+            coin_flip_made(&format!("no-asks-words-{case}"), others, owner, 0);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {why}"),
+            "{case}: {told}"
+        );
+        assert_eq!(
+            quoted(told["next"].as_str().unwrap()),
+            refused_line,
+            "{case}"
+        );
+        assert_eq!(said.as_deref(), Some(refused_line.as_str()), "{case}");
+        assert!(asked.is_empty(), "{case}: {asked:?}");
+        assert!(
+            !listed.iter().any(|name| name == "coin-flip"),
+            "{case}: {listed:?}"
+        );
+    }
+    // Said as it is, never the tip to ask for one thing.
+    assert_eq!(made_skill::plain_reason(why), why);
+    assert_eq!(made_skill::not_made_line(why), refused_line);
+    made_skill::set_asks_here(None);
+    set_here(None);
+}

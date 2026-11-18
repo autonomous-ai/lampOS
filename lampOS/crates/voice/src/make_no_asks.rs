@@ -24,6 +24,8 @@
 //!   skill on the lamp it clashes with is turned off by the manage helper's
 //!   own `{"off": NAME}`, as the app's switch does, never deleted: "Made
 //!   NAME and replaced your old OTHER. Say 'keep the old one' to undo."
+//!   Words that would start the owner's own made skills replace them alike
+//!   (`made_skill::asks_taken_sparing`); any other words clash is refused.
 //! - **A remove happens at once** ([`remove_asked`]): only the owner's ask,
 //!   its name matched to their own made skills as before
 //!   (`made_remove::found`); taken off by the manage helper, then kept aside
