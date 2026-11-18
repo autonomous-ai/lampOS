@@ -5,6 +5,17 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "lamp-ears"
+path = "src/main.rs"
+
+# The body sounds' bars measured with a consenting person (#7685,
+# docs/body-sounds-kit.md): their clips and scores in a private folder, an
+# office hour as scores only, a bar per class, and the folder deleted.
+[[bin]]
+name = "lamp-ears-body-kit"
+path = "src/bin/body_kit.rs"
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde_json.workspace = true
