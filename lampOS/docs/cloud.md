@@ -539,9 +539,11 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   group, taking `forget_person` only, so lamp-cloud can forget a person and
   read nothing; lamp-cloud's user must be in that group. Memory's own
   socket (`LAMP_MEMORY_SOCKET`, 0600) is no longer asked by lamp-cloud,
-  with no fallback to it. The product units don't set either yet: until a
-  lamp sets both, the answer is `kept`, and the app shows that the
-  person's memories stay on the lamp, never "removed" alone.
+  with no fallback to it. The product units set both (A8, #6852):
+  `/run/lampos-memory/forget.sock`, for `lampos`, lamp-cloud's own group,
+  and asked only once `LAMP_FACES_PAGE` is on. A lamp without them answers
+  `kept`, and the app shows that the person's memories stay on the lamp,
+  never "removed" alone.
 - **A face already gone can't take its memories from the page.** After
   "forget my face" at the lamp, or a remove whose photo face couldn't be
   let go after the people's forget ran, the eyes no longer know the name:

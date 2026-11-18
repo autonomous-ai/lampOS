@@ -262,7 +262,9 @@ socket is refused before the eyes forget anything.
   or a group memory's own user can't give the socket, EPERM) is logged as
   `the forget socket is not open` and left out: memory still serves its
   own socket, and an app removal answers that memory was kept. So memory's
-  user must be in that group too, as lamp-cloud's. The main socket stays
+  user must be in that group too, as lamp-cloud's. The product unit opens
+  it at `/run/lampos-memory/forget.sock` for `lampos`, lamp-cloud's group,
+  which memory's user is in (A8, #6852). The main socket stays
   0600. A line on it must be exactly
   `{"op":"forget_person","person":ID}`, those two keys and an id of the
   shape above; it is re-encoded before the store sees it

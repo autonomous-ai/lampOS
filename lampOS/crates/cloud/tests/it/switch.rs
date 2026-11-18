@@ -240,3 +240,36 @@ fn the_unit_may_reach_lamp_voices_say_socket() {
         .collect();
     assert!(writable.contains(&"-/run/lampos-say"), "{writable:?}");
 }
+
+/// A8 (#6852): the app's removal reaches memory. lamp-cloud's unit names
+/// memory's narrow socket where memory's unit opens it, for lamp-cloud's own
+/// group; the faces page itself stays as `LAMP_FACES_PAGE` sets it.
+#[test]
+fn the_unit_names_memorys_forget_socket_for_its_own_group() {
+    const MEMORY: &str = include_str!("../../../../deploy/product/lamp-memory.service");
+    let flag = |name: &str| {
+        let start = MEMORY
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        let mut words = start.split_whitespace();
+        words.find(|word| *word == name)?;
+        words.next().map(str::to_owned)
+    };
+    let socket = flag("--forget-socket").expect("memory opens no forget socket");
+    let given = format!(
+        "Environment={}={socket}",
+        lamp_cloud::faces::MEMORY_ENVIRONMENT
+    );
+    assert!(UNIT.lines().any(|line| line == given), "{given}");
+    let group = flag("--forget-group").unwrap();
+    assert!(UNIT.lines().any(|line| line == format!("Group={group}")));
+    let eyes = lamp_cloud::faces::Eyes::from(|name| match name {
+        "LAMP_FACES_PAGE" => Some("on".to_owned()),
+        "LAMP_EYES_WHO_SOCKET" => Some("/run/lampos-eyes/who.sock".to_owned()),
+        "LAMP_MEMORY_FORGET_SOCKET" => Some(socket.clone()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(eyes.memory, Some(socket.into()));
+}
