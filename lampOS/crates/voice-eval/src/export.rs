@@ -692,6 +692,7 @@ const BUS_TOPICS: &[&str] = &[
     "devices/ask",
     "devices/event",
     "diagnostics",
+    "ears/body",
     "ears/classes",
     "ears/level",
     "ears/sudden",
