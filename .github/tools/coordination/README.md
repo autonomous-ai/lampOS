@@ -259,7 +259,7 @@ None of them counts on a quoted line or inside a fenced code block. Without one,
   A HOLD with no sha still holds. A READ-OK with no sha makes the PR not eligible.
 - A marker later in the first 400 characters counts only with a commit of 9 or more characters right after it.
   It does not count when it is quoted (backticks or quotation marks), in brackets, after a possessive ("the Reviewer-lead's READ-OK …"),
-  or named as a noun ("your HOLD …", "the/that/this/their/for …").
+  or named as a noun ("your HOLD …", "the/that/this/their/for …"), or when a sentence says it is lifted or limited ("lift only HOLD …", "this lifts/clears/replaces HOLD …").
 - A marker on a Markdown quote line (`> READ-OK …`, on any line, the first too) or inside a fenced code block (```` ``` ```` or `~~~`) never counts.
 - The signature is the reader's name: "Sixth, 09:16" (an optional "The"), the name right after the marker's commit,
   the name that opens the next line ("Sixth: …"; a capitalised word or "<word> builder", never a label such as "Tests:", "Why:" or "Fail-first:"),

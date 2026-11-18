@@ -68,6 +68,18 @@ class Parsing(unittest.TestCase):
     def test_a_possessive_read_ok_is_not_a_read(self):
         self.assertIsNone(parse_marker("Friday, 15:30: the Reviewer-lead's READ-OK e2b57f1f48 was on this head."))
 
+    def test_a_hold_a_sentence_says_is_lifted_is_not_a_hold(self):
+        # 18 Nov (#7590): V2's 05:15 line held the PR under V2's name through six trains.
+        v2 = ("V2, 05:15 GMT+7, for the lead: **Heron** and **Thirteen**, your READ-OKs at `aa44e74e86` lift only "
+              "HOLD `136b22c459`. The older HOLDs aren't named in any READ-OK yet.")
+        self.assertIsNone(parse_marker(v2))
+        for words in ("this lifts HOLD", "it clears HOLD", "that READ-OK cleared HOLD", "which replaces HOLD"):
+            self.assertIsNone(parse_marker("Seventh, 10:00: " + words + " `136b22c459` on the old head."), words)
+        # A reader's own HOLD after a signature still counts.
+        self.assertEqual(parse_marker("Heron, 14:03 GMT+7, my read for Ten: HOLD 256d8a201e5f9b7d")[:2],
+                         ("HOLD", "256d8a201e5f9b7d"))
+        self.assertEqual(read_markers([c("writer-b", v2)], W), "")
+
     def test_bracketed_and_quoted_markers_do_not_count(self):
         self.assertIsNone(parse_marker("Friday, to Reviewer-two (HOLD 3e741c2201): new head"))
         self.assertIsNone(parse_marker("your 19:34 comment opens with `HOLD 73aa8b23f0`"))

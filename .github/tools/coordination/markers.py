@@ -104,9 +104,13 @@ def parse_marker(body):
     # to by its comment's id ("the records for HOLD 6385086855", #3387): each held its PR under the replier's name.
     # 3 Nov 15:4x: nor a possessive's ("the Reviewer-lead's READ-OK e2b57f1f48 was on this head", the Reviewer-lead's
     # 15:14 read of #5068): it counted as the writer's own READ-OK and cleared the bot's "HOLD train N".
+    # 18 Nov 13:3x (first builder): nor one a sentence says is lifted or limited ("your READ-OKs at `aa44e74e86` lift
+    # only HOLD `136b22c459`", V2 on #7590 at 05:15): it held #7590 under V2's name, a HOLD nobody had posted, once its
+    # line in train-hold.txt came off at 13:13, with both reads, its ROW and its DEFAULT-ON in.
     m = next((x for x in re.finditer(r"\b(READ-OK|HOLD)\*{0,2}\s+(?:#\d+\s+)?`?([0-9a-f]{9,40})`?\b\s*(.*)", body[:400])
               if not x.group(2).isdigit()
-              and not re.search(r"(?i)(\b(your|for|the|that|this|their|his|her|its)|['’]s)\s+\**$", body[:x.start()])
+              and not re.search(r"(?i)(\b(your|for|the|that|this|their|his|her|its|only|lifts?|lifted|lifting|clears?|"
+                                r"cleared|clearing|replaces|replaced)|['’]s)\s+\**$", body[:x.start()])
               # 27 Oct 05:3x: nor one in brackets, the HOLD a reply answers ("Friday, to Reviewer-two (HOLD
               # 3e741c220): new head ..."): three such replies held #3608 under Friday's name after both READ-OKs.
               and not re.search(r"[(\[]\**`?$", body[:x.start()])
