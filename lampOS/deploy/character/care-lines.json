@@ -1,0 +1,34 @@
+{
+  "_about": "The fixed care line the lamp says after its reply when a person may harm themselves (#7689). Kept by the safety reader: each region's line only from an official source, with that source and the date it was checked; re-checked once a quarter. A region with no entry gets `default`. Room for a child line later (`child`, not read yet).",
+  "regions": {
+    "US": {
+      "source": "988 Suicide and Crisis Lifeline (988lifeline.org), call or text 988, 24/7",
+      "checked": "2026-11-18",
+      "lines": {
+        "en": "You can call or text 988, the Suicide and Crisis Lifeline, any time."
+      }
+    },
+    "CN": {
+      "source": "National Health Commission, 12356 national psychological assistance hotline (en.nhc.gov.cn, 14 Feb 2025; english.www.gov.cn, 13 Feb 2025); hours vary by province, so no 'any time'; 120 for emergencies",
+      "checked": "2026-11-18",
+      "lines": {
+        "zh": "你可以拨打12356心理援助热线，有人愿意倾听。如果你现在有危险，请拨打120。",
+        "en": "You can call 12356, the national mental health hotline. If you're in danger right now, call 120."
+      }
+    },
+    "VN": {
+      "source": "No verified 24/7 national crisis line (TherapyRoute Vietnam, findahelpline.com); 115 is the medical emergency number",
+      "checked": "2026-11-18",
+      "lines": {
+        "vi": "Nếu bạn đang gặp nguy hiểm, hãy gọi 115 ngay. Bạn cũng có thể nói với một người bạn tin tưởng ngay bây giờ.",
+        "en": "If you're in danger, please call 115 now, and reach out to someone you trust right away."
+      }
+    }
+  },
+  "default": {
+    "lines": {
+      "en": "Please reach out to someone you trust, or your local emergency number, right now.",
+      "vi": "Hãy nói ngay với một người bạn tin tưởng, hoặc gọi số khẩn cấp nơi bạn ở."
+    }
+  }
+}
