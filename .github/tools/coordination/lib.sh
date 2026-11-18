@@ -141,11 +141,19 @@ coord_same_patch() {
 # every check COMPLETED with anything but SUCCESS (FAILURE, CANCELLED, TIMED_OUT, STARTUP_FAILURE, ACTION_REQUIRED,
 # ERROR, a null conclusion). SKIPPED and NEUTRAL never ran by design; a check still running is not red. A commit
 # status reads as a check (its state). 12 Nov (#6556 B): the train bot's eligible() sits out a PR whose head has any.
+# 18 Nov (#7367, never carried from 06:19): a head can hold several runs of one check (a workflow run twice on the
+# commit, a rerun). Each check, its workflow and name, is judged by one run: one still running (not red), else the
+# latest that was not CANCELLED (a cancel is the runner's, not the code's verdict), else the latest. A time GitHub
+# leaves at 0001-01-01 counts as none.
 coord_red_checks_jq='[(.statusCheckRollup // [])[]
-  | {n: (.name // .context // "?"),
+  | {n: (.name // .context // "?"), w: (.workflowName // ""),
+     t: ([.startedAt, .completedAt] | map(select(. != null and . != "" and (startswith("0001") | not))) | first // ""),
      s: (if .__typename == "StatusContext" then (if .state == "PENDING" or .state == "EXPECTED" then "PENDING" else "COMPLETED" end) else (.status // "") end),
-     c: (if .__typename == "StatusContext" then .state else .conclusion end)}
-  | select(.s == "COMPLETED" and .c != "SUCCESS" and .c != "SKIPPED" and .c != "NEUTRAL")]
+     c: (if .__typename == "StatusContext" then .state else .conclusion end)}]
+  | group_by([.w, .n])
+  | map(if any(.[]; .s != "COMPLETED") then empty
+        else ((map(select(.c != "CANCELLED")) | max_by(.t)) // max_by(.t)) end)
+  | map(select(.s == "COMPLETED" and .c != "SUCCESS" and .c != "SKIPPED" and .c != "NEUTRAL"))
   | if length == 0 then "ok" else "red " + (map(.n) | join(", ")) end'
 # coord_arm64_green_jq: over the same JSON, "ok" when the PR's own ARM64 run is there and all green: its (build) and
 # (release) jobs and every shard (k/N), one N, at least one shard, each COMPLETED with SUCCESS; else "waiting <what>".
