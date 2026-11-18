@@ -2152,8 +2152,8 @@ fn a_standing_elbow_whose_load_drops_after_its_ease_keeps_it() {
 /// 10 s line but read 176, 144 and 64 right after moves, and leant and
 /// gestured every 10 to 25 s; it was never eased and heated. Here the elbow
 /// holds 50 short at 220 with one 140 read every 30 s and a lean between
-/// each: a dip pauses the count as a lean does, so it is eased, and once
-/// its load drops (at 100 s) the ease is kept.
+/// each: a dip takes a step off a leaky count, not the count, so it is
+/// eased, and once its load drops (at 100 s) the ease is kept.
 #[test]
 fn a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased() {
     let ms = Duration::from_millis;
@@ -2174,25 +2174,113 @@ fn a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased
     assert_eq!(goals, [2_650, at[1] + STAND_EASE_MARGIN], "at {at:?}");
 }
 
-/// A joint that truly settles, its load under `STAND_EASE_LOAD` for 2 s
-/// (past `STAND_EASE_SETTLED`), starts the count again: 50 short at 220
-/// with that settle at 40 s, it is not eased by 90 s, though it was short
-/// and loaded for more than `STAND_EASE_STEPS` in all.
+/// The elbow's load in spells from `from` until `until` seconds: `a`'s
+/// seconds at its load, then `b`'s, and again.
+fn spells(
+    from: u64,
+    until: u64,
+    a: (u64, u16),
+    b: (u64, u16),
+) -> Vec<(Duration, Duration, usize, u16)> {
+    let mut out = Vec::new();
+    let mut at = from;
+    while at < until {
+        for (secs, load) in [a, b] {
+            out.push((
+                Duration::from_secs(at),
+                Duration::from_secs(at + secs),
+                2,
+                load,
+            ));
+            at += secs;
+        }
+    }
+    out
+}
+
+/// lamp-52e6's 15:06 ROW (#7281): the shoulder spent 30 s at 38 short and
+/// load 164, then landed at its stand (load 20) for 30 s, and again, and
+/// heated to 52-53 degrees; each landing's settle zeroed the count. Here
+/// the elbow, with a lean in each landing: the leaky count gains 20 s of
+/// strain a minute, so it is eased within 3 min, and the ease is kept.
 #[test]
-fn a_standing_elbow_whose_load_settles_for_2_s_starts_its_count_again() {
+fn a_standing_elbow_loaded_in_30_s_spells_between_landings_is_eased_within_3_min() {
     let (goals, at) = elbow_standing_for(
-        Duration::from_secs(90),
-        220,
-        Duration::from_secs(90),
-        &[],
+        Duration::from_secs(185),
+        164,
+        Duration::ZERO,
+        &[(45, 49), (105, 109)],
         |lamp| {
-            lamp.short = Some((2, 50.0));
-            lamp.strains.insert(
-                0,
-                (Duration::from_secs(40), Duration::from_secs(42), 2, 140),
-            );
+            lamp.short = Some((2, 38.0));
+            lamp.strains = spells(0, 185, (35, 164), (30, 20));
         },
     );
+    assert_eq!(at[1], 2_600 - 38, "at {at:?}");
+    assert_eq!(goals, [2_650, 2_562 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// Held 50 short at a steady 220: eased once `STAND_EASE_STEPS` (60 s) of
+/// strain are counted from fully stood (about 4.7 s), not before.
+#[test]
+fn a_standing_elbow_held_short_at_a_steady_220_is_eased_at_60_s() {
+    let short = |lamp: &mut Lamp| lamp.short = Some((2, 50.0));
+    let at_62 = elbow_standing_for(
+        Duration::from_secs(62),
+        220,
+        Duration::from_secs(62),
+        &[],
+        short,
+    );
+    assert_eq!(at_62.0, [2_650, 2_600], "{at_62:?}");
+    let at_70 = elbow_standing_for(
+        Duration::from_secs(70),
+        220,
+        Duration::from_secs(70),
+        &[],
+        short,
+    );
+    assert_eq!(at_70.0, [2_650, 2_550 + STAND_EASE_MARGIN], "{at_70:?}");
+}
+
+/// Truly settled, 50 short at a load of 20 for 10 min: never eased.
+#[test]
+fn a_standing_elbow_short_but_settled_for_10_min_is_never_eased() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(600),
+        20,
+        Duration::from_secs(600),
+        &[],
+        |lamp| lamp.short = Some((2, 50.0)),
+    );
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+}
+
+/// The other bound: 5 s spells at 220 among 25 s settled at 20, for
+/// 10 min. A 25 s settle takes off more than a 5 s spell adds, so the
+/// leaky count stays near 0 and it is never eased.
+#[test]
+fn a_standing_elbow_loaded_in_5_s_spells_among_25_s_settled_is_never_eased() {
+    let (goals, at) =
+        elbow_standing_for(Duration::from_secs(600), 220, Duration::ZERO, &[], |lamp| {
+            lamp.short = Some((2, 50.0));
+            lamp.strains = spells(0, 600, (5, 220), (25, 20));
+        });
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+}
+
+/// #7338's undo counts leakily too: eased at about 65 s, then at 190 in
+/// 30 s spells between 30 s settled at 20 from 75 s, its strain still
+/// reaches `STAND_EASE_STEPS` (at about 245 s) and the ease is undone.
+/// With a load that stays under, it is kept
+/// (`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`).
+#[test]
+fn a_standing_elbow_loaded_in_spells_after_its_ease_has_the_ease_undone() {
+    let (goals, at) =
+        elbow_standing_for(Duration::from_secs(270), 190, Duration::ZERO, &[], |lamp| {
+            lamp.short = Some((2, 45.0));
+            lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, 190)];
+            lamp.strains.extend(spells(75, 270, (30, 20), (30, 190)));
+        });
     assert_eq!(goals, [2_650, 2_600], "at {at:?}");
 }
 

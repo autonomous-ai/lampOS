@@ -565,13 +565,15 @@ pub const STAND_EASE_LOAD: u16 = 150;
 /// a gesture easing back, long before 74ff's 30 to 40 min to heat.
 /// ponytail: unmeasured; time counts only while it is asked its stand goal.
 pub const STAND_EASE_STEPS: u32 = 3_000;
-/// The count of [`STAND_EASE_STEPS`] starts again only after this many steps
-/// in a row not short and loaded (one second); fewer only pause it (#7281).
-/// lamp-52e6's shoulder held 52 short at 220 on every 10 s line but read
-/// 176, 144 and 64 right after moves: one such step zeroed a minute's count,
-/// and in a lively room it was never eased and heated.
-/// ponytail: unmeasured; lengthen if a real settle is shorter than a dip.
-pub const STAND_EASE_SETTLED: u32 = 50;
+/// The count toward [`STAND_EASE_STEPS`] is leaky (#7281): at its stand goal,
+/// every this many steps not short and loaded take one off it, down to 0,
+/// so a minute settled undoes 20 s of strain, and one settle never zeroes it.
+/// lamp-52e6's shoulder (15:06 ROW) spent 20 to 40 s at 38 short and load 164
+/// between landings at its stand (load 20) and heated to 52-53 degrees; a
+/// count that a settle reset never reached 60 s. Five-second spells among 25 s
+/// settled still floor at 0.
+/// ponytail: the rate is tuned on one lamp's day; retune from more journals.
+pub const STAND_EASE_DECAY: u32 = 3;
 /// Left this far toward the goal from where it holds, so it still presses
 /// the lamp up a little. ponytail: unmeasured.
 pub const STAND_EASE_MARGIN: u16 = 5;
@@ -6772,7 +6774,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // ease that leaves it loaded is undone and easing stops for the run.
     let stand_measured = standing.map(|up| [up.pose[3], up.pose[4]]);
     let mut stand_short_steps = [0u32; 2];
-    // #7281: the steps in a row since each was last short and loaded.
+    // #7281: settled steps toward the next one taken off the count.
     let mut stand_settled_steps = [0u32; 2];
     let mut too_short_said = [false; 2];
     let mut stand_eased = [false; 2];
@@ -9279,18 +9281,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     } else {
                         is.position.saturating_sub(goal)
                     };
-                    // #7281: a step not short and loaded only pauses the
-                    // count, as a lean does; STAND_EASE_SETTLED of them in a
-                    // row (a joint that has truly settled) start it again.
-                    // One low load sample after a move no longer zeroes it.
+                    // #7281: leaky. A step short and loaded adds one; every
+                    // STAND_EASE_DECAY steps that are not take one off, to 0.
+                    // A joint loaded in spells between landings still counts
+                    // up; one settled now and then does not.
                     if is.load > STAND_EASE_LOAD && (stand_eased[index] || short > STAND_EASE_SHORT)
                     {
                         stand_short_steps[index] += 1;
-                        stand_settled_steps[index] = 0;
                     } else {
-                        stand_settled_steps[index] = stand_settled_steps[index].saturating_add(1);
-                        if stand_settled_steps[index] >= STAND_EASE_SETTLED {
-                            stand_short_steps[index] = 0;
+                        stand_settled_steps[index] += 1;
+                        if stand_settled_steps[index] >= STAND_EASE_DECAY {
+                            stand_settled_steps[index] = 0;
+                            stand_short_steps[index] = stand_short_steps[index].saturating_sub(1);
                         }
                     }
                     if stand_short_steps[index] >= STAND_EASE_STEPS {
