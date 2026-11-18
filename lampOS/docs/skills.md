@@ -1976,17 +1976,27 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   too (#7634, lamp-9adf 18 Nov 07:20:43: "Lamp, use my look title skill."
   was taken as the yes to `page-title`'s waiting task): a line that names
   a skill other than the waiting one is never its yes, whatever skill the
-  model named. Code reads the words said right before "skill" or
-  "skills", back to a word that comes before a name ("my", "the", "use",
-  "run", "yes", "and", …, `skill_write_yes::BEFORE_A_NAME`) or the
-  clause's start, at most six (`skill_write_yes::other_skill_named`,
-  marked per request by `line_heard`); when no run of them ending at
-  "skill" is the waiting skill's own name by the same match
-  (`made_remove::same_name`), the line names another skill, and its `yes`
-  is read as `new_ask`: nothing kept, the wait let go, and the line
-  answered as its own ask (the named skill used or asked). "yes, use my
-  page title", "Yes, use my page title skill." and a plain "Yes." are
-  still page title's yes; "Yes, and use my weather skill." is not. The
+  model named. At each "skill" or "skills" in a clause, code first matches
+  every run of up to six words ending right before it, or starting right
+  after it, against the waiting skill's own name by the same match
+  (`made_remove::same_name`), no word left out, so "yes, use my lamp test
+  email two skill" is `lamp-test-email-2`'s and "Có, dùng skill page
+  title" page title's. Only when none matches does the line name another
+  skill: the words right before "skill", back to a word that comes before
+  a name ("my", "the", "use", "run", "yes", "and", …,
+  `skill_write_yes::BEFORE_A_NAME`) or the clause's start, or with none
+  there the words right after it ("run skill look title", "use the skill
+  look title"), at most six (`skill_write_yes::other_skill_named`, marked
+  per request by `line_heard`). Its `yes` is read as `new_ask`: nothing
+  kept, the wait let go, and the line answered as its own ask (the named
+  skill used or asked). "yes, use my page title", "Yes, use my page title
+  skill." and a plain "Yes." are still page title's yes; "Yes, and use my
+  weather skill." is not. Accepted limits: a line without the word
+  "skill" is not read (its `named` alone binds it, #7545); "kỹ năng" is
+  not read; an adjective before "skill" ("Yes, great skill.") fails
+  closed, read as another skill's name; and a remove's wait is not read
+  on purpose, so "Yes, and remove the joke time skill too." still removes
+  the one asked about (El's P2 on #7561). The
   journal: "… was a new ask, not an answer (a yes naming look title, not
   page-title) …". The forced round is told only
   `approve_id`, `answer` and `named` of `make_skill`'s form, all required

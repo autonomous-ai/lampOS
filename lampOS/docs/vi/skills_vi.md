@@ -4977,18 +4977,28 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   đọc (#7634, lamp-9adf 07:20:43 ngày 18/11: câu "Lamp, use my look title
   skill." bị lấy làm cái "có" cho task đang chờ của `page-title`): một câu
   nhắc tới kỹ năng khác với kỹ năng đang chờ không bao giờ là cái "có" của
-  nó, dù mô hình nêu kỹ năng nào. Code đọc các từ nói ngay trước "skill"
-  hoặc "skills", lùi về tới một từ đứng trước tên ("my", "the", "use",
-  "run", "yes", "and", …, `skill_write_yes::BEFORE_A_NAME`) hoặc đầu mệnh
-  đề, nhiều nhất sáu từ (`skill_write_yes::other_skill_named`, được đánh
-  dấu theo từng request bởi `line_heard`); khi không có đoạn nào trong số
-  đó kết thúc ở "skill" là chính tên kỹ năng đang chờ theo cùng phép so
-  khớp (`made_remove::same_name`), câu đó nhắc tới kỹ năng khác, và `yes`
-  của nó được đọc là `new_ask`: không giữ gì, bỏ việc chờ, và câu đó được
-  trả lời như một yêu cầu riêng (kỹ năng được nhắc tới được dùng hoặc
-  hỏi). "yes, use my page title", "Yes, use my page title skill." và một
-  câu "Yes." đơn thuần vẫn là cái "có" của page title; "Yes, and use my
-  weather skill." thì không. Nhật ký: "… was a new ask, not an answer (a
+  nó, dù mô hình nêu kỹ năng nào. Tại mỗi "skill" hoặc "skills" trong một
+  mệnh đề, code trước hết so khớp mọi đoạn tối đa sáu từ kết thúc ngay
+  trước nó, hoặc bắt đầu ngay sau nó, với chính tên kỹ năng đang chờ theo
+  cùng phép so khớp (`made_remove::same_name`), không bỏ từ nào, nên "yes,
+  use my lamp test email two skill" là của `lamp-test-email-2` và "Có,
+  dùng skill page title" là của page title. Chỉ khi không đoạn nào khớp
+  thì câu đó mới nhắc tới kỹ năng khác: các từ ngay trước "skill", lùi về
+  tới một từ đứng trước tên ("my", "the", "use", "run", "yes", "and", …,
+  `skill_write_yes::BEFORE_A_NAME`) hoặc đầu mệnh đề, hoặc nếu không có
+  thì các từ ngay sau nó ("run skill look title", "use the skill look
+  title"), nhiều nhất sáu từ (`skill_write_yes::other_skill_named`, được
+  đánh dấu theo từng request bởi `line_heard`). `yes` của nó được đọc là
+  `new_ask`: không giữ gì, bỏ việc chờ, và câu đó được trả lời như một yêu
+  cầu riêng (kỹ năng được nhắc tới được dùng hoặc hỏi). "yes, use my page
+  title", "Yes, use my page title skill." và một câu "Yes." đơn thuần vẫn
+  là cái "có" của page title; "Yes, and use my weather skill." thì không.
+  Giới hạn được chấp nhận: câu không có từ "skill" thì không được đọc (chỉ
+  `named` gắn nó, #7545); "kỹ năng" không được đọc; một tính từ trước
+  "skill" ("Yes, great skill.") thất bại theo hướng an toàn, được đọc là
+  tên kỹ năng khác; và việc chờ gỡ kỹ năng cố ý không được đọc, nên "Yes,
+  and remove the joke time skill too." vẫn gỡ kỹ năng đã hỏi (P2 của El
+  trên #7561). Nhật ký: "… was a new ask, not an answer (a
   yes naming look title, not page-title) …". Vòng bị buộc
   chỉ được nói `approve_id`, `answer` và `named` trong form của `make_skill`, cả ba
   bắt buộc (`skill_write_yes::APPROVE_FIELDS`, #6921), nên lời gọi bị buộc

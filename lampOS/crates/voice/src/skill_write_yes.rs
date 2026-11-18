@@ -1087,28 +1087,51 @@ fn task_wait(waiting: &Waiting) -> bool {
     waiting.asks.grants.is_some() && !waiting.asks.code && !waiting.asks.remove
 }
 
-/// Words that end a skill's name said before "skill", going back: what
-/// comes before a name ("my look title skill", "use page title skill"),
-/// never part of it.
+/// Words that end another skill's name as it is cut from a line
+/// ([`other_skill_named`]): going back from "skill", what comes before a
+/// name ("my look title skill", "use look title skill"); going on after
+/// it, what comes after one too ([`AFTER_A_NAME`]). Never used to find
+/// the waiting skill's own name, which may hold any of them
+/// (`lamp-test-email-2`, `play-time`).
 const BEFORE_A_NAME: &[&str] = &[
     "my", "the", "your", "our", "this", "that", "a", "an", "use", "run", "open", "try", "launch",
     "start", "play", "what", "which", "yes", "and", "then", "lamp",
 ];
 
-/// The most words a skill's name is said in before "skill".
+/// Words that end another skill's name said after "skill", besides
+/// [`BEFORE_A_NAME`]'s ("use the skill look title please").
+const AFTER_A_NAME: &[&str] = &["please", "now", "too", "for", "to", "is", "instead"];
+
+/// Words before "skill" after which no name follows it: "What skill is
+/// that?" names none.
+const ASKS_WHICH: &[&str] = &["what", "which"];
+
+/// The most words a skill's name is said in, before or after "skill".
 const NAME_WORDS: usize = 6;
 
 /// The skill other than `skill` that a heard line names (#7634, lamp-9adf
 /// 18 Nov 07:20:43: "Lamp, use my look title skill." was taken as the yes
-/// to `page-title`'s task): the words said right before "skill" or
-/// "skills", back to a word that comes before a name ([`BEFORE_A_NAME`])
-/// or the start of the clause, at most [`NAME_WORDS`]. It is another skill
-/// when no run of them ending at "skill" is `skill`'s own name by the
-/// made-skill name match #7545 binds a yes with
-/// ([`crate::made_remove::same_name`]), so "yes, use my page title skill"
-/// names its own, and "that skill" or a line with no "skill" names none.
-/// Spelling only: no word is judged by what it means.
+/// to `page-title`'s task). Within a clause, at each "skill" or "skills":
+///
+/// - **Its own name first.** Every run of at most [`NAME_WORDS`] words
+///   ending right before "skill", or starting right after it ("dùng skill
+///   page title"), is matched against `skill` by the made-skill name match
+///   #7545 binds a yes with ([`crate::made_remove::same_name`]), no word
+///   left out: "yes, use my lamp test email two skill" names
+///   `lamp-test-email-2`. One that matches names its own skill.
+/// - **Else another's.** The words right before "skill", back to a word
+///   that comes before a name ([`BEFORE_A_NAME`]) or the clause's start;
+///   with none, the words right after it ("run skill look title", "use the
+///   skill look title"), up to a word that ends one ([`BEFORE_A_NAME`],
+///   [`AFTER_A_NAME`]), unless "skill" follows "what" or "which"
+///   ([`ASKS_WHICH`]). At most [`NAME_WORDS`] either way.
+///
+/// "that skill", "What skill is that?" and a line with no "skill" name
+/// none. Fails closed: an adjective before "skill" ("great skill") is read
+/// as another skill's name. "kỹ năng" is not read. Spelling only: no word
+/// is judged by what it means.
 pub fn other_skill_named(heard: &str, skill: &str) -> Option<String> {
+    let own = |words: &[String]| crate::made_remove::same_name(&words.join(" "), skill);
     for clause in heard.split([',', ';', '.', '?', '!']) {
         let words: Vec<String> = clause
             .split(|c: char| !c.is_alphanumeric())
@@ -1119,18 +1142,32 @@ pub fn other_skill_named(heard: &str, skill: &str) -> Option<String> {
             if word != "skill" && word != "skills" {
                 continue;
             }
+            let before = (at.saturating_sub(NAME_WORDS)..at).any(|from| own(&words[from..at]));
+            let after =
+                (at + 2..=words.len().min(at + 1 + NAME_WORDS)).any(|to| own(&words[at + 1..to]));
+            if before || after {
+                continue;
+            }
             let start = (0..at)
                 .rev()
                 .take(NAME_WORDS)
                 .take_while(|&before| !BEFORE_A_NAME.contains(&words[before].as_str()))
                 .last();
-            let Some(start) = start else {
-                continue;
-            };
-            let own = (start..at)
-                .any(|from| crate::made_remove::same_name(&words[from..at].join(" "), skill));
-            if !own {
+            if let Some(start) = start {
                 return Some(words[start..at].join(" "));
+            }
+            if at > 0 && ASKS_WHICH.contains(&words[at - 1].as_str()) {
+                continue;
+            }
+            let end = (at + 1..words.len())
+                .take(NAME_WORDS)
+                .take_while(|&after| {
+                    let word = words[after].as_str();
+                    !BEFORE_A_NAME.contains(&word) && !AFTER_A_NAME.contains(&word)
+                })
+                .last();
+            if let Some(end) = end {
+                return Some(words[at + 1..=end].join(" "));
             }
         }
     }
@@ -2753,7 +2790,7 @@ mod tests {
     /// #7634: what a heard line names before "skill", read against the
     /// waiting skill by the made-skill name match.
     #[test]
-    fn a_line_names_another_skill_only_by_a_name_before_skill() {
+    fn a_line_names_another_skill_only_by_a_name_said_with_skill() {
         let other = |heard| other_skill_named(heard, "page-title");
         assert_eq!(
             other("Lamp, use my look title skill."),
@@ -2764,17 +2801,76 @@ mod tests {
             Some("weather".into())
         );
         assert_eq!(other("yes run joke time skill"), Some("joke time".into()));
+        assert_eq!(
+            other("Yes, and use my weather skills."),
+            Some("weather".into())
+        );
+        // The name after "skill" is another's too.
+        assert_eq!(other("run skill look title"), Some("look title".into()));
+        assert_eq!(
+            other("use the skill look title please"),
+            Some("look title".into())
+        );
+        // Fails closed: an adjective before "skill" is read as a name.
+        assert_eq!(other("Yes, great skill."), Some("great".into()));
         for own in [
             "yes, use my page title",
             "Yes, use my page title skill.",
+            "Yes, use my page title skills.",
             "yes page title skill",
             "use the page tidle skill",
+            "Có, dùng skill page title",
+            "yes, use the skill page title",
             "Yes.",
             "Yes, that skill.",
             "What skill is that?",
+            // Not read (accepted limits): no "skill", or "kỹ năng".
+            "Yes, and use my weather.",
+            "Có, dùng kỹ năng thời tiết",
         ] {
             assert_eq!(other(own), None, "{own}");
         }
+        // A waiting skill's own name may hold the words that cut another's
+        // (the pre-push read's P2 on #7634): every run is matched for its
+        // own name first, the cut never applied to it.
+        for (heard, skill) in [
+            ("yes, use my lamp test email two skill", "lamp-test-email-2"),
+            ("yes, run the play time skill", "play-time"),
+            ("yes, use my start the day skill", "start-the-day"),
+            ("yes, the what now skill", "what-now"),
+            ("yes, use my my diary skill", "my-diary"),
+            ("yes, use skill lamp test email two", "lamp-test-email-2"),
+        ] {
+            assert_eq!(other_skill_named(heard, skill), None, "{heard}");
+        }
+    }
+
+    /// #7634's scope: a remove's wait keeps #7545's "a yes with more asked
+    /// answers the rest" (El's P2 on #7561): "Yes, and remove the joke time
+    /// skill too." after "Remove moon fact?" is still moon fact's yes, as
+    /// the heard line is read for another skill on a skill's task's wait
+    /// alone ([`task_wait`]).
+    #[test]
+    fn a_removes_wait_still_takes_a_yes_with_another_skill_named() {
+        clear_for_test();
+        let now = Instant::now();
+        let id = wait_for_yes(
+            Asks {
+                skill: "moon-fact".into(),
+                sha256: "b".repeat(64),
+                writes: Vec::new(),
+                say_back: "Remove moon fact?".into(),
+                grants: None,
+                code: false,
+                remove: true,
+            },
+            1,
+            now,
+        );
+        lamp_said(1, "Remove moon fact?");
+        line_heard(2, false, "Yes, and remove the joke time skill too.");
+        assert_eq!(answered(&id, 2, Some("yes"), Some("moon fact")), None);
+        clear_for_test();
     }
 
     /// #7545 on a task's wait too: photo booth's task said back, then a

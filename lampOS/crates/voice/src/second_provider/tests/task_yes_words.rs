@@ -399,13 +399,20 @@ fn a_line_naming_another_skill_is_never_the_yes_to_a_tasks_wait() {
 }
 
 /// #7634: "yes" with another skill's name after it ("Yes, and use my
-/// weather skill.") is no yes to page-title's task either, whatever the
-/// model named.
+/// weather skill.", plural too), or said after "skill" ("yes, run skill
+/// look title"), is no yes to page-title's task either, whatever the model
+/// named.
 #[test]
 fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
-    for named in ["page-title", yes::NAMED_NONE, "weather"] {
+    for (heard, named) in [
+        ("Yes, and use my weather skill.", "page-title"),
+        ("Yes, and use my weather skill.", yes::NAMED_NONE),
+        ("Yes, and use my weather skill.", "weather"),
+        ("Yes, and use my weather skills.", "page-title"),
+        ("yes, run skill look title", "page-title"),
+        ("yes, use the skill look title", yes::NAMED_NONE),
+    ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
-        let heard = "Yes, and use my weather skill.";
         let went = went(
             heard,
             vec![
@@ -429,6 +436,8 @@ fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
         ("Yes, use my page title skill.", "page title"),
         ("Yes.", yes::NAMED_NONE),
         ("Yes.", "page-title"),
+        ("Có, dùng skill page title", "page title"),
+        ("yes, use my page title skills", "page title"),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
         assert_eq!(forced(heard), make_skill_forced(), "{heard}");
