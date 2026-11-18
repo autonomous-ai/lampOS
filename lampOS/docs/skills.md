@@ -6721,7 +6721,7 @@ in `made_skill::keep_asked`, before anything is kept, a said start too:
   "Asked: <line>. Made: <name and step words>. Does the made skill do what
   was asked? Answer yes or no." A clear no refuses it; a yes or any other
   answer keeps it; a timeout or an error keeps it too, as
-  `made_skill::ON_JUDGE_LOST` says (`Keep`; `AskAgain` asks again), journaled as
+  `made_skill::on_judge_lost` says (the first builder's ruling: kept when the skill runs only when asked and never moves the body; asked again when it runs on its own, by a trigger or a time, or moves the body), journaled as
   `judge=yes|no|unclear|timeout|error` with counts only, never words. So a
   paraphrase ("remind me to drink water" made as `hydration-nudge`) is kept.
   The 1.5 seconds are added at most, and only on this no-overlap path. The

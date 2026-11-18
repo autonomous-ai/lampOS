@@ -3160,7 +3160,7 @@ bằng lời nói:
   "Asked: <câu>. Made: <tên và lời các bước>. Does the made skill do what
   was asked? Answer yes or no." Một câu "no" rõ ràng thì từ chối; yes hay
   câu khác thì giữ; hết giờ hay lỗi cũng giữ, theo
-  `made_skill::ON_JUDGE_LOST` (`Keep`; `AskAgain` thì hỏi lại), ghi nhật ký
+  `made_skill::on_judge_lost` (theo phán quyết của First: giữ khi kỹ năng chỉ chạy lúc được gọi và không cử động thân; hỏi lại khi nó tự chạy, theo trigger hay giờ, hoặc cử động thân), ghi nhật ký
   `judge=yes|no|unclear|timeout|error` chỉ với số đếm, không ghi lời. Vì
   vậy kỹ năng diễn đạt lại ("remind me to drink water" thành
   `hydration-nudge`) vẫn được giữ. Tối đa 1,5 giây chỉ cộng thêm trên nhánh
