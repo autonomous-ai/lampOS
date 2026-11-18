@@ -299,7 +299,7 @@ pub const EXAMPLES_FOLDER: &str = "examples";
 /// with the light and the voice, and a reminder every 30 minutes started
 /// by words. lamp-skills' `tests/it/make_check.rs` packs each with the
 /// real `lamp-skills pack`, so none can be one the check refuses.
-pub const MAKE_EXAMPLES: [(&str, &str); 16] = [
+pub const MAKE_EXAMPLES: [(&str, &str); 19] = [
     (
         "desk-light/skill.toml",
         include_str!("make_examples/desk-light/skill.toml"),
@@ -355,6 +355,18 @@ pub const MAKE_EXAMPLES: [(&str, &str); 16] = [
     (
         "breathing-coach/scripts/main.py",
         include_str!("make_examples/breathing-coach/scripts/main.py"),
+    ),
+    (
+        "exchange-rate/skill.toml",
+        include_str!("make_examples/exchange-rate/skill.toml"),
+    ),
+    (
+        "exchange-rate/SKILL.md",
+        include_str!("make_examples/exchange-rate/SKILL.md"),
+    ),
+    (
+        "exchange-rate/scripts/main.py",
+        include_str!("make_examples/exchange-rate/scripts/main.py"),
     ),
     (
         "water-breaks/skill.toml",
@@ -452,6 +464,13 @@ pub fn gateway_checked_prompt(folder: &Path, switches: &CheckSwitches) -> String
     // carries it in its unit when the product has asks on.
     if std::env::var(ASKS_ENVIRONMENT).is_ok_and(|value| value == "on") {
         before.push_str(&format!("{ASKS_ENVIRONMENT}=on "));
+    }
+    // #7742: with a gateway run's own way out on, a made skill's code may be
+    // granted `net`, which lamp-skills' check takes only with LAMP_TASK_NET
+    // on, so the agent's check is given it as the run would be.
+    let on = |name: &str| std::env::var(name).is_ok_and(|value| value == "on");
+    if on(crate::skill_task::NET_SWITCH) && on(crate::skill_task::GATEWAY_NET_SWITCH) {
+        before.push_str(&format!("{}=on ", crate::skill_task::NET_SWITCH));
     }
     // The skill.toml form inline too, as in [`gateway_prompt`].
     // #7245 (lamp-c0a4, 18 Nov 13:27): Harness's `new` refused the checked
