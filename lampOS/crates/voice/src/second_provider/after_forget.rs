@@ -25,6 +25,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)
         || crate::action_claim::unplug_tool(name, &Value::Null).is_some()
+        || name == crate::made_skill::MAKE
         || matches!(
             name,
             "light_on"
@@ -64,6 +65,16 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
     }
     if result.get("error").is_some() {
         outcome.insert("error".into(), json!(true));
+    }
+    // A made skill removed by `make_skill` (#7683): a remove's yes, or a
+    // clash's replace that took others off. Its flag, never the names.
+    if name == crate::made_skill::MAKE
+        && (result["removed"].is_string()
+            || result["replaced"]
+                .as_array()
+                .is_some_and(|replaced| !replaced.is_empty()))
+    {
+        outcome.insert("skill_removed".into(), json!(true));
     }
     if result.get("face").is_some() {
         outcome.insert(
