@@ -18,6 +18,7 @@ mod held_forget;
 mod held_rename;
 mod held_save;
 mod history_keeps_calls;
+mod just_made_note;
 mod keep_at_once;
 mod limit_local;
 mod made_line;

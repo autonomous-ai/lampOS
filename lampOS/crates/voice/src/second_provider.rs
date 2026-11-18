@@ -11779,6 +11779,13 @@ async fn spoken(
         // person's choice (#6593): its clash_id and question, for the same
         // reason (the Reviewer-lead's P1 on #6614).
         .chain(crate::made_clash::waiting_note(request, Instant::now()))
+        // The skill made, or turned off or on, in the owner's conversation
+        // (#7660): what "the skill you just made" and "it" mean.
+        .chain(crate::just_made::note_here(
+            request,
+            scope.as_ref(),
+            Instant::now(),
+        ))
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
