@@ -815,12 +815,14 @@ pub const INTERPRETER: &str = "python3";
 /// folders, lamp-control's socket, SDK, token) for the launcher
 /// ([`crate::skill_start`]) to claim once, and the Harness task
 /// ([`prompt`]) asks the agent to run the launcher with the run's id.
+/// A run granted `net` names its own `egress` socket in its grant (#7742).
 /// Refused before anything is made live for a fixed write.
 pub fn open_start(
     starts: &crate::skill_start::Starts,
     folder: &Path,
     run: &SkillRun,
     token: &str,
+    egress: Option<&Path>,
 ) -> Result<(crate::skill_start::Live, String), String> {
     if run.script.as_os_str().is_empty() {
         return Err(
@@ -844,6 +846,9 @@ pub fn open_start(
             socket: env_of(SOCKET_ENV),
             pythonpath: env_of(PYTHONPATH_ENV),
             token: token.to_owned(),
+            // A run granted `net` (#7742): its own egress socket, made
+            // before this, which its fence gets as a descriptor.
+            egress: egress.map(Path::to_path_buf),
         },
     )?;
     Ok((live, prompt(Path::new(crate::skill_start::LAUNCHER), run)))
@@ -1075,11 +1080,76 @@ cd "$r" || no "the run's folder"
 exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$r" LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$i" "$s"
 "#;
 
+/// lamp-tasks' own program, which the fence of a run granted `net` starts
+/// its relay with (`lamp-tasks net-relay --egress`, #7742): the one
+/// lamp-update's agent namespace scripts start, `/opt` shown in the
+/// gateway's namespace.
+pub const RELAY: &str = "/opt/lampOS/tasks/current/lamp-tasks";
+
+/// The line [`FENCE_NET_EDITS`] adds that starts a run's relay to its own
+/// egress socket ([`crate::skill_start::EGRESS_FD`]): lamp-tasks reads the
+/// installed launcher for it before it gives a gateway agent's run its way
+/// out (#7742), so an older launcher, whose fence has none, is refused in
+/// words before anything is made.
+pub const FENCE_NET_LINE: &str = "m=$(unshare --user --map-user=\"$u\" --map-group=\"$g\" -- /opt/lampOS/tasks/current/lamp-tasks net-relay --egress /proc/self/fd/5 &)\n";
+
+/// What [`fence_args`] changes in [`FENCE_TEXT`] for a run granted `net`
+/// (#7742, its grant naming its egress socket), each found exactly once (a
+/// test holds it), the same way out a held Hermes run's namespace script
+/// gives it (`lamp_update::hermes_install`'s `TASKS_EDITS`): in the run's
+/// own network namespace (only `lo`), before the script, `lo` brought up
+/// (`ip`; none, the fence fails), port 53 opened to its own ids, a
+/// `resolv.conf` naming `127.0.0.1` bound read-only over the lamp's, and
+/// [`RELAY`] `net-relay --egress` started as the caller's own ids in a
+/// nested user namespace (no capability over these mounts) with its web
+/// proxy on `127.0.0.1:3128` and DNS on `127.0.0.1:53`, both piped to the
+/// egress socket on fd 5, where lamp-tasks lets out only the public web on
+/// ports 80 and 443 ([`crate::egress`]); its `ready` is waited for (none,
+/// the fence fails). Fd 5 is then closed, so the script holds no
+/// descriptor of it, and the script is given `HTTPS_PROXY`, `HTTP_PROXY`
+/// (both cases), `NO_PROXY` and `NODE_USE_ENV_PROXY=1`. The PID namespace
+/// ends the relay with the script. Nothing else the fence shows or hides
+/// changes: the run still sees only its own folder and its skill's.
+pub const FENCE_NET_EDITS: [(&str, &str); 2] = [
+    (
+        "cd \"$r\" || no \"the run's folder\"\n",
+        concat!(
+            "[ -S /proc/self/fd/5 ] || no \"the run's egress socket\"\n",
+            "x=; for c in /usr/sbin/ip /sbin/ip; do if [ -x \"$c\" ]; then x=$c; break; fi; done\n",
+            "[ -n \"$x\" ] && \"$x\" link set lo up || no \"lo up in the run's own network\"\n",
+            "echo 53 > /proc/sys/net/ipv4/ip_unprivileged_port_start || no \"port 53 in the run's own network\"\n",
+            "q=$(readlink -f /etc/resolv.conf) || q=/etc/resolv.conf\n",
+            "[ -f \"$q\" ] && printf 'nameserver 127.0.0.1\\n' > /tmp/.lampos-dns && mount -n --bind /tmp/.lampos-dns \"$q\" && mount -n -o remount,bind,ro,nosuid,nodev,noexec \"$q\" && rm -f /tmp/.lampos-dns || no \"resolv.conf naming 127.0.0.1\"\n",
+            "m=$(unshare --user --map-user=\"$u\" --map-group=\"$g\" -- /opt/lampOS/tasks/current/lamp-tasks net-relay --egress /proc/self/fd/5 &)\n",
+            "[ \"$m\" = ready ] || no \"the run's relay on 127.0.0.1:3128 and 127.0.0.1:53\"\n",
+            "exec 5<&-\n",
+            "cd \"$r\" || no \"the run's folder\"\n",
+        ),
+    ),
+    (
+        " PYTHONPATH=\"$py\" /bin/sh -c ",
+        " PYTHONPATH=\"$py\" HTTPS_PROXY=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 http_proxy=http://127.0.0.1:3128 NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost NODE_USE_ENV_PROXY=1 /bin/sh -c ",
+    ),
+];
+
+/// [`FENCE_TEXT`] as a run's fence runs it: with [`FENCE_NET_EDITS`] when
+/// `net` (its grant names its egress socket), else byte for byte.
+pub fn fence_text(net: bool) -> String {
+    let mut text = FENCE_TEXT.to_owned();
+    if net {
+        for (from, to) in FENCE_NET_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+    }
+    text
+}
+
 /// The launcher's `unshare` arguments for `grant` (its run's folder in the
 /// runs' project, its parent), the caller's `uid` and `gid`, and `hidden`
 /// covered ([`HIDDEN`] on a lamp): a user (root mapped), network (only
 /// `lo`), mount and PID namespace of its own, then [`FENCE_TEXT`] with its
-/// arguments. Never the token.
+/// arguments ([`fence_text`]: with the run's way out when its grant names
+/// an egress socket, #7742). Never the token.
 pub fn fence_args(
     grant: &crate::skill_start::Grant,
     uid: u32,
@@ -1104,7 +1174,11 @@ pub fn fence_args(
     .iter()
     .map(Into::into)
     .collect();
-    args.push(FENCE_TEXT.replace("\"$SCRIPT_PATH\"", SCRIPT_PATH).into());
+    args.push(
+        fence_text(grant.egress.is_some())
+            .replace("\"$SCRIPT_PATH\"", SCRIPT_PATH)
+            .into(),
+    );
     args.push("fence".into());
     args.push(uid.to_string().into());
     args.push(gid.to_string().into());
@@ -2119,7 +2193,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let run = fixed_write_run(dir.path());
         let starts = crate::skill_start::Starts::default();
-        let said = open_start(&starts, dir.path(), &run, "run-secret")
+        let said = open_start(&starts, dir.path(), &run, "run-secret", None)
             .err()
             .unwrap();
         assert!(said.contains("fixed write is not taken"), "{said}");
@@ -2196,6 +2270,63 @@ mod tests {
         }
     }
 
+    /// #7742: a grant naming its egress socket gets the fence with the
+    /// run's way out, each edit made once ([`FENCE_NET_EDITS`]): the relay
+    /// to fd 5 started as the caller's ids before the script, its `ready`
+    /// waited for, fd 5 closed before the script and the proxy given it;
+    /// the folders shown and the paths hidden as for any run. A grant with
+    /// none gets [`FENCE_TEXT`] byte for byte.
+    #[test]
+    fn a_net_grant_gets_the_fence_with_its_relay_and_no_other_grant_does() {
+        let mut grant = crate::skill_start::Grant {
+            script: "/var/lib/lampOS/skills/s/scripts/main.py".into(),
+            interpreter: INTERPRETER.into(),
+            skill: "/var/lib/lampOS/skills/s".into(),
+            run: "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1".into(),
+            socket: "/run/lampos-control/control.sock".into(),
+            pythonpath: "/opt/lampOS/sdk".into(),
+            token: "secret".into(),
+            egress: None,
+        };
+        let hidden: Vec<&Path> = HIDDEN.iter().map(Path::new).collect();
+        let text_of = |grant: &crate::skill_start::Grant| {
+            fence_args(grant, 990, 990, &hidden)[12]
+                .to_string_lossy()
+                .into_owned()
+        };
+        let plain = text_of(&grant);
+        assert_eq!(plain, FENCE_TEXT.replace("\"$SCRIPT_PATH\"", SCRIPT_PATH));
+        assert!(!plain.contains("net-relay") && !plain.contains("PROXY"));
+        grant.egress = Some("/run/lampos-tasks/egress/skill-task-1.sock".into());
+        let net = text_of(&grant);
+        for (from, to) in FENCE_NET_EDITS {
+            assert_eq!(FENCE_TEXT.matches(from).count(), 1, "{from}");
+            assert_eq!(net.matches(to).count(), 1, "{to}");
+        }
+        assert_eq!(net.matches(FENCE_NET_LINE).count(), 1);
+        assert!(FENCE_NET_LINE.contains(RELAY));
+        assert!(
+            FENCE_NET_LINE.contains(&format!("/proc/self/fd/{}", crate::skill_start::EGRESS_FD))
+        );
+        // Relay ready, then fd 5 closed, then the script, in that order.
+        let at = |line: &str| net.find(line).unwrap();
+        assert!(at(FENCE_NET_LINE) < at("[ \"$m\" = ready ]"));
+        assert!(at("[ \"$m\" = ready ]") < at("exec 5<&-"));
+        assert!(at("exec 5<&-") < at("exec unshare --user --map-user"));
+        assert!(net.contains("HTTPS_PROXY=http://127.0.0.1:3128"));
+        assert!(net.contains("NODE_USE_ENV_PROXY=1"));
+        // Every mount of the fence as for any run.
+        for line in plain.lines().filter(|line| line.contains("mount")) {
+            assert!(net.contains(line), "{line}");
+        }
+        // The egress path itself is never an argument: fd 5 alone.
+        assert!(
+            fence_args(&grant, 990, 990, &hidden)
+                .iter()
+                .all(|arg| !arg.to_string_lossy().contains("egress/skill-task-1"))
+        );
+    }
+
     /// The launcher's fence, run for real with `unshare`, `mount` and the
     /// interpreter stood in for: what each was given, in order, the
     /// script's environment, and what the fence said on fd 4.
@@ -2242,6 +2373,7 @@ mod tests {
             socket: "/run/lampos-control/control.sock".into(),
             pythonpath: "/sdk".into(),
             token: "run-secret".into(),
+            egress: None,
         };
         let hidden = vec![dir.path().join("state"), dir.path().join("absent")];
         Fenced {

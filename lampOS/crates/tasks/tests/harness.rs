@@ -7453,6 +7453,7 @@ fn skill_runner_with(
         ),
         makes: false,
         egress: None,
+        gateway_net: None,
     }
 }
 
@@ -8851,6 +8852,127 @@ fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
         &[("hermes", ONE_PATH_HERMES)],
         Some(&ns_with_net_runs()),
     );
+    refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
+}
+
+/// #7742: with `LAMP_TASK_NET_GATEWAY` on (the runner's `gateway_net`, the
+/// installed skill-start launcher) and OpenClaw the lamp's default, a run
+/// granted `net` is not refused: its egress socket `skill-<run id>.sock`
+/// is made before `harness new`, there while the launcher claims the run,
+/// named in the run's grant (which its fence gets as a descriptor), and
+/// gone after the run. A launcher whose fence has no relay line is refused
+/// in words, nothing asked of Harness and no socket; with the switch off,
+/// the refusal is the one before #7742.
+#[test]
+fn a_gateway_net_run_gets_its_egress_socket_named_in_its_fence_grant() {
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    let net_run = || {
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = true;
+        run
+    };
+    let gateway_runner = |rig: &Rig, launcher: Option<&str>| {
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        let mut runner = one_path_runner(
+            rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        );
+        runner.egress = Some(egress_of(rig));
+        runner.gateway_net = launcher.map(|text| {
+            let path = rig.root.path().join("skill-start");
+            fs::write(&path, text).unwrap();
+            path
+        });
+        runner
+    };
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = gateway_runner(
+        &rig,
+        Some(&format!("ELF...{}...", lamp_tasks::gateway::FENCE_NET_LINE)),
+    );
+    let socket = rig.root.path().join("egress/skill-task-1.sock");
+    // The launcher's claim, taken straight from the run's live starts: its
+    // grant, and whether the socket was there then.
+    let starts = runner.starts.clone();
+    let claimed = thread::spawn({
+        let socket = socket.clone();
+        move || {
+            use std::os::unix::fs::FileTypeExt;
+            let until = Instant::now() + Duration::from_secs(20);
+            while Instant::now() < until {
+                if starts.is_live("task-1") {
+                    let there = fs::symlink_metadata(&socket)
+                        .is_ok_and(|meta| meta.file_type().is_socket());
+                    return Some((starts.claim("task-1").unwrap(), there));
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            None
+        }
+    });
+    // No fence here says it started: the run ends as one whose fence failed.
+    let ran = runner.run(&net_run(), &|| {});
+    assert_eq!(ran, Err(lamp_tasks::gateway::FENCE_FAILED.to_owned()));
+    let (grant, there) = claimed.join().unwrap().expect("live");
+    assert!(there, "the egress socket was there at the claim");
+    assert_eq!(grant.egress.as_deref(), Some(socket.as_path()));
+    assert!(
+        rig.calls().iter().any(|call| call["args"][0] == "new"),
+        "harness new was asked"
+    );
+    assert!(!socket.exists(), "gone after the run");
+    assert!(!rig.root.path().join("egress/skill-task-1.folder").exists());
+
+    let refused = |runner: HarnessRunner, rig: &Rig, why: &str| {
+        let said = runner.run(&net_run(), &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::NET_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(!rig.root.path().join("egress").exists(), "no socket");
+        assert!(!rig.root.path().join("runs").exists(), "no token file");
+    };
+    // An older launcher: its fence has no relay line.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    refused(
+        gateway_runner(&rig, Some("ELF...an older fence...")),
+        &rig,
+        "a skill-start launcher whose fence gives no run its way out",
+    );
+    // No launcher at all.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = gateway_runner(&rig, None);
+    runner.gateway_net = Some(rig.root.path().join("no-launcher"));
+    refused(
+        runner,
+        &rig,
+        "a skill-start launcher whose fence gives no run its way out",
+    );
+    // The switch off: refused as before #7742.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    refused(
+        gateway_runner(&rig, None),
+        &rig,
+        "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces, which no one run can be held in",
+    );
+    // No egress in lamp-tasks (LAMP_TASK_NET off there), the switch on.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = gateway_runner(&rig, Some(lamp_tasks::gateway::FENCE_NET_LINE));
+    runner.egress = None;
     refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
 }
 
