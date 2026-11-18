@@ -9,7 +9,7 @@
 //                  never a Docker, VM or VPN one; the others are listed). It must be one of this computer's own.
 //
 // A REAL lamp instead: `node examples/twin/try.js --real --host H` (code and pin in LAMP_TRY_CODE / LAMP_TRY_PIN or a prompt)
-// or `--real --keyring DIR`; see real.js. No lamp-sim, no stimuli; every row says if the lamp or the run cannot do it.
+// or `--real --keyring DIR` (add `--local` to serve the page on 127.0.0.1 only, not on the network); see real.js. No lamp-sim, no stimuli; every row says if the lamp or the run cannot do it.
 //
 // --lamp-sim PATH  the lamp-sim binary (default: `lamp-sim` on the PATH; lamp-body and lamp-control beside it)
 // The lamp lives in a private folder of its own (~/.lampsim-try-PID, 0700) that Ctrl-C removes, and listens on

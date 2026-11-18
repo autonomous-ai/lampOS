@@ -22,6 +22,8 @@ test('the code and the pin are refused on the command line, with the way to give
   assert.throws(() => parseReal(['--real', '--host', 'h', '--keyring', 'd']), /give one of them/);
   assert.throws(() => parseReal(['--real', '--host', 'h', '--nope']), /unknown argument --nope/);
   assert.deepEqual([...parseReal(['--real', '--host', 'h', '--camera']).flags].sort(), ['camera', 'real']);
+  assert.deepEqual([...parseReal(['--real', '--keyring', 'd', '--local']).flags].sort(), ['local', 'real']);
+  assert.throws(() => parseReal(['--real', '--keyring', 'd', '--local', '--lan-address', '10.0.0.5']), /--local and --lan-address/);
 });
 
 test('the code and pin come from the environment first, then a prompt that is asked in order', async () => {
@@ -166,4 +168,30 @@ test('the say row speaks its own default on a real lamp, not the virtual lamp\'s
   t.after(() => page.socket.close());
   assert.equal((await page.press('say')).ok, true);
   assert.deepEqual(fake.asked('say'), [{ text: 'Hello from the try-it page.' }]);
+});
+
+test('--local serves the page on 127.0.0.1 only and prints no network address; without it the notes of a pairing with no notes grant are not asked for at the end', async (t) => {
+  const fake = await FakeLamp.start({ grants: ['light', 'body'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  const kept = join(home, 'kept');
+  mkdirSync(kept, { mode: 0o700 });
+  chmodSync(kept, 0o700);
+  await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'mine', keyring: new Keyring(kept) });
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const real = await run(t, { args: ['--keyring', kept, '--local'], env: { LAMP_TRY_CODE: '', LAMP_TRY_PIN: '' }, fake, home });
+  assert.match(real.out.text, /Open this in a browser on this computer/);
+  assert.equal(/on your network/.test(real.out.text), false, 'no network address is said');
+  assert.match(real.out.text, /http:\/\/localhost:\d+\/\?t=/);
+  const table = await (await fetch(`${real.base}/try.json?t=${real.token}`)).json();
+  assert.equal(table.mode, 'real');
+  // The same page is not on any other address of this computer.
+  const { networkInterfaces } = await import('node:os');
+  const other = Object.values(networkInterfaces()).flat().find((a) => a && !a.internal && a.family === 'IPv4')?.address;
+  if (other) {
+    const refused = await fetch(`http://${other}:${new URL(real.base).port}/try.json?t=${real.token}`, { signal: AbortSignal.timeout(3000) }).then(() => false, () => true);
+    assert.equal(refused, true, 'the page does not answer on the network address');
+  }
+  real.child.kill('SIGINT');
+  assert.equal(await real.ended, 0);
+  assert.equal(/could not clean up/.test(real.out.text), false, `no false alarm for the notes without a grant: ${real.out.text}`);
 });

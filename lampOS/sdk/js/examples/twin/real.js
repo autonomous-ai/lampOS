@@ -4,6 +4,7 @@
 //
 //   LAMP_TRY_CODE=12345678 LAMP_TRY_PIN=<the pin> node examples/twin/try.js --real --host H [--port N]
 //   node examples/twin/try.js --real --keyring DIR            (a pairing made before; nothing is removed)
+//   ... --local   the page is served on 127.0.0.1 only (no network address, none printed), for a page that moves a real lamp
 //
 // The code (8 digits) and the pin (the lamp's certificate fingerprint, from the owner's app) come from the environment
 // or a prompt that does not echo: never from the command line, where `ps` shows them. A code run pairs as
@@ -23,7 +24,7 @@ import { Keyring, Lamp } from '../../src/index.js';
 import { portFree } from './virtual-lamp.js';
 
 export const CLIENT_NAME = 'try-controller';
-const ONE_WORD = new Set(['--real', '--camera', '--microphone', '--no-open']);
+const ONE_WORD = new Set(['--real', '--camera', '--microphone', '--no-open', '--local']);
 const WITH_VALUE = new Set(['--host', '--port', '--keyring', '--twin-port', '--glb', '--lan-address']);
 
 // The arguments of a real run. `--code` and `--pin` are refused with the way to give them; anything else unknown is too.
@@ -39,6 +40,7 @@ export function parseReal(args) {
   }
   if (!out.keyring && !out.host) throw new Error('--real needs --host H (and the code and pin) or --keyring DIR (a pairing made before)');
   if (out.keyring && out.host) throw new Error('--keyring and --host: a keyring already knows its lamp; give one of them');
+  if (out.flags.has('local') && out['lan-address'] !== undefined) throw new Error('--local and --lan-address: --local serves this computer only, there is no network address to choose');
   return out;
 }
 
@@ -97,8 +99,9 @@ export async function pairOrOpen(options, env = process.env, ask = promptHidden)
 // Runs the twin on that keyring and says its URL; the page is on the network like try.js's.
 export async function startReal(options, folderOrKeyringPath) {
   const twinPort = options['twin-port'] ?? String((await portFree(8737)) ? 8737 : 0);
-  const args = [fileURLToPath(new URL('server.js', import.meta.url)), '--real', '--lan', '--port', twinPort === '0' ? String(await freePort()) : twinPort,
-    ...(options.glb ? ['--glb', options.glb] : []), ...(options['lan-address'] ? ['--lan-address', options['lan-address']] : []),
+  const localOnly = options.flags.has('local');
+  const args = [fileURLToPath(new URL('server.js', import.meta.url)), '--real', ...(localOnly ? [] : ['--lan']), '--port', twinPort === '0' ? String(await freePort()) : twinPort,
+    ...(options.glb ? ['--glb', options.glb] : []), ...(!localOnly && options['lan-address'] ? ['--lan-address', options['lan-address']] : []),
     ...(options.flags.has('camera') ? ['--camera'] : []), ...(options.flags.has('microphone') ? ['--microphone'] : [])];
   const { LAMP_TRY_CODE: _code, LAMP_TRY_PIN: _pin, ...clean } = process.env;
   // Its own process group: a terminal's Ctrl-C reaches this program alone, which then asks the twin to end (SIGTERM) and waits.
@@ -110,7 +113,7 @@ export async function startReal(options, folderOrKeyringPath) {
       text += chunk;
       const local = /http:\/\/localhost:\d+\/\?t=\S+/.exec(text)?.[0];
       const network = /on your network: (http:\/\/[\d.]+:\d+\/\?t=\S+)/.exec(text)?.[1];
-      if (local && network) resolve({ local, network });
+      if (local && (network || localOnly)) resolve({ local, network });
       else if (local) timer ??= setTimeout(() => resolve({ local }), 1500);
     });
     twin.on('close', (code) => reject(new Error(`the twin ended (${code})`)));
@@ -153,8 +156,10 @@ export async function runReal(argv, { exit = (code) => process.exit(code), log =
     const started = await startReal(options, keyringAt);
     twin = started.twin;
     const on = [options.flags.has('camera') && 'CAMERA', options.flags.has('microphone') && 'MICROPHONE'].filter(Boolean).join(' and ');
-    log(`\n  A REAL LAMP. Open this on any device on your network:\n\n    ${started.urls.network ?? started.urls.local}\n\n  (the token in it is the key; Ctrl-C stops the page and takes this run's test clips and notes off the lamp)`);
-    log(on ? `  ${on} ON: anyone on your network who has this link can see or hear the room through the page, over plain HTTP.\n` : '  The camera and the microphone rows are off (give --camera / --microphone to turn them on).\n');
+    const localOnly = options.flags.has('local');
+    const shown = localOnly ? started.urls.local : (started.urls.network ?? started.urls.local);
+    log(`\n  A REAL LAMP. ${localOnly ? 'Open this in a browser on this computer (the page is not on the network):' : 'Open this on any device on your network:'}\n\n    ${shown}\n\n  (the token in it is the key; Ctrl-C stops the page and takes this run's test clips and notes off the lamp)`);
+    log(on ? `  ${on} ON: ${localOnly ? 'only this computer can' : 'anyone on your network who has this link can'} see or hear the room through the page${localOnly ? '' : ', over plain HTTP'}.\n` : '  The camera and the microphone rows are off (give --camera / --microphone to turn them on).\n');
     // The twin ending by itself is an end with a failure, unless it ended cleanly (exit 0: it was asked to by a signal that
     // reached it too, and has cleaned up): that is a clean end of the run.
     twin.on('close', (code) => end(code === 0 ? 0 : 1));

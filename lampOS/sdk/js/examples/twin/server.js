@@ -414,7 +414,8 @@ if (real) {
     cleanup: async () => {
       await bounded(release());
       await bounded(cleanScratch(lamp));
-      await bounded(cleanScratchNotes(lamp));
+      // Notes are listed only on a pairing that has the grant: without it the lamp answers no_grant, and there is nothing of ours to remove.
+      if (lamp.grants.includes('notes')) await bounded(cleanScratchNotes(lamp));
       await bounded(cleanScratchSkill(lamp));
       await bounded(lamp.close());
     },
