@@ -10892,6 +10892,22 @@ impl Heeding {
         }
     }
 
+    /// [`crate::said_to_me::Line::question_waits`]: the lamp still waits on
+    /// its question, a read-back's or a skill's yes within its own wait, or
+    /// the thread's question asked within
+    /// [`crate::said_to_me::QUESTION_WAITS`]; `signs.lamp_asked` alone has
+    /// no clock (the Reviewer-lead's HOLD on #7705).
+    fn question_waits(&self, request: u64, heard: &str, signs: &Signs) -> bool {
+        let now = Instant::now();
+        crate::services::answer_awaited(heard)
+            || signs.lamp_asked
+                && (crate::skill_write_yes::answer_awaited(request, now)
+                    || crate::thread::current(self.thread.as_deref(), |thread| {
+                        thread.lamp_asked_within(request, now, crate::said_to_me::QUESTION_WAITS)
+                    })
+                    .unwrap_or_default())
+    }
+
     /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
     /// is held as not said to the lamp, its face and conversation then no
     /// sign. Out of a conversation the turned face's pitch and gaze are the
@@ -10930,6 +10946,7 @@ impl Heeding {
             // A read-back asks for an answer, however its last sentence
             // reads (`services::answer_awaited`).
             lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
+            question_waits: self.question_waits(request, heard, signs),
             turned,
             ..Default::default()
         };
@@ -28304,12 +28321,30 @@ mod tests {
 
     /// The first builder's ruling on #7698 (lamp-06c1, request 99: one word,
     /// held out of the window): past the window, Jay turned to the lamp and
-    /// not seen speaking, a bare yes or no to its pending question is
-    /// answered; with no question pending it stays held.
+    /// not seen speaking, a bare yes or no to the question the lamp still
+    /// waits on is answered; with no question, or one asked longer ago than
+    /// `said_to_me::QUESTION_WAITS` (the Reviewer-lead's HOLD on #7705: an
+    /// "Anything else?" long gone), it stays held.
     #[test]
     fn with_said_to_me_a_bare_yes_to_a_pending_question_is_answered_out_of_the_window() {
         use lamp_msgs::SpeakingState::No;
-        let judged = |lamp_asked: bool, words: &str| {
+        let _one = crate::provider_worker::tests::one_thread();
+        // The lamp's words `ago`, a question or not.
+        let judged = |ago: Duration, asked: bool, words: &str| {
+            let at = Instant::now() - ago;
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Call me Jay.", true, at);
+            thread.lamp(
+                1,
+                if asked {
+                    "Your name is Jay. Is that right?"
+                } else {
+                    "Your name is Jay."
+                },
+                at,
+            );
+            let lamp_asked = thread.lamp_asked(9);
+            *crate::thread::THREAD.lock().unwrap() = thread;
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let (now, now_us) = (Instant::now(), monotonic_us());
             turned_face_looks(&eyes, now, 200, &[Some(No)], &mut 0);
@@ -28323,11 +28358,25 @@ mod tests {
             };
             let verdict = heeding.heed_signs(9, (now_us, now_us + 600_000), words, signs);
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             verdict
         };
+        let fresh = Duration::from_secs(60);
+        let stale = crate::said_to_me::QUESTION_WAITS + Duration::from_secs(10);
         for yes in ["Yes.", "No."] {
-            assert_eq!(judged(true, yes), None, "{yes} to the pending question");
-            assert!(judged(false, yes).is_some(), "{yes} with no question");
+            assert_eq!(
+                judged(fresh, true, yes),
+                None,
+                "{yes} to the question the lamp waits on"
+            );
+            assert!(
+                judged(fresh, false, yes).is_some(),
+                "{yes} with no question"
+            );
+            assert!(
+                judged(stale, true, yes).is_some(),
+                "{yes} to a stale question"
+            );
         }
     }
 

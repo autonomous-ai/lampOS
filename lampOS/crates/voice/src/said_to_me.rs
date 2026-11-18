@@ -34,10 +34,16 @@
 //! conversation going on, whatever the line's length (#7698: on lamp-06c1 on
 //! 18 Nov a bare "Yes." to the lamp's read-back was held, many times). Out
 //! of the window, a line of [`SHORT_WORDS`] words or fewer that is a plain
-//! yes or no (`services::plain_yes`, `services::plain_no`) while the lamp's
-//! question waits is the same answer (the first builder's ruling on #7698:
-//! request 99 there was one word, held out of the window); any other line
-//! out of the window is judged as before.
+//! yes or no (`services::plain_yes`, `services::plain_no`) while the lamp
+//! still waits on its question ([`Line::question_waits`]: asked no more than
+//! [`QUESTION_WAITS`] ago, or a read-back or a skill's yes within its own
+//! wait) is the same answer (the first builder's ruling on #7698: request 99
+//! there was one word, held out of the window; "while the lamp is still
+//! waiting for the answer", #7570 19:46). A question older than that waits
+//! no more: the thread drops exchanges by count, not age, so its
+//! `lamp_asked` alone would answer a "No." hours after an "Anything else?"
+//! (the Reviewer-lead's HOLD on #7705). Any other line out of the window is
+//! judged as before.
 //!
 //! Anything else loses those signs and is journaled `held: <reason>`
 //! ([`Held`]). A lip smack heard as one or two words while the owner faced
@@ -49,6 +55,12 @@ pub const ENVIRONMENT: &str = "LAMP_SAID_TO_ME";
 
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
+
+/// How long, from the start of the lamp's words that asked, its question
+/// still waits for a bare yes or no out of the window: as long as the lamp
+/// waits for the answer to its own read-back (`crate::services::PENDING_FOR`)
+/// and to a made skill's say-back (`crate::skill_write_yes::YES_WITHIN`).
+pub const QUESTION_WAITS: std::time::Duration = crate::services::PENDING_FOR;
 
 /// The head's pitch, in degrees, down positive as `lamp_msgs::Face::pitch`
 /// (radians) has it, inside which a face is facing the lamp: a head down to a
@@ -140,6 +152,13 @@ pub struct Line<'a> {
     /// asked something, or a read-back waits for its answer (the rule's
     /// `Attention::lamp_asked`, as the worker tells it).
     pub lamp_asked: bool,
+    /// The lamp still waits on its question, as the out-of-window answer
+    /// reads it: the thread's question asked no more than
+    /// [`QUESTION_WAITS`] ago (`Thread::lamp_asked_within`), or a read-back
+    /// (`services::answer_awaited`) or a skill's yes
+    /// (`skill_write_yes::answer_awaited`) within its own wait. Unlike
+    /// [`Self::lamp_asked`], never a question gone stale.
+    pub question_waits: bool,
     /// A face turned to the lamp through it (the eyes' `facing`, yaw).
     pub turned: bool,
     /// The pitch, in radians, down positive (`lamp_msgs::Face::pitch`),
@@ -265,9 +284,10 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     // Out of the window, a bare yes or no to the lamp's own question still
-    // answers it (the first builder's ruling on #7698: lamp-06c1, 18 Nov,
-    // request 99, a one-word "Yes." after the rename's read-back was held).
-    if line.lamp_asked && bare_yes_or_no(line.heard) {
+    // answers it while the lamp waits on it (the first builder's ruling on
+    // #7698: lamp-06c1, 18 Nov, request 99, a one-word "Yes." after the
+    // rename's read-back was held), never a stale one (#7705's HOLD).
+    if line.question_waits && bare_yes_or_no(line.heard) {
         return Said::InConversation;
     }
     if outside_pitch(line.pitch) {
@@ -550,6 +570,7 @@ mod tests {
             going_on: false,
             turned: true,
             lamp_asked,
+            question_waits: lamp_asked,
             read_silent: true,
             ..Line::default()
         };
@@ -561,6 +582,19 @@ mod tests {
             judge(late("Yes.", false)),
             Said::Held(Held::NotSeenSpeaking)
         );
+        // The Reviewer-lead's HOLD on #7705: the thread's question gone
+        // stale (past `QUESTION_WAITS`), still `lamp_asked`: held.
+        for heard in ["Yes.", "No."] {
+            let stale = Line {
+                question_waits: false,
+                ..late(heard, true)
+            };
+            assert_eq!(
+                judge(stale),
+                Said::Held(Held::NotSeenSpeaking),
+                "{heard} to a stale question"
+            );
+        }
         // A question pending, but not a bare yes or no: judged as before.
         assert_eq!(
             judge(late("Pasta.", true)),
