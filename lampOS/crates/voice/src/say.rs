@@ -402,6 +402,9 @@ enum Taking {
     Refused,
     /// Near the end of the lamp's day: all but [`unasked_worded`].
     NearDayEnd,
+    /// During the care hold (`LAMP_CARE_LINE`): only what a person asked
+    /// for ([`asked_for`]).
+    Asked,
 }
 
 /// A say nobody asked for that the model must word (#7664): a skill's
@@ -2283,6 +2286,26 @@ impl Says {
         self.next_of(taken_as_a_turn)
     }
 
+    /// Whether the say waiting first is one a person asked for
+    /// ([`asked_for`]), for the care hold.
+    fn next_asked(&self, now: std::time::Instant) -> Option<usize> {
+        self.next_of(|request| taken_as_a_turn(request) && asked_for(request, now))
+    }
+}
+
+
+/// Whether `request` is one a person asked for, which the care hold
+/// (`LAMP_CARE_LINE`, #7689) lets through: the shutdown's last words, the
+/// lamp's agent's answer to the owner's ask, a made skill's run the owner
+/// asked for now, or a line marked as answering the owner.
+pub fn asked_for(request: &Request, now: std::time::Instant) -> bool {
+    is_last_words(request)
+        || request.answers
+        || request.skill == AGENT_SKILL
+        || crate::made_run::answers_now(&request.skill, now)
+}
+
+impl Says {
     /// Whether a turn start waits, not yet expired at `now_us`.
     pub fn turn_start_waits(&self, now_us: u64) -> bool {
         self.waiting.iter().any(|waiting| {
@@ -2574,6 +2597,13 @@ impl Says {
         self.take_of(now_us, Taking::NearDayEnd)
     }
 
+    /// [`Self::take`] during the care hold (`LAMP_CARE_LINE`, #7689): only
+    /// a say a person asked for ([`asked_for`]); what nobody asked for
+    /// waits, or expires.
+    pub fn take_asked(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, Taking::Asked)
+    }
+
     fn take_of(&mut self, now_us: u64, taking: Taking) -> Option<(String, u8, Ticket, bool)> {
         self.expire(now_us);
         let waiting = loop {
@@ -2588,6 +2618,7 @@ impl Says {
                 Taking::NearDayEnd => {
                     self.next_of(|request| taken_as_a_turn(request) && !unasked_worded(request))
                 }
+                Taking::Asked => self.next_asked(std::time::Instant::now()),
                 Taking::All => self.next_index(),
             };
             let waiting = self.waiting.remove(next?);
@@ -2609,7 +2640,9 @@ impl Says {
         );
         let (who, question) = (waiting.request.who, waiting.request.question);
         let turn = match &waiting.request.words {
-            Words::Text(text) if taking != Taking::All => crate::onboarding::said_as_is(text),
+            Words::Text(text) if matches!(taking, Taking::Refused | Taking::NearDayEnd) => {
+                crate::onboarding::said_as_is(text)
+            }
             words => words.turn(),
         };
         Some((

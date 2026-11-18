@@ -2822,6 +2822,8 @@ fn second_route_worker_environment(
         lamp_msgs::chosen_voice::ENVIRONMENT,
         // Words of self-harm answered with care and the care line (#7689).
         crate::care_line::ENVIRONMENT,
+        crate::care_line::REGION_ENVIRONMENT,
+        crate::care_line::FILE_ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").

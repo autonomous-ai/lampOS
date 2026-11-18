@@ -434,7 +434,10 @@ impl ProviderConfig {
         // `LAMP_CARE_LINE` (#7689): how to answer words of self-harm, last,
         // on every route and after a forget alike.
         Ok(if crate::care_line::on_from_environment() {
-            format!("{character}\n\n{}", crate::care_line::INSTRUCTION)
+            format!(
+                "{character}\n\n{}",
+                crate::care_line::instruction(&crate::care_line::line_now())
+            )
         } else {
             character
         })

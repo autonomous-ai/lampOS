@@ -4133,26 +4133,39 @@ async fn play_fixed(
     kept_words: bool,
 ) -> bool {
     let line = shared.fixed(english);
-    play_words(
+    let kept = shared.fixed_clips.kept(english);
+    match play_words(
         shared,
         (request, heard_at),
-        (line, Some(english)),
+        (line, kept, DOWN_LINE_MOST_SAMPLES),
         why,
         kept_words,
     )
     .await
+    {
+        None => false,
+        Some((_, whole)) => {
+            // Kept for the next time only when said whole.
+            if let Some(clip) = whole {
+                shared.fixed_clips.keep(english, clip);
+            }
+            true
+        }
+    }
 }
 
-/// [`play_fixed`]'s words `line`, its clip kept under `english` when it is
-/// one of the fixed lines (`None`: a line chosen as the lamp runs, such as
-/// the care line, #7689, streamed from the voice each time).
+/// [`play_fixed`]'s words `line`: from `kept`, its clip rendered ahead,
+/// else streamed from the voice, at most `most` samples. None when the
+/// turn is gone; else how many samples played, and the clip when it was
+/// streamed whole (for its keeper to keep). The care line (#7689) is
+/// played this way too.
 async fn play_words(
     shared: &Shared,
     (request, heard_at): (u64, Instant),
-    (line, english): (&str, Option<&'static str>),
+    (line, kept, most): (&str, Option<Vec<i16>>, usize),
     why: &str,
     kept_words: bool,
-) -> bool {
+) -> Option<(usize, Option<Vec<i16>>)> {
     if !shared
         .emit(ProviderOutput::Transcript {
             request: Some(request),
@@ -4161,10 +4174,9 @@ async fn play_words(
         })
         .await
     {
-        return false;
+        return None;
     }
     shared.said_piece(request, kept_words.then_some(line));
-    let kept = english.and_then(|english| shared.fixed_clips.kept(english));
     let ahead = kept.is_some();
     let mut first = true;
     let mut play = |samples: Vec<i16>| {
@@ -4186,11 +4198,12 @@ async fn play_words(
         }
     };
     let mut played = 0;
+    let mut whole = None;
     if let Some(clip) = kept {
         for part in clip.chunks(PACKET_SAMPLES) {
             let audio = play(part.to_vec());
             if !shared.emit(audio).await {
-                return false;
+                return None;
             }
             shared.said_samples(request, part.len());
             played += part.len();
@@ -4210,20 +4223,19 @@ async fn play_words(
                 for part in packet.chunks(PACKET_SAMPLES) {
                     let audio = play(part.to_vec());
                     if !shared.emit(audio).await {
-                        return false;
+                        return None;
                     }
                     shared.said_samples(request, part.len());
                     played += part.len();
                 }
                 clip.extend(packet);
-                if clip.len() >= DOWN_LINE_MOST_SAMPLES {
+                if clip.len() >= most {
                     break;
                 }
             }
             if played > 0 {
-                // Kept for the next time only when said whole.
-                if !failed && let Some(english) = english {
-                    shared.fixed_clips.keep(english, clip);
+                if !failed {
+                    whole = Some(clip);
                 }
                 break;
             }
@@ -4234,7 +4246,7 @@ async fn play_words(
             "lamp-voice second: request {request}: its fixed line could not be said: the voice gave no sound for it twice ({why})"
         );
     }
-    true
+    Some((played, whole))
 }
 
 /// The newest answer's pieces as written for the voice, in order
@@ -4692,7 +4704,15 @@ async fn render_line(services: &Arc<dyn Services>, text: &str) -> Vec<i16> {
 /// A voice's packets in one clip, at most `DOWN_LINE_MOST_SAMPLES`; empty
 /// if the voice failed.
 async fn clip_of(
+    speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+) -> Vec<i16> {
+    clip_up_to(speech, DOWN_LINE_MOST_SAMPLES).await
+}
+
+/// [`clip_of`], at most `most` samples.
+async fn clip_up_to(
     mut speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+    most: usize,
 ) -> Vec<i16> {
     let mut clip = Vec::new();
     while let Some(packet) = speech.next().await {
@@ -4700,8 +4720,8 @@ async fn clip_of(
             Ok(packet) => clip.extend(packet),
             Err(_) => return Vec::new(),
         }
-        if clip.len() >= DOWN_LINE_MOST_SAMPLES {
-            clip.truncate(DOWN_LINE_MOST_SAMPLES);
+        if clip.len() >= most {
+            clip.truncate(most);
             break;
         }
     }
@@ -7598,6 +7618,27 @@ impl Engine {
         shared
             .fixed_clips
             .render(&shared.services, shared.language, lines);
+        // The care line (`LAMP_CARE_LINE`), rendered ahead for the lamp's
+        // region and language now, so a voice down later still says it (the
+        // first builder's P2 on #7752). Rendered again the next time if not.
+        if let Some(care) = &shared.care {
+            let line = care.line();
+            if care.clip(&line).is_none() {
+                let (care, services) = (care.clone(), shared.services.clone());
+                tokio::spawn(async move {
+                    let clip =
+                        clip_up_to(services.speak(line.clone()), crate::care_line::MOST_SAMPLES)
+                            .await;
+                    if clip.is_empty() {
+                        eprintln!(
+                            "lamp-voice second: the care line could not be rendered ahead; trying again at the next line"
+                        );
+                    } else {
+                        care.keep_clip(&line, clip);
+                    }
+                });
+            }
+        }
     }
 
     pub fn submit(&mut self, input: ProviderInput) {
@@ -10790,10 +10831,20 @@ async fn spoken(
     // plain yes to a task read back is taken in code (#7027), never one that
     // may be the lamp's own words heard back.
     let began_clear = !marks.over_the_lamps_voice && !in_echo_tail;
+    // `LAMP_CARE_LINE` (#7689): words of self-harm are never held by the
+    // said-to-me rule (the first builder's P2 on #7752): they are answered,
+    // and the care line follows, whoever said them.
+    let care_caught = !empty
+        && !held
+        && !echoed
+        && shared.care.as_ref().is_some_and(|care| {
+            crate::care_line::said_harm(&text) && !care.own_line_heard(&text, Instant::now())
+        });
     // The rule judges this very line (`carried_past_silent_undone`).
-    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
+    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held && !care_caught;
     let mut heeded = match &shared.heed {
         _ if echoed => Some(OWN_ECHO_HELD),
+        _ if care_caught => None,
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             // Said by the name just before: its window begins with the
@@ -12045,16 +12096,18 @@ async fn spoken(
     // after one, the person asking who they can call. The model is told,
     // the exchange stays out of memory, and the care line follows the
     // answer ([`answer`]). Everyone heard, no face asked first.
+    // Kept out of memory, and held from the running summary and its talk
+    // note (the safety read's P1 on #7752).
     if let Some(care) = &shared.care {
         let now = Instant::now();
-        if crate::care_line::said_harm(&text)
-            || (care.holds(now) && crate::care_line::asks_who_to_call(&text))
-        {
-            care.mark(request, now);
+        let asks = care.holds(now) && crate::care_line::asks_who_to_call(&text);
+        if care_caught || asks {
+            care.mark(now, asks);
             crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
             notes.insert(notes.len() - cut_in_told, crate::care_line::NOTE.to_owned());
             eprintln!(
-                "lamp-voice second: request {request} is a care turn: the care line follows its answer (LAMP_CARE_LINE)"
+                "lamp-voice second: request {request} is a care turn: the care line follows its answer, or the next one if this is cut (LAMP_CARE_LINE)"
             );
         }
     }
@@ -16921,9 +16974,6 @@ async fn answer(
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
     let made_said = made_skill_said(&asked, &said);
     let heard_at = Instant::now();
-    // Whether the person asks who they can call: the care line again at
-    // once (`crate::care_line::AGAIN_AFTER`).
-    let care_asks = heard && crate::care_line::asks_who_to_call(&said);
     // The request's own words, for a forget it calls (#3113): never the
     // next line, which may be someone else's.
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
@@ -21550,23 +21600,33 @@ async fn answer(
         wrote
     };
     let ended = tokio::try_join!(writing, saying);
-    // `LAMP_CARE_LINE` (#7689): a care turn's fixed line, after whatever
-    // the model said or failed to say, unless a newer line took the turn.
-    // Never the model's words: the line for the lamp's region and language.
+    // `LAMP_CARE_LINE` (#7689): the care line owed, after whatever the
+    // model said or failed to say: this care turn's, or one an earlier
+    // turn owed when a cut, a stop or a newer line ended it (the P1s on
+    // #7752). Not when a newer line took this turn: its answer says it.
+    // Never the model's words: the line for the lamp's region and language,
+    // from its clip rendered ahead when there is one.
     if let Some(care) = &shared.care
         && !matches!(ended, Err(Stop::Gone))
-        && let Some(line) = care.line_after(request, Instant::now(), care_asks)
-    {
-        let line = line.to_owned();
-        if play_words(
+        && let Some(line) = care.owed_line(Instant::now())
+        && let Some((played, whole)) = play_words(
             shared,
             (request, heard_at),
-            (&line, None),
+            (&line, care.clip(&line), crate::care_line::MOST_SAMPLES),
             "the care line, LAMP_CARE_LINE",
             true,
         )
         .await
-        {
+    {
+        if let Some(clip) = whole {
+            care.keep_clip(&line, clip);
+        }
+        if played == 0 {
+            eprintln!(
+                "lamp-voice second: request {request}: the care line could not be said: still owed to the next answer"
+            );
+        } else {
+            care.said(&line, Instant::now());
             eprintln!("lamp-voice second: request {request}: the care line followed its answer");
             // Its words are over again, as the answer's were: what reads
             // the lamp's words line by line ends this one too.

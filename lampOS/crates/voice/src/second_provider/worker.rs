@@ -4075,20 +4075,17 @@ pub fn serve(
     // `LAMP_CARE_LINE` (#7689): words of self-harm answered with care, and
     // the fixed care line for the lamp's region and language after it.
     if crate::care_line::on_from_environment() {
-        let region = crate::second_provider::region_from_file()
-            .map(|region| region.trim().to_owned())
-            .filter(|region| !region.is_empty());
         let language =
             crate::language::from_environment().map_or("en", crate::language::Language::code);
+        // Where the lamp is is read again at each line: setup's time zone
+        // may be set after the worker starts.
+        let care =
+            crate::care_line::Care::reading(crate::care_line::CareLines::installed(), language);
         eprintln!(
             "lamp-voice second: words of self-harm are answered with care and the care line for region {} in {language} (LAMP_CARE_LINE)",
-            region.as_deref().unwrap_or("not known")
+            care.region().as_deref().unwrap_or("not known")
         );
-        engine = engine.caring(Some(std::sync::Arc::new(crate::care_line::Care::new(
-            crate::care_line::CareLines::shipped(),
-            region,
-            language,
-        ))));
+        engine = engine.caring(Some(std::sync::Arc::new(care)));
     }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)
@@ -14704,6 +14701,12 @@ fn keep_scoped(
                     }
                     None => thread.lamp(*request, &text, now),
                 }
+                // A care turn's exchange too (`LAMP_CARE_LINE`, the safety
+                // read's P1 on #7752): kept for the talk going on, never
+                // given to the running summary or its talk note.
+                if crate::care_line::held_from_summary(*request) {
+                    thread.held_for(*request);
+                }
             }
         }
         ProviderOutput::TurnComplete { request, .. } => {
@@ -23978,6 +23981,56 @@ mod tests {
             "{lamp:?}"
         );
         *crate::thread::THREAD.lock().unwrap() = before;
+    }
+
+    /// `LAMP_CARE_LINE` (the safety read's P1 on #7752): a care turn's
+    /// exchange stays in the thread but is never given to the running
+    /// summary or its talk note; another request's is.
+    #[test]
+    fn a_care_turns_exchange_never_reaches_the_summary() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let (care, plain) = (u64::MAX - 7752, u64::MAX - 7753);
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let before = std::mem::take(&mut *thread);
+        thread.forget();
+        drop(thread);
+        crate::care_line::hold_from_summary(care);
+        for (request, heard, said) in [
+            (care, "I want to kill myself", "I'm here with you."),
+            (plain, "What's the weather?", "Sunny."),
+        ] {
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: heard.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: said.into(),
+                    finished: true,
+                },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                super::keep_scoped(&event, None, None, None);
+            }
+        }
+        let rest = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .summary_rest(None, Instant::now() + Duration::from_secs(1));
+        *crate::thread::THREAD.lock().unwrap() = before;
+        assert!(
+            !rest.iter().any(|(request, ..)| *request == care),
+            "{rest:?}"
+        );
+        assert!(
+            rest.iter().any(|(request, ..)| *request == plain),
+            "{rest:?}"
+        );
     }
 
     /// #2137's redesign, step 5: the second worker's own path, not only
