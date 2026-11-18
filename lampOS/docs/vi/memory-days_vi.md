@@ -1828,3 +1828,11 @@ nhận, thêm `people` là các id bộ nhớ đã hỏi; hoặc `refused: LÝ D
 là 0 chỉ khi cả khuôn mặt lẫn bộ nhớ đều đã đi; 1 trong mọi trường hợp khác
 (kể cả bộ nhớ trả `kept`); 2 khi gọi sai. `LAMP_FACES_PAGE` và các unit giữ
 nguyên.
+
+Unit product mở sẵn socket hẹp của bộ nhớ (A8, #6852): `lamp-memory.service`
+chạy với `--forget-socket /run/lampos-memory/forget.sock --forget-group lampos`
+(`lampos` là nhóm của lamp-cloud, và user của bộ nhớ cũng ở trong nhóm này), và
+`lamp-cloud.service` đặt `LAMP_MEMORY_FORGET_SOCKET` trỏ tới đúng socket đó. Socket
+chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, nên
+khi công tắc đó còn tắt thì không có gì thay đổi với người dùng; khi nó bật, xóa
+một người trong app cũng xóa những gì bộ nhớ giữ về họ.

@@ -20,8 +20,11 @@ RuntimeDirectory=lampos-memory
 RuntimeDirectoryMode=0755
 PrivateNetwork=yes
 SupplementaryGroups=lampos
+# The app's narrow socket (A8, #6852; docs/memory.md "Forgetting a person"): `forget_person` only, 0660 for
+# lampos, lamp-cloud's group, so a person removed in the app goes from memory too. Asked only with lamp-cloud's
+# LAMP_FACES_PAGE=on; the same trust as the eyes' who.sock (anything running as lampos).
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
-ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus
+ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus --forget-socket /run/lampos-memory/forget.sock --forget-group lampos
 Restart=on-failure
 RestartSec=2s
 StandardInput=null
