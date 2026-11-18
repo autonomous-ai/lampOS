@@ -4756,7 +4756,8 @@ Mô tả đầy đủ ở [skills.md](../skills.md), "A number from the reading 
 
 ## Kỹ năng cũ được làm lại ở dạng giữa
 
-Khi bật `LAMP_REMAKE_OLD_SKILLS` (đúng `on`, không unit nào đặt; first
+Khi bật `LAMP_REMAKE_OLD_SKILLS` (đúng `on`; bật trong `lamp-voice` của
+sản phẩm từ lần bật #7765, theo quy tắc bật hết của chủ sản phẩm; first
 builder đồng ý trên #6811, 18/11 16:40; làm lại không cần hỏi, first
 builder 18:23; dạng giữa, phán quyết 19:50 của anh), một kỹ năng DeepSeek
 làm trước khi có route, không phải phản ứng nhanh, được làm lại ở dạng giữa

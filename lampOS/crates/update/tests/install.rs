@@ -2863,6 +2863,29 @@ fn the_product_never_says_an_action_no_call_made() {
     );
 }
 
+/// An old skill DeepSeek made before the route is remade in the middle
+/// form without asking, with a 7-day put-back (`LAMP_REMAKE_OLD_SKILLS`,
+/// #7765; the product owner's everything-on rule). `on` once in
+/// `lamp-voice.service`, the one unit that reads it (passed to its
+/// `provider` and `second` workers), and no other product unit names it.
+#[test]
+fn the_product_remakes_old_skills_in_the_middle_form() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_REMAKE_OLD_SKILLS=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_REMAKE_OLD_SKILLS"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
 /// A line that is only an installed skill's name said plainly ("photo
 /// booth", "run photo booth") calls that skill in code as round 1
 /// (`LAMP_SKILL_NAMED`, #6772, #6782): on lamp-52e6 at 12587 (13 Nov)

@@ -7551,9 +7551,10 @@ line no longer cuts `wellbeing_nudges` or `set_pose` to its name alone.
 
 ## Old skills remade in the middle form
 
-With `LAMP_REMAKE_OLD_SKILLS` on (exactly `on`, in no unit; the first
-builder's yes on #6811, 18 Nov 16:40; remade without asking, the first
-builder 18:23; the middle form, his 19:50 ruling), a skill DeepSeek made
+With `LAMP_REMAKE_OLD_SKILLS` on (exactly `on`; on in the product's
+`lamp-voice` since #7765's switch-on, the product owner's everything-on
+rule; the first builder's yes on #6811, 18 Nov 16:40; remade without
+asking, the first builder 18:23; the middle form, his 19:50 ruling), a skill DeepSeek made
 before the route, which isn't a quick reaction, is made again in the middle
 form a new make judged no quick reaction takes: the trigger the lamp's own
 model picks, one task for the lamp's agent whose words are the skill's own

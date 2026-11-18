@@ -1,6 +1,6 @@
 //! Old skills remade in the middle form (the first builder's yes on #6811,
 //! 18 Nov 16:40, and his 19:50 ruling): with `LAMP_REMAKE_OLD_SKILLS=on`
-//! ([`ENVIRONMENT`], on only when exactly `on`, in no unit), a made skill
+//! ([`ENVIRONMENT`], on only when exactly `on`; on in the product's `lamp-voice`), a made skill
 //! DeepSeek made before the route (its `made_with` missing or `deepseek`)
 //! that is not a quick reaction (`made_skill::quick_reaction`; a quick
 //! reaction is left alone) is made again as a new make judged no quick
