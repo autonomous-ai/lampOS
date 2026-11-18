@@ -2433,6 +2433,8 @@ fn second_route_worker_environment(
         // A wordless call only on a sure hearing (#5385).
         crate::second_provider::wordless_call::ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
+        // A name heard at the night's rest needs the name in the words (#5226).
+        crate::second_provider::REST_NAME_IN_WORDS_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
         // Read by the speech-to-text stream in this worker (#2527): without
@@ -2851,6 +2853,7 @@ mod tests {
             crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
             crate::second_provider::wordless_call::ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
+            crate::second_provider::REST_NAME_IN_WORDS_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
@@ -3926,6 +3929,7 @@ mod tests {
                     || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
                     || name == crate::second_provider::wordless_call::ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
+                    || name == crate::second_provider::REST_NAME_IN_WORDS_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT
@@ -4169,6 +4173,7 @@ mod tests {
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
+                    "LAMP_REST_NAME_IN_WORDS=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_ROOM_HELD_TALK=on",
                     "LAMP_SAID_TO_ME=on",
