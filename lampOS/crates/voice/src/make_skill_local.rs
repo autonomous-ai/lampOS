@@ -2418,7 +2418,12 @@ pub(crate) fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
         sha256: made.sha256.clone(),
         writes: Vec::new(),
         say_back: if made.uses.agent_task {
-            made_skill::agent_said(&made.uses.grants)
+            // On at once with `LAMP_MAKE_NO_ASKS` (the first builder, 01:26
+            // on #7819): its say-back names no yes it never waits for.
+            made_skill::agent_said_as(
+                &made.uses.grants,
+                crate::make_no_asks::on() && crate::make_no_asks::keeps_no_yes(made),
+            )
         } else {
             made_skill::code_said_as(&made.uses.grants, made_skill::code_goes_on_at_once(made))
         }
@@ -10820,6 +10825,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     #[test]
     fn with_the_switch_a_cannot_becomes_a_task_for_the_agent_with_the_request_and_its_grants() {
         no_cannot_here(Some(true));
+        // `LAMP_MAKE_NO_ASKS` off: on, it goes on at once with no yes.
+        crate::make_no_asks::set_here(Some(false));
         let (root, keeping) = keeping("no-cannot-task");
         let (url, served) = service_sent(vec![
             (200, "cannot: a skill can't look at a plant.".to_owned()),
@@ -10870,6 +10877,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
         assert!(take_said_line().is_some_and(|line| !line.contains("I made")));
+        crate::make_no_asks::set_here(None);
         no_cannot_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -11895,6 +11903,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     #[test]
     fn with_task_net_a_timed_web_make_is_kept_on_its_trigger_granted_net() {
         net_make_here(Some(true));
+        // `LAMP_MAKE_NO_ASKS` off: on, it goes on at once with no yes.
+        crate::make_no_asks::set_here(Some(false));
         let (root, keeping) = keeping("net-timed");
         let (url, served) = service_sent(vec![
             (200, "internet: the Bitcoin price".to_owned()),
@@ -11942,6 +11952,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(entry["uses"]["grants"], json!(grants), "{entry}");
         assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
         assert!(take_said_line().is_some_and(|line| !line.contains("Bitcoin")));
+        crate::make_no_asks::set_here(None);
         net_make_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -12391,6 +12402,114 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder, 01:26 on #7819: with `LAMP_MAKE_NO_ASKS` on, a
+    /// middle-form make is on at once, said in one line with its undo, no
+    /// "It runs only once you agree" and no spoken yes awaited; its task's
+    /// grants stay exactly those said. "remove it" undoes it.
+    #[test]
+    fn with_no_asks_a_middle_form_make_is_on_at_once_with_its_undo() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        set_owner_here(Some(true));
+        const HI: &str = "say hi when I sit down";
+        let (root, keeping, copy) = keeping_copied("no-asks-middle");
+        set_tasks_here(Some(task_asks("sit-hi", &"cd".repeat(32), "", &["speak"])));
+        let helper = manage_helper(&keeping.manage);
+        let tasks = agent_answering(vec![]);
+        let sat = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (200, trigger_answer("sit-hi", "speak", "room/presence", sat)),
+        ]);
+        let told = make_with_by(
+            7,
+            Some(HI),
+            HI,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        let kept: toml::Table = toml::from_str(&std::fs::read_to_string(&copy).unwrap()).unwrap();
+        assert_eq!(kept["do"][0]["task"]["task"].as_str(), Some(HI), "{kept:?}");
+        assert_eq!(kept["grants"], toml::Value::from(vec!["speak"]), "{kept:?}");
+        assert_eq!(told["made"], "sit-hi", "{told}");
+        assert_eq!(told["on"], true, "{told}");
+        for none in [
+            crate::skill_write_yes::APPROVE_ID,
+            "code_waits_for_yes",
+            "not_on",
+        ] {
+            assert!(told.get(none).is_none(), "{none}: {told}");
+        }
+        assert!(!crate::skill_write_yes::awaited(std::time::Instant::now()));
+        assert!(!told.to_string().contains("once you agree"), "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("Ask nothing and add no question"), "{next}");
+        assert!(
+            next.ends_with("\"Made sit hi. Say 'remove it' to undo.\""),
+            "{next}"
+        );
+        assert_eq!(
+            take_said_line().as_deref(),
+            Some("Made sit hi. Say 'remove it' to undo.")
+        );
+        // Its task's yes recorded for exactly the grants it was made with.
+        let recorded = tasks_recorded_here();
+        let [recorded] = recorded.as_slice() else {
+            panic!("{recorded:?}")
+        };
+        assert_eq!(recorded.grants.as_deref(), Some(&["speak".to_owned()][..]));
+        let entries = made_skill::entries(&keeping.directory);
+        assert_eq!(entries[0]["on"], true, "{entries:?}");
+        assert_eq!(entries[0]["uses"]["agent_task"], true, "{entries:?}");
+        // "remove it", within ten minutes, removes it.
+        let sha256 = entries[0]["sha256"].as_str().unwrap().to_owned();
+        let folder = keeping.installed.join("sit-hi");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join(".package.json"),
+            json!({ "sha256": sha256 }).to_string(),
+        )
+        .unwrap();
+        let remover = remove_helper(&keeping.manage);
+        let undone = crate::make_no_asks::undo(
+            &keeping,
+            crate::make_no_asks::LAST,
+            crate::app_make::now_unix_ms(),
+        );
+        assert_eq!(undone["removed"], "sit-hi", "{undone}");
+        assert_eq!(remover.join().unwrap()["remove"], "sit-hi");
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        set_tasks_here(None);
+        set_owner_here(None);
+        crate::make_no_asks::set_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A manage helper at `socket` that answers done once: the line asked.
+    fn remove_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
+        use std::io::BufRead;
+        let _ = std::fs::remove_file(socket);
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(&stream, r#"{{"done": "ok"}}"#).unwrap();
+            serde_json::from_str(&line).unwrap()
+        })
     }
 
     /// The 19:50 ruling and "do it like V1": judged a quick reaction,

@@ -2821,7 +2821,8 @@ pub struct Uses {
     /// Its one task is the lamp's agent's to do itself, its `run` the
     /// lamp's own ([`crate::make_no_cannot::RUN`], with
     /// `LAMP_MAKE_NO_CANNOT` on): said back as a task for the agent
-    /// ([`agent_said`]), and never on at once.
+    /// ([`agent_said`]), and never on at once but with `LAMP_MAKE_NO_ASKS`
+    /// ([`agent_said_as`]; the first builder, 01:26 on #7819).
     pub agent_task: bool,
 }
 
@@ -3041,8 +3042,16 @@ pub const RUNS_ONCE_AGREED: &str = " It runs only once you agree.";
 /// words (`crate::skill_task_yes::uses_said`), and [`RUNS_ONCE_AGREED`].
 /// What must be heard whole before the person's yes; never on at once.
 pub fn agent_said(grants: &[String]) -> String {
+    agent_said_as(grants, false)
+}
+
+/// [`agent_said`], `at_once` whether it goes on at once with no yes
+/// (`LAMP_MAKE_NO_ASKS`, [`crate::make_no_asks::keeps_no_yes`]; the first
+/// builder, 01:26 on #7819): then with no [`RUNS_ONCE_AGREED`].
+pub fn agent_said_as(grants: &[String], at_once: bool) -> String {
+    let waits = if at_once { "" } else { RUNS_ONCE_AGREED };
     format!(
-        " The lamp's agent does it, and {}.{RUNS_ONCE_AGREED}",
+        " The lamp's agent does it, and {}.{waits}",
         crate::skill_task_yes::uses_said(grants)
     )
 }
@@ -7013,9 +7022,17 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
         // (the camera, the microphone, who is in view, a message).
         let at_once = grants_go_on_at_once(&grants) && !writes && reaches_plainly(table).is_empty();
         // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`): said as one,
-        // and it always waits for the yes.
+        // waiting for the yes; with `LAMP_MAKE_NO_ASKS` on, one that sends
+        // nothing goes on at once with no yes (the first builder, 01:26 on
+        // #7819), so no wait is said ([`crate::make_no_asks::keeps_no_yes`]).
         if agent_task(table) {
-            said.push_str(&agent_said(&grants));
+            let messages = table
+                .get("permissions")
+                .and_then(|permissions| permissions.get("messages"))
+                .and_then(toml::Value::as_bool)
+                == Some(true);
+            let at_once = crate::make_no_asks::on() && !writes && !messages;
+            said.push_str(&agent_said_as(&grants, at_once));
         } else {
             said.push_str(&code_said_as(&grants, at_once));
         }
