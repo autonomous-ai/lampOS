@@ -1734,6 +1734,7 @@ pub fn plain_reason(why: &str) -> String {
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
         || why == UNRELATED
+        || why == crate::make_found::NOT_FOUND
     {
         return why.to_owned();
     }
@@ -10162,6 +10163,17 @@ const NOT_MADE_TOLD: &str = "Tell the person this, in the language of the conver
 pub fn tells_made(note: &str) -> bool {
     note.strip_prefix(ALREADY_DONE)
         .is_some_and(|told| !told.starts_with(NOT_MADE_TOLD))
+}
+
+/// All the lamp says of a make whose found check said what it looks up
+/// can't be found (`LAMP_MAKE_FOUND_CHECK`, #7680, [`crate::make_found`]):
+/// it was not made, and nothing is asked (the first builder's yes under
+/// the owner's no-asks rule).
+pub fn not_found_line(kind: &str, name: &str) -> String {
+    format!(
+        "I couldn't find a {kind} called {name}, so I didn't make it. Say the name again if it's \
+         different."
+    )
 }
 
 /// What the lamp says when a kept skill couldn't be put on: why, in the

@@ -48,6 +48,7 @@ const OWN_REDIRECTS: usize = 2;
 /// The most of an answer read.
 const MOST_BYTES: usize = 512 * 1024;
 
+#[derive(Clone)]
 enum Backend {
     DeepSeek {
         base: String,
@@ -111,6 +112,17 @@ impl Search {
                 url: url.to_owned(),
                 extra,
             },
+        })
+    }
+
+    /// The same search with a client of its own, for one asked on a
+    /// runtime of its own (`crate::make_found`): no connection is shared
+    /// with the voice's runtime.
+    pub fn alone(&self) -> Result<Self> {
+        Ok(Self {
+            client: http_client()?,
+            key: self.key.clone(),
+            backend: self.backend.clone(),
         })
     }
 

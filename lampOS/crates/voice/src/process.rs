@@ -1465,6 +1465,10 @@ fn worker_command(
             role,
             var(crate::make_no_asks::ENVIRONMENT).as_deref(),
         ))
+        .envs(make_found_worker_environment(
+            role,
+            var(crate::make_found::ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1703,6 +1707,17 @@ fn make_no_asks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::make_no_asks::ENVIRONMENT, "on"))
+}
+
+// A make's found check (#7680, `make_found::on`), passed the same narrow
+// way: the exact `on`, to the second route alone, whose worker has the
+// voice's search the check asks.
+fn make_found_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::make_found::ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -3163,6 +3178,7 @@ mod tests {
                 crate::make_no_asks::ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
+            (crate::make_found::ENVIRONMENT, ["second"].as_slice()),
         ] {
             let only = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             for role in ["second", "provider", "capture", "speaker"] {

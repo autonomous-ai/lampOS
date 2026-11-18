@@ -1187,6 +1187,12 @@ fn make_with_by(
             });
         }
     };
+    // A voice make may check once that what it looks up can be found
+    // (`LAMP_MAKE_FOUND_CHECK`, #7680): its search begins as the one more
+    // call's `looks up:` line is read ([`crate::make_found::begin`]), it is
+    // waited for before that task is kept ([`agent_task`]), and whatever
+    // is left is dropped with this make.
+    let _found = crate::make_found::Armed::new();
     let made = make_kept_heard(
         request,
         heard,
@@ -1246,6 +1252,20 @@ fn make_with_by(
                 "Say exactly this and nothing else: {}",
                 made_skill::UNRELATED
             )
+        });
+    }
+    // Not found by its check (#7680, `LAMP_MAKE_FOUND_CHECK`, the first
+    // builder's yes under the no-asks rule): nothing was kept and nothing
+    // waits; the lamp says the one plain line alone, no question in it.
+    if let Err(Refused(why, _)) = &made
+        && why == crate::make_found::NOT_FOUND
+    {
+        let line = crate::make_found::take_not_found_line()
+            .unwrap_or_else(|| made_skill::NOT_MADE_TRY.to_owned());
+        MADE_LINE.with(|kept| kept.replace(Some((line.clone(), Outcome::Failed))));
+        return json!({
+            "error": line,
+            "next": format!("Say exactly this and nothing else: {line}")
         });
     }
     let needs = made
@@ -3323,7 +3343,11 @@ fn net_made(
 /// asked of the lamp's own model in one more call (`chat`, begun only while
 /// one round still fits [`longest_make`]), kept through the make's own
 /// checks (`kept`), or only asked for, kept from `from` in `keeping` as an
-/// agent skill ([`made_skill::keep_agent_asked`]).
+/// agent skill ([`made_skill::keep_agent_asked`]). With
+/// `LAMP_MAKE_FOUND_CHECK` on, a task granted `net` that named what it
+/// looks up is kept only once its check said it isn't `not_found`
+/// ([`crate::make_found::refused`], #7680): before anything is written,
+/// so a thing that can't be found leaves the lamp's skills as they were.
 fn agent_task(
     request: &str,
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
@@ -3331,6 +3355,10 @@ fn agent_task(
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     (from, keeping): (&str, &Keeping),
 ) -> Result<Made, Refused> {
+    let kept_found = |answer: Result<String, String>| match crate::make_found::refused(chat) {
+        Some(refused) => Err(refused),
+        None => kept(answer),
+    };
     crate::make_no_cannot::made(
         request,
         |brief| {
@@ -3341,8 +3369,11 @@ fn agent_task(
             )
         },
         || began.elapsed() + ROUND_WITHIN <= longest_make(),
-        kept,
-        |files, words| made_skill::keep_agent_asked(files, from, keeping, words),
+        &kept_found,
+        |files, words| match crate::make_found::refused(chat) {
+            Some(refused) => Err(refused),
+            None => made_skill::keep_agent_asked(files, from, keeping, words),
+        },
         // Only a hint: the model decides by naming the grant (the lead's
         // rule; the first builder on #7261).
         crate::make_skill_agent::service_hint(request),
@@ -4576,10 +4607,12 @@ light = { dim = 1 }
                     };
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
-                    // A make's brief, or its judge's question (#7621).
+                    // A make's brief, its judge's question (#7621), or its
+                    // found check's question (#7680).
                     assert!(
                         body.contains(made_skill::BRIEF_HEAD)
-                            || body.contains("Does the made skill do what was asked?"),
+                            || body.contains("Does the made skill do what was asked?")
+                            || body.contains("found, not_found or unsure"),
                         "{body}"
                     );
                     assert!(!body.contains("\"tools\""), "{body}");
@@ -10214,5 +10247,336 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(system(), system_net(made_skill::reads_on(), false, true));
         assert!(whole("internet: the price".to_owned(), true).is_ok());
         net_make_here(None);
+    }
+
+    /// `LAMP_TASK_NET` and what a task for the lamp's agent needs, with
+    /// `LAMP_MAKE_FOUND_CHECK` as `found` for this test's thread (#7680);
+    /// none clears them all, the fakes too.
+    fn found_make_here(on: Option<bool>, found: Option<bool>) {
+        net_make_here(on);
+        crate::make_found::set_on_here(found);
+        if on.is_none() {
+            crate::make_found::set_search_here(None);
+            crate::make_found::set_judge_here(None);
+            crate::make_found::set_within_here(None);
+        }
+    }
+
+    /// A search that finds nothing, and a judge that answers `judge`.
+    fn found_fakes(judge: Option<&'static str>) {
+        crate::make_found::set_search_here(Some(Arc::new(|query: &str| {
+            assert!(!query.is_empty());
+            json!({"results": []})
+        })));
+        crate::make_found::set_judge_here(Some(Arc::new(move |_: &str| judge.map(str::to_owned))));
+    }
+
+    /// The person's make of a coin that doesn't exist (#7680, lamp-9adf).
+    const ZORBO: &str = "when I say zorbo price, check the zorbo coin price on the web and tell me";
+
+    /// The one more call's answer for [`ZORBO`], with what it looks up.
+    const ZORBO_ASKED: &str =
+        "name: zorbo-coin-price\ngrants: net, speak\nasks: zorbo price\nlooks up: coin | zorbo";
+
+    /// The same make on a trigger.
+    const ZORBO_DAILY: &str =
+        "check the zorbo coin price every day at eight in the morning and tell me";
+
+    fn zorbo_daily_answer() -> String {
+        format!(
+            "{}looks up: coin | zorbo\n",
+            plant_answer("net, speak").replace("plant-check", "zorbo-daily")
+        )
+    }
+
+    /// Every file under `root`, but the made counts' own (flushed by a
+    /// thread of the process's, whenever): what a make kept, or didn't.
+    fn files_under(root: &Path) -> Vec<PathBuf> {
+        let mut files = Vec::new();
+        let mut left = vec![root.to_path_buf()];
+        while let Some(at) = left.pop() {
+            for entry in std::fs::read_dir(&at).into_iter().flatten().flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.contains("counts") {
+                    continue;
+                }
+                if path.is_dir() {
+                    left.push(path.clone());
+                }
+                files.push(path);
+            }
+        }
+        files.sort();
+        files
+    }
+
+    /// #7680, its switch on, the first builder's yes under the no-asks
+    /// rule: a make that looks up a coin no search finds is not made, asked
+    /// for by its words or on a trigger. Nothing is written (the made index
+    /// and every file kept as before), nothing waits for a yes (no
+    /// `approve_id`), and the tool's answer is the one plain line, no
+    /// question, the line a cut turn says too; one search.
+    #[test]
+    fn a_make_naming_an_unknown_coin_is_not_made_and_nothing_is_asked() {
+        let line = made_skill::not_found_line("coin", "zorbo");
+        assert_eq!(
+            line,
+            "I couldn't find a coin called zorbo, so I didn't make it. Say the name again if \
+             it's different."
+        );
+        assert!(!line.contains('?'), "{line}");
+        for (index, (request, answer)) in [
+            (ZORBO, ZORBO_ASKED.to_owned()),
+            (ZORBO_DAILY, zorbo_daily_answer()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            found_make_here(Some(true), Some(true));
+            found_fakes(Some("not_found"));
+            let before = crate::make_found::searches_here();
+            let (root, keeping) = keeping(&format!("found-unknown-{index}"));
+            let files = files_under(&root);
+            let (url, served) = service(vec![
+                (200, "internet: the zorbo coin price".to_owned()),
+                (200, answer),
+            ]);
+            let told = make_with(0, None, request, &keeping, chat_at(url), NOW, || None);
+            assert_eq!(served.join().unwrap(), 2, "{index}: {told}");
+            assert_eq!(crate::make_found::searches_here() - before, 1, "{index}");
+            assert_eq!(
+                told,
+                json!({
+                    "error": line,
+                    "next": format!("Say exactly this and nothing else: {line}")
+                }),
+                "{index}"
+            );
+            assert!(
+                told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
+                "{index}"
+            );
+            assert_eq!(take_said_line().as_deref(), Some(line.as_str()), "{index}");
+            assert!(
+                made_skill::entries(&keeping.directory).is_empty(),
+                "{index}"
+            );
+            assert_eq!(files_under(&root), files, "{index}: nothing kept");
+            assert!(
+                !crate::skill_write_yes::awaited(std::time::Instant::now()),
+                "{index}: nothing waits"
+            );
+            assert_eq!(crate::make_found::take_not_found_line(), None, "{index}");
+            found_make_here(None, None);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// #7680: with `LAMP_MAKE_FOUND_CHECK` off, the same make of a coin a
+    /// check would find nowhere is made as before: kept and put on, no
+    /// search, nothing said of a name.
+    #[test]
+    fn with_the_switch_off_an_unknown_coin_is_made_as_before() {
+        found_make_here(Some(true), Some(false));
+        found_fakes(Some("not_found"));
+        let before = crate::make_found::searches_here();
+        let (root, keeping) = keeping("found-off");
+        let helper = manage_helper(&keeping.manage);
+        let (url, served) = service(vec![
+            (200, "internet: the zorbo coin price".to_owned()),
+            (200, ZORBO_ASKED.to_owned()),
+        ]);
+        let told = make_with(0, None, ZORBO, &keeping, chat_at(url), NOW, || None);
+        assert_eq!(served.join().unwrap(), 2, "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(crate::make_found::searches_here(), before);
+        assert_eq!(told["made"], "zorbo-coin-price", "{told}");
+        assert_eq!(told["on"], true, "{told}");
+        assert!(any_on(&keeping.directory));
+        let line = made_skill::not_found_line("coin", "zorbo");
+        assert!(!told.to_string().contains(&line), "{told}");
+        let _ = take_said_line();
+        found_make_here(None, None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7680: the same make of a coin the search finds is made exactly as
+    /// with the switch off: asked for by its words, kept and put on, told
+    /// the same; one search with it on, none off.
+    #[test]
+    fn a_make_naming_a_known_coin_is_made_as_now() {
+        let bitcoin = format!("{BITCOIN_ASKED}\nlooks up: coin | bitcoin");
+        let mut told_as = Vec::new();
+        for found in [false, true] {
+            found_make_here(Some(true), Some(found));
+            found_fakes(Some("found"));
+            let before = crate::make_found::searches_here();
+            let (root, keeping) = keeping(&format!("found-known-{found}"));
+            let helper = manage_helper(&keeping.manage);
+            let (url, served) = service(vec![
+                (200, "internet: the Bitcoin price".to_owned()),
+                (200, bitcoin.clone()),
+            ]);
+            let told = make_with(0, None, BITCOIN, &keeping, chat_at(url), NOW, || None);
+            assert_eq!(served.join().unwrap(), 2, "{told}");
+            assert!(helper.join().unwrap()["install_made"].is_string());
+            assert_bitcoin_kept(&told, &keeping);
+            assert_eq!(
+                crate::make_found::searches_here() - before,
+                usize::from(found),
+                "{found}"
+            );
+            told_as.push(told);
+            let _ = take_said_line();
+            found_make_here(None, None);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        assert_eq!(told_as[0], told_as[1]);
+    }
+
+    /// #7680: a make with no `net` grant, one that only speaks or lights,
+    /// is never checked, even with a `looks up:` line: no search at all.
+    #[test]
+    fn a_make_that_only_speaks_or_lights_is_never_checked() {
+        no_cannot_here(Some(true));
+        crate::make_found::set_on_here(Some(true));
+        found_fakes(Some("not_found"));
+        let before = crate::make_found::searches_here();
+        let (root, keeping) = keeping("found-no-net");
+        let (url, served) = service(vec![
+            (200, "cannot: a skill can't look at a plant.".to_owned()),
+            (
+                200,
+                format!(
+                    "{}looks up: place | my desk\n",
+                    plant_answer("light, speak")
+                ),
+            ),
+        ]);
+        let told = make(PLANT, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap(), 2, "{told}");
+        assert_eq!(told["made"], "plant-check", "{told}");
+        assert_eq!(crate::make_found::searches_here(), before);
+        let line = made_skill::not_found_line("place", "my desk");
+        assert!(!told.to_string().contains(&line), "{told}");
+        let _ = take_said_line();
+        no_cannot_here(None);
+        found_make_here(None, None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7680: the check fails open. An unsure judge, a judge or a search
+    /// past its bound, a failed search, or no search at all make the
+    /// unknown coin as with the switch off: kept and put on, nothing held.
+    #[test]
+    fn an_unsure_or_timed_out_check_makes_it_as_now() {
+        type Search = Option<Arc<dyn Fn(&str) -> Value + Send + Sync>>;
+        let none: Search = None;
+        let results: Search = Some(Arc::new(|_: &str| json!({"results": []})));
+        let failed: Search = Some(Arc::new(
+            |_: &str| json!({"error": "the search failed: 500"}),
+        ));
+        let late: Search = Some(Arc::new(|_: &str| {
+            std::thread::sleep(Duration::from_millis(600));
+            json!({"results": []})
+        }));
+        for (index, (search, judge)) in [
+            (results.clone(), Some("unsure")),
+            (results, None),
+            (late, Some("not_found")),
+            (failed, Some("not_found")),
+            (none, Some("not_found")),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            found_make_here(Some(true), Some(true));
+            crate::make_found::set_within_here(Some(Duration::from_millis(200)));
+            crate::make_found::set_search_here(search);
+            crate::make_found::set_judge_here(Some(Arc::new(move |_: &str| {
+                judge.map(str::to_owned)
+            })));
+            let before = crate::make_found::searches_here();
+            let (root, keeping) = keeping(&format!("found-open-{index}"));
+            let helper = manage_helper(&keeping.manage);
+            let (url, served) = service(vec![
+                (200, "internet: the zorbo coin price".to_owned()),
+                (200, ZORBO_ASKED.to_owned()),
+            ]);
+            let told = make_with(0, None, ZORBO, &keeping, chat_at(url), NOW, || None);
+            assert_eq!(served.join().unwrap(), 2, "{index}: {told}");
+            assert!(
+                helper.join().unwrap()["install_made"].is_string(),
+                "{index}"
+            );
+            assert_eq!(crate::make_found::searches_here() - before, 1, "{index}");
+            assert_eq!(told["made"], "zorbo-coin-price", "{index}: {told}");
+            assert_eq!(told["on"], true, "{index}: {told}");
+            assert!(told.get("code_waits_for_yes").is_none(), "{index}: {told}");
+            assert!(any_on(&keeping.directory), "{index}");
+            let _ = take_said_line();
+            found_make_here(None, None);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// #7680, rule 7: what the check adds to a `net` make, printed. With a
+    /// search and a judge that answer at once, the make with the switch on
+    /// against off; with a search that never answers, the check gives up
+    /// at its bound ([`crate::make_found::SEARCH_WITHIN`]) and the judge is
+    /// never asked.
+    #[test]
+    fn the_found_checks_added_latency_is_bounded() {
+        let mut took = Vec::new();
+        for found in [false, true] {
+            found_make_here(Some(true), Some(found));
+            found_fakes(Some("found"));
+            let (root, keeping) = keeping(&format!("found-latency-{found}"));
+            let helper = manage_helper(&keeping.manage);
+            let (url, served) = service(vec![
+                (200, "internet: the Bitcoin price".to_owned()),
+                (200, format!("{BITCOIN_ASKED}\nlooks up: coin | bitcoin")),
+            ]);
+            let began = std::time::Instant::now();
+            let told = make_with(0, None, BITCOIN, &keeping, chat_at(url), NOW, || None);
+            took.push(began.elapsed());
+            assert_eq!(served.join().unwrap(), 2, "{told}");
+            helper.join().unwrap();
+            let _ = take_said_line();
+            found_make_here(None, None);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        crate::make_found::set_search_here(Some(Arc::new(|_: &str| {
+            std::thread::sleep(crate::make_found::SEARCH_WITHIN + Duration::from_secs(1));
+            json!({"results": []})
+        })));
+        crate::make_found::set_judge_here(Some(Arc::new(|_: &str| -> Option<String> {
+            panic!("judged")
+        })));
+        crate::make_found::set_on_here(Some(true));
+        let chat = Arc::new(|| -> Result<Chat, String> { Err("no chat".into()) });
+        let began = std::time::Instant::now();
+        let late = crate::make_found::found("coin", "zorbo", chat);
+        let at_bound = began.elapsed();
+        assert_eq!(
+            late,
+            crate::make_found::Found::Unknown("the search timed out")
+        );
+        println!(
+            "#7680 found check: a net make off {} ms, on {} ms (search and judge at once); a \
+             search that never answers given up at {} ms (bound {} ms, the judge's {} ms)",
+            took[0].as_millis(),
+            took[1].as_millis(),
+            at_bound.as_millis(),
+            crate::make_found::SEARCH_WITHIN.as_millis(),
+            crate::make_found::JUDGE_WITHIN.as_millis()
+        );
+        assert!(
+            at_bound >= crate::make_found::SEARCH_WITHIN
+                && at_bound < crate::make_found::SEARCH_WITHIN + Duration::from_millis(500),
+            "{at_bound:?}"
+        );
+        found_make_here(None, None);
     }
 }

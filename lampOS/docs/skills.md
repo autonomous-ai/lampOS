@@ -6013,6 +6013,45 @@ the same code for both writers.
   internet", and waiting for the spoken yes. Its run gets its way out only
   with that kept yes, as any `net` run (docs/tasks.md). Off, the prompt is
   as before, byte for byte.
+- **A make that looks a thing up checks once that it can be found, with
+  `LAMP_MAKE_FOUND_CHECK=on`** (#7680; off unless `on`, lamp-voice alone
+  reads it, in no product unit; `crate::make_found`). On lamp-9adf, 18 Nov,
+  "…the price of zorbo coin every morning" made `zorbo-coin-price` and put
+  it on in 2.8 s, and no such coin exists. With the switch on, the one more
+  call (`make_no_cannot::system`) may add one line, `looks up:` and its
+  kind, one of coin, stock, place or site, then `|` and the name as the
+  person said it (`looks up: coin | zorbo`), which `make_no_cannot::read`
+  takes beside the answer. Only a voice make whose task is granted `net`
+  and gave that line is checked, once, at make time: one search through
+  the voice's own search (`LAMP_SECOND_SEARCH`, the second route's worker)
+  of `"<name> <kind>"`, or of the name alone when it already ends with its
+  kind ("zorbo coin", never "zorbo coin coin"; `LooksUp::query`), begun the
+  moment the line is read and bounded at 3 s (`make_found::SEARCH_WITHIN`);
+  then one judge call on the make's own chat, bounded at 3 s
+  (`make_found::JUDGE_WITHIN`), answering `found`, `not_found` or `unsure`.
+  Both are waited for just before the task is kept
+  (`make_skill_local::agent_task`, `make_found::refused`). At most 6 s are
+  added, and only to such makes. Under the owner's no-asks rule (the first
+  builder's yes on #7680, 18 Nov 18:44), `not_found` is not made and
+  nothing is asked: asked for by its words or on a trigger, nothing is
+  written (the skills and the made index stay as they were), nothing waits
+  for a yes, and the lamp says one plain line alone, no question: "I
+  couldn't find a coin called zorbo, so I didn't make it. Say the name
+  again if it's different." (`made_skill::not_found_line`; the tool's
+  answer is that line as its `error` and "Say exactly this and nothing
+  else", the line a cut turn says too). Saying the name again is a new ask,
+  checked anew. Found, no search on the route, a timeout, an error or
+  `unsure` make it as before, with its one-line undo: the check fails open,
+  so a real coin is never lost to a slow search. A make with no `net`
+  grant (one that only speaks or lights) is never searched for, nor is the
+  app's make. Only the query leaves the lamp, through the search the voice
+  already uses for questions; the journal names the kind, never the name:
+  `lamp-voice: a skill made here: it looks a coin up by name: checked
+  once: found|not_found|unknown (why), N ms`, on `not_found` `…: not found:
+  not made, nothing asked`, and the make's own line `…wasn't kept in N ms:
+  what it looks up by name can't be found (LAMP_MAKE_FOUND_CHECK), so it
+  wasn't made` (`make_found::NOT_FOUND`). Off, the one more call's prompt
+  and its parse are as before, byte for byte.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the

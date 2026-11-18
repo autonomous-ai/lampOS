@@ -2556,6 +2556,13 @@ pub fn serve(
     // A web search as functions of its own, with LAMP_SECOND_SEARCH:
     // declared beside the lamp's tools and answered here.
     let search = search_for(&config, route, credentials.as_deref())?.map(Arc::new);
+    // A skill made by this worker's chat checks once that what it looks up
+    // can be found (`LAMP_MAKE_FOUND_CHECK`, #7680), through this search.
+    if tools.make_skill
+        && let Some(search) = &search
+    {
+        crate::make_found::set_search(Arc::clone(search));
+    }
     let searched = search
         .as_ref()
         .map(|search| search.declarations())

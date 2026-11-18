@@ -408,6 +408,14 @@ asks: take a desk photo";
 const ASKED_EXAMPLE_ASKED: &str =
     "when I say take a desk photo, take a photo of my desk and tell me what's on it";
 
+/// What the one more call is told of a task that looks one named thing
+/// up, with `LAMP_MAKE_FOUND_CHECK` on ([`crate::make_found`]): one more
+/// line, read by [`read`] into [`take_looks_up`].
+pub const LOOKS_UP_TOLD: &str = " When the task looks up one thing the person named by its \
+     name, a coin, a stock, a place or a site, add a line looks up: and its kind, one of coin, \
+     stock, place or site, then | and the name as the person said it (\"looks up: coin | \
+     bitcoin\").";
+
 /// What the lamp's own model is told for the one more call: it picks the
 /// name, the fewest grants and when the task runs, never the task or code.
 pub fn system() -> String {
@@ -428,11 +436,16 @@ pub fn system() -> String {
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
-         words (\"needs: paying for things\"). A whole answer, \
+         words (\"needs: paying for things\").{looks_up} A whole answer, \
          for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
          {ASKED_EXAMPLE}\n",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
+        looks_up = if crate::make_found::on() {
+            LOOKS_UP_TOLD
+        } else {
+            ""
+        },
     )
 }
 
@@ -493,8 +506,42 @@ const NOT_THE_FORM: &str = "answer a line name:, a line grants: and either one f
                             skill.toml block holding only [permissions] topics and one \
                             [trigger], or a line asks:; or only needs: and what";
 
+/// What the last [`read`] on this thread took from a `looks up:` line
+/// (`LAMP_MAKE_FOUND_CHECK`, [`crate::make_found`]), taken.
+pub fn take_looks_up() -> Option<crate::make_found::LooksUp> {
+    LOOKS_UP.with(std::cell::RefCell::take)
+}
+
+thread_local! {
+    /// What the last [`read`] on this thread took from a `looks up:` line,
+    /// until [`take_looks_up`] takes it.
+    static LOOKS_UP: std::cell::RefCell<Option<crate::make_found::LooksUp>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// With `LAMP_MAKE_FOUND_CHECK` on, the check of what a task granted `net`
+/// looks up (`looks_up`) begun now ([`crate::make_found::begin`]), and
+/// waited for just before the task is kept
+/// (`make_skill_local::agent_task`); a task with no `net` grant is never
+/// checked.
+fn found_begun(looks_up: Option<crate::make_found::LooksUp>, grants: &[String]) {
+    if let Some(looks_up) = looks_up
+        && grants
+            .iter()
+            .any(|grant| grant == crate::skill_task_yes::NET.0)
+    {
+        crate::make_found::begin(looks_up);
+    }
+}
+
 /// `answer` read as [`Answer`]; else what a repair is told.
 pub fn read(answer: &str) -> Result<Answer, String> {
+    // What it looks up, with `LAMP_MAKE_FOUND_CHECK` on alone: off, the
+    // line is passed over as any other, as before.
+    let found = crate::make_found::on();
+    if found {
+        LOOKS_UP.with(|looks_up| looks_up.replace(None));
+    }
     let mut name = None;
     let mut grants = None;
     let mut asks: Vec<String> = Vec::new();
@@ -523,6 +570,10 @@ pub fn read(answer: &str) -> Result<Answer, String> {
         let lower = trimmed.to_lowercase();
         if let Some(rest) = after_head(trimmed, "needs:") {
             return Ok(Answer::Uncovered(missing(rest)));
+        }
+        if found && let Some(rest) = after_head(trimmed, "looks up:") {
+            LOOKS_UP.with(|looks_up| looks_up.replace(crate::make_found::LooksUp::read(rest)));
+            continue;
         }
         if let Some(rest) = after_head(trimmed, "asks:") {
             for said in rest.split('|').filter_map(phrase) {
@@ -861,7 +912,9 @@ pub fn made(
                 return Err(Refused::new(made_skill::MODEL_SILENT));
             }
         };
-        let lines = match read(&answer) {
+        let read_answer = read(&answer);
+        let looks_up = take_looks_up();
+        let lines = match read_answer {
             Ok(Answer::Uncovered(uncovered)) => return Err(uncovered.refused()),
             Ok(Answer::Skill {
                 name,
@@ -882,6 +935,7 @@ pub fn made(
                 if task_cut(request) {
                     return Err(Uncovered::TooLong.refused());
                 }
+                found_begun(looks_up, &grants);
                 let made = kept_asked(&asked_files(&name, &asks, &grants, &words), &words);
                 if made.is_ok() {
                     eprintln!(
@@ -903,6 +957,7 @@ pub fn made(
                         Ok(grants) => grants,
                         Err(uncovered) => return Err(uncovered.refused()),
                     };
+                    found_begun(looks_up, &grants);
                     last = kept(Ok(skill_text(&name, &grants, &block, &words)));
                     match &last {
                         Ok(_) => {
@@ -1465,5 +1520,62 @@ mod tests {
         ] {
             assert!(system.contains(part), "{part}");
         }
+    }
+
+    /// #7680, `LAMP_MAKE_FOUND_CHECK` on: a `looks up:` line beside the
+    /// answer is taken through the thread-local, once, and the answer
+    /// itself reads as it does without it, asked for or on a trigger.
+    #[test]
+    fn read_takes_a_looks_up_line() {
+        crate::make_found::set_on_here(Some(true));
+        for answer in [ASKED_EXAMPLE, EXAMPLE] {
+            let with = read(&format!("{answer}\nLooks up: Coin | zorbo"));
+            let taken = take_looks_up();
+            let without = read(answer);
+            assert!(with.is_ok(), "{with:?}");
+            assert_eq!(with, without);
+            assert_eq!(
+                taken,
+                Some(crate::make_found::LooksUp {
+                    kind: "coin".into(),
+                    name: "zorbo".into()
+                })
+            );
+            assert_eq!(take_looks_up(), None, "taken once");
+        }
+        crate::make_found::set_on_here(None);
+    }
+
+    /// #7680: no `looks up:` line, one of a kind the lamp doesn't check,
+    /// or the switch off: none taken, and the answer reads as before.
+    #[test]
+    fn no_looks_up_line_is_none() {
+        crate::make_found::set_on_here(Some(true));
+        assert!(read(ASKED_EXAMPLE).is_ok());
+        assert_eq!(take_looks_up(), None);
+        let fruit = format!("{ASKED_EXAMPLE}\nlooks up: fruit | apple");
+        assert_eq!(read(&fruit), read(ASKED_EXAMPLE));
+        assert_eq!(take_looks_up(), None);
+        crate::make_found::set_on_here(Some(false));
+        let coin = format!("{ASKED_EXAMPLE}\nlooks up: coin | zorbo");
+        assert_eq!(read(&coin), read(ASKED_EXAMPLE));
+        assert_eq!(take_looks_up(), None);
+        crate::make_found::set_on_here(None);
+    }
+
+    /// #7680: with `LAMP_MAKE_FOUND_CHECK` off the one more call's prompt
+    /// is as before, byte for byte: the prompt on with its one sentence
+    /// left out, and no word of a `looks up:` line in it.
+    #[test]
+    fn switch_off_prompt_is_byte_for_byte() {
+        crate::make_found::set_on_here(Some(true));
+        let on = system();
+        crate::make_found::set_on_here(Some(false));
+        let off = system();
+        crate::make_found::set_on_here(None);
+        assert!(on.contains(LOOKS_UP_TOLD), "{on}");
+        assert_eq!(off, on.replacen(LOOKS_UP_TOLD, "", 1));
+        assert!(!off.contains("looks up"), "{off}");
+        assert_eq!(off, system());
     }
 }

@@ -2807,6 +2807,47 @@ cả hai người viết.
   lamp-9adf, 12/11 18:10, "every morning at eight, check the weather and tell
   me if I need an umbrella" được giữ là của DeepSeek, một skill chỉ nói
   "Check the weather now, please."
+- **Một lần tạo tra cứu một thứ theo tên sẽ kiểm tra một lần xem có tìm
+  thấy nó không, khi `LAMP_MAKE_FOUND_CHECK=on`** (#7680; tắt trừ khi là
+  `on`, chỉ lamp-voice đọc, chưa có trong unit sản phẩm nào;
+  `crate::make_found`). Trên lamp-9adf, 18/11, câu "…the price of zorbo
+  coin every morning" tạo `zorbo-coin-price` và bật nó trong 2,8 s, dù
+  không có đồng coin nào như vậy. Khi bật, lần gọi thêm
+  (`make_no_cannot::system`) có thể thêm một dòng, `looks up:` cùng loại
+  của nó, một trong coin, stock, place hoặc site, rồi `|` và cái tên như
+  người dùng đã nói (`looks up: coin | zorbo`), được `make_no_cannot::read`
+  lấy bên cạnh câu trả lời. Chỉ một lần tạo bằng giọng nói có task được
+  cấp `net` và có dòng đó mới được kiểm tra, một lần, lúc tạo: một lần tìm
+  qua chính công cụ tìm kiếm của giọng nói (`LAMP_SECOND_SEARCH`, worker
+  của tuyến thứ hai) với `"<name> <kind>"`, hoặc chỉ cái tên khi nó đã kết
+  thúc bằng loại của nó ("zorbo coin", không bao giờ "zorbo coin coin";
+  `LooksUp::query`), bắt đầu ngay khi dòng đó được đọc, giới hạn 3 s
+  (`make_found::SEARCH_WITHIN`); rồi một lần hỏi giám khảo trên chính chat
+  của lần tạo, giới hạn 3 s (`make_found::JUDGE_WITHIN`), trả lời `found`,
+  `not_found` hoặc `unsure`. Cả hai được chờ ngay trước khi task được giữ
+  (`make_skill_local::agent_task`, `make_found::refused`). Thêm tối đa 6 s,
+  và chỉ cho những lần tạo như vậy. Theo quy tắc không hỏi lại của chủ
+  sản phẩm (lời đồng ý của first builder trên #7680, 18/11 18:44),
+  `not_found` thì không tạo và không hỏi gì: dù được gọi bằng lời hay chạy
+  theo trigger, không gì được ghi (các skill và chỉ mục skill đã tạo vẫn
+  như cũ), không gì chờ lời đồng ý, và đèn chỉ nói một câu đơn giản, không
+  có câu hỏi: "I couldn't find a coin called zorbo, so I didn't make it.
+  Say the name again if it's different." (`made_skill::not_found_line`;
+  câu trả lời của tool là câu đó trong `error` cùng "Say exactly this and
+  nothing else", cũng là câu được nói khi lượt bị cắt). Nói lại cái tên là
+  một yêu cầu mới, được kiểm tra lại. Tìm thấy, không có công cụ tìm kiếm
+  trên tuyến, quá giờ, lỗi hay `unsure` thì tạo như trước, với câu hoàn tác
+  một dòng: phép kiểm tra mở khi lỗi, nên một đồng coin có thật không bao
+  giờ bị mất vì một lần tìm chậm. Một lần tạo không có quyền `net` (chỉ
+  nói hay chỉ bật đèn) không bao giờ được tìm, lần tạo trong ứng dụng cũng
+  vậy. Chỉ câu tìm kiếm rời khỏi đèn, qua công cụ tìm kiếm giọng nói vốn
+  dùng để trả lời câu hỏi; nhật ký chỉ ghi loại, không bao giờ ghi tên:
+  `lamp-voice: a skill made here: it looks a coin up by name: checked
+  once: found|not_found|unknown (why), N ms`, khi `not_found` thì `…: not
+  found: not made, nothing asked`, và dòng của chính lần tạo `…wasn't kept
+  in N ms: what it looks up by name can't be found (LAMP_MAKE_FOUND_CHECK),
+  so it wasn't made` (`make_found::NOT_FOUND`). Khi tắt, prompt của lần
+  gọi thêm và cách đọc nó vẫn như trước, từng byte.
 - **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
   câu cố định của nó, "I couldn't make that one."
   (`make_skill_agent::CANNOT_LINE`); với `LAMP_MAKE_NO_CANNOT=on` lời của nó
