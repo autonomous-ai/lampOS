@@ -3149,9 +3149,13 @@ lamp".
   The seal is `control.code`'s, under `info` `lampos/v1/monitor.link`, with
   `aad` the lamp's device id and the `request_id` joined by a newline. No
   key, a key that is not one, no `request_id`, or the dev monitor off: refused
-  before any code is made. lamp-peek not running or giving no code: "the dev
-  monitor did not answer on the lamp now". The code and the link are in no
-  journal line, error or clear part of the reply; the code rides only in the
+  before any code is made. A socket not there yet or refusing, as when the
+  app asks the moment `monitor.set` said on and lamp-peek has not bound it
+  yet (#6401: 43 ms early on lamp-0c89), is tried again every 100 ms for up
+  to 3 s. lamp-peek still not there after that, or giving no code: "the dev
+  monitor did not answer on the lamp now", the reason in the journal. The
+  code and the link are in no journal line, error or clear part of the
+  reply; the code rides only in the
   link's fragment, so the browser never sends it in a request line. The app
   shows the link and its QR; the page is on port 80, so the link names none.
 - **Words on the page:** with the switch on, the page shows the words anyone
@@ -3161,7 +3165,8 @@ lamp".
 
 Tests: `monitor::tests` (the switch, the set's line, the get from the
 drop-in, the link sealed, bound to the lamp and the request and refused
-before a code is made, lamp-peek giving none); setup's
+before a code is made, lamp-peek giving none, a socket that appears late
+waited for and one that never does refused once the wait passes); setup's
 `the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it` and
 `the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply`.
 
