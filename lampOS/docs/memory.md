@@ -1040,7 +1040,15 @@ fifty-three?" and "Want me to keep Thursday book club for you?" do; on
 lamp-06c1 on 5 Nov, S14, both were missed and the keep dropped). Their plain yes on the next spoken line,
 within `HELD_FORGET_FOR` (60 s), with their own face seen saying it and no
 other (`LAMP_EYES_SPEAKING`, `speaking_faces::seen_saying`), writes it in
-their scope, and the reply says it is kept. The yes may say the keep back
+their scope, and the reply says it is kept. With
+`LAMP_KEEP_QUIETLY_ONE_FACE=on` (on in the product unit; the memory owner's
+rule, "mouth detection only blocks the forget and nothing else"), their
+plain yes on a line theirs by the face-in-view rule
+(`ScopeLease::by_one_face`: their known face the one face in view, or the
+line carried and read as theirs, no face seen speaking it, no other voice
+heard) lets it go too, with no face seen saying it; another face seen
+speaking the yes, another person, a line with no such rule and every held
+forget's yes stay as above. The yes may say the keep back
 (`known_faces::plain_agreement_to_keep`): "Yes, please keep that.", "Keep
 it." alone, or "keep off" beside a yes, which is how speech to text heard
 "keep that" on lamp-06c1 (5 Nov, S14 run 14:21, request 424: "Yes. Please
