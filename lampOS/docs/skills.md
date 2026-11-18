@@ -5671,8 +5671,13 @@ the same code for both writers.
   path), reads `answer.md` back, mints no token and opens no skill-start
   run, and removes the session and the folder however the make ends
   ([tasks.md](tasks.md), "A voice make on OpenClaw, through the one run
-  path"). OpenClaw can run only skill-start, so its run skips the guide's
-  `lamp-skills pack`; the voice's checks and repairs are the same. A
+  path"). With V1's tools on (`LAMP_OPENCLAW_V1_TOOLS`, on in the
+  product) OpenClaw has V1's full exec (on the gateway, security full,
+  ask off, elevated), so its run gets the guide's `lamp-skills pack` check
+  as Hermes's does (`skill_make::gateway_checked_prompt`); with that switch `off`
+  OpenClaw can run only skill-start, so its run skips the check
+  (`gateway_guide`). Either way the voice's checks and repairs are the
+  same. A
   first `cannot:` naming none of the lamp's real limits
   (`made_skill::real_limit`) is asked once more, its reason quoted back
   with what a skill can do (`make_skill_local::cannot_asked_again`,
@@ -5809,26 +5814,32 @@ the same code for both writers.
     as lamp-tasks says the first hand-over's run started (never after a
     cut turn, and dropped if it can't be said within 15 s), then nothing
     until the lamp says the skill back or that it couldn't make it. With
-    the guide one answer may take up to 90 s, plus up to 5 s of lamp-tasks'
-    grace, and the agent's part up to 120 s with a repair. A voice repair
-    begins only while one more 90 s answer still ends within the 120 s, so
-    only after an answer that came within 30 s: after an answer of 60 s or
-    more no voice repair fits and the voice's check of that answer stands,
-    and both repairs happen only when the first answer and the first
-    repair together took 30 s or less. The fixes that usually fit are the
-    guide's own, inside the run.
+    the guide one answer may take up to 10 minutes, plus up to 5 s of
+    lamp-tasks' grace, and the agent's part up to 10 minutes 30 s with a
+    repair. A voice repair begins only while one more 10-minute answer
+    still ends within the 10 minutes 30 s, so only after an answer that
+    came within 30 s: after an answer of more than 30 s no voice repair
+    fits and the voice's check of that answer stands, and both repairs
+    happen only when the first answer and the first repair together took
+    30 s or less. The fixes that usually fit are the guide's own, inside
+    the run.
 - **No make run, no hand-over.** When lamp-tasks can't give that run (an
   older build with no make socket, `LAMP_SKILL_TASKS` off, or held and a
   Hermes wrapper without the network lines), the make is not handed over
   (`NotWritten::NoMakeRun`). DeepSeek's one answer's failure stands and is
   said plainly. The journal says "can't be run in a skill run's namespace
   here".
-- **A silent agent.** lamp-tasks kills the run's whole process group at
-  its 90 s. The voice waits that long and a little more (at most 5 s), and
-  its failure stands.
-- **Bounds.** Each of the agent's answers within 90 s
-  (`make_skill_agent::WRITE_WITHIN`, within lamp-tasks' most of 120 s,
-  `lamp_tasks::skill_make::MOST_WITHIN`). It was 45 s: on lamp-9adf, 14 Nov
+- **A silent agent.** lamp-tasks ends the run at the line's `within_ms`:
+  10 minutes with the guide (on in the product), 90 s without; a Hermes
+  run's whole process group is killed. The voice waits that long and a
+  little more (at most 5 s; on the one run path, where lamp-tasks counts
+  from the hand-over, up to twice the run's time and that grace,
+  `Agent::read_within`), and its failure stands.
+- **Bounds.** Each of the agent's answers within 10 minutes with the
+  guide (`make_skill_agent::GUIDED_WRITE_WITHIN`) and 90 s without
+  (`make_skill_agent::WRITE_WITHIN`), within lamp-tasks' most of 10
+  minutes (`lamp_tasks::skill_make::MOST_WITHIN`, #7245; 120 s before).
+  The 90 s was 45 s: on lamp-9adf, 14 Nov
   (build 12958), a make with code ran out at 45 s 2 of 2, where `hermes
   chat -q "Say OK."` alone takes about 24.5 s on that Orange Pi, about 13 s
   of it before Hermes's own session starts, and a gmail make with no
@@ -5836,11 +5847,13 @@ the same code for both writers.
   work once Hermes is up. A repair is begun only while one more answer
   fits the agent's 10 minutes 30 s (`make_skill_agent::MAKE_WITHIN`,
   #7245; 120 s before), so without the guide repairs have room.
-  No answer from it in 90 s, an error, or its first answer not given: the
+  No answer from it in its time (10 minutes with the guide, 90 s
+  without), an error, or its first answer not given: the
   make is not made, and what is said is DeepSeek's one answer's failure,
   which had no repairs (with an agent on the lamp DeepSeek gets none), so
   this is not today's failure after 3 repairs. A make can go on up to
-  240 s, which the second route's wait for a make's line follows
+  12 minutes 30 s (DeepSeek's 120 s and the agent's 10 minutes 30 s),
+  which the second route's wait for a make's line follows
   (`make_skill_local::longest_make`).
 - **What is heard.** "I'll make it now" is said at once, unchanged. Once
   lamp-tasks says the agent's first make run starts (it says so as it

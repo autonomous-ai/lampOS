@@ -2456,8 +2456,9 @@ order is kept. A written turn is the same from the chat on.
     answer and came back with no words, in a quiet room, is answered
     `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`), except while a
     skill an earlier line asked for by voice is still being made or its
-    line is still to be said, for at most `make_skill_local::MAKE_WITHIN`
-    (2 minutes) after its call (`Shared::quiet_for_a_make`, lamp-9adf, 11
+    line is still to be said, for at most `make_skill_local::longest_make`
+    (2 minutes; 12 minutes 30 s with the lamp's agent's make,
+    `LAMP_MAKE_SKILL_AGENT`) after its call (`Shared::quiet_for_a_make`, lamp-9adf, 11
     Nov; skills.md, "A cut while it is made"): then the lamp stays quiet,
     with `LAMP_CUT_IN_WORDLESS_RESUMES` too. With `LAMP_SAID_TO_ME` the
     question is asked only when a face was seen speaking through the cut;

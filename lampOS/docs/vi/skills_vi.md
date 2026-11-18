@@ -2482,9 +2482,14 @@ cả hai người viết.
   một thư mục tạo mới (đường chạy chung của #7133), đọc lại `answer.md`,
   không tạo token và không mở lần chạy skill-start nào, và xoá phiên cùng
   thư mục dù lần tạo kết thúc thế nào ([tasks_vi.md](tasks_vi.md), "Một lần
-  tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). OpenClaw chỉ
-  chạy được skill-start, nên lần chạy của nó bỏ `lamp-skills pack` của
-  hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` đầu
+  tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). Khi quyền
+  công cụ của V1 bật (`LAMP_OPENCLAW_V1_TOOLS`, bật trong sản phẩm), OpenClaw có
+  toàn quyền exec như V1 (trên gateway, security full, ask off, elevated),
+  nên lần chạy của nó có bước kiểm tra `lamp-skills pack` của hướng dẫn như lần
+  tạo của Hermes (`skill_make::gateway_checked_prompt`); khi công tắc đó
+  `off`, OpenClaw chỉ chạy được skill-start, nên lần chạy của nó bỏ bước
+  kiểm tra (`gateway_guide`). Dù thế nào, kiểm tra và sửa của giọng nói
+  vẫn như cũ. Một `cannot:` đầu
   tiên không nêu giới hạn thật nào của đèn (`made_skill::real_limit`) được
   hỏi lại một lần, trích lại lý do cùng những gì một kỹ năng làm được
   (`make_skill_local::cannot_asked_again`, `CANNOT_AGAIN_CAN`), chỉ khi
@@ -2626,12 +2631,12 @@ cả hai người viết.
     lamp-tasks báo lần chạy của lần giao đầu tiên đã bắt đầu (không bao giờ
     sau một lượt bị cắt, và bỏ qua nếu không nói được trong 15 giây), rồi
     im lặng cho đến khi đèn nói lại kỹ năng hoặc nói không tạo được. Với
-    hướng dẫn, một câu trả lời có thể mất tới 90 giây, cộng tối đa 5 giây
-    chờ thêm của lamp-tasks, và phần của agent tới 120 giây khi có một lần
-    sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả lời 90
-    giây vẫn kết thúc trong 120 giây, tức là chỉ sau một câu trả lời đến
-    trong 30 giây: sau một câu trả lời từ 60 giây trở lên thì không còn lần
-    sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
+    hướng dẫn, một câu trả lời có thể mất tới 10 phút, cộng tối đa 5 giây
+    chờ thêm của lamp-tasks, và phần của agent tới 10 phút 30 giây khi có
+    một lần sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả
+    lời 10 phút vẫn kết thúc trong 10 phút 30 giây, tức là chỉ sau một câu
+    trả lời đến trong 30 giây: sau một câu trả lời quá 30 giây thì không
+    còn lần sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
     đó giữ nguyên; cả hai lần sửa chỉ xảy ra khi câu trả lời đầu và lần sửa
     đầu cộng lại không quá 30 giây. Những lần sửa thường vừa là của chính
     hướng dẫn, bên trong lần chạy.
@@ -2641,12 +2646,17 @@ cả hai người viết.
   giao (`NotWritten::NoMakeRun`). Thất bại của một câu trả lời của DeepSeek
   vẫn giữ nguyên và được nói rõ ràng. Nhật ký ghi "can't be run in a skill
   run's namespace here".
-- **Agent im lặng.** lamp-tasks giết cả nhóm tiến trình của lần chạy khi
-  hết 90 giây. Giọng nói chờ chừng đó và thêm một chút (tối đa 5 giây), rồi
-  thất bại vẫn giữ nguyên.
-- **Giới hạn.** Mỗi câu trả lời của agent trong 90 giây
-  (`make_skill_agent::WRITE_WITHIN`, trong mức tối đa 120 giây của
-  lamp-tasks, `lamp_tasks::skill_make::MOST_WITHIN`). Trước đây là 45 giây:
+- **Agent im lặng.** lamp-tasks kết thúc lần chạy khi hết `within_ms` của
+  dòng: 10 phút khi có hướng dẫn (bật trong sản phẩm), 90 giây khi không;
+  với Hermes, cả nhóm tiến trình của lần chạy bị giết. Giọng nói chờ chừng
+  đó và thêm một chút (tối đa 5 giây; trên đường chạy chung, nơi
+  lamp-tasks tính từ lúc giao, tới gấp đôi thời gian của lần chạy cộng
+  phần chờ thêm đó, `Agent::read_within`), rồi thất bại vẫn giữ nguyên.
+- **Giới hạn.** Mỗi câu trả lời của agent trong 10 phút khi có hướng dẫn
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`) và 90 giây khi không
+  (`make_skill_agent::WRITE_WITHIN`), trong mức tối đa 10 phút của
+  lamp-tasks (`lamp_tasks::skill_make::MOST_WITHIN`, #7245; trước là 120
+  giây). Mức 90 giây trước đây là 45 giây:
   trên lamp-9adf, 14/11 (bản 12958), một lần tạo có code hết giờ ở 45 giây
   2 trên 2, trong khi riêng `hermes chat -q "Say OK."` đã mất khoảng 24,5
   giây trên Orange Pi đó, khoảng 13 giây trước khi phiên của Hermes bắt
@@ -2655,11 +2665,13 @@ cả hai người viết.
   sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 10 phút 30 giây của
   agent (`make_skill_agent::MAKE_WITHIN`, #7245; trước là 120 giây), nên
   khi không có hướng dẫn các lần sửa có chỗ.
-  Agent không trả lời trong 90 giây, lỗi, hay không có câu trả lời đầu: kỹ
+  Agent không trả lời trong thời gian của nó (10 phút khi có hướng dẫn, 90
+  giây khi không), lỗi, hay không có câu trả lời đầu: kỹ
   năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
   của DeepSeek, vốn không được sửa (khi đèn có agent DeepSeek không được sửa
   lần nào), nên đây không phải thất bại sau 3 lần sửa như hôm nay. Một lần
-  tạo có thể kéo dài tới 240 giây, và tuyến thứ hai chờ câu của lần tạo theo
+  tạo có thể kéo dài tới 12 phút 30 giây (120 giây của DeepSeek và 10 phút
+  30 giây của agent), và tuyến thứ hai chờ câu của lần tạo theo
   đúng mức đó (`make_skill_local::longest_make`).
 - **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
   lamp-tasks báo lần chạy tạo đầu tiên của agent bắt đầu (nó báo ngay khi
