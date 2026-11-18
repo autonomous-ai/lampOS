@@ -27,9 +27,10 @@
 //!   that turn was played through ([`heard_through`], [`heard`]) does it go
 //!   on as a finished make does; cut, it stays off and is told again. Not
 //!   put on then, its person is told why ([`not_on_line`]). One with code of
-//!   its own goes on the same way, by its yes's path with no yes asked, and
-//!   only while the lamp runs a skill's code (`LAMP_MADE_SCRIPTS`), else it
-//!   is said off; one that clashes is asked the clash's choice as a finished
+//!   its own goes on the same way, by its yes's path with no yes asked, only
+//!   as a finished make's would (`made_skill::code_goes_on_at_once`); one
+//!   that keeps its yes (it sends, or the camera, the microphone or
+//!   hearing) or that the lamp can't run is said ready and off, never on; one that clashes is asked the clash's choice as a finished
 //!   make is ([`told`]). Not back today, it is told the next time.
 //! - **A failure, the 10 minutes run out, or a restart** while it ran (the
 //!   mark kept `making`, [`after_start`]; run out, kept so once): one plain
@@ -623,16 +624,53 @@ pub fn may_tell(owner_alone: bool, quiet: bool, night: bool, someone_there: bool
 
 /// The most times one telling is offered (El's P2 on #7774): then it is
 /// left to `ready_untold` in the app's list and to "Is my skill ready?",
-/// the skill off until told, never said again and again.
+/// the skill off until told, never said again and again. Counted in
+/// [`OFFERS_FILE`], so a restart doesn't begin it again.
 pub const MOST_OFFERS: u32 = 3;
 
-/// The coordinator's side: the marks read off the made skills' folder, and
-/// each telling's offers so far, and when last.
+/// Beside the marks: how many times each telling was offered, by its key.
+pub const OFFERS_FILE: &str = "long-make-offers.json";
+
+/// The offers kept in `directory`, by key.
+fn offers(directory: &Path) -> std::collections::BTreeMap<String, u32> {
+    std::fs::read(directory.join(OFFERS_FILE))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// One more offer of the telling `key` kept in `directory`, the counts of
+/// tellings no longer marked (`marked`) dropped: how many now.
+fn offer_counted(directory: &Path, key: &str, marked: &[String]) -> u32 {
+    crate::made_skill::index_locked(directory, || {
+        let mut offers = offers(directory);
+        offers.retain(|offered, _| marked.contains(offered));
+        let times = offers.entry(key.to_owned()).or_default();
+        *times += 1;
+        let times = *times;
+        let kept = serde_json::to_vec(&offers)
+            .map_err(std::io::Error::other)
+            .and_then(|bytes| {
+                let new = directory.join(format!(".{OFFERS_FILE}.new"));
+                std::fs::write(&new, bytes)?;
+                std::fs::rename(&new, directory.join(OFFERS_FILE))
+            });
+        if let Err(error) = kept {
+            eprintln!("lamp-voice: a long make's offers were not kept: {error}");
+        }
+        times
+    })
+}
+
+/// The coordinator's side: the marks read off the made skills' folder,
+/// each telling's offers so far ([`OFFERS_FILE`]), and when each was
+/// offered last.
 pub struct Tells {
     directory: PathBuf,
     read_at: Option<Instant>,
     marks: Vec<State>,
-    offered: Vec<(String, Instant, u32)>,
+    times: std::collections::BTreeMap<String, u32>,
+    last: Vec<(String, Instant)>,
 }
 
 impl Tells {
@@ -648,15 +686,16 @@ impl Tells {
             directory,
             read_at: None,
             marks: Vec::new(),
-            offered: Vec::new(),
+            times: std::collections::BTreeMap::new(),
+            last: Vec::new(),
         }
     }
 
     /// The telling due at `now` and `now_ms`, its key and line: the first
     /// mark not under way that wasn't offered within [`OFFER_AGAIN_AFTER`],
     /// nor [`MOST_OFFERS`] times. The marks are read at most once per
-    /// [`READ_EVERY`]; a ready skill removed in the app since goes quietly
-    /// (El's P3 on #7774).
+    /// [`READ_EVERY`]; one whose skill was removed in the app since goes
+    /// quietly (El's P3 on #7774).
     fn due(&mut self, now: Instant, now_ms: u64) -> Option<(String, String)> {
         if self
             .read_at
@@ -665,27 +704,33 @@ impl Tells {
             self.read_at = Some(now);
             self.marks = marks(&self.directory, now_ms);
             let directory = &self.directory;
-            self.marks.retain(|state| match state {
-                State::Made { sha256, .. }
-                    if crate::made_skill::kept_by_sha256(directory, sha256).is_none() =>
-                {
-                    eprintln!("lamp-voice: a long make's skill was removed: its mark goes quietly");
-                    if let Some(key) = key(state) {
-                        let _ = take(directory, &key, now_ms);
-                    }
-                    false
+            self.marks.retain(|state| {
+                if !removed(directory, state) {
+                    return true;
                 }
-                _ => true,
+                eprintln!("lamp-voice: a long make's skill was removed: its mark goes quietly");
+                if let Some(key) = key(state) {
+                    let _ = take(directory, &key, now_ms);
+                }
+                false
             });
+            self.times = if self.marks.is_empty() {
+                Default::default()
+            } else {
+                offers(directory)
+            };
             let keys: Vec<String> = self.marks.iter().filter_map(key).collect();
-            self.offered.retain(|(key, ..)| keys.contains(key));
+            self.last.retain(|(key, _)| keys.contains(key));
         }
         self.marks.iter().find_map(|state| {
             let key = key(state)?;
-            let held = self.offered.iter().any(|(offered, last, times)| {
-                *offered == key
-                    && (*times >= MOST_OFFERS || now.duration_since(*last) < OFFER_AGAIN_AFTER)
-            });
+            let held = self
+                .times
+                .get(&key)
+                .is_some_and(|times| *times >= MOST_OFFERS)
+                || self.last.iter().any(|(offered, last)| {
+                    *offered == key && now.duration_since(*last) < OFFER_AGAIN_AFTER
+                });
             (!held).then_some(key).zip(tell_line(state))
         })
     }
@@ -700,19 +745,24 @@ impl Tells {
     /// `now_ms`, counted as offered; none with nothing to tell. Asked only
     /// once [`may_tell`] holds.
     pub fn next(&mut self, now: Instant, now_ms: u64) -> Option<String> {
-        let (key, line) = self.due(now, now_ms)?;
-        match self
-            .offered
-            .iter_mut()
-            .find(|(offered, ..)| *offered == key)
-        {
-            Some((_, last, times)) => {
-                *last = now;
-                *times += 1;
-            }
-            None => self.offered.push((key.clone(), now, 1)),
+        let (told, line) = self.due(now, now_ms)?;
+        let marked: Vec<String> = self.marks.iter().filter_map(key).collect();
+        let times = offer_counted(&self.directory, &told, &marked);
+        self.times.insert(told.clone(), times);
+        self.last.retain(|(offered, _)| *offered != told);
+        self.last.push((told.clone(), now));
+        Some(format!("{OPENS}{told}] Say only, in a few words: {line})"))
+    }
+}
+
+/// Whether the skill a mark tells of was removed in the app since: a
+/// made one, or one not put on, no longer kept.
+fn removed(directory: &Path, state: &State) -> bool {
+    match state {
+        State::Made { sha256, .. } | State::NotOn { sha256, .. } => {
+            crate::made_skill::kept_by_sha256(directory, sha256).is_none()
         }
-        Some(format!("{OPENS}{key}] Say only, in a few words: {line})"))
+        State::NotMade { .. } | State::Making { .. } => false,
     }
 }
 
@@ -776,16 +826,18 @@ fn ready_on_with(name: &str, also: &str) -> String {
 }
 
 /// Whether the ready skill `made`, its telling heard whole, goes on then
-/// ([`heard`]): with no code of its own and no clash; or with code, while
-/// this lamp runs a skill's code (`LAMP_MADE_SCRIPTS`,
-/// [`crate::made_skill::scripts_on`]), with no yes asked, by the path a
-/// yes puts it on by (`make_skill_local::code_on_at_once`).
+/// ([`heard`]): with no code of its own and no clash; or with code that may
+/// go on with no yes (`LAMP_MADE_CODE_ON_AT_ONCE`,
+/// [`crate::made_skill::code_goes_on_at_once`], by the path a yes puts it
+/// on by, `make_skill_local::code_on_at_once`), exactly as a finished make
+/// does. One that sends, or with the camera, the microphone or hearing,
+/// keeps its yes (Twelve's P2 on #7774): never put on here.
 fn goes_on_once_heard(
     keeping: &crate::made_skill::Keeping,
     made: &crate::made_skill::Made,
 ) -> bool {
     if made.uses.code {
-        crate::made_skill::scripts_on()
+        crate::made_skill::code_goes_on_at_once(made)
     } else {
         crate::made_clash::found(keeping, made).is_empty()
     }
@@ -847,6 +899,19 @@ pub fn told(
                     crate::made_skill::not_on_line(NO_CODE_HERE)
                 ));
             }
+            // Code that keeps its yes (it sends, or the camera, the
+            // microphone or hearing): never said on nor put on with no yes,
+            // as a finished make's isn't (Twelve's P2 on #7774).
+            if !on && made.uses.code && !crate::made_skill::code_goes_on_at_once(&made) {
+                eprintln!(
+                    "lamp-voice: request {request}: a long make's skill with code that keeps its yes is told ready and off"
+                );
+                return say_only(&format!(
+                    "{} {}",
+                    ready_line(&made.name),
+                    crate::made_skill::not_on_line(crate::made_skill::CODE_BY_VOICE)
+                ));
+            }
             if !on && !made.uses.code {
                 let clashes = crate::made_clash::found(keeping, &made);
                 if !clashes.is_empty() {
@@ -881,7 +946,16 @@ pub fn told(
             );
             say_only(&not_finished_line(name.as_deref()))
         }
-        State::NotOn { name, why, .. } => {
+        State::NotOn {
+            name, why, sha256, ..
+        } => {
+            if crate::made_skill::kept_by_sha256(directory, &sha256).is_none() {
+                eprintln!(
+                    "lamp-voice: request {request}: a long make's skill is gone: its mark goes quietly"
+                );
+                let _ = take(directory, asked, now_ms);
+                return "(Nobody has spoken. Say nothing, and call nothing.)".to_owned();
+            }
             eprintln!("lamp-voice: request {request}: a long make's skill not put on is told why");
             say_only(&not_on_line(&name, &why))
         }
@@ -910,37 +984,39 @@ pub fn told_here(request: u64, text: String) -> String {
 /// The mark `key` in `directory` at `now_ms` taken off, every other kept:
 /// it, or none when told already.
 fn take(directory: &Path, key_of_it: &str, now_ms: u64) -> Option<State> {
+    replace(directory, key_of_it, None, now_ms)
+}
+
+/// The mark `key` in `directory` at `now_ms` taken off, `with` kept in
+/// its place when some, in one write under the index's lock: it, or none
+/// when told already (nothing then changes).
+fn replace(directory: &Path, key_of_it: &str, with: Option<State>, now_ms: u64) -> Option<State> {
     crate::made_skill::index_locked(directory, || {
         let mut marks = marks(directory, now_ms);
         let at = marks
             .iter()
             .position(|state| key(state).as_deref() == Some(key_of_it))?;
-        let taken = marks.remove(at);
+        let taken = match with {
+            Some(with) => std::mem::replace(&mut marks[at], with),
+            None => marks.remove(at),
+        };
         write_all(directory, &marks);
         Some(taken)
     })
 }
 
-/// `state` kept beside the marks in `directory` at `now_ms`.
-fn add(directory: &Path, state: State, now_ms: u64) {
-    crate::made_skill::index_locked(directory, || {
-        let mut marks = marks(directory, now_ms);
-        marks.push(state);
-        write_all(directory, &marks);
-    });
-}
-
 /// The turn that told the news `key` was heard whole (the coordinator's
-/// proof a say's `spoken` takes): its person knows, so its mark is taken
-/// off, every other make's kept, and each is told once. A ready skill
-/// that goes on then ([`goes_on_once_heard`]) is put on now (`put_on`, as
-/// a finished make goes on), the index's lock not held while the helper is
-/// waited for; put on, or on already, `ready_untold` is taken off. Not put
-/// on, it stays off and `ready_untold`, and its person is told why at the
-/// next moment ([`not_on_line`]), never left thinking it is on. One that
-/// clashes waits for the choice asked in that turn. A turn cut or not
-/// heard whole calls nothing: the skill stays off, untold, and is told
-/// again next time.
+/// proof a say's `spoken` takes): its person knows. A ready skill that
+/// goes on then ([`goes_on_once_heard`]) is put on first (`put_on`, as a
+/// finished make goes on), the index's lock not held while the helper is
+/// waited for; only then is its mark taken off, every other make's kept,
+/// so a crash between leaves it told again, never lost (Twelve's P3 on
+/// #7774). Put on, or on already, `ready_untold` is taken off. Not put
+/// on, it stays off and `ready_untold`, and its mark becomes why
+/// ([`not_on_line`]), told at the next moment, never left thinking it is
+/// on. One that clashes waits for the choice asked in that turn; one that
+/// keeps its yes stays off. A turn cut or not heard whole calls nothing:
+/// the skill stays off, untold, and is told again next time.
 pub fn heard(
     keeping: &crate::made_skill::Keeping,
     told: &str,
@@ -948,11 +1024,14 @@ pub fn heard(
     put_on: impl FnOnce(&crate::made_skill::Made) -> Result<(), String>,
 ) {
     let directory = &keeping.directory;
-    let Some(taken) = take(directory, told, now_ms) else {
+    let Some(state) = marks(directory, now_ms)
+        .into_iter()
+        .find(|state| key(state).as_deref() == Some(told))
+    else {
         return;
     };
     eprintln!("lamp-voice: a long make's news was heard whole: told once");
-    match taken {
+    match state {
         State::Made { sha256, .. } => {
             let made = crate::made_skill::kept_by_sha256(directory, &sha256);
             let not_on = match &made {
@@ -969,24 +1048,31 @@ pub fn heard(
                     eprintln!(
                         "lamp-voice: a long make's skill, told ready, was not put on: {why}; its person is told why"
                     );
-                    add(
+                    replace(
                         directory,
-                        State::NotOn {
+                        told,
+                        Some(State::NotOn {
                             name: made.name,
                             sha256,
                             why,
                             ended_ms: now_ms,
-                        },
+                        }),
                         now_ms,
                     );
                 }
-                _ => crate::made_skill::mark(directory, &sha256, READY_UNTOLD, None),
+                _ => {
+                    crate::made_skill::mark(directory, &sha256, READY_UNTOLD, None);
+                    take(directory, told, now_ms);
+                }
             }
         }
         State::NotOn { sha256, .. } => {
             crate::made_skill::mark(directory, &sha256, READY_UNTOLD, None);
+            take(directory, told, now_ms);
         }
-        State::NotMade { .. } | State::Making { .. } => {}
+        State::NotMade { .. } | State::Making { .. } => {
+            take(directory, told, now_ms);
+        }
     }
 }
 

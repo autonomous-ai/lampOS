@@ -220,6 +220,10 @@ fn a_telling_is_offered_at_most_three_times() {
         }
     }
     assert_eq!(offered, MOST_OFFERS);
+    // Kept beside the marks: a restart doesn't begin the count again
+    // (Twelve's 19:40 P3).
+    let mut restarted = Tells::at(dir.0.clone());
+    assert!(!restarted.has_news(at, NOW + 3));
     assert_eq!(
         read(&dir.0, NOW + 3).map(|state| key(&state)),
         Some(Some(format!("not_made {}", NOW + 1))),

@@ -13177,6 +13177,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let code = json!({"code": true, "grants": ["light"], "light": true});
         let glow = "ef".repeat(32);
         made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
         kept_long(&keeping, 6_811_290, "desk-glow", &glow, code.clone());
         let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
         let at = std::time::Instant::now();
@@ -13193,6 +13194,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let mut put = false;
         crate::long_make::heard(&keeping, &key, NOW + 6_000, |made| {
             assert!(made.uses.code);
+            // Put on first, its mark still there (Twelve's P3 on #7774): a
+            // crash here leaves it told again, never lost.
+            assert!(crate::long_make::read(&keeping.directory, NOW + 6_000).is_some());
             put = true;
             made_skill::mark(&keeping.directory, &made.sha256, "on", Some(json!(true)));
             Ok(())
@@ -13219,7 +13223,87 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             panic!("never on with the lamp running no skill's code")
         });
         assert_ne!(entry_of(&keeping, &off)["on"], true);
+        made_skill::set_code_at_once_here(None);
         made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's 19:40 P2 on #7774: a long make of a skill with code that
+    /// sends keeps its yes as a finished make's does, the switch to put
+    /// code on at once or not: told ready and why it's off, never "on",
+    /// never put on, and no task yes recorded with nobody's yes.
+    #[test]
+    fn a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-sends");
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        let btc = "78".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_330,
+            "btc-price",
+            &btc,
+            json!({"code": true, "grants": ["speak"], "messages": true, "speak": true}),
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_331, note, (NOW + 5_000, at), || None);
+        assert!(
+            said.contains(&format!(
+                "Your btc price skill is ready. {}",
+                made_skill::not_on_line(made_skill::CODE_BY_VOICE)
+            )),
+            "{said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| {
+            panic!("a send keeps its yes: never put on, its task's yes never recorded")
+        });
+        assert_ne!(entry_of(&keeping, &btc)["on"], true);
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 7_000),
+            None
+        );
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's 19:40 P3 on #7774: a mark that a skill couldn't be put on,
+    /// its skill removed in the app since, goes quietly, as a made one's.
+    #[test]
+    fn a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-not-on-gone");
+        let sip = "9a".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_340,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| Err("the check".into()));
+        assert!(matches!(
+            crate::long_make::read(&keeping.directory, NOW + 7_000),
+            Some(crate::long_make::State::NotOn { .. })
+        ));
+        // Removed in the app.
+        std::fs::write(keeping.directory.join(made_skill::INDEX), b"[]").unwrap();
+        assert!(!tells.has_news(at + Duration::from_secs(5), NOW + 8_000));
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 9_000),
+            None
+        );
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
