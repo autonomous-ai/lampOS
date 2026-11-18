@@ -4239,11 +4239,43 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   - **Checked before anything is made** (`skill_task::takes_net_runs`):
     the default agent's wrapper carries `ONE_PATH_EGRESS_LINES` and
     Hermes's make-home line, and the agent namespace the egress lines and
-    Hermes's make lines. Otherwise, a gateway default (OpenClaw: its turns
-    run in its gateway's namespaces, shared by every turn, which no one run
-    can be held in), `LAMP_TASK_NET` off in lamp-tasks, or the lamp's
-    Hermes not yet on the one run path's wrapper (#6898's round): refused
-    in `skill_task::NET_REFUSED`'s words, nothing made, asked or started.
+    Hermes's make lines. Otherwise, a gateway default with
+    `LAMP_TASK_NET_GATEWAY` off (OpenClaw: its turns run in its gateway's
+    namespaces, shared by every turn, which no one run can be held in),
+    `LAMP_TASK_NET` off in lamp-tasks, or the lamp's Hermes not yet on the
+    one run path's wrapper (#6898's round): refused in
+    `skill_task::NET_REFUSED`'s words, nothing made, asked or started.
+  - **On OpenClaw** (#7742, `LAMP_TASK_NET_GATEWAY=on` in lamp-tasks, on
+    in the product; `skill_task::HarnessRunner::gateway_way_out`): the
+    gateway's turns stay shared, but a skill's script runs only in the
+    skill-start launcher's per-run fence (its own user, network, mount and
+    PID namespaces), so the way out is given there, never to the agent's
+    own tools. lamp-tasks first reads the installed launcher
+    (`/usr/local/lib/lampos/skill-start`) for the fence's relay line
+    (`gateway::FENCE_NET_LINE`); an older copy is refused in words
+    ("a skill-start launcher whose fence gives no run its way out"). Then,
+    as for Hermes, it makes `/run/lampos-tasks/egress/skill-<run-id>.sock`
+    before `harness new` and names it in the run's grant. The gateway sees
+    no `/run/lampos-tasks`, so at the claim lamp-tasks sends an `O_PATH`
+    descriptor of that socket alone with the grant's line (`SCM_RIGHTS`);
+    the launcher refuses a grant naming a socket with no descriptor and
+    puts it on fd 5 (`skill_start::EGRESS_FD`). The fence
+    (`gateway::FENCE_NET_EDITS`) brings `lo` up in the run's own network,
+    opens port 53 to the run, binds a read-only `resolv.conf` naming
+    `127.0.0.1`, starts `/opt/lampOS/tasks/current/lamp-tasks net-relay
+    --egress /proc/self/fd/5` as the caller's ids in a nested user
+    namespace (its proxy on `127.0.0.1:3128`, DNS on `127.0.0.1:53`, both
+    piped to the egress socket, where lamp-tasks keeps every check of
+    `egress`), waits for its `ready`, closes fd 5, and only then says
+    `started` and runs the script with `HTTPS_PROXY`, `HTTP_PROXY` (both
+    cases), `NO_PROXY` and `NODE_USE_ENV_PROXY=1`. The run still sees only
+    its own folder and its skill's. Any step failing ends the fence before
+    the script (the run fails as `gateway::FENCE_FAILED`). The socket is
+    removed when the run ends; the relay and the network go with the
+    fence's PID namespace. lamp-tasks journals, once the fence says
+    `started`, "run <id>'s egress ready in its fence: N ms after the run's
+    start, M ms after its claim" (the start counts the agent's turn up to
+    its exec of the launcher; the claim, the fence's own setup).
   - **Every refusal is said.** A `net` run refused before anything of it
     ran (any of the above, `NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH` or
     `egress::NO_EGRESS`) is answered `no_net` (`skill_task::NO_NET`);

@@ -2707,7 +2707,10 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
         let on = service.iter().filter(|line| **line == switch).count();
-        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        let mentioned = text
+            .lines()
+            .filter(|line| line.contains(&format!("{name}=")))
+            .count();
         assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
         assert_eq!(mentioned, on, "{unit} names {name}");
     }
@@ -2716,6 +2719,34 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
             install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
             "{reader} is not a product unit"
         );
+    }
+}
+
+/// A gateway agent's (OpenClaw's) run granted `net` (#7742): its own
+/// egress socket, relayed in its skill-start fence alone, with
+/// `LAMP_TASK_NET_GATEWAY=on` once in the two units whose part reads it,
+/// beside `LAMP_TASK_NET`, and in no other: `lamp-tasks` (the run's way
+/// out, `skill_task::GATEWAY_NET_SWITCH`) and `lamp-voice` (a make on
+/// OpenClaw may write its own code granted `net`).
+#[test]
+fn the_product_lets_a_gateway_agents_task_reach_the_public_web() {
+    let name = lamp_voice::skill_task_yes::GATEWAY_NET_ENVIRONMENT;
+    assert_eq!(name, "LAMP_TASK_NET_GATEWAY");
+    let switch = format!("Environment={name}=on");
+    let net = format!(
+        "Environment={}=on",
+        lamp_voice::skill_task_yes::NET_ENVIRONMENT
+    );
+    let readers = ["lamp-tasks.service", "lamp-voice.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+        if on == 1 {
+            assert!(service.contains(&net.as_str()), "{unit} lacks {net}");
+        }
     }
 }
 

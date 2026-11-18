@@ -1437,6 +1437,10 @@ fn worker_command(
             role,
             var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
         ))
+        .envs(task_net_gateway_worker_environment(
+            role,
+            var(crate::skill_task_yes::GATEWAY_NET_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_secrets_worker_environment(
             role,
             var(crate::upload_agent::SECRETS_ENVIRONMENT).as_deref(),
@@ -1629,6 +1633,17 @@ fn task_net_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
+}
+
+// A gateway agent's `net` run (`skill_task_yes::gateway_net_on`, #7742),
+// passed the same narrow way: the exact `on`, to the two routes whose
+// `make_skill` hands a make to the lamp's agent.
+fn task_net_gateway_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_task_yes::GATEWAY_NET_ENVIRONMENT, "on"))
 }
 
 // A skill's keys given in the app (`upload_agent::secrets_on`), passed the
@@ -3152,6 +3167,10 @@ mod tests {
             ),
             (
                 crate::skill_task_yes::NET_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_task_yes::GATEWAY_NET_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (

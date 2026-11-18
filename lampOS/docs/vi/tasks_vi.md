@@ -1635,11 +1635,43 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   - **Kiểm tra trước khi tạo gì** (`skill_task::takes_net_runs`): wrapper
     của agent mặc định có `ONE_PATH_EGRESS_LINES` và dòng make-home của
     Hermes, agent namespace có các dòng lối ra và dòng make của Hermes. Nếu
-    không, agent gateway mặc định (OpenClaw: lượt của nó chạy trong các
-    namespace của gateway, chung cho mọi lượt, không giữ riêng được một lần
-    chạy), `LAMP_TASK_NET` tắt trong lamp-tasks, hoặc Hermes của đèn chưa ở
-    wrapper của đường chạy chung (vòng của #6898): bị từ chối bằng lời của
-    `skill_task::NET_REFUSED`, không tạo, hỏi hay chạy gì.
+    không, agent gateway mặc định khi `LAMP_TASK_NET_GATEWAY` tắt (OpenClaw:
+    lượt của nó chạy trong các namespace của gateway, chung cho mọi lượt,
+    không giữ riêng được một lần chạy), `LAMP_TASK_NET` tắt trong
+    lamp-tasks, hoặc Hermes của đèn chưa ở wrapper của đường chạy chung
+    (vòng của #6898): bị từ chối bằng lời của `skill_task::NET_REFUSED`,
+    không tạo, hỏi hay chạy gì.
+  - **Trên OpenClaw** (#7742, `LAMP_TASK_NET_GATEWAY=on` trong lamp-tasks,
+    bật trong sản phẩm; `skill_task::HarnessRunner::gateway_way_out`): các
+    lượt của gateway vẫn dùng chung, nhưng script của kỹ năng chỉ chạy
+    trong hàng rào riêng từng lần chạy của launcher skill-start (user,
+    network, mount và PID namespace riêng), nên lối ra được cấp ở đó, không
+    bao giờ cho công cụ của chính agent. Trước tiên lamp-tasks đọc launcher
+    đã cài (`/usr/local/lib/lampos/skill-start`) tìm dòng relay của hàng
+    rào (`gateway::FENCE_NET_LINE`); bản cũ bị từ chối bằng lời ("a
+    skill-start launcher whose fence gives no run its way out"). Sau đó,
+    như với Hermes, nó tạo `/run/lampos-tasks/egress/skill-<run-id>.sock`
+    trước `harness new` và ghi tên socket trong grant của lần chạy. Gateway
+    không thấy `/run/lampos-tasks`, nên khi launcher nhận lần chạy,
+    lamp-tasks gửi kèm dòng grant một descriptor `O_PATH` của đúng socket
+    đó (`SCM_RIGHTS`); launcher từ chối grant có tên socket mà không có
+    descriptor, và đặt nó ở fd 5 (`skill_start::EGRESS_FD`). Hàng rào
+    (`gateway::FENCE_NET_EDITS`) bật `lo` trong network riêng của lần chạy,
+    mở cổng 53 cho lần chạy, bind một `resolv.conf` chỉ đọc ghi
+    `127.0.0.1`, chạy `/opt/lampOS/tasks/current/lamp-tasks net-relay
+    --egress /proc/self/fd/5` bằng id của người gọi trong user namespace
+    lồng (proxy ở `127.0.0.1:3128`, DNS ở `127.0.0.1:53`, cả hai nối tới
+    socket lối ra, nơi lamp-tasks giữ mọi kiểm tra của `egress`), chờ
+    `ready` của nó, đóng fd 5, rồi mới báo `started` và chạy script với
+    `HTTPS_PROXY`, `HTTP_PROXY` (cả hai kiểu chữ), `NO_PROXY` và
+    `NODE_USE_ENV_PROXY=1`. Lần chạy vẫn chỉ thấy thư mục của nó và thư mục
+    của kỹ năng. Bước nào lỗi thì hàng rào dừng trước script (lần chạy lỗi
+    như `gateway::FENCE_FAILED`). Socket bị xóa khi lần chạy kết thúc; relay
+    và network đi cùng PID namespace của hàng rào. Khi hàng rào báo
+    `started`, lamp-tasks ghi journal "run <id>'s egress ready in its
+    fence: N ms after the run's start, M ms after its claim" (tính từ lúc
+    bắt đầu gồm cả lượt của agent tới khi nó exec launcher; tính từ lúc
+    nhận, chỉ phần dựng hàng rào).
   - **Mọi lần từ chối đều được nói.** Lần chạy có `net` bị từ chối trước
     khi chạy gì (mọi lý do ở trên, `NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH`
     hoặc `egress::NO_EGRESS`) được trả `no_net` (`skill_task::NO_NET`);
