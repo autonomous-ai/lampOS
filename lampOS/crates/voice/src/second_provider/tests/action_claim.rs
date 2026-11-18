@@ -81,10 +81,14 @@ fn went(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
-    went_doing(on, worded_on, false, product, heard, written, first, later)
+    went_doing(
+        on, worded_on, false, None, product, heard, written, first, later,
+    )
 }
 
-/// [`went`], with `LAMP_ACTION_CLAIM_DOING` as `doing_on` (#7285).
+/// [`went`], with `LAMP_ACTION_CLAIM_DOING` as `doing_on` (#7285) and
+/// `LAMP_ACTION_CLAIM_SKILLS` on when `skills_off` is some, those skills
+/// turned off already (#7587).
 #[allow(
     clippy::too_many_arguments,
     reason = "a test helper: each switch and script part named at the call"
@@ -93,6 +97,7 @@ fn went_doing(
     on: bool,
     worded_on: bool,
     doing_on: bool,
+    skills_off: Option<&[&str]>,
     product: bool,
     heard: &str,
     written: bool,
@@ -146,7 +151,21 @@ fn went_doing(
     .saying_at_once(product)
     .checking_action_claims(on)
     .checking_worded_claims(worded_on)
-    .checking_doing_claims(doing_on);
+    .checking_doing_claims(doing_on)
+    .checking_skill_claims(skills_off.is_some())
+    .knowing_skill_names({
+        let off: Vec<String> = skills_off
+            .unwrap_or_default()
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        Arc::new(move || crate::action_claim::KnownSkills {
+            names: ["moon-time", "cloudfact", "focus_mode"]
+                .map(str::to_owned)
+                .to_vec(),
+            off: off.clone(),
+        })
+    });
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -416,7 +435,9 @@ fn doing(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
-    went_doing(true, false, doing_on, true, heard, false, first, later)
+    went_doing(
+        true, false, doing_on, None, true, heard, false, first, later,
+    )
 }
 
 /// The cut-in as lamp-52e6 heard it in 13417's request 21 (#7285).
@@ -2067,4 +2088,216 @@ fn readiness_said_after_a_fold_begun_is_not_said() {
         said(&[crate::action_claim::NOT_DONE_LINE]),
         "{went:?}"
     );
+}
+
+/// One spoken turn with `LAMP_ACTION_CLAIM_SKILLS` as `skills_on` (#7587),
+/// the claim check on and the product's short lines.
+fn skills(
+    skills_on: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    let off: &[&str] = &[];
+    went_doing(
+        true,
+        false,
+        false,
+        skills_on.then_some(off),
+        true,
+        heard,
+        false,
+        first,
+        later,
+    )
+}
+
+/// #7587, lamp-9adf: "remove the moon time skill" heard as "… moon time
+/// scale" got "Moon time is removed." with no `make_skill`, and after a
+/// failed make "CloudFact is removed." with none: both skills stayed. With
+/// `LAMP_ACTION_CLAIM_SKILLS` the reply is held and the model asked once
+/// more, as a light claim is; the retry's `make_skill` remove runs and its
+/// words are said. A second such reply with no call is the line that it
+/// wasn't done. Off, it is said as it came, as on the lamp.
+#[test]
+fn a_skill_said_removed_with_no_make_is_asked_again_then_not_done() {
+    for (heard, reply, name) in [
+        (
+            "Remove the moon time scale.",
+            "Moon time is removed.",
+            "moon time",
+        ),
+        ("Remove CloudFact.", "CloudFact is removed.", "CloudFact"),
+    ] {
+        let remove = calling_with(
+            crate::made_skill::MAKE,
+            json!({ crate::made_remove::REMOVE: name }),
+        );
+        let went = skills(true, heard, saying(reply), vec![remove, saying(reply)]);
+        assert_eq!(went.ran, [crate::made_skill::MAKE], "{heard}: {went:?}");
+        assert_eq!(went.said, said(&[reply]), "{heard}: {went:?}");
+        assert!(told_claim(&went), "{heard}: {went:?}");
+        let went = skills(true, heard, saying(reply), vec![saying(reply)]);
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{heard}: {went:?}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (2, 0), "{heard}");
+        assert!(told_claim(&went), "{heard}");
+        // Off: said as it came, nothing asked again.
+        let went = skills(false, heard, saying(reply), vec![saying(reply)]);
+        assert_eq!(went.said, said(&[reply]), "{heard}: {went:?}");
+        assert_eq!((went.asked, went.ran.len()), (1, 0), "{heard}");
+    }
+}
+
+/// #7587: a turn whose `make_skill` did run (a remove, a turn off) says its
+/// outcome in the model's words: it stands, with no note. Ordinary talk
+/// about skills is said as it came.
+#[test]
+fn a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came() {
+    for (heard, args, reply) in [
+        (
+            "Remove the moon time skill.",
+            json!({ crate::made_remove::REMOVE: "moon time" }),
+            "Moon time is removed.",
+        ),
+        (
+            "Turn off the CloudFact skill.",
+            json!({ crate::made_turn::TURN_OFF: "CloudFact" }),
+            "The CloudFact skill is off now.",
+        ),
+    ] {
+        let went = skills(
+            true,
+            heard,
+            calling_with(crate::made_skill::MAKE, args),
+            vec![saying(reply)],
+        );
+        assert_eq!(went.said, said(&[reply]), "{heard}: {went:?}");
+        assert_eq!((went.asked, went.ran.len()), (2, 1), "{heard}");
+        assert!(went.notes.is_empty(), "{heard}: {went:?}");
+    }
+    for (heard, reply) in [
+        ("What skills do I have?", "You have three skills."),
+        (
+            "Can you tell me the moon's phase each night?",
+            "I can make a skill for that.",
+        ),
+        ("Turn off CloudFact.", "CloudFact was never actually made."),
+    ] {
+        let went = skills(true, heard, saying(reply), vec![]);
+        assert_eq!(went.said, said(&[reply]), "{heard}: {went:?}");
+        assert_eq!(went.asked, 1, "{heard}");
+        assert!(went.notes.is_empty(), "{heard}: {went:?}");
+    }
+}
+
+/// Twelve's adversarial P2 on #7587 and El's on #7601: "start my focus
+/// mode skill" ran through `use_skill`, and "Okay, the focus mode skill is
+/// started." after it stands, said as it came with no note. With no call it
+/// is held. A `use_skill` puts no skill on: "I turned the CloudFact skill
+/// back on." beside one is asked again.
+#[test]
+fn a_skill_said_started_beside_its_use_skill_is_said_as_it_came() {
+    let heard = "Start my focus mode skill.";
+    let reply = "Okay, the focus mode skill is started.";
+    let went = skills(
+        true,
+        heard,
+        calling_with(crate::use_skill::NAME, json!({ "skill": "focus_mode" })),
+        vec![saying(reply)],
+    );
+    assert_eq!(went.said, said(&[reply]), "{went:?}");
+    assert_eq!(went.ran, [crate::use_skill::NAME], "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    let went = skills(true, heard, saying(reply), vec![saying(reply)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    let reply = "I turned the CloudFact skill back on.";
+    let went = went_doing(
+        true,
+        false,
+        false,
+        Some(&["cloudfact"]),
+        true,
+        "Turn CloudFact back on.",
+        false,
+        calling_with(crate::use_skill::NAME, json!({ "skill": "cloudfact" })),
+        vec![saying(reply), saying(reply)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert!(!went.notes.is_empty(), "{went:?}");
+}
+
+/// El's P2 on #7601: "Okay, the stove is turned off." names none of the
+/// person's skills, so it is said as it came, with no ask again.
+#[test]
+fn a_bare_state_naming_no_skill_is_said_as_it_came() {
+    let reply = "Okay, the stove is turned off.";
+    let went = skills(true, "Turn off the stove.", saying(reply), vec![]);
+    assert_eq!(went.said, said(&[reply]), "{went:?}");
+    assert_eq!(went.asked, 1, "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+}
+
+/// El's P2 on #7601: CloudFact turned off in the app, then "Turn off
+/// CloudFact." answered "CloudFact is turned off." with no call: a true
+/// state, said as it came. Not off, the same reply is asked again.
+#[test]
+fn a_skill_said_off_that_is_off_already_is_said_as_it_came() {
+    let heard = "Turn off CloudFact.";
+    let reply = "CloudFact is turned off.";
+    let went = went_doing(
+        true,
+        false,
+        false,
+        Some(&["cloudfact"]),
+        true,
+        heard,
+        false,
+        saying(reply),
+        vec![],
+    );
+    assert_eq!(went.said, said(&[reply]), "{went:?}");
+    assert_eq!(went.asked, 1, "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    let went = skills(true, heard, saying(reply), vec![saying(reply)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+}
+
+/// SubDarren's P2 on #7601: a brightness-only call backs no skill's
+/// removal: "Moon time is removed." beside it is not said, and the next
+/// round is told so.
+#[test]
+fn a_skill_said_removed_beside_only_a_light_call_is_held() {
+    let reply = "Moon time is removed.";
+    let went = skills(
+        true,
+        "Remove moon time and make it brighter.",
+        vec![
+            text(reply),
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c0",
+                "light_brighter",
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying(reply), saying(reply)],
+    );
+    assert!(!went.said.contains(&format!("said:{reply}")), "{went:?}");
+    assert!(!went.notes.is_empty(), "{went:?}");
 }

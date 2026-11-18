@@ -4473,6 +4473,75 @@ and put on. Any other turn claiming a make with no call is still held. Test:
 `second_provider::tests::action_claim::a_makes_own_line_stands_and_a_made_claim_elsewhere_is_held`,
 `a_not_made_notes_made_claim_is_held`.
 
+A skill said removed, turned off or on, started or made with no call behind
+it is never said either (`LAMP_ACTION_CLAIM_SKILLS=on`, #7587; on in the
+product's `lamp-voice.service`, and nothing without
+`LAMP_ACTION_CLAIM_CHECKED`). On lamp-9adf "remove the moon time skill" was
+heard as "… moon time scale" and answered "Moon time is removed." with no
+`make_skill` call, and after a failed make "CloudFact is removed." with none:
+both skills stayed. With the switch, on a line that asks for a skill's change
+(`action_claim::asks_a_skill_change`: "remove", "delete", "uninstall",
+"cancel", "turn", "switch", "disable", "enable", "start", "stop", "run",
+"make", "create" or "put" in it) and not asked as a question, a reply that
+opens, bare or after a lead-in, with a skill said removed, off, on, made,
+started or running (`action_claim::SKILL_SAID`, `BARE_SKILL_SAID`), closing at
+its sentence's end and never on a '?', is held only when both hold:
+(a) its subject, whole (`action_claim::claim_subject`: the words before "is",
+"was" or "has", or after "I" and its verb, in the first clause that holds the
+claim's verb, "the", "my", "your", "skill" and "app" left out at its edges
+only ("walk the dog" stays whole); "the stretch
+reminder" is not "stretch"), is one of the person's MADE skills (`made.json`,
+`made_remove::names`) by its exact name, compared lower case with spaces,
+hyphens and underscores dropped (`action_claim::made_named`: "moon time",
+"moon-time" and `moon_time` are one); and (b) the turn has no call of its kind
+for that skill (`action_claim::backs_skill`): removed, turned off or turned on
+need a `make_skill` whose argument, compared the same way, holds that subject
+("moon time scale" holds "moon time") or is near it as the call itself finds
+the skill (`made_remove::apart_any` and `near`: "cloud fax" turns CloudFact
+off, "the moon fax" moon-fact said "Moonfact"), or a yes (`approve_id`);
+started or running need a `make_skill` `run` or a `use_skill` `skill` that
+holds it or is near it the same way. A
+made skill said made is never held: it is there.
+Held, it is asked once more with the same note, then said as "Sorry, I didn't
+do that. Could you ask me again?". A made skill said off that `lamp-skills`'
+`off` file shows off already, or on that it shows on, tells a true state and is
+never held (`skill_about::turned_off`). Everything else stands: core and
+installed skills, near names, bare states naming no made skill ("Okay, the
+stove is turned off.", "I've deleted the reminder."), a start of a skill whose
+function has another name ("the guard mode skill is started" beside
+`keep_watch`), "You have three skills.", "I can make a skill for that." and
+"CloudFact was never actually made.". A light call beside "Moon time is
+removed." backs nothing, so it is held. The names and the off ones are read
+once a judged turn from the lamp's own files. Only English replies are read,
+and only the sentence that holds the claim ("Okay. Moon time is removed." reads its second). Tests:
+`action_claim::tests::a_made_skill_said_removed_with_no_make_is_a_claim`,
+`a_claim_naming_no_made_skill_is_none`,
+`a_made_skill_said_on_or_off_is_judged_by_its_state`,
+`a_made_skill_said_started_stands_beside_its_run`,
+`a_claims_whole_subject_picks_the_made_skill`,
+`talk_about_skills_is_no_skill_claim`,
+`second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
+`a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`,
+`a_skill_said_started_beside_its_use_skill_is_said_as_it_came`,
+`a_bare_state_naming_no_skill_is_said_as_it_came`,
+`a_skill_said_off_that_is_off_already_is_said_as_it_came`,
+`a_skill_said_removed_beside_only_a_light_call_is_held`,
+`second_provider::tests::skill_named_words::a_skill_named_runs_call_backs_its_start_and_off_is_unchanged`. One whose whole subject is no made skill's name
+("The reminder is removed.") is never held, as a reminder cancelled may be
+said removed too. A call names the skill when its argument holds the name
+or is near it the way the call itself finds a skill ("cloud fax" turns
+CloudFact off, "moon fax" runs moon fact). A
+remove's yes is its own `make_skill` call with the `approve_id`, so the
+removed line after it stands. Like the worded claims it never judges a line
+the person asked as a question, whose reply may tell a true state. "You have
+three skills.", "I can make a skill for that." and "CloudFact was never
+actually made." are no claims. Only English replies are read, and only the
+sentence that holds the claim ("Okay. Moon time is removed." reads its second). Tests:
+`action_claim::tests::a_skill_said_removed_with_no_make_is_a_claim`,
+`talk_about_skills_is_no_skill_claim`,
+`second_provider::tests::action_claim::a_skill_said_removed_with_no_make_is_asked_again_then_not_done`,
+`a_skill_change_beside_its_make_and_talk_about_skills_are_said_as_they_came`.
+
 A made skill with code of its own that is not on is never said to be on
 (`LAMP_MADE_NOT_ON_TOLD=on`, #7270; off unless set, on in the product's
 lamp-voice;
