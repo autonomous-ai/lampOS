@@ -11182,17 +11182,15 @@ async fn spoken(
     // "Lamp ơi"), or as the coordinator reads a line of the name alone
     // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
     // alone, or no words at all.
-    // Its words past the name: only a plain yes, a few words, confirms a
-    // made skill's remove (`skill_write_yes::PLAIN_YES_MOST`, #6960).
+    // Its words too: only a plain yes the code reads confirms a made
+    // skill's remove (`skill_write_yes::plain_answer`, #7683), and only a
+    // plain replace a clash's replace (`made_clash::line_heard`).
     let name_only = called
         || text.trim().is_empty()
         || name_alone(&text)
         || crate::attention::only_the_name(&text);
-    crate::skill_write_yes::line_heard(
-        request,
-        name_only,
-        crate::skill_write_yes::line_words(&text, net::key_terms::NAME),
-    );
+    crate::skill_write_yes::line_heard(request, name_only, &text);
+    crate::made_clash::line_heard(request, name_only, &text);
     // A remove on the line right after one that found nothing is asked
     // only when this line names the skill (`made_remove::line_heard`).
     if !name_only {
