@@ -18,6 +18,9 @@ enum Lamp {
     /// A `remember` of this text with a line in the same round, then the
     /// line again.
     KeepsAsking(&'static str, &'static str),
+    /// A call, then a line, then another round's line: the round asked
+    /// again.
+    CallsAskedAgain(&'static str, &'static str, &'static str),
 }
 
 impl Lamp {
@@ -25,7 +28,9 @@ impl Lamp {
     fn name(&self) -> &'static str {
         match self {
             Lamp::Says(_) => "",
-            Lamp::Calls(name, _) | Lamp::CallsWithStale(name, _) => name,
+            Lamp::Calls(name, _)
+            | Lamp::CallsWithStale(name, _)
+            | Lamp::CallsAskedAgain(name, ..) => name,
             Lamp::Keeps(..) | Lamp::KeepsAsking(..) => crate::remember::REMEMBER,
         }
     }
@@ -160,6 +165,12 @@ async fn run_full_with_audio(
                 ]);
                 chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
             }
+            Lamp::CallsAskedAgain(name, line, again) => {
+                let calls = vec![call("c1", name, json!({"name": who}))];
+                chats.push_back(vec![Ok(ChatEvent::ToolCalls(calls)), Ok(ChatEvent::Done)]);
+                chats.push_back(vec![text(line), Ok(ChatEvent::Done)]);
+                chats.push_back(vec![text(again), Ok(ChatEvent::Done)]);
+            }
             Lamp::Calls(name, line) | Lamp::CallsWithStale(name, line) => {
                 let mut calls = vec![call("c1", name, json!({"name": who}))];
                 if matches!(lamp, Lamp::CallsWithStale(_, _)) {
@@ -256,6 +267,7 @@ async fn run_full_with_audio(
         .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)))
         .not_keeping_unsure(UNSURE.with(|on| on.replace(false)))
         .judging_call_words(CALL_WORDS.with(|on| on.replace(false)))
+        .checking_live_facts(LIVE.with(|on| on.replace(false)))
         .carrying_the_name(carries);
     let called_at = CALLED_AT.with(|at| at.replace(None));
     // A line begun with the name waits up to 2.5 s with the name's carry.
@@ -416,6 +428,9 @@ thread_local! {
     /// The turn, by its place in the next [`run_full`]'s turns, that the
     /// coordinator ends as only the lamp's name (`Called`), once.
     static CALLED_AT: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// `LAMP_LIVE_FACT_CHECKED` ([`Engine::checking_live_facts`], #7605)
+    /// for the next [`run_full`] on this thread, once.
+    static LIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -3162,4 +3177,50 @@ async fn a_called_lines_words_past_the_name_answer_a_held_forget() {
         );
         assert_eq!(ran.forgets.len(), runs, "{said} {on}");
     }
+}
+
+/// #7605's order: the take-back is said before a held live figure's
+/// block, which asks again (`continue`) or ends the turn. A round that
+/// doubts the keep just before it and also gives a made-up price says the
+/// take-back, then the round asked again; the price is never said. Were
+/// the live block first, its ask again would skip the take-back.
+#[tokio::test]
+async fn a_take_back_is_said_before_a_held_live_figure_asks_again() {
+    let taken_back = crate::remember::doubted::TAKEN_BACK_LINE;
+    let again = "Sorry, I couldn't find the gold price.";
+    let lamp = Lamp::CallsAskedAgain(
+        crate::remember::REMEMBER,
+        "Was that 'rhinodulus' right? Gold is around $4,050 an ounce today.",
+        again,
+    );
+    UNSURE.with(|on| on.set(true));
+    LIVE.with(|on| on.set(true));
+    let ran = run_full(
+        &[("A", "My favorite flower is a rhinodulus.", lamp, 0)],
+        Some(&[(&["A"], true)]),
+        9951,
+        (false, true),
+        json!({"remembered": true}),
+    )
+    .await;
+    let said: Vec<&str> = ran
+        .events
+        .iter()
+        .filter_map(|event| event.strip_prefix("said:"))
+        .map(str::trim)
+        .collect();
+    assert!(
+        !said.iter().any(|piece| piece.contains("4,050")),
+        "{said:?}"
+    );
+    let back = said.iter().position(|piece| *piece == taken_back);
+    let after = said.iter().position(|piece| *piece == again);
+    assert!(
+        back.is_some() && after.is_some() && back < after,
+        "{said:?}"
+    );
+    assert!(
+        format!("{:?}", ran.asked).contains(crate::live_fact::NOTE_OPENS),
+        "asked again for the figure"
+    );
 }

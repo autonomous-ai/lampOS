@@ -2980,6 +2980,12 @@ pub fn serve(
         );
         crate::skill_write_yes::approve_force()
     });
+    // The round after a live figure was held must call the lookup its note
+    // names (`LAMP_LIVE_FACT_CHECKED`, #7605).
+    let task_yes = first_force(
+        crate::live_fact::force_when(crate::live_fact::on()),
+        task_yes,
+    );
     let net = match first_force(
         task_yes,
         first_force(
@@ -4817,6 +4823,16 @@ pub fn serve(
         });
         read
     }));
+    // A live figure said with no lookup behind it ("around $4,050 an
+    // ounce" to "the gold price today?"; `LAMP_LIVE_FACT_CHECKED=on`,
+    // #7605): held, and asked again with the lookup required.
+    let live_facts = crate::live_fact::on();
+    if live_facts {
+        eprintln!(
+            "lamp-voice second: a live figure (a price, rate, score or the weather) said with no lookup in its turn is not said; asked again with the lookup required (LAMP_LIVE_FACT_CHECKED)"
+        );
+    }
+    engine = engine.checking_live_facts(live_facts);
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
