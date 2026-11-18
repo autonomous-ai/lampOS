@@ -7951,6 +7951,46 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_asks_here(None);
     }
 
+    /// A 2,000-byte request (18 Nov, [`made_skill::MOST_REQUEST_BYTES`]):
+    /// its longest repair, with the longest system prompt this worker can
+    /// give (every switch that adds to it on), still fits the rules the
+    /// lamp's agent's make run takes (`lamp_tasks::skill_make`), and the
+    /// lamp's own chat is handed the same two. Nothing of a brief goes to
+    /// the tasks part's 2,000 bytes any more.
+    #[test]
+    fn the_longest_repair_and_system_prompt_fit_the_agents_make_rules() {
+        let longest = "ộ".repeat(made_skill::MOST_REQUEST_BYTES / 3)
+            + &"a".repeat(made_skill::MOST_REQUEST_BYTES % 3);
+        assert_eq!(longest.len(), made_skill::MOST_REQUEST_BYTES);
+        let repair = made_skill::repair_brief(&longest, &"y".repeat(5_000)).unwrap();
+        assert!(repair.len() <= made_skill::MOST_REPAIR_BRIEF_BYTES);
+        assert_eq!(made_skill::request_of(&repair), longest);
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_said_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        for scripts in [false, true] {
+            made_skill::set_scripts_here(Some(scripts));
+            for (reads, agent, net) in [
+                (true, false, false),
+                (true, true, false),
+                (true, true, true),
+                (true, false, true),
+            ] {
+                let rules = format!("{}\n\n{repair}\n", system_net(reads, agent, net));
+                assert!(
+                    rules.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES,
+                    "{} > {}",
+                    rules.len(),
+                    lamp_tasks::skill_make::MOST_RULES_BYTES
+                );
+            }
+        }
+        made_skill::set_scripts_here(None);
+        made_skill::set_asks_here(None);
+        made_skill::set_said_here(None);
+        made_skill::set_writes_here(None);
+    }
+
     /// #6526 with the person's own words on too: with `LAMP_MADE_SKILL_SAID`
     /// and `LAMP_MADE_SKILL_ASKS` both on, the making model is told both
     /// starts (a [said] start's rules, then the asks'), the room's talk

@@ -10,7 +10,8 @@
 //! - **The socket** ([`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if unset),
 //!   for `lamp-cloud`: one JSON line in, one out, then closed.
 //!   - `{"make": {"words", "request_id"}}`: the words become the voice's
-//!     own brief ([`crate::made_skill::brief`], at most 480 bytes) and are
+//!     own brief ([`crate::made_skill::brief`], at most 2,000 bytes,
+//!     [`crate::made_skill::MOST_REQUEST_BYTES`]) and are
 //!     made at once on a thread of their own: typing them in the app is the
 //!     person's ask. The answer is `{"making": true}` once the ask is
 //!     recorded, before it is made, or `{"refused": WHY}` in plain words.
@@ -1228,6 +1229,28 @@ mod tests {
         written: false,
     };
 
+    /// Vietnamese words of exactly `bytes` bytes, 1 to 3 bytes a letter,
+    /// spaced singly, with no space at either end: the app's longest ask.
+    pub(crate) fn vietnamese(bytes: usize) -> String {
+        const LINE: &str = "Mỗi sáng lúc bảy giờ, khi tôi ngồi vào bàn, hãy bật đèn ấm dịu \
+                            và nhắc tôi uống một cốc nước.";
+        let mut words = String::new();
+        for letter in LINE.chars().chain(" ".chars()).cycle() {
+            if words.len() + letter.len_utf8() > bytes {
+                break;
+            }
+            words.push(letter);
+        }
+        while words.len() < bytes {
+            words.push('a');
+        }
+        if words.ends_with(' ') {
+            words.pop();
+            words.push('a');
+        }
+        words
+    }
+
     /// A folder of the test's own, empty.
     fn folder(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("app-make-{name}-{}", std::process::id()));
@@ -1708,6 +1731,76 @@ mod tests {
         assert_eq!(told["state"], "not_kept", "{told}");
         assert_eq!(told["why"], "the lamp's model didn't answer");
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// The app's MAKE IT with 2,000 bytes of Vietnamese (18 Nov: at 480 a
+    /// Vietnamese ask was cut at 160 to 240 letters): through the socket, as
+    /// lamp-cloud's `skills.make` sends it, the words reach the lamp's own
+    /// model whole in its brief, and the skill it writes is kept and put on
+    /// at once, the app told `on`. One byte more is refused at once, the
+    /// model never asked.
+    #[test]
+    fn through_the_socket_two_thousand_bytes_of_vietnamese_make_a_kept_skill() {
+        use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service_sent};
+        static URL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        fn scripted() -> Result<Chat, String> {
+            chat_at(URL.get().expect("the scripted model is up").clone())()
+        }
+        let (root, keeping) = keeping("app-2000");
+        let path = PathBuf::from(format!("/tmp/am2k-{}/make.sock", std::process::id()));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+        let (url, sent) = service_sent(vec![(200, good())]);
+        URL.set(url).unwrap();
+        let installed = manage_helper(&keeping.manage);
+        serve(
+            &path,
+            None,
+            MAKE,
+            keeping,
+            None,
+            scripted,
+            root.join("skills"),
+            |_| true,
+        )
+        .unwrap();
+        let ask = |line: &Value| {
+            let mut stream = std::os::unix::net::UnixStream::connect(&path).unwrap();
+            writeln!(stream, "{line}").unwrap();
+            let mut told = String::new();
+            BufReader::new(stream).read_line(&mut told).unwrap();
+            serde_json::from_str::<Value>(&told).unwrap()
+        };
+        let words = vietnamese(2_000);
+        assert_eq!(words.len(), 2_000);
+        assert!(words.chars().count() < 1_700, "{}", words.chars().count());
+        let over = format!("{words}a");
+        assert_eq!(
+            ask(&json!({"make": {"words": over, "request_id": "r0"}})),
+            json!({"refused": "That is too long to ask for as one skill: say it more shortly."})
+        );
+        assert_eq!(
+            ask(&json!({"make": {"words": words, "request_id": "r1"}})),
+            json!({"making": true})
+        );
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let mut told = ask(&json!({"made": {"request_id": "r1"}}));
+        while told["state"] == "making" && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+            told = ask(&json!({"made": {"request_id": "r1"}}));
+        }
+        assert_eq!(told["state"], "on", "{told}");
+        assert_eq!(told["name"], "evening-dim");
+        assert_eq!(installed.join().unwrap()["install_made"], told["sha256"]);
+        // The model was asked once, the request whole in its brief.
+        let bodies = sent.join().unwrap();
+        assert_eq!(bodies.len(), 1);
+        assert!(
+            bodies[0].contains(&format!("Request: {words}\"")),
+            "{}",
+            bodies[0]
+        );
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// Writers that overlap (reviewer-two's P2 on #2887): an old ask's

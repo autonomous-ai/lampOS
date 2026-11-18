@@ -44,8 +44,24 @@ pub const WAIT: Duration = Duration::from_secs(2);
 /// nothing was asked.
 pub const UNREACHED: &str = "making a skill can't be reached on the lamp now";
 
-/// The longest words: the voice's own bound for a skill's request.
-pub const MOST_WORDS_BYTES: usize = 480;
+/// The longest words, in bytes: the voice's own bound for a skill's
+/// request (`lamp_voice::made_skill::MOST_REQUEST_BYTES`, held equal by a
+/// test). 480 from 6 Nov (180 before); 2,000 since 18 Nov, when a
+/// Vietnamese request, 2 or 3 bytes a letter, was still cut at 160 to 240
+/// letters. `system.info` tells the app this bound
+/// ([`MOST_WORDS_FIELD`]), so the app holds a lamp that doesn't say it,
+/// an older one, to 480. Past it the app is told [`past_most_words`].
+pub const MOST_WORDS_BYTES: usize = 2_000;
+
+/// `system.info`'s field for [`MOST_WORDS_BYTES`], there only while
+/// `skills.make` is in its `can`.
+pub const MOST_WORDS_FIELD: &str = "make_skill_most_bytes";
+
+/// What the app is told of words past [`MOST_WORDS_BYTES`]: the bound in
+/// plain digits, as the app reads it back (its `plainRefusal`).
+pub fn past_most_words() -> String {
+    format!("what the skill should do is at most {MOST_WORDS_BYTES} bytes")
+}
 
 /// How often lamp-cloud asks lamp-voice whether making a skill is ready
 /// ([`watch`]).
@@ -276,9 +292,7 @@ pub fn make(socket: &Path, data: &Value) -> Result<Option<Value>, String> {
         .filter(|words| !words.is_empty())
         .ok_or("say what the skill should do")?;
     if words.len() > MOST_WORDS_BYTES {
-        return Err(format!(
-            "what the skill should do is at most {MOST_WORDS_BYTES} bytes"
-        ));
+        return Err(past_most_words());
     }
     let id = request_id(data).ok_or("the ask needs a request id")?;
     if !request_id_ok(id) {
@@ -532,12 +546,12 @@ mod tests {
         // Refused here, before the voice is asked.
         assert!(make(&socket, &json!({"words": "x"})).is_err());
         assert!(make(&socket, &json!({"words": " ", "request_id": "r3"})).is_err());
-        assert!(
+        assert_eq!(
             make(
                 &socket,
-                &json!({"words": "a".repeat(181), "request_id": "r3"})
-            )
-            .is_err()
+                &json!({"words": "a".repeat(MOST_WORDS_BYTES + 1), "request_id": "r3"})
+            ),
+            Err(past_most_words())
         );
         for id in ["", "r 1", "r/1", &"r".repeat(65)] {
             let why = make(&socket, &json!({"words": "x", "request_id": id})).unwrap_err();
@@ -551,6 +565,130 @@ mod tests {
             ),
             Err(UNREACHED.to_owned())
         );
+    }
+
+    /// Vietnamese words of exactly `bytes` bytes, 1 to 3 bytes a letter,
+    /// spaced singly, with no space at either end: the app's longest ask.
+    fn vietnamese(bytes: usize) -> String {
+        const LINE: &str = "Mỗi sáng lúc bảy giờ, khi tôi ngồi vào bàn, hãy bật đèn ấm dịu \
+                            và nhắc tôi uống một cốc nước.";
+        let mut words = String::new();
+        for letter in LINE.chars().chain(" ".chars()).cycle() {
+            if words.len() + letter.len_utf8() > bytes {
+                break;
+            }
+            words.push(letter);
+        }
+        while words.len() < bytes {
+            words.push('a');
+        }
+        if words.ends_with(' ') {
+            words.pop();
+            words.push('a');
+        }
+        words
+    }
+
+    /// 18 Nov: the app's box takes 2,000 bytes, lamp-voice's own bound for
+    /// a skill's request, so a Vietnamese ask of up to about 700 to 1,000
+    /// letters is never cut.
+    #[test]
+    fn the_words_bound_is_lamp_voices_two_thousand_bytes() {
+        assert_eq!(MOST_WORDS_BYTES, 2_000);
+        assert_eq!(MOST_WORDS_BYTES, lamp_voice::made_skill::MOST_REQUEST_BYTES);
+        assert_eq!(
+            past_most_words(),
+            "what the skill should do is at most 2000 bytes"
+        );
+    }
+
+    /// 2,000 bytes of Vietnamese go to lamp-voice whole, in one line; one
+    /// byte more is refused here with the bound named, as the app reads it
+    /// back, and lamp-voice is never asked.
+    #[test]
+    fn two_thousand_bytes_of_vietnamese_are_handed_whole_and_one_more_refused() {
+        let (socket, seen) = voice("vi2k", vec![json!({"making": true})]);
+        let words = vietnamese(2_000);
+        assert_eq!(words.len(), 2_000);
+        assert!(words.chars().count() < 1_700, "{}", words.chars().count());
+        assert_eq!(
+            make(
+                &socket,
+                &json!({"words": format!("{words}a"), "request_id": "r0"})
+            ),
+            Err("what the skill should do is at most 2000 bytes".to_owned())
+        );
+        assert_eq!(
+            make(&socket, &json!({"words": words, "request_id": "r1"})),
+            Ok(Some(json!({"making": true, "request_id": "r1"})))
+        );
+        assert_eq!(
+            seen.recv().unwrap(),
+            json!({"make": {"words": words, "request_id": "r1"}})
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// From `skills.make` through lamp-voice's own app-make socket
+    /// (`lamp_voice::app_make::serve`, not a stand-in): 2,000 bytes of
+    /// Vietnamese pass lamp-cloud's bound and lamp-voice's, are taken and
+    /// reach its maker, here with no model to ask, so not kept, and why
+    /// (lamp-voice's own tests make one into a kept skill through the same
+    /// socket with a scripted model). 2,001 is refused here.
+    #[test]
+    fn two_thousand_bytes_reach_lamp_voices_own_maker() {
+        let dir = PathBuf::from(format!("/tmp/mkv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        // Its own directory: lamp-voice makes it, the voice's alone.
+        let socket = PathBuf::from(format!("/tmp/mkvs-{}/make.sock", std::process::id()));
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+        let keeping = lamp_voice::made_skill::Keeping {
+            directory: dir.join("made"),
+            program: dir.join("no-pack"),
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        fn no_model() -> Result<lamp_voice::second_provider::net::Chat, String> {
+            Err("no model here".into())
+        }
+        let on = lamp_voice::app_make::On {
+            make: true,
+            written: false,
+        };
+        lamp_voice::app_make::serve(
+            &socket,
+            None,
+            on,
+            keeping,
+            None,
+            no_model,
+            dir.join("skills"),
+            |_| true,
+        )
+        .unwrap();
+        let words = vietnamese(2_000);
+        assert_eq!(
+            make(
+                &socket,
+                &json!({"words": format!("{words}a"), "request_id": "r0"})
+            ),
+            Err(past_most_words())
+        );
+        assert_eq!(
+            make(&socket, &json!({"words": words, "request_id": "r1"})),
+            Ok(Some(json!({"making": true, "request_id": "r1"})))
+        );
+        let asked = json!({"request_id": "r1"});
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut told = made(&socket, &asked).unwrap().unwrap();
+        while told["state"] == "making" && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+            told = made(&socket, &asked).unwrap().unwrap();
+        }
+        assert_eq!(told["state"], "not_kept", "{told}");
+        assert_eq!(told["why"], "the lamp's model didn't answer");
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The state read back, its `uses` as the page's `may_use` rows.

@@ -3060,17 +3060,29 @@ gone ([switches.md](switches.md)). What happens:
    - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
      `name =` in `skill.toml` fails the check as an unknown field. That was
      what failed #2813's rerun on lamp-0c89.
-   - The request is at most 480 bytes, refused if longer, never cut, and
-     the model is asked nothing then.
+   - The request is at most 2,000 bytes (`MOST_REQUEST_BYTES`; 180 at
+     first, 480 from 6 Nov when the owner found 180 too short in the app,
+     2,000 from 18 Nov when a Vietnamese request, 2 or 3 bytes a letter,
+     was still cut at 160 to 240 letters), refused if longer, never cut,
+     and the model is asked nothing then. The app's MAKE IT and the
+     voice's own make share it.
    - Nothing else of the conversation goes with it.
    - It names the triggers and gestures only as "one [trigger] as listed
      (coming to the desk is room/presence)" and `body = { gesture }`: the
      system prompt lists each (`TRIGGER_MEANINGS`,
-     `made_skill::gesture_names`). So the longest brief is 1,440 bytes
-     (`MOST_BRIEF_BYTES`; 1,160 until the brief told the remind step and
-     its `every` in #7245, 1,340 before that) and a repair's check lines 735
-     (`MOST_REPAIR_BYTES`, 560 before), the six triggers' meanings whole
-     in it; the two still fit the tasks part's 3,000 bytes.
+     `made_skill::gesture_names`). So the brief's own words are at most
+     960 bytes, the longest brief 2,960 with a 2,000-byte request
+     (`MOST_BRIEF_BYTES`; 1,160 with 480, 1,440 once the brief told the
+     remind step and its `every` in #7245, 1,340 before that) and a
+     repair's check lines 735 (`MOST_REPAIR_BYTES`, 560 before), the six
+     triggers' meanings whole in it. A brief goes only to a maker: the
+     lamp's own chat, or the lamp's agent's make run, whose rules (the
+     system prompt and the brief) lamp-tasks takes up to 48 KiB
+     (`lamp_tasks::skill_make::MOST_RULES_BYTES`; a test holds the longest
+     repair with the longest system prompt within it); a gateway make's
+     words name the rules file and never inline the request. It is no
+     longer held to the tasks part's bound (3,000 bytes since #7245): no
+     brief has gone there since 3 Nov.
 3. **Written by the lamp's own model.** The brief goes to the second
    route's chat (`llm_*`, the relay or the person's own DeepSeek), with no
    tools, streamed, on a thread and runtime of its own, at most 30 s
@@ -3505,7 +3517,7 @@ gone ([switches.md](switches.md)). What happens:
      another kind goes back for repair (`made_skill::WRITE_NOT_FIXED`).
      The system prompt lists the kinds and their keys
      (`make_skill_local::write_rules`); the brief adds "Or one write, as
-     above." (or "Or a read/write as above."), still within 1,440
+     above." (or "Or a read/write as above."), still within 2,960
      bytes.
    - **Its words are the request's own** (`made_skill::write_from_request`,
      at `keep_asked`, which now takes the request, `made_skill::Asked`):
@@ -3708,7 +3720,7 @@ gone ([switches.md](switches.md)). What happens:
      the grants, that the code reaches the lamp only through the lamp's
      SDK with those grants and has no other network, and that the lamp
      says it back and waits for the yes; the brief adds "Or code, as
-     above." (still within 1,440 bytes), and an answer may be up to 37 KiB.
+     above." (still within 2,960 bytes), and an answer may be up to 37 KiB.
      It names the SDK's real calls (`made_skill::SCRIPT_SDK`, #6749 E):
      `import asyncio`, `from lampos import Lamp`, `lamp = await
      Lamp.local()` in `async def main()`, then only `lamp.device()` (its
@@ -5181,8 +5193,8 @@ Tests:
   `own_echo::yes_tests::the_say_backs_own_words_in_its_tail_are_held`;
   `skill_writes_told::tests` (each send told once after the mark, said
   with its time).
-- `made_skill::tests`: the brief within 1,340 bytes (so its repair fits the
-  tasks part's 2,000), `every_request_is_briefed_and_the_model_judges_it`
+- `made_skill::tests`: the brief within 2,960 bytes with a 2,000-byte
+  request (`MOST_BRIEF_BYTES`, its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
   word list), `the_read_steps_are_the_catalogues_readable_services`,
   exactly two files, the
@@ -6165,7 +6177,7 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    Tests: `coordinator::service::tests::the_app_make_socket_answers_through_a_closed_and_an_unreadable_switch`,
    `say::tests::bound_at_start_the_say_socket_answers_through_the_privacy_wait`.
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
-   (`made_skill::brief`, at most 480 bytes) and are made at once on a
+   (`made_skill::brief`, at most 2,000 bytes) and are made at once on a
    thread of their own by the lamp's own model, the same example, check
    and up to three repairs (`make_skill_local::make_kept`,
    `app_make::make_here`). Not made (or a written one not kept), the app
@@ -6706,7 +6718,7 @@ made skill is refused at install.
    no `[trigger]` and no `[ask]`. The model is told a skill can't yet hear
    what is said in the room, and the brief says "one [trigger] as listed or
    [said] as above" where it otherwise names the desk's presence (the
-   system prompt names it too), so the longest brief stays within 1,440
+   system prompt names it too), so the longest brief stays within 2,960
    bytes. Anything else beside `[said]` is refused with lines for a repair
    (`made_skill::said_asked`), and the person hears "I couldn't make that
    one." if the repairs are used up.
@@ -6854,7 +6866,7 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    request told to the lamp (a [said] start) or the words the person names
    to start it (asks), both below", and the brief "one [trigger] listed,
    [said]/asks as above", written short so the longest brief with every
-   switch on stays within 1,440 bytes.
+   switch on stays within 2,960 bytes.
 2. **Held by the cap** (`made_skill::made_asks`, in `held`): an array of 1
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
