@@ -316,6 +316,11 @@ impl Live {
         } else {
             count.saturating_sub(1)
         };
+        // A panel is gone with the app's last connection (its run).
+        if *count == 0 {
+            self.sockets.remove(name);
+            self.forget_run(name);
+        }
     }
 
     /// An app's panel is gone with its run (it stopped).
@@ -409,6 +414,19 @@ pub fn values(manifest: &AppManifest, kept: &Map<String, Value>) -> Map<String, 
         all.insert(setting.key.clone(), value.clone());
     }
     all
+}
+
+/// An installed app's settings as the app reads them: every key of its
+/// manifest, the owner's value or the default. `None` if it is not installed.
+pub fn settings_of(place: &Place<'_>, name: &str) -> Option<Map<String, Value>> {
+    let manifest = installed(place.apps, name)?;
+    let kept = kept_of(place.state);
+    let mine = kept
+        .get(name)
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    Some(values(&manifest, &mine))
 }
 
 fn kept_of(state: Option<&Path>) -> Map<String, Value> {
