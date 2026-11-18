@@ -251,6 +251,24 @@ class DocsRows(unittest.TestCase):
         self.assertEqual(self.reads(self.P2, [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-a", "Reader A", self.P2)]),
                          "short 1")
 
+    def test_a_product_md_change_is_code(self):
+        # 15:1x (the Reviewer-lead's P2 on #7710): a skill's SKILL.md (or a guide the product loads) is not docs.
+        self.git("checkout", "-q", "-b", "pr4", self.P1)
+        self.write("skills/water/SKILL.md", "Suggest a sip of water.\n")
+        p4 = self.commit("a product .md")
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", self.P1)])
+        self.assertEqual(self.same_patch(p4, c), [p4])
+
+    def test_a_docs_only_pr_is_never_offered_as_code(self):
+        # 15:1x (the Reviewer-lead's P2 on #7710): with no code at all, any docs rewrite would match.
+        self.git("checkout", "-q", "-b", "docs-only", "origin/lamp-voice")
+        self.write("docs/switches.md", "| A | on |\n| B | off |\n")
+        d1 = self.commit("a docs change")
+        self.write("docs/switches.md", "| A | on, rewritten |\n| B | off |\n")
+        d2 = self.commit("the docs rewritten")
+        c = self.jsonl("c.jsonl", [self.ok("writer-a", "Reader A", d1)])
+        self.assertEqual(self.same_patch(d2, c), [d2])
+
     def test_a_code_change_still_needs_two_restates(self):
         both = [self.ok("writer-a", "Reader A", self.P1), self.ok("writer-b", "Reader B", self.P3)]
         self.assertEqual(self.reads(self.P3, both), "short 1")
