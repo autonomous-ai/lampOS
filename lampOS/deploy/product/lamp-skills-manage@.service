@@ -52,6 +52,8 @@ Environment=LAMP_MADE_SKILL_SAID=on
 Environment=LAMP_UPLOAD_TO_AGENT=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# On OpenClaw too (#7742): a made skill's own code granted net, said back and agreed to, is put on.
+Environment=LAMP_TASK_NET_GATEWAY=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service,
 # lamp-cloud.service and lamp-voice.service.
