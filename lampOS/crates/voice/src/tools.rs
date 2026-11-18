@@ -1721,6 +1721,11 @@ fn answer_inner(
     }
 }
 
+/// Who answered a `use_skill` call naming a made skill turned off, run now
+/// by `make_skill`'s path ([`crate::made_run::use_skill_off_here`]), as the
+/// journal says it.
+pub const MADE_RUN_WHOM: &str = "the made skill's run";
+
 /// What the model is told when a call about faces comes from anything but
 /// the person at the lamp.
 pub const FACES_IN_PERSON: &str =
@@ -2024,7 +2029,18 @@ fn run_spoken_call_inner(
                 }
                 _ => ("nobody", ToolAnswer::plain(unavailable()), false),
             },
-            Err(told) => (crate::use_skill::NAME, ToolAnswer::plain(told), true),
+            // A made skill turned off, named by `use_skill`, which names
+            // none (`LAMP_MADE_SKILL_OFF_SAID`, #7562): its run now.
+            Err(told) => match crate::made_run::use_skill_off_here(
+                call,
+                request,
+                heard,
+                lease,
+                settings.skills.as_deref(),
+            ) {
+                Some(ran) => (MADE_RUN_WHOM, ToolAnswer::plain(ran), true),
+                None => (crate::use_skill::NAME, ToolAnswer::plain(told), true),
+            },
         }
     } else if let Route::Executive(directory) = route
         && is_skills(settings, route)
@@ -2918,8 +2934,19 @@ fn run_call_with_scope(
                     _ => ("nobody", (unavailable(), false)),
                 },
                 // Refused by the voice itself, no skill asked: the journal
-                // says so (the reviewer on #1706).
-                Err(told) => (crate::use_skill::NAME, (told, true)),
+                // says so (the reviewer on #1706). A made skill turned off,
+                // which `use_skill` names none of, is its run now
+                // (`LAMP_MADE_SKILL_OFF_SAID`, #7562).
+                Err(told) => match crate::made_run::use_skill_off_here(
+                    call,
+                    request,
+                    heard,
+                    lease,
+                    settings.skills.as_deref(),
+                ) {
+                    Some(ran) => (MADE_RUN_WHOM, (ran, true)),
+                    None => (crate::use_skill::NAME, (told, true)),
+                },
             }
         }
         Route::Services(folder) => (

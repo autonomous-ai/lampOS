@@ -20546,16 +20546,69 @@ async fn answer(
                         answer.told = crate::made_turn::just_on();
                     }
                 }
+                // A run that failed after a turn on in this turn for the ask
+                // (the lamp's own above, or the model's `turn_on` then its
+                // run now; Heron's P2 on #7562): the skill is turned off
+                // again, as the owner had it, through `make_skill`'s own
+                // `turn_off`, and said plainly that it didn't run and is
+                // still off; never run again in this turn.
+                if crate::made_skill::off_said_on()
+                    && let Some(why) = crate::made_turn::failed_after_turn_on(
+                        model_on.as_deref(),
+                        on_for_ask.is_some(),
+                        &call.name,
+                        &answer.told,
+                    )
+                {
+                    let spoken = on_for_ask.take().unwrap_or_else(|| {
+                        crate::made_skill::spoken_name(model_on.as_deref().unwrap_or_default())
+                    });
+                    model_on = None;
+                    let (name, args) = crate::made_turn::off_again(&spoken);
+                    let off = net::ToolCall {
+                        extra: None,
+                        id: crate::made_turn::OFF_AGAIN_ID.into(),
+                        name,
+                        args,
+                    };
+                    let off_told = run_tool_in_context(
+                        shared,
+                        request,
+                        heard,
+                        &off,
+                        scope.as_ref(),
+                        context_epoch,
+                    )
+                    .await;
+                    answer.told = if crate::made_turn::turned(&off.name, &off.args, &off_told)
+                        && off_told["off"] == true
+                    {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned on for the ask didn't run: turned off again (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        turned_on_now = false;
+                        crate::made_turn::not_run_still_off(&spoken, &why)
+                    } else {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned on for the ask didn't run, and wasn't turned off again (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        crate::made_turn::not_run_left_on(&spoken, &why)
+                    };
+                    on_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
+                }
                 // The run now of the skill the model's own `turn_on` turned
                 // on in this turn (#7562's row on lamp-9adf, 18 Nov, request
                 // 9: "tell me a space fact with my space facts skill" was a
-                // turn on, then, told so, its run): said with the undo line.
+                // turn on, then, told so, its run): said with the undo line,
+                // once in the turn (Heron's P3): a run of it again after is
+                // said as any run.
                 if let Some(told) = crate::made_run::ran_after_turn_on(
                     model_on.as_deref(),
                     &call.name,
                     &answer.told,
                 ) {
                     answer.told = told;
+                    model_on = None;
                 }
                 // Turned on for the ask: said with one line and its undo,
                 // and never run again in this turn.

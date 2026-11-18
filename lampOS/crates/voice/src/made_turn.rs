@@ -442,9 +442,9 @@ pub fn off_note(keeping: &Keeping, state: &Path) -> Option<String> {
     };
     Some(format!(
         "(For you to know, not to answer: {count} they made or added {are} turned off now. A \
-         line that asks to use or run one: call its function as for any skill, or make_skill \
-         with run and its name, never turn_on alone; the lamp turns it on for the owner's ask \
-         and runs it, and its answer says what to say. \
+         line that asks to use or run one: call it as for any skill, by its function, by \
+         use_skill with its name, or by make_skill with run and its name, never turn_on alone; \
+         the lamp turns it on for the owner's ask and runs it, and its answer says what to say. \
          {BACK_ON_BY_CALL})"
     ))
 }
@@ -555,6 +555,67 @@ pub fn undo_line(spoken: &str) -> String {
         "{} was off, so I turned it on. Say 'turn it off' to undo.",
         opening(spoken)
     )
+}
+
+/// What the model is told of a skill turned on for the ask whose run then
+/// failed (`why`), turned off again as the owner had it (Heron's P2 on
+/// #7562): it didn't run, and it is still off. No undo: nothing changed.
+pub fn not_run_still_off(spoken: &str, why: &str) -> Value {
+    json!({
+        "error": why,
+        "next": format!(
+            "Say plainly, in a few words, in the conversation's language, that {spoken} didn't \
+             run now, and why: {why}; it is still off, as it was. Never say it is on or running. \
+             Call nothing."
+        )
+    })
+}
+
+/// What the model is told of a skill turned on for the ask whose run then
+/// failed (`why`), and that could not be turned off again: it didn't run,
+/// and it is on now, said with the undo line.
+pub fn not_run_left_on(spoken: &str, why: &str) -> Value {
+    json!({
+        "error": why,
+        "next": format!(
+            "Say plainly, in a few words, in the conversation's language, that {spoken} didn't \
+             run now, and why: {why}. Then say: \"{}\" Never say it is running. Call nothing.",
+            undo_line(spoken)
+        )
+    })
+}
+
+/// The `make_skill` call the lamp makes itself to turn the skill `spoken`
+/// off again when its run after a turn on for the ask failed
+/// ([`not_run_still_off`]): as the person's own `turn_off` would, so it goes
+/// through the same checks.
+pub fn off_again(spoken: &str) -> (String, Value) {
+    (made_skill::MAKE.to_owned(), json!({ TURN_OFF: spoken }))
+}
+
+/// The id of the lamp's own [`off_again`] call: an id only, in no chat's
+/// thread.
+pub const OFF_AGAIN_ID: &str = "turned_on_for_ask_off_again";
+
+/// Of the call `name` answered `told`, a failed run of a skill turned on in
+/// this turn for the ask: a `make_skill` run now that names the made skill
+/// `on` the model's own `turn_on` turned on (`made_run::NOT_RAN`), or, with
+/// `function` (the lamp's own turn on for a skill's function), any refusal
+/// of that function. Its why; none for a run, for one still answering off
+/// just after (`JUST_ON`), or for any other call.
+pub fn failed_after_turn_on(
+    on: Option<&str>,
+    function: bool,
+    name: &str,
+    told: &Value,
+) -> Option<String> {
+    let why = told["error"].as_str()?;
+    if why == JUST_ON || ran_turned_off(told) {
+        return None;
+    }
+    let ran_on =
+        on.is_some_and(|on| name == made_skill::MAKE && told[crate::made_run::NOT_RAN] == on);
+    (ran_on || function && !crate::made_run::stopped(told)).then(|| why.to_owned())
 }
 
 /// What the model is told of its call of a skill turned off that the lamp
@@ -1161,7 +1222,10 @@ mod tests {
         off.state = Some(&places.state);
         asked(off, &keeping, owner, helper);
         let note = off_note(&keeping, &places.state).unwrap();
-        assert!(note.contains("call its function"), "{note}");
+        assert!(note.contains("by its function"), "{note}");
+        // #7562's row on lamp-9adf, 18 Nov: a made skill has no function,
+        // and the model's `use_skill` for one turned off runs it too.
+        assert!(note.contains("by use_skill with its name"), "{note}");
         assert!(note.contains("the lamp turns it on"), "{note}");
         assert!(!note.contains("Never turn it on"), "{note}");
         let (name, args) = on_for_ask("btc_price", &json!({}));
@@ -1437,23 +1501,138 @@ mod tests {
         made_skill::set_off_said_here(None);
     }
 
+    /// `make_skill`'s call `args` answered by the real
+    /// `make_skill_local::answer`, with lamp-skills' folder given, in a turn
+    /// nobody spoke: a run now reaches `made_run::asked_here` and is
+    /// refused there as unheard (`made_run::NOT_ASKED_ALOUD`), a turn
+    /// reaches [`asked_here`] (this module's [`NOT_ASKED_ALOUD`]), so which
+    /// path took the call shows and nothing runs or turns.
+    fn answered_unheard_with_skills(args: Value) -> Value {
+        let call = lamp_gemini::ToolCall {
+            id: "1".into(),
+            name: made_skill::MAKE.into(),
+            args,
+        };
+        let skills = std::env::temp_dir().join("lamp-voice-made-turn-no-skills");
+        crate::make_skill_local::answer(&call, 84, false, None, Some(&skills))
+    }
+
     /// #7562's row on lamp-9adf, 18 Nov, request 9 ("Lamp, tell me a space
-    /// fact with my space facts skill."): switch on, one call that carries
-    /// a `turn_on` and a run now is the run now, which turns it on itself
-    /// (`made_run::asked_turning`; a run with no lamp-skills folder here is
-    /// unavailable, a turn unheard is `NOT_ASKED_ALOUD`). Switch off, as
-    /// before: a run now.
+    /// fact with my space facts skill."): one call that carries a `turn_on`
+    /// and a run now of one skill is the run now (`made_run::asked_here`,
+    /// which turns it on itself), with the switch on or off, never a turn.
+    /// Two skills named (Heron's P3): with the switch on, nothing is done and
+    /// each is asked again as its own call; off, the run now as before.
     #[test]
     fn a_turn_on_with_a_run_now_is_the_run_now() {
         for switch in [true, false] {
             made_skill::set_off_said_here(Some(switch));
-            let told = answered_unheard(json!({
+            for run in ["space facts", "my space facts skill", "space_facts"] {
+                let told = answered_unheard_with_skills(json!({
+                    TURN_ON: "space facts",
+                    crate::made_run::RUN: run
+                }));
+                assert_eq!(
+                    told["error"],
+                    crate::made_run::NOT_ASKED_ALOUD,
+                    "{switch}: {told}"
+                );
+                assert_ne!(told["error"], NOT_ASKED_ALOUD, "{switch}: {told}");
+            }
+            let told = answered_unheard_with_skills(json!({
                 TURN_ON: "space facts",
-                crate::made_run::RUN: "space facts"
+                crate::made_run::RUN: "unread mail"
             }));
-            assert_eq!(told, crate::tools::unavailable(), "{switch}: {told}");
+            if switch {
+                assert_eq!(
+                    told,
+                    crate::made_run::two_skills("space facts", "unread mail"),
+                    "{told}"
+                );
+            } else {
+                assert_eq!(told["error"], crate::made_run::NOT_ASKED_ALOUD, "{told}");
+            }
         }
         made_skill::set_off_said_here(None);
+    }
+
+    /// The real `make_skill_local::answer` dispatch, the switch on: a run
+    /// now alone is `made_run::asked_here`'s; a turn on or off alone is
+    /// [`asked_here`]'s; switch off, a turn is no request of this module's.
+    #[test]
+    fn make_skill_answer_dispatches_a_run_and_a_turn() {
+        made_skill::set_off_said_here(Some(true));
+        let told = answered_unheard_with_skills(json!({ crate::made_run::RUN: "space facts" }));
+        assert_eq!(told["error"], crate::made_run::NOT_ASKED_ALOUD, "{told}");
+        for key in [TURN_OFF, TURN_ON] {
+            let told = answered_unheard_with_skills(json!({ key: "space facts" }));
+            assert_eq!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(Some(false));
+        for key in [TURN_OFF, TURN_ON] {
+            let told = answered_unheard_with_skills(json!({ key: "space facts" }));
+            assert_ne!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(None);
+    }
+
+    /// Heron's P2 on #7562, for the second route: a failed run after a turn
+    /// on in the turn is known (the model's own `turn_on`, by the run's
+    /// `made_run::NOT_RAN`; the lamp's own for a skill's function, any
+    /// refusal but still off), and the skill turned off again by a
+    /// `make_skill` turn off as the person's own; a run, one still off just
+    /// after, or another skill's refusal is none.
+    #[test]
+    fn a_failed_run_after_a_turn_on_is_known() {
+        let why = "it has nothing to do but at its own moment";
+        let refused = json!({"error": why, crate::made_run::NOT_RAN: "space-facts"});
+        let make = made_skill::MAKE;
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), false, make, &refused).as_deref(),
+            Some(why)
+        );
+        assert_eq!(
+            failed_after_turn_on(Some("moon-fact"), false, make, &refused),
+            None
+        );
+        assert_eq!(failed_after_turn_on(None, false, make, &refused), None);
+        let ran = json!({crate::made_run::RUN: "space-facts", "ran": true});
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), false, make, &ran),
+            None
+        );
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), true, make, &just_on()),
+            None
+        );
+        let function = json!({"error": "I'm still doing that."});
+        assert_eq!(
+            failed_after_turn_on(None, true, "btc_price", &function).as_deref(),
+            Some("I'm still doing that.")
+        );
+        assert_eq!(
+            failed_after_turn_on(None, false, "btc_price", &function),
+            None
+        );
+        let off = json!({"error": FUNCTION_OFF});
+        assert_eq!(failed_after_turn_on(None, true, "btc_price", &off), None);
+        assert_eq!(
+            off_again("space facts"),
+            (make.to_owned(), json!({ TURN_OFF: "space facts" }))
+        );
+        let still = not_run_still_off("space facts", why);
+        let next = still["next"].as_str().unwrap();
+        assert!(
+            next.contains("still off") && !next.contains("undo"),
+            "{next}"
+        );
+        let left = not_run_left_on("space facts", why);
+        assert!(
+            left["next"]
+                .as_str()
+                .unwrap()
+                .contains(&undo_line("space facts"))
+        );
     }
 
     /// Switch on: one call that carries both a turn-off and a remove is
