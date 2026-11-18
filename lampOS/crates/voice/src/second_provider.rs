@@ -14291,9 +14291,11 @@ fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -
 /// as a forget is ([`hold_forget`]), so the same rules let it go: only a
 /// plain yes on the next spoken turn, from the same session's person,
 /// within `remember::HELD_FORGET_FOR`, with their face seen saying it and
-/// no other ([`take_held_forget`]); the conversation's end, a forget,
-/// another face or anything else drops it. Only where the eyes read
-/// speaking: without them nothing is held. What the model is told.
+/// no other, or with `LAMP_KEEP_QUIETLY_ONE_FACE` on a line theirs by the
+/// face-in-view rule, no face seen saying it ([`take_held_forget`]); the
+/// conversation's end, a forget, another face or anything else drops it.
+/// Only where the eyes read speaking: without them nothing is held. What
+/// the model is told.
 fn hold_carried_keep(
     shared: &Shared,
     (request, said): (u64, &str),
@@ -14705,6 +14707,21 @@ fn take_held_forget(
             }
         };
     }
+    // A held keep's yes on a line theirs by the face-in-view rule
+    // (`ScopeLease::by_one_face`: their known face the one face in view, or
+    // the line carried and read as theirs, no face seen speaking it, no
+    // other voice heard), with `LAMP_KEEP_QUIETLY_ONE_FACE`: the memory
+    // owner's rule, "mouth detection only blocks the forget and nothing
+    // else". Its person is the line's own (`line_person`), since such a
+    // line holds no forget asker; another face seen speaking the yes is
+    // never theirs. A held forget's yes is unchanged.
+    let keep_by_face = held.call.name == crate::remember::REMEMBER
+        && by_one_face
+        && crate::keep_quietly::one_face_on()
+        && !sight
+            .as_ref()
+            .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
+    let asker = if keep_by_face { line_person } else { asker };
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -14746,6 +14763,8 @@ fn take_held_forget(
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
         Some("the eyes don't read who speaks")
+    } else if keep_by_face {
+        None
     } else if by_one_face {
         // A line theirs only by their face alone in view
         // (`LAMP_PERSON_SCOPE_ONE_FACE`) is no yes to a forget: nothing saw
@@ -14777,7 +14796,15 @@ fn take_held_forget(
             );
             Taken::Nothing
         }
-        None => Taken::Runs(held.call, held.line, false),
+        None => {
+            if keep_by_face {
+                eprintln!(
+                    "lamp-voice second: request {request}: their yes keeps the keep held in request {}: no face was seen saying it, their face the one face in view or the line carried (LAMP_KEEP_QUIETLY_ONE_FACE)",
+                    held.request
+                );
+            }
+            Taken::Runs(held.call, held.line, false)
+        }
     }
 }
 
