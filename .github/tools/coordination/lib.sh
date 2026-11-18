@@ -97,13 +97,16 @@ coord_switch_on() {
 # the same patch by range-diff.
 patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 
-# code_patch_of COMMIT: patch_of with the .md files left out, "none" for a change of docs alone. 18 Nov (Jarvis's ask on
-# #6543): a rebase that merges a PR's own docs rows with rows another train touched changes its patch but not its code.
-# coord_same_patch then names such a head "code:<sha>", and reads2.py counts a READ-OK on it only beside a read of the
-# head's own patch: one reader's restate covers the docs, and the other's earlier read still covers the code.
+# code_patch_of COMMIT: patch_of with the docs left out (any `docs/` folder and README.md files), "none" for a change of
+# docs alone. 18 Nov (Jarvis's ask on #6543): a rebase that merges a PR's own docs rows with rows another train touched
+# changes its patch but not its code. coord_same_patch then names such a head "code:<sha>", and reads2.py counts a
+# READ-OK on it only beside a read of the head's own patch: one reader's restate covers the docs, and the other's
+# earlier read still covers the code. 15:1x (the Reviewer-lead's P2 on #7710): not every .md is docs. The product
+# loads some (`include_str!` guides, a skill's SKILL.md, the realtime prompts), so only docs paths are left out.
 code_patch_of() {
   local b p; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1
-  p=$(git diff -U0 $b $1 -- . ':(exclude)*.md' | git patch-id --stable | cut -d' ' -f1) || return 1
+  p=$(git diff -U0 $b $1 -- . ':(exclude,glob)**/docs/**' ':(exclude,glob)**/README.md' ':(exclude,glob)README.md' \
+      | git patch-id --stable | cut -d' ' -f1) || return 1
   print -r -- ${p:-none}
 }
 
@@ -160,7 +163,8 @@ coord_same_patch() {
     if [[ ${REPLY#* } == $hp ]]; then print -r -- $full; continue; fi
     (( ${reads[(Ie)$s]} )) || continue
     [[ -n $hc ]] || { coord_cached_code_patch $seen[1] $lv && hc=$REPLY || hc=- }
-    [[ $hc != - ]] && coord_cached_code_patch $full $lv && [[ $REPLY == $hc ]] && print -r -- code:$full
+    # 15:1x (the Reviewer-lead's P2 on #7710): a PR of docs alone has no code to carry a read over, so none is offered.
+    [[ $hc != - && $hc != none ]] && coord_cached_code_patch $full $lv && [[ $REPLY == $hc ]] && print -r -- code:$full
   done
   return 0
 }
