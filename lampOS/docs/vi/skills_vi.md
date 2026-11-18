@@ -3518,25 +3518,27 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.
 
-#### Việc một kỹ năng trên đèn đã làm thì được đề nghị dùng nó (`LAMP_MAKE_CORE_OFFER=on`, tắt)
+#### Việc một kỹ năng trên đèn đã làm thì nó được bật lên (`LAMP_MAKE_CORE_OFFER=on`, tắt)
 
 Tắt nếu không đặt `LAMP_MAKE_CORE_OFFER=on`, chưa có trong unit sản phẩm
 nào (#7747: trên lamp-9adf ba lời nhắc uống nước tạo bằng giọng nói nằm cạnh
 kỹ năng lõi `sip-of-water`, không cái nào có các điều kiện giữ của nó; người
 dùng xin một lời nhắc uống nước tốt hơn và nhận được cái thứ hai, kém hơn).
-`lamp-voice` chỉ truyền đúng `on` cho worker `second`
+Được bật lên, không bao giờ đề nghị (First, 18:41): quy tắc của First ngày
+18/11 trên Queue (#6811), "lời đề nghị thành hành động kèm một câu có cách
+hoàn tác". `lamp-voice` chỉ truyền đúng `on` cho worker `second`
 (`process::second_route_worker_environment`). Khi bật
 (`crate::make_core_offer`):
 
 - **Một mô hình phán xét, trước khi tạo gì.** Một lần gọi `make_skill` bằng
-  giọng nói có `request` và không có `new_skill` trước hết lập danh sách
-  ứng viên (`make_core_offer::candidates`): trong các kỹ năng trên đèn mà
-  người dùng không tự tạo, mọi cái đã tắt bằng giọng nói hay trong app, và
-  vài cái khác (đang bật, hoặc tắt trong tệp của nó) có lời gần với request
-  nhất (`skill_about::nearest`), tối đa 40, mỗi cái kèm mô tả trong
-  `SKILL.md` cắt ở 200 byte. Không có ứng viên thì tạo ngay. Nếu có, một
-  lần gọi ngắn tới chính chat của lần tạo (`llm_*`, gửi request và các dòng
-  đó, như brief vốn đã gửi request), giới hạn 2 giây
+  giọng nói có `request` trước hết lập danh sách ứng viên
+  (`make_core_offer::candidates`): trong các kỹ năng trên đèn mà người dùng
+  không tự tạo, mọi cái đã tắt bằng giọng nói hay trong app, và vài cái
+  khác (đang bật, hoặc tắt trong tệp của nó) có lời gần với request nhất
+  (`skill_about::nearest`), tối đa 40, mỗi cái kèm mô tả trong `SKILL.md`
+  cắt ở 200 byte. Không có ứng viên thì tạo ngay. Nếu có, một lần gọi ngắn
+  tới chính chat của lần tạo (`llm_*`, gửi request và các dòng đó, như
+  brief vốn đã gửi request), giới hạn 2 giây
   (`make_core_offer::JUDGE_WITHIN`), hỏi cái nào, nếu có, làm cùng việc,
   với cùng trigger và cùng thời gian. Thời gian khác thì không khớp:
   "remind me to drink water every 20 minutes" không phải lời nhắc sau khi
@@ -3545,33 +3547,28 @@ dùng xin một lời nhắc uống nước tốt hơn và nhận được cái 
   trả lời không nêu ứng viên nào, hết giờ hay lỗi: tạo như trước. Không tốn
   vòng nào của chính mô hình giọng nói, nên `MAX_ROUNDS` không bị ảnh
   hưởng; một lần tạo chờ thêm tối đa 2 giây.
-- **Có một cái khớp** ("remind me to drink water when I've sat a while"):
-  không tạo gì, không bao giờ âm thầm thay thế. Mô hình giọng nói được cho
-  biết đúng kỹ năng đó và chỉ nói nó làm gì theo mô tả của nó, không bao
-  giờ nói có thể đổi thời gian hay thiết lập của nó (chưa kỹ năng lõi nào
-  có thiết lập mà giọng nói được ghi; việc đó cần một bản ghi thiết lập
-  trong `lamp-skills` trước). Cái đã tắt được đề nghị bật lên; cái đang
-  bật, hoặc tắt trong tệp của nó (chỉ bật được trong app), được nói đúng
-  như vậy, kèm câu hỏi họ có còn muốn một kỹ năng mới không.
-- **Đồng ý** bật nó là `make_skill` với `core_on`, chỉ có tên. Chỉ được
-  nhận khi nghe thấy, chỉ câu của chủ sở hữu (`services::owner_hears`), chỉ
-  cho đúng một kỹ năng đã đề nghị (nói theo tên thư mục hay lời, "Sip of
-  water", "a sip of water"), chỉ cho cái đã tắt bằng giọng nói hay trong
-  app, và chỉ trong câu nghe được đầu tiên sau lời đề nghị mà không chỉ là
-  tên của đèn (`make_core_offer::line_heard`), trong vòng 60 giây. Đồng ý
-  cho một câu hỏi sau đó, hay `core_on` cho kỹ năng khác, không bật gì.
-  Trình quản lý bật nó bằng chính `{"on": NAME}` của nó, như công tắc
-  trong app.
-- **Từ chối mà vẫn muốn cái mới** là cùng request với `new_skill`: tạo như
-  đã xin, không phán xét, và lời đề nghị được bỏ.
+- **Khớp và đã tắt bằng giọng nói hay trong app** ("remind me to drink
+  water when I've sat a while", khi Sip of water đang tắt): nó được bật
+  ngay trong lượt đó, bằng chính `{"on": NAME}` của trình quản lý như công
+  tắc trong app, không đề nghị và không cần đồng ý. Không tạo gì, và đèn
+  nói một câu, một lần, theo ngôn ngữ của cuộc trò chuyện: "Sip of water
+  already does that, so I turned it on. Say 'make my own instead' to undo."
+- **Khớp nhưng không bật được** (đã bật, tắt trong tệp của nó, hoặc trình
+  quản lý từ chối): tạo như đã xin, và không nói gì về kỹ năng đó.
+- **Hoàn tác:** "make my own instead", hay câu tương tự, do mô hình giọng
+  nói phán xét, là `make_skill` với `make_own_instead`, chỉ có nó, trong
+  vòng 5 phút (`make_core_offer::UNDO_WITHIN`). Đúng kỹ năng đó được tắt
+  lại, rồi yêu cầu đầu tiên của người dùng, như đã giữ, được tạo như mọi
+  lần tạo; chỉ một lần. Không có gì để hoàn tác thì không tắt và không tạo
+  gì. Trình quản lý không tắt lại được thì nói vậy, không tạo gì, và có thể
+  xin hoàn tác lại.
 
 MAKE IT trong app không đổi. Khi tắt, tham số và câu trả lời của
 `make_skill` giống hệt từng byte như trước. Kiểm thử: `make_core_offer::tests`
-(`a_make_with_a_core_skill_on_the_lamp_is_offered_not_made`,
+(`a_make_a_turned_off_core_skill_does_turns_it_on_with_one_line_and_its_undo`,
+`a_match_that_cant_be_turned_on_is_made_as_asked_and_never_named`,
 `a_different_timing_or_a_lost_judge_goes_on_to_make`,
-`a_yes_turns_the_offered_core_skill_on`,
-`core_on_turns_on_only_the_one_offered_in_the_line_that_answers_it`,
-`a_new_skill_still_wanted_is_made_as_asked_and_the_offer_let_go`,
+`the_undo_turns_it_back_off_and_makes_the_first_ask`,
 `the_judge_is_shown_at_most_forty_skills`,
 `the_switch_off_changes_nothing`).
 

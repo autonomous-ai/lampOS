@@ -7135,17 +7135,19 @@ reset still ask. On (`crate::make_no_asks`):
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
 
-#### What a skill on the lamp already does, offered (`LAMP_MAKE_CORE_OFFER=on`, off)
+#### What a skill on the lamp already does, turned on (`LAMP_MAKE_CORE_OFFER=on`, off)
 
 Off unless `LAMP_MAKE_CORE_OFFER=on`, in no product unit (#7747: on
 lamp-9adf three water reminders made by voice sat beside the core
 `sip-of-water`, none with its guards; the person asked for a better water
-reminder and got a second, worse one). `lamp-voice` passes the exact `on` to
-its `second` worker alone (`process::second_route_worker_environment`).
-On (`crate::make_core_offer`):
+reminder and got a second, worse one). Turned on, never offered (first
+builder 18:41): the first builder's rule of 18 Nov on the Queue (#6811),
+"offers become the action plus one line with an undo". `lamp-voice` passes
+the exact `on` to its `second` worker alone
+(`process::second_route_worker_environment`). On (`crate::make_core_offer`):
 
 - **A model judges, before anything is made.** A voice `make_skill` call
-  with a `request` and no `new_skill` first lists the candidates
+  with a `request` first lists the candidates
   (`make_core_offer::candidates`): of the skills on the lamp the person
   didn't make, every one turned off by voice or in the app, and the few
   others (on, or off in their files) whose words come nearest the request
@@ -7161,34 +7163,28 @@ On (`crate::make_core_offer`):
   no candidate, a timeout or an error: the make goes on as before. No round
   of the voice's own model is spent, so `MAX_ROUNDS` is untouched; a make
   waits at most 2 seconds more.
-- **One matches** ("remind me to drink water when I've sat a while"):
-  nothing is made, never a silent swap. The voice model is told that one
-  skill and says what it does only as its description says, and never that
-  its timing or settings can be changed (no core skill exposes a setting
-  the voice may write; that needs a settings record in `lamp-skills`
-  first). One turned off is offered to be turned on; one on, or off in its
-  files (turned on only in the app), is said as it is, with whether they
-  still want a new one.
-- **A yes** to turning it on is `make_skill` with `core_on`, the name
-  alone. It is taken only heard, only on the owner's line
-  (`services::owner_hears`), only for the one skill offered (said by its
-  folder name or its words, "Sip of water", "a sip of water"), only for one
-  turned off by voice or in the app, and only in the first heard line after
-  the offer that is more than the lamp's name
-  (`make_core_offer::line_heard`), within 60 seconds. A yes to a later
-  question, or a `core_on` for any other skill, turns nothing on. The
-  manage helper turns it on with its own `{"on": NAME}`, as the app's
-  switch does.
-- **A no, when they still want a new one**, is the same request with
-  `new_skill`: made as asked, with no judge, and the offer is let go.
+- **It matches and is turned off by voice or in the app** ("remind me to
+  drink water when I've sat a while", with Sip of water off): it is turned
+  on at once in that turn, by the manage helper's own `{"on": NAME}` as the
+  app's switch does, with no offer and no yes. Nothing is made, and the
+  lamp says one line, once, in the conversation's language: "Sip of water
+  already does that, so I turned it on. Say 'make my own instead' to undo."
+- **It matches but can't be turned on** (already on, off in its files, or
+  the helper refused): the make goes on as asked, and nothing is said of
+  that skill.
+- **The undo:** "make my own instead", or the like, judged by the voice
+  model, is `make_skill` with `make_own_instead` alone, within 5 minutes
+  (`make_core_offer::UNDO_WITHIN`). That one skill is turned back off, then
+  the person's first ask, as it was kept, is made as any make; once. With
+  nothing to undo, nothing is turned off or made. A helper that can't turn
+  it back off is said so, nothing is made, and the undo may be asked again.
 
 The app's MAKE IT is unchanged. Off, `make_skill`'s parameters and answers
 are byte for byte as before. Tests: `make_core_offer::tests`
-(`a_make_with_a_core_skill_on_the_lamp_is_offered_not_made`,
+(`a_make_a_turned_off_core_skill_does_turns_it_on_with_one_line_and_its_undo`,
+`a_match_that_cant_be_turned_on_is_made_as_asked_and_never_named`,
 `a_different_timing_or_a_lost_judge_goes_on_to_make`,
-`a_yes_turns_the_offered_core_skill_on`,
-`core_on_turns_on_only_the_one_offered_in_the_line_that_answers_it`,
-`a_new_skill_still_wanted_is_made_as_asked_and_the_offer_let_go`,
+`the_undo_turns_it_back_off_and_makes_the_first_ask`,
 `the_judge_is_shown_at_most_forty_skills`,
 `the_switch_off_changes_nothing`).
 

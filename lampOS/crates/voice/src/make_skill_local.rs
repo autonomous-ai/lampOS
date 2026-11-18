@@ -860,7 +860,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "enum": crate::made_clash::CHOICES,
         "description": "With clash_id only: replace the other skill or skills, keep them all (they may take turns), or cancel, as the person chose in any words."
     });
-    // A skill on the lamp offered in place of a make (#7747).
+    // The undo of a skill turned on in place of a make (#7747).
     crate::make_core_offer::with_parameters(&mut parameters);
     if code {
         let request = format!(
@@ -3648,13 +3648,6 @@ pub fn answer(
     {
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
     }
-    // A skill on the lamp offered in place of a make, turned on by the
-    // person's yes (#7747, `LAMP_MAKE_CORE_OFFER`).
-    if crate::make_core_offer::on()
-        && let Some(name) = call.args[crate::make_core_offer::CORE_ON].as_str()
-    {
-        return crate::make_core_offer::turned_on_here(name, request, heard, lease);
-    }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
     if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
@@ -3731,12 +3724,24 @@ pub fn answer(
         );
         return serde_json::json!({ "error": NOT_ASKED_ALOUD });
     }
+    // The undo of a skill on the lamp turned on in place of a make (#7747,
+    // `LAMP_MAKE_CORE_OFFER`): turned back off, then the first ask made.
+    let undone = if crate::make_core_offer::on() && call.args[crate::make_core_offer::UNDO] == true
+    {
+        match crate::make_core_offer::undone_here(request) {
+            Ok(first_ask) => Some(first_ask),
+            Err(told) => return told,
+        }
+    } else {
+        None
+    };
     // `request` is not required, so a clash's choice can come alone
     // (#6593): a make with none, or a choice with no clash_id, makes
     // nothing and is told so plainly (Heron's P3 on #6614).
-    if call.args["request"]
-        .as_str()
-        .is_none_or(|request| request.trim().is_empty())
+    if undone.is_none()
+        && call.args["request"]
+            .as_str()
+            .is_none_or(|request| request.trim().is_empty())
     {
         eprintln!("lamp-voice: request {request}: a skill wasn't made: the call had no request");
         if crate::make_no_asks::on() {
@@ -3756,13 +3761,17 @@ pub fn answer(
     let Some(keeping) = Keeping::when(true) else {
         return crate::tools::unavailable();
     };
-    // What a skill on the lamp already does is offered, not made again
-    // (#7747, `LAMP_MAKE_CORE_OFFER`): the model judges, then makes with
-    // `new_skill` when none does or the person still wants one.
-    if let Some(offered) = crate::make_core_offer::before_make_here(&call.args, request, skills) {
-        return offered;
+    // What a turned-off skill on the lamp already does turns it on, with
+    // one line and its undo, never an offer (#7747, `LAMP_MAKE_CORE_OFFER`;
+    // the first builder, 18 Nov 18:41). Never after an undo.
+    if undone.is_none()
+        && let Some(turned) = crate::make_core_offer::before_make_here(&call.args, request, skills)
+    {
+        return turned;
     }
-    let request_words = call.args["request"].as_str().unwrap_or_default();
+    let request_words = undone
+        .as_deref()
+        .unwrap_or_else(|| call.args["request"].as_str().unwrap_or_default());
     // Whose ask it was, asked only for a make with code of its own
     // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's.
     if crate::make_no_asks::on() {
