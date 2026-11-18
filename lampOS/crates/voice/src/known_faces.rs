@@ -2705,6 +2705,11 @@ fn run_switched(
     // [`speaker_gave_face_leave`]). A name given is no yes to keeping a
     // face (the first builder on #7331); setup asks its own face question.
     // Before the name's own checks, so a no is never asked to spell.
+    // Not while the eyes' known file names a face at the lamp, the file the
+    // second voice's rename force reads (`rename_asks`): a known face's
+    // "Call me Jay." goes to the eyes, whose "known as" answer holds the
+    // rename for their yes, and two faces are the eyes' own refusal
+    // (row-7422c on lamp-52e6, #7653).
     if checked
         && switches.name_learn_fix
         && call.name == REMEMBER
@@ -2715,6 +2720,7 @@ fn run_switched(
             &said.this,
             said.before.last().map(|(_, lamp)| lamp.as_str()),
         )
+        && known_now(&known_file_of(socket)).is_none()
     {
         return (json!({"error": ASK_FACE_FIRST}), true);
     }
@@ -6215,6 +6221,48 @@ mod tests {
         assert_eq!(
             sent.join().unwrap(),
             vec![json!({"remember": "Ada", "one_face": true, "replace": false}); 3]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #7653 (row-7422c on lamp-52e6, 18 Nov): a known face's "Call me
+    /// Jay." was refused here as [`ASK_FACE_FIRST`], so the eyes never said
+    /// the face is known as Walter and the rename was never held. With
+    /// `LAMP_NAME_LEARN_FIX`, while the eyes' known file names a face at the
+    /// lamp, the save goes to the eyes and their "known as" answer is a
+    /// rename asked ([`rename_asked`]).
+    #[test]
+    fn a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename() {
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Jay"}),
+        };
+        let (socket, sent) = eyes(vec![json!({"error": "known_as", "known_as": "Walter"})]);
+        std::fs::write(known_file_of(&socket), "Walter\n").unwrap();
+        let switches = FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            ..FaceSwitches::default()
+        };
+        let (told, _) = run_switched(
+            &socket,
+            &save,
+            switches,
+            &Said::now("Call me Jay."),
+            None,
+            &mut None,
+        );
+        assert!(!refused_here(&told), "{told}");
+        assert_eq!(
+            rename_asked(&told),
+            Some(Some("Walter".to_owned())),
+            "{told}"
+        );
+        assert_eq!(
+            sent.join().unwrap(),
+            vec![json!({"remember": "Jay", "one_face": true, "replace": false})]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
