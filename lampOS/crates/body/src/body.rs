@@ -414,6 +414,9 @@ const LEAN_SECONDS: f32 = 1.5;
 /// cubic does, never faster than `GESTURE_STEP`, so it neither snaps back
 /// nor stops dead.
 const EASE_OUT: Duration = Duration::from_millis(700);
+/// How long a new energy level waits for a still head before it is taken
+/// under one no faster than its pace (#7749: taken within 5 s of the send).
+const LEVEL_PATIENCE: Duration = Duration::from_secs(2);
 /// A skill's or idle gesture paused as listening began picks up again where
 /// it was if the voice goes back to resting within this, with no answer
 /// (#2602: the line was music, a cough, or not said to the lamp). A longer
@@ -6917,6 +6920,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut limits = limits;
     let stand_base = standing.map(|up| up.seconds);
     let mut energy = 1u8;
+    // A new level asked and since when (#7749), for `LEVEL_PATIENCE`.
+    let mut level_since: Option<(u8, Duration)> = None;
     let mut said_no_stand = false;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
@@ -7182,20 +7187,29 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             pending = None;
         }
         // The head may be moving (a rest glance, the mood's pose, talk): the
-        // level waits only while a joint is faster than the new level lets
-        // it go, so the cap never drops under it (#7749: waiting for a head under
-        // 1 count a second, nothing playing or waiting, held levels 19-22 s
-        // on lamp-52e6 on 2026-11-19). The head's
-        // roll keeps level 1's pace whatever the level (`ROLL_SPEED`).
+        // level waits for it to be still, so a joint turning keeps the pace
+        // it began with; but after `LEVEL_PATIENCE` only while a joint is
+        // faster than the new level lets it go, so the cap never drops under
+        // it (#7749: waiting for a head under 1 count a second, nothing
+        // playing or waiting, held levels 19-22 s on lamp-52e6 on
+        // 2026-11-19). The head's roll keeps level 1's pace whatever the
+        // level (`ROLL_SPEED`).
+        level_since = (level != energy).then_some(match level_since {
+            Some((was, since)) if was == level => (level, since),
+            _ => (level, now),
+        });
         let next_speed = base.at(level).speed;
+        let patient = level_since.is_some_and(|(_, since)| now - since >= LEVEL_PATIENCE);
         if level != energy
             && playing.is_none()
             && easing_out.is_none()
             && pending.is_none()
-            && velocity
-                .iter()
-                .enumerate()
-                .all(|(index, speed)| index == 1 || speed.abs() <= next_speed)
+            && (velocity.iter().all(|speed| speed.abs() < 1.0)
+                || patient
+                    && velocity
+                        .iter()
+                        .enumerate()
+                        .all(|(index, speed)| index == 1 || speed.abs() <= next_speed))
             && stand_velocity == 0.0
         {
             energy = level;
