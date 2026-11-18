@@ -6542,35 +6542,50 @@ the same code for both writers.
   3,000-byte task bound (`MAX_PROMPT_BYTES`, 2,000 before #7245). Hermes's make folder and words are unchanged.
 - **Only a quick reaction stays DeepSeek's (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
   off unless set, in no product unit; the first builder's ruling on #6811,
-  18 Nov 16:23, and the wider route he said yes to at 16:34).** DeepSeek
-  drafts as before. Its draft is kept only when it is a quick reaction
+  18 Nov 16:23, the wider route he said yes to at 16:34, his 19:50 ruling
+  on the middle form, and the owner's "do it like V1" on #7764).** With an
+  agent on the lamp, the make's first call is DeepSeek's judgement of the
+  request's meaning, never a draft and never a word list
+  (`made_skill::REACTION_JUDGE`, answered `{"quick_reaction": true|false,
+  "reason": "..."}`; its reason is never read or journaled), waited for at
+  most 4 s (`REACTION_JUDGE_WITHIN`; about a second is usual), its time
+  and outcome journaled: `a skill made here: judged in 840 ms: not a quick
+  reaction`. A quick reaction is a phrase, a touch, a pat or the button that
+  only uses the light, the body, exact words or the hum, and needs no
+  internet, sensor, time, read, write or thinking; a one-off reminder is
+  judged one, as the lamp's own timer answers it. Judged one, DeepSeek
+  drafts as before, and its draft is kept only when it is a quick reaction
   (`made_skill::quick_reaction`, by its start and its step kinds alone,
   never a word): started by the person's own act (words they name,
   `asks` or a `[said]` start; a `[trigger]` on `controls/*`, a touch, a pat
   or the button; or no trigger, run only when asked), with only `light`,
-  `body`, a `say` of exact words or the hum, and no `task`, no `[[while]]`
-  and no `grants`. Any other draft (the clock, someone at the desk, a face,
-  what the sitter is doing, any other sensor, a guard, a read, a write, a
-  task) is never kept: the make goes to the lamp's agent with the same
-  brief, the "about a minute" line said as for any hand-over, and the
-  journal says `a skill made here: not a quick reaction (on room/presence):
-  made by the agent (Hermes), DeepSeek's draft not kept`. The agent is told,
-  after the rules and in every repair's rules, sip-of-water's guards as its
-  template (`made_skill::BEHAVIOUR_TEMPLATE`, 986 bytes; the rules with the
-  longest brief go from 7,789 to 8,777 bytes, within lamp-tasks' 48 KiB, and
-  the brief is unchanged, within `MOST_BRIEF_BYTES`): `[[while]]` on
-  `voice/state` `not_equals = "speaking"` for 30 s and `equals = "resting"`
-  for 5 s, on `room/activity` `state not_equals = "head_down"` with
-  `unknown = "holds"`, `rearm = "leaves"`, `most_a_day`, the `wellbeing`
-  budget, `[active]` hours, `[quiet]` nights, `[rest] after_ignored = 2`
-  and one short, warm line of exact words (a made skill's say is said as
-  written, never a note for the voice to word). The agent making none (no
-  answer in its time, busy, its run failed, no make run) is said plainly in
-  its own failure words (`make_skill_agent::not_made_try`) and nothing is
-  kept: never DeepSeek's unguarded draft. With no agent on the lamp at all
-  (#7375's `missing`), "this lamp has no agent set up to make it"; with the
-  agent not known (lamp-tasks' targets unread, or an engine no make run
-  takes), DeepSeek's as before. A `cannot:` answer (a one-off reminder is
+  `body`, a `say` of exact words (never the model's `internet:` or
+  `cannot:` marker) or the hum, and no `task`, no `[[while]]` and no
+  `grants`. Judged none, unsure, late or failed, no draft is asked for; a
+  draft that is no quick reaction is never kept. Either way the make is
+  the middle form: the lamp writes the skill itself as one task for its
+  agent (`make_no_cannot::made`): the trigger its own model picks in one
+  more call (a time is a trigger), or the words that ask for it, and one
+  `do.task` whose words are the person's request, run by
+  `scripts/agent.py`, so the agent does all the work when it fires; no
+  `say`, no other step and no timer or `[[while]]` a model wrote. On a
+  trigger it keeps sip-of-water's guards (`made_skill::template_guards`,
+  from `made_skill::BEHAVIOUR_TEMPLATE`): `[[while]]` on `voice/state`
+  `not_equals = "speaking"` for 30 s and `equals = "resting"` for 5 s, and
+  on `room/activity` `state not_equals = "head_down"` with
+  `unknown = "holds"`, their topics granted by the lamp. Its grants are
+  `make_no_cannot`'s (`net` only with `LAMP_TASK_NET`), it needs skills'
+  tasks on (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; asked for by its
+  words, `LAMP_UPLOAD_TO_AGENT`), it is said back as a task for the
+  agent and waits for the spoken yes, and its `made_with` is the agent's.
+  The journal says `a skill made here: judged not a quick reaction: to
+  the agent (Hermes), its trigger and one task of the request; no DeepSeek
+  draft kept`. Not made (tasks off, a grant no switch covers), it is said
+  plainly and nothing is kept; the agent is never asked to write the skill.
+  With no agent on the lamp at all (#7375's `missing`), "this lamp has no
+  agent set up to make it"; with the agent not known (lamp-tasks' targets
+  unread, or an engine no make run takes), no judgement and DeepSeek's as
+  before. A `cannot:` answer (a one-off reminder is
   the lamp's own timer, never a make), the internet's line and a
   linked-service make keep their routes. The two guards: a `[[while]]` on
   `voice/state` or `room/activity` read as above is said plainly ("never in
@@ -6586,11 +6601,15 @@ the same code for both writers.
   `"made_with"` in its `made.json` entry; one the model wrote is dropped, as
   `made_by` is, switch on or off. Off, every make is byte for byte as
   before. Tests: `a_quick_reaction_is_a_persons_act_with_only_light_body_or_words`,
-  `with_the_switch_only_a_quick_reaction_stays_deepseeks`,
-  `with_the_switch_an_agent_making_none_keeps_nothing_and_says_so`,
+  `a_reaction_judgement_is_read_as_its_bool_alone`,
+  `with_the_switch_a_make_judged_no_reaction_is_its_trigger_and_one_task_never_drafted`,
+  `with_the_switch_a_failed_judgement_goes_to_the_agent`,
+  `with_the_switch_a_quick_reaction_is_judged_one_and_drafted_with_reflex_steps`,
+  `with_the_switch_a_true_judgement_whose_draft_is_no_reaction_goes_to_the_agent`,
+  `with_the_switch_a_make_not_a_reaction_keeps_nothing_when_tasks_are_off`,
   `with_the_switch_a_one_off_reminder_never_reaches_the_agents_make`,
   `with_the_switch_off_a_presence_draft_is_deepseeks_as_before`,
-  `the_template_and_the_longest_brief_fit_the_agents_rules`,
+  `with_the_reactions_switch_a_timed_task_keeps_sip_of_waters_guards_and_no_say`,
   `the_templates_guards_are_said_plainly_and_any_other_while_is_not`,
   `made_with_is_the_lamps_line_for_each_engine_and_the_models_is_dropped`,
   and lamp-skills' `a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker`

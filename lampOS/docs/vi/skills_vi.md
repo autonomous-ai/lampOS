@@ -3318,33 +3318,48 @@ cả hai người viết.
 - **Chỉ phản ứng nhanh ở lại với DeepSeek (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
   tắt nếu không đặt, không có trong unit sản phẩm nào; phán quyết của
   first builder trên #6811, 18/11 16:23, và tuyến rộng hơn anh đồng ý lúc
-  16:34).** DeepSeek vẫn viết bản nháp như trước. Bản nháp chỉ được giữ khi
-  là một phản ứng nhanh (`made_skill::quick_reaction`, chỉ theo cách bắt đầu
+  16:34, phán quyết 19:50 về dạng giữa, và câu "do it like V1" của chủ sở
+  hữu trên #7764).** Khi đèn có agent, lần gọi đầu của lần tạo là đánh giá
+  của DeepSeek theo ý nghĩa của yêu cầu, không phải bản nháp, không danh
+  sách từ (`made_skill::REACTION_JUDGE`, trả lời `{"quick_reaction":
+  true|false, "reason": "..."}`; lý do không bao giờ được đọc hay ghi nhật
+  ký), chờ tối đa 4 giây (`REACTION_JUDGE_WITHIN`; thường khoảng một giây),
+  thời gian và kết quả được ghi: `a skill made here: judged in 840 ms: not a
+  quick reaction`. Phản ứng nhanh là một câu nói, chạm, vuốt đầu hoặc nút
+  bấm chỉ dùng đèn, thân, lời cố định hoặc tiếng ngân, không cần internet,
+  cảm biến, giờ, đọc, ghi hay suy nghĩ; nhắc việc một lần được đánh giá là
+  phản ứng nhanh, vì bộ hẹn giờ của đèn trả lời nó. Được đánh giá là phản
+  ứng nhanh: DeepSeek viết bản nháp như trước, và bản nháp chỉ được giữ khi
+  là phản ứng nhanh (`made_skill::quick_reaction`, chỉ theo cách bắt đầu
   và loại bước, không bao giờ theo từ ngữ): do chính người dùng khởi động
   (câu họ đặt, `asks` hoặc `[said]`; `[trigger]` trên `controls/*`: chạm,
   vuốt đầu, nút bấm; hoặc không có trigger, chỉ chạy khi được gọi), chỉ có
-  `light`, `body`, một `say` đúng lời hoặc tiếng ngân, không `task`, không
-  `[[while]]`, không `grants`. Mọi bản nháp khác (đồng hồ, có người ở bàn,
-  khuôn mặt, việc người ngồi đang làm, cảm biến khác, guard, đọc, ghi, task)
-  không bao giờ được giữ: lần tạo chuyển cho agent của đèn với cùng brief,
-  câu "khoảng một phút" được nói như mọi lần chuyển giao, và nhật ký ghi
-  `a skill made here: not a quick reaction (on room/presence): made by the
-  agent (Hermes), DeepSeek's draft not kept`. Agent được cho biết, sau
-  luật và trong luật của mỗi lần sửa, các guard của sip-of-water làm mẫu
-  (`made_skill::BEHAVIOUR_TEMPLATE`, 986 byte; luật với brief dài nhất từ
-  7.789 lên 8.777 byte, trong giới hạn 48 KiB của lamp-tasks, brief không
-  đổi, trong `MOST_BRIEF_BYTES`): `[[while]]` trên `voice/state`
-  `not_equals = "speaking"` 30 giây và `equals = "resting"` 5 giây, trên
-  `room/activity` `state not_equals = "head_down"` với `unknown = "holds"`,
-  `rearm = "leaves"`, `most_a_day`, ngân sách `wellbeing`, giờ `[active]`,
-  đêm `[quiet]`, `[rest] after_ignored = 2` và một câu ngắn, ấm áp, đúng lời
-  (lời của skill tự tạo được nói đúng như viết). Agent không tạo được (không
-  trả lời kịp, bận, lần chạy hỏng, không có lần chạy make) thì được nói rõ
-  bằng lời lỗi của chính agent (`make_skill_agent::not_made_try`) và không
-  giữ gì: không bao giờ giữ bản nháp không guard của DeepSeek. Đèn không có
-  agent nào (`missing` của #7375): "this lamp has no agent set up to make
-  it"; chưa biết agent (chưa đọc được targets của lamp-tasks, hoặc engine
-  không có lần chạy make): của DeepSeek như trước. Câu trả lời `cannot:`
+  `light`, `body`, một `say` đúng lời (không bao giờ là dấu `internet:`
+  hay `cannot:` của mô hình) hoặc tiếng ngân, không `task`, không
+  `[[while]]`, không `grants`. Được đánh giá không phải, không chắc, trễ
+  hoặc lỗi: không xin bản nháp nào; bản nháp không phải phản ứng nhanh
+  không bao giờ được giữ. Cả hai trường hợp đều theo dạng giữa: đèn tự viết
+  skill thành một task cho agent (`make_no_cannot::made`): trigger do mô
+  hình của đèn chọn trong một lần gọi nữa (giờ cũng là trigger), hoặc lời
+  gọi nó, và một `do.task` có lời là chính yêu cầu của người dùng, chạy
+  bằng `scripts/agent.py`, để agent làm toàn bộ việc khi nó chạy; không
+  `say`, không bước nào khác, không hẹn giờ hay `[[while]]` do mô hình
+  viết. Trên trigger nó giữ các guard của sip-of-water
+  (`made_skill::template_guards`, lấy từ `made_skill::BEHAVIOUR_TEMPLATE`):
+  `[[while]]` trên `voice/state` `not_equals = "speaking"` 30 giây và
+  `equals = "resting"` 5 giây, trên `room/activity` `state not_equals =
+  "head_down"` với `unknown = "holds"`, topic của chúng do đèn cấp. Quyền
+  của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
+  của skill bật (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; gọi bằng lời thì
+  `LAMP_UPLOAD_TO_AGENT`), được nói lại như một task cho agent và chờ câu
+  đồng ý, và `made_with` là của agent. Nhật ký ghi `a skill made here:
+  judged not a quick reaction: to the agent (Hermes), its trigger and one
+  task of the request; no DeepSeek draft kept`. Không tạo được (task tắt,
+  quyền không công tắc nào cho), được nói rõ và không giữ gì; agent không
+  bao giờ được nhờ viết skill. Đèn không có agent nào (`missing` của
+  #7375): "this lamp has no agent set up to make it"; chưa biết agent (chưa
+  đọc được targets của lamp-tasks, hoặc engine không có lần chạy make):
+  không đánh giá, của DeepSeek như trước. Câu trả lời `cannot:`
   (nhắc việc một lần là bộ hẹn giờ của đèn, không bao giờ là make), dòng
   internet và make dịch vụ liên kết giữ tuyến của chúng. Hai guard: một
   `[[while]]` trên `voice/state` hoặc `room/activity` đọc như trên được nói
