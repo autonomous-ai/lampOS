@@ -2268,8 +2268,18 @@ thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
   on" không gọi hàm nào và được trả lời "Bitcoin price is back on" trong
   khi nó vẫn tắt). Khi có kỹ năng họ đã tạo hoặc đã thêm nằm trong tệp
   `off` của lamp-skills, mỗi lượt được nghe trên tuyến thứ hai cho mô hình
-  một ghi chú (`made_turn::off_note`): có bao nhiêu kỹ năng đang tắt, không
-  bao giờ nói là kỹ năng nào; rằng một câu xin dùng hay chạy một kỹ năng
+  một ghi chú (`made_turn::off_note`): có bao nhiêu kỹ năng đang tắt; trong
+  phòng riêng (`LAMP_PRIVATE_ROOM`, nơi mọi câu đều là của chủ) thì nêu cả
+  từng kỹ năng, bằng tên nói của nó kèm dấu tắt ("space facts: off", tối đa
+  8, `OFFERED_MOST`), "Each is still theirs on the lamp, only turned off:
+  never say there is no such skill" (các dòng thử của #7562 trên lamp-9adf,
+  18/11: "Lamp, run space facts" khi nó đang tắt được đáp "There's no space
+  facts skill on the lamp" mà không gọi hàm nào, vì mô hình chỉ được báo
+  số lượng và một kỹ năng chạy theo câu nói của nó không có hàm riêng);
+  ngoài phòng riêng thì không bao giờ nói là kỹ năng nào, vì một cái tên có
+  thể mang tên một người và câu nói có thể không phải của chủ (phòng riêng
+  được đọc không chờ: không bao giờ chờ giọng của chủ trước vòng 1); rằng
+  một câu xin dùng hay chạy một kỹ năng
   như vậy gọi nó như mọi kỹ năng, bằng hàm của nó, bằng `use_skill` với tên
   của nó, hoặc bằng `make_skill` với `run`, không bao giờ chỉ `turn_on`, và
   đèn bật nó lên cho yêu cầu của chủ (bên dưới); và `made_turn::BACK_ON_BY_CALL` ("A skill turned off
