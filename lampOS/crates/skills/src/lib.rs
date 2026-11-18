@@ -452,6 +452,12 @@ fn checked_when(when: Option<String>, whose: &str) -> Option<String> {
 /// The file in `--state-dir` that keeps the skills turned off: one line
 /// each, the skill's name, and nothing else.
 pub const OFF_FILE: &str = "off";
+/// What the model is told when it calls the function of a skill turned
+/// off by a person, by voice or in the app ([`Engine::tool`]): it ran
+/// nothing, and a line that asked to use it never turns it on. The voice's
+/// own text (`lamp_voice::made_turn::FUNCTION_OFF`), which knows such an
+/// answer by it and refuses a `turn_on` after it in the same turn (#7562).
+pub const TOOL_TURNED_OFF: &str = lamp_voice::made_turn::FUNCTION_OFF;
 /// The file in `--state-dir` beside [`OFF_FILE`] that keeps the core skills
 /// shipped off that the person turned on (#2585, `lamp-update`'s
 /// `product_skills::ON`): one name a line, kept on through a round.
@@ -10410,6 +10416,17 @@ impl Engine {
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .ok_or("No skill of mine does that just now.")?;
+        // An installable skill (made, added from a file, from the Store)
+        // turned off by a person, by voice or in the app (#7562's row on
+        // lamp-9adf, 18 Nov: btc price, turned off by voice, ran its task
+        // when the model called its function): its function runs nothing
+        // until it is turned back on, as the running program has the `off`
+        // file (read again within 2 s). A skill the lamp ships keeps its
+        // function, as before; a `[stop]` function, above, still turns one
+        // back on.
+        if skill.kind == SkillKind::Installable && self.off.contains(&skill.name) {
+            return Err(TOOL_TURNED_OFF.into());
+        }
         // A tool's run is not the nudge an unsaid say gives back (#5207).
         self.unsaid_from.remove(&skill.name);
         if skill.requested_audio().is_some() && !permitted {

@@ -3488,7 +3488,7 @@ pub fn yes_taken(place: &Place, request: u64, words: &str, person: Option<&str>)
 }
 
 /// Lower-case words of letters and digits; an apostrophe stays inside one.
-fn plain_words(text: &str) -> Vec<String> {
+pub(crate) fn plain_words(text: &str) -> Vec<String> {
     text.split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
         .map(|word| {
             word.trim_matches(|c: char| c == '\'' || c == '’')

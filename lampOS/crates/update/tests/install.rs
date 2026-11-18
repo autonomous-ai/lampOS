@@ -2837,6 +2837,34 @@ fn the_voice_tells_a_skills_state_and_its_present_spacing() {
     );
 }
 
+/// A skill the person made is turned off and back on by voice, never
+/// removed for it (`LAMP_MADE_SKILL_OFF_SAID`, #7445): on lamp-9adf, 17 Nov
+/// 18:11, with it off in every unit, "turn off the mail count skill" was
+/// asked "Remove mail count?". `on`, once, in lamp-voice, the only part
+/// that reads it.
+#[test]
+fn the_voice_turns_a_made_skill_off_never_removing_it() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    let line = format!(
+        "Environment={}=on",
+        lamp_voice::made_skill::OFF_SAID_ENVIRONMENT
+    );
+    assert_eq!(
+        service.iter().filter(|set| **set == line).count(),
+        1,
+        "the voice sets {line} once"
+    );
+    assert_eq!(
+        lamp_voice::made_skill::OFF_SAID_ENVIRONMENT,
+        "LAMP_MADE_SKILL_OFF_SAID"
+    );
+}
+
 /// Each second-route turn is told the light as `light/state` says it now
 /// (`LAMP_LIGHT_TOLD`): on lamp-52e6 at 9928 (4 Nov), "what colour is the
 /// light?" was answered "White" three times while the light was warm at
