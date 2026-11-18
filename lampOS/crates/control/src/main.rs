@@ -58,6 +58,9 @@ const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
 /// The owner's switch for `speaker.stream`, off unless `on`.
 const SPEAKER_ENVIRONMENT: &str = "LAMP_CONTROL_SPEAKER";
+/// A skill run's say, sound and turn held in the lamp's quiet hours
+/// (#7625): on unless exactly `off`.
+const QUIET_RUNS_ENVIRONMENT: &str = "LAMP_CONTROL_QUIET_RUNS";
 /// `on` makes a new computer's pairing glow once on the ring (a soft pulse,
 /// docs/control.md, "Pairing, once per computer"); off unless given.
 const PAIR_CUE_ENVIRONMENT: &str = "LAMP_CONTROL_PAIR_CUE";
@@ -184,15 +187,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         )
     );
     // The quiet hours (#3917): the lamp's zone, `--zone`, `system` by
-    // default. With a window set, one that can't be read keeps every
-    // computer's say and sound refused as quiet, never a silent UTC; with
-    // the quiet hours off (the default) the zone is never consulted.
+    // default. One that can't be read keeps say and sound refused as quiet,
+    // never a silent UTC: a computer's with a window set, and a skill run's
+    // whenever runs are held (#7625, the default).
     let zone = option(arguments, "--zone").unwrap_or_else(|| "system".to_owned());
     let local_time = match lamp_local_time::LocalTime::zone(&zone) {
         Ok(local_time) => Some(Arc::new(local_time)),
         Err(error) => {
             eprintln!(
-                "lamp-control: {error}; with quiet hours set, say and sound are refused as quiet"
+                "lamp-control: {error}; a skill run's say and sound (and a computer's, with quiet hours set) are refused as quiet"
             );
             None
         }
@@ -207,6 +210,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     match window {
         Some(window) => eprintln!("lamp-control: quiet hours {window} local"),
         None => eprintln!("lamp-control: quiet hours off, this lamp's setting"),
+    }
+    if std::env::var(QUIET_RUNS_ENVIRONMENT).ok().as_deref() == Some("off") {
+        eprintln!(
+            "lamp-control: a skill run's say, sound and turn are not held in quiet hours ({QUIET_RUNS_ENVIRONMENT}=off)"
+        );
+    } else {
+        eprintln!(
+            "lamp-control: a skill run's say, sound and turn are held in the lamp's quiet hours, {} local",
+            lamp_local_time::QuietWindow::DEFAULT
+        );
     }
     // The rates are off unless `--rates default` (or
     // LAMP_CONTROL_RATES=default) turns them back on: every rate lifted but
@@ -231,6 +244,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(clients_path),
     )
     .with_quiet_hours(session::Quiet::new(local_time).with_window(window))
+    // A skill run's say, sound and turn held in the lamp's quiet hours (#7625),
+    // unless `LAMP_CONTROL_QUIET_RUNS` is exactly `off`.
+    .with_quiet_runs(std::env::var(QUIET_RUNS_ENVIRONMENT).ok().as_deref() != Some("off"))
     .with_language_file(std::env::var_os("LAMP_LANGUAGE_FILE").map_or_else(
         || PathBuf::from(lamp_control::language::PATH),
         PathBuf::from,
