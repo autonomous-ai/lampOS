@@ -142,7 +142,17 @@ pub fn instruction(line: &str) -> String {
     )
 }
 
-/// The note beside a line [`said_harm`] caught, for the model.
+/// [`NOTE`] when the lamp said its line in the last five minutes and won't
+/// again now ([`AGAIN_AFTER`]).
+pub const NOTE_SAID: &str = "These words may mean the person might harm themselves or not want to live. Answer with care, as your instructions say. The lamp gave them its line with a place to turn a moment ago: don't repeat it or any number unless they ask.";
+
+/// Beside any other line while the lamp's line is owed (a care turn cut
+/// before it): the lamp says it after this answer, so the model doesn't
+/// too (the safety read's P2 on #7752).
+pub const OWED_NOTE: &str = "The lamp says its line with a place to turn itself, right after your answer: don't say it or any number.";
+
+/// The note beside a line [`said_harm`] caught, for the model, when the
+/// lamp's line follows its answer.
 pub const NOTE: &str = "These words may mean the person might harm themselves or not want to live. Answer with care, as your instructions say. The lamp says the line with a place to turn itself, right after your answer: don't say it or any number.";
 
 /// The coordinator's written turn after a care turn was cut or stopped and
@@ -175,7 +185,22 @@ impl CareLines {
     pub fn installed() -> Self {
         let path =
             std::env::var_os(FILE_ENVIRONMENT).unwrap_or_else(|| std::ffi::OsString::from(FILE));
-        Self::or_shipped(std::fs::read_to_string(path).ok().as_deref())
+        Self::or_shipped_whole(std::fs::read_to_string(path).ok().as_deref())
+    }
+
+    /// [`Self::or_shipped`], and a copy that lacks a region the shipped
+    /// lines have is not a good one: a US lamp is never given the default
+    /// because a region went missing (the safety read's P3 on #7752).
+    pub fn or_shipped_whole(text: Option<&str>) -> Self {
+        let shipped = Self::shipped();
+        text.and_then(Self::parse)
+            .filter(|lines| {
+                shipped
+                    .regions
+                    .keys()
+                    .all(|region| lines.regions.contains_key(region))
+            })
+            .unwrap_or(shipped)
     }
 }
 
@@ -201,6 +226,14 @@ pub fn country_of_zone(zone: &str) -> Option<&'static str> {
         "America/Menominee",
         "Pacific/Honolulu",
     ];
+    // Old names of US zones, and Puerto Rico, which 988 serves.
+    const US_ALSO: &[&str] = &[
+        "America/Indianapolis",
+        "America/Fort_Wayne",
+        "America/Louisville",
+        "America/Knox_IN",
+        "America/Puerto_Rico",
+    ];
     const US_PREFIXES: &[&str] = &[
         "America/Indiana/",
         "America/Kentucky/",
@@ -208,7 +241,10 @@ pub fn country_of_zone(zone: &str) -> Option<&'static str> {
         "US/",
     ];
     let zone = zone.trim();
-    if US.contains(&zone) || US_PREFIXES.iter().any(|prefix| zone.starts_with(prefix)) {
+    if US.contains(&zone)
+        || US_ALSO.contains(&zone)
+        || US_PREFIXES.iter().any(|prefix| zone.starts_with(prefix))
+    {
         Some("US")
     } else if ["Asia/Ho_Chi_Minh", "Asia/Saigon"].contains(&zone) {
         Some("VN")
@@ -228,14 +264,22 @@ pub fn country_of_zone(zone: &str) -> Option<&'static str> {
     }
 }
 
+/// The zone the lamp's images ship set to (`scripts/imager`), kept by
+/// setup when the app sends none it knows: it may never have been set.
+pub const IMAGE_ZONE: &str = "America/New_York";
+
 /// Where the lamp is, for its line: the hand-set region
 /// ([`REGION_ENVIRONMENT`]), else lamp-cloud's placement when it says
-/// `CN`, else the country of the lamp's set time zone (`zone`). None when
-/// none says: the default line.
+/// `CN`, else the country of the lamp's set time zone (`zone`). The
+/// images' own zone ([`IMAGE_ZONE`]) counts only for an owner who speaks
+/// English (`language`): a lamp never set up with a zone is not told 988 in
+/// another language (the safety read's P2 on #7752). None when none says:
+/// the default line, which is never a wrong number.
 pub fn region_from(
     set: Option<&str>,
     placement: Option<&str>,
     zone: Option<&str>,
+    language: &str,
 ) -> Option<String> {
     let two = |value: &str| {
         let value = value.trim().to_ascii_uppercase();
@@ -243,15 +287,20 @@ pub fn region_from(
     };
     set.and_then(two)
         .or_else(|| placement.and_then(two).filter(|region| region == "CN"))
-        .or_else(|| zone.and_then(country_of_zone).map(str::to_owned))
+        .or_else(|| {
+            zone.filter(|zone| zone.trim() != IMAGE_ZONE || language == "en")
+                .and_then(country_of_zone)
+                .map(str::to_owned)
+        })
 }
 
-/// [`region_from`] as the lamp has it now.
-pub fn region_now() -> Option<String> {
+/// [`region_from`] as the lamp has it now, for an owner speaking `language`.
+pub fn region_now(language: &str) -> Option<String> {
     region_from(
         std::env::var(REGION_ENVIRONMENT).ok().as_deref(),
         crate::second_provider::region_from_file().as_deref(),
         crate::local_time::zone_here().as_deref(),
+        language,
     )
 }
 
@@ -260,7 +309,7 @@ pub fn line_now() -> String {
     let language =
         crate::language::from_environment().map_or("en", crate::language::Language::code);
     CareLines::installed()
-        .line(region_now().as_deref(), language)
+        .line(region_now(language).as_deref(), language)
         .to_owned()
 }
 
@@ -348,7 +397,7 @@ impl Care {
     pub fn line(&self) -> String {
         let region = match &self.region {
             RegionFrom::Fixed(region) => region.clone(),
-            RegionFrom::Now => region_now(),
+            RegionFrom::Now => region_now(&self.language),
         };
         self.lines
             .line(region.as_deref(), &self.language)
@@ -359,7 +408,7 @@ impl Care {
     pub fn region(&self) -> Option<String> {
         match &self.region {
             RegionFrom::Fixed(region) => region.clone(),
-            RegionFrom::Now => region_now(),
+            RegionFrom::Now => region_now(&self.language),
         }
     }
 
@@ -375,10 +424,17 @@ impl Care {
         }
     }
 
-    /// Whether a line is owed at `now`.
+    /// Whether a line is owed at `now` and due ([`Said::is_due`]): the
+    /// next answer's end says it.
     pub fn owes(&self, now: std::time::Instant) -> bool {
         self.owed.lock().is_ok_and(|owed| {
-            owed.is_some_and(|owed| now.saturating_duration_since(owed.at) < AGAIN_AFTER)
+            owed.is_some_and(|owing| {
+                now.saturating_duration_since(owing.at) < AGAIN_AFTER
+                    && self
+                        .said
+                        .lock()
+                        .is_ok_and(|said| said.is_due(now, owing.asks))
+            })
         })
     }
 
