@@ -222,7 +222,10 @@ jobs:
       # Controls state by CLOCK_MONOTONIC, not the wall clock a slow runner outran. 18 Nov (#7657 made it block): it
       # still ends "privacy switch unreadable: physical privacy closed or lost freshness" on a slow runner, after
       # `listening_ready`, because lamp-controls' loop didn't run for 134 ms, past the privacy reading's 50 ms
-      # (lamp-voice at 1069d04a6 and train 1034, 11:4x). So it doesn't block again until a runner's stall can't end it.
+      # (lamp-voice at 1069d04a6 and train 1034, 11:4x). #7675: LAMP_PRIVACY_GAP_RIDE=on (#2602) rides a stall under a second, but only in a `serve` run
+      # (`GapRide::new(.. && lifetime.continuous())`); this step's directed-fixture run is finite, so the ride is inert
+      # here: run 44292874929 (18 Nov 12:05Z) ended the same way, with no `privacy_gap` row. It stays non-blocking until the
+      # sim's loop keeps its 50 ms or the step runs the voice as a service.
       # If it fails it prints what the fault was (the journal's `reference_fault` row with every timestamp turned into an age before
       # the fault). Cleanup (F3): only the pids this step started; the sim's children (lamp-controls) outlive
       # `kill` by about a second and still write, so wait for the sim, poll up to 5 s for its sockets to go, and retry
@@ -290,6 +293,8 @@ jobs:
           except OSError as error:
               print("no events.jsonl:", error); sys.exit(0)
           for row in rows:
+              if row.get("kind") == "fault":
+                  print("fault row:", json.dumps(row))
               if row.get("kind") != "reference_fault":
                   continue
               fault = row["details"]; timing = fault["timing"]; at = fault["at_us"]

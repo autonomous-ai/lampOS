@@ -2674,6 +2674,70 @@ fn a_short_gap_in_the_switchs_readings_is_ridden_and_the_conversation_goes_on() 
     assert!(ran.error.contains("freshness lost"), "{}", ran.error);
 }
 
+/// #7675: on a slow macOS runner the Controls loop stalled 134 ms, past the
+/// privacy reading's 50 ms, and the voice ended "privacy switch unreadable".
+/// With `LAMP_PRIVACY_GAP_RIDE=on` (the Mac CI step only; no lamp unit sets
+/// it) such a stall is ridden with the microphone closed: nothing taken, the
+/// capture's lease lapsed, the conversation goes on when a fresh open reading
+/// is steady.
+#[test]
+fn a_134_ms_stall_of_the_controls_loop_is_ridden_with_the_microphone_closed() {
+    let (ran, began) = gap_run(true, 1_500_000, (300_000, 434_000), None);
+    let started = gap_marks(&ran, "began");
+    let reopened = gap_marks(&ran, "reopened");
+    assert_eq!(reopened.len(), 1, "{}", ran.error);
+    let (gap_at, _) = started[0];
+    let (open_at, lasted) = reopened[0];
+    assert!(
+        (began + 300_000..began + 400_000).contains(&gap_at),
+        "{}",
+        gap_at - began
+    );
+    assert_eq!(lasted, Some(open_at - gap_at));
+    assert!(
+        lasted.unwrap() < crate::privacy_gap::RIDE_US,
+        "a stall of a loop is ridden well inside the bound: {lasted:?}"
+    );
+    // The microphone stayed closed the whole time: no authority reached the
+    // capture between the lapse and the reopen, and nothing was said.
+    assert!(
+        ran.capture_authorities
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at)),
+        "renewed in the stall"
+    );
+    assert!(
+        ran.chunk_times
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at))
+    );
+    assert!(ran.capture_authorities.iter().any(|at| *at >= open_at));
+}
+
+/// The same stall with the switch off (every lamp's unit today) ends the
+/// conversation at once: the lamp's rule is not loosened.
+#[test]
+fn the_same_stall_without_the_switch_still_ends_the_conversation_at_once() {
+    let (ran, began) = gap_run(false, 1_500_000, (300_000, 434_000), None);
+    assert!(gap_marks(&ran, "began").is_empty());
+    assert!(gap_marks(&ran, "reopened").is_empty());
+    assert!(
+        ran.error.contains("privacy switch unreadable"),
+        "{}",
+        ran.error
+    );
+    assert!(ran.ended_us < began + 434_000, "{}", ran.error);
+}
+
+/// With the switch on, a reading that is really closed (the physical mute)
+/// is still not ridden: the microphones close at once and it ends.
+#[test]
+fn a_really_closed_reading_is_not_ridden_even_with_the_switch_on() {
+    let (ran, began) = gap_run(true, 1_500_000, (300_000, 434_000), Some(300_000));
+    assert!(gap_marks(&ran, "reopened").is_empty(), "{}", ran.error);
+    assert!(ran.ended_us < began + 500_000, "{}", ran.error);
+}
+
 /// #2602, the first builder's P1s on #2623: with the rig's camera and the
 /// eyes' link both there, a ridden gap gives neither a yes. The eyes are
 /// told no as it begins and hear no yes until it reopens; the camera gets
