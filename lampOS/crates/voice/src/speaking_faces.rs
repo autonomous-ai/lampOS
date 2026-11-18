@@ -1100,7 +1100,7 @@ impl SpeakingFaces {
                     .0
                     .filter(|pitch| !crate::said_to_me::lost(*pitch))
             };
-            let mut pitches: Vec<f32> = during().filter_map(measured).collect();
+            let mut pitches: Vec<f32> = during().filter_map(|look| measured(&look)).collect();
             let used = during()
                 .filter(|look| measured(look).is_some() || look.speaker_pose.1.is_some())
                 .count();
