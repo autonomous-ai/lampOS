@@ -10723,17 +10723,35 @@ impl Heeding {
             return false;
         }
         let turned = signs.turned == Some(true);
-        let (pitch, looking, looks) = self
+        // Another voice in the conversation: this line's print under
+        // `DIFFERENT_BELOW` against the conversation's, or a line of it that
+        // showed another person (`Self::another_person`). The lone face's
+        // pose, none read speaking, then says nothing of who said the line
+        // (the Reviewer-lead's HOLD on #7726). A print not come yet is no
+        // other voice.
+        let another_voice = signs.going_on
+            && (self.another_person.is_some()
+                || self
+                    .voices
+                    .as_mut()
+                    .and_then(|voices| voices.likeness_so_far(request))
+                    .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
+        let (pitch, looking, looks, skipped) = self
             .eyes
             .as_ref()
             .zip(line_between(said.0, said.1))
-            .map_or((None, None, 0), |((eyes, _), (from, to))| {
+            .map_or((None, None, 0, false), |((eyes, _), (from, to))| {
                 if signs.going_on {
-                    eyes.speaker_pose_between(from, to)
+                    let (pitch, looking, looks) =
+                        eyes.speaker_pose_between(from, to, !another_voice);
+                    let skipped = another_voice
+                        && eyes.speaker_pose_between(from, to, true) != (pitch, looking, looks);
+                    (pitch, looking, looks, skipped)
                 } else {
                     // The newest look that gave a pose: one look, or none.
                     let (pitch, looking) = eyes.turned_pose_between(from, to);
-                    (pitch, looking, usize::from(pitch.is_some() || looking.is_some()))
+                    let looks = usize::from(pitch.is_some() || looking.is_some());
+                    (pitch, looking, looks, false)
                 }
             });
         let line = crate::said_to_me::Line {
@@ -10757,7 +10775,10 @@ impl Heeding {
         };
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        let pose = crate::said_to_me::pose(pitch, looking, looks);
+        let mut pose = crate::said_to_me::pose(pitch, looking, looks);
+        if skipped {
+            pose.push_str(", the lone face's pose skipped: another voice");
+        }
         let words = heard.split_whitespace().count();
         // Every decision journaled with the pose, for a row to count
         // (#7721); the held line as before, the pose after it.
@@ -28083,6 +28104,38 @@ mod tests {
             None,
             "a yes awaited"
         );
+    }
+
+    /// The Reviewer-lead's HOLD on #7726: Jay alone in view, head down, his
+    /// mouth unread (as in most looks on lamp-74ff). With no other voice in
+    /// the conversation his pose is the line's: held. When the conversation
+    /// has shown another voice, Ada's off camera, his pose says nothing of
+    /// her follow-up: judged as before, the pose unread, answered.
+    #[test]
+    fn with_said_to_me_a_lone_face_down_holds_only_its_own_voices_line() {
+        use lamp_msgs::SpeakingState::Unknown;
+        let judged = |another_voice: bool| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let down = (Some(40f32.to_radians()), None);
+            turned_face_looks_posed(&eyes, now, 200, &[Some(Unknown)], &mut 0, down);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            heeding.keeping_line_rooms();
+            heeding.keep_line_room(8, crate::room_told::Room::Quiet, true, another_voice);
+            let signs = super::Signs {
+                going_on: true,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let line = "And can you add milk to the list";
+            let verdict = heeding.heed_signs(9, (now_us, now_us + 2_200_000), line, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        assert!(judged(false).is_some(), "his own voice, head down");
+        assert_eq!(judged(true), None, "another voice says it");
     }
 
     /// `LAMP_TURNED_FACE_SPEAKS` (lamp-52e6, 24 Oct 05:31): desk talk between

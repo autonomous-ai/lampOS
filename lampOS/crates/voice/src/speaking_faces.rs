@@ -258,6 +258,10 @@ struct Look {
     /// leave its mouth unread); none with two speaking faces or several in
     /// view (#7721, [`SpeakingFaces::speaker_pose_between`]).
     speaker_pose: (Option<f32>, Option<bool>),
+    /// [`Self::speaker_pose`] is the lone face's, none read speaking: its
+    /// voice not shown to be that face's, so read only when no other voice
+    /// is in the conversation (the Reviewer-lead's HOLD on #7726).
+    speaker_lone: bool,
     /// The eyes' word in this look on which lost id each face follows
     /// (`follows`, #4885): (old, new), bare ids.
     follows: Vec<(String, String)>,
@@ -472,6 +476,7 @@ impl SpeakingFaces {
             _ => None,
         };
         let speaker_pose = speaker.map_or((None, None), |face| (face.pitch, face.looking));
+        let speaker_lone = speaking_faces.is_empty();
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
@@ -514,6 +519,7 @@ impl SpeakingFaces {
             turned_unread,
             turned_pose,
             speaker_pose,
+            speaker_lone,
             follows,
         });
     }
@@ -1081,11 +1087,14 @@ impl SpeakingFaces {
     /// down, and `looking` false when more looks read it false than true;
     /// `None` when no look gave it, which is unknown (`LAMP_SAID_TO_ME` in a
     /// conversation's window, #7721); with the number of looks that gave
-    /// either, for the journal.
+    /// either, for the journal. Without `lone`, a look whose pose is only
+    /// the lone face's ([`Look::speaker_lone`]) gives none: another voice
+    /// may be saying the line off camera.
     pub fn speaker_pose_between(
         &self,
         from: Instant,
         to: Instant,
+        lone: bool,
     ) -> (Option<f32>, Option<bool>, usize) {
         self.looks.lock().map_or((None, None, 0), |looks| {
             let during = || {
@@ -1093,6 +1102,7 @@ impl SpeakingFaces {
                     .kept
                     .iter()
                     .filter(|look| look.at >= from && look.at <= to)
+                    .filter(|look| lone || !look.speaker_lone)
             };
             // The eyes' lost-marks sentinel is no pitch (#7721).
             let measured = |look: &&Look| {
@@ -2898,19 +2908,22 @@ mod tests {
         look(&eyes, 1, Yes, 0.8, Some(false));
         look(&eyes, 2, Yes, 0.0, Some(true));
         let to = from + EVERY * 3;
-        assert_eq!(eyes.speaker_pose_between(from, to), (Some(0.7), Some(false), 3));
+        assert_eq!(eyes.speaker_pose_between(from, to, true), (Some(0.7), Some(false), 3));
         assert_eq!(eyes.turned_pose_between(from, to), (None, None), "not turned");
         let unread = SpeakingFaces::default();
         look(&unread, 0, Unknown, 0.7, None);
-        assert_eq!(unread.speaker_pose_between(from, to), (Some(0.7), None, 1));
+        assert_eq!(unread.speaker_pose_between(from, to, true), (Some(0.7), None, 1));
+        // Another voice in the conversation: the lone face's pose is not read.
+        assert_eq!(unread.speaker_pose_between(from, to, false), (None, None, 0));
+        assert_eq!(eyes.speaker_pose_between(from, to, false), (Some(0.7), Some(false), 3));
         let still = SpeakingFaces::default();
         look(&still, 0, No, 0.7, Some(false));
-        assert_eq!(still.speaker_pose_between(from, to), (None, None, 0));
+        assert_eq!(still.speaker_pose_between(from, to, true), (None, None, 0));
         // Lost marks (the eyes' 90 degrees) are no pitch: unread.
         let lost = SpeakingFaces::default();
         look(&lost, 0, Yes, std::f32::consts::FRAC_PI_2, None);
-        assert_eq!(lost.speaker_pose_between(from, to), (None, None, 0));
-        assert_eq!(eyes.speaker_pose_between(to, to), (None, None, 0));
+        assert_eq!(lost.speaker_pose_between(from, to, true), (None, None, 0));
+        assert_eq!(eyes.speaker_pose_between(to, to, true), (None, None, 0));
     }
 
     /// #7442: one `yes` in one or two looks is a face seen speaking; a mouth
