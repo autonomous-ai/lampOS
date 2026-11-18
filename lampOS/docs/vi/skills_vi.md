@@ -4700,10 +4700,12 @@ thoại của giọng nói giữ ghi chú viết cùng câu trả lời (300 byt
 trống đặt ở đầu). Hàm `desk_time` của giọng nói đi cùng công tắc này
 ([second-voice.md](../second-voice.md)).
 
-- **Kỹ năng nào có.** Sip of water (cả hai ghi chú), Stretch break và Rest
-  your eyes mở đầu ghi chú bằng nó. Chỉ được điền cho kỹ năng có
-  `room/activity` trong `[permissions] topics`, từ giá trị mới nhất của chủ đề
-  đó còn hạn và đang có lần ngồi.
+- **Kỹ năng nào có.** Bất kỳ kỹ năng nào có `{sitting}` trong ghi chú trần:
+  kỹ năng tự chọn bằng cách viết nó vào, code không có danh sách kỹ năng nào.
+  Chỉ được điền cho kỹ năng lõi có `room/activity` trong `[permissions]
+  topics`, từ giá trị mới nhất của chủ đề đó còn hạn và đang có lần ngồi; ở
+  kỹ năng khác thì bị bỏ đi. Hiện Sip of water (cả hai ghi chú), Stretch break
+  và Rest your eyes mở đầu ghi chú bằng nó.
 - **Nói gì.** Số phút nguyên, và khi biết giờ địa phương (`Engine::clock`),
   giờ bắt đầu lần ngồi; không bao giờ là nhãn trạng thái của mắt, và chỉ lần
   ngồi hiện tại, mà mắt bắt đầu lại khi người khác ngồi xuống.
