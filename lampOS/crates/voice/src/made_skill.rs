@@ -217,6 +217,25 @@ pub fn set_loose_here(on: Option<bool>) {
     LOOSE_HERE.with(|here| here.set(on));
 }
 
+thread_local! {
+    /// [`remind_told`] as a test of this thread sets it.
+    static REMIND_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether the brief tells the repeating reminder step (#7245): with the
+/// agent's guide on (`make_skill_agent::guide_on`), the make the guide and
+/// its examples teach it to.
+pub fn remind_told() -> bool {
+    REMIND_HERE
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(crate::make_skill_agent::guide_on)
+}
+
+/// [`remind_told`] for the calling thread alone, for tests.
+pub fn set_remind_here(on: Option<bool>) {
+    REMIND_HERE.with(|here| here.set(on));
+}
+
 /// The least cooldown of a made skill that speaks with [`LOOSE_ENVIRONMENT`]
 /// on: a minute, as often as the person asked, never every moment.
 pub const LEAST_LOOSE_SAY_COOLDOWN_SECS: u64 = 60;
@@ -1085,7 +1104,9 @@ pub const ASKS_RULES: &str = "A skill may also start when the person says words 
      yes, a no, a question or a stop. Started only by them, it has no [trigger] and no [ask], \
      and no topics; its steps are any the rules above give a skill (a send, a task for the \
      lamp's agent, its code, the light, the head, a say), each as told there. The lamp says the \
-     words back and runs it each time the person says them; a send still waits for their yes.";
+     words back and runs it each time the person says them; a send still waits for their yes. \
+     The asks line is the file's first line, never under [permissions] or any other table: \
+     asks = [\"apple file\"], then kind = \"installable\", then version, then [permissions].";
 
 /// What the lamp can't do yet with [`WRITES_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
@@ -1312,6 +1333,98 @@ const MOST_SCRIPT_PATH_BYTES: usize = 64;
 /// The most of a `task` step's own words, said back whole.
 pub const MOST_TASK_CHARS: usize = 120;
 
+/// The folder a made skill's light shows are kept in (#7245, `show =
+/// "NAME"` and `shows/NAME.toml`, lamp-skills' #1679 format), inside its
+/// own: only with [`ASKS_ENVIRONMENT`] on, since lamp-skills plays a show
+/// only in a skill a person asks for (its tool, or its own words alone).
+pub const SHOWS_FOLDER: &str = "shows/";
+/// The most light shows a made skill may carry.
+pub const MOST_SHOWS: usize = 2;
+/// The most of one show's file: 30 frames with a pattern each fit well
+/// within it.
+pub const MOST_SHOW_BYTES: usize = 4 * 1024;
+/// The most frames of a show (`lamp_skills::SHOW_FRAMES`' end), told the
+/// repair before lamp-skills' own check holds it to 2 to 30.
+pub const MOST_SHOW_FRAMES: usize = 30;
+/// The most of a show's name, as lamp-skills takes a file's name.
+const MOST_SHOW_NAME_BYTES: usize = 48;
+
+/// What a repair is told when a made skill's light show isn't held
+/// ([`shows_held`]).
+const SHOWS_ONLY: &str = "A light show is one fenced block named ```shows/NAME.toml (NAME in \
+                          lowercase letters, digits, - and _), 2 to 30 [[light]] frames, each \
+                          colour, level 1 to 5 and for = \"2s\" to \"20s\", a minute in all, \
+                          played by one [[do]] step show = \"NAME\" in a skill started by its \
+                          asks alone, with light = true in [permissions]";
+
+/// What the person hears when a made skill's light show isn't held.
+pub const SHOWS_NOT_HELD: &str = "its light show isn't one the lamp can play";
+
+/// The name of a show's file `path`, `shows/NAME.toml`: NAME as
+/// lamp-skills takes a file's name (lowercase letters, digits, `-` and
+/// `_`), so always inside its folder; none otherwise.
+fn show_name(path: &str) -> Option<&str> {
+    let name = path.strip_prefix(SHOWS_FOLDER)?.strip_suffix(".toml")?;
+    ((1..=MOST_SHOW_NAME_BYTES).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_'))
+    .then_some(name)
+}
+
+/// A made skill's light show refused for its form: [`SHOWS_NOT_HELD`]
+/// said, and `what` with [`SHOWS_ONLY`] told the repair; `what`, a fixed
+/// phrase, journaled.
+fn shows_not_held(what: &str) -> Refused {
+    eprintln!("lamp-voice: a made skill's light show isn't held: {what}");
+    Refused(
+        SHOWS_NOT_HELD.into(),
+        Some(format!(
+            "The lamp refused its light show: {what}. {SHOWS_ONLY}"
+        )),
+    )
+}
+
+/// A made skill's light shows held to their form (#7245), before
+/// lamp-skills' own check reads each frame as it packs: each file played
+/// by a `show` step and each `show` step's file written, each a TOML table
+/// of at most [`MOST_SHOW_FRAMES`] `[[light]]` frames.
+fn shows_held(toml: &str, shows: &[(String, String)]) -> Result<(), Refused> {
+    let played: Vec<String> = toml::from_str::<toml::Table>(toml)
+        .ok()
+        .and_then(|table| table.get("do")?.as_array().cloned())
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("show")?.as_str().map(str::to_owned))
+        .collect();
+    let written: Vec<&str> = shows
+        .iter()
+        .filter_map(|(path, _)| show_name(path))
+        .collect();
+    if played.iter().any(|name| !written.contains(&name.as_str())) {
+        return Err(shows_not_held(
+            "a show step with no shows/ file of its name",
+        ));
+    }
+    if written
+        .iter()
+        .any(|name| !played.iter().any(|step| step == name))
+    {
+        return Err(shows_not_held("a shows/ file no show step plays"));
+    }
+    for (_, text) in shows {
+        let frames = toml::from_str::<toml::Table>(text)
+            .ok()
+            .and_then(|table| Some(table.get("light")?.as_array()?.len()));
+        match frames {
+            Some(frames) if frames <= MOST_SHOW_FRAMES => {}
+            Some(_) => return Err(shows_not_held("more frames than a show may have")),
+            None => return Err(shows_not_held("a show that isn't [[light]] frames")),
+        }
+    }
+    Ok(())
+}
+
 /// What a made skill's code may be granted: the grants a `do.task`'s script
 /// may hold (`crate::skill_task_yes::GRANTS`, #6305, the same names in the
 /// same order, a test holds), each with what this say-back's sentence says
@@ -1332,6 +1445,17 @@ pub const GRANTS: [(&str, &str); 12] = [
     ("notes", "small notes of its own on the lamp"),
     ("speech", "everything the lamp says out loud"),
 ];
+
+/// The grants the making model is told of ([`GRANTS`]): `notes` only with
+/// [`notes_on`], as its SDK calls and rules are (#7245, lamp-c0a4, 18 Nov:
+/// the grant told with no notes call, the model reasoned the SDK had none).
+pub fn grants_told() -> Vec<&'static str> {
+    GRANTS
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| *name != "notes" || notes_on())
+        .collect()
+}
 
 /// The grant a made skill's code never has ([`GRANTS`]), and what the lamp
 /// can't do yet when it is asked for.
@@ -1479,6 +1603,17 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     // the longest brief stays within [`MOST_BRIEF_BYTES`]. With the
     // person's own words on too ([`ASKS_ENVIRONMENT`]), both stand there,
     // written short so the longest brief with all on still fits.
+    // #7245: the repeating reminder step (`remind every`) and a repeat
+    // while someone stays, only with the agent's guide on (First's P2 on
+    // #7737): off, DeepSeek's makes are given today's brief. A one-off
+    // reminder (`in`, `at`) is never taught: it stays the lamp's Schedule.
+    let remind = if remind_told() {
+        ", or remind = { every = \"30m\" (15m-24h), words } (actions = \
+         [\"repeat_reminder\"]); again every N minutes while someone stays: a held \
+         trigger, no rearm, cooldown N"
+    } else {
+        ""
+    };
     let trigger = if asks_on() && said_on() {
         "one [trigger] listed, [said]/asks as above"
     } else if asks_on() {
@@ -1497,7 +1632,7 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
          during = {{ from = \"HH:MM\", to = \"HH:MM\" }} if asked; \
          [ask] policy = \"nudge\" or listed; [[do]] only steps asked: light = \
          {{ colour, level 1-5, for }}, body = {{ gesture }}, say = {{ text }} (exact \
-         words, asker's language) or cue = \"hum\".{read}{code} SKILL.md: \
+         words, asker's language) or cue = \"hum\"{remind}.{read}{code} SKILL.md: \
          front matter name (lowercase, hyphens), description. \
          {REQUEST_MARK}{request}"
     ))
@@ -1528,19 +1663,21 @@ const REPAIR_ASK: &str = " Answer again with both blocks, fixed. ";
 /// (`make_skill_local`).
 pub const MOST_REPAIR_BYTES: usize = 735;
 /// The longest a [`brief`] is with the longest request, any service's
-/// read step included: its own words, at most 680 bytes, and the
-/// request's [`MOST_REQUEST_BYTES`]. 1,160 with a 480-byte request, 2,680
-/// with 2,000 (18 Nov).
-pub const MOST_BRIEF_BYTES: usize = 2_680;
+/// read step included: its own words, at most 960 bytes, and the
+/// request's [`MOST_REQUEST_BYTES`]. 1,160 with a 480-byte request; 1,440
+/// since the brief tells the remind step, `every` with it (#7245); 2,960
+/// with a 2,000-byte request (18 Nov).
+pub const MOST_BRIEF_BYTES: usize = 2_960;
 /// The longest a [`repair_brief`] is: the longest [`brief`], the
 /// [`REPAIR_MARK`], the check's [`MOST_REPAIR_BYTES`] and the ask. A brief
 /// goes only to a maker, the lamp's own chat (`make_skill_local`) or the
 /// lamp's agent's make run (`make_skill_agent`), whose rules, the system
 /// prompt and the brief, lamp-tasks takes up to
 /// `lamp_tasks::skill_make::MOST_RULES_BYTES` (48 KiB; a test holds the
-/// longest system prompt with it within that). No longer the tasks part's
-/// 2,000 bytes (`agent_tasks::MOST_TASK_BYTES`): no brief has been handed
-/// there since the lamp's own model became the maker (3 Nov).
+/// longest system prompt with it within that); a gateway make's words name
+/// the rules file and never inline the request. No longer the tasks part's
+/// bound (`agent_tasks::MOST_TASK_BYTES`): no brief has been handed there
+/// since the lamp's own model became the maker (3 Nov).
 pub const MOST_REPAIR_BRIEF_BYTES: usize =
     MOST_BRIEF_BYTES + REPAIR_MARK.len() + MOST_REPAIR_BYTES + REPAIR_ASK.len();
 
@@ -1584,6 +1721,9 @@ pub struct Files {
     /// Its code, with [`SCRIPTS_ENVIRONMENT`] on: each file's path, under
     /// [`SCRIPTS_FOLDER`], and its text, in the order written. None off.
     pub scripts: Vec<(String, String)>,
+    /// Its light shows (#7245), with [`ASKS_ENVIRONMENT`] on: each file's
+    /// path, `shows/NAME.toml`, and its text. None off.
+    pub shows: Vec<(String, String)>,
 }
 
 /// Whether `path` is a made skill's script as it may be written: under
@@ -1805,6 +1945,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     let mut toml = None;
     let mut card = None;
     let mut scripts: Vec<(String, String)> = Vec::new();
+    let mut shows: Vec<(String, String)> = Vec::new();
     let fenced = fenced(answer);
     for block in fenced.blocks {
         if block.open {
@@ -1842,6 +1983,28 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
             }
             continue;
         }
+        // A light show (#7245): only with asks on, a skill a person asks
+        // for being the only one lamp-skills plays a show in. Off, a file
+        // a made skill can't have, as before.
+        if let Named::Show(name) = &block.named {
+            if !asks_on() {
+                return Err(not_a_skills_form("a file a made skill can't have"));
+            }
+            if show_name(name).is_none() {
+                return Err(shows_not_held("a show's file name"));
+            }
+            if block.body.len() > MOST_SHOW_BYTES || !script_text_ok(&block.body) {
+                return Err(shows_not_held("a show's file too long or not plain text"));
+            }
+            if shows.iter().any(|(path, _)| path == name) {
+                return Err(not_a_skills_form("one of its files twice"));
+            }
+            shows.push((name.clone(), block.body));
+            if shows.len() > MOST_SHOWS {
+                return Err(shows_not_held("more shows than a made skill may carry"));
+            }
+            continue;
+        }
         let slot = match block.part() {
             Some(Part::Toml) => &mut toml,
             Some(Part::Card) => &mut card,
@@ -1858,6 +2021,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
             card,
             left_out,
             scripts,
+            shows,
         }),
         _ => Err(not_a_skills_form("not both of a skill's files")),
     }
@@ -1892,6 +2056,8 @@ enum Part {
 enum Named {
     Part(Part),
     Script(String),
+    /// A light show's file (#7245, `shows/…` as written).
+    Show(String),
     Bare,
     Other,
 }
@@ -1912,7 +2078,7 @@ impl Block {
             Named::Part(part) => Some(*part),
             Named::Bare if self.body.trim_start().starts_with("---") => Some(Part::Card),
             Named::Bare => Some(Part::Toml),
-            Named::Script(_) | Named::Other => None,
+            Named::Script(_) | Named::Show(_) | Named::Other => None,
         }
     }
 }
@@ -1951,6 +2117,11 @@ fn fence_named(info: &str) -> (Named, bool) {
     // where it is read ([`files`]).
     if word.starts_with(SCRIPTS_FOLDER) {
         return (Named::Script(word.to_owned()), true);
+    }
+    // A light show's file (#7245), its path as written: held to its form
+    // where it is read ([`files`]).
+    if word.starts_with(SHOWS_FOLDER) {
+        return (Named::Show(word.to_owned()), true);
     }
     let word = word.to_ascii_lowercase();
     match word.as_str() {
@@ -2011,7 +2182,7 @@ fn fenced(answer: &str) -> Fenced {
                 // A file of its code always begins a block of its own, so
                 // it is refused with its switch off, never kept as words.
                 let other_file = (whole && matches!(name, Named::Part(_)) && name != block.named)
-                    || matches!(name, Named::Script(_));
+                    || matches!(name, Named::Script(_) | Named::Show(_));
                 if other_file || block.named == Named::Part(Part::Toml) {
                     closed = true;
                     again = Some(line);
@@ -2748,7 +2919,10 @@ pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
 /// interval, a minute at least ([`say_paced_with`]).
 pub fn paced_for(text: &str, asked: &[(u32, u32)], limits: bool, repeat: Option<u64>) -> String {
     mannered_with(
-        &say_paced_with(&topic_granted(&tidied(text)), repeat),
+        &say_paced_with(
+            &topic_granted(&notes_granted(&tidied(&asks_lifted(text)))),
+            repeat,
+        ),
         asked,
         limits,
     )
@@ -2883,6 +3057,113 @@ pub fn limits_asked(request: &str) -> bool {
     LIMITS.iter().any(|limit| request.contains(limit))
 }
 
+/// A made skill's `asks` lifted back to the top of its `skill.toml`, with
+/// [`ASKS_ENVIRONMENT`] on (#7582, lamp-c0a4, 18 Nov 04:35 and 04:40:
+/// OpenClaw wrote `asks = ["..."]` after `[permissions]`, so TOML read it
+/// as a field of that table and `lamp-skills` refused the skill on
+/// "unknown field"). [`ASKS_RULES`] says the words go at the top; a model
+/// that writes them under a table means the skill's own asks. Lifted only
+/// when the top has no `asks`, the line (or the lines up to its closing
+/// `]`) sits under a table, and the text then reads as the same skill
+/// with `asks` at the top and nowhere else; otherwise it is given back as
+/// it came, for the check to say why. Off, or with nothing to lift, the
+/// text is byte for byte as it came. One journal line when lifted.
+pub fn asks_lifted(text: &str) -> String {
+    if !asks_on() {
+        return text.to_owned();
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    if table.contains_key("asks") {
+        return text.to_owned();
+    }
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let is_header = |line: &str| line.trim_start().starts_with('[');
+    let Some(first_table) = lines.iter().position(|line| is_header(line)) else {
+        return text.to_owned();
+    };
+    let starts_asks = |line: &str| {
+        let line = line.trim_start();
+        line.strip_prefix("asks")
+            .is_some_and(|rest| rest.trim_start().starts_with('='))
+    };
+    let Some(start) = lines
+        .iter()
+        .enumerate()
+        .skip(first_table)
+        .find(|(_, line)| starts_asks(line))
+        .map(|(index, _)| index)
+    else {
+        return text.to_owned();
+    };
+    // A line's text before a `#` outside a string.
+    let code = |line: &str| -> String {
+        let mut quoted = false;
+        line.chars()
+            .take_while(|&c| {
+                if c == '"' {
+                    quoted = !quoted;
+                }
+                quoted || c != '#'
+            })
+            .collect()
+    };
+    let Some(end) =
+        (start..lines.len()).find(|&index| code(lines[index]).trim_end().ends_with(']'))
+    else {
+        return text.to_owned();
+    };
+    // Lifted to the file's first line, as [`ASKS_RULES`] tells the model.
+    let mut asks: String = lines[start..=end].concat();
+    if !asks.ends_with('\n') {
+        asks.push('\n');
+    }
+    let mut lifted: Vec<&str> = Vec::with_capacity(lines.len() + 1);
+    lifted.push(&asks);
+    lifted.extend_from_slice(&lines[..first_table]);
+    lifted.extend(
+        lines
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index >= first_table && !(start..=end).contains(index))
+            .map(|(_, line)| *line),
+    );
+    let out: String = lifted.concat();
+    let Ok(read) = toml::from_str::<toml::Table>(&out) else {
+        return text.to_owned();
+    };
+    let mut expected = table.clone();
+    let mut moved = None;
+    // Under a table, or under one step of an array of tables (`[[do]]`: a
+    // model that writes its asks last puts them in the last step).
+    'found: for (_, value) in expected.iter_mut() {
+        let tables: Vec<&mut toml::Table> = match value {
+            toml::Value::Table(inner) => vec![inner],
+            toml::Value::Array(items) => items
+                .iter_mut()
+                .filter_map(toml::Value::as_table_mut)
+                .collect(),
+            _ => Vec::new(),
+        };
+        for inner in tables {
+            if let Some(found) = inner.remove("asks") {
+                moved = Some(found);
+                break 'found;
+            }
+        }
+    }
+    let Some(moved) = moved else {
+        return text.to_owned();
+    };
+    expected.insert("asks".into(), moved);
+    if read != expected {
+        return text.to_owned();
+    }
+    eprintln!("lamp-voice: a made skill tidied: its asks lifted to the top, out of a table");
+    out
+}
+
 /// A made skill's `skill.toml` with the fields that can't apply taken out,
 /// as the lamp's own model wrote them on lamp-74ff, 11 Nov 09:48-09:50
 /// ("nod when I stand up" failed all three repairs twice): a body step's
@@ -2929,6 +3210,18 @@ pub fn tidied(text: &str) -> String {
             *text = tidied;
             *table = expected;
         }
+    }
+    // (0) A `tool` beside `asks` (#7245, lamp-c0a4 18 Nov 14:21: OpenClaw's
+    // kept session wrote one from an earlier make's check): the asks start
+    // it, and a tool would leave it to run only when called on.
+    if table.contains_key("asks") && table.contains_key("tool") {
+        tidy(
+            &mut text,
+            &mut table,
+            &|table| Some(table),
+            "tool",
+            "its tool beside its asks, which start it".to_owned(),
+        );
     }
     // (a) A gesture's `for`, with no mood to hold.
     let steps = table
@@ -3290,6 +3583,124 @@ fn entries_of(line: &str, key: &str) -> Vec<(usize, usize)> {
     spans
 }
 
+/// A made skill's `skill.toml` with a notes grant written under another
+/// name taken as the one grant there is, `notes`, with
+/// [`NOTES_ENVIRONMENT`] on (#7245, lamp-c0a4, 18 Nov 01:00: OpenClaw's
+/// "fruit notes" skill asked for `notes-write`, refused as a grant the lamp
+/// doesn't have, and no repair was left in time). Only a name of notes
+/// itself is taken (`note`, or `notes` or `note` then `-` or `_` and a
+/// word, as `notes-write`, `notes_read`): it gives the skill nothing more
+/// than the notes it asked for, which the say-back says. Each such grant is
+/// written once as `notes`, in the text itself, so what is checked, said
+/// and packed is one text; a skill written otherwise, or one that then
+/// doesn't read as the same skill with `notes` for those grants, is given
+/// back as it came, for the check to say why. Off, nothing changes.
+pub fn notes_granted(text: &str) -> String {
+    if !notes_on() {
+        return text.to_owned();
+    }
+    // `note` or `notes`, any case, alone or then `-`, `_` or `:` and a
+    // word of letters, digits, `-` or `_` (`notes-write`, `Notes_Read`,
+    // `notes:write`, `notes-read-write`, `notes-v2`).
+    fn of_notes(grant: &str) -> bool {
+        let grant = grant.to_ascii_lowercase();
+        grant != "notes"
+            && (grant == "note"
+                || ["notes", "note"].iter().any(|stem| {
+                    grant.strip_prefix(stem).is_some_and(|rest| {
+                        rest.len() > 1
+                            && rest.starts_with(['-', '_', ':'])
+                            && rest[1..]
+                                .chars()
+                                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+                    })
+                }))
+    }
+    // A line without its trailing comment: a grant's name holds no `#`.
+    fn uncommented(line: &str) -> &str {
+        line.split('#').next().unwrap_or(line).trim_end()
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let Some(toml::Value::Array(grants)) = table.get("grants") else {
+        return text.to_owned();
+    };
+    let Some(names) = grants
+        .iter()
+        .map(toml::Value::as_str)
+        .collect::<Option<Vec<&str>>>()
+    else {
+        return text.to_owned();
+    };
+    if !names.iter().any(|grant| of_notes(grant)) {
+        return text.to_owned();
+    }
+    let mut expected: Vec<&str> = Vec::new();
+    for grant in &names {
+        let grant = if of_notes(grant) { "notes" } else { grant };
+        if !expected.contains(&grant) {
+            expected.push(grant);
+        }
+    }
+    // The one line that starts the top-level `grants`, and the line its
+    // list ends on: one line, or several as an agent writes them (lamp-c0a4,
+    // 18 Nov 03:27: OpenClaw's `notes-write` given back as it came).
+    let lines: Vec<&str> = text.lines().collect();
+    let at: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| {
+            line.trim_start()
+                .strip_prefix("grants")
+                .is_some_and(|rest| rest.trim_start().starts_with('='))
+        })
+        .map(|(at, _)| at)
+        .collect();
+    let [at] = at[..] else {
+        return text.to_owned();
+    };
+    // A grant's name holds no `]`: the list ends on the first line from
+    // `at` that ends with one.
+    let Some(end) = (at..lines.len()).find(|&line| uncommented(lines[line]).ends_with(']')) else {
+        return text.to_owned();
+    };
+    let quoted: Vec<String> = expected
+        .iter()
+        .map(|grant| Value::from(*grant).to_string())
+        .collect();
+    let mut written: Vec<String> = lines[..at].iter().map(|line| (*line).to_owned()).collect();
+    written.push(format!("grants = [{}]", quoted.join(", ")));
+    written.extend(lines[end + 1..].iter().map(|line| (*line).to_owned()));
+    let mut tidied = written.join("\n");
+    if text.ends_with('\n') {
+        tidied.push('\n');
+    }
+    let mut same = table.clone();
+    same.insert(
+        "grants".into(),
+        toml::Value::Array(
+            expected
+                .iter()
+                .map(|grant| toml::Value::String((*grant).to_owned()))
+                .collect(),
+        ),
+    );
+    if toml::from_str::<toml::Table>(&tidied).ok() != Some(same) {
+        return text.to_owned();
+    }
+    let asked: Vec<&str> = names.into_iter().filter(|grant| of_notes(grant)).collect();
+    eprintln!(
+        "lamp-voice: a made skill tidied: its grant {} taken as notes",
+        asked
+            .iter()
+            .map(|grant| named(grant))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    tidied
+}
+
 /// A made skill's `skill.toml` with the topics its own parts read in its
 /// `[permissions] topics`, added when the model left them out: its
 /// `[trigger]`'s topic (lamp-9adf, 11 Nov 05:36: "dims the light at 10 pm"
@@ -3440,13 +3851,13 @@ pub fn mannered_asked(text: &str, asked: &[(u32, u32)]) -> String {
 /// rests (the first builder's yes on #6059, 22:44). Asked for, or off, the
 /// manners are set as before.
 pub fn mannered_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
-    let set_limits = limits || !loose_on();
     let Ok(table) = toml::from_str::<toml::Table>(text) else {
         return text.to_owned();
     };
     let Some(trigger) = table.get("trigger").and_then(toml::Value::as_table) else {
         return text.to_owned();
     };
+    let set_limits = limits || !loose_on();
     if table.contains_key("tool") {
         return text.to_owned();
     }
@@ -4090,6 +4501,57 @@ pub fn briefs_skill_cant(why: &str) -> bool {
     briefs_own_refusal_in(why, &[BRIEFS_SKILL_CANT])
 }
 
+/// The lamp's real limits a made skill's `cannot:` may name (#7245): the
+/// brief's own refusals ([`BRIEFS_OWN_REFUSALS`]) but hearing, what
+/// [`cant_yet`] names for a part, and a look-up on the web. A `cannot:`
+/// naming none of them is the model's own slip, asked again once
+/// (`make_skill_local`'s `handed_to_agent`).
+const REAL_LIMITS: &[&str] = &[
+    "know who someone is",
+    "sending a message",
+    "Ask me for a reminder instead",
+    "sending what you didn't say word for word",
+    "adding an event with no day and time",
+    "adding a calendar event while my clock isn't set",
+    "You can ask me for it yourself any time",
+    SENDS_ON_ITS_OWN,
+    BRIEFS_SKILL_CANT,
+    "deleting or changing what is in your services",
+    CODE_OF_ITS_OWN,
+    ONE_PERSON,
+    OTHER_SOUND,
+    "a move of its own",
+    "reading your linked services",
+    "writing to a linked service",
+    "code that puts other skills",
+    "starting on a sound it hears",
+    "starting when a reminder comes due",
+    "starting on the news of your work",
+    "starting on a touch",
+    "starting on its own mood",
+    "starting on how its parts are",
+    "starting on a pause",
+    "internet",
+    "the web",
+    "web page",
+    "website",
+    "online",
+    "look up",
+    "looking up",
+];
+
+/// Hearing the room, a real limit only with asks off ([`asks_on`]): with
+/// them on, "when I say fruit notes" is the skill's own ask, no hearing
+/// (lamp-c0a4, 18 Nov).
+const HEARING_LIMITS: &[&str] = &["hear what is said", "starting on words it hears"];
+
+/// Whether the model's `cannot:` reason `why` names one of the lamp's real
+/// limits ([`REAL_LIMITS`], and hearing with asks off): never asked again.
+pub fn real_limit(why: &str) -> bool {
+    briefs_own_refusal_in(why, REAL_LIMITS)
+        || (!asks_on() && briefs_own_refusal_in(why, HEARING_LIMITS))
+}
+
 /// [`briefs_own_refusal`], against `refusals`.
 fn briefs_own_refusal_in(why: &str, refusals: &[&str]) -> bool {
     let plain = |text: &str| {
@@ -4676,10 +5138,169 @@ pub const SCRIPT_DOESNT_PARSE: &str = "its code isn't Python that parses";
 /// (lamp-9adf, 13 Nov: `from lamp import light` and
 /// `light.set_light(..., for="59s")`).
 pub const SCRIPT_SDK: &str = "import asyncio; from lampos import Lamp; async def main(): lamp = \
-     await Lamp.local(), then only await lamp.device() (a dict; temperature_c maps each sensor to \
+     await Lamp.local(), then any lampos call (sdk.md has them all, when given), such as await lamp.device() (a dict; temperature_c maps each sensor to \
      degrees C; grant device), await lamp.air() (air), await lamp.light(colour, level, for_ms) (a \
      light step's colour, level 1-5, for_ms in ms; light), await lamp.say(text) (speak), await \
      lamp.gesture(name) (body), await lamp.close(); last, asyncio.run(main())";
+
+/// The switch for a made skill's notes (#7245): `on` exactly, off unless
+/// set. On, the making model is told the lamp's notes calls
+/// ([`SCRIPT_NOTES_SDK`], grant `notes`): a small note the skill keeps in
+/// lamp-control's notes store and its next run reads back, never a file the
+/// person opens; and a say that claims a file or a note with no
+/// `lamp.notes.set` in its code is refused ([`claims_a_file`]). Off, the
+/// prompt and the check are as before, byte for byte.
+pub const NOTES_ENVIRONMENT: &str = "LAMP_MADE_NOTES";
+
+#[cfg(test)]
+thread_local! {
+    /// [`NOTES_ENVIRONMENT`] as a test of this thread sets it.
+    static NOTES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill may keep notes in this process ([`NOTES_ENVIRONMENT`]).
+pub fn notes_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = NOTES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(NOTES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`notes_on`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_notes_here(on: Option<bool>) {
+    NOTES_HERE.with(|here| here.set(on));
+}
+
+/// The notes calls added to [`SCRIPT_SDK`] with [`NOTES_ENVIRONMENT`] on:
+/// lamp-control's notes store as it bounds it (control/src/notes.rs).
+pub const SCRIPT_NOTES_SDK: &str = "await lamp.notes.set(key, value) (keeps a small note on the \
+     lamp, not a file the person opens: key 1-64 of A-Z a-z 0-9 . _ : -, value any JSON at most \
+     16 KiB, at most 256 notes; notes), await lamp.notes.get(key) (the note kept, or None; \
+     notes), ";
+
+/// How a made skill's code reaches the lamp ([`SCRIPT_SDK`]), with its
+/// notes calls when [`notes_on`]; off, [`SCRIPT_SDK`] exactly.
+pub fn script_sdk() -> String {
+    if !notes_on() {
+        return SCRIPT_SDK.to_owned();
+    }
+    let close = "await lamp.close()";
+    let at = SCRIPT_SDK.find(close).expect("SCRIPT_SDK closes the lamp");
+    format!(
+        "{}{SCRIPT_NOTES_SDK}{}",
+        &SCRIPT_SDK[..at],
+        &SCRIPT_SDK[at..]
+    )
+}
+
+/// lamp-control's answer to "forget everything" (#7245): every made
+/// skill's notes deleted (`{"notes_forget_skills": true}` on its owner's
+/// socket, [`crate::skill_task_yes::CONTROL_SOCKET`]).
+pub const NOTES_FORGET_SKILLS: &str = "notes_forget_skills";
+
+/// Every made skill's notes forgotten by lamp-control at `control`
+/// (#7245's "forget everything").
+pub fn forget_all_notes_by(control: &Path) -> Result<(), String> {
+    let answer = crate::tools::reached(
+        control,
+        &serde_json::json!({ NOTES_FORGET_SKILLS: true }),
+        Duration::from_secs(2),
+    )
+    .ok_or("lamp-control couldn't be reached")?
+    .ok_or("lamp-control didn't answer in time")?;
+    match answer.get("error").and_then(serde_json::Value::as_str) {
+        Some(why) => Err(why.to_owned()),
+        None => Ok(()),
+    }
+}
+
+/// [`forget_all_notes_by`] off the voice's turn, with [`notes_on`] alone:
+/// off, nothing is sent. A failure is journaled.
+pub fn forget_all_notes_soon() {
+    if !notes_on() {
+        return;
+    }
+    let control = control_socket();
+    std::thread::spawn(move || {
+        if let Err(why) = forget_all_notes_by(&control) {
+            eprintln!("lamp-voice: made skills' notes were not forgotten: {why}");
+        }
+    });
+}
+
+#[cfg(test)]
+thread_local! {
+    /// lamp-control's socket as a test of this thread sets it.
+    static CONTROL_HERE: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// lamp-control's socket [`forget_all_notes_soon`] asks: its own, or a
+/// test's fake.
+fn control_socket() -> std::path::PathBuf {
+    #[cfg(test)]
+    if let Some(here) = CONTROL_HERE.with(|here| here.borrow().clone()) {
+        return here;
+    }
+    std::path::PathBuf::from(crate::skill_task_yes::CONTROL_SOCKET)
+}
+
+/// Words that tell the person a kept note is a file they can open
+/// (#7245, First's ruling: a note is read back by the skill, never opened).
+const OPEN_WORDS: [&str; 4] = ["open", "download", "folder", "document"];
+
+/// The first say or task text of `toml` that promises a file the person
+/// can open ("a file you can open"): a note is no such thing.
+pub fn promises_a_file_to_open(toml: &str) -> Option<String> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    let steps = table.get("do")?.as_array()?;
+    steps
+        .iter()
+        .filter_map(|step| {
+            step.get("say")
+                .and_then(say_text)
+                .or_else(|| Some(step.get("task")?.get("task")?.as_str()?.to_owned()))
+        })
+        .find(|text| {
+            let words = words_of(text);
+            words.iter().any(|word| word == "file" || word == "files")
+                && words.iter().any(|word| OPEN_WORDS.contains(&word.as_str()))
+        })
+}
+
+/// Why a made skill is refused when a say claims a file or a note its code
+/// never keeps (#7245: on c0a4, 17 Nov, "Writing three facts about apples
+/// into a file." with no step that wrote one).
+pub const CLAIMS_A_FILE: &str = "its say claims a file no step writes";
+
+/// The words a say claims a kept file or note with.
+const FILE_WORDS: [&str; 6] = ["file", "files", "note", "notes", "saved", "saving"];
+
+/// The first say of `toml` that claims a file or a note ([`FILE_WORDS`])
+/// when none of `scripts`' `.py` files calls `lamp.notes.set`: what it
+/// says, for its refusal ([`CLAIMS_A_FILE`]). None when no say claims one,
+/// or the code does keep a note.
+pub fn claims_a_file(toml: &str, scripts: &[(String, String)]) -> Option<String> {
+    let keeps = scripts
+        .iter()
+        .any(|(path, text)| path.ends_with(RUNNABLE_ENDING) && text.contains("notes.set("));
+    if keeps {
+        return None;
+    }
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    table
+        .get("do")?
+        .as_array()?
+        .iter()
+        .filter_map(|step| say_text(step.get("say")?))
+        .find(|text| {
+            words_of(text)
+                .iter()
+                .any(|word| FILE_WORDS.contains(&word.as_str()))
+        })
+}
 
 #[cfg(test)]
 thread_local! {
@@ -4862,7 +5483,8 @@ fn scripts_parse(scripts: &[(String, String)]) -> Result<(), Refused> {
                     SCRIPT_DOESNT_PARSE.into(),
                     Some(format!(
                         "The lamp refused its code: {path} isn't Python that parses{at}, \
-                         {error}{shown}. Reach the lamp only so: {SCRIPT_SDK}."
+                         {error}{shown}. Reach the lamp only so: {}.",
+                        script_sdk()
                     )),
                 ));
             }
@@ -6897,6 +7519,12 @@ fn step_plainly(step: &toml::Value) -> Option<String> {
     if let Some(light) = step.get("light").and_then(|light| light.as_table()) {
         return light_plainly(light);
     }
+    // A light show (#7245): its frames held by [`shows_held`] and by
+    // lamp-skills' check, which plays one only in a skill a person asks
+    // for.
+    if let Some(show) = step.get("show") {
+        return show.as_str().map(|_| "plays a light show".to_owned());
+    }
     body_plainly(step.get("body")?.as_table()?)
 }
 
@@ -7786,6 +8414,7 @@ fn keep_said(said: &Said, files: &Files, from: &str, keeping: &Keeping) -> Resul
             version,
             uses,
             scripts: &[],
+            shows: &[],
         },
         Ok(said.said_back()),
         false,
@@ -7880,15 +8509,31 @@ pub fn put_on_cap(text: &str) -> Result<(String, Uses), Refused> {
 /// at most [`MOST_SCRIPT_BYTES`] each, [`MOST_SCRIPTS`] and
 /// [`MOST_SCRIPTS_BYTES`] in all), only with [`SCRIPTS_ENVIRONMENT`] on, and
 /// matched to its `task` step ([`code_matches`]); granted `net`, only the
-/// lamp's own agent script ([`agent_script_only`]).
+/// lamp's own agent script ([`agent_script_only`]). A light show's file
+/// (#7245, `shows/NAME.toml`) is held as [`files`] took it, only with
+/// [`ASKS_ENVIRONMENT`] on, and played by its step ([`shows_held`]).
 pub fn put_on_scripts<'a>(
     toml: &str,
     uses: &Uses,
     files: impl IntoIterator<Item = (&'a str, &'a [u8])>,
 ) -> Result<(), Refused> {
     let mut scripts: Vec<(String, String)> = Vec::new();
+    let mut shows: Vec<(String, String)> = Vec::new();
     for (path, bytes) in files {
         if path == "skill.toml" || path == "SKILL.md" {
+            continue;
+        }
+        if path.starts_with(SHOWS_FOLDER) && asks_on() {
+            let text = std::str::from_utf8(bytes)
+                .ok()
+                .filter(|text| script_text_ok(text) && text.len() <= MOST_SHOW_BYTES);
+            match (show_name(path), text) {
+                (Some(_), Some(text)) => shows.push((path.to_owned(), text.to_owned())),
+                _ => return Err(shows_not_held("a show's file name, size or text")),
+            }
+            if shows.len() > MOST_SHOWS {
+                return Err(shows_not_held("more shows than a made skill may carry"));
+            }
             continue;
         }
         if !script_path_ok(path) {
@@ -7925,11 +8570,13 @@ pub fn put_on_scripts<'a>(
     {
         return Err(scripts_not_held("the internet for code of its own"));
     }
+    shows_held(toml, &shows)?;
     let files = Files {
         toml: toml.to_owned(),
         card: String::new(),
         left_out: None,
         scripts,
+        shows,
     };
     code_matches(&files, uses)
 }
@@ -8003,6 +8650,7 @@ pub fn keep_written(
             version,
             uses,
             scripts: &[],
+            shows: &[],
         },
         Ok(said),
         false,
@@ -8298,6 +8946,35 @@ pub fn keep_asked(
     // Each .py it wrote Python that parses, before its check and its
     // say-back (#6749 E): one that doesn't goes to a repair.
     scripts_parse(&files.scripts)?;
+    // Each light show played by a step and held to its form (#7245).
+    shows_held(&files.toml, &files.shows)?;
+    // A say that claims a file or a note its code never keeps (#7245),
+    // with the notes switch alone: off, the check is as before.
+    if notes_on()
+        && let Some(text) = promises_a_file_to_open(&files.toml)
+    {
+        eprintln!("lamp-voice: a made skill was not kept: it promises a file to open");
+        return Err(Refused(
+            CLAIMS_A_FILE.into(),
+            Some(format!(
+                "\"{text}\" promises a file the person can open, but a note is kept by the \
+                 skill and read back by it: say what it keeps and when it reads it back"
+            )),
+        ));
+    }
+    if notes_on()
+        && let Some(text) = claims_a_file(&files.toml, &files.scripts)
+    {
+        eprintln!("lamp-voice: a made skill was not kept: its say claims a file no step writes");
+        return Err(Refused(
+            CLAIMS_A_FILE.into(),
+            Some(format!(
+                "say \"{text}\" claims a file or a note, but no code keeps one: keep it with \
+                 await lamp.notes.set(key, value) in a task step's code (grant notes), or answer \
+                 one line, {CANNOT} and one short sentence"
+            )),
+        ));
+    }
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
     if !uses.writes.is_empty() {
@@ -8400,7 +9077,7 @@ impl Ending<'_> {
             keeping,
             &keeping.installed,
             &name,
-            &made_words(toml, &files.scripts),
+            &made_words(toml, &[&files.scripts[..], &files.shows[..]].concat()),
             MOST_NAME_BYTES,
         )?;
         // Its own words, never another skill's (`LAMP_MADE_SKILL_ASKS`):
@@ -8424,6 +9101,7 @@ impl Ending<'_> {
                 version,
                 uses,
                 scripts: &files.scripts,
+                shows: &files.shows,
             },
             said,
             false,
@@ -8908,6 +9586,9 @@ struct Card<'a> {
     uses: Uses,
     /// Its code, under [`SCRIPTS_FOLDER`] (#6307): none but a made skill's.
     scripts: &'a [(String, String)],
+    /// Its light shows, under [`SHOWS_FOLDER`] (#7245): none but a made
+    /// skill's.
+    shows: &'a [(String, String)],
 }
 
 /// A skill added from a file (`crate::upload_skill`, `LAMP_SKILL_UPLOAD`):
@@ -8957,6 +9638,7 @@ pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
             version,
             uses,
             scripts: &[],
+            shows: &[],
         },
         Ok(does),
         true,
@@ -9006,6 +9688,7 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
             version,
             uses,
             scripts: &files.scripts,
+            shows: &files.shows,
         },
         Ok(does),
         true,
@@ -9079,6 +9762,7 @@ pub fn keep_agent_asked(
             version,
             uses,
             scripts: &files.scripts,
+            shows: &files.shows,
         },
         Ok(does),
         true,
@@ -9188,6 +9872,7 @@ fn packed_and_kept(
         version,
         uses,
         scripts,
+        shows,
     } = card;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
@@ -9219,6 +9904,16 @@ fn packed_and_kept(
                 fs::create_dir_all(parent)?;
             }
             fs::write(file, text)?;
+        }
+        // Its light shows beside them (#7245), each name held to
+        // [`show_name`], so always inside its folder: packed, so read by
+        // lamp-skills' own check frame by frame, and covered by its SHA-256.
+        for (path, text) in shows {
+            if show_name(path).is_none() {
+                return Err(io::Error::other("a show's path outside its folder"));
+            }
+            fs::create_dir_all(folder.join(SHOWS_FOLDER))?;
+            fs::write(folder.join(path), text)?;
         }
         Ok::<_, io::Error>(())
     })()
@@ -9253,7 +9948,9 @@ fn packed_and_kept(
             uses,
             package: kept_as,
         };
-        let toml_sha256 = hex(&Sha256::digest(made_words(toml, scripts).as_bytes()));
+        let toml_sha256 = hex(&Sha256::digest(
+            made_words(toml, &[scripts, shows].concat()).as_bytes(),
+        ));
         remember(&keeping.directory, from, &made, added, &toml_sha256).map_err(unkept)?;
         // A write's exact contents, kept beside it for the person's yes
         // (#6066, [`writes_of`]): the voice's own folder, as the package.
@@ -10371,6 +11068,175 @@ mod tests {
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
     /// 18:10) is caught; a reminder the person asked to be told, or words
     /// they gave to say, is not.
+    // #7245: "forget everything" sends lamp-control one line, only with
+    // the notes switch on.
+    #[test]
+    fn forget_all_notes_sends_its_one_line() {
+        use std::io::{BufRead as _, Write as _};
+        let socket =
+            std::env::temp_dir().join(format!("lamp-voice-7245-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            (&stream).write_all(b"{\"forgot\":2}\n").unwrap();
+            line
+        });
+        assert_eq!(forget_all_notes_by(&socket), Ok(()));
+        let line: serde_json::Value = serde_json::from_str(&served.join().unwrap()).unwrap();
+        assert_eq!(line, serde_json::json!({"notes_forget_skills": true}));
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    // #7245: "forget everything" heard asks lamp-control once to forget
+    // every made skill's notes with LAMP_MADE_NOTES on, and never with it
+    // off.
+    #[test]
+    fn forget_everything_asks_control_once_only_with_notes_on() {
+        use std::io::{BufRead as _, Write as _};
+        let socket =
+            std::env::temp_dir().join(format!("lamp-voice-7245-soon-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        CONTROL_HERE.with(|here| *here.borrow_mut() = Some(socket.clone()));
+        // Every line the fake lamp-control reads within `wait`.
+        let read_for = |wait: Duration| {
+            let until = std::time::Instant::now() + wait;
+            let mut lines = Vec::new();
+            while std::time::Instant::now() < until {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        let mut line = String::new();
+                        std::io::BufReader::new(&stream)
+                            .read_line(&mut line)
+                            .unwrap();
+                        (&stream).write_all(b"{\"forgot\":1}\n").unwrap();
+                        lines.push(serde_json::from_str::<serde_json::Value>(&line).unwrap());
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(5)),
+                }
+            }
+            lines
+        };
+        set_notes_here(Some(false));
+        forget_all_notes_soon();
+        assert_eq!(
+            read_for(Duration::from_millis(300)),
+            Vec::<serde_json::Value>::new()
+        );
+        set_notes_here(Some(true));
+        forget_all_notes_soon();
+        assert_eq!(
+            read_for(Duration::from_millis(1500)),
+            [serde_json::json!({"notes_forget_skills": true})]
+        );
+        set_notes_here(None);
+        CONTROL_HERE.with(|here| *here.borrow_mut() = None);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    // #7245: the say-back of a skill that keeps notes says notes, never a
+    // file (First's ruling): its grant's words.
+    #[test]
+    fn a_notes_grant_is_said_back_as_notes_never_a_file() {
+        let said = GRANTS.iter().find(|(name, _)| *name == "notes").unwrap().1;
+        assert!(said.contains("notes"), "{said}");
+        assert!(
+            !words_of(said)
+                .iter()
+                .any(|word| word == "file" || word == "files"),
+            "{said}"
+        );
+    }
+
+    // #7245: c0a4, 18 Nov 01:00, OpenClaw's notes skill asked for
+    // `notes-write`, refused as a grant the lamp doesn't have; with
+    // LAMP_MADE_NOTES on, a notes grant under another name is `notes`.
+    #[test]
+    fn a_notes_grant_under_another_name_is_taken_as_notes() {
+        let asked = "name = \"fruit-notes\"\ngrants = [\"speak\", \"notes-write\", \"notes_read\"]\n\
+                     [[do]]\ntask = { task = \"keep fruit facts\", run = \"scripts/main.py\" }\n";
+        set_notes_here(Some(false));
+        assert_eq!(notes_granted(asked), asked);
+        set_notes_here(Some(true));
+        let tidy = notes_granted(asked);
+        assert!(tidy.contains("grants = [\"speak\", \"notes\"]\n"), "{tidy}");
+        assert!(
+            !tidy.contains("notes-write") && !tidy.contains("notes_read"),
+            "{tidy}"
+        );
+        assert!(tidy.contains("[[do]]\ntask = "), "{tidy}");
+        // Through the chain each made skill takes.
+        assert!(paced_for(asked, &[], false, None).contains("\"notes\""));
+        // Only a name of notes itself: no other grant is taken or added.
+        for kept in [
+            "grants = [\"notes\"]\n",
+            "grants = [\"notebook\"]\n",
+            "grants = [\"notes-\"]\n",
+            "grants = [\"camera\", \"gmail-read\"]\n",
+            "grants = [\"notes write\"]\n",
+        ] {
+            assert_eq!(notes_granted(kept), kept);
+        }
+        // Grants over several lines, as OpenClaw writes them (c0a4, 18 Nov
+        // 03:27), are taken too, written on one line.
+        let spread = "name = \"fruit\"\ngrants = [\n  \"speak\",\n  \"notes-write\",\n]\n[[do]]\nsay = { text = \"Hi.\" }\n";
+        assert_eq!(
+            notes_granted(spread),
+            "name = \"fruit\"\ngrants = [\"speak\", \"notes\"]\n[[do]]\nsay = { text = \"Hi.\" }\n"
+        );
+        // A comment on the list's lines is no end of it (the adversarial
+        // read's P2a), and other spellings of notes are notes (its P2b).
+        let commented = "grants = [ # the code's\n  \"Notes:Write\", # its list\n  \"speak\",\n] # mine\n[[do]]\nsay = { text = \"Hi.\" }\n";
+        assert_eq!(
+            notes_granted(commented),
+            "grants = [\"notes\", \"speak\"]\n[[do]]\nsay = { text = \"Hi.\" }\n"
+        );
+        for spelled in ["notes-read-write", "notes-v2", "NOTE", "note_keep"] {
+            let one = format!("grants = [\"{spelled}\"]\n");
+            assert_eq!(notes_granted(&one), "grants = [\"notes\"]\n", "{spelled}");
+        }
+        // A list whose end can't be found is given back as it came.
+        let open = "grants = [\n  \"notes-write\",\n";
+        assert_eq!(notes_granted(open), open);
+        set_notes_here(None);
+    }
+
+    // #7245: c0a4, 17 Nov, a say-only skill claimed a file it never wrote.
+    #[test]
+    fn a_say_claiming_a_file_with_no_notes_call_is_caught() {
+        let toml = "[[do]]\nsay = { text = \"Writing three facts about apples into a file.\" }\n";
+        assert_eq!(
+            claims_a_file(toml, &[]).as_deref(),
+            Some("Writing three facts about apples into a file.")
+        );
+        let keeps = vec![(
+            "scripts/main.py".to_owned(),
+            "await lamp.notes.set(\"apples\", [\"a\", \"b\", \"c\"])".to_owned(),
+        )];
+        assert_eq!(claims_a_file(toml, &keeps), None);
+        // A notes call in a text file is no step.
+        let in_text = vec![("scripts/README.md".to_owned(), keeps[0].1.clone())];
+        assert!(claims_a_file(toml, &in_text).is_some());
+        // A say naming no file is not held to it.
+        let plain = "[[do]]\nsay = { text = \"Three facts about apples.\" }\n";
+        assert_eq!(claims_a_file(plain, &[]), None);
+        // A note is no file to open (First's ruling on #7245).
+        let opens = "[[do]]\ntask = { task = \"keep apple facts in a file you can open\", run = \"scripts/main.py\" }\n";
+        assert!(promises_a_file_to_open(opens).is_some());
+        let true_words = "[[do]]\nsay = { text = \"I'll keep three facts about apples, and read them to you when you say apple file.\" }\n";
+        assert_eq!(promises_a_file_to_open(true_words), None);
+        // "profile" is no "file".
+        let profile = "[[do]]\nsay = { text = \"Your profile looks good.\" }\n";
+        assert_eq!(claims_a_file(profile, &[]), None);
+    }
+
     #[test]
     fn a_say_handing_the_ask_back_is_caught_and_a_reminder_is_not() {
         let with = |say: &str| {
@@ -10451,6 +11317,25 @@ light = { dim = 1 }
 
     fn answer(toml: &str, card: &str) -> String {
         format!("Here it is.\n\n```skill.toml\n{toml}```\n\n```markdown SKILL.md\n{card}```\n")
+    }
+
+    /// #7245 (First's P2 on #7737): the brief tells the repeating
+    /// reminder step only with the agent's guide on, and never a one-off
+    /// (`in`, `at`), which stays the lamp's Schedule.
+    #[test]
+    fn the_brief_tells_remind_every_only_with_the_guide() {
+        set_remind_here(Some(false));
+        let off = brief_for("remind me to drink water", false, false).unwrap();
+        assert!(!off.contains("remind ="), "{off}");
+        set_remind_here(Some(true));
+        let on = brief_for("remind me to drink water", false, false).unwrap();
+        assert!(on.contains("remind = { every"), "{on}");
+        assert!(on.contains("repeat_reminder"), "{on}");
+        assert!(
+            !on.contains("set_timer") && !on.contains("set_reminder"),
+            "{on}"
+        );
+        set_remind_here(None);
     }
 
     /// The brief and the longest request fit in [`MOST_BRIEF_BYTES`], so a
@@ -14724,6 +15609,71 @@ light = { colour = "green", level = 3, for = "20s" }
     /// its own, and that it waits for the yes; asks not as lamp-skills
     /// takes them go back for a repair; off, they are taken out or refused
     /// exactly as before.
+    /// #7582, lamp-c0a4, 18 Nov 04:35 and 04:40: OpenClaw wrote the
+    /// skill's `asks` after `[permissions]`, so TOML read it as a field of
+    /// that table and `lamp-skills` refused it ("unknown field"). With
+    /// `LAMP_MADE_SKILL_ASKS` on it is lifted to the top and the skill is
+    /// kept as written there; off, or when it can't be lifted cleanly, the
+    /// text is byte for byte as it came.
+    #[test]
+    fn a_made_skills_asks_written_under_a_table_are_lifted_to_the_top() {
+        const UNDER: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n\
+            asks = [\"send my test note\"]\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        const SPREAD: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n\
+            asks = [\n  \"send my test note\", # the person's words\n  \"mail my note\",\n]\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let top = |text: &str| toml::from_str::<toml::Table>(text).unwrap();
+        let lifted = asks_lifted(UNDER);
+        assert_eq!(
+            lifted, ASKS_WRITE_TOML,
+            "the asks line first, the rest as written"
+        );
+        assert_eq!(paced(UNDER), paced(ASKS_WRITE_TOML));
+        let (_, uses) = capped_with(&paced(UNDER), false).unwrap();
+        assert_eq!(uses.writes, ["gmail"]);
+        let spread = top(&asks_lifted(SPREAD));
+        assert_eq!(
+            spread["asks"].as_array().unwrap().len(),
+            2,
+            "{}",
+            asks_lifted(SPREAD)
+        );
+        assert!(spread["permissions"].get("asks").is_none());
+        // Already at the top, or nothing to lift: as it came.
+        assert_eq!(asks_lifted(ASKS_WRITE_TOML), ASKS_WRITE_TOML);
+        let both = format!("asks = [\"send my test note\"]\n{UNDER}");
+        assert_eq!(asks_lifted(&both), both);
+        let none = UNDER.replace("asks = [\"send my test note\"]\n", "");
+        assert_eq!(asks_lifted(&none), none);
+        // Written last, under the last `[[do]]` step (gentle-robin's read).
+        let last = "kind = \"installable\"\nversion = \"1.0.0\"\n[[do]]\nsay = { text = \"hi\" }\n\
+            asks = [\"send my note\"]\n";
+        let lifted_last = asks_lifted(last);
+        assert!(
+            lifted_last.starts_with("asks = [\"send my note\"]\n"),
+            "{lifted_last}"
+        );
+        assert!(top(&lifted_last)["do"][0].get("asks").is_none());
+        let string = UNDER.replace(
+            "asks = [\"send my test note\"]",
+            "asks = \"send my test note\"",
+        );
+        assert_eq!(asks_lifted(&string), string, "not a list: as it came");
+        // Off: byte for byte.
+        set_asks_here(Some(false));
+        assert_eq!(asks_lifted(UNDER), UNDER);
+        assert_eq!(asks_lifted(SPREAD), SPREAD);
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
     #[test]
     fn a_made_skill_started_by_its_words_carries_its_asks_only_with_its_switch() {
         set_writes_here(Some(true));
@@ -16963,6 +17913,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             card: format!("---\nname: {name}\ndescription: made.\n---\n\n# Made\n"),
             left_out: None,
             scripts: Vec::new(),
+            shows: Vec::new(),
         }
     }
 
@@ -17230,5 +18181,139 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert_eq!(Judged::read(""), Judged::Unclear);
         set_english_here(None);
         set_unrelated_here(None);
+    }
+
+    /// #7245: a made skill started by its asks alone that plays a light
+    /// show: "traffic light", green, yellow, red, three seconds each, five
+    /// times.
+    const SHOW_TOML: &str = "asks = [\"traffic light\"]\nkind = \"installable\"\n\
+        version = \"1.0.0\"\n\n[permissions]\nlight = true\n\n[[do]]\nshow = \"traffic-light\"\n";
+    const SHOW_CARD: &str = "---\nname: traffic-light\ndescription: Plays a traffic light show.\n---\n\n# Traffic light\n";
+
+    /// A show of `rounds` times green, yellow, red, each `lasting`.
+    fn traffic_show(rounds: usize, lasting: &str) -> String {
+        let mut show = String::new();
+        for _ in 0..rounds {
+            for colour in ["green", "yellow", "red"] {
+                show.push_str(&format!(
+                    "[[light]]\ncolour = \"{colour}\"\nlevel = 4\nfor = \"{lasting}\"\n\n"
+                ));
+            }
+        }
+        show
+    }
+
+    /// The answer with its two files and each of `shows`, `(path, text)`.
+    fn show_answer(toml: &str, shows: &[(&str, &str)]) -> String {
+        let mut answer = answer(toml, SHOW_CARD);
+        for (path, text) in shows {
+            answer.push_str(&format!("\n```{path}\n{text}```\n"));
+        }
+        answer
+    }
+
+    /// A keeping whose stand-in for `lamp-skills pack` packs the folder's
+    /// skill.toml and every show file as its package's bytes.
+    fn show_keeping(name: &str) -> (PathBuf, Keeping) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch(name);
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/skill.toml\" \"$4\"/shows/*.toml > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        (dir, keeping)
+    }
+
+    /// #7245: with asks on, a ```shows/NAME.toml block is carried into the
+    /// packed skill beside its skill.toml (15 frames of 3 s, 45 s), said
+    /// back as a light show, and held again as it is put on; its package's
+    /// SHA-256 covers it.
+    #[test]
+    fn a_made_skills_light_show_is_carried_into_its_package() {
+        set_asks_here(Some(true));
+        let (dir, keeping) = show_keeping("made-show");
+        let show = traffic_show(5, "3s");
+        let path = "shows/traffic-light.toml";
+        let asked = Asked {
+            request: "when I say traffic light, change the light green, then yellow, then red",
+            ..Asked::default()
+        };
+        let made = keep_asked(
+            &show_answer(SHOW_TOML, &[(path, &show)]),
+            false,
+            "local:show",
+            &keeping,
+            &asked,
+        )
+        .unwrap();
+        let package = fs::read_to_string(&made.package).unwrap();
+        assert!(package.ends_with(&show), "{package}");
+        assert_eq!(package.matches("[[light]]").count(), 15);
+        assert!(
+            made.description.contains("plays a light show"),
+            "{}",
+            made.description
+        );
+        assert!(made.uses.light);
+        let put = [
+            ("skill.toml", SHOW_TOML.as_bytes()),
+            (path, show.as_bytes()),
+        ];
+        assert!(put_on_scripts(SHOW_TOML, &made.uses, put).is_ok());
+        set_asks_here(None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7245: a show not held is refused before the check, with its repair
+    /// lines: more than 30 frames, a file no step plays, a step whose file
+    /// is missing, a name outside shows/; with asks off, a shows/ block is
+    /// a file a made skill can't have, as before, and put on is refused.
+    #[test]
+    fn a_made_skills_bad_light_show_is_refused() {
+        set_asks_here(Some(true));
+        let (dir, keeping) = show_keeping("made-show-bad");
+        let path = "shows/traffic-light.toml";
+        let good = traffic_show(1, "3s");
+        let long = traffic_show(11, "2s");
+        let other = SHOW_TOML.replace("show = \"traffic-light\"", "light = { colour = \"red\" }");
+        for (name, answer) in [
+            ("frames", show_answer(SHOW_TOML, &[(path, &long)])),
+            ("unplayed", show_answer(&other, &[(path, &good)])),
+            ("missing", show_answer(SHOW_TOML, &[])),
+            (
+                "name",
+                show_answer(SHOW_TOML, &[("shows/../x.toml", &good)]),
+            ),
+        ] {
+            let refused =
+                keep_asked(&answer, false, name, &keeping, &Asked::default()).unwrap_err();
+            assert_eq!(refused.0, SHOWS_NOT_HELD, "{name}");
+            assert!(refused.1.unwrap().contains(SHOWS_ONLY), "{name}");
+        }
+        assert!(entries(&keeping.directory).is_empty());
+        let put = [
+            ("skill.toml", SHOW_TOML.as_bytes()),
+            (path, long.as_bytes()),
+        ];
+        assert!(put_on_scripts(SHOW_TOML, &Uses::default(), put).is_err());
+        set_asks_here(Some(false));
+        let refused = files(&show_answer(SHOW_TOML, &[(path, &good)])).unwrap_err();
+        assert_eq!(refused.0, NOT_A_SKILLS_FORM);
+        let put = [
+            ("skill.toml", SHOW_TOML.as_bytes()),
+            (path, good.as_bytes()),
+        ];
+        assert!(put_on_scripts(SHOW_TOML, &Uses::default(), put).is_err());
+        set_asks_here(None);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

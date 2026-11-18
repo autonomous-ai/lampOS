@@ -1,0 +1,58 @@
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "lampos/deepseek-flash"
+      },
+      "workspace": "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp"
+    }
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token",
+      "token": "kept-gateway-token"
+    },
+    "bind": "loopback",
+    "mode": "local",
+    "port": 18789
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "lampos": {
+        "api": "openai-completions",
+        "apiKey": "${LAMP_HERMES_TOKEN}",
+        "baseUrl": "http://127.0.0.1:7741/v1/deepseek",
+        "models": [
+          {
+            "contextWindow": 128000,
+            "id": "deepseek-flash",
+            "maxTokens": 8192,
+            "name": "deepseek-flash"
+          }
+        ],
+        "request": {
+          "allowPrivateNetwork": true
+        }
+      }
+    }
+  },
+  "plugins": {
+    "allow": [
+      "openai",
+      "memory-core"
+    ]
+  },
+  "skills": {
+    "load": {
+      "extraDirs": [
+        "/var/lib/lampOS/skills"
+      ]
+    }
+  },
+  "tools": {
+    "exec": {
+      "mode": "ask"
+    }
+  }
+}

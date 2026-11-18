@@ -1263,7 +1263,7 @@ started once its answer is told:
 |---|---|
 | Retained tasks | 16. When full, the oldest task that is over (never sent, expired, cancelled, or its agent finished, stopped or failed) gives way to the new one; only when all 16 are still going (waiting for a yes, being handed over, working, or asking the person) is preparation refused. Until 2026-10-15 a full store refused every new task for good: lamp-4ace stopped handing work over at its sixteenth |
 | Observations | 4 distinct records per task; no silent eviction of delivery evidence |
-| Text | Task: 2,000 bytes; selected speech: 1,000 bytes; observed ask: 4 KiB; answer: 16 KiB |
+| Text | Task: 3,000 bytes (2,000 before #7245, 18 Nov, the user's call: room for the make's reading list); selected speech: 1,000 bytes; observed ask: 4 KiB; answer: 16 KiB |
 | Local transport | 8 KiB request; 128 KiB response, enough for escaped bounded observation text |
 | Clients | 4 workers, 4 queued sockets, 16 queued owner requests |
 | Client deadlines | 300 ms complete request, 1,100 ms owner receipt, 1,200 ms total server service |
@@ -2832,6 +2832,36 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
   (`AGENTS.md`) is written, as for Hermes.
+- **V1's tool grants (`LAMP_OPENCLAW_V1_TOOLS`, on, #7245).** The owner's
+  decision: "follow V1, so skills get made: whatever V1 gave, we give." The
+  design source is the platform's `runtimes/openclaw/service_setup.go`,
+  line 136 and lines 237-250; the keys and values are V1's:
+  - `tools.profile`: `"full"`;
+  - `tools.exec`: `host: "gateway"`, `mode: "full"`, which is exactly V1's
+    `security: "full"`, `ask: "off"` in OpenClaw 2026.11.2. `security` and
+    `ask` are taken out, as OpenClaw refuses `mode` beside either and the
+    stable rollback target writes `mode` (below);
+  - `tools.elevated`: `enabled: true`, `allowFrom.webchat: ["*"]`. V1 keys
+    this by its messaging channel. A Harness turn on the gateway comes in
+    on OpenClaw's own `webchat` channel. Other channels are kept;
+  - `agents.defaults.elevatedDefault`: `"full"`;
+  - `agents.defaults.sandbox.mode`: `"off"`.
+
+  The merge runs at every lamp-tasks start, so a lamp that has the old file
+  gets these keys on its next start or update. Its model, workspace,
+  `gateway` block and any other key stay. The gateway takes `tools` hot and
+  reads `agents` on each turn, so it needs no restart. `openclaw-ns` and its
+  binds are unchanged, so the namespace still limits what a command can
+  see. With the switch `off`, `tools.exec.mode` is `"ask"` again and V1's
+  values are taken out, so the file is byte for byte what it was before
+  #7245. With it on, V1's `security: "full"`, `ask: "off"` is written as
+  its exact `mode: "full"`. Either way `security` and `ask` are never
+  written and are always taken out: OpenClaw refuses `mode` beside either
+  (exit 78, the gateway down), and today's stable lamp-tasks, the rollback
+  target, inserts `mode: "ask"` and removes nothing else, so only a
+  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). The skill-start launcher's allow-list entry ("One exec approval",
+  below) stays. A skill's run still execs it, and `security: "full"` allows
+  that exec too, so a run needs no grant of its own.
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
@@ -3547,7 +3577,11 @@ as a Harness task with the agent's own tools
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
   (`MakeLine::parse`): no other field but `guide` and `switches`, the
   rules (the system prompt and the brief) at most 48 KiB with no NUL,
-  `within_ms` from 1 to 120 s.
+  `within_ms` from 1 s to 10 minutes (`MOST_WITHIN`; #7245, the first
+  builder's call on #6811, 18 Nov: an agent's make is waited for, then said
+  as not made). A make on
+  a gateway agent (OpenClaw) with the kept session on is typed into the
+  lamp's kept session, not a new one (`HarnessRunner::run`, `makes`).
 - **The guide (`"guide":true`, lamp-voice's `LAMP_MAKE_AGENT_GUIDE`,
   off):** only when the line says `true` (a boolean, `false` by default),
   the lamp's skill-creator guide (`skill_make::GUIDE`, from
@@ -3859,9 +3893,41 @@ path, with no second runner:
   is not called): a make has no grants. The Harness session and the folder
   are removed however the make ends: an answer, `cannot:`, past its
   deadline or an error.
-- **No `lamp-skills pack` in the run:** OpenClaw's exec allow-list holds
-  only skill-start, so a gateway make skips the guide's check step; the
-  voice still puts the answer through its whole check and repairs.
+- **The `lamp-skills pack` check in the run (#7245):** with V1's tools on
+  (`LAMP_OPENCLAW_V1_TOOLS`, on in the product, "OpenClaw's settings on the
+  lamp" above), a gateway make is given the same files as Hermes's make:
+  the rules whole and the guide whole, the check step included. Its prompt
+  is Hermes's `guided_prompt` with one difference. The check is run as `cd
+  <make folder> && [LAMP_AGENT_SERVICES=on] [LAMP_SKILL_WRITES=on]
+  /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check
+  draft/NAME`. The `cd` is there because an OpenClaw exec starts in the
+  agent's workspace. The switches are there because the gateway's
+  environment can't carry the line's check switches. Inside `openclaw-ns`,
+  `/opt` is not hidden, `/tmp` is the namespace's own writable tmpfs and
+  the make folder is writable. The skills folder and `/run/lampos-skills`
+  are shown read-only, as in Hermes's namespace, so the check reads and
+  writes what it does there. With the switch `off`, a gateway make skips
+  the check as before: `skill_make::gateway_guide` and `without_check`,
+  and words that run no command. Either way, the voice still puts the
+  answer through its whole check and repairs.
+- **The skill.toml form inline (`skill_make::gateway_form`, #7245):** the
+  gateway make's words (`gateway_prompt`, guided or not) end with a short
+  block of the form, so OpenClaw has it even if it never opens `rules.md`:
+  the order in one line (`FORM_ORDER`: `asks` first, only when `rules.md`
+  offers asks, then `kind`, `version`, `[permissions]`, then `[trigger]`,
+  `[ask]` and `[[do]]`), the one rule (`FORM_RULE`: never `asks` under
+  `[permissions]` or any other table) and one minimal skill.toml
+  (`FORM_TOML`, 9 lines: `asks = ["desk glow on"]`, `kind`, `version`,
+  `[permissions]` `light = true`, one warm light step). The block is 695
+  bytes, held to at most 1024 (`MOST_FORM_BYTES`); the guided words with
+  it are 1308 bytes for the lamp's make folder, within Harness's 2000-byte
+  task bound (`harness::MAX_PROMPT_BYTES`; 611 before). Grants, triggers,
+  steps, limits and the person's request stay in `rules.md` alone, and the
+  words still say to read it. lamp-skills' `tests/it/make_check.rs` packs
+  `FORM_TOML` with the real `lamp-skills pack` (`made: here`,
+  `LAMP_MADE_SKILL_ASKS=on`) and refuses it with `asks` under
+  `[permissions]`. Given back in chat it is refused as the rules' example
+  is (`is_example`). Hermes's make's words are unchanged.
 - **A `cannot:` answer** goes back to the voice as written, for #7234's
   fallback.
 - **An answer said in chat (`skill_make::make_answer`, #7245, #7427):**
@@ -4524,8 +4590,10 @@ file:
   allow-list add for /usr/local/lib/lampos/skill-start did not succeed in
   120000 ms (the first: …, the second: …); the next run tries again") and does not hold the run, but the start
   is not kept, so the next run reads and adds again. With
-  OpenClaw's stock `tools.exec.mode: "ask"`, a headless
-  turn's exec is denied without this entry. A denied exec still ends the turn as
+  OpenClaw's stock `tools.exec.mode: "ask"` (V1's tools off), a headless
+  turn's exec is denied without this entry. With V1's tools on (#7245,
+  `security: "full"`, `ask: "off"`), the exec is allowed anyway; the entry
+  is kept for a lamp with them off. A denied exec still ends the turn as
   `stopped`, so the fail-closed check above tells a denied run from a
   done one.
 - **lamp-update shows the run what it needs.** With
@@ -4984,7 +5052,11 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   answers, a sign-out or an engine switch is `harness close
   lamp-one-openclaw --program-token-file …` and then `openclaw gateway call
   sessions.delete` of its `engineSession`, which deletes the conversation
-  (Harness's `close --forget` is not built yet); a sign-out or an engine
+  (Harness's `close --forget` is not built yet); a cancel (a turn cut at
+  its deadline included) closes it with `--now` too, as Harness refuses a
+  plain close while the session is working (#7245: on lamp-c0a4 a make cut
+  at its deadline left the kept session `working`, and every later make was
+  told `NOT_IDLE` until the gateway restarted); a sign-out or an engine
   switch removes the token file too. One not closed is tried again at the
   next look, and no pane is opened meanwhile. A factory reset wipes the
   store folder, token included.

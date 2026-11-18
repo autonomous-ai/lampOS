@@ -1,0 +1,13 @@
+asks = ["stretch break"]
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+body = true
+speak = true
+
+[[do]]
+body = { gesture = "stretching" }
+
+[[do]]
+say = { text = "Time to stretch with me." }

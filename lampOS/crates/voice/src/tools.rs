@@ -2674,6 +2674,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // "Forget everything" heard, and kept: every made skill's notes
+            // go too (#7245), with their switch alone.
+            if heard
+                && model.name == crate::remember::FORGET_EVERYTHING
+                && told.get("error").is_none()
+            {
+                crate::made_skill::forget_all_notes_soon();
+            }
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),

@@ -1,0 +1,13 @@
+asks = ["desk light please"]
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+light = true
+speak = true
+
+[[do]]
+light = { colour = "warm", level = 4, for = "10m" }
+
+[[do]]
+say = { text = "Desk light on." }

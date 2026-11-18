@@ -1000,7 +1000,11 @@ agent (`lamp_tasks::skill_make`).
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
   `switches`, luật (system prompt và brief) tối đa 48 KiB và không có NUL,
-  `within_ms` từ 1 đến 120 giây.
+  `within_ms` từ 1 giây đến 10 phút (`MOST_WITHIN`; #7245, quyết định của
+  builder đầu tiên trên #6811, 18/11: lần tạo của agent được chờ, quá thì
+  nói là không tạo được). Lần
+  tạo trên agent gateway (OpenClaw) khi bật phiên giữ sẵn được gõ vào phiên
+  giữ sẵn của đèn, không mở phiên mới (`HarnessRunner::run`, `makes`).
 - **Hướng dẫn (`"guide":true`, `LAMP_MAKE_AGENT_GUIDE` của lamp-voice,
   tắt):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
   skill-creator của đèn (`skill_make::GUIDE`, từ `skill_make_guide.md`: bản
@@ -1307,10 +1311,43 @@ OpenClaw, qua đường chạy chung, không có runner thứ hai:
   được mở (không gọi `gateway::open_start`): lần tạo không có quyền nào.
   Phiên Harness và thư mục bị xoá dù lần tạo kết thúc thế nào: có câu trả
   lời, `cannot:`, quá hạn hay lỗi.
-- **Không có `lamp-skills pack` trong lần chạy:** danh sách exec cho phép
-  của OpenClaw chỉ có skill-start, nên lần tạo qua gateway bỏ bước kiểm tra
-  của hướng dẫn; giọng nói vẫn đưa câu trả lời qua toàn bộ kiểm tra và sửa
-  của nó.
+- **Có bước kiểm tra `lamp-skills pack` trong lần chạy (#7245):** khi
+  quyền công cụ của V1 bật (`LAMP_OPENCLAW_V1_TOOLS`, bật trong sản phẩm,
+  xem "Cài đặt của OpenClaw trên đèn" bên dưới), lần tạo qua gateway nhận
+  đúng các file mà lần tạo của Hermes nhận: rules đầy đủ và hướng dẫn đầy
+  đủ, có cả bước kiểm tra. Lời nhắc của nó là `guided_prompt` của Hermes,
+  chỉ khác một điểm. Bước kiểm tra chạy dưới dạng `cd <thư mục tạo> &&
+  [LAMP_AGENT_SERVICES=on] [LAMP_SKILL_WRITES=on]
+  /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check
+  draft/NAME`. Có `cd` vì exec của OpenClaw bắt đầu trong workspace của
+  agent. Có các công tắc vì môi trường của gateway không mang được các công
+  tắc kiểm tra của dòng lệnh. Bên trong `openclaw-ns`, `/opt` không bị ẩn,
+  `/tmp` là tmpfs riêng ghi được của namespace và thư mục tạo ghi được. Thư
+  mục skill và `/run/lampos-skills` được hiện chỉ đọc, như trong namespace
+  của Hermes, nên bước kiểm tra đọc và ghi đúng như ở đó. Khi công tắc là
+  `off`, lần tạo qua gateway bỏ bước kiểm tra như trước:
+  `skill_make::gateway_guide` và `without_check`, cùng lời nhắc không chạy
+  lệnh nào. Dù thế nào, giọng nói vẫn đưa câu trả lời qua toàn bộ kiểm tra
+  và sửa của nó.
+- **Dạng skill.toml ngay trong lời nhắn (`skill_make::gateway_form`,
+  #7245):** lời nhắn của lần tạo qua gateway (`gateway_prompt`, có hướng
+  dẫn hay không) kết thúc bằng một khối ngắn về dạng file, để OpenClaw có
+  nó kể cả khi không mở `rules.md`: thứ tự trong một dòng (`FORM_ORDER`:
+  `asks` trước tiên, chỉ khi `rules.md` cho phép asks, rồi `kind`,
+  `version`, `[permissions]`, rồi `[trigger]`, `[ask]` và `[[do]]`), một
+  quy tắc (`FORM_RULE`: không bao giờ đặt `asks` dưới `[permissions]` hay
+  bảng nào khác) và một skill.toml tối thiểu (`FORM_TOML`, 9 dòng:
+  `asks = ["desk glow on"]`, `kind`, `version`, `[permissions]`
+  `light = true`, một bước đèn ấm). Khối dài 695 byte, giới hạn tối đa 1024
+  (`MOST_FORM_BYTES`); lời nhắn có hướng dẫn kèm khối là 1308 byte với thư
+  mục tạo của đèn, trong giới hạn 2000 byte của tác vụ Harness
+  (`harness::MAX_PROMPT_BYTES`; trước đó 611). Quyền, trigger, bước, giới
+  hạn và yêu cầu của người dùng vẫn chỉ nằm trong `rules.md`, và lời nhắn
+  vẫn bảo đọc nó. `tests/it/make_check.rs` của lamp-skills đóng gói
+  `FORM_TOML` bằng `lamp-skills pack` thật (`made: here`,
+  `LAMP_MADE_SKILL_ASKS=on`) và từ chối nó khi `asks` nằm dưới
+  `[permissions]`. Nếu bị trả lại trong chat, nó bị từ chối như ví dụ của
+  rules (`is_example`). Lời nhắn tạo của Hermes không đổi.
 - **Câu trả lời `cannot:`** được trả về giọng nói nguyên văn, cho phương án
   dự phòng của #7234.
 - **Câu trả lời nói trong chat (`skill_make::make_answer`, #7245, #7427):**
@@ -1892,8 +1929,10 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   /usr/local/lib/lampos/skill-start did not succeed in 120000 ms (the
   first: …, the second: …); the next run tries again") và không giữ lần chạy lại, nhưng lần khởi động không được giữ,
   nên lần chạy sau đọc và thêm lại. Với
-  `tools.exec.mode: "ask"` mặc định của OpenClaw, nếu không có mục này
-  thì exec của một lượt không giao diện bị từ chối. Một
+  `tools.exec.mode: "ask"` mặc định của OpenClaw (quyền công cụ của V1
+  tắt), nếu không có mục này thì exec của một lượt không giao diện bị từ
+  chối. Khi quyền công cụ của V1 bật (#7245, `security: "full"`, `ask:
+  "off"`), exec vẫn được cho phép. Mục này được giữ cho đèn tắt chúng. Một
   exec bị từ chối vẫn kết thúc lượt là `stopped`, nên phép kiểm tra đóng
   khi lỗi ở trên phân biệt lần chạy bị từ chối với lần chạy đã xong.
 - **lamp-update cho lần chạy thấy thứ nó cần.** Chỉ cần
@@ -2366,7 +2405,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất
   hoặc đổi engine là `harness close lamp-one-openclaw --program-token-file …`
   rồi `openclaw gateway call sessions.delete` với `engineSession` của nó, xoá
-  hội thoại (`close --forget` của Harness chưa được xây); đăng xuất hoặc đổi
+  hội thoại (`close --forget` của Harness chưa được xây); một lần huỷ (kể cả
+  lượt bị cắt ở hạn chót) đóng phiên kèm `--now`, vì Harness từ chối lệnh
+  close thường khi phiên đang chạy (#7245: trên lamp-c0a4 một lần make bị cắt
+  ở hạn chót để phiên giữ lại ở trạng thái `working`, và mọi lần make sau đều
+  bị báo `NOT_IDLE` cho tới khi gateway khởi động lại); đăng xuất hoặc đổi
   engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
   và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
   token.
@@ -2911,6 +2954,37 @@ là phần của một coder khác trong #6226; thiết kế:
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
   (`AGENTS.md`) được ghi, như với Hermes.
+- **Quyền công cụ của V1 (`LAMP_OPENCLAW_V1_TOOLS`, bật, #7245).** Quyết
+  định của chủ sản phẩm: "làm theo V1 để skill được tạo ra: V1 cho gì thì ta
+  cho nấy." Nguồn thiết kế là `runtimes/openclaw/service_setup.go` của
+  platform, dòng 136 và các dòng 237-250. Khóa và giá trị là của V1:
+  - `tools.profile`: `"full"`;
+  - `tools.exec`: `host: "gateway"`, `mode: "full"`, đúng bằng
+    `security: "full"`, `ask: "off"` của V1 trong OpenClaw 2026.11.2.
+    `security` và `ask` bị bỏ đi, vì OpenClaw từ chối `mode` đi cùng một
+    trong hai và đích rollback stable ghi `mode` (bên dưới);
+  - `tools.elevated`: `enabled: true`, `allowFrom.webchat: ["*"]`. V1 đặt
+    khóa này theo kênh nhắn tin của nó. Lượt Harness trên gateway đi vào
+    qua kênh riêng `webchat` của OpenClaw. Các kênh khác được giữ;
+  - `agents.defaults.elevatedDefault`: `"full"`;
+  - `agents.defaults.sandbox.mode`: `"off"`.
+
+  Việc gộp chạy ở mỗi lần lamp-tasks khởi động. Vì vậy một đèn đang có file
+  cũ sẽ nhận các khóa này ở lần khởi động hay cập nhật kế tiếp. Model,
+  workspace, khối `gateway` và mọi khóa khác vẫn được giữ. Gateway nhận
+  `tools` ngay khi đang chạy và đọc `agents` ở mỗi lượt, nên không cần khởi
+  động lại. `openclaw-ns` và các bind của nó không đổi, nên namespace vẫn
+  giới hạn những gì một lệnh nhìn thấy. Khi công tắc là `off`,
+  `tools.exec.mode` lại là `"ask"` và các giá trị của V1 bị bỏ đi, nên file
+  giống hệt từng byte như trước #7245. Khi bật, `security: "full"`, `ask:
+  "off"` của V1 được ghi bằng đúng `mode: "full"` tương đương. Dù bật hay
+  tắt, `security` và `ask` không bao giờ được ghi và luôn bị bỏ đi: OpenClaw
+  từ chối `mode` đi cùng một trong hai (exit 78, gateway chết), và lamp-tasks
+  stable hôm nay, đích rollback, chèn `mode: "ask"` mà không bỏ gì khác, nên
+  chỉ file có riêng `mode` mới qua được rollback (#7245, thấy trên
+  lamp-c0a4). Mục cho phép của launcher
+  skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
+  "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 

@@ -259,8 +259,9 @@ pub const WHO: &str = "who";
 pub const CONFIRM_WITHIN: Duration = Duration::from_secs(120);
 /// The longest task text the tasks part takes (lamp-tasks'
 /// `MAX_PROMPT_BYTES`, 2,000 since #2813: a made skill's repair carries its
-/// brief, the request and the check's lines).
-pub(crate) const MOST_TASK_BYTES: usize = 2_000;
+/// brief, the request and the check's lines; #7245, 18 Nov: 3,000, the
+/// user's call, room for the make's reading list).
+pub(crate) const MOST_TASK_BYTES: usize = 3_000;
 /// The most a task takes once JSON-escaped in the request line, as the tasks
 /// part bounds it (`lamp_tasks::harness::MAX_ENCODED_PROMPT_BYTES`, P3 on
 /// #3239): a control character escapes to 6 bytes.

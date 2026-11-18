@@ -5206,9 +5206,12 @@ fn manifest(
             steps.push(Step::Call(Call::Stand(share as u8)));
         }
         if let Some(show) = step.show {
-            if !asked_alone {
+            // A made skill started by its own words alone
+            // (`LAMP_MADE_SKILL_ASKS`, [`started_by_words`], no trigger) is
+            // asked by a person too, so it may play a show (#7245).
+            if !(asked_alone || (by_words && triggers.is_empty())) {
                 return Err(
-                    "show only in a skill started by its tool alone: a light show is played only when a person asks"
+                    "show only in a skill started by its tool or its own words alone: a light show is played only when a person asks"
                         .into(),
                 );
             }
