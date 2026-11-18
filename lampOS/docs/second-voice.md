@@ -602,7 +602,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   fallback is persistence: the route keeps when the first 429 before any
   word came, and a 429 that comes `LIMIT_AFTER` (2 min) or more after it,
   with no chat round begun between, is a usage limit too (a rate burst's
-  per-minute window passes well within 2 min). Either says "I've hit my
+  per-minute window passes well within 2 min). With `LAMP_VOICE_DAY_SHED`
+  on (#7664), a day last read spent (`X-Usage-Day-Used` 1, "The lamp's
+  day" below) makes the first 429 a usage limit too. Either says "I've hit my
   usage limit." (`DOWN_LINE_LIMIT`, V1's `PhraseLLMLimit`) instead of the
   slow line, and with a time back it says when, in the lamp's local time
   (`local_time::offset_here`) and the owner's language
@@ -2830,6 +2832,44 @@ order is kept. A written turn is the same from the chat on.
 - A failure is `TurnFailed` at the stage the coordinator accepts: InputOpen
   while the line is coming, AwaitingResponse before any answer audio,
   Responding after.
+
+### The lamp's day (`LAMP_VOICE_DAY_SHED`, #7664)
+
+A lamp's day allowance should last its owner's day, so near its end the
+lamp stops spending it on what nobody asked for. Off unless
+`LAMP_VOICE_DAY_SHED=on` (the coordinator's unit; it hands the worker
+`--day-shed`); off, the header is not even read.
+
+- **The reading.** The relay sends `X-Usage-Day-Used`, the share of the
+  lamp's day used (three decimals, 0 to 1; exactly 1 on a day-limit
+  refusal), on chat answers, HTTP speech and the proxy. The worker reads it
+  on every answer in `net::post`, success or refusal (`day_shed::heard`).
+  Only a finite value from 0 to 1 is kept, and a bad one changes nothing.
+  A 2xx without it clears the reading (no day limit, or the check failed
+  open: harmless for shedding), and a refusal without it keeps it. The
+  reading is for one UTC day, the relay's: tomorrow it starts from nothing.
+- **Where it is kept.** When the reading changes, the worker writes it to
+  `/run/lampos-voice/day-used.json` (`day_shed::FILE`, the voice's runtime
+  folder, gone at a reboot): the day and the share, nothing heard or said.
+  The coordinator reads that file at most once a second (`day_shed::Look`).
+  A missing, unreadable or other day's file means not shedding. The journal
+  says each change of level once: `the lamp's day is 0.85 used: what
+  nobody asked for is shed`.
+- **From 0.8 (`NEAR`), what nobody asked for is shed:**
+  - A line let out only as the conversation going on, by someone other
+    than the one the lamp was talking with (`worker::CONVERSATION_ALONE`),
+    is held, not sent to the model only to be judged (`DAY_NEAR_HELD`).
+    The caller's own follow-up (`worker::FOLLOW_UP_NOTE`), a named line,
+    a turn, a tap and a face still go: the owner's own talk is never shed.
+  - In the coordinator, a say the model must word waits for a new day or
+    its own expiry (`Says::take_near_day_end`): a skill's note, an
+    add-on's quoted line, a made skill's line, a text not said as it is.
+    A reminder the person set, the onboarding, fixed words, sounds and a
+    line that answers the owner's own run go on.
+  - News of handed-over work is not told until the day opens again.
+  - Nothing is said about being near the limit.
+- **At 1.0 (`SPENT`)**, the same, and the first 429 says the usage limit at
+  once (above), not after `LIMIT_AFTER`.
 
 ## What a person hears
 
