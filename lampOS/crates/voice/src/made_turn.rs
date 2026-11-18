@@ -76,9 +76,9 @@ pub const LATER: &str = "later";
 /// lamp-9adf, 18 Nov 03:2x: after "turn off my bitcoin price skill", "turn
 /// my bitcoin price skill back on" made no call, and the lamp said
 /// "Bitcoin price is back on" while it stayed off).
-pub const BACK_ON_BY_CALL: &str = "A skill turned off is turned back on only by calling make_skill \
-     with turn_on and its name, when their line asks to turn it on; never say it is on or back on \
-     unless that call's answer says so.";
+pub const BACK_ON_BY_CALL: &str = "A skill turned off is turned back on by calling make_skill \
+     with turn_on and its name, when their line asks to turn it on, or by the lamp when the owner \
+     asks to use it; never say it is on or back on unless a call's answer says so.";
 
 /// What the model is told when it calls the function of a skill the person
 /// made or added that is turned off (`lamp_skills::TOOL_TURNED_OFF` is
@@ -87,11 +87,6 @@ pub const FUNCTION_OFF: &str = "That skill is turned off, so it did nothing. Say
      words: it is off and didn't run, and they can ask to turn it back on. Never turn it on for \
      this: it is turned back on only by calling make_skill with turn_on and its name, when their \
      line asks to turn it on; never say it is on or back on unless that call's answer says so.";
-
-/// What the model is told of a `turn_on` called in a turn where a skill's
-/// function answered [`FUNCTION_OFF`].
-pub const NOT_ASKED_ON: &str =
-    "a skill turned off is turned back on only when the person asks to turn it on, never to use it";
 
 /// What the model is told of a skill's function that answered
 /// [`FUNCTION_OFF`] after a `turn_on` turned that skill on in the same turn.
@@ -442,8 +437,9 @@ pub fn off_note(keeping: &Keeping, state: &Path) -> Option<String> {
     };
     Some(format!(
         "(For you to know, not to answer: {count} they made or added {are} turned off now. A \
-         line that asks to use or run one runs nothing: it is off and didn't run, so say what \
-         its function's answer says. Never turn it on for that. {BACK_ON_BY_CALL})"
+         line that asks to use or run one: call its function as for any skill; the lamp turns \
+         it on for the owner's ask and runs it, and its answer says what to say. \
+         {BACK_ON_BY_CALL})"
     ))
 }
 
@@ -463,67 +459,6 @@ pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
 /// ran nothing ([`FUNCTION_OFF`]).
 pub fn ran_turned_off(told: &Value) -> bool {
     told["error"] == FUNCTION_OFF
-}
-
-/// Whether the call `name` with `args` is a `make_skill` turn back on, as
-/// `make_skill_local` reads it (a turn-off beside it is a turn-off), with
-/// the switch on.
-pub fn turns_on(name: &str, args: &Value) -> bool {
-    name == made_skill::MAKE
-        && made_skill::off_said_on()
-        && args[TURN_ON].is_string()
-        && !args[TURN_OFF].is_string()
-}
-
-/// The words a line asks a skill on by, each alone or as a run in order:
-/// the short fixed set of the first builder's 12:51 ruling on #7683 ("turn
-/// on", "back on", "switch on", "enable", "put back on", "resume",
-/// "unpause", Vietnamese "bật"), lower case. "Put back on" is "back on".
-const ON_ASKS: [&[&str]; 6] = [
-    &["turn", "on"],
-    &["back", "on"],
-    &["switch", "on"],
-    &["enable"],
-    &["resume"],
-    &["unpause"],
-];
-
-/// The Vietnamese word a line asks a skill on by ("bật lại btc price").
-const ON_ASK_VI: &str = "bật";
-
-/// The verbs whose "on" may close the line apart from them ("turn btc price
-/// on", "switch my moon fact skill on").
-const ON_VERBS: [&str; 2] = ["turn", "switch"];
-
-/// Whether `line` asks to turn something on: one of [`ON_ASKS`] as a run of
-/// its words, [`ON_ASK_VI`], or one of [`ON_VERBS`] with "on" its last word.
-/// Never a use, a run or a play ("use my bitcoin skill", "run btc price").
-/// Kept to the fixed set on purpose: a line it misses costs the person
-/// saying "turn it on"; one it took wrongly would turn on a skill they
-/// turned off.
-pub fn asks_on(line: &str) -> bool {
-    let words = crate::agent_tasks::plain_words(line);
-    let run_at = |at: usize, run: &[&str]| {
-        words.len() - at >= run.len() && run.iter().zip(&words[at..]).all(|(a, b)| a == b)
-    };
-    (0..words.len()).any(|at| ON_ASKS.iter().any(|run| run_at(at, run)))
-        || words.iter().any(|word| word == ON_ASK_VI)
-        || (words.last().is_some_and(|last| last == "on")
-            && words.iter().any(|word| ON_VERBS.contains(&word.as_str())))
-}
-
-/// Whether the call `name` with `args` is a `turn_on` ([`turns_on`]) that
-/// is not run (#7562 point 2, the first builder's ranking, 18 Nov: no
-/// `turn_on` of a turned-off skill in any order on a line that didn't ask
-/// it on): the person's heard `line` doesn't ask it on ([`asks_on`]), or it
-/// isn't the turn's only `make_skill` call (`makes_in_turn`, itself
-/// counted), as #7683's strict yes holds a remove. "Lamp, use my btc price
-/// skill." never turns it on, whether the model calls `turn_on` before the
-/// skill's function, after it, or alone. A plain yes never lets the model's
-/// own `turn_on` through (Thirteen's P2, 18 Nov): only the lamp's offer
-/// ([`Offer`]) takes a yes, read in code, for its own skill, within its wait.
-pub fn on_refused(name: &str, args: &Value, line: &str, makes_in_turn: usize) -> bool {
-    turns_on(name, args) && !(makes_in_turn == 1 && asks_on(line))
 }
 
 /// What the model is told of a skill's function that still answered
@@ -548,146 +483,81 @@ pub const RERUN_AFTER: Duration = if cfg!(test) {
     Duration::from_millis(1_200)
 };
 
-/// How long the offer to turn a skill back on waits for its yes ([`Offer`]).
-pub const OFFER_FOR: Duration = Duration::from_secs(60);
+/// The id of the `turn_on` the lamp calls itself for an ask to use a skill
+/// turned off ([`on_for_ask`]): an id only, in no chat's thread.
+pub const ON_FOR_ASK_ID: &str = "turned_off_on_for_ask";
 
-/// The ids of the calls a yes to the offer makes in code: the `turn_on`,
-/// then the skill's own call for the ask. Ids only: the second route knows
-/// these calls by the round it made in code, never by their ids.
-pub const OFFER_ON_ID: &str = "turned_off_offer_on";
-pub const OFFER_RUN_ID: &str = "turned_off_offer_run";
-
-/// The offer to turn a skill back on and run it (#7684, the first builder's
-/// 11:05 ruling on #7562): a heard line asked to use a skill the person
-/// made or added that is turned off, in `request`, at `at`; its function's
-/// call `name` with `args` is the ask a yes runs once.
-#[derive(Clone, Debug)]
-pub struct Offer {
-    pub request: u64,
-    pub at: std::time::Instant,
-    pub name: String,
-    pub args: Value,
+/// The skill's name as said, of its function's call `name` with `args`
+/// ("btc price" for `btc_price`).
+pub fn spoken_of(name: &str, args: &Value) -> String {
+    crate::skill_named::spoken(crate::skill_named::function_of(name, args))
 }
 
-impl Offer {
-    /// The skill's name as said ("btc price" for `btc_price`).
-    pub fn spoken(&self) -> String {
-        crate::skill_named::spoken(crate::skill_named::function_of(&self.name, &self.args))
-    }
-
-    /// Whether the heard `line` of `request`, at `now`, takes the offer: the
-    /// very next line, within [`OFFER_FOR`], a plain yes ([`offer_yes`]).
-    pub fn taken_by(&self, request: u64, line: &str, now: std::time::Instant) -> bool {
-        request != self.request
-            && now.saturating_duration_since(self.at) < OFFER_FOR
-            && offer_yes(line)
-    }
-
-    /// The `turn_on` a yes makes, by the skill's said name.
-    pub fn turn_on_args(&self) -> Value {
-        json!({ TURN_ON: self.spoken() })
-    }
-}
-
-/// What the model is told of a turned-off skill's function asked for use
-/// on a heard line (#7684), in place of [`FUNCTION_OFF`]: the offer, said
-/// as it is, and nothing turned on.
-pub fn offer_told(spoken: &str) -> Value {
+/// `spoken` with its first letter upper case, as a line opens.
+fn opening(spoken: &str) -> String {
     let mut said = spoken.chars();
-    let said: String = said
-        .next()
+    said.next()
         .map(|first| first.to_uppercase().chain(said).collect())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// The `make_skill` call the lamp makes itself when a heard line asked to
+/// use a skill turned off, its function's call `name` with `args`
+/// answering [`FUNCTION_OFF`] (the first builder, 18:41 on 18 Nov, from the
+/// product owner: nothing is asked of the person, an offer becomes the
+/// action and one line with an undo). Its `turn_on` goes through
+/// `make_skill` as the model's own would ([`asked`]): heard, the owner's
+/// alone, the name matched to theirs; a guest's is refused there. No words
+/// of the line are read: the model's call of the skill is the ask.
+pub fn on_for_ask(name: &str, args: &Value) -> (String, Value) {
+    (
+        made_skill::MAKE.to_owned(),
+        json!({ TURN_ON: spoken_of(name, args) }),
+    )
+}
+
+/// What the model is told of its call of a skill turned off that the lamp
+/// turned on for the ask and ran again (`ran`, that run's answer, or
+/// [`just_on`] if it still answered off): the one line to say first, in
+/// the conversation's language, with its undo, then what it found.
+pub fn turned_on_for_ask(spoken: &str, ran: &Value) -> Value {
     json!({
-        "error": "that skill is turned off, so it did nothing",
+        "turned_on": spoken,
+        "ran": ran,
         "next": format!(
-            "Say only this, in the conversation's language: \"{said} is turned off. Want me to \
-             turn it back on and check?\" Never turn it on now, and never say it is on. Call \
-             nothing."
+            "It was off, so the lamp turned it on and ran it for their ask. Say first, in the \
+             conversation's language: \"{} was off, so I turned it on. Say 'turn it off' to \
+             undo.\" Then say what ran tells you to say, in a few words. Call nothing.",
+            opening(spoken)
         )
     })
 }
 
-/// What the model is told before a yes to the offer is answered: the skill
-/// was turned on and run for their ask, by the calls before it.
-pub fn yes_note(spoken: &str) -> String {
-    format!(
-        "(For you to know: they said yes to turning {spoken} back on and checking, so the lamp \
-         turned it on and ran it once for their ask, in the calls below. Say what it found in a \
-         few words, and that it is on again; if a call says it didn't, say that plainly.)"
-    )
-}
-
-/// What the model is told of its call of the skill the offer's yes ran in
-/// code already (`ran`, that run's answer): never run again.
-pub fn ran_already(ran: &Value) -> Value {
+/// What the model is told of its call of a skill turned off that the lamp
+/// did not turn on for the ask: the `turn_on`'s answer `on` refused it (a
+/// guest's line, [`NOT_OWNER`], or another why) or found no such skill of
+/// theirs. Said plainly, never that it is on.
+pub fn not_turned_on(on: &Value) -> Value {
+    let why = on["error"].as_str().unwrap_or("it couldn't be turned on");
     json!({
-        "error": "Not run again: their yes turned it back on and it was run for them already.",
-        "ran": ran,
-        "next": "Say only what its result above tells you to say. Call nothing."
+        "error": "that skill is turned off, so it did nothing",
+        "not_turned_on": why,
+        "next": format!(
+            "Say only, plainly, in a few words, in the conversation's language, that it is \
+             turned off, so it didn't run, and why it wasn't turned on: {why}. Name no skill. \
+             Never say it is on. Call nothing."
+        )
     })
 }
 
-/// The yes words an offer takes ([`offer_yes`]), lower case.
-const OFFER_YES: [&str; 11] = [
-    "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "vâng", "ừ", "có", "được",
-];
-/// The yes phrases an offer takes.
-const OFFER_YES_PHRASES: [&[&str]; 5] = [
-    &["go", "ahead"],
-    &["do", "it"],
-    &["turn", "it", "on"],
-    &["bật", "lại"],
-    &["bật", "lên"],
-];
-/// The words a plain yes may hold beside its yes.
-const OFFER_BESIDE: [&str; 5] = ["please", "lamp", "hey", "đi", "nhé"];
-
-/// Whether the heard `line` is a plain yes to the offer and nothing else:
-/// at most six words, no question, only [`OFFER_YES`] words or
-/// [`OFFER_YES_PHRASES`] beside [`OFFER_BESIDE`] ("Yes.", "Lamp, yeah, go
-/// ahead.", "Okay, please.", "Vâng.", "Có.", "Được, bật lại đi."). "Yes, and
-/// play some music." or "Yes?" is not. Read in code, as #7683's strict
-/// remove-yes is.
-// TODO(#7683): share #7683's plain-yes helper once it lands.
-pub fn offer_yes(line: &str) -> bool {
-    if line.trim_end().ends_with('?') {
-        return false;
-    }
-    let words = crate::agent_tasks::plain_words(line);
-    if words.is_empty() || words.len() > 6 {
-        return false;
-    }
-    let (mut at, mut yes) = (0, false);
-    while at < words.len() {
-        let phrase = OFFER_YES_PHRASES.iter().find(|phrase| {
-            words.len() - at >= phrase.len() && phrase.iter().zip(&words[at..]).all(|(a, b)| a == b)
-        });
-        if let Some(phrase) = phrase {
-            yes = true;
-            at += phrase.len();
-        } else if OFFER_YES.contains(&words[at].as_str()) {
-            yes = true;
-            at += 1;
-        } else if OFFER_BESIDE.contains(&words[at].as_str()) {
-            at += 1;
-        } else {
-            return false;
-        }
-    }
-    yes
-}
-
-/// What the model is told, the call not run, of a `turn_on` refused
-/// ([`on_refused`]; #7562's row on lamp-9adf, 18 Nov 10:53: "Lamp, use my
-/// btc price skill." with btc price turned off was turned on and said
-/// "back on", never run). Turning it on stays for a line that asks it on.
-pub fn not_asked_on() -> Value {
+/// What the model is told of its call of the skill the lamp turned on and
+/// ran for the ask already (`ran`, what it was told of that run): never
+/// run again.
+pub fn ran_already(ran: &Value) -> Value {
     json!({
-        "error": NOT_ASKED_ON,
-        "next": "Say only, in a few words, in the conversation's language, that the skill is \
-                 turned off, so it didn't run, and that they can say turn it back on whenever \
-                 they like. Never say it is on. Call nothing."
+        "error": "Not run again: it was turned on and run for their ask already.",
+        "ran": ran,
+        "next": "Say only what its result above tells you to say. Call nothing."
     })
 }
 
@@ -1223,7 +1093,7 @@ mod tests {
             "{note}"
         );
         assert!(
-            note.contains("only by calling make_skill with turn_on"),
+            note.contains("turned back on by calling make_skill with turn_on"),
             "{note}"
         );
         assert!(
@@ -1245,12 +1115,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// #7562's row on lamp-9adf, 18 Nov 10:53: told one of theirs is off,
-    /// "Lamp, use my btc price skill." was answered with a `turn_on` and
-    /// "Bitcoin price is back on.", never run. The note and the function's
-    /// own answer say a use is told off and didn't run, never turned on.
+    /// The first builder, 18:41 on 18 Nov (no offer): told one of theirs is
+    /// off, a line that asks to use it calls its function as any skill's;
+    /// the lamp turns it on for the owner's ask, by `make_skill`'s own
+    /// `turn_on` of its said name, and the model says one line with its
+    /// undo, in the conversation's language. A guest's turn on is refused
+    /// and told plainly, never said on.
     #[test]
-    fn a_turned_off_skill_asked_for_use_is_told_off_never_turned_on() {
+    fn a_turned_off_skill_asked_for_use_is_turned_on_with_an_undo_line() {
         use crate::skill_about;
         made_skill::set_off_said_here(Some(true));
         yes::clear_for_test();
@@ -1261,99 +1133,35 @@ mod tests {
         off.state = Some(&places.state);
         asked(off, &keeping, owner, helper);
         let note = off_note(&keeping, &places.state).unwrap();
-        for told in [note.as_str(), FUNCTION_OFF] {
-            assert!(told.contains("didn't run"), "{told}");
-            assert!(told.contains("Never turn it on for"), "{told}");
-            assert!(told.contains("asks to turn it on"), "{told}");
-        }
-        made_skill::set_off_said_here(None);
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    /// #7562 point 2: a `turn_on` stands only on a line that asks it on, as
-    /// the turn's only `make_skill` call; a use, a run, a play, or a plain
-    /// yes to whatever the lamp said last, never (Thirteen's P2: only the
-    /// lamp's own offer takes a yes, in code).
-    #[test]
-    fn a_turn_on_stands_only_on_a_line_that_asks_it_on() {
-        made_skill::set_off_said_here(Some(true));
-        let on = json!({ TURN_ON: "btc price" });
-        for line in [
-            "Turn btc price back on.",
-            "Turn it on.",
-            "Bật lại btc price.",
-        ] {
-            assert!(!on_refused(made_skill::MAKE, &on, line, 1), "{line}");
-            // Beside another skill change in the turn, refused.
-            assert!(on_refused(made_skill::MAKE, &on, line, 2), "{line}");
-        }
-        for line in [
-            "Use my bitcoin skill.",
-            "Run btc price.",
-            "Play btc price.",
-            "Yes.",
-            "Có.",
-        ] {
-            assert!(on_refused(made_skill::MAKE, &on, line, 1), "{line}");
-        }
-        // Not a turn on: never refused here.
-        let off = json!({ TURN_OFF: "btc price" });
-        assert!(!on_refused(made_skill::MAKE, &off, "Use it.", 1));
-        made_skill::set_off_said_here(None);
-    }
-
-    /// #7684: the offer is taken only by a plain yes, read in code, on the
-    /// very next line, within its wait.
-    #[test]
-    fn the_offer_is_taken_only_by_a_plain_yes_on_the_next_line() {
-        for yes in [
-            "Yes.",
-            "Lamp, yeah, go ahead.",
-            "Okay, please.",
-            "Do it.",
-            "Turn it on.",
-            "Sure",
-            "Vâng.",
-            "Ừ.",
-            "Có.",
-            "Được.",
-            "Có, bật lại đi.",
-            "Ok được.",
-        ] {
-            assert!(offer_yes(yes), "{yes}");
-        }
-        for not in [
-            "No.",
-            "Yes?",
-            "Yes, and play some music.",
-            "What time is it?",
-            "Yes yes yes yes yes yes yes.",
-            "Có không?",
-            "Không.",
-            "",
-        ] {
-            assert!(!offer_yes(not), "{not}");
-        }
-        let at = std::time::Instant::now();
-        let offer = Offer {
-            request: 4,
-            at,
-            name: "btc_price".into(),
-            args: json!({}),
-        };
-        assert_eq!(offer.spoken(), "btc price");
-        assert_eq!(offer.turn_on_args(), json!({ TURN_ON: "btc price" }));
-        assert!(offer.taken_by(5, "Yes.", at));
-        assert!(!offer.taken_by(4, "Yes.", at), "its own line");
-        assert!(!offer.taken_by(5, "Yes.", at + OFFER_FOR), "past its wait");
-        let told = offer_told(&offer.spoken());
+        assert!(note.contains("call its function"), "{note}");
+        assert!(note.contains("the lamp turns it on"), "{note}");
+        assert!(!note.contains("Never turn it on"), "{note}");
+        let (name, args) = on_for_ask("btc_price", &json!({}));
+        assert_eq!(name, made_skill::MAKE);
+        assert_eq!(args, json!({ TURN_ON: "btc price" }));
+        let told = turned_on_for_ask("btc price", &json!({"price": "90,000 dollars"}));
+        let next = told["next"].as_str().unwrap();
         assert!(
-            told["next"]
-                .as_str()
-                .unwrap()
-                .contains("Btc price is turned off. Want me to turn it back on and check?"),
+            next.contains("\"Btc price was off, so I turned it on. Say 'turn it off' to undo.\""),
             "{told}"
         );
+        assert!(next.contains("conversation's language"), "{told}");
+        assert_eq!(told["ran"]["price"], "90,000 dollars", "{told}");
+        // A guest's: the turn on refused by `asked`, told plainly.
+        let mut on = ask("btc price", false);
+        on.state = Some(&places.state);
+        let refused = asked(on, &keeping, || false, helper);
+        let told = not_turned_on(&refused);
+        assert_eq!(told["not_turned_on"], NOT_OWNER, "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("didn't run") && next.contains("Never say it is on"));
+        assert!(
+            skill_about::turned_off(&places.state)
+                .unwrap()
+                .contains("btc-price")
+        );
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// At most eight of theirs are offered, newest first.

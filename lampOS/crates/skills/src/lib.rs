@@ -454,9 +454,9 @@ fn checked_when(when: Option<String>, whose: &str) -> Option<String> {
 pub const OFF_FILE: &str = "off";
 /// What the model is told when it calls the function of a skill turned
 /// off by a person, by voice or in the app ([`Engine::tool`]): it ran
-/// nothing, and a line that asked to use it never turns it on. The voice's
-/// own text (`lamp_voice::made_turn::FUNCTION_OFF`), which knows such an
-/// answer by it and refuses a `turn_on` after it in the same turn (#7562).
+/// nothing. The voice's own text (`lamp_voice::made_turn::FUNCTION_OFF`),
+/// which knows such an answer by it and, for the owner's heard ask, turns
+/// the skill on and runs it again in the same turn (#7562).
 pub const TOOL_TURNED_OFF: &str = lamp_voice::made_turn::FUNCTION_OFF;
 /// The file in `--state-dir` beside [`OFF_FILE`] that keeps the core skills
 /// shipped off that the person turned on (#2585, `lamp-update`'s

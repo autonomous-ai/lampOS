@@ -4,11 +4,11 @@
 //! - "Lamp, use my btc price skill." with btc price turned off: its function
 //!   answered that it is off, the model then called `make_skill` with
 //!   `turn_on`, and the lamp said "Bitcoin price is back on." and never ran
-//!   it. A model's `turn_on` runs only on a line that asks it on, as the
-//!   turn's only `make_skill` call (#7562 point 2): in any order of the
-//!   calls, a use, or a plain yes to whatever the lamp asked, is refused
-//!   back to the model, never run. Only the lamp's own offer (#7684) takes
-//!   a yes, in code.
+//!   it. Now (the first builder, 18:41 on 18 Nov, from the product owner:
+//!   no offer, nothing asked of the person) the owner's ask of a skill
+//!   turned off turns it on and runs it in that turn, said with one line
+//!   and its undo; a guest's is refused. Whether a line asks a skill on is
+//!   the model's, by the call it makes: no words are read for it.
 //! - "Lamp, turn off my bitcoin price skill." found no skill by that name
 //!   and offered theirs (btc price among them, on); the model made no
 //!   second call and said "Bitcoin price is already off …" while it was on.
@@ -88,19 +88,50 @@ fn went_all(
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
     late: usize,
 ) -> Went {
-    went_spaced(before, heard, rounds, late, Duration::ZERO)
+    went_as(
+        before,
+        heard,
+        rounds,
+        Setup {
+            late,
+            ..Setup::default()
+        },
+    )
 }
 
-/// [`went_all`], the engine's clock moved on by `gap` before each line
-/// after the first.
-fn went_spaced(
+/// How a turn is set up: `late` as for [`went_all`]; `switch`,
+/// `LAMP_MADE_SKILL_OFF_SAID` on; `owner`, the lines the owner's (a guest's
+/// turn is refused by `make_skill` as `made_turn::asked` refuses it).
+#[derive(Clone, Copy, Debug)]
+struct Setup {
+    late: usize,
+    switch: bool,
+    owner: bool,
+}
+
+impl Default for Setup {
+    fn default() -> Self {
+        Self {
+            late: 0,
+            switch: true,
+            owner: true,
+        }
+    }
+}
+
+/// [`went_all`] as `setup` says.
+fn went_as(
     before: Option<(&str, &str)>,
     heard: &[&str],
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
-    late: usize,
-    gap: Duration,
+    setup: Setup,
 ) -> Went {
-    crate::made_skill::set_off_said_here(Some(true));
+    let Setup {
+        late,
+        switch,
+        owner,
+    } = setup;
+    crate::made_skill::set_off_said_here(Some(switch));
     let history: Vec<Message> = before
         .map(|(person, lamp)| vec![Message::user(person), Message::assistant(lamp)])
         .unwrap_or_default();
@@ -124,6 +155,8 @@ fn went_spaced(
                 }
                 None => json!({ "error": crate::made_turn::FUNCTION_OFF }),
             }
+        } else if name == crate::made_skill::MAKE && !owner {
+            json!({ "error": crate::made_turn::NOT_OWNER })
         } else if name == crate::made_skill::MAKE {
             let answer = make_skill_answers(&args);
             if answer["off"] == false {
@@ -136,17 +169,14 @@ fn went_spaced(
         seen.lock().unwrap().push((name, args));
         Box::pin(async move { answer })
     });
-    let moved: Arc<Mutex<Duration>> = Arc::default();
-    let clock = moved.clone();
-    let mut engine = Engine::with_clock(
+    let mut engine = Engine::new(
         script.clone(),
-        Arc::new(move || Told {
+        move || Told {
             text: "SYSTEM".to_owned(),
             after: None,
             history: history.clone(),
-        }),
+        },
         tools,
-        Arc::new(move || Instant::now() + *clock.lock().unwrap()),
     )
     .announcing(false);
     let labels = tokio::runtime::Builder::new_current_thread()
@@ -156,9 +186,6 @@ fn went_spaced(
         .block_on(async {
             let mut labels = Vec::new();
             for request in 1..=heard.len() as u64 {
-                if request > 1 {
-                    *moved.lock().unwrap() += gap;
-                }
                 engine.submit(start(request));
                 engine.submit(audio(request, 1));
                 engine.submit(end(request));
@@ -220,41 +247,6 @@ fn names(went: &Went) -> Vec<&str> {
     went.ran.iter().map(|(name, _)| name.as_str()).collect()
 }
 
-/// lamp-9adf, 18 Nov 10:53, pass 1: "Lamp, use my btc price skill." with
-/// btc price turned off. Its function answers that it is off; the model's
-/// `turn_on` after it is refused, never run, and told why, so the lamp says
-/// it is off and didn't run.
-#[test]
-fn a_turned_off_skill_asked_for_use_is_never_turned_on() {
-    let went = went(
-        "Lamp, use my btc price skill.",
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            calls(
-                "c2",
-                crate::made_skill::MAKE,
-                json!({ crate::made_turn::TURN_ON: "btc price" }),
-            ),
-            saying("Btc price is turned off, so it didn't run."),
-        ],
-    );
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
-    assert_eq!(
-        went.said,
-        said(&["Btc price is turned off,", " so it didn't run."]),
-        "{went:?}"
-    );
-    let refused = went
-        .told
-        .iter()
-        .find(|(id, _)| id == "c2")
-        .map(|(_, told)| told.clone())
-        .unwrap_or_default();
-    assert!(refused.contains(crate::made_turn::NOT_ASKED_ON), "{went:?}");
-    assert!(refused.contains("didn't run"), "{refused}");
-    assert!(refused.contains("Never say it is on"), "{refused}");
-}
-
 /// A line that asks to turn it back on, with no function of a turned-off
 /// skill answered in the turn, turns it on as before.
 #[test]
@@ -293,64 +285,25 @@ fn turn_on(id: &str) -> Vec<net::Result<ChatEvent>> {
     )
 }
 
-/// #7562 point 2, the first builder's ranking (18 Nov): no `turn_on` of a
-/// turned-off skill in any order on a line that asked to use it. The
-/// model's `turn_on` before the skill's function, for "use my btc price
-/// skill", is refused, never run; the function runs and answers it is off.
+/// The model judges whether a line asks a skill on, by the call it makes:
+/// a `turn_on` it calls before the function, for "use my btc price skill",
+/// runs as any call, no words read for it, and the function then runs.
 #[test]
-fn a_turn_on_called_before_the_function_for_a_use_is_refused() {
+fn the_models_own_turn_on_runs_on_its_judgment() {
     let went = went(
-        "Lamp, use my btc price skill.",
+        USE,
         vec![
             turn_on("c1"),
             calls("c2", FUNCTION, json!({})),
-            saying("Btc price is off."),
+            saying("Btc price is on: bitcoin is 90,000 dollars."),
         ],
     );
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
-    assert!(
-        told_for(&went, "c1").contains(crate::made_turn::NOT_ASKED_ON),
+    assert_eq!(
+        names(&went),
+        [crate::made_skill::MAKE, FUNCTION],
         "{went:?}"
     );
-}
-
-/// The same with the `turn_on` alone, the function never called, for a use
-/// or a run in other words: refused, never run.
-#[test]
-fn a_turn_on_alone_for_a_use_or_a_run_is_refused() {
-    for line in [
-        "Lamp, use my bitcoin skill.",
-        "Run btc price.",
-        "Play my btc price skill.",
-        "Lamp, what's the bitcoin price?",
-    ] {
-        let went = went(line, vec![turn_on("c1"), saying("Btc price is off.")]);
-        assert!(went.ran.is_empty(), "{line}: {went:?}");
-        assert!(
-            told_for(&went, "c1").contains(crate::made_turn::NOT_ASKED_ON),
-            "{line}: {went:?}"
-        );
-    }
-}
-
-/// A line that asks it on, in each of the fixed ways (the first builder's
-/// 12:51 ruling on #7683), English or Vietnamese: turned on.
-#[test]
-fn a_line_that_asks_it_on_turns_it_on() {
-    for line in [
-        "Lamp, turn my btc price skill back on.",
-        "Turn on btc price.",
-        "Turn btc price on.",
-        "Switch on my btc price skill.",
-        "Enable btc price.",
-        "Put btc price back on.",
-        "Resume btc price.",
-        "Unpause the btc price skill.",
-        "Lamp, bật lại btc price.",
-    ] {
-        let went = went(line, vec![turn_on("c1"), saying("Btc price is on again.")]);
-        assert_eq!(names(&went), [crate::made_skill::MAKE], "{line}: {went:?}");
-    }
+    assert!(told_for(&went, "c2").contains("90,000"), "{went:?}");
 }
 
 /// "Turn on btc price and run it": turned on, in either order of the calls.
@@ -381,83 +334,17 @@ fn turn_on_and_run_it_turns_it_on_in_either_order() {
             saying("Btc price is on again."),
         ],
     );
+    // The function first: the lamp turned it on for the ask and ran it,
+    // then the model's own `turn_on` runs as any call.
     assert_eq!(
         names(&after),
-        [FUNCTION, crate::made_skill::MAKE],
-        "{after:?}"
-    );
-}
-
-/// A plain yes to a "turn it back on?" the model asked itself, with no
-/// offer of the lamp's waiting, turns nothing on (Thirteen's P2 on #7562):
-/// only the lamp's own offer (#7684), its yes read in code, turns it on;
-/// nor does the model's `turn_on` of another skill on that yes.
-#[test]
-fn a_yes_to_the_models_own_turn_it_back_on_question_turns_nothing_on() {
-    const ASKED: &str = "Btc price is off, so it didn't run. Want me to turn it back on?";
-    for yes in ["Yes.", "Yeah, go ahead.", "Có."] {
-        let went = went_after(
-            Some((USE, ASKED)),
-            yes,
-            vec![turn_on("c1"), saying("Btc price is on again.")],
-        );
-        assert!(went.ran.is_empty(), "{yes}: {went:?}");
-        assert!(
-            told_for(&went, "c1").contains(crate::made_turn::NOT_ASKED_ON),
-            "{yes}: {went:?}"
-        );
-        let other = went_after(
-            Some((USE, ASKED)),
-            yes,
-            vec![moon_on("c1"), saying("Moon fact is on again.")],
-        );
-        assert!(other.ran.is_empty(), "{yes}: {other:?}");
-    }
-}
-
-/// A turn on of moon fact, another skill than the one offered.
-fn moon_on(id: &str) -> Vec<net::Result<ChatEvent>> {
-    calls(
-        id,
-        crate::made_skill::MAKE,
-        json!({ crate::made_turn::TURN_ON: "moon fact" }),
-    )
-}
-
-/// A turn on beside another `make_skill` call in its turn is not the turn's
-/// only change to a skill: refused, though the line asks it on.
-#[test]
-fn a_turn_on_beside_another_skill_change_is_refused() {
-    let went = went(
-        "Turn btc price back on.",
-        vec![
-            vec![
-                Ok(ChatEvent::ToolCalls(vec![
-                    call(
-                        "c1",
-                        crate::made_skill::MAKE,
-                        json!({ crate::made_turn::TURN_ON: "btc price" }),
-                    ),
-                    call(
-                        "c2",
-                        crate::made_skill::MAKE,
-                        json!({ crate::made_turn::TURN_OFF: "moon fact" }),
-                    ),
-                ])),
-                Ok(ChatEvent::Done),
-            ],
-            saying("Done."),
+        [
+            FUNCTION,
+            crate::made_skill::MAKE,
+            FUNCTION,
+            crate::made_skill::MAKE
         ],
-    );
-    assert_eq!(names(&went), [crate::made_skill::MAKE], "{went:?}");
-    assert_eq!(
-        went.ran[0].1[crate::made_turn::TURN_OFF],
-        "moon fact",
-        "{went:?}"
-    );
-    assert!(
-        told_for(&went, "c1").contains(crate::made_turn::NOT_ASKED_ON),
-        "{went:?}"
+        "{after:?}"
     );
 }
 
@@ -600,213 +487,114 @@ fn a_run_just_after_its_turn_on_is_tried_again_and_never_said_off() {
     assert!(!told.contains(crate::made_turn::FUNCTION_OFF), "{told}");
 }
 
-/// The line that asks to use btc price while it is turned off (#7684).
+/// The line that asks to use btc price while it is turned off.
 const USE: &str = "Lamp, use my btc price skill.";
 
-/// The lamp's offer for it, as the model is told to say it.
-const OFFER: &str = "Btc price is turned off. Want me to turn it back on and check?";
+/// The one line the lamp says, through the model, of a skill it turned on
+/// for an ask to use it, with its undo.
+const UNDO: &str = "Btc price was off, so I turned it on. Say 'turn it off' to undo.";
 
-/// #7684, the first builder's 11:05 ruling on #7562: "use X" while X is off
-/// is answered with the offer, "X is turned off. Want me to turn it back on
-/// and check?", and no `turn_on` is made.
+/// The first builder, 18:41 on 18 Nov, from the product owner: nothing is
+/// asked of the person, an offer becomes the action and one line with an
+/// undo. The owner's "Lamp, use my btc price skill." with btc price turned
+/// off: its function answers that it is off, so the lamp turns it on and
+/// runs it again in that turn, asked of no chat between; the model is told
+/// what it found and the one line to say first, in the conversation's
+/// language. Never "want me to turn it back on?".
 #[test]
-fn a_use_while_off_offers_to_turn_it_back_on_and_turns_nothing_on() {
-    let went = went(USE, vec![calls("c1", FUNCTION, json!({})), saying(OFFER)]);
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
+fn asked_to_run_an_off_skill_it_is_turned_on_and_run_in_one_turn_with_the_undo_line() {
+    let went = went(
+        USE,
+        vec![
+            calls("c1", FUNCTION, json!({})),
+            saying(&format!("{UNDO} Bitcoin is 90,000 dollars.")),
+        ],
+    );
+    assert_eq!(
+        names(&went),
+        [FUNCTION, crate::made_skill::MAKE, FUNCTION],
+        "{went:?}"
+    );
+    assert_eq!(
+        went.ran[1].1,
+        json!({ crate::made_turn::TURN_ON: "btc price" }),
+        "{went:?}"
+    );
     let told = told_for(&went, "c1");
-    assert!(told.contains(OFFER), "{told}");
+    assert!(told.contains(UNDO), "{told}");
+    assert!(told.contains("90,000"), "{told}");
+    assert!(told.contains("conversation's language"), "{told}");
+    assert!(!told.contains(crate::made_turn::FUNCTION_OFF), "{told}");
+    assert!(!told.contains("Want me"), "{told}");
+    assert!(
+        went.said.iter().any(|said| said.contains("90,000 dollars")),
+        "{went:?}"
+    );
+}
+
+/// The same while lamp-skills still answers off just after the turn on (it
+/// reads its `off` file again within 2 s): run again after a short wait;
+/// still off after every try, told it was just turned on, with the undo
+/// line, never that it is off.
+#[test]
+fn a_run_turned_on_for_the_ask_is_tried_again_while_still_off() {
+    let rounds = || vec![calls("c1", FUNCTION, json!({})), saying(UNDO)];
+    let late = went_all(None, &[USE], rounds(), 1);
+    assert_eq!(
+        names(&late),
+        [FUNCTION, crate::made_skill::MAKE, FUNCTION, FUNCTION],
+        "{late:?}"
+    );
+    let told = told_for(&late, "c1");
+    assert!(told.contains("90,000") && told.contains(UNDO), "{told}");
+    let never = went_all(None, &[USE], rounds(), 100);
+    let told = told_for(&never, "c1");
+    assert!(told.contains(crate::made_turn::JUST_ON), "{told}");
+    assert!(told.contains(UNDO), "{told}");
     assert!(!told.contains(crate::made_turn::FUNCTION_OFF), "{told}");
 }
 
-/// A plain yes on the very next line turns it on and runs it once for the
-/// ask, in code, asked of no chat; its answer is then said, and it stays on.
+/// A guest's ask of a turned-off skill turns nothing on: the lamp's turn on
+/// is refused by `make_skill` as the owner's alone, and the model is told
+/// plainly that it is off and didn't run, and why, never that it is on.
 #[test]
-fn a_plain_yes_to_the_offer_turns_it_on_and_runs_it_once() {
-    for yes in [
-        "Yes.",
-        "Lamp, yeah, go ahead.",
-        "Okay, please.",
-        "Turn it on.",
-        "Vâng.",
-    ] {
-        let went = went_all(
-            None,
-            &[USE, yes],
-            vec![
-                calls("c1", FUNCTION, json!({})),
-                saying(OFFER),
-                saying("Btc price is on again: bitcoin is 90,000 dollars."),
-            ],
-            0,
-        );
-        assert_eq!(
-            names(&went),
-            [FUNCTION, crate::made_skill::MAKE, FUNCTION],
-            "{yes}: {went:?}"
-        );
-        assert_eq!(
-            went.ran[1].1[crate::made_turn::TURN_ON],
-            "btc price",
-            "{yes}: {went:?}"
-        );
-        assert!(
-            went.said.iter().any(|said| said.contains("90,000 dollars")),
-            "{yes}: {went:?}"
-        );
-    }
-}
-
-/// "No." leaves it off, with nothing run: a `turn_on` the model makes for
-/// it is refused.
-#[test]
-fn a_no_to_the_offer_leaves_it_off() {
-    let went = went_all(
+fn a_guests_ask_of_an_off_skill_is_refused_and_turns_nothing_on() {
+    let went = went_as(
         None,
-        &[USE, "No."],
+        &[USE],
         vec![
             calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            turn_on("c2"),
-            saying("Okay, it stays off."),
+            saying("It's turned off, and only the lamp's owner can turn it on."),
         ],
-        0,
-    );
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
-}
-
-/// A new ask in place of the yes leaves it off and is answered as itself;
-/// a yes a line later is no yes to the offer, nor is more than a plain yes.
-#[test]
-fn a_new_ask_in_place_of_the_yes_leaves_it_off_and_is_answered() {
-    let went = went_all(
-        None,
-        &[USE, "What time is it?", "Yes."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            calls("c2", "the_time", json!({})),
-            saying("It's three."),
-            saying("Yes to what?"),
-        ],
-        0,
-    );
-    assert_eq!(names(&went), [FUNCTION, "the_time"], "{went:?}");
-    assert!(
-        went.said.iter().any(|said| said == "said:It's three."),
-        "{went:?}"
-    );
-    let more = went_all(
-        None,
-        &[USE, "Yes, and play some music."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            saying("Sure."),
-        ],
-        0,
-    );
-    assert_eq!(names(&more), [FUNCTION], "{more:?}");
-}
-
-/// A yes past the offer's wait (`OFFER_FOR`, 60 s) is no yes to it: nothing
-/// is turned on, whatever the model calls (Thirteen's P2 on #7562).
-#[test]
-fn a_yes_after_the_offers_wait_turns_nothing_on() {
-    let went = went_spaced(
-        Some((USE, OFFER)),
-        &[USE, "Yes."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            turn_on("c2"),
-            saying("Btc price is on again."),
-        ],
-        0,
-        crate::made_turn::OFFER_FOR + Duration::from_secs(1),
-    );
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
-    assert!(
-        told_for(&went, "c2").contains(crate::made_turn::NOT_ASKED_ON),
-        "{went:?}"
-    );
-    // Within its wait, the same yes is taken.
-    let within = went_spaced(
-        Some((USE, OFFER)),
-        &[USE, "Yes."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            saying("Btc price is on again: bitcoin is 90,000 dollars."),
-        ],
-        0,
-        crate::made_turn::OFFER_FOR - Duration::from_secs(1),
+        Setup {
+            owner: false,
+            ..Setup::default()
+        },
     );
     assert_eq!(
-        names(&within),
-        [FUNCTION, crate::made_skill::MAKE, FUNCTION],
-        "{within:?}"
-    );
-}
-
-/// A yes that names another skill than the one offered is no yes to the
-/// offer, and the model's `turn_on` of that other skill on it is refused;
-/// nor does the model turn another skill on beside the offer's own yes.
-#[test]
-fn a_yes_naming_another_skill_turns_nothing_on() {
-    let went = went_all(
-        Some((USE, OFFER)),
-        &[USE, "Yes, moon fact."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            moon_on("c2"),
-            saying("Moon fact is on again."),
-        ],
-        0,
-    );
-    assert_eq!(names(&went), [FUNCTION], "{went:?}");
-    assert!(
-        told_for(&went, "c2").contains(crate::made_turn::NOT_ASKED_ON),
+        names(&went),
+        [FUNCTION, crate::made_skill::MAKE],
         "{went:?}"
     );
-    let beside = went_all(
-        Some((USE, OFFER)),
-        &[USE, "Yes."],
-        vec![
-            calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
-            moon_on("c2"),
-            saying("Btc price is on again: bitcoin is 90,000 dollars."),
-        ],
-        0,
-    );
-    assert_eq!(
-        names(&beside),
-        [FUNCTION, crate::made_skill::MAKE, FUNCTION],
-        "{beside:?}"
-    );
-    assert_eq!(
-        beside.ran[1].1[crate::made_turn::TURN_ON],
-        "btc price",
-        "{beside:?}"
-    );
+    let told = told_for(&went, "c1");
+    assert!(told.contains(crate::made_turn::NOT_OWNER), "{told}");
+    assert!(told.contains("didn't run"), "{told}");
+    assert!(told.contains("Never say it is on"), "{told}");
+    assert!(!told.contains(UNDO), "{told}");
+    assert!(!told.contains("90,000"), "{told}");
 }
 
-/// The offer's yes ran the skill once in code: the model's call of the same
-/// function after it is given that answer and never run again (Thirteen's
-/// P3 on #7562).
+/// The skill turned on and run for the ask: the model's call of the same
+/// function after it is given that answer and never run again.
 #[test]
-fn the_offers_run_is_never_run_again_by_the_model() {
-    let went = went_all(
-        None,
-        &[USE, "Yes."],
+fn the_skill_turned_on_and_run_for_the_ask_is_never_run_again() {
+    let went = went(
+        USE,
         vec![
             calls("c1", FUNCTION, json!({})),
-            saying(OFFER),
             calls("c2", FUNCTION, json!({})),
-            saying("Btc price is on again: bitcoin is 90,000 dollars."),
+            saying(&format!("{UNDO} Bitcoin is 90,000 dollars.")),
         ],
-        0,
     );
     assert_eq!(
         names(&went),
@@ -816,4 +604,28 @@ fn the_offers_run_is_never_run_again_by_the_model() {
     let told = told_for(&went, "c2");
     assert!(told.contains("Not run again"), "{told}");
     assert!(told.contains("90,000"), "{told}");
+}
+
+/// With the switch off, a use of a turned-off skill is as before: its
+/// function's answer told as it is, nothing turned on.
+#[test]
+fn switch_off_a_use_of_an_off_skill_changes_nothing() {
+    let went = went_as(
+        None,
+        &[USE],
+        vec![
+            calls("c1", FUNCTION, json!({})),
+            saying("Btc price is off."),
+        ],
+        Setup {
+            switch: false,
+            ..Setup::default()
+        },
+    );
+    assert_eq!(names(&went), [FUNCTION], "{went:?}");
+    assert_eq!(
+        told_for(&went, "c1"),
+        json!({ "error": crate::made_turn::FUNCTION_OFF }).to_string(),
+        "{went:?}"
+    );
 }
