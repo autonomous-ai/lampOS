@@ -48,7 +48,7 @@ echo "$*" >> "$FAKE_DIR/calls.log"
 case "$*" in
   "pr diff"*) cat "$FAKE_DIR/files.txt" ;;
   *collaborators*) echo w1 ;;
-  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*|*issues/6809/comments*|*issues/6811/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
+  @QUEUE_CASE@) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
   *issues/*/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; cat "$FAKE_DIR/comments-$n.json" ;;
   *"--state all"*) echo 23 ;;
   *"--json headRefName --jq"*) cat "$FAKE_DIR/open.txt" 2>/dev/null ;;
@@ -67,7 +67,10 @@ case "$*" in
   *"--json state"*) cat "$FAKE_DIR/state.txt" 2>/dev/null || echo OPEN ;;
 esac
 """
-ARM_CHECKS = [{"__typename": "CheckRun", "name": "build and test", "status": "COMPLETED", "conclusion": "SUCCESS"},
+# Every Queue issue lib.sh names is answered from queue-N.json, so a new Queue issue needs no test change (19 Nov:
+# #6811 filled and #7814 went on; the pattern here listed the issues by hand).
+FAKE_GH = FAKE_GH.replace("@QUEUE_CASE@", "|".join("*issues/%d/comments*" % n for n in QUEUE))
+ARM_CHECKS =[{"__typename": "CheckRun", "name": "build and test", "status": "COMPLETED", "conclusion": "SUCCESS"},
               {"__typename": "CheckRun", "name": "clippy", "status": "COMPLETED", "conclusion": "SUCCESS"}]
 # A PR's own ARM64 run with every job green, as the train bot needs it on a PR the ARM64 run takes (#6556, train 841).
 ARM = "lampOS — build and test on Linux ARM64 (%s)"

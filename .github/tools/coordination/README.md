@@ -28,7 +28,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue; and, from the first read of #7186, a PR that fails alone while lamp-voice's own head is red is not left out and the bot stops. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
 | `tests/test_lane_pids.py` | Tests for #7188: with two lanes, a lane is busy until its train is done with while the other lane still gets its train, the wait between rounds lasts while a train runs and ends when one ends, a stop ends each waiting lane with its `merge-when-green.sh` and lets a lane past its wait finish, a train PR left open is said at the next start, and no process but the bot's own job reads as a lane or is signalled by a stop. The bot's own loop runs for real, as in `tests/test_failed_trains.py`, with a stand-in `sleep` for the bot's own waits. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
-| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
+| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811, #7814) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
 | `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
 
@@ -237,7 +237,7 @@ in time order with the comments (its submit time), so a later HOLD beats an earl
 A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review with an empty body, not yet submitted, or dismissed counts for nothing.
 
 **Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
-If any Queue issue (#4710, #5385, #6059, #6809 or #6811) can't be fetched, no PR is eligible that round.
+If any Queue issue (#4710, #5385, #6059, #6809, #6811 or #7814) can't be fetched, no PR is eligible that round.
 `still-eligible.sh` rechecks the markers, the Queue HOLDs, TWO READS and the lamp row just before a train merges.
 
 **Two readers for every PR (13 Nov, the lead).** The train bot and `still-eligible.sh` call `reads2.py --always`, so every PR needs READ-OKs from two different signed readers on its head, asked or not. A reader who restates is still one reader, and two names on one shared login are two readers. A ONE READ line no longer lowers it.
