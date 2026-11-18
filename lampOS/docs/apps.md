@@ -12,9 +12,10 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 3a, `app_yes.rs`) and the app socket without phrases and triggers (piece 3b-1, `app_socket.rs`, [control.md](control.md)). Designed and not yet built: the
 app socket's phrases and triggers (piece 3b-2), lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
-the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that does not
-know format 2 refuses an app package in words ("format 2 is not one this lamp
-reads (1)") and installs nothing.
+the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
+format probe refuses an app package in words ("format 2 is not one this lamp
+reads (1)"); an older lamp refuses it with its parser's "unknown field". Either
+way nothing is installed.
 
 ## The package (format 2)
 
@@ -82,12 +83,19 @@ english-lessons/skills/english-tutor/skill.toml
 | `runtime` | `name` is `python3` (the only one in v1); `entry` is a dotted module path (`a.b.c`), and `src/a/b/c.py` or `src/a/b/c/__init__.py` must be in the package. It is run isolated (`-I`: no `PYTHONPATH`, no working directory on the path), which a bare `python3 -I -m <entry>` cannot do (it never finds `<app>/src`; run on 18 Nov), so the unit runs `python3 -I -c 'import runpy, sys; sys.path[:0] = sys.argv[1:3]; runpy.run_module(sys.argv[3], run_name="__main__", alter_sys=True)' <app>/src <the lamp's SDK folder> <entry>`: the app's `src` first, then the folder the lamp keeps `lampos` in, then the module as `__main__` (checked 18 Nov with a module that imports a package from the second entry). Where the lamp keeps the SDK is the installer's (`lamp-apps-manage`), not the manifest's |
 | `grants` | names from the door's 14 only (`body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device`, `camera`, `microphone`, `speaker`, `notes`, `speech`), no duplicates. No service's name, and not `net` or `logs`. What the owner says yes to is this list as the app showed it |
 | `net`, `logs` | top-level booleans, default `false`, never inside `grants` |
-| `phrases` | at most 16; each at most 64 bytes with at least 8 letters, no repeats; needs `hear` |
+| `phrases` | at most 16; each at most 64 bytes (the socket's `phrases.set` counts characters) with at least 8 letters, no repeats; needs `hear` |
 | `triggers` | required (may be `[]`); at most 8, the same per-phrase rule; needs `hear`; matched whenever the app runs and **not** part of the 16 phrases. A trigger may also be a phrase: a heard line is delivered once, as the trigger |
 | `settings` | at most 16, below |
 | `skills` | the companion skills: exactly the folders under `skills/`, each holding a `skill.toml`; installed, updated and removed with the app, never listed on their own |
 | `assets` | exactly the files under `assets/`, each ending `.wav`, at most 20; each a WAV of 16-bit mono PCM at 24 kHz, 1 to 240,000 frames (10 s), within the lamp's loudness limits (no sample past −12 dBFS, no 10 ms louder than −30 dBFS RMS: the voice's own `decode_sound_with_limit`) |
 | `files` | as above |
+
+Also enforced, as the reader reads them: a path in the tar is at most 1024
+bytes, each of its parts ASCII `[A-Za-z0-9._-]` of at most 100 bytes and none
+beginning with `.`; `entry` is lowercase, at most 100 bytes; a label, title or
+hint has no leading or trailing space. A tar holds plain files only (no link,
+device or sparse entry), no second manifest, signature or file of one path,
+and no gzip.
 
 ### Settings
 
