@@ -15898,9 +15898,20 @@ async fn said_while_made<T>(
     }
     let mut in_turn = crate::make_skill_agent::waiting_in_turn(request);
     tokio::pin!(answering);
-    tokio::select! {
-        answer = &mut answering => return Ok(answer),
-        Ok(()) = &mut in_turn.due => {}
+    loop {
+        let due = tokio::select! {
+            answer = &mut answering => return Ok(answer),
+            Ok(due) = &mut in_turn.due => due,
+        };
+        // A line of its own before the make starts (#7765's follow-up: an
+        // old skill's remake not cancelled, so the make waits for its
+        // slot): said now, the turn still waiting for the make's own line.
+        let Some(line) = due else { break };
+        in_turn = crate::make_skill_agent::waiting_in_turn(request);
+        eprintln!(
+            "lamp-voice second: request {request}: the make waits for its slot: its line is said in this turn"
+        );
+        queue.push(queue.shared.fixed(line).to_owned()).await?;
     }
     let wait = queue.shared.one_path_wait;
     let line = queue

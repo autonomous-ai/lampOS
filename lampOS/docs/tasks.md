@@ -3694,11 +3694,30 @@ as a Harness task with the agent's own tools
 - **The answers:** `{"ok":true,"started":true}` once the run is about to
   start (the voice says its waiting line only then), then
   `{"ok":true,"answer"}`. Otherwise one refusal: `off`, `bad_request`,
-  `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
-  `no_answer`. The voice hands nothing over on `off`, `not_held_off`,
-  `no_namespace` or no socket (an older build). The journal says only the
-  outcome: `[lamp-tasks] skill make: refused <code>: <why>`, the refusal's
+  `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed`,
+  `no_answer` or, for a cancelled remake, `cancelled`. The voice hands
+  nothing over on `off`, `not_held_off`, `no_namespace` or no socket (an
+  older build). The journal says only the outcome:
+  `[lamp-tasks] skill make: refused <code>: <why>`, the refusal's
   fixed-form reason (`journal_line`), never the rules or the answer.
+- **The cancel** (#7765's follow-up, `skill_make::CANCEL_OP`): a make
+  lamp-voice sends while it remakes an old skill (`made_remake`) is marked
+  `"remake":true`. Since the middle form (the first builder's 19:50 ruling)
+  a remake is written by the lamp and sends no make here, so none is
+  marked today; the cancel stays for any such make.
+  A person's make refused `busy` sends `{"op":"skill_make_cancel"}`, on
+  the same socket (lamp-voice as root alone, as every line), nothing else
+  in it (`bad_request`). A remake's make is ended at once: its run's
+  process group killed, or its Harness session closed, as at its deadline
+  (`SkillRun::cancel`). Its folder is removed and nothing kept; its own
+  connection is told `cancelled`. The slot is freed, its run waited for
+  at most 0.75 s (`CANCEL_WAIT`). The answer, `{"ok":true,"cancelled":true}`,
+  comes within a second. A person's make is never cancelled: refused
+  `not_remake`, it goes on. With none running: `nothing`. One connection
+  more is taken (`MOST_CONNECTIONS`, 3), for a cancelled make still ending.
+  Tests: `a_cancel_stops_a_remakes_make_at_once_and_frees_the_slot`,
+  `a_persons_make_is_never_cancelled_and_a_cancel_of_nothing_answers_plainly`,
+  `a_makes_line_may_mark_it_a_remake`, `a_cancelled_run_is_killed_at_once`.
 - **Tests:** `skill_make::tests`: a make runs in its own folder, its rules
   there and its answer read back, only its home in its environment, the
   folder removed; each make's home holds only the provider config at its

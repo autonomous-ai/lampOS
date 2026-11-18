@@ -679,6 +679,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "오, 안녕하세요.",
         ],
     ),
+    // A person's make waiting for an old skill's remake to end (#7765's
+    // follow-up, `make_skill_agent::FINISHING_LINE`).
+    (
+        crate::make_skill_agent::FINISHING_LINE,
+        [
+            "Đợi mình một chút, mình đang làm nốt một việc.",
+            "ちょっと待ってね、今ひとつ片付けてるところ。",
+            "稍等一下，我正在忙完一件事。",
+            "잠깐만요, 하던 일을 마무리하고 있어요.",
+        ],
+    ),
 ];
 
 impl Language {

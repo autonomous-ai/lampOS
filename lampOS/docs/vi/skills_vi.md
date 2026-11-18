@@ -4790,13 +4790,23 @@ không bao giờ bị chiếm.
   và kích thước của chỉ mục được giữ, nên chỉ quét lại khi chỉ mục đổi: với
   31 kỹ năng (kiểm thử debug trên laptop), quét mất khoảng 4,4 ms, một lần
   xem không đổi gì khoảng 0,3 ms.
-- **Người đi trước** (#7765). Lần làm lại không bao giờ chiếm chỗ làm kỹ
-  năng duy nhất của lamp-tasks (dạng giữa do đèn viết), nên không bao giờ
-  giữ chân lần làm của người. Lần làm của người bị từ chối `busy` vì một lần
-  làm khác trong khi đang làm lại thì vẫn yêu cầu lần làm lại nhường
-  (`made_remake::stand_down`) và chờ chỗ, hỏi lại mỗi 0,5 giây trong thời
-  gian của nó; lần làm lại không giữ gì, kỹ năng cũ giữ nguyên, và được thử
-  lại vào ngày khác, không tính là một lần thử.
+- **Người đi trước** (#7765 và phần tiếp theo). Lần làm lại ở dạng giữa
+  không bao giờ chiếm chỗ làm kỹ năng duy nhất của lamp-tasks (đèn tự viết
+  nó), nên không bao giờ giữ chân lần làm của người, và hôm nay không lần
+  làm nào được gửi với `"remake":true`. Việc huỷ vẫn giữ cho lần làm như
+  vậy: lần làm của người bị từ chối `busy` thì yêu cầu lamp-tasks huỷ lần
+  làm đang chạy (`{"op":"skill_make_cancel"}`, docs/tasks.md, "The
+  cancel"), và nó chỉ huỷ lần được đánh dấu là làm lại (lượt chạy dừng ngay,
+  chỗ được giải phóng trong vòng một giây, và lần làm của người được gửi lại
+  ngay; trong bộ kiểm thử nó bắt đầu khoảng 0,06 giây sau khi hỏi). Lần làm
+  của người không bao giờ bị huỷ. Nếu huỷ không được khi lần làm lại chạy ở
+  đây (chỗ do lần làm khác giữ), lần làm lại nhường
+  (`made_remake::stand_down`), đèn nói một lần "One moment, I'm finishing
+  something." (câu cố định, theo ngôn ngữ của cuộc trò chuyện), và lần làm
+  hỏi lại mỗi 0,5 giây. Mỗi lần hỏi chỉ được phần thời gian còn lại của nó
+  (`within`), không bao giờ quá; hết giờ thì người nghe câu báo bận. Lần
+  làm lại không giữ gì, kỹ năng cũ giữ nguyên, và được thử lại vào ngày
+  khác, không tính là một lần thử.
 - **Làm lại từng cái một** (`made_remake::step`, mỗi phút một lần trong
   worker của route thứ hai): chỉ khi rảnh (10 phút không nghe câu nào),
   không trong giờ yên lặng của kỹ năng tự làm (`made_skill::MANNERS_QUIET`,

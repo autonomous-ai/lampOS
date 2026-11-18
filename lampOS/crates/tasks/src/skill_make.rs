@@ -70,8 +70,18 @@
 //! - **The answers**: `{"ok":true,"started":true}` once the run is about
 //!   to start (so the voice says its waiting line only then), then
 //!   `{"ok":true,"answer"}`; or one refusal: `off`, `bad_request`,
-//!   `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
-//!   `no_answer`.
+//!   `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed`,
+//!   `no_answer` or, for a cancelled remake, `cancelled`.
+//! - **The cancel** (#7765's follow-up, [`CANCEL_OP`]): an old skill's
+//!   remake is sent with `"remake":true`. A person's make refused `busy`
+//!   while it runs sends `{"op":"skill_make_cancel"}` (from lamp-voice
+//!   alone, as every line here): the remake's run is ended at once (its
+//!   process group killed, or its Harness session closed, as at its
+//!   deadline), its folder removed and nothing kept, its own connection
+//!   told `cancelled`, and the slot freed; answered
+//!   `{"ok":true,"cancelled":true}` within a second ([`CANCEL_WAIT`]). A
+//!   person's make is never cancelled (`not_remake`); with none running,
+//!   `nothing`.
 //! - **The socket** ([`MakeHandOvers`]): with `LAMP_SKILL_TASKS` on (the
 //!   switch lamp-update's namespace edits are written with), `serve` binds
 //!   [`MAKE_SOCKET`] for lamp-voice alone, as root, one make at a time,
@@ -118,8 +128,27 @@ pub const NO_ANSWER: &str = "the lamp's Hermes wrote no answer";
 pub const BUSY: &str = "a skill is already being made on this lamp; one is made at a time";
 /// How long a connection has to send its line, and to take each answer.
 pub const LINE_WAIT: Duration = Duration::from_secs(5);
-/// The most connections read or answered at once.
-pub const MOST_CONNECTIONS: usize = 2;
+/// The most connections read or answered at once: the make, the next one
+/// (or a cancel) and a cancelled make's still ending.
+pub const MOST_CONNECTIONS: usize = 3;
+/// The voice's line that stops a remake's make (#7765's follow-up):
+/// `{"op":"skill_make_cancel"}`, nothing else in it.
+pub const CANCEL_OP: &str = "skill_make_cancel";
+/// The refusal's code a cancelled make's own connection is told.
+pub const CANCELLED_CODE: &str = "cancelled";
+/// What a cancelled make's own connection is told.
+pub const CANCELLED: &str = "the remake was cancelled for a person's make; nothing was kept";
+/// A cancel's refusal when no make runs.
+pub const NOTHING_CODE: &str = "nothing";
+pub const NOTHING_MADE: &str = "no skill is being made on this lamp";
+/// A cancel's refusal when the make running is a person's.
+pub const NOT_REMAKE_CODE: &str = "not_remake";
+pub const NOT_REMAKE: &str = "a person's make is never cancelled";
+/// How long a cancel waits for the cancelled run to end before its slot
+/// is freed anyway: the cancel is answered within a second.
+pub const CANCEL_WAIT: Duration = Duration::from_millis(750);
+/// How often a cancel looks whether the cancelled run ended.
+const CANCEL_TICK: Duration = Duration::from_millis(5);
 /// How often the socket is looked at while no one connects.
 const ACCEPT_TICK: Duration = Duration::from_millis(20);
 
@@ -150,6 +179,12 @@ pub struct MakeLine {
     /// [`NOT_READY_LINE`] instead (Harness hasn't looked yet).
     #[serde(default)]
     pub engine: Option<String>,
+    /// #7765's follow-up: an old skill's remake (lamp-voice's
+    /// `made_remake`), which the voice's cancel ([`CANCEL_OP`]) may stop
+    /// for a person's make; only when the line says `true`. A person's
+    /// make never says it, and is never cancelled.
+    #[serde(default)]
+    pub remake: bool,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -404,6 +439,7 @@ pub fn make_run_with(
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -1014,6 +1050,20 @@ pub fn answer_with(
     gateway: Option<&MakeGateway>,
     started: &mut dyn FnMut(),
 ) -> Value {
+    answer_cancellable(line, on, work, hermes, gateway, &Arc::default(), started)
+}
+
+/// [`answer_with`], its run ended at once once `cancel` is set
+/// ([`SkillRun::cancel`]): the voice's cancel of a remake's make.
+fn answer_cancellable(
+    line: &[u8],
+    on: bool,
+    work: &Path,
+    hermes: &dyn Runner,
+    gateway: Option<&MakeGateway>,
+    cancel: &Arc<AtomicBool>,
+    started: &mut dyn FnMut(),
+) -> Value {
     if !on {
         return refusal(
             "off",
@@ -1033,7 +1083,7 @@ pub fn answer_with(
             }
             Ok(MakeAgent::Hermes) => hermes,
             Ok(MakeAgent::Gateway(_)) => {
-                return answer_on_gateway(&make, work, gateway, started);
+                return answer_on_gateway(&make, work, gateway, cancel, started);
             }
             Err(why) => return refusal("run_failed", &why),
         },
@@ -1054,11 +1104,12 @@ pub fn answer_with(
     started();
     // A make has no token to end.
     let switches = make.switches.clone().unwrap_or_default();
-    let ran = runner.run(
-        &make_run_with(&folder.path, make.within(), make.guide, &switches),
-        &|| {},
-    );
+    let mut run = make_run_with(&folder.path, make.within(), make.guide, &switches);
+    run.cancel = cancel.clone();
+    let ran = runner.run(&run, &|| {});
     match ran {
+        // Cancelled: nothing of it is read or kept.
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => match answer_read(&folder.fd) {
             Some(text) => json!({"ok": true, "answer": text}),
@@ -1075,6 +1126,7 @@ fn answer_on_gateway(
     make: &MakeLine,
     work: &Path,
     gateway: &MakeGateway,
+    cancel: &Arc<AtomicBool>,
     started: &mut dyn FnMut(),
 ) -> Value {
     if let Err(why) = gateway.ready() {
@@ -1090,10 +1142,12 @@ fn answer_on_gateway(
         }
     };
     started();
-    let run = gateway_run(&folder.path, make.within(), make.guide);
+    let mut run = gateway_run(&folder.path, make.within(), make.guide);
+    run.cancel = cancel.clone();
     let ran = gateway.run(&run, &|| {});
     drop(folder);
     match ran {
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         // Harness or the gateway not ready yet: said to the person at
         // once in the lamp's short words, never a silent failure; the
         // reason is journaled.
@@ -1588,7 +1642,7 @@ impl MakeHandOvers {
 
     fn accept(self, listener: &std::os::unix::net::UnixListener, stop: &AtomicBool) {
         let this = Arc::new(self);
-        let running = Arc::new(AtomicBool::new(false));
+        let running = Arc::new(Slot::default());
         let open = Arc::new(AtomicUsize::new(0));
         while !stop.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -1634,7 +1688,7 @@ impl MakeHandOvers {
         }
     }
 
-    fn one(&self, stream: &UnixStream, running: &AtomicBool) {
+    fn one(&self, stream: &UnixStream, running: &Slot) {
         let line = match read_line_within(stream, MOST_LINE_BYTES) {
             Ok(line) => line,
             Err(refused) => {
@@ -1660,21 +1714,36 @@ impl MakeHandOvers {
             write_answer(stream, &answered);
             return;
         }
-        if running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        // The voice's cancel of a remake's make (#7765's follow-up): from
+        // lamp-voice alone, as every line here ([`caller_may`]).
+        if is_cancel(&line) {
+            let answered = match serde_json::from_slice::<Value>(&line) {
+                Ok(whole) if whole == json!({"op": CANCEL_OP}) => running.cancel(),
+                _ => refusal("bad_request", "not a cancel's line"),
+            };
+            eprintln!(
+                "[lamp-tasks] skill make: a cancel: {}",
+                if answered["ok"] == true {
+                    "a remake's make was cancelled".to_owned()
+                } else {
+                    format!("refused {}", answered["error"].as_str().unwrap_or("?"))
+                }
+            );
+            write_answer(stream, &answered);
+            return;
+        }
+        let Some(place) = running.take(remakes(&line)) else {
             eprintln!("[lamp-tasks] skill make: refused busy, one is being made");
             write_answer(stream, &refusal("busy", BUSY));
             return;
-        }
-        let place = Place(running);
-        let answered = answer_with(
+        };
+        let answered = answer_cancellable(
             &line,
             true,
             &self.work,
             &*self.runner,
             self.one_path.as_deref(),
+            &place.cancel,
             &mut || {
                 write_answer(stream, &json!({"ok": true, "started": true}));
             },
@@ -1713,12 +1782,104 @@ impl Drop for Counted {
     }
 }
 
+/// Whether `line` is a cancel's ([`CANCEL_OP`]), whole or not.
+fn is_cancel(line: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(line).is_ok_and(|line| line["op"] == CANCEL_OP)
+}
+
+/// Whether a make's `line` marks it a remake ([`MakeLine::remake`]); the
+/// line is checked whole after.
+fn remakes(line: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(line).is_ok_and(|line| line["remake"] == true)
+}
+
+/// lamp-tasks' one make slot: the make running, if any, and whether it is
+/// a remake the voice may cancel ([`Slot::cancel`]).
+#[derive(Default)]
+struct Slot {
+    held: std::sync::Mutex<Option<Held>>,
+    made: std::sync::atomic::AtomicU64,
+}
+
+/// The make holding the [`Slot`].
+struct Held {
+    id: u64,
+    remake: bool,
+    cancel: Arc<AtomicBool>,
+}
+
+impl Slot {
+    fn held(&self) -> std::sync::MutexGuard<'_, Option<Held>> {
+        self.held.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// The slot for a make (`remake`: a remake's), or none while another
+    /// holds it.
+    fn take(&self, remake: bool) -> Option<Place<'_>> {
+        let mut held = self.held();
+        if held.is_some() {
+            return None;
+        }
+        let id = self.made.fetch_add(1, Ordering::Relaxed) + 1;
+        let cancel = Arc::new(AtomicBool::new(false));
+        *held = Some(Held {
+            id,
+            remake,
+            cancel: cancel.clone(),
+        });
+        Some(Place {
+            slot: self,
+            id,
+            cancel,
+        })
+    }
+
+    /// Let go by the make `id` only: a cancelled make's slot may hold the
+    /// next one already.
+    fn free(&self, id: u64) {
+        let mut held = self.held();
+        if held.as_ref().is_some_and(|held| held.id == id) {
+            *held = None;
+        }
+    }
+
+    fn holds(&self, id: u64) -> bool {
+        self.held().as_ref().is_some_and(|held| held.id == id)
+    }
+
+    /// The voice's cancel: a remake's make ended at once and its slot
+    /// freed, answered within a second (its run waited for at most
+    /// [`CANCEL_WAIT`], then the slot freed all the same); a person's make
+    /// refused [`NOT_REMAKE_CODE`]; none running, [`NOTHING_CODE`].
+    fn cancel(&self) -> Value {
+        let id = match &*self.held() {
+            None => return refusal(NOTHING_CODE, NOTHING_MADE),
+            Some(held) if !held.remake => return refusal(NOT_REMAKE_CODE, NOT_REMAKE),
+            Some(held) => {
+                held.cancel.store(true, Ordering::Release);
+                held.id
+            }
+        };
+        let until = std::time::Instant::now() + CANCEL_WAIT;
+        while self.holds(id) && std::time::Instant::now() < until {
+            std::thread::sleep(CANCEL_TICK);
+        }
+        self.free(id);
+        json!({"ok": true, "cancelled": true})
+    }
+}
+
 /// The one make's place, let go however it ends.
-struct Place<'a>(&'a AtomicBool);
+struct Place<'a> {
+    slot: &'a Slot,
+    id: u64,
+    /// Set by the voice's cancel ([`Slot::cancel`]).
+    cancel: Arc<AtomicBool>,
+}
 
 impl Drop for Place<'_> {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::Release);
+        self.slot.free(self.id);
     }
 }
 
@@ -3084,5 +3245,161 @@ mod tests {
         assert_eq!(parsed(r#","one_path":false"#), Ok(false));
         assert_eq!(parsed(r#","one_path":true"#), Ok(true));
         assert!(parsed(r#","one_path":"yes""#).is_err());
+    }
+
+    /// Holds its run until it is cancelled or its deadline passes, as an
+    /// agent's run that writes nothing in time; keeps whether each was
+    /// cancelled.
+    #[derive(Default)]
+    struct Holding(Mutex<Vec<bool>>);
+
+    impl Runner for Holding {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            let began = std::time::Instant::now();
+            while !run.cancelled() && began.elapsed() < run.deadline {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            self.0.lock().unwrap().push(run.cancelled());
+            Ok(0)
+        }
+    }
+
+    /// What [`serving`] gives: the folder, the socket, the work folder,
+    /// the stop and the serving thread.
+    type Served = (
+        tempfile::TempDir,
+        PathBuf,
+        PathBuf,
+        Arc<AtomicBool>,
+        std::thread::JoinHandle<()>,
+    );
+
+    /// The make socket served in a fresh folder on `runner`.
+    fn serving(runner: Arc<dyn Runner + Send + Sync>) -> Served {
+        let dir = tempfile::Builder::new()
+            .prefix("tmc-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let socket = dir.path().join("skill-make.sock");
+        let work = dir.path().join("work");
+        std::fs::create_dir(&work).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let handle = MakeHandOvers {
+            socket: socket.clone(),
+            work: work.clone(),
+            runner,
+            one_path: None,
+            caller: |_| true,
+            asks: None,
+        }
+        .start(true, stop.clone())
+        .unwrap()
+        .expect("on binds");
+        (dir, socket, work, stop, handle)
+    }
+
+    /// `line` sent on a connection of its own: its answers' lines.
+    fn sent(socket: &Path, line: &Value) -> std::io::Lines<BufReader<UnixStream>> {
+        let mut stream = UnixStream::connect(socket).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        writeln!(stream, "{line}").unwrap();
+        BufReader::new(stream).lines()
+    }
+
+    fn next(lines: &mut std::io::Lines<BufReader<UnixStream>>) -> Value {
+        serde_json::from_str(&lines.next().unwrap().unwrap()).unwrap()
+    }
+
+    fn make_line(remake: bool, within_ms: u64) -> Value {
+        let mut line = json!({"op":"skill_make","rules":"R","within_ms":within_ms});
+        if remake {
+            line["remake"] = json!(true);
+        }
+        line
+    }
+
+    /// The make folders left in `work`.
+    fn make_folders(work: &Path) -> Vec<String> {
+        std::fs::read_dir(work)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(FOLDER_HEAD))
+            .collect()
+    }
+
+    /// The reviewer's follow-up on #7765: a person's make no longer waits
+    /// in silence for an old skill's remake. A cancel stops a make marked
+    /// as a remake at once (its run ended, its folder gone, nothing kept),
+    /// answered within a second, and the slot is free for the next make.
+    #[test]
+    fn a_cancel_stops_a_remakes_make_at_once_and_frees_the_slot() {
+        let holding = Arc::new(Holding::default());
+        let (_dir, socket, work, stop, handle) = serving(holding.clone());
+        let mut remake = sent(&socket, &make_line(true, 60_000));
+        assert_eq!(next(&mut remake), json!({"ok": true, "started": true}));
+        assert_eq!(make_folders(&work).len(), 1);
+        // Busy for a person's make while the remake runs.
+        let mut first = sent(&socket, &make_line(false, 1_000));
+        assert_eq!(next(&mut first)["error"], "busy");
+        let asked = std::time::Instant::now();
+        let mut cancel = sent(&socket, &json!({"op": CANCEL_OP}));
+        assert_eq!(next(&mut cancel), json!({"ok": true, "cancelled": true}));
+        let answered = asked.elapsed();
+        assert!(answered < Duration::from_secs(1), "{answered:?}");
+        // The remake's own connection is told, and keeps nothing.
+        let told = next(&mut remake);
+        assert_eq!(told["ok"], false, "{told}");
+        assert_eq!(told["error"], CANCELLED_CODE, "{told}");
+        // The slot is free: the person's make starts at once.
+        let mut person = sent(&socket, &make_line(false, 1_000));
+        assert_eq!(next(&mut person), json!({"ok": true, "started": true}));
+        let start = asked.elapsed();
+        eprintln!("a person's make started {start:?} after its cancel was asked");
+        assert!(start < Duration::from_secs(2), "{start:?}");
+        assert_eq!(next(&mut person)["error"], "no_answer");
+        assert_eq!(*holding.0.lock().unwrap(), vec![true, false]);
+        assert!(make_folders(&work).is_empty(), "{:?}", make_folders(&work));
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+    }
+
+    /// A person's make can never be cancelled: the cancel is refused and
+    /// the make goes on to its own end. A cancel with nothing being made
+    /// is answered plainly. Only the exact cancel line is one.
+    #[test]
+    fn a_persons_make_is_never_cancelled_and_a_cancel_of_nothing_answers_plainly() {
+        let holding = Arc::new(Holding::default());
+        let (_dir, socket, _work, stop, handle) = serving(holding.clone());
+        let mut none = sent(&socket, &json!({"op": CANCEL_OP}));
+        assert_eq!(next(&mut none), refusal(NOTHING_CODE, NOTHING_MADE));
+        let mut person = sent(&socket, &make_line(false, 1_500));
+        assert_eq!(next(&mut person), json!({"ok": true, "started": true}));
+        let mut cancel = sent(&socket, &json!({"op": CANCEL_OP}));
+        assert_eq!(next(&mut cancel), refusal(NOT_REMAKE_CODE, NOT_REMAKE));
+        assert_eq!(next(&mut person)["error"], "no_answer");
+        assert_eq!(*holding.0.lock().unwrap(), vec![false]);
+        let mut odd = sent(&socket, &json!({"op": CANCEL_OP, "all": true}));
+        assert_eq!(next(&mut odd)["error"], "bad_request");
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+    }
+
+    /// The make's line may mark it a remake (`"remake":true`); nothing
+    /// else but a boolean is one.
+    #[test]
+    fn a_makes_line_may_mark_it_a_remake() {
+        let parsed = |extra: &str| {
+            MakeLine::parse(
+                format!(r#"{{"op":"skill_make","rules":"R","within_ms":1000{extra}}}"#).as_bytes(),
+            )
+            .map(|make| make.remake)
+        };
+        assert_eq!(parsed(""), Ok(false));
+        assert_eq!(parsed(r#","remake":true"#), Ok(true));
+        assert!(parsed(r#","remake":"yes""#).is_err());
     }
 }

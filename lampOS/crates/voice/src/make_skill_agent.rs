@@ -164,9 +164,14 @@ fn on_with(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// What a waiting turn is told ([`waiting_due`]): `None`, the make's own
+/// waiting line ([`waiting_line`]); a line of its own otherwise
+/// ([`FINISHING_LINE`]), said before the make starts.
+pub type Due = Option<&'static str>;
+
 /// The voice turns waiting on a make, each with its request and the
 /// sender its waiting line is told on ([`waiting_in_turn`]).
-static IN_TURN: std::sync::Mutex<Vec<(u64, u64, tokio::sync::oneshot::Sender<()>)>> =
+static IN_TURN: std::sync::Mutex<Vec<(u64, u64, tokio::sync::oneshot::Sender<Due>)>> =
     std::sync::Mutex::new(Vec::new());
 /// The last [`InTurn`]'s number.
 static IN_TURN_MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -191,8 +196,8 @@ pub fn set_made_for(request: u64) {
 /// in silence. Dropped, the turn no longer waits.
 pub struct InTurn {
     made: u64,
-    /// Sent once, when the make's waiting line is due.
-    pub due: tokio::sync::oneshot::Receiver<()>,
+    /// Sent once, when the make's waiting line is due ([`Due`]).
+    pub due: tokio::sync::oneshot::Receiver<Due>,
 }
 
 impl Drop for InTurn {
@@ -218,6 +223,12 @@ pub fn waiting_in_turn(request: u64) -> InTurn {
 /// was cut, and nobody is left to hear it); false with none, and the say
 /// service is asked instead.
 pub fn waiting_due(request: u64) -> bool {
+    waiting_due_with(request, None)
+}
+
+/// [`waiting_due`], the turn told `due`: the make's own waiting line, or
+/// a line of its own.
+fn waiting_due_with(request: u64, due: Due) -> bool {
     if request == 0 {
         return false;
     }
@@ -227,7 +238,7 @@ pub fn waiting_due(request: u64) -> bool {
     });
     match told {
         Some(told) => {
-            let _ = told.send(());
+            let _ = told.send(due);
             true
         }
         None => false,
@@ -369,6 +380,22 @@ fn busy_why() -> String {
 /// How often a person's make asks again for the slot an old skill's remake
 /// holds ([`Agent::write`]).
 const BUSY_AGAIN: Duration = Duration::from_millis(500);
+/// The least a make may be given (`lamp_tasks::skill_make::LEAST_WITHIN`):
+/// a make sent again is never given less.
+const LEAST_WITHIN: Duration = Duration::from_secs(1);
+/// lamp-tasks' line that stops a remake's make
+/// (`lamp_tasks::skill_make::CANCEL_OP`).
+const CANCEL_OP: &str = "skill_make_cancel";
+/// lamp-tasks' code told to a remake's make it cancelled
+/// (`lamp_tasks::skill_make::CANCELLED_CODE`).
+const CANCELLED_CODE: &str = "cancelled";
+/// How long the cancel's answer is waited for: lamp-tasks answers it
+/// within a second.
+const CANCEL_WITHIN: Duration = Duration::from_millis(1_500);
+/// Said once when a remake's make couldn't be cancelled, before a person's
+/// make waits for the slot, so they never wait in silence: a fixed line,
+/// said in the conversation's language (`language::FIXED_LINES`).
+pub const FINISHING_LINE: &str = "One moment, I'm finishing something.";
 
 impl Agent {
     /// The agent for a voice make, with the switch on and a tasks part;
@@ -542,29 +569,122 @@ impl Agent {
     /// [`WAITING_LINE`] is said once lamp-tasks says the run starts, never
     /// when it was refused at once.
     ///
-    /// The person goes first (#7765): refused `busy` while an old skill is
-    /// remade here (`crate::made_remake`), the remake is asked to stand
-    /// down and this make waits for the slot, asking again every
-    /// [`BUSY_AGAIN`] within [`Agent::within`], never told busy for it.
+    /// The person goes first (#7765 and its follow-up): a person's make
+    /// refused `busy` asks lamp-tasks to cancel the make running, which it
+    /// does only for an old skill's remake (`crate::made_remake`, sent
+    /// with `"remake":true`; since the middle form a remake is written by
+    /// the lamp and sends no make here), and is sent again at once. When the cancel
+    /// fails while a remake runs here, the remake is asked to stand down,
+    /// [`FINISHING_LINE`] is said once (when a person waits) and this make
+    /// asks again every [`BUSY_AGAIN`], each time given only what is left
+    /// of its own deadline ([`Agent::within`]), never past it; at the
+    /// deadline it is told busy. A remake's own make is never sent again.
     pub fn write(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
-        let began = std::time::Instant::now();
+        let remake = crate::made_skill::remaking_here();
+        // A remake that stood down for a person sends nothing more.
+        if remake && crate::made_remake::stood_down() {
+            return Err(NotWritten::Failed(busy_why()));
+        }
+        let until = std::time::Instant::now() + self.within.min(self.make_within);
+        // What is left of the deadline, as a make sent now is given it.
+        let left = || until.saturating_duration_since(std::time::Instant::now());
+        let (mut cancel_asked, mut finishing_said) = (false, false);
+        let mut within = self.within;
         loop {
-            let written = self.write_once(system, brief, waiting);
-            let busy = matches!(&written, Err(NotWritten::Failed(why)) if *why == busy_why());
-            if busy && began.elapsed() < self.within && crate::made_remake::stand_down() {
-                eprintln!(
-                    "lamp-voice: a skill made here: an old skill's remake holds the make: it \
-                     stands down, this make waits its turn"
-                );
-                std::thread::sleep(BUSY_AGAIN);
-                continue;
+            let written = Self {
+                within,
+                ..self.clone()
             }
-            return written;
+            .write_once(system, brief, waiting, remake);
+            let busy = matches!(&written, Err(NotWritten::Failed(why)) if *why == busy_why());
+            if !busy || remake {
+                return written;
+            }
+            if !cancel_asked {
+                cancel_asked = true;
+                if self.cancel_remake() && left() >= LEAST_WITHIN {
+                    eprintln!(
+                        "lamp-voice: a skill made here: an old skill's remake held the make: \
+                         cancelled, this make is sent again at once"
+                    );
+                    within = left();
+                    continue;
+                }
+            }
+            if left() < LEAST_WITHIN + BUSY_AGAIN || !crate::made_remake::stand_down() {
+                return written;
+            }
+            if !finishing_said {
+                finishing_said = true;
+                eprintln!(
+                    "lamp-voice: a skill made here: an old skill's remake holds the make and \
+                     wasn't cancelled: it stands down, this make waits its turn"
+                );
+                if waiting {
+                    self.say_finishing();
+                }
+            }
+            std::thread::sleep(BUSY_AGAIN);
+            within = left();
+            if within < LEAST_WITHIN {
+                return written;
+            }
         }
     }
 
-    /// One [`Agent::write`] to lamp-tasks' make socket.
-    fn write_once(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
+    /// lamp-tasks asked to cancel the make running ([`CANCEL_OP`]): whether
+    /// it did, a remake's alone.
+    fn cancel_remake(&self) -> bool {
+        let asked = || -> std::io::Result<Value> {
+            let mut stream = UnixStream::connect(self.tasks.join(MAKE_SOCKET_NAME))?;
+            stream.set_write_timeout(Some(SEND_WITHIN))?;
+            stream.set_read_timeout(Some(CANCEL_WITHIN))?;
+            writeln!(stream, "{}", json!({"op": CANCEL_OP}))?;
+            let mut text = String::new();
+            BufReader::new(std::io::Read::take(stream, 4096)).read_line(&mut text)?;
+            serde_json::from_str(&text).map_err(std::io::Error::other)
+        };
+        match asked() {
+            Ok(answer) if answer == json!({"ok": true, "cancelled": true}) => true,
+            Ok(answer) => {
+                eprintln!(
+                    "lamp-voice: a skill made here: the make running wasn't cancelled ({})",
+                    code(&answer)
+                );
+                false
+            }
+            Err(error) => {
+                eprintln!("lamp-voice: a skill made here: the cancel wasn't answered: {error}");
+                false
+            }
+        }
+    }
+
+    /// Say [`FINISHING_LINE`] once: in the voice turn waiting on this
+    /// thread's make, when one does, else through the say service.
+    fn say_finishing(&self) {
+        if waiting_due_with(MADE_FOR.with(std::cell::Cell::get), Some(FINISHING_LINE)) {
+            return;
+        }
+        let Some(socket) = self.say.clone() else {
+            return;
+        };
+        let _ = std::thread::Builder::new()
+            .name("lamp-voice-make-finishing".into())
+            .spawn(move || {
+                crate::app_make::say_waiting_at(&socket, FINISHING_LINE, WAITING_WITHIN_MS);
+            });
+    }
+
+    /// One [`Agent::write`] to lamp-tasks' make socket, marked a remake's
+    /// when `remake`.
+    fn write_once(
+        &self,
+        system: &str,
+        brief: &str,
+        waiting: bool,
+        remake: bool,
+    ) -> Result<String, NotWritten> {
         let mut stream = UnixStream::connect(self.tasks.join(MAKE_SOCKET_NAME))
             .map_err(|_| NotWritten::NoMakeRun)?;
         // lamp-tasks ends the run at `within`; its answer comes just after.
@@ -590,6 +710,11 @@ impl Agent {
             if let Some(engine) = self.engine() {
                 line["engine"] = json!(engine);
             }
+        }
+        // An old skill's remake: lamp-tasks may cancel it for a person's
+        // make. A person's make never carries it.
+        if remake {
+            line["remake"] = json!(true);
         }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
@@ -637,6 +762,12 @@ impl Agent {
         // short line, said to the person at once.
         if code == NOT_READY_CODE {
             return Err(NotWritten::Failed(crate::made_skill::NOT_READY_LINE.into()));
+        }
+        // A remake's make cancelled for a person's make: it stands down,
+        // kept nothing and counts no try (`made_remake`), said as busy.
+        if code == CANCELLED_CODE && remake {
+            crate::made_remake::cancelled_for_a_person();
+            return Err(NotWritten::Failed(busy_why()));
         }
         Err(NotWritten::Failed(format!(
             "lamp-tasks didn't make it ({code})"
@@ -1003,7 +1134,7 @@ pub(crate) mod tests {
         set_made_for(request);
         assert_eq!(agent.write("S", "B", true).unwrap(), "x");
         set_made_for(0);
-        assert_eq!(in_turn.due.try_recv(), Ok(()));
+        assert_eq!(in_turn.due.try_recv(), Ok(None));
         assert!(!waiting_due(request), "told once");
         std::thread::sleep(Duration::from_millis(100));
         assert!(listener.accept().is_err(), "the say service is not asked");

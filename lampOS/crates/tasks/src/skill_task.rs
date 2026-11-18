@@ -872,6 +872,17 @@ pub struct SkillRun {
     /// make's runner reads it back from the run's own folder
     /// ([`Runner::tell_words`]). Never a make's or a fixed write's.
     pub tells: bool,
+    /// Set to end the run at once, as at its deadline: only a remake's
+    /// make, by the voice's cancel (`crate::skill_make`, #7765's
+    /// follow-up). Never set for any other run.
+    pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl SkillRun {
+    /// Whether the run was cancelled ([`Self::cancel`]).
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Acquire)
+    }
 }
 
 /// What a run that tells its answer ([`tells_answer`]) is asked of its
@@ -977,6 +988,7 @@ impl SkillRun {
             answer: std::sync::OnceLock::new(),
             net: false,
             tells: false,
+            cancel: Default::default(),
         }
     }
 
@@ -1749,7 +1761,8 @@ impl Runner for HermesRunner {
                 Err(error) if error == rustix::io::Errno::INTR => {}
                 Err(_) => break None,
             }
-            if began.elapsed() >= run.deadline {
+            // A remake's make cancelled by the voice: ended at once.
+            if began.elapsed() >= run.deadline || run.cancelled() {
                 break None;
             }
             std::thread::sleep(self.tick);
@@ -1762,6 +1775,7 @@ impl Runner for HermesRunner {
             Some(Some(0)) => Ok(0),
             Some(Some(code)) => Err(format!("the lamp's Hermes ended with status {code}")),
             Some(None) => Err("the lamp's Hermes was ended by a signal".into()),
+            None if run.cancelled() => Err("the run was cancelled".into()),
             None if began.elapsed() >= run.deadline => Err(format!(
                 "the run was ended at its deadline, {} s",
                 run.deadline.as_secs()
@@ -2965,10 +2979,12 @@ impl HarnessRunner {
             engine.argument()
         );
         let stopping = self.stopping.get().cloned();
+        // A remake's make cancelled by the voice ends as at a stop.
         let stopped = || {
-            stopping
-                .as_ref()
-                .is_some_and(|stop| stop.load(Ordering::Acquire))
+            run.cancelled()
+                || stopping
+                    .as_ref()
+                    .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
         let status = loop {
             use rustix::process::{WaitId, WaitIdOptions, waitid};
@@ -3543,10 +3559,12 @@ impl Runner for HarnessRunner {
         // serves its RPCs, not only its port, at most SERVING_WITHIN (#7170).
         let mut gateway = (harness.gateway)();
         let stopping = self.stopping.get().cloned();
+        // A remake's make cancelled by the voice ends as at a stop.
         let stopped = || {
-            stopping
-                .as_ref()
-                .is_some_and(|stop| stop.load(Ordering::Acquire))
+            run.cancelled()
+                || stopping
+                    .as_ref()
+                    .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
         let until = began + run.deadline;
         if engine == EngineKind::Openclaw
@@ -3691,10 +3709,12 @@ impl Runner for HarnessRunner {
             run.deadline.saturating_sub(began.elapsed())
         };
         let stopping = self.stopping.get().cloned();
+        // A remake's make cancelled by the voice ends as at a stop.
         let stopped = || {
-            stopping
-                .as_ref()
-                .is_some_and(|stop| stop.load(Ordering::Acquire))
+            run.cancelled()
+                || stopping
+                    .as_ref()
+                    .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
         // Whether a `stopped` end's own `show` already found the session
         // bound (#6432's [`after_stop`]): its agent started, so the end
@@ -6061,6 +6081,29 @@ mod tests {
             began.elapsed() < Duration::from_secs(10),
             "{:?}",
             began.elapsed()
+        );
+    }
+
+    /// #7765's follow-up: a remake's make cancelled by the voice is killed
+    /// at once, long before its deadline.
+    #[test]
+    fn a_cancelled_run_is_killed_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let runner = shell("sleep 30", dir.path());
+        let run = skill_run("tok", Duration::from_secs(30));
+        let cancel = run.cancel.clone();
+        let cancelling = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            cancel.store(true, Ordering::Release);
+            std::time::Instant::now()
+        });
+        let why = runner.run(&run, &|| {}).unwrap_err();
+        let cancelled = cancelling.join().unwrap();
+        assert!(why.contains("cancelled"), "{why}");
+        assert!(
+            cancelled.elapsed() < Duration::from_secs(1),
+            "{:?}",
+            cancelled.elapsed()
         );
     }
 

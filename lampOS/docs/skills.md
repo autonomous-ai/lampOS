@@ -7617,13 +7617,22 @@ is never taken.
   `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off; its entry records `made_with` and
   `remade_from` (the old package's SHA-256), with the old entry under `old`
   beside `replaced_at_ms`.
-- **The person goes first** (#7765). A remake never takes lamp-tasks' one
-  make slot (the middle form is written by the lamp), so it never holds up
-  a person's make. A person's make refused `busy` for another make while a
-  remake runs still asks the remake to stand down
-  (`made_remake::stand_down`) and waits for the slot, asking again every
-  0.5 s within its own time; the remake keeps nothing, the old skill stays,
-  and it is tried again another day, not counted as a try.
+- **The person goes first** (#7765 and its follow-up). A remake in the
+  middle form never takes lamp-tasks' one make slot (the lamp writes it), so
+  it never holds up a person's make, and no make is sent marked
+  `"remake":true` today. The cancel stays for such a make: a person's make
+  refused `busy` asks lamp-tasks to cancel the make running
+  (`{"op":"skill_make_cancel"}`, docs/tasks.md, "The cancel"), which it
+  does only for one marked a remake (its run ends at once, the slot is freed
+  within a second, and the person's make is sent again at once; in the test
+  harness it starts about 0.06 s after its ask). A person's make is never
+  cancelled. If the cancel fails while a remake runs here (the slot held by
+  another make), the remake stands down (`made_remake::stand_down`), the
+  lamp says once "One moment, I'm finishing something." (a fixed line, in
+  the conversation's language), and the make asks again every 0.5 s. Each
+  ask is given only what is left of its own time (`within`), never past it;
+  at its end the person hears the busy line. The remake keeps nothing, the
+  old skill stays, and it is tried again another day, not counted as a try.
 - **A failed remake** leaves the old skill exactly as it was; the new one,
   if kept, is dropped. The journal says "a made skill's remake: not kept:"
   and a short reason of the lamp's own, never a word of the skill. It is

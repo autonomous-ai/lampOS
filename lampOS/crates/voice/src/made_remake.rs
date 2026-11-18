@@ -416,6 +416,20 @@ pub fn stand_down() -> bool {
     true
 }
 
+/// Whether the remake running on this thread stood down for a person's
+/// make: its make sends nothing more (`make_skill_agent::Agent::write`).
+/// Never for a make on any other thread.
+pub fn stood_down() -> bool {
+    STEPPING.with(std::cell::Cell::get) && STOOD_DOWN.load(Ordering::Acquire)
+}
+
+/// lamp-tasks cancelled the remake's make running here for a person's
+/// make (from this process or another of lamp-voice's): it stands down,
+/// as for [`stand_down`].
+pub fn cancelled_for_a_person() {
+    STOOD_DOWN.store(true, Ordering::Release);
+}
+
 struct One;
 
 impl One {
@@ -426,6 +440,7 @@ impl One {
             .then_some(Self);
         if one.is_some() {
             STOOD_DOWN.store(false, Ordering::Release);
+            STEPPING.with(|here| here.set(true));
         }
         one
     }
@@ -433,8 +448,14 @@ impl One {
 
 impl Drop for One {
     fn drop(&mut self) {
+        STEPPING.with(|here| here.set(false));
         REMAKING.store(false, Ordering::Release);
     }
+}
+
+std::thread_local! {
+    /// Whether this thread holds the one remake ([`One`]).
+    static STEPPING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// One look of the pass: old ones past [`UNDO_FOR`] dropped, then at most
@@ -1571,6 +1592,300 @@ mod tests {
         assert_eq!(agent.write("S", "B", false).unwrap(), "made");
         assert!(STOOD_DOWN.load(Ordering::Acquire));
         drop(one);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A scripted lamp-tasks make socket in a folder of its own: each line
+    /// it is sent kept with when it came; a make answered by `make` (its
+    /// number among the makes), a cancel by `cancel`.
+    struct Scripted {
+        dir: PathBuf,
+        sent: std::sync::Arc<Mutex<Vec<(Value, std::time::Instant)>>>,
+    }
+
+    impl Drop for Scripted {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    impl Scripted {
+        fn agent(&self, within: Duration) -> crate::make_skill_agent::Agent {
+            crate::make_skill_agent::Agent {
+                tasks: self.dir.clone(),
+                say: None,
+                within,
+                make_within: Duration::from_secs(10),
+                guide: false,
+                one_path: false,
+                repairs_if_untaken: false,
+            }
+        }
+
+        fn ops(&self) -> Vec<String> {
+            let sent = self.sent.lock().unwrap();
+            sent.iter()
+                .map(|(line, _)| line["op"].as_str().unwrap_or("?").to_owned())
+                .collect()
+        }
+    }
+
+    fn scripted(
+        name: &str,
+        make: impl Fn(usize) -> Value + Send + 'static,
+        cancel: Value,
+    ) -> Scripted {
+        use std::io::{BufRead, BufReader, Write};
+        let dir = PathBuf::from(format!("/tmp/mrc-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(
+            dir.join(crate::make_skill_agent::MAKE_SOCKET_NAME),
+        )
+        .unwrap();
+        let sent = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let kept = sent.clone();
+        std::thread::spawn(move || {
+            let mut makes = 0;
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                let _ = BufReader::new(&stream).read_line(&mut line);
+                let line: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
+                kept.lock()
+                    .unwrap()
+                    .push((line.clone(), std::time::Instant::now()));
+                let cancels = line["op"] == "skill_make_cancel";
+                let answer = if cancels {
+                    cancel.clone()
+                } else {
+                    makes += 1;
+                    make(makes)
+                };
+                if answer["ok"] == true && !cancels {
+                    let _ = writeln!(stream, "{}", json!({"ok": true, "started": true}));
+                }
+                let _ = writeln!(stream, "{answer}");
+            }
+        });
+        Scripted { dir, sent }
+    }
+
+    fn busy() -> Value {
+        json!({"ok": false, "error": "busy", "message": "busy"})
+    }
+
+    /// The reviewer's follow-up on #7765: a person's make refused busy
+    /// while a remake runs cancels the remake's make and is sent again at
+    /// once, never waiting for the remake's run to end.
+    #[test]
+    fn a_persons_make_during_a_remake_cancels_it_and_starts_at_once() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let tasks = scripted(
+            "cancel",
+            |n| match n {
+                1 => busy(),
+                _ => json!({"ok": true, "answer": "made"}),
+            },
+            json!({"ok": true, "cancelled": true}),
+        );
+        let agent = tasks.agent(Duration::from_secs(5));
+        let one = One::take().unwrap();
+        let asked = std::time::Instant::now();
+        assert_eq!(agent.write("S", "B", false).unwrap(), "made");
+        drop(one);
+        assert_eq!(
+            tasks.ops(),
+            ["skill_make", "skill_make_cancel", "skill_make"]
+        );
+        let sent = tasks.sent.lock().unwrap().clone();
+        // A person's make is never marked a remake.
+        assert!(sent.iter().all(|(line, _)| line.get("remake").is_none()));
+        // Sent again at once, never after a wait of [`BUSY_AGAIN`]'s.
+        let start = sent[2].1 - asked;
+        eprintln!("a person's make was sent again {start:?} after it was asked");
+        assert!(start < Duration::from_millis(400), "{start:?}");
+    }
+
+    /// A failed cancel: one waiting line is said first, in the turn that
+    /// waits on the make, then the make waits for the slot as before,
+    /// within its own deadline; the cancel is sent once.
+    #[test]
+    fn a_failed_cancel_says_the_waiting_line_then_waits_within_the_deadline() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let tasks = scripted(
+            "failed",
+            |n| match n {
+                1..=3 => busy(),
+                _ => json!({"ok": true, "answer": "made"}),
+            },
+            json!({"ok": false, "error": "not_remake", "message": "no"}),
+        );
+        let agent = tasks.agent(Duration::from_secs(5));
+        let request = 7_765_200;
+        let mut in_turn = crate::make_skill_agent::waiting_in_turn(request);
+        crate::make_skill_agent::set_made_for(request);
+        let one = One::take().unwrap();
+        let asked = std::time::Instant::now();
+        let written = agent.write("S", "B", true);
+        crate::make_skill_agent::set_made_for(0);
+        drop(one);
+        assert_eq!(written.unwrap(), "made");
+        assert!(
+            asked.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            asked.elapsed()
+        );
+        assert_eq!(
+            in_turn.due.try_recv(),
+            Ok(Some(crate::make_skill_agent::FINISHING_LINE))
+        );
+        assert_eq!(
+            tasks.ops(),
+            [
+                "skill_make",
+                "skill_make_cancel",
+                "skill_make",
+                "skill_make",
+                "skill_make"
+            ]
+        );
+        // A fixed line: said in the conversation's language.
+        assert!(crate::language::is_fixed(
+            crate::make_skill_agent::FINISHING_LINE
+        ));
+    }
+
+    /// The wait never runs past the person's make's own deadline: each make
+    /// sent again is given only what is left of it, and at the end the
+    /// person hears the busy line.
+    #[test]
+    fn the_retry_never_passes_the_deadline() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let tasks = scripted(
+            "deadline",
+            |_| busy(),
+            json!({"ok": false, "error": "nothing", "message": "no"}),
+        );
+        let within = Duration::from_millis(2_500);
+        let agent = tasks.agent(within);
+        let one = One::take().unwrap();
+        let asked = std::time::Instant::now();
+        let why = agent.write("S", "B", false).unwrap_err().to_string();
+        let took = asked.elapsed();
+        drop(one);
+        assert!(took <= within, "{took:?}");
+        assert_eq!(
+            crate::make_skill_agent::not_made_try(&why),
+            made_skill::AGENT_BUSY_TRY
+        );
+        let sent = tasks.sent.lock().unwrap().clone();
+        let makes: Vec<_> = sent
+            .iter()
+            .filter(|(line, _)| line["op"] == "skill_make")
+            .collect();
+        assert!(makes.len() >= 2, "{}", makes.len());
+        for (line, at) in makes {
+            let given = Duration::from_millis(line["within_ms"].as_u64().unwrap());
+            assert!(given >= Duration::from_secs(1), "{given:?}");
+            // Given what was left as it was sent, a moment before it came.
+            let slack = Duration::from_millis(100);
+            assert!(
+                *at - asked + given <= within + slack,
+                "{:?} + {given:?}",
+                *at - asked
+            );
+        }
+    }
+
+    /// End to end against lamp-tasks' own make socket: a remake's make
+    /// holds the slot; a person's make cancels it and starts within two
+    /// seconds of its ask (before: up to the remake's ~90 s run). The
+    /// remake keeps nothing and is said as standing down for the person,
+    /// so it counts no try.
+    #[test]
+    fn a_persons_make_starts_within_two_seconds_on_lamp_tasks_own_socket() {
+        use lamp_tasks::skill_task::{Runner, SkillRun};
+        use std::sync::Arc;
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        /// The remake's run holds until cancelled; the person's writes
+        /// its answer at once, and when it started is kept.
+        #[derive(Default)]
+        struct Runs {
+            remake_started: AtomicBool,
+            person_started: Mutex<Option<std::time::Instant>>,
+        }
+        impl Runner for Runs {
+            fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+                let folder = run.start_in.clone().unwrap();
+                let rules = fs::read_to_string(folder.join("rules.md")).unwrap();
+                if rules.contains("REMAKE") {
+                    self.remake_started.store(true, Ordering::Release);
+                    while !run.cancelled() {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    return Ok(0);
+                }
+                *self.person_started.lock().unwrap() = Some(std::time::Instant::now());
+                fs::write(folder.join("answer.md"), "made").unwrap();
+                Ok(0)
+            }
+        }
+        let dir = PathBuf::from(format!("/tmp/mre-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("work")).unwrap();
+        // lamp-tasks binds only in a private folder.
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let runs = Arc::new(Runs::default());
+        let stop = Arc::new(AtomicBool::new(false));
+        let served = lamp_tasks::skill_make::MakeHandOvers {
+            socket: dir.join(crate::make_skill_agent::MAKE_SOCKET_NAME),
+            work: dir.join("work"),
+            runner: runs.clone(),
+            one_path: None,
+            caller: |_| true,
+            asks: None,
+        }
+        .start(true, stop.clone())
+        .unwrap()
+        .unwrap();
+        let agent = crate::make_skill_agent::Agent {
+            tasks: dir.clone(),
+            say: None,
+            within: Duration::from_secs(60),
+            make_within: Duration::from_secs(120),
+            guide: false,
+            one_path: false,
+            repairs_if_untaken: false,
+        };
+        let one = One::take().unwrap();
+        let remaking = {
+            let agent = agent.clone();
+            std::thread::spawn(move || {
+                let _as = made_skill::RemakeAs::set("water");
+                agent.write("S", "REMAKE", false)
+            })
+        };
+        while !runs.remake_started.load(Ordering::Acquire) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let asked = std::time::Instant::now();
+        assert_eq!(agent.write("S", "PERSON", false).unwrap(), "made");
+        let start = runs.person_started.lock().unwrap().unwrap() - asked;
+        eprintln!("with a remake running, a person's make started {start:?} after its ask");
+        assert!(start < Duration::from_secs(2), "{start:?}");
+        let why = remaking.join().unwrap().unwrap_err().to_string();
+        assert_eq!(
+            crate::make_skill_agent::not_made_try(&why),
+            made_skill::AGENT_BUSY_TRY
+        );
+        assert!(STOOD_DOWN.load(Ordering::Acquire));
+        drop(one);
+        stop.store(true, Ordering::Release);
+        served.join().unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -7479,6 +7479,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
