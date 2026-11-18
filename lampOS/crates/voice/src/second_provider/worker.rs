@@ -8034,22 +8034,6 @@ fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     Some((at(began_us)?, at(ended_us)?))
 }
 
-/// Whether `eyes` saw a face (one turned to the lamp, with `turned`) speaking
-/// from `began_us` to `ended_us`
-/// ([`crate::speaking_faces::SpeakingFaces::seen_speaking_between`]); never
-/// without them.
-fn seen_speaking_between(
-    eyes: Option<&(
-        Arc<crate::speaking_faces::SpeakingFaces>,
-        Option<crate::speaking_faces::Reader>,
-    )>,
-    (began_us, ended_us): (u64, u64),
-    turned: bool,
-) -> bool {
-    eyes.zip(line_between(began_us, ended_us))
-        .is_some_and(|((eyes, _), (from, to))| eyes.seen_speaking_between(from, to, turned))
-}
-
 /// Whether `eyes` saw only silent faces turned to the lamp from `began_us`
 /// to `ended_us`, by this process's clock; never without them. With
 /// `unread_spoils`, a turned mouth unread in any look says no
@@ -10914,24 +10898,6 @@ impl Heeding {
                     .as_mut()
                     .and_then(|voices| voices.likeness_so_far(request))
                     .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
-        let (pitch, looking, looks, skipped) = self
-            .eyes
-            .as_ref()
-            .zip(line_between(said.0, said.1))
-            .map_or((None, None, 0, false), |((eyes, _), (from, to))| {
-                if signs.going_on {
-                    let (pitch, looking, looks) =
-                        eyes.speaker_pose_between(from, to, !another_voice);
-                    let skipped = another_voice
-                        && eyes.speaker_pose_between(from, to, true) != (pitch, looking, looks);
-                    (pitch, looking, looks, skipped)
-                } else {
-                    // The newest look that gave a pose: one look, or none.
-                    let (pitch, looking) = eyes.turned_pose_between(from, to);
-                    let looks = usize::from(pitch.is_some() || looking.is_some());
-                    (pitch, looking, looks, false)
-                }
-            });
         let line = crate::said_to_me::Line {
             heard,
             name_heard: !signs.names.is_empty(),
@@ -10940,23 +10906,17 @@ impl Heeding {
             // reads (`services::answer_awaited`).
             lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
             turned,
-            pitch,
-            looking,
-            // In a conversation any face speaking it; else the turned one.
-            seen_speaking: seen_speaking_between(
-                self.eyes.as_ref(),
-                said,
-                turned && !signs.going_on,
-            ),
-            read_silent: self
-                .eyes
-                .as_ref()
-                .zip(line_between(said.0, said.1))
-                .is_some_and(|((eyes, _), (from, to))| eyes.read_silent_between(from, to)),
+            ..Default::default()
+        };
+        // The eyes' signs as the replay of saved journals reads them
+        // (`crate::replay`, #7772); none without eyes.
+        let (line, looks, skipped) = match self.eyes.as_ref().zip(line_between(said.0, said.1)) {
+            Some(((eyes, _), (from, to))) => line.with_eyes(eyes, from, to, another_voice),
+            None => (line, 0, false),
         };
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        let mut pose = crate::said_to_me::pose(pitch, looking, looks);
+        let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
         }
