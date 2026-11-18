@@ -604,7 +604,7 @@ when a move's command goes; nothing in S3a does): it listens to `controls/touch`
 BEFORE the move goes, and any contact with the lamp (its head, its button),
 from Controls, enabled, valid and later than the arming, sends `Stop` on
 `devices/ask` straight away, once, and ends the guard; it also ends at its
-time (60 s) or when another stop was sent. Timed in a test on a real bus from
+time (60 s) or when a stop was *taken* by the desk (`ok`): a stop that ended "not sure", refused or away leaves the guard armed, the last fallback. The guard is the voice process's own (`MOVING` is per process): it stops only a move that process began, never a desk moved from the app. With nobody listening for asks on the bus (lamp-cloud down) a stop is answered "away" at once, not after its whole wait. Timed in a test on a real bus from
 the touch on the bus to the `Stop` on the bus: under 100 ms (the guard looks
 every 20 ms); lamp-cloud then sends it up (`stop` goes first, past every cap,
 tested under 100 ms to the send); the cloud's and the desk's own legs are
