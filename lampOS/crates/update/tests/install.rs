@@ -8824,7 +8824,7 @@ fn sysstats_collection_is_off_until_its_file_and_written_once() {
 fn sysstats_drop_in_bytes_are_pinned() {
     assert_eq!(
         install::SYSSTAT_DROPIN,
-        "# lamp-update (#7254): sysstat's collection writes the SD card every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n[Unit]\nConditionPathExists=/etc/lampOS/sysstat-on\n"
+        "# lamp-update (#7254): sysstat's collection fills /var/log, the lamp's 47 MB RAM log disk, every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n[Unit]\nConditionPathExists=/etc/lampOS/sysstat-on\n"
     );
     assert_eq!(
         install::SYSSTAT_DROPINS,

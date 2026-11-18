@@ -1123,8 +1123,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    **sysstat's collection off** (#7254; `install::sysstat_quiet`, also
    `lamp-update region`). Debian's `sysstat` timers start
    `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
-   daily, writing `/var/log/sysstat` on the SD card for nothing any part reads
-   (lamp-c0a4 kept about 30 MB by 18 Nov). Install writes
+   daily, writing `/var/log/sysstat` for nothing any part reads. `/var/log` is
+   the lamp's 47 MB RAM log disk (zram): on lamp-06c1 it reached 81 %, and past
+   75 % the base cuts the journal to 5 MB (Friday's reading on #7254);
+   lamp-c0a4 kept about 30 MB of sysstat by 18 Nov. Install writes
    `/etc/systemd/system/sysstat-collect.service.d/lampos.conf` and
    `/etc/systemd/system/sysstat-summary.service.d/lampos.conf`, 0644, each a
    comment line, `[Unit]` and `ConditionPathExists=/etc/lampOS/sysstat-on`,
