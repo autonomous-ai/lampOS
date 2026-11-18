@@ -5700,14 +5700,20 @@ fn run_for_guarded(
         person,
         needs_face::on(),
         crate::known_faces::name_learn_fix_on(),
-        // Unasked only where the face save is speaker-bound
-        // (`LAMP_REMEMBER_SPEAKER`): elsewhere it asks (#7787's HOLDs).
-        crate::known_faces::face_no_ask_on()
-            && crate::remember_speaker::switched_on(
-                std::env::var(crate::remember_speaker::ENVIRONMENT)
-                    .ok()
-                    .as_deref(),
-            ),
+        // Saved unasked only where the face save is speaker-bound
+        // (`LAMP_REMEMBER_SPEAKER`); elsewhere nothing kept and nothing
+        // asked (#7787's HOLDs, the first builder 21:13).
+        if !crate::known_faces::face_no_ask_on() {
+            needs_face::NoAsk::Off
+        } else if crate::remember_speaker::switched_on(
+            std::env::var(crate::remember_speaker::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ) {
+            needs_face::NoAsk::Save
+        } else {
+            needs_face::NoAsk::Quiet
+        },
     ) {
         return (told, true);
     }
