@@ -1,9 +1,12 @@
-//! The owner's yes, as lamp-control keeps it. lamp-cloud writes it for a tap
-//! in the app and the voice for a spoken yes; the helper only ever USES IT
-//! UP, once, by asking lamp-control on its admin socket. The key is what the
-//! owner said yes to: the operation, the app, the version, the SHA-256 of
-//! the package's bytes, and for an update the grants it newly asks. A package
-//! changed after the yes has another SHA-256 and so installs nothing.
+//! The owner's yes, as lamp-control keeps it. The owner's tap in the app IS
+//! the yes: one `apps.install` or `apps.remove` makes lamp-cloud write the
+//! record, from the package it fetched, with nothing shown to the person and
+//! nothing asked of them. The helper only ever USES IT UP, once, by asking
+//! lamp-control on its admin socket. The key is what the tap named: the
+//! operation, the app, the version, the SHA-256 of the package's bytes, and
+//! for an update the grants, `net` and `logs` it newly asks. A package
+//! changed after the tap has another SHA-256 and so installs nothing; that
+//! refusal is an integrity check, not a question.
 use serde_json::{Value, json};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

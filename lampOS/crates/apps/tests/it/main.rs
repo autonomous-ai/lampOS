@@ -12,4 +12,5 @@ mod remove;
 mod skills_reader;
 mod staging;
 mod sweep;
+mod tap;
 mod yes;
