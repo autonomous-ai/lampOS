@@ -3447,6 +3447,7 @@ fn fetch_checked(
 ) -> Result<(), Fetch> {
     let urls = model_urls(url);
     let mut failed = Fetch::Failed(format!("{url} was not asked for"));
+    let mut quick_cut_short = None;
     for (number, (url, quick)) in urls.iter().enumerate() {
         let last = number + 1 == urls.len();
         match fetch_one(channel, url, bytes, sha256, to, *quick) {
@@ -3455,6 +3456,9 @@ fn fetch_checked(
                 return Ok(());
             }
             Err(error) => {
+                if *quick && !answered(&error) {
+                    quick_cut_short = Some(url);
+                }
                 if !last {
                     eprintln!("lamp-update: {url}: {error}; asking the next");
                 }
@@ -3462,7 +3466,25 @@ fn fetch_checked(
             }
         }
     }
+    // A lamp that can't reach GitHub (in China) whose quick CDN try was cut
+    // short, not answered "not there" or a mismatch: the CDN once more with
+    // a whole fetch's waits, its only way (#7709, Seventh's P2). GitHub's
+    // answer stays the one said if this fails too.
+    if let Some(url) = quick_cut_short {
+        eprintln!("lamp-update: asking {url} again with a whole fetch");
+        if fetch_one(channel, url, bytes, sha256, to, false).is_ok() {
+            eprintln!("lamp-update: {url} served {}", to.display());
+            return Ok(());
+        }
+    }
     Err(failed)
+}
+
+/// Whether a failed try of [`fetch_one`] was answered: the file is not
+/// there, or it does not match. Anything else (out of reach, a timeout, a
+/// server error) cut the try short.
+fn answered(error: &Fetch) -> bool {
+    matches!(error, Fetch::Failed(why) if why.ends_with(" is not there") || why == "it does not match its SHA-256")
 }
 
 /// One try of [`fetch_checked`], at `url` alone: `quick` within
@@ -4407,6 +4429,36 @@ mod tests {
         let served = fetch_genuine(&mut channel, STABLE_MODEL);
         assert_eq!(served, (Ok(()), genuine));
         assert_eq!(channel.asked, asks(&[(STABLE_MODEL, false)]));
+    }
+
+    /// #7709 (Seventh's P2): a lamp that can't reach GitHub, whose quick
+    /// CDN try is cut short (a 503), asks the CDN once more with a whole
+    /// fetch and is served there; a CDN answering "not there" is not asked
+    /// again.
+    #[test]
+    fn a_quick_cdn_try_cut_short_is_asked_again_whole_when_github_fails() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors {
+            busy_once: Some(CDN_MODEL.into()),
+            ..Mirrors::default()
+        };
+        channel.files.insert(CDN_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine));
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false), (CDN_MODEL, false)])
+        );
+        let mut channel = Mirrors::default();
+        let (fetched, _) = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(
+            fetched,
+            Err(Fetch::Failed(format!("{GITHUB_MODEL} is not there")))
+        );
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
     }
 
     /// #7709: what a CDN without the file adds before GitHub is asked,
