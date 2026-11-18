@@ -736,7 +736,7 @@ folded, may wait up to that long for its first motion to begin.
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
 | `busy` | another client holds the part, or this one by another lease; a `turn.end` with no turn of this computer's, "not this computer's turn" |
 | `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window"; the voice's, for `turn.end` and `listen.set`, and "the voice here doesn't take turns from a computer" or "…doesn't take a computer's mute" from a voice older than them |
-| `quiet_hours` | `say`, `sound` and `turn.start` in this lamp's quiet hours, when it has them set (off by default; see "Limits, rates and quiet hours") |
+| `quiet_hours` | `say`, `sound` and `turn.start` in this lamp's quiet hours, when it has them set (off by default), and a skill run's in the lamp's quiet hours, 22:00 to 07:00 (#7625; see "Limits, rates and quiet hours") |
 | `private`, `paused`, `asleep` | reserved: no request is refused with them today. These states reach a client another way: its leases are lost with that `why` (a `lease` event), `lamp.changed`'s `lamp_state` says them, and a `say` the voice's privacy gate doesn't speak ends with a `done` of `how: "dropped"` and the voice's why. A gesture or move the body drops while private or asleep is not told |
 | `rate` | over a rate below; `retry_ms` says when |
 | `bad_request` | not this schema, or an op it doesn't know |
@@ -1004,7 +1004,22 @@ local time isn't known (its clock not yet set, or its zone unreadable:
 "quiet hours: the lamp's local time isn't known"). A refusal reaches no
 part and isn't counted against the rate, and it's journaled once a
 computer a night. With no window, or `off`, nothing is refused, even while
-its time isn't known. Besides that setting,
+its time isn't known. **A skill's run is held to the lamp's quiet hours
+whatever that setting** (#7625, `LAMP_CONTROL_QUIET_RUNS`, on unless
+exactly `off`): a run's `say`, `sound` and `turn.start` on the run socket
+are refused `quiet_hours` ("quiet hours: 22:00 to 07:00 local, a skill's
+run") inside the very window lamp-skills and the told path read
+(`lamp_local_time::quiet_hours`, today `QuietWindow::DEFAULT`; there is no
+owner's setting yet), never a window of lamp-control's own, and while the
+lamp's time isn't known. A trigger's or a schedule's run can't talk at
+night, and nor can a run's own `say` right after a spoken night ask: the
+run gate has no lift. A voice-asked night answer comes only by the told
+path, a run that hands its answer back (a `-read` grant through Harness),
+which keeps the quiet hours and lifts them for 5 minutes after the ask
+([tasks.md](tasks.md)). A run's hello says the window in `limits`
+(`quiet_hours`: `{"from": "22:00", "to": "07:00"}`). Paired computers are as above.
+Journaled at start.
+Besides that setting,
 the owner's per-client allowance, with the app's setting, will be the only
 thing that lifts it (Fourteen, Eighth and Nine on #3504). Every command and its answer is
 journaled as one line (client id and name, op, result: "The journal"

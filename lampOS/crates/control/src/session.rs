@@ -309,6 +309,11 @@ pub struct Door {
     pin: [u8; 32],
     /// The quiet hours, once wired: the lamp's local time, if known.
     quiet: Option<Quiet>,
+    /// A skill run's say, sound and turn held in the lamp's quiet hours
+    /// (#7625, `LAMP_CONTROL_QUIET_RUNS`, on unless exactly `off`), paired
+    /// computers aside: a run speaks for itself only by day; at night its
+    /// answer goes by the told path, which keeps the quiet hours.
+    quiet_runs: bool,
     /// Where a pushed skill's package is kept for the manage helper: none,
     /// and skill push is off on this lamp.
     push_folder: Option<PathBuf>,
@@ -383,13 +388,41 @@ impl Quiet {
     fn refuses(&mut self, client: &str, wall_s: u64) -> Option<String> {
         // Off by this lamp's own setting: never quiet.
         let window = self.window?;
+        let label = format!("{window} local, this lamp's setting");
+        self.refuses_in(client, wall_s, &label, |minute| window.contains(minute))
+    }
+
+    /// Why a skill run's say or sound is refused at `wall_s`, if it is
+    /// (#7625): the lamp's quiet hours exactly as lamp-skills and the told
+    /// path read them (`lamp_local_time::quiet_hours`, today
+    /// [`lamp_local_time::QuietWindow::DEFAULT`]; no owner's setting yet),
+    /// never a window of lamp-control's own, nor the paired computers'
+    /// `--quiet-hours`.
+    fn refuses_run(&mut self, client: &str, wall_s: u64) -> Option<String> {
+        let label = format!(
+            "{} local, a skill's run",
+            lamp_local_time::QuietWindow::DEFAULT
+        );
+        self.refuses_in(client, wall_s, &label, lamp_local_time::quiet_hours)
+    }
+
+    /// Why `client`'s say or sound is refused at `wall_s` by the quiet
+    /// hours `quiet_at` (a local minute of the day: quiet), said as
+    /// `label`; with the lamp's time unknown, quiet.
+    fn refuses_in(
+        &mut self,
+        client: &str,
+        wall_s: u64,
+        label: &str,
+        quiet_at: impl Fn(u16) -> bool,
+    ) -> Option<String> {
         let why = match &self.local_time {
             Some(local) if wall_s >= CLOCK_SET_AFTER_S => {
                 let minute = local.minute_of_day(wall_s.saturating_mul(1_000));
-                if !window.contains(minute) {
+                if !quiet_at(minute) {
                     return None;
                 }
-                format!("quiet hours: {window} local, this lamp's setting")
+                format!("quiet hours: {label}")
             }
             _ => "quiet hours: the lamp's local time isn't known".to_owned(),
         };
@@ -431,6 +464,7 @@ impl Door {
             runs: crate::runs::Runs::default(),
             pin,
             quiet: None,
+            quiet_runs: false,
             push_folder: None,
             pushes: Pushes::default(),
             sounds: None,
@@ -535,6 +569,26 @@ impl Door {
     pub fn with_quiet_hours(mut self, quiet: Quiet) -> Self {
         self.quiet = Some(quiet);
         self
+    }
+
+    /// A skill run's say, sound and turn held in the lamp's quiet hours
+    /// (#7625): `serve` turns it on unless `LAMP_CONTROL_QUIET_RUNS` is
+    /// exactly `off`; a door without, as in tests, holds runs only to the
+    /// lamp's own window.
+    pub fn with_quiet_runs(mut self, on: bool) -> Self {
+        self.quiet_runs = on;
+        self
+    }
+
+    /// The quiet hours a skill's run is held to, as its hello's `limits`
+    /// says them: the lamp's own (lamp-skills' and the told path's) when
+    /// runs are held, else this lamp's setting for computers.
+    fn run_quiet_window(&self) -> Option<lamp_local_time::QuietWindow> {
+        if self.quiet_runs {
+            Some(lamp_local_time::QuietWindow::DEFAULT)
+        } else {
+            self.quiet.as_ref().and_then(|quiet| quiet.window)
+        }
     }
 
     /// Skill push on, its packages kept in `folder` for the manage helper.
@@ -1457,13 +1511,20 @@ impl Door {
         // The quiet hours, before the rate, so a refusal isn't counted. A
         // turn meets them with or without a prompt: it opens the lamp to
         // talk.
-        if matches!(op, Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. })
-            && let Some(why) = self
-                .quiet
-                .as_mut()
-                .and_then(|quiet| quiet.refuses(&client, wall_s))
-        {
-            return refuse(ErrorCode::QuietHours, why);
+        // A skill's run meets the lamp's quiet hours whatever a paired
+        // computer's setting (#7625): a trigger's or a schedule's run could
+        // otherwise talk at 3 a.m.; with the lamp's time unknown, quiet.
+        if matches!(op, Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. }) {
+            let run = session.run_socket && self.quiet_runs;
+            let why = match self.quiet.as_mut() {
+                Some(quiet) if run => quiet.refuses_run(&client, wall_s),
+                Some(quiet) => quiet.refuses(&client, wall_s),
+                None if run => Some("quiet hours: the lamp's local time isn't known".to_owned()),
+                None => None,
+            };
+            if let Some(why) = why {
+                return refuse(ErrorCode::QuietHours, why);
+            }
         }
         let class = Class::of(&op);
         if let Some(class) = class
@@ -1699,10 +1760,7 @@ impl Door {
             };
             *self.open.entry(run.client.clone()).or_default() += 1;
             session.client = Some(run.client.clone());
-            let limits = limits(
-                self.quiet.as_ref().and_then(|quiet| quiet.window),
-                self.rates.lifted(),
-            );
+            let limits = limits(self.run_quiet_window(), self.rates.lifted());
             return ok(
                 re,
                 json!({
@@ -3082,6 +3140,107 @@ mod tests {
         assert_eq!(limits["say_max_bytes"], 900);
         assert!(limits.get("say_max_chars").is_none());
         assert!(limits.get("take_max_ms").is_none());
+    }
+
+    /// #7625 (lamp-9adf, 18 Nov): a skill's run spoke for itself 6 min 19 s
+    /// after a night ask, through its own `say`, with quiet hours off for
+    /// computers. A run's say, sound and turn meet the lamp's quiet hours
+    /// whatever the computers' setting, and while the lamp's time is
+    /// unknown; by day they go; a paired computer is as before; and with
+    /// `LAMP_CONTROL_QUIET_RUNS=off` a run is as before too.
+    #[test]
+    fn a_skill_runs_say_is_held_in_the_lamps_quiet_hours_and_a_computers_is_not() {
+        let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
+        const MIDNIGHT_UTC: u64 = 1_793_145_600;
+        let at = |hour_local: u64| MIDNIGHT_UTC + ((hour_local + 24 - 7) % 24) * 3_600;
+        let say = r#"{"id":3,"op":"say","text":"Here is your plan."}"#;
+        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        let turn = r#"{"id":6,"op":"turn.start"}"#;
+        // Quiet hours off for computers (the product's default), held for runs.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7.clone())))
+            .with_quiet_runs(true);
+        for hour in [22, 23, 0, 3, 6] {
+            for frame in [say, sound, turn] {
+                let refused = door.handle(&mut session, frame, &mut fake, 2 * S, at(hour));
+                assert_eq!(
+                    code_of(&refused),
+                    Some("quiet_hours"),
+                    "{hour}: {refused:?}"
+                );
+                assert_eq!(
+                    reply(&refused)["error"]["why"],
+                    "quiet hours: 22:00 to 07:00 local, a skill's run"
+                );
+            }
+        }
+        assert!(fake.did.is_empty(), "{:?}", fake.did);
+        // By day the run says it.
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 3 * S, at(12)))["ok"],
+            true
+        );
+        // The lamp's time unknown: a run is quiet, as a computer is with a window.
+        let unknown = door.handle(&mut session, say, &mut fake, 4 * S, 1_000);
+        assert_eq!(code_of(&unknown), Some("quiet_hours"));
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door.with_quiet_runs(true);
+        let unwired = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
+        assert_eq!(
+            code_of(&unwired),
+            Some("quiet_hours"),
+            "no zone wired: unknown"
+        );
+        // A paired computer at 23:00, quiet hours off for computers: said.
+        let computer = Computer::new(40);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak, Grant::Hear]);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7.clone())))
+            .with_quiet_runs(true);
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, at(23)))["ok"],
+            true
+        );
+        // A run's hello says the window it is held to, never "off".
+        let held =
+            Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None).with_quiet_runs(true);
+        assert_eq!(
+            held.run_quiet_window(),
+            Some(lamp_local_time::QuietWindow::DEFAULT)
+        );
+        let not = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        assert_eq!(not.run_quiet_window(), None);
+        // One window for the whole lamp (the first builder's condition on
+        // #7625): every minute of the day, a run is held exactly when
+        // lamp-skills and the told path count the lamp's quiet hours
+        // (`lamp_local_time::quiet_hours`), whatever a computer's setting.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(
+                Quiet::new(Some(utc7.clone()))
+                    .with_window(Some(lamp_local_time::QuietWindow { from: 60, to: 120 })),
+            )
+            .with_quiet_runs(true);
+        let local = lamp_local_time::LocalTime::Offset(7 * 60);
+        for minute in 0..1_440u64 {
+            let wall_s = MIDNIGHT_UTC + ((minute + 1_440 - 7 * 60) % 1_440) * 60;
+            let skills_quiet =
+                lamp_local_time::quiet_hours(local.minute_of_day(wall_s.saturating_mul(1_000)));
+            let held =
+                code_of(&door.handle(&mut session, sound, &mut fake, 10 * S + minute, wall_s))
+                    == Some("quiet_hours");
+            assert_eq!(held, skills_quiet, "minute {minute}");
+        }
+        // The switch off: a run at 23:00 says it, as before #7625.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7)))
+            .with_quiet_runs(false);
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, at(23)))["ok"],
+            true
+        );
     }
 
     /// The welcome and the hello both say the owner's language, read at each
