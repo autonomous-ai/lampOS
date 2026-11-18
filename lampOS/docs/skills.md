@@ -6087,7 +6087,9 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    as `text`, as written): "I made evening dim, and it's on: <what it does>, using its light."
    (`made_skill::on_line`), or "I made it but couldn't put it on: <why>."
    (`made_skill::not_on_line`). Nothing is asked and nothing waits for a
-   yes; what became of the line is only logged.
+   yes. What became of the line, its one more ask after a drop included,
+   is logged and kept against the ask (`app_make::line_said`, #7718 item
+   2): `line` in the answer below.
 5. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
    only, never a skill made by voice. `state` is `making` (being made, or
    kept and being put on), `on`, or `not_kept` with `why` in plain words:
@@ -6109,10 +6111,20 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    #5977 and never said yes to still reads `left_off`. Once kept: `name`,
    `description`, `version`, `uses` (`light`, `body`, `topics`, and
    `speak`, true only for a skill written in the app) and `sha256`.
+   In any state, `line` tells the line the lamp says of it (#7718 item 2):
+   `owed` from the ask, through the make and the skill put on, until the
+   say service has said it or let it go, its one more ask after a drop
+   included; then `spoken`, or `not_said` (dropped twice, not begun in its
+   wait, refused, no say service, or lamp-voice restarted before it was
+   said: `cut_by_restart` lets every line still owed go). No `line` for
+   an ask kept before it was told. lamp-cloud holds the app's last
+   onboarding page's line on it ([cloud.md](cloud.md), "The app's
+   onboarding pages, done on the lamp"), and the app can wait on it
+   rather than estimate how long the line takes.
    `{"state": "none"}` with no ask.
 6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
-   asks, each its request id, when, its task and why it wasn't kept. Never
-   the words. Every writer (the socket's admission and the making thread)
+   asks, each its request id, when, its task, why it wasn't kept and its
+   `line`. Never the words. Every writer (the socket's admission and the making thread)
    holds one lock (`.app.lock`, `flock`) across its read, decision and
    write, and writes through a file of its own, so no ask is lost.
 
@@ -6122,7 +6134,11 @@ and `ready` at once, a make through the real socket with no model to ask
 told not kept and why, overlapping writers losing nothing, the socket's
 group, `made_here_goes_on_at_once_with_no_ask_said` on a lamp with no tasks
 part at all, `made_here_and_not_put_on_says_why_and_tells_the_app`, and one
-not kept told why with nothing said). The app's side
+not kept told why with nothing said;
+`an_apps_ask_tells_its_line_owed_until_said_and_a_restart_lets_it_go`,
+`an_apps_ask_keeps_its_lines_end` and
+`through_the_socket_a_makes_line_is_told_owed_until_its_say_ends` for
+`line`). The app's side
 is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
 "A skill typed in the app").
 

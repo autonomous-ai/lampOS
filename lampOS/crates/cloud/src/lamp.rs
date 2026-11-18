@@ -839,6 +839,19 @@ impl Lamp for Real {
         if !crate::onboarding_page::PAGES.lock().ok()?.is_open() {
             return None;
         }
+        // The last page's line waits for Create's made skill's line
+        // (#7718 item 2): lamp-voice asked, outside the lock, at most every
+        // `LOOK_EVERY`, only while that line is waited for.
+        let looking = crate::onboarding_page::PAGES.lock().ok()?.made_to_look_at();
+        if let Some(request_id) = looking {
+            let socket = self.make_skill.clone().or_else(|| self.write_skill.clone());
+            if socket.is_none_or(|socket| crate::make_skill::line_ended(&socket, &request_id)) {
+                crate::onboarding_page::PAGES
+                    .lock()
+                    .ok()?
+                    .made_line_ended(&request_id);
+            }
+        }
         let light = self.light().ok();
         let run = self.skill_run();
         let turn = self.answered_turn();

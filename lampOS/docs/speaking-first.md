@@ -815,7 +815,11 @@ after the made skill's read; the exact form, held for the 45 s
 conversation, would have lapsed at its 30 s. A page's exact line still
 goes after a say of the lamp's own already waiting
 (`Says::page_line_behind_a_say`: a made skill's line asked before it is
-said first). Any other skill's say keeps every gate. Tests:
+said first). The last page's line is not even sent while a make asked on
+Create still owes its line, cut and asked once more included: lamp-cloud
+holds it until lamp-voice tells that line's end (#7718 item 2,
+[cloud.md](cloud.md), "The app's onboarding pages, done on the lamp").
+Any other skill's say keeps every gate. Tests:
 `say::tests::an_app_pages_line_skips_the_quiet_and_every_other_say_keeps_it`,
 `say::tests::an_app_pages_line_goes_after_a_say_already_waiting`.
 

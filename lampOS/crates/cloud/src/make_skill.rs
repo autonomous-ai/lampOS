@@ -338,6 +338,29 @@ pub fn made(socket: &Path, data: &Value) -> Result<Option<Value>, String> {
     Ok(Some(told))
 }
 
+/// Whether lamp-voice is done with the line of the app's ask `request_id`
+/// (#7718 item 2), for the last onboarding page's line to wait on
+/// (`crate::onboarding_page::Pages::made_to_look_at`): its `line` told
+/// said or let go (`lamp_voice::app_make::LINE_SPOKEN`, `LINE_NOT_SAID`),
+/// not while `owed`. An older voice tells no `line`: done once the ask is
+/// no longer `making` (a line it then queued still goes first, by the
+/// say service's own order). A voice not answering, or an answer of
+/// another shape, is done: nothing is held for a voice that can't tell.
+pub fn line_ended(socket: &Path, request_id: &str) -> bool {
+    let Ok(told) = exchange(socket, &json!({"made": {"request_id": request_id}})) else {
+        return true;
+    };
+    match (told["line"].as_str(), told["state"].as_str()) {
+        (Some(line), _) => line != LINE_OWED,
+        (None, Some(state)) => state != "making",
+        (None, None) => true,
+    }
+}
+
+/// lamp-voice's `line` while an app's ask's line is still to be said
+/// (`lamp_voice::app_make::LINE_OWED`, held equal by a test).
+pub const LINE_OWED: &str = "owed";
+
 /// `lamp-cloud make-skill make WORDS REQUEST_ID` or `made REQUEST_ID`, for
 /// the played check (`tools/played/make-skill.sh`, `MAKE_FROM=app`): the
 /// same [`make`] and [`made`] the app's kinds call, on [`SOCKET`], told in
@@ -600,6 +623,32 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    /// #7718 item 2: the last onboarding page waits while lamp-voice tells
+    /// the made skill's line owed, and no longer once it is said or let
+    /// go. An older voice (no `line`) is waited on only while `making`; a
+    /// voice not answering holds nothing.
+    #[test]
+    fn a_made_lines_end_is_read_from_the_voice() {
+        assert_eq!(LINE_OWED, lamp_voice::app_make::LINE_OWED);
+        let (socket, seen) = voice(
+            "line",
+            vec![
+                json!({"request_id": "r1", "state": "making", "line": "owed"}),
+                json!({"request_id": "r1", "state": "on", "line": "owed"}),
+                json!({"request_id": "r1", "state": "on", "line": lamp_voice::app_make::LINE_SPOKEN}),
+                json!({"request_id": "r1", "state": "not_kept", "line": lamp_voice::app_make::LINE_NOT_SAID}),
+                json!({"request_id": "r1", "state": "making"}),
+                json!({"request_id": "r1", "state": "on"}),
+                json!({"refused": "x"}),
+            ],
+        );
+        let ended: Vec<bool> = (0..7).map(|_| line_ended(&socket, "r1")).collect();
+        assert_eq!(ended, [false, false, true, true, false, true, true]);
+        assert_eq!(seen.recv().unwrap(), json!({"made": {"request_id": "r1"}}));
+        assert!(line_ended(Path::new("/nowhere/make.sock"), "r1"));
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
     /// The played check's command: the same calls, told in plain words.

@@ -971,7 +971,13 @@ voice tells it.
   once that yes puts it on; the field is absent when it wasn't said back. Once kept:
   `name`, `description`, `version`, `sha256` (what the helper put on) and
   `may_use`, the skills page's rows (`skills::may_use`). With no ask,
-  `{"state": "none"}`. A skill made here is also told with `needs_link`,
+  `{"state": "none"}`. In any state, `line` (#7718 item 2): `owed` while
+  the lamp is still to say its line of it (being made, the line waiting,
+  or asked once more after a cut), then `spoken` or `not_said` (let go:
+  nothing more of it will be said); absent from a lamp-voice before it,
+  and for an ask kept before it. The app can hold its Create page on it
+  rather than on an estimate ([skills.md](skills.md), "Asked for in the
+  app"). A skill made here is also told with `needs_link`,
   the linked services it reads that weren't linked when it was made:
   `[{"code": "gmail", "name": "Gmail"}]`, or `[]` with none missing (and
   for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
@@ -2898,7 +2904,23 @@ says `onboarding_page_supported: true` then, and `onboarding_page_version:
 - **create.** Nothing here: lamp-voice says the made skill's own line as
   it puts it on ("I made <Name>, and it's on.", `made_skill::on_line`).
 - **done.** `{"page": "done"}`: "You're a skill master now! Keep exploring,
-  just say Hey Lamp anytime. Have fun!", once.
+  just say Hey Lamp anytime. Have fun!", once. After a `skills.make` or
+  `skills.write` that lamp-voice took (`making`) while Create was open
+  (#7718 item 2; on lamp-0c89 on 18 Nov the app told `done` about 4 s
+  after the made skill was on, while its 25 s line was still to come, or
+  cut and asked once more), the line and its push wait until lamp-voice
+  tells that ask's `line` said or let go (`skills.made`'s `line` above,
+  `make_skill::line_ended`, asked every 250 ms while it waits,
+  `onboarding_page::LOOK_EVERY`). It waits at most 240 s from the ask
+  (`onboarding_page::MADE_LINE_LONGEST`): lamp-voice's longest make, 120 s
+  (`make_skill_local::MAKE_WITHIN`) and 120 s more for the agent's part
+  with `LAMP_MAKE_SKILL_AGENT` (`make_skill_agent::MAKE_WITHIN`), held
+  equal by a test. A make that fails says why aloud and tells its line's
+  end as any other, so the bound only covers a voice that never tells: an
+  older lamp-voice, with no `line`, is waited on only while the ask reads
+  `making` (its line then queued goes first by the say service's own
+  order), and a voice not answering holds nothing. A make on another
+  page, the pages closed (`null`) or a new Try forget it.
 - **The line.** Every line is in `crate::onboarding_page`, one constant
   each. Handed to the voice's say socket (`LAMP_SAY_SOCKET`, else
   `/run/lampos-say/say.sock`), skill `onboarding-app`, let go after 30 s:
@@ -2917,7 +2939,10 @@ says `onboarding_page_supported: true` then, and `onboarding_page_version:
   says `onboarding.page_done: handed to the client` or `not handed to the
   client, not tried again`.
 
-Tests: `onboarding_page::tests`,
+Tests: `onboarding_page::tests` (#7718 item 2:
+`the_last_pages_line_waits_for_creates_made_line`,
+`the_last_pages_line_waits_only_for_creates_make_and_not_for_ever`),
+`make_skill::tests::a_made_lines_end_is_read_from_the_voice`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`.
 
 ## The two yeses from the app (#5500, `consent.get`, `consent.set`)
