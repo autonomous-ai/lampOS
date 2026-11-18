@@ -5361,13 +5361,12 @@ becomes a remove. Then, in code (`made_turn::asked`):
   a second make of it. Never list their skills for it. If more than one
   fits and their line doesn't say which, ask once, short, naming only those
   that fit so one word answers it, as in "The water one or the stretch
-  one?", and call nothing. If none fits, say plainly, in a few words, that
-  they have no skill like that, and ask nothing: never which one they mean.
+  one?", and call nothing. If none of these fits, the line is about another of theirs or something else: call make_skill with what they said, as for any skill, and never say from this note that they have no skill like that.
   A line about anything else, the light, music or a timer, is answered as
   it is: no question about skills, and no skill turned on for it.)", at
   most 3 skills, each by the last done with it. The "more than one"
   sentence (`just_made::ASK_WHICH`) is told only when the note names more
-  than one skill; the "none" sentence (`just_made::NONE_FITS`) always. This
+  than one skill; the "none" sentence (`just_made::NOTE_NONE_FITS`) always: a line none of the note's skills fits goes to `make_skill`, which looks among all of theirs, so the note never says they have none like that (Thirteen's P2 on #7715). This
   is the first builder's ruling on #7715 (23:14, "keep the one question,
   worded to be quick"): one candidate is acted on, never asked; several
   are asked once by name, so one word answers; none is said plainly, never
