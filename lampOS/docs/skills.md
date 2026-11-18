@@ -6953,9 +6953,16 @@ the same code for both writers.
     plainly, never on. One with code that keeps its yes as a finished
     make's does (`made_skill::code_goes_on_at_once` false: it sends, or the
     camera, the microphone or hearing, or `LAMP_MADE_CODE_ON_AT_ONCE` off)
-    is said ready and why it's off (`made_skill::CODE_BY_VOICE`), never on,
-    never put on, and no task yes recorded with nobody's yes (Twelve's 19:40
-    P2 on #7774). One that clashes with a skill on the lamp is said ready
+    (so every skill with code in the product, where that switch is off) is
+    said ready and read back as an app make's is
+    (`make_skill_local::app_code_asked`): "Your <name> skill is ready." and
+    `made_skill::on_line`, word for word, with what its code may use, its
+    yes awaited from that request on (`skill_write_yes::wait_for_yes_noted`,
+    `then_wait`). It is never said on, never put on with no yes, and no
+    task yes is recorded with nobody's yes (Twelve's 19:40 P2 on #7774);
+    the person's yes after the say-back is heard whole puts exactly that
+    package on (`put_on_agreed`), so it is never stranded off (his 20:26
+    P2). One that clashes with a skill on the lamp is said ready
     and asked the clash's question (`made_clash::asked`), as a finished
     make is; one on already is said on, nothing asked again. Nothing goes
     on and nothing is cleared in the worker: only when the coordinator saw

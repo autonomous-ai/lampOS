@@ -3559,10 +3559,17 @@ cả hai người viết.
     (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
     bao giờ nói là bật. Skill có code vẫn cần câu đồng ý như lần tạo xong
     (`made_skill::code_goes_on_at_once` sai: nó gửi đi, hoặc dùng camera,
-    micro hay nghe, hoặc `LAMP_MADE_CODE_ON_AT_ONCE` tắt) được nói là xong
-    và lý do nó tắt (`made_skill::CODE_BY_VOICE`), không bao giờ nói là bật,
-    không bật, và không ghi câu đồng ý cho task khi không ai đồng ý (P2 lúc
-    19:40 của Twelve trên #7774). Skill trùng với một skill trên đèn được
+    micro hay nghe, hoặc `LAMP_MADE_CODE_ON_AT_ONCE` tắt; nên mọi skill có
+    code trong sản phẩm, nơi switch đó tắt) được nói là xong và đọc lại như
+    lần tạo của app (`make_skill_local::app_code_asked`): "Your <name> skill
+    is ready." và `made_skill::on_line`, từng chữ, kèm thứ code của nó được
+    dùng, câu đồng ý được chờ từ yêu cầu đó
+    (`skill_write_yes::wait_for_yes_noted`, `then_wait`). Không bao giờ nói
+    là bật, không bật khi chưa ai đồng ý, và không ghi câu đồng ý cho task
+    khi không ai đồng ý (P2 lúc 19:40 của Twelve trên #7774); người dùng
+    đồng ý sau khi nghe trọn phần đọc lại thì đúng gói đó được bật
+    (`put_on_agreed`), nên không bao giờ bị kẹt ở trạng thái tắt (P2 lúc
+    20:26). Skill trùng với một skill trên đèn được
     nói là xong và hỏi câu hỏi trùng (`made_clash::asked`), như lần tạo
     xong; skill đã bật rồi được nói là bật, không hỏi lại gì. Worker không
     bật và không xóa gì: chỉ khi coordinator thấy chính lượt đó được phát
