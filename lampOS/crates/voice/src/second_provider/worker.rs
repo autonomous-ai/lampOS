@@ -28302,6 +28302,35 @@ mod tests {
         }
     }
 
+    /// The first builder's ruling on #7698 (lamp-06c1, request 99: one word,
+    /// held out of the window): past the window, Jay turned to the lamp and
+    /// not seen speaking, a bare yes or no to its pending question is
+    /// answered; with no question pending it stays held.
+    #[test]
+    fn with_said_to_me_a_bare_yes_to_a_pending_question_is_answered_out_of_the_window() {
+        use lamp_msgs::SpeakingState::No;
+        let judged = |lamp_asked: bool, words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks(&eyes, now, 200, &[Some(No)], &mut 0);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            let signs = super::Signs {
+                lamp_asked,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let verdict = heeding.heed_signs(9, (now_us, now_us + 600_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        for yes in ["Yes.", "No."] {
+            assert_eq!(judged(true, yes), None, "{yes} to the pending question");
+            assert!(judged(false, yes).is_some(), "{yes} with no question");
+        }
+    }
+
     /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question
     /// said facing the lamp and seen speaking is held with the head down to
     /// a phone (40 degrees) or the eyes looking away, and answered level and

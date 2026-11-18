@@ -32,7 +32,12 @@
 //! words asked something or a read-back waits for its answer
 //! ([`Line::lamp_asked`], as the rule reads it): the answer window is the
 //! conversation going on, whatever the line's length (#7698: on lamp-06c1 on
-//! 18 Nov a bare "Yes." to the lamp's read-back was held, many times).
+//! 18 Nov a bare "Yes." to the lamp's read-back was held, many times). Out
+//! of the window, a line of [`SHORT_WORDS`] words or fewer that is a plain
+//! yes or no (`services::plain_yes`, `services::plain_no`) while the lamp's
+//! question waits is the same answer (the first builder's ruling on #7698:
+//! request 99 there was one word, held out of the window); any other line
+//! out of the window is judged as before.
 //!
 //! Anything else loses those signs and is journaled `held: <reason>`
 //! ([`Held`]). A lip smack heard as one or two words while the owner faced
@@ -259,6 +264,12 @@ pub fn judge(line: Line<'_>) -> Said {
     if !line.turned {
         return Said::Stands;
     }
+    // Out of the window, a bare yes or no to the lamp's own question still
+    // answers it (the first builder's ruling on #7698: lamp-06c1, 18 Nov,
+    // request 99, a one-word "Yes." after the rename's read-back was held).
+    if line.lamp_asked && bare_yes_or_no(line.heard) {
+        return Said::InConversation;
+    }
     if outside_pitch(line.pitch) {
         Said::Held(Held::NotFacingPitch)
     } else if line.looking == Some(false) {
@@ -293,6 +304,14 @@ pub fn short_stood_by(line: Line<'_>) -> Option<&'static str> {
     } else {
         "read_silent false"
     })
+}
+
+/// A line of [`SHORT_WORDS`] words or fewer that is a plain yes or a plain
+/// no and nothing else (`services::plain_yes`, `services::plain_no`: the
+/// read-back's own deterministic test, no question).
+fn bare_yes_or_no(heard: &str) -> bool {
+    heard.split_whitespace().count() <= SHORT_WORDS
+        && (crate::services::plain_yes(heard) || crate::services::plain_no(heard))
 }
 
 /// The lamp's name heard in the line's sound or written in its words.
@@ -505,8 +524,7 @@ mod tests {
 
     /// #7698: the lamp read back what it heard and asked; the person's bare
     /// "Yes." in the answer window, their face in view read silent, is the
-    /// conversation going on. A question pending makes no line said to the
-    /// lamp outside the window.
+    /// conversation going on.
     #[test]
     fn a_bare_yes_to_the_lamps_own_question_is_answered_in_its_window() {
         let answer = |heard| Line {
@@ -519,13 +537,40 @@ mod tests {
         for heard in ["Yes.", "Yeah.", "No."] {
             assert_eq!(judge(answer(heard)), Said::InConversation, "{heard}");
         }
-        // Past the window, no conversation: the question carries nothing.
-        let late = Line {
+    }
+
+    /// The first builder's ruling on #7698 (lamp-06c1, request 99): past the
+    /// window, Jay's face turned to the lamp and not seen speaking, a bare
+    /// yes or no to the lamp's pending question still answers it; anything
+    /// else past the window is judged as before.
+    #[test]
+    fn a_bare_yes_or_no_to_the_lamps_pending_question_is_answered_out_of_the_window() {
+        let late = |heard, lamp_asked| Line {
+            heard,
             going_on: false,
             turned: true,
-            ..answer("Yes.")
+            lamp_asked,
+            read_silent: true,
+            ..Line::default()
         };
-        assert_eq!(judge(late), Said::Held(Held::NotSeenSpeaking));
+        for heard in ["Yes.", "Yeah.", "No.", "Yes please."] {
+            assert_eq!(judge(late(heard, true)), Said::InConversation, "{heard}");
+        }
+        // No question pending: held as before.
+        assert_eq!(
+            judge(late("Yes.", false)),
+            Said::Held(Held::NotSeenSpeaking)
+        );
+        // A question pending, but not a bare yes or no: judged as before.
+        assert_eq!(
+            judge(late("Pasta.", true)),
+            Said::Held(Held::NotSeenSpeaking)
+        );
+        assert_eq!(
+            judge(late("Yes, and Ada too", true)),
+            Said::Held(Held::NotSeenSpeaking)
+        );
+        assert_eq!(judge(late("Yes?", true)), Said::Held(Held::NotSeenSpeaking));
     }
 
     /// #7698's control: two people talking, Jay and Ada, the lamp asked

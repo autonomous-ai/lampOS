@@ -5942,7 +5942,14 @@ after a take-over, but now for every turn:
   `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
   speaking it (one `yes` in a look of the line,
   `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
-  speaking), with 3 words or more, a question or an ask. Otherwise the face
+  speaking), with 3 words or more, a question or an ask; or, out of the
+  window, when the lamp's own question waits (`said_to_me::Line::lamp_asked`)
+  and the line is 2 words or fewer and a plain yes or a plain no
+  (`services::plain_yes`, `services::plain_no`), whatever its face or pose
+  (the first builder's ruling on #7698: lamp-06c1, 18 Nov, request 99, a
+  one-word yes after a rename's read-back, held out of the window; let
+  through as `said to the lamp, in a conversation`, `out of the window`; a
+  bare yes with no question pending is held as before). Otherwise the face
   and the conversation are no sign, for every use of them in `attention`,
   and the journal says `request N: not said to the lamp, held: <reason>`
   (`not facing (pitch)`, `looking away`, `not facing in a conversation
