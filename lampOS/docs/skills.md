@@ -5235,8 +5235,23 @@ model is told changes: no words of the line are read. Then, in code
   good morning 2 and 3, and `use_skill`'s off-skill run
   (`made_run::off_named`) found none. With the switch on, a near name is
   taken in only for a nearest one still standing after that step, so a
-  name said whole is that skill alone; "good morning" beside the three
-  still asks which. And `use_skill` itself (`use_skill::translate`), when
+  name said whole is that skill alone (beside moon, moon fact and moon
+  facts, "the moon fact skill" is moon fact and "moon facts" moon facts,
+  where before each asked which; "the moon fax skill" still asks which of
+  moon and moon fact). **A name whose numbers differ is never near**
+  (Heron's P2 on #7830: `apart` is over letters, so "3" and "13" are one
+  apart, and with only good morning 13 made "good morning three" found it
+  alone, "alarm two" found alarm 3, and a turn off, a run now and a
+  remove at once acted on it): with the switch on, `made_remove::found`
+  compares the numbers of the words asked and of each name, as digits and
+  in order (`same_numbers`). When any near name has the same numbers,
+  only those are near; when none has, the near ones are never taken
+  alone: one is `Found::Nothing` (good morning 13 for "good morning
+  three", alarm 3 for "alarm two" or "alarm"), several still ask which
+  ("good morning" beside good morning 1, 2 and 3). So "good morning"
+  beside good morning, good morning 2 and 3 is good morning, named as it
+  is written. A turn off, a run now and a remove, asked or at once
+  (`make_no_asks::remove_asked`), all match through it. And `use_skill` itself (`use_skill::translate`), when
   no function has the exact name given, takes the one function whose name
   is the same as a skill's name is written (`made_skill::name_asked`:
   lower case, underscores, spaces and dashes alike, no "my" or "skill"),

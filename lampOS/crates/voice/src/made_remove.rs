@@ -305,16 +305,31 @@ fn inside(short: &str, long: &str) -> bool {
 /// they didn't make when it is named as it is written, or when none of
 /// theirs is near and it is; else nothing.
 pub fn found(asked: &str, keeping: &Keeping) -> Found {
+    let late = made_skill::off_said_on();
+    // With `LAMP_MADE_SKILL_OFF_SAID` on, a name whose numbers differ from
+    // those asked is never near ([`same_numbers`], Heron's P2 on #7830:
+    // "3" and "13" are one letter apart, so "good morning three" found
+    // good morning 13 alone, and a turn off, a run now and a remove at once
+    // acted on it). Those of theirs whose numbers are the same, when any
+    // is near; else those near, never taken alone ([`Found::Nothing`] for
+    // one, still asked which among several: "good morning" beside good
+    // morning 1, 2 and 3).
+    let numbered = |name: &str| !late || same_numbers(asked, name);
     let made = made(keeping);
-    let theirs: Vec<(usize, &str, &str)> = made
+    let mut theirs: Vec<(usize, &str, &str)> = made
         .iter()
         .map(|(name, sha256)| (apart(asked, name), name.as_str(), sha256.as_str()))
         .filter(|(apart, name, _)| near(*apart, name))
         .collect();
+    let numbers_differ = !theirs.is_empty() && !theirs.iter().any(|(_, name, _)| numbered(name));
+    if !numbers_differ {
+        theirs.retain(|(_, name, _)| numbered(name));
+    }
     let others = others(keeping, &made);
     let other = |exact: bool| {
         others
             .iter()
+            .filter(|name| numbered(name))
             .map(|name| (apart(asked, name), name))
             .filter(|(apart, name)| {
                 if exact {
@@ -348,7 +363,6 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
     // lamp-9adf, 18 Nov: "good morning three" is good morning 3 named as it
     // is written, and was asked which beside good morning 2, taken in for
     // holding good morning, itself only good morning 3's part).
-    let late = made_skill::off_said_on();
     if !late {
         hold_nearest(&theirs, &mut tied);
     }
@@ -364,6 +378,8 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
     }
     tied.sort_by_key(|(_, name, _)| (name.len(), *name));
     match tied.as_slice() {
+        // One alone whose numbers differ from those asked: never taken.
+        [_] if numbers_differ => other(false).unwrap_or(Found::Nothing),
         [(apart, name, sha256)] => Found::Made {
             name: (*name).to_owned(),
             sha256: (*sha256).to_owned(),
@@ -371,6 +387,20 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
         },
         _ => Found::Alike(tied.iter().map(|(_, name, _)| (*name).to_owned()).collect()),
     }
+}
+
+/// Whether the numbers in `asked` and in the skill `name`, each as digits
+/// ([`words_of`]: "three" and "3" are both `3`), are the same, in order:
+/// "good morning three" and `good-morning-3`, never `good-morning-13` nor
+/// `good-morning`. A name's numbers only, never a meaning.
+fn same_numbers(asked: &str, name: &str) -> bool {
+    let numbers = |said: &str| -> Vec<String> {
+        words_of(said)
+            .into_iter()
+            .filter(|word| word.bytes().all(|byte| byte.is_ascii_digit()))
+            .collect()
+    };
+    numbers(asked) == numbers(name)
 }
 
 /// Each of `theirs` not in `tied` that holds the words of one in `tied`,
@@ -1190,9 +1220,10 @@ pub(crate) mod tests {
     /// skill" didn't find `good-morning-3` beside good morning and good
     /// morning 2. A number said as a word or as digits, zero to twenty and
     /// past, is the same as its digits, and a name said whole is that
-    /// skill alone, never asked which beside one a digit apart; "good
-    /// morning" alone, beside three such skills, still asks which. With
-    /// `LAMP_MADE_SKILL_OFF_SAID` on; off, as before.
+    /// skill alone, never asked which beside one a digit apart. "good
+    /// morning" is good morning, the one whose numbers are the same (none):
+    /// a name whose numbers differ from those asked is never near (Heron's
+    /// P2 on #7830). With `LAMP_MADE_SKILL_OFF_SAID` on; off, as before.
     #[test]
     fn a_number_said_as_a_word_or_digits_finds_its_skill() {
         let (root, keeping) = keeping("found-numbered");
@@ -1228,14 +1259,7 @@ pub(crate) mod tests {
         assert_eq!(found("alarm twenty", &keeping), one("alarm-20"));
         assert_eq!(found("alarm 20", &keeping), one("alarm-20"));
         assert_eq!(found("alarm zero", &keeping), one("alarm-0"));
-        match found("good morning", &keeping) {
-            Found::Alike(names) => assert_eq!(
-                names,
-                ["good-morning", "good-morning-2", "good-morning-3"],
-                "{names:?}"
-            ),
-            other => panic!("{other:?}"),
-        }
+        assert_eq!(found("good morning", &keeping), one("good-morning"));
         let turned_off = std::collections::BTreeSet::from(["good-morning-3".to_owned()]);
         assert_eq!(
             crate::made_run::off_named("use my good morning three skill", &keeping, &turned_off)
@@ -1243,6 +1267,137 @@ pub(crate) mod tests {
             Some("good-morning-3")
         );
         crate::made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7830: `apart` is over letters, so "3" and "13" are 1
+    /// apart; with only `good-morning-13` made, "good morning three" was
+    /// `Found::Made` alone, and "alarm two" was `alarm-3`, which a turn off,
+    /// a run now and a remove at once act on. With the switch on, a name
+    /// whose numbers (as digits, `made_skill::name_digits`) differ from
+    /// those asked is never near: nothing alone, and asked which only among
+    /// several ("good morning" beside good morning 1, 2 and 3). Off, as
+    /// before.
+    #[test]
+    fn a_name_one_number_off_is_never_taken_alone() {
+        let (root, keeping) = keeping("found-number-off");
+        made_here(&keeping, &[("good-morning-13", true), ("alarm-3", true)]);
+        let made_one = |found: Found, name: &str, exact: bool| matches!(found, Found::Made { name: ref made, exact: was, .. } if made == name && was == exact);
+        crate::made_skill::set_off_said_here(Some(true));
+        assert_eq!(found("good morning three", &keeping), Found::Nothing);
+        assert_eq!(found("good morning 3", &keeping), Found::Nothing);
+        assert_eq!(found("alarm two", &keeping), Found::Nothing);
+        assert_eq!(found("alarm", &keeping), Found::Nothing);
+        assert!(made_one(
+            found("good morning thirteen", &keeping),
+            "good-morning-13",
+            true
+        ));
+        assert!(made_one(found("alarm three", &keeping), "alarm-3", true));
+        // Through a remove: nothing asked, nothing waits; at once
+        // (`LAMP_MAKE_NO_ASKS`): nothing removed.
+        yes::clear_for_test();
+        let now = Instant::now();
+        let told = asked(ask("good morning three", 1), &keeping, owner, now);
+        assert_eq!(told["error"], NO_MADE, "{told}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        assert!(!yes::awaited(now));
+        let told = crate::make_no_asks::remove_asked(
+            "alarm two",
+            2,
+            true,
+            &keeping,
+            || true,
+            |name| panic!("{name} removed"),
+        );
+        assert!(told.get("removed").is_none(), "{told}");
+        assert!(told["error"].is_string(), "{told}");
+        // Through a turn off: nothing turned.
+        for name in ["alarm two", "good morning three"] {
+            let told = crate::made_turn::asked(
+                crate::made_turn::Ask {
+                    name,
+                    off: true,
+                    request: 3,
+                    heard: true,
+                    state: None,
+                },
+                &keeping,
+                || true,
+                |name, _| panic!("{name} turned"),
+            );
+            assert!(told.get(crate::made_turn::TURN_OFF).is_none(), "{told}");
+            assert_eq!(told["error"], NO_MADE, "{told}");
+        }
+        assert_eq!(names(&keeping.directory), ["good-morning-13", "alarm-3"]);
+        // Off: the nearest by letters, as before.
+        crate::made_skill::set_off_said_here(Some(false));
+        assert!(made_one(
+            found("good morning three", &keeping),
+            "good-morning-13",
+            false
+        ));
+        // Several whose numbers differ: asked which, never one alone.
+        crate::made_skill::set_off_said_here(Some(true));
+        made_here(
+            &keeping,
+            &[
+                ("good-morning-1", true),
+                ("good-morning-2", true),
+                ("good-morning-3", true),
+            ],
+        );
+        match found("good morning", &keeping) {
+            Found::Alike(names) => assert_eq!(
+                names,
+                ["good-morning-1", "good-morning-2", "good-morning-3"],
+                "{names:?}"
+            ),
+            other => panic!("{other:?}"),
+        }
+        crate::made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #7830: with the switch on, a near name is taken in
+    /// only for a nearest one still standing, which changes a remove's
+    /// match too: beside moon, moon fact and moon facts, "the moon fact
+    /// skill" and "moon facts" are each that skill alone and ask "Remove
+    /// …?" of it; "the moon fax skill" still asks which of moon and moon
+    /// fact. Off, "the moon fact skill" asks which of moon fact and moon
+    /// facts, as before.
+    #[test]
+    fn a_remove_beside_moon_moon_fact_and_moon_facts() {
+        let (root, keeping) = keeping("remove-moon-facts");
+        made_here(
+            &keeping,
+            &[("moon", true), ("moon-fact", true), ("moon-facts", true)],
+        );
+        let now = Instant::now();
+        crate::made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        let told = asked(ask("the moon fact skill", 1), &keeping, owner, now);
+        assert_eq!(told["remove"], "moon-fact", "{told}");
+        yes::clear_for_test();
+        let told = asked(ask("moon facts", 2), &keeping, owner, now);
+        assert_eq!(told["remove"], "moon-facts", "{told}");
+        yes::clear_for_test();
+        let told = asked(ask("the moon fax skill", 3), &keeping, owner, now);
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("moon or moon fact"), "{next}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        crate::made_skill::set_off_said_here(Some(false));
+        yes::clear_for_test();
+        let told = asked(ask("the moon fact skill", 4), &keeping, owner, now);
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("moon fact or moon facts"), "{next}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        crate::made_skill::set_off_said_here(None);
+        yes::clear_for_test();
+        assert_eq!(
+            names(&keeping.directory),
+            ["moon", "moon-fact", "moon-facts"]
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

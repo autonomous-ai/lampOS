@@ -2250,8 +2250,23 @@ thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
   là good morning 2 hay 3, và việc chạy kỹ năng đang tắt qua `use_skill`
   (`made_run::off_named`) không tìm thấy gì. Khi bật công tắc, một tên gần
   chỉ được lấy thêm cho một tên gần nhất còn đứng sau bước đó, nên một tên
-  nói trọn vẹn là đúng kỹ năng đó; "good morning" bên cạnh ba kỹ năng kia
-  vẫn hỏi là cái nào. Và chính `use_skill` (`use_skill::translate`), khi
+  nói trọn vẹn là đúng kỹ năng đó (bên cạnh moon, moon fact và moon facts,
+  "the moon fact skill" là moon fact và "moon facts" là moon facts, trước
+  đây mỗi câu đều hỏi là cái nào; "the moon fax skill" vẫn hỏi là moon hay
+  moon fact). **Một tên có số khác không bao giờ là gần** (P2 của Heron
+  trên #7830: `apart` tính theo chữ cái, nên "3" và "13" chỉ cách nhau một
+  chữ, và khi chỉ có good morning 13 thì "good morning three" tìm thấy
+  riêng nó, "alarm two" tìm thấy alarm 3, rồi việc tắt, chạy ngay và gỡ
+  ngay đều làm trên nó): khi bật công tắc, `made_remove::found` so các số
+  trong câu được hỏi với các số của từng tên, dưới dạng chữ số và theo thứ
+  tự (`same_numbers`). Khi có tên gần nào có cùng các số, chỉ những tên đó
+  là gần; khi không có, các tên gần không bao giờ được lấy riêng: một tên
+  thì là `Found::Nothing` (good morning 13 cho "good morning three", alarm
+  3 cho "alarm two" hay "alarm"), nhiều tên thì vẫn hỏi là cái nào ("good
+  morning" bên cạnh good morning 1, 2 và 3). Vì vậy "good morning" bên cạnh
+  good morning, good morning 2 và 3 là good morning, được nêu đúng như cách
+  viết. Việc tắt, chạy ngay và gỡ, có hỏi hay làm ngay
+  (`make_no_asks::remove_asked`), đều khớp qua đó. Và chính `use_skill` (`use_skill::translate`), khi
   không hàm nào có đúng tên được đưa, lấy một hàm duy nhất có tên giống như
   cách viết tên kỹ năng (`made_skill::name_asked`: chữ thường, gạch dưới,
   khoảng trắng và gạch ngang như nhau, bỏ "my" và "skill"), số thành chữ
