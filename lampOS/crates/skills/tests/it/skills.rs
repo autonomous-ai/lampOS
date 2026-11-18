@@ -770,6 +770,15 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
             "\"voice/state\", \"voice/decision\"]",
             "[permissions] topics: voice/decision is never a skill's to read",
         ),
+        // What the lamp did, and why, is told on lamp/did and read by the
+        // voice's keeper alone (#7757): a skill that read it would be
+        // triggered by its own runs.
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"lamp/did\"]",
+            "[permissions] topics: lamp/did is never a skill's to read",
+        ),
         (
             "welcome-back",
             "speak = true\n",

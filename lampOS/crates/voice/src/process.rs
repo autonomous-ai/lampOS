@@ -1252,6 +1252,10 @@ fn worker_command(
             role,
             var(crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT).as_deref(),
         ))
+        .envs(did_keep_worker_environment(
+            role,
+            var(crate::did_history::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2235,6 +2239,17 @@ fn named_agent_takes_line_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT, "on"))
+}
+
+// The last hour of what the lamp did, and why, kept in memory
+// (`did_history::ENVIRONMENT`, #7757): the exact `on`, to the second route,
+// whose look-up reads it.
+fn did_keep_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::did_history::ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -3509,6 +3524,13 @@ mod tests {
                         "LAMP_NAMED_AGENT_TAKES_LINE",
                         ["second"].as_slice(),
                     ),
+                    // The last hour of what the lamp did, kept: the second
+                    // route alone (#7757).
+                    (
+                        did_keep_worker_environment,
+                        "LAMP_DID_KEEP",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3823,6 +3845,7 @@ mod tests {
                     crate::skill_named::ENVIRONMENT,
                     crate::told_when_asked::ENVIRONMENT,
                     crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
+                    crate::did_history::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -4132,6 +4155,7 @@ mod tests {
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_CUT_IN_WORDLESS_RESUMES=on",
                     "LAMP_DECLINE_SILENT=on",
+                    "LAMP_DID_KEEP=on",
                     "LAMP_ENDPOINT_PAUSE_JOIN=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
