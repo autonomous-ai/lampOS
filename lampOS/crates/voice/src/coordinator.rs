@@ -15774,6 +15774,7 @@ fn commit_reminder_turn(
         } else {
             Vec::new()
         },
+        timer: offer.timer,
     };
     current.reminder = Some(reminders.admitted(
         offer,

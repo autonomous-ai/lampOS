@@ -677,14 +677,24 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   answers at start (`limit_local::time_pieces`, 38 clips: "It's one" to
   "It's twelve", "oh", one to nineteen, twenty to fifty, "a.m.", "p.m."),
   joined end to end: "It's seven" "fifty" "two" "p.m.". With the clock not
-  set or a piece not kept, the limit's own way. A timer is not done yet: a
-  due timer is said through a chat (`Asker::Reminder`), which the limit
-  refuses too, so one set at the limit would not ring. The journal: `at the
-  usage limit <function> was done without the model, its own line said in
-  N ms (LAMP_LIMIT_LOCAL_ASKS)`, `at the usage limit the time was said
-  without the model`, and for a line said to the lamp that is no plain
-  ask, `limit_local: no plain ask matched (N words)`, its word count only,
-  never its words. The journal: `said its thoughts are slow`,
+  set or a piece not kept, the limit's own way. A due timer or
+  reminder (#7642, V2's ruling A) is rung in place of the chat turn the
+  limit refuses, at the known limit before any chat and at its own chat's
+  limit refusal: a timer with "Your timer is done.", a reminder (or a
+  timer said with others as late) with "You have a reminder.", both
+  rendered at start with the fixed answers (`LIMIT_TIMER_DONE`,
+  `LIMIT_REMINDER_DUE`). The turn ends answered, with `OwnWordsSaid` first
+  so its `GenerationComplete` ends no refusal, and the coordinator
+  completes the item as said: rung once, never held by the no-audio
+  retries ([schedule.md](schedule.md)). With its clip not kept, the chat is
+  asked as before. Setting a timer is not done yet: its line carries a
+  time and can't be rendered at the limit. The journal: `at the usage
+  limit <function> was done without the model, its own line said in N ms
+  (LAMP_LIMIT_LOCAL_ASKS)`, `at the usage limit the time was said without
+  the model`, `at the usage limit the due timer was rung with "Your timer
+  is done.", no chat asked (LAMP_LIMIT_LOCAL_ASKS)`, and for a line said
+  to the lamp that is no plain ask, `limit_local: no plain ask matched (N
+  words)`, its word count only, never its words. The journal: `said its thoughts are slow`,
   and `(again, the shorter line)` for the second. Once the slow line (either
   one) or the usage-limit line has been handed over, or a quiet ask in a
   limit run has ended, the route sends `DownLineSaid` for the request,

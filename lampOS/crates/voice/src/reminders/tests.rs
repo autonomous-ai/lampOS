@@ -102,8 +102,27 @@ fn offer() -> Offer {
         expires_at_us: AT + LEASE_US,
         also: Vec::new(),
         again: false,
+        timer: false,
     }
 }
+
+/// #7642: an offer from a build before `timer` is a reminder's, and a
+/// reminder's offer is sent as before, with no `timer` key.
+#[test]
+fn an_offer_without_timer_is_a_reminders_and_sent_as_before() {
+    let sent = serde_json::to_value(offer()).unwrap();
+    assert!(sent.get("timer").is_none(), "{sent}");
+    let read: Offer = serde_json::from_value(sent).unwrap();
+    assert!(!read.timer);
+    let timer = serde_json::to_value(Offer {
+        timer: true,
+        ..offer()
+    })
+    .unwrap();
+    assert_eq!(timer["timer"], true);
+    assert!(serde_json::from_value::<Offer>(timer).unwrap().timer);
+}
+
 fn owner(boot: u8) -> (TurnOwner, u64) {
     let at = MonoTime::from_micros(AT);
     let until = MonoTime::from_micros(AT + LEASE_US);

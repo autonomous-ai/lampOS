@@ -75,6 +75,7 @@ fn reminder(request: u64, handoff: &InputHandoff, text: &str) -> ProviderInput {
         also: Vec::new(),
         again: false,
         ids: Vec::new(),
+        timer: false,
     }
 }
 
@@ -201,6 +202,7 @@ fn reminder_preserves_authority_and_session_validation_before_policy() {
                 also: Vec::new(),
                 again: false,
                 ids: Vec::new(),
+                timer: false,
             },
             NOW,
             &sink,
@@ -252,6 +254,7 @@ fn reminder_text_is_quoted_data_and_lateness_is_preserved_with_no_picture() {
                 also: Vec::new(),
                 again: false,
                 ids: Vec::new(),
+                timer: false,
             },
             NOW,
             &sink,
@@ -375,6 +378,7 @@ impl LiveRig {
                 also: Vec::new(),
                 again: false,
                 ids: Vec::new(),
+                timer: false,
             })
             .unwrap();
         owner.turn()

@@ -346,6 +346,11 @@ pub const LIMIT_AGAIN_NAMED: Duration = Duration::from_secs(300);
 /// it, one line asks the chat again to find whether the limit has passed,
 /// as a held refusal tries once a minute (#4265; Heron on #7612).
 pub const LIMIT_TRY_AGAIN: Duration = Duration::from_secs(60);
+/// With `LAMP_LIMIT_LOCAL_ASKS`, a due timer's line at the usage limit, in
+/// place of the chat turn the limit refuses (#7642, V2's ruling A).
+pub const LIMIT_TIMER_DONE: &str = "Your timer is done.";
+/// [`LIMIT_TIMER_DONE`] for a reminder, its words being the chat's to say.
+pub const LIMIT_REMINDER_DUE: &str = "You have a reminder.";
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
 pub(crate) const DOWN_LINES: [&str; 4] = [
@@ -7331,8 +7336,9 @@ impl Engine {
     /// refused with the usage limit, a heard line that plainly asks for a
     /// light or volume change ([`limit_local::matched`]) runs that function
     /// with no model and says its own short line, rendered ahead
-    /// ([`FixedClips`]). Only with the down line, whose run of refusals
-    /// knows the limit. Before any turn only.
+    /// ([`FixedClips`]), and a due timer or reminder is rung with its own
+    /// line ([`limit_ring`], #7642). Only with the down line, whose run of
+    /// refusals knows the limit. Before any turn only.
     pub fn doing_at_the_limit(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.limit_local = on;
@@ -7420,6 +7426,7 @@ impl Engine {
         .chain(
             crate::action_claim::SAID_LINES
                 .into_iter()
+                .chain([LIMIT_TIMER_DONE, LIMIT_REMINDER_DUE])
                 .filter(|_| shared.limit_local),
         )
         // And the pieces the time is said from there (#7642), last.
@@ -8198,8 +8205,12 @@ impl Engine {
                 also,
                 again,
                 ids,
+                timer,
                 ..
             } => {
+                // A timer alone is rung at the usage limit with its own
+                // line; one said with others, as a reminder (#7642).
+                let timer = timer && also.is_empty();
                 // Deferred unless this route is the lamp's only voice and the
                 // lamp says its reminders: standing by, Gemini says them once
                 // it is back.
@@ -8240,7 +8251,7 @@ impl Engine {
                         &shared,
                         (request, lease),
                         note,
-                        Asker::Reminder,
+                        Asker::Reminder { timer },
                         None,
                         None,
                         Vec::new(),
@@ -8926,6 +8937,37 @@ async fn limit_local_ask(
         began.elapsed().as_millis()
     );
     if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+        return Err(Stop::Gone);
+    }
+    Ok(true)
+}
+
+/// `LAMP_LIMIT_LOCAL_ASKS` (#7642, V2's ruling A): at the usage limit a due
+/// timer is rung with [`LIMIT_TIMER_DONE`] and a reminder with
+/// [`LIMIT_REMINDER_DUE`], from its clip rendered ahead, in place of the
+/// chat turn the limit refuses. The turn then ends answered, so the
+/// coordinator completes the item with that audio, as said: no ring again,
+/// and no attempt lost to the no-audio retries. Told as the lamp's own
+/// words ([`ProviderOutput::OwnWordsSaid`]), so it ends no refusal. False,
+/// with nothing said, when the clip isn't kept: the limit's way then.
+async fn limit_ring(shared: &Shared, request: u64, timer: bool) -> Result<bool, Stop> {
+    let line = if timer {
+        LIMIT_TIMER_DONE
+    } else {
+        LIMIT_REMINDER_DUE
+    };
+    let Some(clip) = shared.fixed_clips.kept(line) else {
+        eprintln!(
+            "lamp-voice second: request {request}: at the usage limit \"{line}\" isn't rendered yet: the reminder's chat is asked (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+        return Ok(false);
+    };
+    cue(shared, request, clip).await?;
+    eprintln!(
+        "lamp-voice second: request {request}: at the usage limit the due {} was rung with \"{line}\", no chat asked (LAMP_LIMIT_LOCAL_ASKS)",
+        if timer { "timer" } else { "reminder" }
+    );
+    if !shared.emit(ProviderOutput::OwnWordsSaid { request }).await {
         return Err(Stop::Gone);
     }
     Ok(true)
@@ -13678,8 +13720,9 @@ enum Asker {
         quoted: bool,
     },
     /// A due reminder, said as the Live route says it: a note to say it, and
-    /// no tool runs (`provider_worker::reminder_note`).
-    Reminder,
+    /// no tool runs (`provider_worker::reminder_note`); `timer` for a timer
+    /// alone, rung at the usage limit with its own line ([`limit_ring`]).
+    Reminder { timer: bool },
 }
 
 /// How long a turn's first round may take to begin, when it has no wait's
@@ -16537,6 +16580,7 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    let reminder = matches!(asked, Asker::Reminder { .. });
     // Whether the line names the lamp, known without the model: the name
     // in its words, its name detector's note, or a wake by name before it
     // (#7346: after the first usage-limit line, only such a line hears it).
@@ -16821,7 +16865,7 @@ async fn answer(
     // `calls=none`). A line asked as a question has only its removed forms
     // judged: "Planet fact is on." may answer "is planet fact on?".
     let made_names: Vec<crate::action_claim::MadeSkill> = match &shared.made_names {
-        Some(read) if shared.action_claims && !quoted && asked != Asker::Reminder => read(),
+        Some(read) if shared.action_claims && !quoted && !reminder => read(),
         _ => Vec::new(),
     };
     let made_asked = crate::action_claim::asked_as_a_question(&said);
@@ -17639,6 +17683,11 @@ async fn answer(
         // `LAMP_LIMIT_LOCAL_ASKS` (#7346): a spoken line is tried as an ask
         // with no model at the usage limit, at round 1 only.
         let limit_local = shared.limit_local && heard && !quoted;
+        // And a due timer or reminder is rung with its own line (#7642).
+        let limit_ring_timer = match asked {
+            Asker::Reminder { timer } if shared.limit_local => Some(timer),
+            _ => None,
+        };
         let mut round = 0;
         // The one round asked past MAX_ROUNDS, declaring no function: every
         // round so far ended in calls, so nothing they found was said yet
@@ -17724,6 +17773,15 @@ async fn answer(
                 }
                 return Err(Stop::Failed(Fault::RateLimited));
             }
+            // Already at the usage limit: a due timer or reminder is rung
+            // with its own line, with no chat asked (#7642).
+            if round == 1
+                && let Some(timer) = limit_ring_timer
+                && shared.down.as_ref().is_some_and(|down| down.limited())
+                && limit_ring(shared, request, timer).await?
+            {
+                return Ok(());
+            }
             let mut stream = match prepared.take() {
                 // The skill the heard words named: its call alone, at once.
                 _ if by_words.is_some() => named_round(by_words.take()),
@@ -17796,8 +17854,7 @@ async fn answer(
             // when its calls say whether it was. Not while something of
             // this request was kept already, nor on a turn offered no
             // function (a quoted add-on's or a reminder's).
-            let mut claim_held =
-                (!kept_now && !quoted && asked != Asker::Reminder).then(String::new);
+            let mut claim_held = (!kept_now && !quoted && !reminder).then(String::new);
             // A reply's opening, held until it is known whether it narrates
             // a call as words ("Calling not_for_me.", lamp-06c1, 30 Oct);
             // one that does is never said, nor kept as the lamp's words for
@@ -17819,7 +17876,7 @@ async fn answer(
             // turn whose messages carry one already (the model copies it
             // from there), so no other turn waits ([`begun_lines`]).
             let begun_gate = !quoted
-                && asked != Asker::Reminder
+                && !reminder
                 && !turn_called
                     .iter()
                     .any(|(name, _)| name == crate::made_skill::MAKE)
@@ -17841,7 +17898,7 @@ async fn answer(
             // now.", #7554's ROW at 2e864a0, request 94:
             // [`crate::make_skill_agent::opens_with_make_line`]).
             let opening_gate = !quoted
-                && asked != Asker::Reminder
+                && !reminder
                 && !turn_called
                     .iter()
                     .any(|(name, _)| name == crate::made_skill::MAKE);
@@ -17859,7 +17916,7 @@ async fn answer(
             let mut action_held =
                 ((shared.action_claims || begun_gate || opening_gate || clash_gate)
                     && !quoted
-                    && asked != Asker::Reminder)
+                    && !reminder)
                     .then(String::new);
             // The round named a make_skill call as it streamed (the reader
             // El's HOLD on #7554: on lamp-9adf a make asked right after
@@ -18116,6 +18173,12 @@ async fn answer(
                                     .await?
                                 {
                                     return Err(Stop::Failed(fault(&error)));
+                                }
+                                // And a due timer or reminder is rung (#7642).
+                                if let Some(timer) = limit_ring_timer
+                                    && limit_ring(shared, request, timer).await?
+                                {
+                                    return Ok(());
                                 }
                                 say_limit(shared, (request, heard, named), lasted, word.flatten())
                                     .await?;
@@ -19652,7 +19715,7 @@ async fn answer(
             }
             // A reminder is only said: its words are data, never an ask
             // (as the Live route's tool gate holds it).
-            if asked == Asker::Reminder {
+            if reminder {
                 eprintln!(
                     "lamp-voice second: request {request} is a reminder: its calls are not run"
                 );
