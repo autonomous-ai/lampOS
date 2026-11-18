@@ -184,6 +184,53 @@ class Eligible(Red):
         r, lines = self.round(["7", "8"])
         self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9])
 
+    # 18 Nov 10:5x (#7367, NEXT TRAIN since 06:19, never carried): its head had two runs of one workflow's clippy, one
+    # CANCELLED and one SUCCESS, and every entry was judged alone, so the cancelled one kept it red on that head for
+    # good. Now each check (workflow and name) is judged by one run: one still running, else the latest that wasn't
+    # cancelled (a cancel is the runner's, not the code's), else the latest.
+    def runs(self, *entries):
+        out = []
+        for conclusion, started, workflow in entries:
+            status = "IN_PROGRESS" if conclusion is None else "COMPLETED"
+            out.append({"__typename": "CheckRun", "name": "clippy, every crate and target", "workflowName": workflow,
+                        "status": status, "conclusion": conclusion or "", "startedAt": started,
+                        "completedAt": "0001-01-01T00:00:00Z" if conclusion is None else started[:-3] + "59Z"})
+        return out
+
+    def carried(self, *entries):
+        self.two()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN + self.runs(*entries)}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return r, lines[-1] == "dry: would carry 7 8 onto " + self.base[:9]
+
+    def test_a_cancelled_run_beside_a_passed_run_of_the_same_check_is_not_red(self):
+        r, carried = self.carried(("CANCELLED", "2026-11-17T08:33:01Z", "clippy"), ("SUCCESS", "2026-11-17T08:33:25Z", "clippy"))
+        self.assertTrue(carried, r.stderr)
+
+    def test_a_later_cancel_does_not_undo_a_pass(self):
+        r, carried = self.carried(("SUCCESS", "2026-11-17T08:33:25Z", "clippy"), ("CANCELLED", "2026-11-18T03:00:00Z", "clippy"))
+        self.assertTrue(carried, r.stderr)
+
+    def test_a_rerun_still_running_after_a_cancel_is_not_red(self):
+        r, carried = self.carried(("CANCELLED", "2026-11-17T08:33:01Z", "clippy"), (None, "2026-11-18T03:55:55Z", "clippy"))
+        self.assertTrue(carried, r.stderr)
+
+    def test_a_later_failure_after_a_pass_is_red(self):
+        r, carried = self.carried(("SUCCESS", "2026-11-17T08:33:25Z", "clippy"), ("FAILURE", "2026-11-18T03:00:00Z", "clippy"))
+        self.assertFalse(carried)
+        self.assertIn("is red (clippy, every crate and target)", r.stderr)
+
+    def test_only_cancelled_runs_are_red(self):
+        r, carried = self.carried(("CANCELLED", "2026-11-17T08:33:01Z", "clippy"), ("CANCELLED", "2026-11-18T03:00:00Z", "clippy"))
+        self.assertFalse(carried)
+        self.assertIn("is red (clippy, every crate and target)", r.stderr)
+
+    def test_the_same_name_in_two_workflows_is_two_checks(self):
+        r, carried = self.carried(("FAILURE", "2026-11-17T08:33:01Z", "clippy"), ("SUCCESS", "2026-11-18T03:00:00Z", "lint"))
+        self.assertFalse(carried)
+        self.assertIn("is red (clippy, every crate and target)", r.stderr)
+
     def test_unreadable_checks_sit_the_pr_out(self):
         self.two()
         self.fakefile("checks-8.json", "not json")
