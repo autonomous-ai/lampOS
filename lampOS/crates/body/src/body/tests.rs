@@ -21712,7 +21712,10 @@ fn a_new_energy_level_ends_a_shift_at_rest_and_is_taken_within_five_seconds() {
 #[test]
 fn a_new_energy_level_never_cuts_a_gesture_asked_of_it() {
     let nod = |later: u8| {
-        let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+        let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+        // An arm that moves, or it never stands to nod (as `skill_run`).
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
         let time = clock.time.clone();
         let seen = clock.time.clone();
         let asked_once = std::cell::Cell::new(false);

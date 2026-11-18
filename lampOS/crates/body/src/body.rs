@@ -7165,10 +7165,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // #7749: an unprompted gesture waiting (a shift, Expression's
         // `lively`, anything asked at idle priority) is dropped on a new
-        // level rather than played first.
+        // level rather than played first. A call's glance never is: it
+        // keeps the `pending_by` of whatever was asked before it.
         if level != energy
-            && let Some((old, _)) =
-                pending.filter(|(old, _)| idle::is_move(old) || pending_by.0 == Priority::Idle)
+            && let Some((old, _)) = pending.filter(|(old, _)| {
+                idle::is_move(old) || (pending_by.0 == Priority::Idle && from_outside(old))
+            })
         {
             gesture_fates.push_told(
                 (old.name, "dropped: a new energy level"),
@@ -7221,6 +7223,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.steps, limits.speed
             );
         }
+        // Named here: `level` below is the mood's (the voice's), not this.
+        let level_waits = level != energy;
         // A person or a health check lets a seated lamp stand (#4501).
         if asked_now.unseat
             && let Some((joint, why)) = seated.take()
@@ -7884,7 +7888,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Some(due)
                     if now >= due
                         && settled
-                        && level == energy
+                        && !level_waits
                         && standing.is_some_and(|up| up.idle) =>
                 {
                     // An arm a hand holds is not swayed into the hand.
