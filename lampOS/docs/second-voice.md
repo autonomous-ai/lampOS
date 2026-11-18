@@ -6890,7 +6890,7 @@ of the week ahead by name. Only when it is called is the place looked up
 by its first part at Open-Meteo's geocoding
 (`geocoding-api.open-meteo.com`), then its forecast fetched from
 `api.open-meteo.com`, now and for 7 days, with no key; the two together
-within the search's 3 s (`net::weather::WITHIN`). It answers in words the
+within 6 s (`net::weather::WITHIN`). It answers in words the
 model can say: `{"place": "Hanoi, Vietnam", "weather": "In Hanoi,
 Vietnam: Tomorrow, Friday, 24 to 30°C, light rain, 60% chance of
 rain."}`; for now and for today the temperature, the sky, the feeling and
@@ -6907,7 +6907,23 @@ yesterday's as today's after its midnight. A forecast whose rows lack the
 place's today is no answer. A place not found
 answers `{"error": "I couldn't find that place"}`, and a failed lookup or
 fetch says the weather couldn't be reached: never another place's
-weather, nor any older than it is kept. A call waits up to 6 s for its place and forecast (`net::weather::WITHIN`; two of five took past 3 s on lamp-4ace on 22 Oct). Each place's forecast is kept 10
+weather, nor any older than it is kept. A call waits up to 6 s for its place and forecast (`net::weather::WITHIN`; two of five took past 3 s on lamp-4ace on 22 Oct).
+Each request's connection is raced as happy eyeballs race theirs
+(`net::public`): a try on a new socket of its own begins at once, the next
+400 ms later while none has opened, later ones further apart (0, 0.4, 1 and
+2 s, `GAPS`; drawn in so the last begins at least 1.5 s before the bound,
+`TRY_OPENS_IN`), spread over every address the name has, at most 4
+(`MOST_TRIES`); the first whose TCP and TLS handshakes end is asked. The
+place's lookup must open within 2.5 s (`OPEN_WITHIN`, tries at 0, 0.4, 1 and
+1.4 s); the forecast within what is left of the 6 s less 0.8 s for its
+answer (`net::weather::forecast_open_within`, `FORECAST_ANSWERED_IN`), never
+less than 2.5 s: 4 s after a place looked up in 1.2 s, 5.2 s for a place
+known before. A first try that opens is asked at once, as before. On
+lamp-9adf on 17 Nov the forecast host's one address dropped the SYN of about
+half the connections for stretches; on 18 Nov (#7593) a place looked up in
+1.2 s left its forecast a fixed 2.5 s, none of 4 tries begun within 1.2 s
+opened, and the call failed in 3.7 s with more than 2 s of its 6 s unused.
+Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day
 fetches again, with at most 16 places kept, the oldest out
