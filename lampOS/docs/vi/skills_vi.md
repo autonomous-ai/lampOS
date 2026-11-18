@@ -3027,7 +3027,10 @@ chối khi cài.
    trò chuyện đang diễn ra và đã bật đèn bận. Vì vậy, trên tuyến thứ hai,
    một câu được cho qua chỉ như cuộc trò chuyện đang diễn ra (không có tên,
    không có lời gọi đèn, không có khuôn mặt quay về đèn, không nói gần đèn,
-   không trả lời câu hỏi của đèn; `Attention::played_only_as_going_on`) mà
+   `Attention::played_only_as_going_on`), kể cả câu trả lời câu hỏi của đèn
+   (`Attention::played_as_going_on_to_its_question`; lamp-9adf, 18/11 lúc
+   07:37, yêu cầu 10: "Honestly, I'm so busy this week, it never stops.",
+   khi không có ai trong tầm nhìn, sau câu hỏi của đèn, đã bật đèn bận), mà
    không có khuôn mặt nào được thấy đang nói (`Heeding::going_on_unseen`)
    không bắt đầu kỹ năng loại này, trừ khi có một khuôn mặt trong lần nhìn
    mới nhất của mắt lúc lời gọi đến (`Heeding::holds_said_start`,
@@ -3045,11 +3048,12 @@ chối khi cài.
    (`Engine::holding_said_starts`): không chạy, và mô hình được báo là chưa
    làm (`policy_holds::HELD`); nó vẫn có thể trả lời bằng lời. Một câu được
    cho qua vì dấu hiệu riêng của nó (tên của đèn, khuôn mặt quay về đèn,
-   trả lời câu hỏi hoặc tin của đèn) không bị giữ, nên "Lamp, I'm
+   trả lời tin của đèn) không bị giữ, nên "Lamp, I'm
    busy." từ bên kia phòng vẫn bắt đầu nó. Chỉ dựa trên cấu trúc: không từ
    nào của câu được so khớp. Khi tắt công tắc, không gì được cài và không
    gì thay đổi. Kiểm thử:
    `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_said_start_is_held_on_an_answer_to_the_lamps_question_with_no_face`,
    `a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name`,
    `a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news`,
    `a_held_said_start_is_not_run_and_the_model_is_told_so`,

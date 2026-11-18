@@ -12135,9 +12135,10 @@ impl Heeding {
     /// "a made skill's said start needs one of three things: the lamp's name
     /// in the line; a face in view seen speaking it; a conversation going on
     /// with that face in view"). A line let out by its name, its words
-    /// calling the lamp, a face turned to it, or as an answer to its
-    /// question or its news has its own sign; one let out only as the
-    /// conversation going on, or as a short word, a short sound said close
+    /// calling the lamp, a face turned to it, or as a reply to its news has
+    /// its own sign; one let out only as the conversation going on (an
+    /// answer to its question too: lamp-9adf, 18 Nov, request 10), or as a
+    /// short word, a short sound said close
     /// to it, or a question about its work ([`unseen_line`]; the first
     /// builder at 00:53 on 18 Nov), starts one only when a face was seen
     /// speaking it, or one is in the eyes' newest look as the call comes.
@@ -12408,7 +12409,10 @@ fn others_may_talk(seen: &Seen, caller_faces: &crate::speaking_faces::Speakers) 
 /// The request whose made skill's said start waits on a face in view
 /// ([`Heeding::holds_said_start`], #7448): let out with no face seen speaking
 /// it, either only as the conversation going on (no name, no words calling
-/// the lamp, no face turned to it, no answer to its question) or as a short
+/// the lamp, no face turned to it, not said close to it), an answer to its
+/// question among them
+/// ([`crate::attention::Attention::played_as_going_on_to_its_question`]), or
+/// as a short
 /// word, a short sound said close to it, or a question about its work with
 /// no call of its own ([`crate::attention::Attention::played_on_no_call`]).
 fn unseen_line(
@@ -12419,7 +12423,9 @@ fn unseen_line(
 ) -> Option<u64> {
     (played
         && !seen_speaking
-        && (attention.played_only_as_going_on() || attention.played_on_no_call()))
+        && (attention.played_only_as_going_on()
+            || attention.played_as_going_on_to_its_question()
+            || attention.played_on_no_call()))
     .then_some(request)
 }
 
@@ -30319,6 +30325,88 @@ mod tests {
             )
             .unwrap();
         assert!(!heeding.holds_said_start(21), "a face in view");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf (18 Nov 07:37, #7448's head), request 10: "Honestly, I'm so
+    /// busy this week, it never stops.", with nobody in view, 33 s after the
+    /// lamp answered "Lamp, I am busy." with a question, was let out as the
+    /// conversation going on and started `busy-red-light-2`. An answer to the
+    /// lamp's question is the conversation going on: with no face in view
+    /// its said start is held; with one in the eyes' newest look it starts.
+    #[test]
+    fn a_said_start_is_held_on_an_answer_to_the_lamps_question_with_no_face() {
+        use lamp_msgs::{Face, Faces};
+        let line = "Honestly, I'm so busy this week, it never stops.";
+        let start = monotonic_us();
+        let said = (start + 1_000_000, start + 3_000_000);
+        for room in [
+            crate::room_told::Room::Quiet,
+            crate::room_told::Room::Unknown,
+        ] {
+            let signs = super::Signs {
+                room,
+                going_on: true,
+                lamp_asked: true,
+                turned: None,
+                names: Vec::new(),
+                near: false,
+                continues_from: None,
+                soft_lead_us: 0,
+            };
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            assert_eq!(heeding.judge(10, said, line, signs), None, "let out");
+            assert!(
+                !heeding.attention.played_only_as_going_on(),
+                "an answer to its question"
+            );
+            assert!(heeding.holds_said_start(10), "{room:?}: no name, no face");
+        }
+        // A face in the eyes' newest look as the call comes: it starts.
+        let root = std::path::PathBuf::from(format!("/tmp/lsq-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut faces = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let mut heeding = Heeding::new(false, false, Some(&root), None);
+        heeding.as_the_only_voice(false, true, false);
+        let signs = super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked: true,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        assert_eq!(heeding.judge(10, said, line, signs), None);
+        assert!(heeding.holds_said_start(10), "nobody in view yet");
+        faces
+            .publish_json(
+                monotonic_us(),
+                &Faces {
+                    faces: vec![Face {
+                        pitch: None,
+                        looking: None,
+                        id: "f1".into(),
+                        xmin: 0.3,
+                        ymin: 0.2,
+                        xmax: 0.6,
+                        ymax: 0.7,
+                        confidence: 1.0,
+                        yaw: None,
+                        facing: Some(false),
+                        speaking: None,
+                        follows: None,
+                    }],
+                },
+            )
+            .unwrap();
+        assert!(!heeding.holds_said_start(10), "a face in view");
         let _ = std::fs::remove_dir_all(&root);
     }
 
