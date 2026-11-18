@@ -1676,6 +1676,10 @@ pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// linked record), the task started in code and the note it gets, or
 /// nothing. Blocking: it asks the tasks part.
 pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
+/// A heard line that is a whole spoken trigger of a running app (#7415 piece
+/// 6, `crate::app_triggers`): with its request and words, whether the app
+/// took it. Blocking: it waits up to `app_triggers::HOLD` for the app.
+pub type AppLine = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
 /// [`TaskNote`] with the request's own words too: a new ask while a task
 /// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
 pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
@@ -2086,6 +2090,9 @@ struct Shared {
     /// With the tasks part: a heard whole plain yes starts the task waiting
     /// in code, before the chat round (#7027).
     task_yes: Option<TaskYes>,
+    /// With `LAMP_APP_TRIGGERS=on`: a line that says an installed app's
+    /// trigger is taken by that app, and the request ends here (#7415).
+    app_line: Option<AppLine>,
     /// With the setup walk: a line that spells the person's name, told how
     /// to say it back ([`Engine::noting_a_spelled_name`]).
     spelled_name: Option<WordsNote>,
@@ -5074,6 +5081,7 @@ impl Engine {
                 task_waiting: None,
                 task_declined: None,
                 task_yes: None,
+                app_line: None,
                 spelled_name: None,
                 air: None,
                 seems: None,
@@ -7174,6 +7182,18 @@ impl Engine {
     pub fn taking_a_task_yes(mut self, yes: TaskYes) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_yes = Some(yes);
+        }
+        self
+    }
+
+    /// A heard line that is a whole trigger of a running app is taken by
+    /// that app (`take`, #7415 piece 6): told to it, and when it takes the
+    /// line the request ends here with no chat round, the app speaking for
+    /// itself. A line nothing takes goes on to the model as any other.
+    /// Before any turn only.
+    pub fn taking_app_lines(mut self, take: AppLine) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.app_line = Some(take);
         }
         self
     }
@@ -11349,6 +11369,58 @@ async fn spoken(
             note.len()
         );
     }
+    // A line that is a whole trigger of a running app (#7415 piece 6): told
+    // to the app, which may take it, before anything is spent on its words
+    // (memory recall below). Never while the lamp waits on an answer: a task
+    // read back, a write or skill say-back, a held forget or rename (a
+    // trigger "yes go ahead" must not take the person's yes), never a line
+    // heard over the lamp's voice, and never one let in only as the
+    // conversation going on (`CONVERSATION_ALONE`: no name, not turned to the
+    // lamp, someone other than the caller): that has had no `not_for_me`
+    // judgement, so another person's or the TV's words could start the
+    // owner's app. The caller's own follow-up (`FOLLOW_UP_NOTE`) is theirs.
+    // Not while another person's cut words are kept for this answer
+    // (`carried`): they would be dropped unanswered. A matched line alone
+    // waits (up to the hold) off the runtime's thread, any other costs
+    // nothing here. Taken: the request ends as a normal end does, nothing of
+    // it carried, with no chat round and no words from the lamp; the app
+    // speaks for itself.
+    if let Some(take) = &shared.app_line
+        && began_clear
+        && carried.is_none()
+        && !lamp_awaits_an_answer(&shared, request)
+        && shared
+            .conversation_alone
+            .as_ref()
+            .and_then(|note| note(request))
+            != Some(worker::CONVERSATION_ALONE)
+    {
+        let (take, words) = (take.clone(), text.clone());
+        let taken = tokio::task::spawn_blocking(move || take(request, &words))
+            .await
+            .unwrap_or(false);
+        if taken {
+            eprintln!(
+                "lamp-voice second: request {request}: its words are a trigger of a running app, which took the line: the request ends here, the model not asked ({})",
+                crate::app_triggers::ENVIRONMENT
+            );
+            // Its turn over: nothing of it is carried (words an earlier cut
+            // line joined to it would be answered by the next line).
+            if let Ok(mut in_flight) = shared.in_flight.lock() {
+                in_flight.take_if(|carried| carried.request == request);
+            }
+            sent_given_over(&shared, request);
+            if shared.stages(request, &times).await {
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+            return;
+        }
+    }
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -12412,6 +12484,27 @@ enum Got {
 
 /// `request`'s turn over: a send given to it ([`sent_with_words`]) is done
 /// with, its record dropped, and a later turn may write again (#5853).
+/// Whether the lamp waits now on a person's answer that this line may be:
+/// a task read back for its yes, a write's read-back, a skill's say-back, a
+/// held forget or a held rename. Such a line is the lamp's to read as the
+/// answer it is, never an app's trigger (#7736).
+fn lamp_awaits_an_answer(shared: &Shared, request: u64) -> bool {
+    let now = Instant::now();
+    crate::agent_tasks::awaits_yes(now)
+        || crate::services::awaits_an_answer()
+        || crate::skill_write_yes::answer_awaited(request, now)
+        || shared
+            .held_forget
+            .lock()
+            .ok()
+            .is_some_and(|held| held.held.is_some())
+        || shared
+            .held_rename
+            .lock()
+            .ok()
+            .is_some_and(|held| held.is_held())
+}
+
 fn sent_given_over(shared: &Shared, request: u64) {
     let given = shared
         .write_sent_in
