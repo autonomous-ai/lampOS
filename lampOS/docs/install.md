@@ -104,6 +104,7 @@ differs. Folders are what the unit makes or names.
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
 | setup | `lamp-setup serve` (first boot only, until setup's marker) and `lamp-setup watch-reset` (the reset button, in the target); `docs/setup.md` | root | `/var/lib/lampos-setup/` (its `StateDirectory`; the marker `done`) | `/etc/lampOS/setup/serve.json` and `reset-plan.json` | setup's hotspot and page, where `serve.json`'s `listen` says; the bus (the reset's watch) |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
+| apps-manage | `lamp-apps-manage asked` (root's, one per connection; `lamp-apps-manage start-all` at boot): the Store apps' helper, off unless `LAMP_STORE_APPS=on` (#7415) | root (`CAP_DAC_OVERRIDE`, `CAP_FOWNER`), in `lampos-parts.slice` | `/var/lib/lampos-apps-state/` (0755: the marks); `/opt/lampOS/apps/` (the apps' code, 0755); each app's data is systemd's, `/var/lib/private/lampapp-<name>` behind `/var/lib/lampapp-<name>` (a remove asks `systemctl clean --what=state`; the helper writes none of it) | the staging folder `/var/lib/lampos-apps-staging/` (lampos's) | its own socket, `/run/lampos-apps-manage/manage.sock`; the owner's yes from lamp-control's admin socket |
 | skills | `lamp-skills` | lampos (product unit, #811) | `/var/lib/lampos-skills-state/` (0700, `daily.json`); `/run/lampos-skills/` (0755, runtime) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its runtime folder |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
 
@@ -1186,7 +1187,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
    `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
    and `lamp-region.path` (#6256, below), and the helpers'
-   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
+   sockets `lamp-skills-manage.socket`, `lamp-apps-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
    never enabled; each timer's service is started by the timer

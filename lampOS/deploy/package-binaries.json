@@ -1,15 +1,15 @@
 {
-  "_comment": "Every lamp-* binary the workspace builds, by what the lamp-os package does with it (main's scripts/release/lamp_os_package.py reads this). core: the parts, packaged with their units. optional: carried when built, no unit. provisioning: factory tools, in the generic package's tools/. development: never packaged. A new binary goes in one list in the same pull request; CI fails otherwise (tools/package-binaries.sh).",
+  "_comment": "Every lamp-* binary the workspace builds, by what the lamp-os package does with it (main's scripts/release/lamp_os_package.py reads this). core: the parts, packaged with their units. optional: carried when built, no unit. provisioning: factory tools, in the generic package's tools/. development: never packaged. A new binary goes in one list in the same pull request; CI fails otherwise (tools/package-binaries.sh). lamp-apps (development) is the OLD name of the apps helper, now lamp-apps-manage, a core part because the boot start and the helper's units name it on every lamp even with LAMP_STORE_APPS off (its install folder would be /opt/lampOS/apps, the apps' own code folder): it is never built and never packaged, and is listed only because a CI cache restored from before the rename can still hold the stale file.",
   "core": [
     "lamp-keeper", "lamp-voice", "lamp-turn-end", "lamp-body", "lamp-body-worker",
     "lamp-eyes", "lamp-name", "lamp-memory", "lamp-actions", "lamp-controls",
-    "lamp-expression", "lamp-health", "lamp-policy"
+    "lamp-expression", "lamp-health", "lamp-policy", "lamp-apps-manage"
   ],
   "optional": [
     "lamp-surround", "lamp-update", "lamp-ears", "lamp-schedule", "lamp-tasks", "lamp-air",
     "lamp-records", "lamp-mood", "lamp-bus", "lamp-selftest", "lamp-settings", "lamp-setup",
     "lamp-cloud", "lamp-skills", "lamp-peek", "lamp-addons", "lamp-control", "lamp-services",
-    "lamp-same-voice", "lamp-seen", "lamp-apps"
+    "lamp-same-voice", "lamp-seen"
   ],
   "provisioning": [
     "lamp-body-measure", "lamp-body-mood"
@@ -19,6 +19,6 @@
     "lamp-policy-fit", "lamp-policy-judges", "lamp-sound-fixtures", "lamp-tasks-harness-fixture",
     "lamp-voice-eval", "lamp-memory-bench", "lamp-memory-fixture", "lamp-records-fixture",
     "lamp-policy-replay", "lamp-station", "lamp-seems-measure", "lamp-sim",
-    "lamp-memory-tiers-arm"
+    "lamp-memory-tiers-arm", "lamp-apps"
   ]
 }
