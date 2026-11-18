@@ -4200,6 +4200,22 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   đường của lời đồng ý khi `LAMP_MADE_SCRIPTS=on`; khi tắt thì nó được đưa
   lại nhưng vẫn tắt, và nói rõ lý do. Bản ghi của một lần thay thế vẫn còn
   sau khi kỹ năng mới của nó bị xóa.
+- **Kỹ năng đã xóa được nêu tên lại thì được đưa lại, không bao giờ tạo
+  mới** (DEFAULT-ON của #7828, sửa 2: trên lamp-9adf "Put the flip a coin
+  skill back", vừa bị xóa, được gọi như một lần tạo và tạo ra kỹ năng
+  mới). Trước khi một lần tạo bằng giọng nói hỏi mô hình tạo bất cứ điều
+  gì (`make_no_asks::put_back_named`, từ
+  `make_skill_local::make_with_by`), lời của nó, `request` của mô hình và
+  câu đã nghe, được so với các kỹ năng họ đã xóa và đang cất riêng trong
+  vòng 7 ngày (`make_no_asks::kept_named`), theo cách viết như tên của
+  một lần xóa (`made_remove::apart`, `made_remove::near`), không bao giờ
+  bằng danh sách từ: chỉ kỹ năng gần nhất, một tên nằm trong một tên khác
+  được nói đúng như viết thì là phần của tên kia ("bring back my moon fact
+  skill" là moon fact, không phải moon). Khi chủ đèn yêu cầu, nó được đưa
+  lại và bật, như "put it back": "flip a coin is back on.", với
+  `{"made": NAME, "on": true, "put_back": true}`. Hai kỹ năng đang cất gần
+  như nhau, một kỹ năng mà tên đã có lại trong danh sách, hay yêu cầu của
+  người khác, thì là một lần tạo như trước.
 - **Nơi cất, chính xác.** Mọi bản ghi việc đã làm được giữ 7 ngày, gói của
   kỹ năng đã xóa đi cùng bản ghi của nó; nhiều nhất 50 kỹ năng đã xóa và
   100 bản ghi tất cả, cũ nhất ra trước, gói đi cùng. `lamp-voice` dọn nó khi

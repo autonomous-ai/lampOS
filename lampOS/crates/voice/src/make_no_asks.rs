@@ -35,7 +35,8 @@
 //!   just done, or a name as heard. A make within [`UNDO_WITHIN`] is
 //!   removed (and kept aside); a replace within it puts the old ones back
 //!   on and removes the new one; a remove within [`KEPT_FOR`] is put back
-//!   and on. Only the owner's ask.
+//!   and on. Only the owner's ask. A make whose words name a skill kept
+//!   aside puts that one back, never a new one ([`put_back_named`]).
 //! - **Unsure, not acted on.** A made skill judged not what was asked
 //!   (`LAMP_MADE_UNRELATED_REFUSED`), or a call with no request, makes
 //!   nothing and asks nothing ([`NOT_ACTED`]).
@@ -986,6 +987,88 @@ fn put_back(keeping: &Keeping, record: &Value) -> Value {
             "next": said(&format!("I put {spoken} back, but it stays off: {why}.")),
         }),
     }
+}
+
+/// The skill they made and removed, kept aside within [`KEPT_FOR`], that
+/// a make's `words` name (#7828's DEFAULT-ON, fix 2: on lamp-9adf "Put the
+/// flip a coin skill back", just removed, was called as a make and made a
+/// new one): its latest record. Matched by spelling over each of `words`
+/// (the model's request, the line heard) as a remove's name is
+/// (`made_remove::apart`, `made_remove::near`), never by a list of words:
+/// the nearest alone, a name inside another named as it is written being
+/// that other's part ("moon fact" is moon fact, never moon beside it).
+/// None when two kept aside are as near, or a skill they made of that
+/// name is listed again.
+pub fn kept_named(keeping: &Keeping, words: &[&str], now_unix_ms: u64) -> Option<Value> {
+    let listed: BTreeSet<String> = made_skill::entries(&keeping.directory)
+        .iter()
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect();
+    let kept: Vec<Value> = records(&keeping.directory, now_unix_ms)
+        .into_iter()
+        .filter(|record| record["kind"] == "removed" && in_window(record, now_unix_ms))
+        .collect();
+    let mut named: Vec<(usize, String)> = Vec::new();
+    for record in &kept {
+        let Some(name) = record["name"].as_str() else {
+            continue;
+        };
+        if listed.contains(name) || named.iter().any(|(_, seen)| seen == name) {
+            continue;
+        }
+        let apart = words
+            .iter()
+            .filter(|words| !words.trim().is_empty())
+            .map(|words| made_remove::apart(words, name))
+            .min();
+        if let Some(apart) = apart.filter(|apart| made_remove::near(*apart, name)) {
+            named.push((apart, name.to_owned()));
+        }
+    }
+    let best = named.iter().map(|(apart, _)| *apart).min()?;
+    let mut tied: Vec<&str> = named
+        .iter()
+        .filter(|(apart, _)| *apart == best)
+        .map(|(_, name)| name.as_str())
+        .collect();
+    if best == 0 {
+        let whole = tied.clone();
+        tied.retain(|name| !whole.iter().any(|long| made_remove::inside(name, long)));
+    }
+    let [name] = tied.as_slice() else {
+        return None;
+    };
+    kept.iter()
+        .rev()
+        .find(|record| record["name"] == *name)
+        .cloned()
+}
+
+/// A make whose `words` name a skill they removed, kept aside
+/// ([`kept_named`]), puts that one back and on, as "put it back" does
+/// ([`undo`]), never making a new one, on the owner's ask alone (`owner`,
+/// asked only when one is named). What the model is told; none with the
+/// switch off, when the words name none, or for anyone else's ask, which
+/// is then made as any make is.
+pub fn put_back_named(
+    keeping: &Keeping,
+    words: &[&str],
+    owner: impl FnOnce() -> bool,
+) -> Option<Value> {
+    if !on() {
+        return None;
+    }
+    let record = kept_named(keeping, words, now_unix_ms())?;
+    if !owner() {
+        eprintln!(
+            "lamp-voice: a make named a skill kept aside, not on the owner's ask: made as any make (LAMP_MAKE_NO_ASKS)"
+        );
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: a make named a skill they removed, kept aside: put back, never made anew (LAMP_MAKE_NO_ASKS)"
+    );
+    Some(put_back(keeping, &record))
 }
 
 /// `record` dropped from the records.
