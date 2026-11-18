@@ -10913,7 +10913,11 @@ impl Heeding {
             eprintln!(
                 "lamp-voice second: request {request}: said to me: let through: {}: {words} words, {}; {pose} (LAMP_SAID_TO_ME)",
                 decision.verdict(),
-                if going_on { "in the window" } else { "out of the window" },
+                if going_on {
+                    "in the window"
+                } else {
+                    "out of the window"
+                },
             );
             return false;
         };
