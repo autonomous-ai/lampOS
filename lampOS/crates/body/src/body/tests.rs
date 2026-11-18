@@ -21757,3 +21757,70 @@ fn a_new_energy_level_never_cuts_a_gesture_asked_of_it() {
         "{taken:?} {sent:?}"
     );
 }
+
+/// #7749 (the first builder's 02:14): a shift at rest eased out for a new
+/// level only slows. From a hold and mid-motion, `settle` (its arm at the
+/// 1.2 sag of `LAMP_BODY_PRESENCE`) and `look_up`: no joint moves more a
+/// step than the clip's own pace or the speed it had, and it is home
+/// within 4 s, so with energy_in's 1 s read a level lands within 5 s.
+#[test]
+fn a_shift_eased_out_for_a_new_level_never_speeds_up() {
+    let step_us = TICK.as_micros() as u64;
+    for clip in [&crate::clips::SETTLE, &crate::clips::LOOK_UP] {
+        let scale = |offsets: [f32; 5]| -> [f32; 5] {
+            std::array::from_fn(|index| {
+                if clip.name == "settle" && index >= 3 {
+                    offsets[index] * 1.2
+                } else {
+                    offsets[index]
+                }
+            })
+        };
+        let pace = clip.pace(TICK);
+        let ticks = clip.duration_us() / step_us;
+        let peak = (0..ticks)
+            .max_by_key(|&k| {
+                let at = clip.at(k * step_us).unwrap();
+                at.iter().map(|value| value.abs() as u32).sum::<u32>()
+            })
+            .unwrap();
+        // Held at its peak (still), and a sixth of the way through (moving).
+        for k in [peak, ticks / 6] {
+            let from = scale(clip.at(k * step_us).unwrap());
+            let speed: [f32; 5] = if k == peak {
+                [0.0; 5]
+            } else {
+                let next = scale(clip.at((k + 1) * step_us).unwrap());
+                std::array::from_fn(|index| next[index] - from[index])
+            };
+            assert!(
+                k == peak || speed.iter().any(|v| *v != 0.0),
+                "{}",
+                clip.name
+            );
+            let cap: [f32; 5] = std::array::from_fn(|index| pace[index].max(speed[index].abs()));
+            let mut at = from;
+            let mut steps = 0u32;
+            loop {
+                steps += 1;
+                let before = at;
+                let done = ease_out_step(&mut at, steps, from, speed, cap);
+                for index in 0..5 {
+                    let moved = (at[index] - before[index]).abs();
+                    assert!(
+                        moved <= cap[index].max(EASE_LEAST) + 1e-3
+                            || (done && before[index].abs() < 0.5),
+                        "{} from step {k}: joint {index} moved {moved} at step {steps}, cap {}",
+                        clip.name,
+                        cap[index]
+                    );
+                }
+                if done {
+                    break;
+                }
+                assert!(steps < 200, "{} from step {k}: not home in 4 s", clip.name);
+            }
+            assert_eq!(at, [0.0; 5]);
+        }
+    }
+}
