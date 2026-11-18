@@ -568,7 +568,10 @@ mod tests {
         let started = std::time::Instant::now();
         // Just after a yes: a close does not wait for a repeat to fall due.
         assert!(link.close());
-        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+        // A close that waited for a repeat to fall due would take
+        // PERMIT_REPEAT_US; the bound is that, not 50 ms, which a loaded
+        // macOS runner can miss on a send that never waits.
+        assert!(started.elapsed() < std::time::Duration::from_micros(PERMIT_REPEAT_US));
         assert_eq!(told(&eyes), [r#"{"camera":true}"#, r#"{"camera":false}"#]);
         // No is said once: a second close and a drop after it add nothing.
         assert!(!link.close());
@@ -592,7 +595,9 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(link.close());
         drop(link);
-        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+        // The socket never blocks; the bound only has to catch a close that
+        // waited for a repeat (PERMIT_REPEAT_US), not a loaded runner.
+        assert!(started.elapsed() < std::time::Duration::from_micros(PERMIT_REPEAT_US));
     }
 
     #[test]
