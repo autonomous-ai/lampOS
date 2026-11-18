@@ -442,7 +442,8 @@ me again in a moment.", the shorter "Still slow, sorry.", or "I've hit my
 usage limit." for a usage-limit 429, second-voice.md; and a later ask in
 the same usage-limit run, which hears nothing since the limit was said once;
 or, with `LAMP_LIMIT_LOCAL_ASKS`, a light or volume ask done at the limit
-with no model, which says its own short line instead),
+with no model, which says its own short line instead, or the time asked
+there, said from the lamp's clock),
 it tells the coordinator so with `DownLineSaid`, after the line's audio and
 before the turn's `TurnFailed`, and `select_failure_notice_in` selects no
 `turn_lost` for that turn: the person was already told it broke. Before, on

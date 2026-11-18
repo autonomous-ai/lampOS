@@ -104,6 +104,106 @@ pub(crate) fn matched(said: &str) -> Option<(&'static str, Value)> {
     (!((of_voice && light) || (!of_voice && voice))).then_some(ask)
 }
 
+/// Whether a heard English line plainly asks the lamp's time and nothing
+/// more (#7642): once the name, a greeting and politeness are set aside,
+/// "what time is it", "what's the time", "tell me the time". The time of a
+/// place or of something ("what time is it in London", "what time does it
+/// close") is no such ask.
+pub(crate) fn asks_the_time(said: &str) -> bool {
+    // The name and a greeting set aside as [`matched`] sets them aside.
+    let named = crate::attention::called(said) || crate::attention::called_by_name_on(said, true);
+    let lower = said.to_lowercase().replace('\u{2019}', "'");
+    let rest: Vec<&str> = lower
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| {
+            !(word.is_empty()
+                || FILLER.contains(word)
+                || crate::attention::is_greeting(word)
+                || (named && crate::attention::written_for_the_name(word)))
+        })
+        .collect();
+    matches!(
+        rest.as_slice(),
+        ["what", "time", "is"]
+            | ["what", "is", "time"]
+            | ["what's", "time"]
+            | ["tell", "time"]
+            | ["do", "know", "what", "time", "is"]
+    )
+}
+
+/// The hour said with its lead, "It's seven", by the hour on a 12-hour
+/// clock (0 for twelve).
+const HOURS: [&str; 12] = [
+    "It's twelve",
+    "It's one",
+    "It's two",
+    "It's three",
+    "It's four",
+    "It's five",
+    "It's six",
+    "It's seven",
+    "It's eight",
+    "It's nine",
+    "It's ten",
+    "It's eleven",
+];
+/// A minute's last digit, 1 to 9.
+const UNITS: [&str; 9] = [
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+];
+/// Minutes 10 to 19.
+const TEENS: [&str; 10] = [
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+];
+/// Minutes 20, 30, 40 and 50.
+const TENS: [&str; 4] = ["twenty", "thirty", "forty", "fifty"];
+
+/// Every piece the time is said from ([`time_said`]), each rendered at
+/// the worker's start as a fixed line is, while the voice still answers:
+/// at the limit the relay renders no new speech (#7412).
+pub(crate) fn time_pieces() -> impl Iterator<Item = &'static str> {
+    HOURS
+        .into_iter()
+        .chain(["oh"])
+        .chain(UNITS)
+        .chain(TEENS)
+        .chain(TENS)
+        .chain(["a.m.", "p.m."])
+}
+
+/// The pieces `hour:minute` (24-hour) is said in, in order: "It's seven",
+/// "fifty", "two", "p.m."; "It's seven", "oh", "five", "a.m."; on the hour
+/// no minutes. Each one of [`time_pieces`].
+// ponytail: a time said from word clips joined end to end; one clip per
+// minute (or the relay rendering the line) if a lamp's row hears it choppy.
+pub(crate) fn time_said(hour: i64, minute: i64) -> Vec<&'static str> {
+    let (hour, minute) = (hour.rem_euclid(24) as usize, minute.rem_euclid(60) as usize);
+    let mut said = vec![HOURS[hour % 12]];
+    match minute {
+        0 => {}
+        1..=9 => said.extend(["oh", UNITS[minute - 1]]),
+        10..=19 => said.push(TEENS[minute - 10]),
+        _ => {
+            said.push(TENS[minute / 10 - 2]);
+            if minute % 10 != 0 {
+                said.push(UNITS[minute % 10 - 1]);
+            }
+        }
+    }
+    said.push(if hour < 12 { "a.m." } else { "p.m." });
+    said
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +307,30 @@ mod tests {
         ];
         for (said, want) in cases {
             assert_eq!(&matched(said), want, "{said:?}");
+        }
+    }
+
+    /// Each line and whether it plainly asks the lamp's time (#7642).
+    #[test]
+    fn asks_the_time_only_plainly() {
+        let cases = [
+            ("What time is it?", true),
+            ("Hey lamp, what time is it now?", true),
+            ("Hey Lampy, what time is it", true),
+            ("What's the time, please?", true),
+            ("What\u{2019}s the time?", true),
+            ("What is the time?", true),
+            ("Can you tell me the time?", true),
+            ("Do you know what time it is?", true),
+            ("What time is it in London?", false),
+            ("What time does the shop close?", false),
+            ("What time is the meeting?", false),
+            ("Set a timer for five minutes.", false),
+            ("Time to go.", false),
+            ("", false),
+        ];
+        for (said, want) in cases {
+            assert_eq!(asks_the_time(said), want, "{said:?}");
         }
     }
 }

@@ -7442,6 +7442,8 @@ impl Engine {
                 .into_iter()
                 .filter(|_| shared.limit_local),
         )
+        // And the pieces the time is said from there (#7642), last.
+        .chain(limit_local::time_pieces().filter(|_| shared.limit_local))
         .collect();
         shared
             .fixed_clips
@@ -8872,13 +8874,39 @@ fn limit_local_unmatched_line(request: u64, said: &str) -> String {
 /// Told to the coordinator as the limit line is, so no `turn_lost` or
 /// limit line follows it. False, with nothing said, when the line is no
 /// such ask or its function was refused or failed: the limit's own way
-/// then, as without the switch.
+/// then, as without the switch. A line that plainly asks the time
+/// ([`limit_local::asks_the_time`], #7642) is answered from the lamp's
+/// clock, said from its pieces rendered ahead ([`limit_local::time_said`]);
+/// with the clock unknown or a piece not kept, the limit's own way.
 async fn limit_local_ask(
     shared: &Shared,
     request: u64,
     said: &str,
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Result<bool, Stop> {
+    if limit_local::asks_the_time(said) {
+        let clip: Option<Vec<i16>> = crate::local_time::clock_here().and_then(|(hour, minute)| {
+            limit_local::time_said(hour, minute)
+                .into_iter()
+                .map(|piece| shared.fixed_clips.kept(piece))
+                .collect::<Option<Vec<_>>>()
+                .map(|clips| clips.concat())
+        });
+        let Some(clip) = clip else {
+            eprintln!(
+                "lamp-voice second: request {request}: at the usage limit the time was asked, and the clock or its words are not at hand: the limit's own way (LAMP_LIMIT_LOCAL_ASKS)"
+            );
+            return Ok(false);
+        };
+        cue(shared, request, clip).await?;
+        eprintln!(
+            "lamp-voice second: request {request}: at the usage limit the time was said without the model (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+        if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+            return Err(Stop::Gone);
+        }
+        return Ok(true);
+    }
     let Some((name, args)) = limit_local::matched(said) else {
         eprintln!("{}", limit_local_unmatched_line(request, said));
         return Ok(false);
