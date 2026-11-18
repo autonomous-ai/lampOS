@@ -87,6 +87,19 @@ pub const PRESENCE_TOPICS: [&str; 2] = ["humans/faces/tracked", "room/stood_up"]
 /// break forward). Off unless set: `sooner` is read, checked and ignored.
 pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 
+/// `LAMP_DESK_TIME=on` (#7694): a note's [`SITTING_SLOT`] says the person's
+/// current sitting at the desk, from `room/activity`'s `sitting_s`, so the
+/// voice's follow-up to a nudge knows what the nudge was about. The voice's
+/// `desk_time` function goes with the same switch. Off unless set: the slot
+/// is dropped and the note is said as before.
+pub const DESK_TIME_ENVIRONMENT: &str = "LAMP_DESK_TIME";
+
+/// Where a note says the current sitting ([`DESK_TIME_ENVIRONMENT`]): a
+/// core wellbeing nudge's plain `say` (Sip of water, Stretch break, Rest
+/// your eyes). Filled only for a skill that may read `room/activity`, from
+/// its newest value that lasts; dropped otherwise (`sitting_told`).
+pub const SITTING_SLOT: &str = "{sitting}";
+
 /// Topics no skill may read, whatever it lists (#7267): an agent's steps
 /// carry its tool's arguments and the start of its results (`tasks/step`),
 /// and a turn's decision names the tools the lamp called for what was said
@@ -6998,6 +7011,9 @@ pub struct Engine {
     /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709),
     /// and a `[[while]]`'s (#6543).
     sooner: bool,
+    /// With [`DESK_TIME_ENVIRONMENT`] on: a note's [`SITTING_SLOT`] says the
+    /// current sitting (#7694).
+    desk_time: bool,
     /// The `[[while]]` conditions, by skill and index, a `sooner` lowered at
     /// the last look, with the `above` it gave (#6543): a line in the
     /// journal as one is lowered, changes or goes back, never each tick.
@@ -7263,6 +7279,7 @@ impl Engine {
             reads: HashMap::new(),
             rest_through_sounds: false,
             sooner: false,
+            desk_time: false,
             lowered: HashMap::new(),
             picked: std::sync::Mutex::default(),
             holds: None,
@@ -7292,6 +7309,13 @@ impl Engine {
     /// `above` (#6543). Without it `sooner` is ignored.
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
+        self
+    }
+
+    /// A note's [`SITTING_SLOT`] says the current sitting
+    /// ([`DESK_TIME_ENVIRONMENT`], #7694). Without it the slot is dropped.
+    pub fn telling_the_sitting(mut self) -> Self {
+        self.desk_time = true;
         self
     }
 
@@ -8430,10 +8454,7 @@ impl Engine {
     }
 
     fn local_minute(&self, now_us: u64) -> Option<u16> {
-        let (offset, at_us, unix_ms) = self.clock?;
-        let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
-        let minutes = ms.div_euclid(60_000) + i128::from(offset);
-        Some(minutes.rem_euclid(1_440) as u16)
+        self.clock.map(|clock| minute_at(clock, now_us))
     }
 
     /// New scheduled behavior needs a recent, plausible local clock.
@@ -8955,7 +8976,7 @@ impl Engine {
             now_us,
         )
         .then(|| {
-            calls(
+            calls_with(
                 seen!(self, skill),
                 &self.picked,
                 skill,
@@ -8963,6 +8984,7 @@ impl Engine {
                 now_us,
                 &Value::Null,
                 run_item,
+                self.desk_time.then_some(self.clock),
             )
         })
     }
@@ -9304,7 +9326,7 @@ impl Engine {
                             (self.skip_ask, self.ask_policy),
                             question(skill),
                             || {
-                                calls(
+                                calls_with(
                                     seen!(self, skill),
                                     &self.picked,
                                     skill,
@@ -9312,6 +9334,7 @@ impl Engine {
                                     now_us,
                                     &Value::Null,
                                     Some(&name),
+                                    self.desk_time.then_some(self.clock),
                                 )
                             },
                         );
@@ -10262,7 +10285,7 @@ impl Engine {
                     (self.skip_ask, self.ask_policy),
                     question,
                     || {
-                        calls(
+                        calls_with(
                             seen!(self, skill),
                             &self.picked,
                             skill,
@@ -10270,6 +10293,7 @@ impl Engine {
                             now_us,
                             &Value::Null,
                             None,
+                            self.desk_time.then_some(self.clock),
                         )
                     },
                 );
@@ -10431,7 +10455,7 @@ impl Engine {
                 skill,
                 self.told_history(
                     skill,
-                    calls(
+                    calls_with(
                         seen!(self, skill),
                         &self.picked,
                         skill,
@@ -10439,6 +10463,7 @@ impl Engine {
                         now_us,
                         args,
                         None,
+                        self.desk_time.then_some(self.clock),
                     ),
                     now_us,
                 ),
@@ -10478,7 +10503,7 @@ impl Engine {
             [one] => Some(one),
             _ => None,
         };
-        let calls = calls(
+        let calls = calls_with(
             seen!(self, skill),
             &self.picked,
             skill,
@@ -10486,6 +10511,7 @@ impl Engine {
             now_us,
             &Value::Null,
             None,
+            self.desk_time.then_some(self.clock),
         );
         if calls.is_empty() {
             return Err("it has nothing to do but at its own moment".into());
@@ -10768,11 +10794,8 @@ fn next_line(now_us: u64, count: usize, last: Option<usize>) -> usize {
     }
 }
 
-/// A skill's steps as calls now. The face to look at: the largest in the
-/// newest list of faces that still lasts. With none, the other steps go on.
-/// Only the steps for every trigger and those for `trigger`. A list of
-/// lines gives one of them, never the one the skill picked last
-/// ([`next_line`]).
+/// [`calls_with`] with the sitting off: a note's [`SITTING_SLOT`] dropped.
+#[cfg(test)]
 fn calls(
     latest: &HashMap<String, (Value, u64, Option<u64>)>,
     picked: &std::sync::Mutex<HashMap<String, usize>>,
@@ -10781,6 +10804,28 @@ fn calls(
     now_us: u64,
     args: &Value,
     item: Option<&str>,
+) -> Vec<Call> {
+    calls_with(latest, picked, skill, trigger, now_us, args, item, None)
+}
+
+/// A skill's steps as calls now. The face to look at: the largest in the
+/// newest list of faces that still lasts. With none, the other steps go on.
+/// Only the steps for every trigger and those for `trigger`. A list of
+/// lines gives one of them, never the one the skill picked last
+/// ([`next_line`]). A note's [`SITTING_SLOT`] is filled from `sitting`, the
+/// engine's local clock when [`DESK_TIME_ENVIRONMENT`] is on (`Some(None)`:
+/// on, the clock not known), and dropped when it is off (`None`) or the
+/// sitting is not known ([`sitting_now`], #7694).
+#[allow(clippy::too_many_arguments)]
+fn calls_with(
+    latest: &HashMap<String, (Value, u64, Option<u64>)>,
+    picked: &std::sync::Mutex<HashMap<String, usize>>,
+    skill: &Skill,
+    trigger: Option<&Trigger>,
+    now_us: u64,
+    args: &Value,
+    item: Option<&str>,
+    sitting: Option<Option<(i32, u64, u64)>>,
 ) -> Vec<Call> {
     let fired = trigger.and_then(|trigger| trigger.name.as_ref());
     let face = Engine::fresh(latest, Faces::TOPIC, now_us).and_then(|faces| {
@@ -10848,6 +10893,10 @@ fn calls(
                 vec![Call::SayFrom(*source, task)]
             }
             Step::Call(Call::Words(words)) => vec![Call::Words(counted(words))],
+            Step::Call(Call::Say(note)) => vec![Call::Say(sitting_told(
+                note,
+                sitting.and_then(|clock| sitting_now(latest, skill, clock, now_us)),
+            ))],
             Step::Call(other) => vec![other.clone()],
             Step::Lines(lines) => {
                 let mut picked = picked
@@ -10868,6 +10917,75 @@ fn calls(
             }
         })
         .collect()
+}
+
+/// The local minute of the day at `at_us`, by the engine's clock (its UTC
+/// offset in minutes, and a monotonic time with its wall time, ms).
+fn minute_at((offset, clock_us, unix_ms): (i32, u64, u64), at_us: u64) -> u16 {
+    let ms = i128::from(unix_ms) + (i128::from(at_us) - i128::from(clock_us)) / 1_000;
+    let minutes = ms.div_euclid(60_000) + i128::from(offset);
+    minutes.rem_euclid(1_440) as u16
+}
+
+/// The current sitting as a note says it ([`SITTING_SLOT`], #7694): the
+/// whole minutes of `room/activity`'s `sitting_s` and, with the local clock
+/// known, when it began. Only for a core skill (one the lamp ships, never a
+/// made, Store or pushed one) that may read `room/activity`, and
+/// only from its newest value that still lasts with a sitting under way;
+/// otherwise none. Context for a follow-up, said only if they ask: "(Measured:
+/// at the desk 47 minutes, since 14:12. Tell it only if asked, rounded.)".
+fn sitting_now(
+    latest: &HashMap<String, (Value, u64, Option<u64>)>,
+    skill: &Skill,
+    clock: Option<(i32, u64, u64)>,
+    now_us: u64,
+) -> Option<String> {
+    if skill.kind != SkillKind::Core
+        || !skill
+            .permissions
+            .topics
+            .iter()
+            .any(|topic| topic == RoomActivity::TOPIC)
+    {
+        return None;
+    }
+    let sitting_s = Engine::fresh(latest, RoomActivity::TOPIC, now_us)
+        .and_then(|value| serde_json::from_value::<RoomActivity>(value.clone()).ok())
+        .map(|activity| activity.sitting_s)
+        .filter(|sitting_s| *sitting_s > 0)?;
+    let began = clock
+        .map(|clock| {
+            let minute = minute_at(
+                clock,
+                now_us.saturating_sub(u64::from(sitting_s) * 1_000_000),
+            );
+            format!(", since {}:{:02}", minute / 60, minute % 60)
+        })
+        .unwrap_or_default();
+    // Short, and first in the note: the voice's thread keeps a written
+    // note's first 300 bytes (`lamp_voice::thread`, `PERSON_BYTES`).
+    Some(format!(
+        "(Measured: at the desk {} minutes{began}. Tell it only if asked, rounded.)",
+        sitting_s / 60
+    ))
+}
+
+/// `note` with its [`SITTING_SLOT`] filled with `told`, or, with none,
+/// dropped: one space where it stood between words, none at an end, so a
+/// note whose slot is dropped is the note as it was before the slot.
+fn sitting_told(note: &str, told: Option<String>) -> String {
+    let Some((before, after)) = note.split_once(SITTING_SLOT) else {
+        return note.to_owned();
+    };
+    [
+        before.trim_end(),
+        told.as_deref().unwrap_or_default(),
+        after.trim_start(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" ")
 }
 
 /// The tools file the voice reads beside the actions part's `tools.json`:
@@ -12161,6 +12279,107 @@ mod tests {
         let exact = load_with("exact", above, r#"{ text = "A {{brace}} and }" }"#).unwrap();
         assert_eq!(said(&exact, None), "A {{brace}} and }");
         assert_eq!(exact.made_refuses(), None);
+    }
+
+    /// #7694: with `LAMP_DESK_TIME=on`, Sip of water's, Stretch break's and
+    /// Rest your eyes' notes say the current sitting from `room/activity`'s
+    /// `sitting_s` (its minutes, and when it began by the local clock), so
+    /// the voice's follow-up knows it; off, stale, away or not permitted,
+    /// the note is said as it was before the slot.
+    #[test]
+    fn a_wellbeing_note_says_the_sitting_only_with_the_switch() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let picked = std::sync::Mutex::new(HashMap::new());
+        // Jay sat down at 10:00 local (the clock's 0 µs) and has been at
+        // the desk 47 minutes and 5 seconds when the nudge runs.
+        let clock: (i32, u64, u64) = (0, 0, REPLAY_DAY_MS + 600 * 60_000);
+        let now_us: u64 = 2_825 * 1_000_000;
+        let activity = |sitting_s: u32, state: &str, at_us: u64| {
+            HashMap::from([(
+                RoomActivity::TOPIC.to_owned(),
+                (
+                    json!({"state": state, "for_s": 0, "sitting_s": sitting_s, "baseline": true}),
+                    at_us,
+                    Some(RoomActivity::LASTS.as_micros() as u64),
+                ),
+            )])
+        };
+        let note = |skill: &Skill,
+                    latest: &HashMap<String, (Value, u64, Option<u64>)>,
+                    sitting: Option<Option<(i32, u64, u64)>>| {
+            calls_with(
+                latest,
+                &picked,
+                skill,
+                skill.triggers.first(),
+                now_us,
+                &Value::Null,
+                None,
+                sitting,
+            )
+            .into_iter()
+            .find_map(|call| match call {
+                Call::Say(note) => Some(note),
+                _ => None,
+            })
+            .expect("a say")
+        };
+        let fresh = activity(2_825, "at_desk", now_us - 500_000);
+        for name in ["sip-of-water", "stretch-break", "rest-your-eyes"] {
+            let skill = load(&root.join(name)).unwrap();
+            let Some(Step::Call(Call::Say(written))) = skill
+                .steps
+                .iter()
+                .map(|(_, step)| step)
+                .find(|step| matches!(step, Step::Call(Call::Say(_))))
+            else {
+                panic!("{name}: a plain say");
+            };
+            assert!(written.starts_with(SITTING_SLOT), "{name}: {written}");
+            let before = written[SITTING_SLOT.len()..].trim_start();
+            // On, the clock known: the minutes and when it began, first.
+            let said = note(&skill, &fresh, Some(Some(clock)));
+            assert_eq!(
+                said,
+                format!(
+                    "(Measured: at the desk 47 minutes, since 10:00. Tell it only if asked, rounded.) {before}"
+                ),
+                "{name}"
+            );
+            // The voice's thread keeps a written note's first 300 bytes.
+            assert!(said.find("rounded.)").unwrap() < 300, "{name}");
+            // On, the clock not known: the minutes alone.
+            let said = note(&skill, &fresh, Some(None));
+            assert!(
+                said.starts_with("(Measured: at the desk 47 minutes. "),
+                "{name}: {said}"
+            );
+            // Off: the note as it was before the slot.
+            assert_eq!(note(&skill, &fresh, None), before, "{name}");
+            // On, but nothing to say: stale, away, or no topic said.
+            for latest in [
+                activity(2_825, "at_desk", now_us - 4_000_000),
+                activity(0, "away", now_us - 500_000),
+                HashMap::new(),
+            ] {
+                assert_eq!(note(&skill, &latest, Some(Some(clock))), before, "{name}");
+            }
+        }
+        // Only a core skill that may read room/activity is told it: one
+        // not given the topic, or one made, from the Store or pushed, never.
+        let sip = load(&root.join("sip-of-water")).unwrap();
+        let before = note(&sip, &fresh, None);
+        let mut not_given = sip.clone();
+        not_given
+            .permissions
+            .topics
+            .retain(|topic| topic != RoomActivity::TOPIC);
+        assert_eq!(note(&not_given, &fresh, Some(Some(clock))), before);
+        let not_core = Skill {
+            kind: SkillKind::Installable,
+            ..sip
+        };
+        assert_eq!(note(&not_core, &fresh, Some(Some(clock))), before);
     }
 
     /// #939, (c): `say = { from = ... }` is a say of what the voice keeps,

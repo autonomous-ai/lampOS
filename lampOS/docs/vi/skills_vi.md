@@ -4668,7 +4668,8 @@ had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
   và còn lời khác, và trường qua được kiểm tra ở trên. Mọi ghi chú khác được
   nói như đã viết, cả ngoặc, như trước khi có chỗ trống: `}` lẻ,
   `{a short break}`, hai chỗ trống, `{{`, hay trường mà các trigger không
-  cho. `say = "…"` trần và lời chính xác (`text`) cũng giữ ngoặc. Vì vậy kỹ
+  cho. `say = "…"` trần và lời chính xác (`text`) cũng giữ ngoặc, trừ
+  `{sitting}` trong ghi chú trần (bên dưới). Vì vậy kỹ
   năng đã có trên đèn, làm bằng giọng nói, từ Store hay được đẩy lên, không
   bao giờ ngừng nạp vì một dấu ngoặc. Kỹ năng mới bị giữ theo chỗ trống khi
   làm, đóng gói và cài (`Skill::made_refuses`): ghi chú có ngoặc không phải
@@ -4686,3 +4687,30 @@ Kiểm thử (`crates/skills/src/lib.rs`):
 `a_note_says_one_number_from_the_reading_that_fired_it`.
 
 Mô tả đầy đủ ở [skills.md](../skills.md), "A number from the reading in a note".
+
+## Lần ngồi hiện tại trong ghi chú sức khỏe (#7694)
+
+Ghi chú `say = "…"` trần có thể chứa `{sitting}` (`lamp_skills::SITTING_SLOT`):
+khi `lamp-skills` bật `LAMP_DESK_TIME=on`, chỗ này được điền lần ngồi hiện
+tại của người ở bàn, lấy từ `sitting_s` của `room/activity`, chính giá trị mà
+`[[while]]` của lời nhắc chờ: "(Measured: at the desk 47 minutes, since
+14:12. Tell it only if asked, rounded.)". Nhờ vậy câu hỏi tiếp theo sau lời
+nhắc ("tôi ngồi đây bao lâu rồi?") khớp với lời nhắc thay vì đoán; luồng hội
+thoại của giọng nói giữ ghi chú viết cùng câu trả lời (300 byte đầu, nên chỗ
+trống đặt ở đầu). Hàm `desk_time` của giọng nói đi cùng công tắc này
+([second-voice.md](../second-voice.md)).
+
+- **Kỹ năng nào có.** Sip of water (cả hai ghi chú), Stretch break và Rest
+  your eyes mở đầu ghi chú bằng nó. Chỉ được điền cho kỹ năng có
+  `room/activity` trong `[permissions] topics`, từ giá trị mới nhất của chủ đề
+  đó còn hạn và đang có lần ngồi.
+- **Nói gì.** Số phút nguyên, và khi biết giờ địa phương (`Engine::clock`),
+  giờ bắt đầu lần ngồi; không bao giờ là nhãn trạng thái của mắt, và chỉ lần
+  ngồi hiện tại, mà mắt bắt đầu lại khi người khác ngồi xuống.
+- **Không đổi khi không dùng.** Công tắc tắt, không có giá trị còn hạn, vắng
+  mặt, hoặc kỹ năng không được cấp `room/activity`: chỗ trống bị bỏ cùng
+  khoảng trắng sau nó, và ghi chú y như trước (mọi ca ghi sẵn của ba kỹ năng
+  chạy lại như trước, công tắc tắt).
+
+Kiểm thử (`crates/skills/src/lib.rs`):
+`a_wellbeing_note_says_the_sitting_only_with_the_switch`.

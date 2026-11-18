@@ -90,7 +90,7 @@ policy = "nudge"
 [[do]]
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
-say = "They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+say = "{sitting} They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
 # the values above, each key whole: a sip after 30 minutes at the desk, and
@@ -151,4 +151,4 @@ give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives it
 [[present.do]]
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
-say = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+say = "{sitting} They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
