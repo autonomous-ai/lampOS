@@ -1,0 +1,268 @@
+[
+{
+  "case": "7705c-A1-r3",
+  "source": "out-7705a-1118-190518 journal-A1 request 3, eyes-A1.txt; row-7705c A1: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; the lamp's own question pending (thread bit ASKED 1), journaled played: a conversation with the lamp is going on; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.25,
+    0.82
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 14.1 7.5 y n no resting",
+    "S 0.25 1 0.1 20.2 1.5 y n no resting",
+    "S 0.50 1 0.1 19.1 1.6 y n no resting",
+    "S 0.75 1 0.1 16.4 3.8 y n no listening",
+    "S 1.00 1 0.1 16.4 3.8 y n no listening",
+    "S 1.25 1 0.1 20.4 -1.8 y n no listening",
+    "S 1.51 1 0.1 20.4 -1.8 y n no listening",
+    "S 1.76 1 0.1 23.8 -0.5 y n no listening",
+    "S 2.01 1 0.1 14.5 3.3 y n no listening",
+    "S 2.26 1 0.1 14.5 3.3 y n no listening",
+    "S 2.51 1 0.1 16.4 -0.3 y n no thinking",
+    "S 2.77 1 0.1 18.0 -0.8 y n no thinking"
+  ]
+}
+,
+{
+  "case": "7705c-A2-r7",
+  "source": "out-7705a-1118-190518 journal-A2 request 7, eyes-A2.txt; row-7705c A2: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; the lamp's own question pending (thread bit ASKED 1), journaled played: a conversation with the lamp is going on; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.14,
+    0.71
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 17.2 1.2 y n no resting",
+    "S 0.25 1 0.1 16.9 1.2 y n no resting",
+    "S 0.50 1 0.1 19.1 -3.9 y n no resting",
+    "S 0.75 1 0.1 17.1 1.1 y n no resting",
+    "S 1.00 1 0.1 19.1 -3.7 y n no listening",
+    "S 1.26 1 0.1 19.1 -3.7 y n no listening",
+    "S 1.51 1 0.1 17.6 -3.0 y n no listening",
+    "S 1.76 1 0.1 24.1 4.2 y n no listening",
+    "S 2.01 1 0.1 22.0 -2.1 y n no listening",
+    "S 2.27 1 0.1 19.4 3.8 y n no thinking",
+    "S 2.52 1 0.1 19.4 3.8 y n no thinking",
+    "S 2.77 1 0.1 20.1 -0.9 y n no thinking"
+  ]
+}
+,
+{
+  "case": "7705c-A3-r11",
+  "source": "out-7705a-1118-190518 journal-A3 request 11, eyes-A3.txt; row-7705c A3: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; the lamp's own question pending (thread bit ASKED 1), journaled played: a conversation with the lamp is going on; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.25,
+    0.82
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 18.7 1.6 y n no resting",
+    "S 0.25 1 0.1 19.4 1.6 y n no resting",
+    "S 0.50 1 0.1 20.3 1.2 y n no resting",
+    "S 0.75 1 0.1 16.7 1.4 y n no listening",
+    "S 1.00 1 0.1 18.4 1.6 y n no listening",
+    "S 1.26 1 0.1 18.4 1.6 y n no listening",
+    "S 1.51 1 0.1 19.8 -2.0 y n no listening",
+    "S 1.76 1 0.1 19.8 -2.0 y n no listening",
+    "S 2.01 1 0.1 19.8 -3.7 y n no listening",
+    "S 2.26 1 0.1 23.8 -3.6 y n no thinking",
+    "S 2.52 1 0.1 16.1 -1.1 y n no thinking",
+    "S 2.77 1 0.1 16.1 -1.1 y n no thinking"
+  ]
+}
+,
+{
+  "case": "7705c-A4-r14",
+  "source": "out-7705a-1118-190518 journal-A4 request 14, eyes-A4.txt; row-7705c A4: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; the lamp's own question pending (thread bit ASKED 1), journaled played: a conversation with the lamp is going on; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.28,
+    0.85
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 12.0 4.6 y n no resting",
+    "S 0.25 1 0.1 13.4 6.0 y n no resting",
+    "S 0.50 1 0.1 13.5 4.3 y n no resting",
+    "S 0.75 1 0.1 13.3 5.5 y n no resting",
+    "S 1.00 1 0.1 13.9 5.0 y n no listening",
+    "S 1.25 1 0.1 13.2 6.8 y n no listening",
+    "S 1.51 1 0.1 8.7 -0.6 y n no thinking",
+    "S 1.76 1 0.1 7.7 -1.4 y n no thinking",
+    "S 2.01 1 0.1 8.8 -0.2 y n no thinking",
+    "S 2.26 1 0.1 2.9 -0.9 y n no thinking",
+    "S 2.51 1 0.1 7.5 1.3 y n no thinking",
+    "S 2.76 1 0.1 12.2 1.8 y n unknown thinking"
+  ]
+}
+,
+{
+  "case": "7705c-A5-r18",
+  "source": "out-7705a-1118-190518 journal-A5 request 18, eyes-A5.txt; row-7705c A5: a 1-word yes in the window after the opener was answered, the kiosk's face, its mouth unread in 12 of 12 looks (not judged by the row); the lamp's own question pending (thread bit ASKED 1), journaled played: someone is turned to the lamp; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.29,
+    0.86
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 12.4 -3.2 y n unknown resting",
+    "S 0.25 1 0.1 12.9 2.7 y n unknown resting",
+    "S 0.50 1 0.1 10.2 -1.8 y n unknown resting",
+    "S 0.75 1 0.1 12.5 2.3 y n unknown resting",
+    "S 1.00 1 0.1 12.5 2.3 y n unknown listening",
+    "S 1.25 1 0.1 10.7 -1.5 y n unknown listening",
+    "S 1.51 1 0.1 12.6 -2.9 y n unknown thinking",
+    "S 1.76 1 0.1 11.4 9.5 y n unknown thinking",
+    "S 2.01 1 0.1 15.1 3.6 y n unknown thinking",
+    "S 2.26 1 0.1 15.8 -0.2 y n unknown thinking",
+    "S 2.52 1 0.1 15.8 -0.2 y n unknown thinking",
+    "S 2.77 1 0.1 19.6 -2.4 y n unknown thinking"
+  ]
+}
+,
+{
+  "case": "7705c-A6-r22",
+  "source": "out-7705a-1118-190518 journal-A6 request 22, eyes-A6.txt; row-7705c A6: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; the lamp's own question pending (thread bit ASKED 1), journaled played: a conversation with the lamp is going on; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.3,
+    0.87
+  ],
+  "words": 1,
+  "going_on": true,
+  "lamp_asked": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 19.7 -1.3 y n no resting",
+    "S 0.25 1 0.1 20.1 -1.2 y n no resting",
+    "S 0.50 1 0.1 19.6 -0.8 y n no resting",
+    "S 0.75 1 0.1 19.6 -1.1 y n no listening",
+    "S 1.00 1 0.1 19.5 -1.0 y n no listening",
+    "S 1.25 1 0.1 17.7 -0.4 y n no listening",
+    "S 1.51 1 0.1 17.7 -0.4 y n no listening",
+    "S 1.76 1 0.1 21.9 1.5 y n no listening",
+    "S 2.01 1 0.1 17.1 1.9 y n no listening",
+    "S 2.26 1 0.1 17.8 2.2 y n unknown listening",
+    "S 2.51 1 0.1 17.1 1.3 y n unknown thinking",
+    "S 2.77 1 0.1 17.5 2.2 y n unknown thinking"
+  ]
+}
+,
+{
+  "case": "7705c-B1-r5",
+  "source": "out-7705a-1118-190518 journal-B1 request 5, eyes-B1.txt; row-7705c B1: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the yes in another voice, journaled held: no face seen speaking it; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.26,
+    0.74
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "held: no face seen speaking it",
+  "eyes": [
+    "S 0.00 1 0.1 23.0 -2.4 y n no resting",
+    "S 0.25 1 0.1 21.7 -2.5 y n no resting",
+    "S 0.50 1 0.1 21.8 -2.5 y n no resting",
+    "S 0.75 1 0.1 21.8 -2.5 y n no listening",
+    "S 1.00 1 0.1 20.3 -2.6 y n no listening",
+    "S 1.25 1 0.1 20.4 -6.6 y n no listening",
+    "S 1.51 1 0.1 20.4 -6.6 y n no thinking",
+    "S 1.76 1 0.1 18.3 4.6 y n no resting",
+    "S 2.01 1 0.1 19.8 -1.2 y n no resting",
+    "S 2.26 1 0.1 15.6 3.7 y n no resting",
+    "S 2.51 2 0.1 22.5 -0.4 y n no resting",
+    "S 2.77 2 0.1 22.2 -2.3 y n unknown resting"
+  ]
+}
+,
+{
+  "case": "7705c-B2-r9",
+  "source": "out-7705a-1118-190518 journal-B2 request 9, eyes-B2.txt; row-7705c B2: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the yes in another voice, journaled held: no face seen speaking it; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.23,
+    0.71
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "held: no face seen speaking it",
+  "eyes": [
+    "S 0.00 1 0.1 19.9 -1.1 y n unknown resting",
+    "S 0.25 1 0.1 20.6 -2.0 y n unknown resting",
+    "S 0.50 1 0.1 18.9 0.5 y n unknown resting",
+    "S 0.75 1 0.1 18.9 -1.3 y n no listening",
+    "S 1.01 1 0.1 18.0 0.1 y n no listening",
+    "S 1.26 1 0.1 19.6 -1.8 y n no listening",
+    "S 1.51 1 0.1 19.1 0.2 y n no thinking",
+    "S 1.76 1 0.1 16.5 4.9 y n no resting",
+    "S 2.02 1 0.1 18.0 0.2 y n no resting",
+    "S 2.27 1 0.1 19.9 1.9 y n unknown resting",
+    "S 2.52 1 0.1 24.8 -1.1 y n unknown resting",
+    "S 2.77 1 0.1 22.2 -1.5 y n unknown resting"
+  ]
+}
+,
+{
+  "case": "7705c-B4-r16",
+  "source": "out-7705a-1118-190518 journal-B4 request 16, eyes-B4.txt; row-7705c B4: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the name heard in the room's sound, journaled played: its name was heard in the room's sound; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.29,
+    0.77
+  ],
+  "words": 1,
+  "going_on": true,
+  "named": true,
+  "expect": "answered",
+  "eyes": [
+    "S 0.00 1 0.1 11.8 1.2 y n no resting",
+    "S 0.25 1 0.1 12.8 1.3 y n no resting",
+    "S 0.50 1 0.1 12.1 1.8 y n no resting",
+    "S 0.75 1 0.1 11.5 1.9 y n no listening",
+    "S 1.01 1 0.1 12.5 1.5 y n no listening",
+    "S 1.26 1 0.1 12.5 1.5 y n no listening",
+    "S 1.51 1 0.1 11.1 -2.4 y n no listening",
+    "S 1.76 1 0.1 5.3 3.8 y y no listening",
+    "S 2.02 1 0.1 10.3 -1.4 y y no listening",
+    "S 2.27 1 0.1 3.0 3.3 y y no listening",
+    "S 2.52 1 0.1 12.6 -0.0 y y unknown listening",
+    "S 2.78 1 0.1 12.9 -0.5 y y unknown thinking"
+  ]
+}
+,
+{
+  "case": "7705c-B5-r20",
+  "source": "out-7705a-1118-190518 journal-B5 request 20, eyes-B5.txt; row-7705c B5: a 1-word yes in the window after the opener was answered, the kiosk's face read silent; no question pending (ASKED 0), the yes in another voice, journaled held: no face seen speaking it; line_s from the kit's yes mark + 0.4 s and the clip's length",
+  "line_s": [
+    0.28,
+    0.76
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "held: no face seen speaking it",
+  "eyes": [
+    "S 0.00 1 0.1 9.0 3.0 y n no resting",
+    "S 0.25 1 0.1 7.3 2.2 y n unknown resting",
+    "S 0.50 1 0.1 7.2 2.1 y n unknown resting",
+    "S 0.75 1 0.1 10.7 1.2 y n no resting",
+    "S 1.00 1 0.1 7.5 2.1 y n no listening",
+    "S 1.25 1 0.1 7.6 2.1 y n no listening",
+    "S 1.50 1 0.1 6.7 3.1 y n no listening",
+    "S 1.76 1 0.1 11.0 6.5 y n no thinking",
+    "S 2.01 1 0.1 15.0 -0.7 y n no resting",
+    "S 2.26 1 0.1 13.8 4.8 y n no resting",
+    "S 2.51 1 0.1 16.0 6.1 y n no resting",
+    "S 2.76 1 0.1 16.0 6.1 y n no resting"
+  ]
+}
+]
