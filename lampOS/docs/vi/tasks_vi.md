@@ -1211,6 +1211,25 @@ OpenClaw, qua đường chạy chung, không có runner thứ hai:
   của OpenClaw chỉ có skill-start, nên lần tạo qua gateway bỏ bước kiểm tra
   của hướng dẫn; giọng nói vẫn đưa câu trả lời qua toàn bộ kiểm tra và sửa
   của nó.
+- **Dạng skill.toml ngay trong lời nhắn (`skill_make::gateway_form`,
+  #7245):** lời nhắn của lần tạo qua gateway (`gateway_prompt`, có hướng
+  dẫn hay không) kết thúc bằng một khối ngắn về dạng file, để OpenClaw có
+  nó kể cả khi không mở `rules.md`: thứ tự trong một dòng (`FORM_ORDER`:
+  `asks` trước tiên, chỉ khi `rules.md` cho phép asks, rồi `kind`,
+  `version`, `[permissions]`, rồi `[trigger]`, `[ask]` và `[[do]]`), một
+  quy tắc (`FORM_RULE`: không bao giờ đặt `asks` dưới `[permissions]` hay
+  bảng nào khác) và một skill.toml tối thiểu (`FORM_TOML`, 9 dòng:
+  `asks = ["desk glow on"]`, `kind`, `version`, `[permissions]`
+  `light = true`, một bước đèn ấm). Khối dài 695 byte, giới hạn tối đa 1024
+  (`MOST_FORM_BYTES`); lời nhắn có hướng dẫn kèm khối là 1308 byte với thư
+  mục tạo của đèn, trong giới hạn 2000 byte của tác vụ Harness
+  (`harness::MAX_PROMPT_BYTES`; trước đó 611). Quyền, trigger, bước, giới
+  hạn và yêu cầu của người dùng vẫn chỉ nằm trong `rules.md`, và lời nhắn
+  vẫn bảo đọc nó. `tests/it/make_check.rs` của lamp-skills đóng gói
+  `FORM_TOML` bằng `lamp-skills pack` thật (`made: here`,
+  `LAMP_MADE_SKILL_ASKS=on`) và từ chối nó khi `asks` nằm dưới
+  `[permissions]`. Nếu bị trả lại trong chat, nó bị từ chối như ví dụ của
+  rules (`is_example`). Lời nhắn tạo của Hermes không đổi.
 - **Câu trả lời `cannot:`** được trả về giọng nói nguyên văn, cho phương án
   dự phòng của #7234.
 - **Câu trả lời nói trong chat (`skill_make::make_answer`, #7245, #7427):**

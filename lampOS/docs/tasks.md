@@ -3809,6 +3809,24 @@ path, with no second runner:
 - **No `lamp-skills pack` in the run:** OpenClaw's exec allow-list holds
   only skill-start, so a gateway make skips the guide's check step; the
   voice still puts the answer through its whole check and repairs.
+- **The skill.toml form inline (`skill_make::gateway_form`, #7245):** the
+  gateway make's words (`gateway_prompt`, guided or not) end with a short
+  block of the form, so OpenClaw has it even if it never opens `rules.md`:
+  the order in one line (`FORM_ORDER`: `asks` first, only when `rules.md`
+  offers asks, then `kind`, `version`, `[permissions]`, then `[trigger]`,
+  `[ask]` and `[[do]]`), the one rule (`FORM_RULE`: never `asks` under
+  `[permissions]` or any other table) and one minimal skill.toml
+  (`FORM_TOML`, 9 lines: `asks = ["desk glow on"]`, `kind`, `version`,
+  `[permissions]` `light = true`, one warm light step). The block is 695
+  bytes, held to at most 1024 (`MOST_FORM_BYTES`); the guided words with
+  it are 1308 bytes for the lamp's make folder, within Harness's 2000-byte
+  task bound (`harness::MAX_PROMPT_BYTES`; 611 before). Grants, triggers,
+  steps, limits and the person's request stay in `rules.md` alone, and the
+  words still say to read it. lamp-skills' `tests/it/make_check.rs` packs
+  `FORM_TOML` with the real `lamp-skills pack` (`made: here`,
+  `LAMP_MADE_SKILL_ASKS=on`) and refuses it with `asks` under
+  `[permissions]`. Given back in chat it is refused as the rules' example
+  is (`is_example`). Hermes's make's words are unchanged.
 - **A `cannot:` answer** goes back to the voice as written, for #7234's
   fallback.
 - **An answer said in chat (`skill_make::make_answer`, #7245, #7427):**

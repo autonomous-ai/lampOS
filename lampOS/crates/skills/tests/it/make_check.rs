@@ -133,3 +133,31 @@ fn the_guides_check_packs_a_draft_exactly_when_the_voices_does() {
         assert!(packs(&photo, &out, &make_run(&make, given)));
     }
 }
+
+/// #7245: the minimal skill.toml a gateway make's words show inline
+/// (`lamp_tasks::skill_make::FORM_TOML`) packs with the real `lamp-skills
+/// pack`, as a skill made on this lamp (`made: here`) with
+/// `LAMP_MADE_SKILL_ASKS` on; its `asks` moved under `[permissions]`, as
+/// the inline rule forbids, is refused.
+#[test]
+fn the_gateway_makes_inline_skill_toml_packs() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let toml = lamp_tasks::skill_make::FORM_TOML;
+    let asks = lamp_voice::made_skill::ASKS_ENVIRONMENT;
+    let made = |name: &str, toml: &str| {
+        let folder = draft(dir.path(), name, toml, false);
+        fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Glows warm.\nmade: here\n---\n"),
+        )
+        .unwrap();
+        folder
+    };
+    let on = [(asks, "on".to_owned())];
+    assert!(packs(&made("desk-glow", toml), &out, &on));
+    let (line, rest) = toml.split_once('\n').unwrap();
+    let under = rest.replace("light = true\n", &format!("light = true\n{line}\n"));
+    assert!(!under.starts_with("asks"));
+    assert!(!packs(&made("desk-glow-under", &under), &out, &on));
+}

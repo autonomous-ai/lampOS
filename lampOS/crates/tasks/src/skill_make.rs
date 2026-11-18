@@ -327,13 +327,72 @@ pub fn without_check(text: &str) -> String {
         .collect()
 }
 
+/// #7245: the most bytes of [`gateway_form`], the form a gateway make's
+/// words carry inline: a short block, so the words stay well within
+/// Harness's task bound (`harness::MAX_PROMPT_BYTES`, 2000).
+pub const MOST_FORM_BYTES: usize = 1024;
+
+/// #7245: the one minimal `skill.toml` a gateway make's words show
+/// ([`gateway_form`]): `asks` on the first line, then `kind`, `version`,
+/// `[permissions]` and one `[[do]]` step, a skill started by the person's
+/// own words alone. lamp-skills' `tests/it/make_check.rs` packs it with the
+/// real `lamp-skills pack`. Given back in chat, it is refused as the rules'
+/// example is ([`is_example`]).
+pub const FORM_TOML: &str = "asks = [\"desk glow on\"]
+kind = \"installable\"
+version = \"1.0.0\"
+
+[permissions]
+light = true
+
+[[do]]
+light = { colour = \"warm\" }
+";
+
+/// #7245: skill.toml's order, in one line, by its real key names: `asks`
+/// first, then `kind`, `version`, `[permissions]`, then the trigger,
+/// `[ask]` and `[[do]]`. The rest (grants, triggers, steps, limits) stays
+/// in the rules alone.
+pub const FORM_ORDER: &str = "The skill.toml form in short; rules.md has the rest (grants, \
+     triggers, steps, limits). Its order: asks = [...] first, at the very top (only when \
+     rules.md offers asks); then kind, version and any other top-level key rules.md gives; then \
+     [permissions]; then [trigger], [ask] and [[do]], each as rules.md says.";
+
+/// #7245: the one rule a gateway make's words state (lamp-c0a4, 18 Nov
+/// 04:35 and 04:40: OpenClaw wrote `asks` after `[permissions]`, and the
+/// skill was refused on "unknown field").
+pub const FORM_RULE: &str = "Never write asks under [permissions] or any other table: a key \
+     after a table's header belongs to that table, so every top-level key goes before the first \
+     table.";
+
+/// #7245: the skill.toml form a gateway agent's make carries in its own
+/// words, so OpenClaw has it even if it never opens the rules: the order
+/// ([`FORM_ORDER`]), the rule ([`FORM_RULE`]) and one minimal skill.toml
+/// ([`FORM_TOML`]), at most [`MOST_FORM_BYTES`].
+pub fn gateway_form() -> String {
+    format!(
+        "{FORM_ORDER} {FORM_RULE} A minimal skill.toml the lamp's check takes, the form only \
+         and never the answer:\n\n```skill.toml\n{FORM_TOML}```"
+    )
+}
+
 /// #7245: a gateway agent's make's words, with the guide when `guide`
 /// ([`gateway_guide`]): as [`prompt`] and [`guided_prompt`], but no check
-/// is run and no command at all.
+/// is run and no command at all; and either way the skill.toml form
+/// inline after them ([`gateway_form`]). The person's request stays in the
+/// rules alone. Hermes's make's words ([`prompt`], [`guided_prompt`]) are
+/// as before.
 pub fn gateway_prompt(folder: &Path, guide: bool) -> String {
-    if !guide {
-        return prompt(folder);
-    }
+    let words = if guide {
+        gateway_guided_words(folder)
+    } else {
+        prompt(folder)
+    };
+    format!("{words}\n\n{}", gateway_form())
+}
+
+/// [`gateway_prompt`]'s words with the guide, before the form.
+fn gateway_guided_words(folder: &Path) -> String {
     format!(
         "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
          lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
@@ -804,14 +863,15 @@ light = { colour = \"cyan\", level = 2, for = \"25s\" }
 /// Whether a skill's two files are the rules' example given back, as the
 /// voice's own maker tells it (`make_skill_local::is_example`): its
 /// `skill.toml` the example's but for blank space, or its `SKILL.md` named
-/// as the example is.
+/// as the example is; or the gateway words' own minimal one
+/// ([`FORM_TOML`], #7245) given back.
 fn is_example(toml: &str, card: &str) -> bool {
     let bare = |text: &str| text.split_whitespace().collect::<String>();
     let name = card
         .lines()
         .find_map(|line| line.trim().strip_prefix("name:"))
         .map(|name| name.trim().trim_matches('"'));
-    bare(toml) == bare(EXAMPLE_TOML) || name == Some(EXAMPLE_NAME)
+    bare(toml) == bare(EXAMPLE_TOML) || bare(toml) == bare(FORM_TOML) || name == Some(EXAMPLE_NAME)
 }
 
 /// Which of a skill's two files a fenced block is, read as the voice reads
@@ -2994,7 +3054,10 @@ mod tests {
             assert_eq!(run.start_in.as_deref(), Some(folder));
             assert_eq!(run.run, "1");
         }
-        assert_eq!(gateway_prompt(folder, false), prompt(folder));
+        assert_eq!(
+            gateway_prompt(folder, false),
+            format!("{}\n\n{}", prompt(folder), gateway_form())
+        );
         let parsed = |extra: &str| {
             MakeLine::parse(
                 format!(r#"{{"op":"skill_make","rules":"R","within_ms":2000{extra}}}"#).as_bytes(),
@@ -3005,5 +3068,103 @@ mod tests {
         assert_eq!(parsed(r#","one_path":false"#), Ok(false));
         assert_eq!(parsed(r#","one_path":true"#), Ok(true));
         assert!(parsed(r#","one_path":"yes""#).is_err());
+    }
+
+    /// #7245: a gateway make's words carry the skill.toml form inline,
+    /// guided or not: the order, the one rule on asks and the minimal
+    /// skill.toml, after the words that still point to the rules for the
+    /// rest and the request; within Harness's task bound for the lamp's
+    /// make folder. Without the form inline (the words alone, as before),
+    /// this fails.
+    #[test]
+    fn a_gateway_makes_words_carry_the_skill_toml_form_inline() {
+        let folder = Path::new(MAKE_WORK).join(FOLDER_HEAD);
+        let form = gateway_form();
+        for guided in [false, true] {
+            let words = gateway_prompt(&folder, guided);
+            assert!(words.ends_with(&format!("\n\n{form}")), "{words}");
+            for part in [FORM_ORDER, FORM_RULE, FORM_TOML] {
+                assert!(words.contains(part), "{guided}: {part}");
+            }
+            assert!(words.contains("```skill.toml\nasks = [\"desk glow on\"]\n"));
+            assert!(words.contains("then [permissions]"), "{words}");
+            assert!(words.contains("Never write asks under [permissions]"));
+            assert!(crate::harness::prompt_fits(&words), "{}", words.len());
+            assert_eq!(
+                gateway_run(&folder, Duration::from_secs(5), guided).prompt,
+                words
+            );
+        }
+    }
+
+    /// #7245: the inline form is a short block, at most
+    /// [`MOST_FORM_BYTES`], its skill.toml 12 lines at most with `asks` on
+    /// its first line and before any table.
+    #[test]
+    fn the_inline_form_stays_within_its_cap() {
+        let form = gateway_form();
+        assert!(form.len() <= MOST_FORM_BYTES, "{}", form.len());
+        assert!(FORM_TOML.lines().count() <= 12);
+        assert!(FORM_TOML.starts_with("asks = ["));
+        let first_table = FORM_TOML.find("\n[").unwrap();
+        assert!(
+            ["kind = ", "version = "]
+                .iter()
+                .all(|key| FORM_TOML.find(key).is_some_and(|at| at < first_table))
+        );
+        assert!(FORM_TOML.find("[permissions]") < FORM_TOML.find("[[do]]"));
+    }
+
+    /// #7245: the gateway words still name the rules, for the rest of the
+    /// form and the person's request, and the guide when guided; the
+    /// request itself is never inlined.
+    #[test]
+    fn a_gateway_makes_words_still_name_the_rules() {
+        let folder = Path::new("/w/make-1");
+        for guided in [false, true] {
+            let words = gateway_prompt(folder, guided);
+            let before = &words[..words.find(FORM_ORDER).unwrap()];
+            assert!(before.contains(RULES_FILE), "{before}");
+            assert_eq!(before.contains(GUIDE_FILE), guided, "{before}");
+            assert!(gateway_form().contains("rules.md has the rest"));
+        }
+    }
+
+    /// #7245: Hermes's make's words (the harness make's, [`make_run_with`])
+    /// are as before: no inline form, guided or not.
+    #[test]
+    fn a_hermes_makes_words_are_unchanged() {
+        let folder = Path::new("/w/make-1");
+        for guided in [false, true] {
+            let words = make_run_with(
+                folder,
+                Duration::from_secs(5),
+                guided,
+                &CheckSwitches::default(),
+            )
+            .prompt;
+            let before = if guided {
+                guided_prompt(folder)
+            } else {
+                prompt(folder)
+            };
+            assert_eq!(words, before);
+            assert!(!words.contains(FORM_TOML) && !words.contains(FORM_RULE));
+        }
+        assert!(prompt(folder).ends_with("install nothing and run nothing else."));
+        assert!(guided_prompt(folder).ends_with("install nothing and run no other command."));
+    }
+
+    /// #7245: the inline skill.toml given back in chat is refused as the
+    /// rules' example is; with another ask it is taken.
+    #[test]
+    fn a_gateway_make_never_takes_the_inline_form_given_back_in_chat() {
+        let work = tempfile::tempdir().unwrap();
+        let made = put(work.path(), "R").unwrap();
+        let card = "```SKILL.md\n---\nname: desk-glow\ndescription: x\n---\n```";
+        let given = format!("```skill.toml\n{FORM_TOML}```\n\n{card}");
+        assert_eq!(make_answer(&made.path, Some((given.as_str(), false))), None);
+        let own = given.replace("desk glow on", "reading glow please");
+        assert!(make_answer(&made.path, Some((own.as_str(), false))).is_some());
     }
 }
