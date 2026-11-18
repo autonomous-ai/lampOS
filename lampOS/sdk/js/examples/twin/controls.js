@@ -22,6 +22,7 @@
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { LampError, schema } from 'lampos';
+import { hue, startRainbow } from './rainbow.js';
 
 const q = JSON.stringify;
 // The one skill the app may put on the lamp: a folder of its own with one recorded move, never one the page names.
@@ -36,7 +37,6 @@ export const PATTERNS = [...schema.patterns];
 export const FEELINGS = ['glad', 'lively', 'low'];
 
 // 32 colours each: `(k, count) => '#rrggbb'`.
-const hue = (h) => `#${[5, 3, 1].map((n) => { const k = (n + h * 6) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))).toString(16).padStart(2, '0'); }).join('')}`;
 export const PIXEL_PRESETS = {
   rainbow: (k, count) => hue(k / count),
   'half red, half blue': (k, count) => (k < count / 2 ? '#ff0000' : '#0000ff'),
@@ -136,6 +136,9 @@ export async function cleanScratchNotes(lamp) {
 
 // The held light of `hold_light` (its `stop()`), one at a time: this app has one lamp and one hand on it.
 let held = null;
+// The endless rainbow, one at a time (`rainbow_on`); the server stops it when the last page closes and at the end of the run, and a touch on the lamp stops it.
+let rainbow = null;
+export async function stopRainbow() { const was = rainbow; rainbow = null; await was?.stop(); }
 
 export const CONTROLS = [
   { id: 'gesture', group: 'Body', needs: ['body'], moves: true, ops: ['gesture'], shows: [], label: 'Gesture', fields: [select('name', GESTURES, 'nod')],
@@ -192,6 +195,30 @@ export const CONTROLS = [
       const pixels = Array.from({ length: count }, (_, k) => PIXEL_PRESETS[a.preset](k, count));
       await lamp.ring(pixels, { forMs: a.for_ms });
       return `lamp.ring(${q(a.preset)} // ${count} pixels, { forMs: ${a.for_ms} })`;
+    } },
+  // The ring turns through the rainbow until it is switched off, the page closes or the run ends (rainbow.js): one `light` frame at a time,
+  // as fast as the lamp's own limits say, sent again after anything the lamp draws over it, so it comes back by itself.
+  { id: 'rainbow_on', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Endless rainbow: on', fields: [number('seconds_per_turn', 1, 60, 6, { integer: true })],
+    hint: "turns the ring through the rainbow without end until you switch it off, touch the lamp or close this page; the lamp's own lights (a talk, someone seen, privacy) show over it, and it returns by itself",
+    run: async ({ lamp }, a) => {
+      // `rainbow` is taken and set without an await between, so two presses at once (or an off during the first frame) always see
+      // the one that is running: only the newest loop lives, and "off" always finds it.
+      const was = rainbow;
+      const started = startRainbow(lamp, { secondsPerTurn: a.seconds_per_turn, say: (line) => console.error(`try-it: ${line}`) });
+      rainbow = started;
+      await was?.stop();
+      try { await started.first; } catch (error) { if (rainbow === started) rainbow = null; await started.stop(); throw error; }
+      if (rainbow !== started) return 'the rainbow was switched off before its first frame was answered';
+      const { gapMs, leaseMs } = started.stats();
+      return `lamp.ring(rainbow frames, { forMs: ${leaseMs} }) every ${gapMs} ms, one turn in ${a.seconds_per_turn} s, until switched off`;
+    } },
+  { id: 'rainbow_off', group: 'Light', ops: [], shows: [], label: 'Endless rainbow: off', fields: [],
+    run: async () => {
+      const was = rainbow;
+      await stopRainbow();
+      if (!was) return 'the rainbow was not on';
+      const { sent, answered, refusals, byCode, gapMs, ended } = was.stats();
+      return `the rainbow ended: ${sent} frames sent every ${gapMs} ms, ${answered} answered, ${refusals} refused${refusals ? ` (${Object.entries(byCode).map(([c, n]) => `${c} ${n}`).join(', ')})` : ''}${ended ? `; it had ended by itself: ${ended}` : ''}`;
     } },
   { id: 'light_off', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },
