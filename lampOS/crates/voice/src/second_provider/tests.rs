@@ -544,6 +544,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
             ProviderOutput::MakeWaiting { request } => (format!("make_waiting:{request}"), false),
+            ProviderOutput::MadeRunNow { skill, .. } => (format!("made_run:{skill}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {

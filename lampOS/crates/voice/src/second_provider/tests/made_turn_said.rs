@@ -52,6 +52,11 @@ fn make_skill_answers(args: &Value) -> Value {
             "off": true,
             "next": "Say only that btc price is off."
         }),
+        (_, Some(on)) if on.contains("space") => json!({
+            crate::made_turn::TURN_ON: "space-facts",
+            "off": false,
+            "next": "Say only that space facts is on again."
+        }),
         (_, Some(_)) => json!({
             crate::made_turn::TURN_ON: "btc-price",
             "off": false,
@@ -144,8 +149,14 @@ fn went_as(
     let seen = ran.clone();
     // `None`, off; `Some(n)`, turned on, answering off `n` more times.
     let on: Arc<Mutex<Option<usize>>> = Arc::default();
+    let (root, keeping) = space_facts_made();
     let tools: ToolRunner = Arc::new(move |_, _, name, args| {
-        let answer = if name == FUNCTION {
+        let answer = if name == crate::made_skill::MAKE
+            && owner
+            && let Some(asked) = args[crate::made_run::RUN].as_str()
+        {
+            run_now(asked, &keeping, &on, late, switch)
+        } else if name == FUNCTION {
             let mut on = on.lock().unwrap();
             match on.as_mut() {
                 Some(0) => json!({"price": "90,000 dollars"}),
@@ -194,6 +205,7 @@ fn went_as(
             labels
         });
     crate::made_skill::set_off_said_here(None);
+    let _ = std::fs::remove_dir_all(&root);
     let asked = script.asked.lock().unwrap();
     let notes = asked
         .iter()
@@ -226,6 +238,65 @@ fn went_as(
         ran: ran.lock().unwrap().clone(),
         told,
     }
+}
+
+/// A lamp of the test's own with space facts made and on it (#7562's row
+/// on lamp-9adf, 18 Nov, requests 6 and 9).
+fn space_facts_made() -> (std::path::PathBuf, crate::made_skill::Keeping) {
+    static MADE: AtomicUsize = AtomicUsize::new(0);
+    let (root, keeping) = crate::make_skill_local::tests::keeping(&format!(
+        "turn-said-space-{}",
+        MADE.fetch_add(1, Ordering::Relaxed)
+    ));
+    crate::made_remove::tests::made_here(&keeping, &[("space-facts", true)]);
+    (root, keeping)
+}
+
+/// `make_skill`'s run now of `asked`, by `made_run`'s own code, of space
+/// facts: off in lamp-skills' `off` file while `on` is `None` (lamp-skills
+/// answers it `made_run::STOPPED`); `on` as [`went_all`]'s; with the
+/// switch, turned on for the ask by `make_skill`'s `turn_on` as stood in
+/// here.
+fn run_now(
+    asked: &str,
+    keeping: &crate::made_skill::Keeping,
+    on: &Mutex<Option<usize>>,
+    late: usize,
+    switch: bool,
+) -> Value {
+    let is_off = |_: &str| on.lock().unwrap().is_none();
+    let turn_on = |_: &str| {
+        *on.lock().unwrap() = Some(late);
+        Ok(())
+    };
+    let turns = switch.then_some(crate::made_run::TurnsOn {
+        is_off: &is_off,
+        turn_on: &turn_on,
+        wait: Duration::from_millis(1),
+    });
+    crate::made_run::asked_turning(
+        crate::made_run::Ask {
+            name: asked,
+            request: 1,
+            heard: true,
+        },
+        keeping,
+        || true,
+        |_| Ok(None),
+        |_| Some((true, true)),
+        |_| {
+            let mut on = on.lock().unwrap();
+            match on.as_mut() {
+                Some(0) => Ok(false),
+                Some(late) => {
+                    *late -= 1;
+                    Err(crate::made_run::STOPPED.to_owned())
+                }
+                None => Err(crate::made_run::STOPPED.to_owned()),
+            }
+        },
+        turns,
+    )
 }
 
 fn calls(id: &str, name: &str, args: Value) -> Vec<net::Result<ChatEvent>> {
@@ -628,4 +699,109 @@ fn switch_off_a_use_of_an_off_skill_changes_nothing() {
         json!({ "error": crate::made_turn::FUNCTION_OFF }).to_string(),
         "{went:?}"
     );
+}
+
+/// The one line said of space facts turned on for the ask, with its undo.
+const SPACE_UNDO: &str = "Space facts was off, so I turned it on. Say 'turn it off' to undo.";
+
+/// The model's run now of space facts, as `make_skill` takes it.
+fn run_space(id: &str) -> Vec<net::Result<ChatEvent>> {
+    calls(
+        id,
+        crate::made_skill::MAKE,
+        json!({ crate::made_run::RUN: "space facts" }),
+    )
+}
+
+/// #7562's row on lamp-9adf, 18 Nov, request 6: "Lamp, use my space facts
+/// skill." with space facts turned off was the model's `make_skill` run,
+/// not the skill's function, refused "it is turned off or snoozed", and the
+/// lamp said "Space facts didn't run — it's turned off at the moment."
+/// (the first builder, 21:17: a use or run ask does what
+/// `made_turn::on_for_ask` does, whichever tool the model reaches for).
+/// Now it is turned on, run, and the undo said, nothing asked.
+#[test]
+fn request_6_a_run_now_of_an_off_skill_turns_it_on_runs_it_and_says_the_undo() {
+    let line = "Lamp, use my space facts skill.";
+    let went = went(
+        line,
+        vec![
+            run_space("c1"),
+            saying(&format!("{SPACE_UNDO} Space facts is running now.")),
+        ],
+    );
+    assert_eq!(names(&went), [crate::made_skill::MAKE], "{went:?}");
+    let told = told_for(&went, "c1");
+    assert!(told.contains(SPACE_UNDO), "{told}");
+    assert!(told.contains("\"ran\":true"), "{told}");
+    assert!(told.contains("running now"), "{told}");
+    assert!(!told.contains(crate::made_run::STOPPED), "{told}");
+    assert!(!told.contains("didn't run"), "{told}");
+    assert!(
+        went.said.iter().any(|said| said.contains("turn it off")),
+        "{went:?}"
+    );
+    // lamp-skills still answering off just after the turn on: run again.
+    let late = went_all(None, &[line], vec![run_space("c1"), saying(SPACE_UNDO)], 1);
+    let told = told_for(&late, "c1");
+    assert!(
+        told.contains(SPACE_UNDO) && told.contains("\"ran\":true"),
+        "{told}"
+    );
+}
+
+/// #7562's row on lamp-9adf, 18 Nov, request 9: "Lamp, tell me a space fact
+/// with my space facts skill." was the model's `make_skill` `turn_on`: "Space
+/// facts is on again.", never run. Its answer tells the model to call the
+/// run now when the line asked to use it (`made_turn::asked`); the run
+/// after the model's own turn on of that skill in the turn is answered with
+/// the undo line, tried again while lamp-skills still reads it off.
+#[test]
+fn request_9_a_turn_on_then_its_run_now_says_the_undo() {
+    for late in [0, 1] {
+        let went = went_all(
+            None,
+            &["Lamp, tell me a space fact with my space facts skill."],
+            vec![
+                calls(
+                    "c1",
+                    crate::made_skill::MAKE,
+                    json!({ crate::made_turn::TURN_ON: "space facts" }),
+                ),
+                run_space("c2"),
+                saying(&format!("{SPACE_UNDO} Space facts is running now.")),
+            ],
+            late,
+        );
+        // The turn on, its run now, and that run again `late` times.
+        assert_eq!(
+            names(&went),
+            vec![crate::made_skill::MAKE; 2 + late],
+            "{went:?}"
+        );
+        let told = told_for(&went, "c2");
+        assert!(told.contains(SPACE_UNDO), "late {late}: {told}");
+        assert!(told.contains("\"ran\":true"), "late {late}: {told}");
+        assert!(!told.contains(crate::made_run::STOPPED), "{told}");
+    }
+}
+
+/// With the switch off, the run now of a turned-off skill is as before:
+/// "didn't run now", lamp-skills' why, nothing turned on, no undo.
+#[test]
+fn switch_off_a_run_now_of_an_off_skill_is_as_before() {
+    let went = went_as(
+        None,
+        &["Lamp, use my space facts skill."],
+        vec![run_space("c1"), saying("Space facts didn't run.")],
+        Setup {
+            switch: false,
+            ..Setup::default()
+        },
+    );
+    assert_eq!(names(&went), [crate::made_skill::MAKE], "{went:?}");
+    let told = told_for(&went, "c1");
+    assert!(told.contains(crate::made_run::STOPPED), "{told}");
+    assert!(told.contains("space facts didn't run now"), "{told}");
+    assert!(!told.contains("undo"), "{told}");
 }

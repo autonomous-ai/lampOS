@@ -381,9 +381,14 @@ pub fn asked(
         json!({
             TURN_ON: made,
             "off": false,
+            // #7562's row on lamp-9adf, 18 Nov, request 9: "tell me a space
+            // fact with my space facts skill" was this turn on alone, and
+            // never ran. Whether the line asked to use it is the model's.
             "next": format!(
-                "Say only, in a few words, in the conversation's language, that {spoken} is on \
-                 again. Call nothing."
+                "If their line asked to use or run it, not only to turn it on, call make_skill \
+                 now with run and its name alone, saying nothing first: its answer says what to \
+                 say. Otherwise say only, in a few words, in the conversation's language, that \
+                 {spoken} is on again, and call nothing."
             )
         })
     }
@@ -437,8 +442,9 @@ pub fn off_note(keeping: &Keeping, state: &Path) -> Option<String> {
     };
     Some(format!(
         "(For you to know, not to answer: {count} they made or added {are} turned off now. A \
-         line that asks to use or run one: call its function as for any skill; the lamp turns \
-         it on for the owner's ask and runs it, and its answer says what to say. \
+         line that asks to use or run one: call its function as for any skill, or make_skill \
+         with run and its name, never turn_on alone; the lamp turns it on for the owner's ask \
+         and runs it, and its answer says what to say. \
          {BACK_ON_BY_CALL})"
     ))
 }
@@ -459,6 +465,13 @@ pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
 /// ran nothing ([`FUNCTION_OFF`]).
 pub fn ran_turned_off(told: &Value) -> bool {
     told["error"] == FUNCTION_OFF
+}
+
+/// Whether the call `name`'s answer `told` says the skill is still off: its
+/// function's [`FUNCTION_OFF`], or `make_skill`'s run now refused by
+/// lamp-skills as off or snoozed (`made_run::STOPPED`).
+pub fn still_off(name: &str, told: &Value) -> bool {
+    ran_turned_off(told) || name == made_skill::MAKE && crate::made_run::stopped(told)
 }
 
 /// What the model is told of a skill's function that still answered
@@ -526,11 +539,22 @@ pub fn turned_on_for_ask(spoken: &str, ran: &Value) -> Value {
         "ran": ran,
         "next": format!(
             "It was off, so the lamp turned it on and ran it for their ask. Say first, in the \
-             conversation's language: \"{} was off, so I turned it on. Say 'turn it off' to \
-             undo.\" Then say what ran tells you to say, in a few words. Call nothing.",
-            opening(spoken)
+             conversation's language: \"{}\" Then say what ran tells you to say, in a few \
+             words. Call nothing.",
+            undo_line(spoken)
         )
     })
+}
+
+/// The one line said of a skill the lamp turned on for an ask to use it,
+/// with its undo ("Btc price was off, so I turned it on. Say 'turn it off'
+/// to undo."): by its function's call ([`turned_on_for_ask`]) or by
+/// `make_skill`'s run now (`made_run::told_turned_on`).
+pub fn undo_line(spoken: &str) -> String {
+    format!(
+        "{} was off, so I turned it on. Say 'turn it off' to undo.",
+        opening(spoken)
+    )
 }
 
 /// What the model is told of its call of a skill turned off that the lamp
@@ -730,6 +754,10 @@ mod tests {
         assert_eq!(told["off"], false, "{told}");
         let next = told["next"].as_str().unwrap();
         assert!(next.contains("coffee time is on again"), "{next}");
+        // #7562's request 9: whether the line asked to use it is the
+        // model's to judge, told to call the run now, which says the undo.
+        assert!(next.contains("asked to use or run it"), "{next}");
+        assert!(next.contains("call make_skill now with run"), "{next}");
         assert_eq!(names(&keeping), ["coffee-time", "moon-fact"]);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -1405,6 +1433,25 @@ mod tests {
         for key in [TURN_OFF, TURN_ON] {
             let told = answered_unheard(json!({ key: "coffee time" }));
             assert_eq!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(None);
+    }
+
+    /// #7562's row on lamp-9adf, 18 Nov, request 9 ("Lamp, tell me a space
+    /// fact with my space facts skill."): switch on, one call that carries
+    /// a `turn_on` and a run now is the run now, which turns it on itself
+    /// (`made_run::asked_turning`; a run with no lamp-skills folder here is
+    /// unavailable, a turn unheard is `NOT_ASKED_ALOUD`). Switch off, as
+    /// before: a run now.
+    #[test]
+    fn a_turn_on_with_a_run_now_is_the_run_now() {
+        for switch in [true, false] {
+            made_skill::set_off_said_here(Some(switch));
+            let told = answered_unheard(json!({
+                TURN_ON: "space facts",
+                crate::made_run::RUN: "space facts"
+            }));
+            assert_eq!(told, crate::tools::unavailable(), "{switch}: {told}");
         }
         made_skill::set_off_said_here(None);
     }

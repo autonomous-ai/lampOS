@@ -5271,6 +5271,18 @@ becomes a remove. Then, in code (`made_turn::asked`):
   a run called after the turn on in the same turn goes to the skill and
   is tried again as above. Off, or unheard, the function's answer is told
   as it is.
+- **The run now turns it on too** (#7562's row on lamp-9adf, 18 Nov: "Lamp,
+  use my space facts skill." was the model's `make_skill` `run`, refused
+  `made_run::STOPPED`, "it is turned off or snoozed"). With the switch on,
+  `made_run::asked_turning` turns a skill in lamp-skills' `off` file on
+  through `make_skill`'s own `turn_on` (`made_turn::asked_here`, as
+  `on_for_ask`), runs it, tried again as above, and answers
+  `made_run::told_turned_on`: still a run, with the same undo line
+  (`made_turn::undo_line`). A snoozed skill, not in the `off` file, is never
+  turned on and stays "didn't run now". A call with `turn_on` and `run`
+  together is the run; a `turn_on` answer tells the model to call `run` when
+  the line asked to use it, and a run after the model's own `turn_on` of
+  that skill in the turn carries the undo line too. Switch off, as before.
 - **Said off or back on only after its turn** (#7562's row on lamp-9adf,
   18 Nov 10:57: "Lamp, turn off my bitcoin price skill." found nothing
   near btc price and offered theirs, and the model, with no second call,
