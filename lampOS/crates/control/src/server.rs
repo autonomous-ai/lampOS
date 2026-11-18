@@ -1648,11 +1648,25 @@ async fn connection<S>(
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|since| since.as_secs())
                         .unwrap_or_default();
+                    // An app's `phrases.set` is the door's own `subscribe` to
+                    // `phrase.heard` (or its `unsubscribe`), so its limits,
+                    // its `hear` grant and its rate are the door's; only
+                    // the reply is the app's.
+                    let (door_text, phrases_set) = if session.app_name().is_some() {
+                        crate::app_socket::phrases_set_as_subscribe(text.as_str())
+                    } else {
+                        (text.to_string(), None)
+                    };
                     let mut outcome = {
                         let mut door = shared.door.lock().expect("door");
                         let mut parts = shared.parts.lock().expect("parts");
-                        door.handle(&mut session, text.as_str(), parts.as_mut(), now, wall)
+                        door.handle(&mut session, &door_text, parts.as_mut(), now, wall)
                     };
+                    if let Some(count) = phrases_set {
+                        for reply in &mut outcome.send {
+                            crate::app_socket::phrases_reply(reply, count);
+                        }
+                    }
                     if let Some(client) = session.client() {
                         let grants = shared
                             .door

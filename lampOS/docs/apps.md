@@ -151,7 +151,7 @@ helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 
 ### The app socket
 
-(Built in piece 3b-1 except `phrases.set`, `phrase.heard` and `app.trigger`, which are 3b-2; the SDK's fake lamp speaks it all. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
+(Built in pieces 3b-1 and 3b-2a except `app.trigger` and the 3 s hold, which are 3b-2b; the SDK's fake lamp speaks it all. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
 `LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in a root
 0755 folder: the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`),
 read from `SO_PEERCRED`'s pid, never a name the app says. It speaks the door's
@@ -162,7 +162,7 @@ its grants allow, each refused `no_grant` without its grant, plus:
 
 | op | fields | answer |
 |---|---|---|
-| `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters, no repeats; needs `hear` | `{"ok":true,"phrases":N}` |
+| `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them); an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
 | `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters | `{"ok":true}` |
 | `app.settings.get` | none | `{"ok":true,"settings":{key: value,…}}`, every key with its current value |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"code":"rate","retry_ms":N}` |
