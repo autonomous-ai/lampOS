@@ -127,3 +127,37 @@ test('the owner stopping the app closes with the reason and no event', async () 
     assert.deepEqual(seen, []);
   });
 });
+
+test('off unsubscribes a door event on an app\'s socket (Heron\'s P2 on #7672)', async () => {
+  await withApp({ appGrants: ['speak', 'hear', 'look'] }, async (fake, lamp) => {
+    const handler = () => {};
+    await lamp.on('person.arrived', handler);
+    await lamp.off('person.arrived', handler);
+    assert.deepEqual(fake.requests.map((r) => r.op), ['subscribe', 'unsubscribe']);
+    // phrase.heard and the app's own events were never subscribed: nothing to take back.
+    await lamp.on('app.trigger', handler);
+    await lamp.off('app.trigger', handler);
+    assert.deepEqual(fake.requests.map((r) => r.op), ['subscribe', 'unsubscribe']);
+  });
+});
+
+test('on phrase.heard with phrases on an app\'s socket points to listenFor', async () => {
+  await withApp({}, async (fake, lamp) => {
+    assert.throws(() => lamp.on('phrase.heard', () => {}, { phrases: ['lesson time'] }), (error) => error.code === 'bad_request' && /listenFor/.test(error.message));
+  });
+});
+
+test('a refused listenFor leaves no handler behind', async () => {
+  await withApp({ appGrants: ['speak'] }, async (fake, lamp) => {
+    await assert.rejects(lamp.listenFor(['lesson time'], () => {}), (error) => error.code === 'no_grant');
+    assert.equal((lamp.handlers.get('phrase.heard') ?? []).length, 0);
+  });
+});
+
+test('an empty panel line is refused by the SDK and the fake alike, and panel(t, null) is the SDK\'s own', async () => {
+  await withApp({}, async (fake, lamp) => {
+    await assert.rejects(lamp.panel('ok', ['a', '', 'b']), (error) => error.code === 'bad_request');
+    await assert.rejects(lamp.request('app.panel.set', { title: 'ok', lines: ['a', '', 'b'] }), (error) => error.code === 'bad_request');
+    assert.equal(await lamp.panel('ok', null), 1);
+  });
+});

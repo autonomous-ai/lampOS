@@ -794,6 +794,11 @@ export class Lamp {
     }
     const short = shortPhrase(phrases);
     if (short) throw short;
+    if (this.app !== null && phrases?.length && event === 'phrase.heard') {
+      // On an app's socket the phrases are the app's whole list, replaced as one (`phrases.set`): a filter here would
+      // never be sent to the lamp, and the handler would never fire.
+      throw new LampError("on an app's socket the phrases are the app's own list: use `await lamp.listenFor(phrases, handler)`", { code: 'bad_request' });
+    }
     // A handler given `phrases` hears only those; with none it hears every `phrase.heard`. The lamp is asked for
     // all the connection's phrases once, so the filter is here.
     let registered = handler;
@@ -829,7 +834,9 @@ export class Lamp {
       return Promise.resolve();
     }
     this.handlers.delete(event);
-    return schema.events.includes(event) && this.app === null ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
+    // On an app's socket `phrase.heard` was never subscribed (`listenFor` turns it on): nothing to take back; a door event
+    // `on()` did subscribe is unsubscribed as anywhere.
+    return schema.events.includes(event) && !(this.app !== null && event === 'phrase.heard') ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
   }
 
   subscribe(events, phrases) {
@@ -853,8 +860,10 @@ export class Lamp {
   async listenFor(phrases, handler) {
     const short = shortPhrase(phrases);
     if (short) throw short;
+    const answer = await this.request('phrases.set', { phrases: [...phrases] });
+    // After the lamp took it, so a refusal (`no_grant`, `bad_request`) leaves no handler behind.
     if (handler) this.handlers.set('phrase.heard', [...(this.handlers.get('phrase.heard') ?? []), handler]);
-    return this.request('phrases.set', { phrases: [...phrases] });
+    return answer;
   }
 
   // Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A say, gesture or light within 3 s
@@ -867,13 +876,15 @@ export class Lamp {
 
   // The app's panel in the owner's app: a title (40 characters at most) and up to 6 lines of 80, plain text, no
   // control characters. One a minute: over it, `rate` with `retry_ms`. Resolves to the panel's revision.
-  async panel(title, lines = []) {
+  async panel(title, lines) {
+    lines ??= [];
     const bad = (why) => new LampError(`panel: ${why}`, { code: 'bad_request' });
     if (typeof title !== 'string' || title.length < 1 || [...title].length > PANEL_TITLE_MAX
       || lines.length > PANEL_LINES_MAX || lines.some((line) => [...line].length > PANEL_LINE_MAX)) {
       throw bad(`a title of 1 to ${PANEL_TITLE_MAX} characters and at most ${PANEL_LINES_MAX} lines of ${PANEL_LINE_MAX}`);
     }
     if (/\p{Cc}/u.test(title) || lines.some((line) => /\p{Cc}/u.test(line))) throw bad('text, no control characters');
+    if (lines.some((line) => line === '')) throw bad('a line is text, never empty (leave it out)');
     return (await this.request('app.panel.set', { title, lines: [...lines] })).rev;
   }
 
