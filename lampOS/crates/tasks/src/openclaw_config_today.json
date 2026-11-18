@@ -52,7 +52,8 @@
   },
   "tools": {
     "exec": {
-      "mode": "ask"
+      "ask": "on-miss",
+      "security": "allowlist"
     }
   }
 }

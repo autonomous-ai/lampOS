@@ -2974,8 +2974,12 @@ là phần của một coder khác trong #6226; thiết kế:
   `tools` ngay khi đang chạy và đọc `agents` ở mỗi lượt, nên không cần khởi
   động lại. `openclaw-ns` và các bind của nó không đổi, nên namespace vẫn
   giới hạn những gì một lệnh nhìn thấy. Khi công tắc là `off`,
-  `tools.exec.mode` lại là `"ask"` và các giá trị của V1 bị bỏ đi, nên file
-  giống hệt từng byte như trước #7245. Mục cho phép của launcher
+  `tools.exec` lại hỏi trước bằng `security: "allowlist"` và `ask:
+  "on-miss"` (đúng bằng `mode: "ask"` của OpenClaw) và các giá trị của V1 bị
+  bỏ đi. Bản thân `tools.exec.mode` không bao giờ được ghi và luôn bị bỏ đi:
+  lamp-tasks cũ hơn (khi rollback) ghi `host`, `security` và `ask` mà không
+  bỏ `mode`, và OpenClaw từ chối file có cả hai (exit 78, gateway chết; thấy
+  trên lamp-c0a4, #7245). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 

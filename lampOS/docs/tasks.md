@@ -2851,9 +2851,12 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   `gateway` block and any other key stay. The gateway takes `tools` hot and
   reads `agents` on each turn, so it needs no restart. `openclaw-ns` and its
   binds are unchanged, so the namespace still limits what a command can
-  see. With the switch `off`, `tools.exec.mode` is `"ask"` again and V1's
-  values are taken out, so the file is byte for byte what it was before
-  #7245. The skill-start launcher's allow-list entry ("One exec approval",
+  see. With the switch `off`, `tools.exec` asks again as `security:
+  "allowlist"` and `ask: "on-miss"` (exactly OpenClaw's `mode: "ask"`) and
+  V1's values are taken out. `tools.exec.mode` itself is never written and
+  is always taken out: an older lamp-tasks (a rollback) writes `host`,
+  `security` and `ask` and never removes `mode`, and OpenClaw refuses a
+  file with both (exit 78, the gateway down; seen on lamp-c0a4, #7245). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 

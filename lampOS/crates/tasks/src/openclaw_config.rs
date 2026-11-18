@@ -28,10 +28,14 @@
 //!   = `full`; `agents.defaults.sandbox.mode` = `off`. So the lamp's
 //!   OpenClaw runs a command headless as V1's did, with no ask nobody can
 //!   answer; its namespace (`openclaw-ns`) still bounds what it sees;
-//! - with it off: `tools.exec.mode` = [`EXEC_MODE`], OpenClaw asking
-//!   before a command not allowed already (Hermes' `approvals.mode:
-//!   manual`), and V1's values above taken out where they are V1's, so the
-//!   file is today's again;
+//! - with it off: `tools.exec` = `{security: allowlist, ask: on-miss}`
+//!   ([`EXEC_SECURITY`], [`EXEC_ASK`]), OpenClaw asking before a command
+//!   not allowed already (Hermes' `approvals.mode: manual`; OpenClaw's
+//!   `mode: ask` is exactly this pair), and V1's values above taken out
+//!   where they are V1's. `tools.exec.mode` is never written and always
+//!   taken out: an older lamp-tasks (a rollback) writes `host`, `security`
+//!   and `ask` and never removes `mode`, and OpenClaw refuses a file with
+//!   both (exit 78, the gateway down; #7245, lamp-c0a4 after a rollback);
 //! - with [`SKILLS_SWITCH`] on, [`SKILLS_DIR`] in `skills.load.extraDirs`:
 //!   OpenClaw reads the lamp's own skills where they are, read-only, never
 //!   copied into its state; the dirs a person added there are kept;
@@ -64,8 +68,12 @@ pub const PROVIDER: &str = "lampos";
 pub const CONTEXT_WINDOW: u64 = 128_000;
 /// The most tokens one answer asks for: DeepSeek chat's default ceiling.
 pub const MAX_TOKENS: u64 = 8_192;
-/// OpenClaw's exec mode that asks before a command not allowed already.
-pub const EXEC_MODE: &str = "ask";
+/// OpenClaw's exec policy that asks before a command not allowed already:
+/// what its `mode: "ask"` means (`resolveExecPolicyForMode`), in the keys
+/// every lamp-tasks writes, so a rollback's writer never leaves `mode`
+/// beside them.
+pub const EXEC_SECURITY: &str = "allowlist";
+pub const EXEC_ASK: &str = "on-miss";
 /// The plugins OpenClaw loads on the lamp when no `plugins.allow` is set
 /// (#6226, measured on lamp-c0a4): with OpenClaw's default 41 of 69
 /// bundled plugins on, a turn stalled 92 s and timed out; with only these
@@ -156,7 +164,8 @@ fn take_empty(map: &mut Map<String, Value>, key: &str) {
 
 /// V1's tool grants (`runtimes/openclaw/service_setup.go`, lines 136 and
 /// 237-250) in `root`, or with `on` false taken out where they are V1's,
-/// with `tools.exec.mode` = [`EXEC_MODE`] as before #7245.
+/// with `tools.exec` asking ([`EXEC_SECURITY`], [`EXEC_ASK`]); `mode` is
+/// never written.
 fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
     let defaults = object(
         object(root, "agents", "agents")?,
@@ -190,10 +199,12 @@ fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
         take(tools, "profile", &json!("full"));
         let exec = object(tools, "exec", "tools.exec")?;
         take(exec, "host", &json!("gateway"));
-        // Left beside `mode`, they would make the file one OpenClaw refuses.
-        exec.remove("security");
-        exec.remove("ask");
-        exec.insert("mode".into(), json!(EXEC_MODE));
+        // OpenClaw's `mode: ask` as `security`/`ask`, never `mode` itself:
+        // an older lamp-tasks writes `security`/`ask` and leaves a `mode`
+        // there, which OpenClaw refuses beside them.
+        exec.remove("mode");
+        exec.insert("security".into(), json!(EXEC_SECURITY));
+        exec.insert("ask".into(), json!(EXEC_ASK));
         if let Some(elevated) = tools.get_mut("elevated").and_then(Value::as_object_mut) {
             if let Some(from) = elevated.get_mut("allowFrom").and_then(Value::as_object_mut) {
                 take(from, ELEVATED_CHANNEL, &json!(["*"]));
@@ -466,9 +477,9 @@ mod tests {
         assert!(!v1_tools_on(Some("off")));
     }
 
-    /// #7245's kill switch: off writes today's file byte for byte (the
-    /// text before #7245, its `tools` only `exec.mode: ask`), and turns a
-    /// file written with V1's tools back into that one.
+    /// #7245's kill switch: off writes today's file (the text before
+    /// #7245 with `exec.mode: ask` as its `security`/`ask` pair), and turns
+    /// a file written with V1's tools back into that one.
     #[test]
     fn with_the_v1_tools_switch_off_the_file_is_todays() {
         let off = |text: &str| merge_config(text, 7741, Path::new(WORKSPACE), true, false).unwrap();
@@ -479,6 +490,38 @@ mod tests {
         assert_eq!(
             off(""),
             off(&merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap())
+        );
+    }
+
+    /// #7245, lamp-c0a4 after a rollback: neither switch's file has
+    /// `tools.exec.mode`, an old one's is taken out, and an older
+    /// lamp-tasks writing `host`/`security`/`ask` over either leaves a
+    /// file OpenClaw takes (`mode` beside `security` or `ask` is refused).
+    #[test]
+    fn no_file_has_an_exec_mode_so_a_rollbacks_writer_leaves_it_valid() {
+        let mut old: Value = serde_json::from_str(INSTALLED).unwrap();
+        old["tools"]["exec"] = json!({"mode": "ask"});
+        let old = serde_json::to_string(&old).unwrap();
+        for v1 in [true, false] {
+            for text in [INSTALLED, "", old.as_str()] {
+                let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                let mut value: Value = serde_json::from_str(&merged).unwrap();
+                let exec = value["tools"]["exec"].as_object_mut().unwrap();
+                assert!(!exec.contains_key("mode"), "{v1}: {merged}");
+                // What 14158's lamp-tasks writes, never removing `mode`.
+                exec.insert("host".into(), json!("gateway"));
+                exec.insert("security".into(), json!("full"));
+                exec.insert("ask".into(), json!("off"));
+                assert!(!exec.contains_key("mode"), "{v1}");
+            }
+        }
+        let off: Value = serde_json::from_str(
+            &merge_config("", 7741, Path::new(WORKSPACE), true, false).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            off["tools"]["exec"],
+            json!({"security": EXEC_SECURITY, "ask": EXEC_ASK})
         );
     }
 
