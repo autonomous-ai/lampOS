@@ -3489,7 +3489,11 @@ cả hai người viết.
   không bao giờ được giữ. Cả hai trường hợp đều theo dạng giữa: đèn tự viết
   skill thành một task cho agent (`make_no_cannot::made`): trigger do mô
   hình của đèn chọn trong một lần gọi nữa (giờ cũng là trigger), hoặc lời
-  gọi nó, và một `do.task` có lời là chính yêu cầu của người dùng, chạy
+  gọi nó, và một `do.task` có lời là chính lời của người dùng, câu nghe
+  được cho lần tạo (`thread.heard_for`, P2 của Twelve trên #7819), không
+  bao giờ là câu diễn đạt lại của mô hình giọng nói trong `request` của
+  `make_skill`, chỉ dùng khi không nghe được gì (tạo từ app hoặc câu gõ);
+  lần đánh giá và lần gọi thêm cũng hỏi theo chính lời đó; chạy
   bằng `scripts/agent.py`, để agent làm toàn bộ việc khi nó chạy; không
   `say`, không bước nào khác, không hẹn giờ hay `[[while]]` do mô hình
   viết. Trên trigger, nhưng không bao giờ trên đồng hồ của đèn

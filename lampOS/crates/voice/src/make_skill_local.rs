@@ -3662,8 +3662,16 @@ fn made_and_journaled_by(
     // the internet's line or what can't be read keeps its own route. With
     // no agent on the lamp (`missing`), told so; an agent not known, no
     // judgement: DeepSeek's as before.
+    // The judge and the middle form's task take the person's own words, the
+    // line heard (the 19:50 ruling; Twelve's P2 on #7819), never the voice
+    // model's paraphrase in `request`; the request's words only when
+    // nothing was heard: a make from the app or a typed line.
+    let own_words = heard
+        .map(str::trim)
+        .filter(|heard| heard.chars().any(char::is_alphanumeric))
+        .unwrap_or(request);
     let routed = made_skill::reactions_on() && (engine.is_some() || missing);
-    let judged_none = routed && reaction_judged(Arc::clone(&chat), request) != Some(true);
+    let judged_none = routed && reaction_judged(Arc::clone(&chat), own_words) != Some(true);
     let first = (!judged_none).then(first_ask);
     // A draft's name, for a long make's lines before the agent's is known
     // (`LAMP_MAKE_MAY_RUN_ON`, #6811); judged none, there is no draft.
@@ -3698,7 +3706,7 @@ fn made_and_journaled_by(
                  one task of the request; no DeepSeek draft kept"
             );
             let made = agent_task(
-                request,
+                own_words,
                 &chat,
                 began,
                 &agent_kept,
@@ -12322,6 +12330,63 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(is_judgement(&sent[0], SIP), "{}", sent[0]);
             assert_eq!(told["made"], name.as_str(), "{told}");
             one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7819, the first builder's 19:50 ruling: the middle
+    /// form's task holds the person's own words, the line heard, never the
+    /// voice model's paraphrase in `request`; the judge and the one more
+    /// call are asked of the heard line too. With nothing heard (a make
+    /// from the app or a typed line), the request's words.
+    #[test]
+    fn with_the_switch_the_middle_forms_task_holds_the_heard_words() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-heard");
+        const HEARD: &str = "when I've been sitting here ages, tell me to roll my shoulders";
+        const PARAPHRASE: &str = "remind the user to do shoulder rolls after a long sitting";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        for (at, heard, words) in [
+            (0, Some(HEARD), HEARD),
+            (1, Some(" \n "), PARAPHRASE),
+            (2, None, PARAPHRASE),
+        ] {
+            let tasks = agent_answering(vec![]);
+            let name = format!("shoulder-roll-{at}");
+            let (url, served) = service_sent(vec![
+                judgement(false),
+                (200, trigger_answer(&name, "speak", "room/presence", sat)),
+            ]);
+            let told = make_with_by(
+                0,
+                heard,
+                PARAPHRASE,
+                &keeping,
+                chat_at(url),
+                NOW + at,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], words), "{}", sent[0]);
+            assert!(
+                sent[1].contains(&format!("Request: {words}")),
+                "{}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name.as_str(), "{told}");
+            one_task_of(
+                &copy,
+                &crate::make_no_cannot::task_words(words),
+                crate::make_no_cannot::RUN,
+            );
+            if words == HEARD {
+                assert!(!std::fs::read_to_string(&copy).unwrap().contains(PARAPHRASE));
+            }
         }
         net_make_here(None);
         made_skill::set_reactions_here(None);
