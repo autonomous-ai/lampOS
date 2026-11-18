@@ -22,6 +22,7 @@ use std::{
 pub mod addon;
 pub mod app_package;
 pub mod clock;
+pub mod core_agent;
 pub mod daily;
 pub mod did;
 pub mod glow;
@@ -323,6 +324,10 @@ struct SkillFile {
     secrets: Option<Vec<String>>,
     #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
+    /// Loaded as a core skill's line through the lamp's agent
+    /// ([`core_agent`], `LAMP_CORE_VIA_AGENT`): never in the file itself.
+    #[serde(skip)]
+    via_agent: bool,
 }
 
 /// `[budget]`: the skills naming one `group` start at most `per_hour` runs
@@ -2455,6 +2460,10 @@ pub struct Skill {
     /// file by its name (`made_asks`), its asks or none, so the voice runs
     /// it when its name is said (`lamp_voice::skill_named`, #7233).
     pub made_here: bool,
+    /// A core skill whose line goes through the lamp's agent
+    /// ([`core_agent`], `LAMP_CORE_VIA_AGENT`): its `do.task` is the line,
+    /// and its say the fallback. False for every other skill.
+    pub via_agent: bool,
 }
 
 impl Skill {
@@ -4154,9 +4163,36 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let mut table: toml::Table =
         toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
     let texts = (description_text.as_str(), manifest_text.as_str());
+    // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
+    // its variant stands in for its grants, [[do]] and [[present.do]] alone.
+    // Off, or for any other skill, nothing is read.
+    let via_agent = match core_agent::overlaid(&name, dir, &table) {
+        Ok(Some(with)) => {
+            table = with;
+            true
+        }
+        Ok(None) => false,
+        Err(why) => {
+            eprintln!(
+                "lamp-skills: skill:{name}: {}: {why}: it says its own line, as with {} off",
+                core_agent::OVERLAY,
+                core_agent::ENVIRONMENT
+            );
+            false
+        }
+    };
+    let read_file = |table: toml::Table| {
+        toml::Value::Table(table)
+            .try_into::<SkillFile>()
+            .map(|file| SkillFile { via_agent, ..file })
+            .map_err(|error| format!("skill.toml: {error}"))
+    };
     let Some(overlay) = table.remove("present") else {
-        let file =
-            toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+        let file = if via_agent {
+            read_file(table)?
+        } else {
+            toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?
+        };
         return manifest(dir, name, description, texts, file).map(|skill| Skill { when, ..skill });
     };
     let toml::Value::Table(overlay) = overlay else {
@@ -4170,11 +4206,6 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
             "skill.toml: [present] gives only {PRESENT_KEYS:?}, not {key:?}"
         ));
     }
-    let read_file = |table: toml::Table| {
-        toml::Value::Table(table)
-            .try_into::<SkillFile>()
-            .map_err(|error| format!("skill.toml: {error}"))
-    };
     let own = read_file(table.clone())?;
     table.extend(overlay);
     let with = read_file(table).map_err(|why| format!("[present]: {why}"))?;
@@ -4990,7 +5021,10 @@ fn manifest(
     if tasks > 1 {
         return Err("do.task: a skill hands over one task, so it has one do.task step".into());
     }
-    if tasks == 1 && kind != SkillKind::Installable {
+    // A core skill's line through the lamp's agent ([`core_agent`]) is the
+    // one core skill that hands a task over, its variant checked as read.
+    if tasks == 1 && kind != SkillKind::Installable && !(kind == SkillKind::Core && file.via_agent)
+    {
         return Err(format!(
             "do.task: only an installable skill hands a task over, never kind = \"{}\"",
             kind.name()
@@ -5800,6 +5834,7 @@ fn manifest(
         grants,
         manners_shed: Vec::new(),
         made_here,
+        via_agent: file.via_agent,
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -6555,6 +6590,9 @@ pub fn load_each_with(
         .into_iter()
         .map(|folder| {
             let skill = load(&folder).and_then(|skill| match skill.task_step() {
+                // A core skill's line through the lamp's agent: its brief is
+                // this program's own, checked byte for byte as it loaded.
+                Some(_) if skill.via_agent => Ok(skill),
                 // A script only from the Store here (#6305).
                 Some(_) => task::origin_refuses(&folder, false).map_or(Ok(skill), Err),
                 None => Ok(skill),
@@ -12004,13 +12042,20 @@ pub fn run_tests_at(dir: &Path, energy: u8) -> Result<(usize, usize), String> {
                 "[[known]] is a watch's: this skill has no [watch]".into(),
             ));
         } else {
-            replay_skill(
-                load_with(dir, expect.present)?,
+            let skill = load_with(dir, expect.present)?;
+            // A core skill's line through the lamp's agent: a case has no
+            // agent, so its run is the run with the agent down, its own say
+            // at once; its hand-over is not one of the case's calls.
+            let via_agent = skill.via_agent;
+            let mut made = replay_skill(
+                skill,
                 case,
                 &expect.call_tool,
                 expect.clock.as_deref(),
                 energy,
-            )?
+            )?;
+            made.retain(|made| !(via_agent && matches!(made.call, Call::Task(_))));
+            made
         };
         let names: Vec<_> = made
             .iter()
