@@ -7054,9 +7054,9 @@ unicast addresses it gives are kept (no private, loopback, link-local,
 shared CGNAT, multicast, unspecified, documentation or reserved one;
 `net::public::global`), and those not raced before join the race: the next
 try goes to the first of them at once, and up to 2 tries more are begun
-(`MORE_TRIES`), all within the same bound. `LAMP_WEATHER_SECOND_LOOKUP=off`
-turns the second lookup off (on unless exactly `off`; no product unit sets
-it). The journal says how many
+(`MORE_TRIES`), all within the same bound. The second lookup runs only
+with `LAMP_WEATHER_SECOND_LOOKUP=on` (off unless exactly `on`); no product
+unit sets it, so the product has none (El's ruling on #7700, 14:23). The journal says how many
 addresses it added and after how long (`a public service's name looked up
 through another resolver gave N address(es) more, after N ms`), or why it
 failed, never the name. With no address more the request ends at its bound
