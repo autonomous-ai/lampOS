@@ -57,13 +57,14 @@ async fn run_full(
     setup: Option<bool>,
     sight: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>) {
-    let (sent, asked, _) = run_timed(turns, two_faces_at, refused, setup, sight, None).await;
+    let (sent, asked, _) = run_timed(turns, two_faces_at, refused, setup, sight, None, false).await;
     (sent, asked)
 }
 
 /// As [`run_full`], with the eyes taking `slow` over each save and each
 /// chat's first event coming a second late, and what the voice was asked
-/// to say.
+/// to say; with `LAMP_FACE_NO_ASK`'s engine switch when `no_ask`
+/// ([`Engine::keeping_faces_unasked`]).
 async fn run_timed(
     turns: &[(&'static str, Lamp)],
     two_faces_at: Option<usize>,
@@ -71,6 +72,7 @@ async fn run_timed(
     setup: Option<bool>,
     sight: bool,
     slow: Option<Duration>,
+    no_ask: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>, Vec<String>) {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
@@ -150,7 +152,8 @@ async fn run_timed(
             None,
         )
         .announcing(false)
-        .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()));
+        .reading_said_from(Arc::new(move || reading.lock().unwrap().clone()))
+        .keeping_faces_unasked(no_ask);
     if let Some(open) = setup {
         engine = engine.reading_setup_from(Arc::new(move || open));
     }
@@ -269,6 +272,7 @@ async fn a_slow_held_save_still_has_the_yes_answered() {
         None,
         false,
         Some(Duration::from_millis(3_500)),
+        false,
     )
     .await;
     assert_eq!(sent, kept());
@@ -502,6 +506,31 @@ async fn at_setup_a_yes_to_the_read_back_with_no_call_asks_the_face_question() {
         .await;
         assert_eq!(sent, kept(), "{read_back}");
     }
+}
+
+/// With `LAMP_FACE_NO_ASK` (the first builder's ruling on #7810): a plain
+/// yes to a name said back at setup, with no save called, runs no save and
+/// has no face question asked; nor does a yes to a face question the model
+/// asked all the same. A yes is no proof that the face in view said the
+/// name, so the setup face waits for the speaker's own (`run_speaker`), and
+/// the step ends with the name only. Off, the face question is asked first,
+/// as (i) shows.
+#[tokio::test]
+async fn at_setup_with_no_ask_a_yes_runs_no_save_and_asks_no_face_question() {
+    let no_ask = |turns: &'static [(&'static str, Lamp)]| async move {
+        let (sent, asked, _) = run_timed(turns, None, None, Some(true), false, None, true).await;
+        (sent, asked)
+    };
+    let (sent, asked) = no_ask(&[NO_CALL_NAME_LINE, NO_CALL_YES]).await;
+    assert_eq!(sent, Vec::<Value>::new());
+    assert!(!asked.iter().any(|chat| asks_the_face(chat)), "{asked:?}");
+    let (sent, _) = no_ask(&[
+        ("Name is Walter.", Lamp::Says(READ_BACK)),
+        ("Yes. That's my name.", Lamp::Says(FACE_QUESTION)),
+        ("Yes.", Lamp::Says("Thanks, Walter.")),
+    ])
+    .await;
+    assert_eq!(sent, Vec::<Value>::new());
 }
 
 /// (i') A no, or anything but a plain yes, to the face question keeps

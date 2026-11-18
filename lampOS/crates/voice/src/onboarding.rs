@@ -1208,6 +1208,12 @@ pub struct Onboarding {
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
     face_kept: bool,
+    /// With a face to keep, names checked and `LAMP_FACE_NO_ASK=on`
+    /// (`known_faces::FACE_NO_ASK_ENVIRONMENT`, the product owner's no-asks
+    /// rule, 18 Nov): "who you are" keeps the face once the name is heard,
+    /// with nothing asked ([`skill::WHO_YOU_ARE_NO_ASK`]); the walk never
+    /// asks the face question itself, nor once more after the walk.
+    face_no_ask: bool,
     /// Whether no hand was on the lamp at the body's last reading.
     released: bool,
     /// Since when a face at least [`NEAR`] has been seen without a break.
@@ -1621,6 +1627,10 @@ impl Onboarding {
         }
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
+        // As the second route's face save reads it: names checked too.
+        walk.face_no_ask = walk.face_kept
+            && crate::known_faces::face_no_ask_on()
+            && std::env::var(crate::known_faces::NAMES_ENVIRONMENT).as_deref() == Ok("checked");
         // The head pads' touches, from `--touch` Controls, only with the
         // voice's bus on.
         if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {
@@ -1728,6 +1738,7 @@ impl Onboarding {
             model_held: false,
             first_update: None,
             face_kept: false,
+            face_no_ask: false,
             released: true,
             near_since: None,
             touches: None,
@@ -3812,14 +3823,14 @@ impl Onboarding {
                 );
                 if again.is_some() {
                     self.save();
-                    self.owed = Some(self.definition.visit_reoffer(step).to_owned());
+                    self.owed = Some(self.step_note(step, true, true));
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
                 // Bound to its turn, so one never said is asked again at
                 // once ([`Self::first_note_finished`]).
                 self.opener_said = true;
-                let note = self.definition.note(step, opened).to_owned();
+                let note = self.step_note(step, opened, false);
                 let intro = step == Step::WhereYouSit && !opened;
                 return Some(self.counted_note(step, note, intro));
             }
@@ -3911,6 +3922,7 @@ impl Onboarding {
         // from the question, as from any of the lamp's words.
         if step == Step::WhoYouAre
             && self.face_kept
+            && !self.face_no_ask
             && !led.face_only
             && !led.heard.face_asked
             && led.heard.name
@@ -4648,6 +4660,23 @@ impl Onboarding {
         self.owed = Some(self.later_line(Step::WhoYouAre));
     }
 
+    /// The note a step is asked with: the file's (`again`, its reoffer; on a
+    /// later `visit`, [`skill::Definition::visit_reoffer`]), except "who you
+    /// are" with nothing asked ([`Self::face_no_ask`]), whose note is the
+    /// walk's own ([`skill::WHO_YOU_ARE_NO_ASK`]): the file's asks for the
+    /// face and a read-back's yes first, and an older lamp-skills refuses a
+    /// new key.
+    fn step_note(&self, step: Step, again: bool, visit: bool) -> String {
+        if step == Step::WhoYouAre && self.face_no_ask {
+            return skill::WHO_YOU_ARE_NO_ASK.to_owned();
+        }
+        if visit {
+            self.definition.visit_reoffer(step).to_owned()
+        } else {
+            self.definition.note(step, again).to_owned()
+        }
+    }
+
     /// "Who you are" just ended done with no face saved, on a lamp that
     /// keeps faces (#5139): a conversation with nobody known in view keeps
     /// nothing, so the walk says that what it remembers waits for a face,
@@ -4656,6 +4685,17 @@ impl Onboarding {
     /// again and again.
     fn name_only(&mut self, face_only: bool, told: Vec<String>) {
         if !self.face_kept || face_only {
+            return;
+        }
+        // With nothing asked (`LAMP_FACE_NO_ASK`): the name only, the face
+        // never asked for once more, and a line that promises nothing about
+        // the face ([`skill::NAME_ONLY_NO_ASK`]).
+        if self.face_no_ask {
+            eprintln!(
+                "lamp-voice: onboarding: who_you_are done with the name only: memory waits for a face, not asked for again (LAMP_FACE_NO_ASK)"
+            );
+            self.owed_after = self.owed.replace(skill::NAME_ONLY_NO_ASK.to_owned());
+            self.save();
             return;
         }
         self.desired.face_again_names = told.into_iter().take(MOST_TOLD_IDS).collect();
@@ -4685,6 +4725,7 @@ impl Onboarding {
         // one's in particular, nor is the face a save takes.
         let due = self.desired.face_again
             && self.face_kept
+            && !self.face_no_ask
             && can_speak
             && face.is_some()
             && self.faces_in_view.is_none_or(|faces| faces == 1)
@@ -8857,6 +8898,73 @@ mod tests {
             "{notes:?}"
         );
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the product owner's no-asks rule, 18 Nov): "who
+    /// you are" is asked with the walk's own note, which keeps the face once
+    /// the name is heard and asks nothing about it. A face saved ends it
+    /// done with the owner kept; a name and a yes with no face saved never
+    /// get the walk's face question, end with the name only on a line that
+    /// promises nothing about the face ([`skill::NAME_ONLY_NO_ASK`]), and
+    /// the face is never asked for again. A redo of "who you are" is asked the same.
+    #[test]
+    fn with_no_ask_who_you_are_keeps_the_face_with_nothing_asked() {
+        assert!(!skill::WHO_YOU_ARE_NO_ASK.contains("May I remember"));
+        let start = |name: &str| {
+            let mut room = Room::new(name);
+            room.walk.face_kept = true;
+            room.walk.face_no_ask = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(
+                room.wait(20 * S, Some(NEAR_MIDDLE)),
+                [skill::WHO_YOU_ARE_NO_ASK]
+            );
+            room
+        };
+
+        // The name heard and the face saved at once: done, the owner kept.
+        let mut room = start("no-ask-kept");
+        room.walk.heard("My name is Walter.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Walter"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.desired.owner.as_deref(), Some("Walter"));
+        // Asked again: the same note, nothing asked.
+        post(&room.walk.file, &json!({"redo_step": "who_you_are"})).unwrap();
+        let notes = room.wait(30 * S, Some(NEAR_MIDDLE));
+        assert!(
+            notes.iter().any(|note| note == skill::WHO_YOU_ARE_NO_ASK),
+            "{notes:?}"
+        );
+
+        // A name and a yes, no face saved (two faces in view): the walk
+        // never asks for the face, and ends with the name only.
+        let mut room = start("no-ask-not-kept");
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Walter, did I get that right?");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Okay.");
+        let notes = room.wait(2 * NAME_WAIT_US, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::FACE_ASK),
+            "{notes:?}"
+        );
+        assert!(
+            notes.iter().any(|note| note == skill::NAME_ONLY_NO_ASK),
+            "{notes:?}"
+        );
+        assert!(
+            !notes
+                .iter()
+                .any(|note| note.contains("once I've seen your face")),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert!(room.walk.kept().owner.is_none());
+        assert!(!room.walk.kept().face_again, "never asked for again");
     }
 
     /// Every fixed line the walk begins ("Say only this: ...") is its own

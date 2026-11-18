@@ -212,6 +212,18 @@ mod tests {
         chosen: known_faces::FaceSwitches,
         reply: Value,
     ) -> (Value, Vec<Value>) {
+        exchange_seen(seen(proof(words)), name, apart, chosen, reply)
+    }
+
+    /// [`own_name_exchange_with`], with what the eyes saw saying the line
+    /// given as `line`: with no enrollment proof, no face was seen saying it.
+    fn exchange_seen(
+        line: speaking_faces::LineSeen,
+        name: &str,
+        apart: bool,
+        chosen: known_faces::FaceSwitches,
+        reply: Value,
+    ) -> (Value, Vec<Value>) {
         let home = crate::process::SessionDirectory::create().unwrap();
         let socket = home.path.join("eyes.sock");
         let listener = UnixListener::bind(&socket).unwrap();
@@ -244,7 +256,6 @@ mod tests {
             }
         });
         let owner = owner();
-        let line = seen(proof(words));
         let answer = known_faces::run_scoped(
             &socket,
             &call(json!({"name": name, "apart": apart})),
@@ -584,6 +595,102 @@ mod tests {
         let (answer, _) =
             own_name_exchange("I'm Ada.", "Ada", false, true, json!({"remembered": "Ada"}));
         assert_eq!(answer, json!({"ok": true, "remembered": "Ada"}));
+    }
+
+    /// `LAMP_FACE_NO_ASK` at setup (the Reviewer-lead's HOLD and the first
+    /// builder's ruling on #7810): the walk's first save keeps a face
+    /// unasked only on the same speaking-face proof as past setup. The face
+    /// seen saying its own name is kept with no face question, and the model
+    /// says the one line. One face seen silent while another voice says the
+    /// name (no enrollment proof), another person's name, or two faces in
+    /// view keep nothing and ask nothing: the step ends with the name only.
+    /// Off, a name alone at setup is still asked for the face's leave
+    /// ([`known_faces::FACE_LEAVE`]).
+    #[test]
+    fn remember_speaker_at_setup_with_no_ask_keeps_only_the_face_seen_saying_the_name() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let setup = |face_no_ask: bool| known_faces::FaceSwitches {
+            at_setup: true,
+            face_no_ask,
+            ..switches()
+        };
+        let asks = |answer: &Value| {
+            let text = answer.to_string();
+            [
+                "May I",
+                "Shall I",
+                "did I get",
+                "look at me",
+                "say their name again",
+            ]
+            .iter()
+            .any(|ask| text.contains(ask))
+        };
+        let kept = json!({"remembered": "Walter"});
+
+        // The face seen saying the name: kept, nothing asked, the line said.
+        let (answer, requests) = own_name_exchange_with(
+            "My name is Walter.",
+            "Walter",
+            false,
+            setup(true),
+            kept.clone(),
+        );
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["note"], known_faces::SETUP_KEPT_NO_ASK, "{answer}");
+        assert!(!asks(&answer), "{answer}");
+        assert_eq!(requests.len(), 1, "{requests:?}");
+        assert_eq!(requests[0]["remember_speaker"]["name"], "Walter");
+
+        // One face seen, silent, while another voice says the name: no face
+        // was seen saying it, so nothing reaches the eyes, nothing is kept
+        // and nothing is asked.
+        let silent = speaking_faces::LineSeen {
+            request: REQUEST,
+            speakers: Vec::new(),
+            ..Default::default()
+        };
+        let (answer, requests) =
+            exchange_seen(silent.clone(), "Walter", false, setup(true), kept.clone());
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer, json!({"error": known_faces::SETUP_NOT_KEPT_NO_ASK}));
+        assert!(!asks(&answer) && !answer.to_string().contains("I'll know you"));
+
+        // Another person's name: nothing sent, nothing asked.
+        let (answer, requests) = own_name_exchange_with(
+            "This is my son Tom.",
+            "Tom",
+            false,
+            setup(true),
+            kept.clone(),
+        );
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer, json!({"error": known_faces::SETUP_NOT_KEPT_NO_ASK}));
+
+        // Two faces in view: nothing kept, nothing asked, no false line.
+        let (answer, _) = own_name_exchange_with(
+            "My name is Walter.",
+            "Walter",
+            false,
+            setup(true),
+            json!({"error": "two_faces"}),
+        );
+        assert_eq!(answer, json!({"error": known_faces::SETUP_NOT_KEPT_NO_ASK}));
+        assert!(!answer.to_string().contains("I'll know you"));
+
+        // Off: a name alone at setup still waits on the face's leave, and the
+        // silent face is still told to look and say it again.
+        let (answer, requests) = own_name_exchange_with(
+            "My name is Walter.",
+            "Walter",
+            false,
+            setup(false),
+            kept.clone(),
+        );
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer["error"], known_faces::FACE_LEAVE);
+        let (answer, _) = exchange_seen(silent, "Walter", false, setup(false), kept);
+        assert_eq!(answer["error"], NOT_SEEN);
     }
 
     #[test]

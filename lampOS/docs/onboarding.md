@@ -542,6 +542,39 @@ as soon as the lamp may speak after the model's answer (below). `room_sounds` an
 ask their questions exactly too (see the step table), each ending "Just say yes
 or no.", and keep their consent clauses.
 
+**With nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set).** The
+product owner's no-asks rule (the first builder 18:50, 18 Nov; the setup
+walk's half, past setup and the photo are [eyes.md](eyes.md)'s). On a lamp
+that keeps faces with `LAMP_NAMES=checked`, "who you are" is asked with the
+walk's own note (`skill::WHO_YOU_ARE_NO_ASK`, in place of the file's
+`first` and `reoffer`, on a redo too): once the name is heard the model
+calls `remember_my_face` at once. There is no "May I remember your face?",
+no read-back's yes before the save, no save held for one, and the walk
+never asks the face question itself (`skill::FACE_ASK`). The name's own
+checks stay (heard, or spelled after the lamp asked).
+
+The face is kept only with the same speaking-face proof as past setup
+(#7810, the Reviewer-lead's HOLD and the first builder's ruling): the
+speaker-bound route (`LAMP_REMEMBER_SPEAKER`, `known_faces::run_speaker`),
+where the eyes saw that face say the name, in the request's own words
+naming the speaker. Then the speaker's leave for the face (`FACE_LEAVE`)
+is not asked, and only when the eyes answer `remembered` is the model told
+to say "I'll know you next time. Say 'forget my face' to undo."
+(`known_faces::SETUP_KEPT_NO_ASK`). Without that proof nothing is kept and
+nothing is asked, not the read-back nor the face question
+(`known_faces::SETUP_NOT_KEPT_NO_ASK`): one face seen silent while another
+voice says the name (a TV, a second person), another person's name ("This
+is my son Tom"), two faces, none, too far or the eye shut, and any save
+off the speaker-bound route (`run_switched`, where one face in view is not
+proof of who spoke). The step then ends with the name only, on its own line,
+"Thanks, it's good to meet you." (`skill::NAME_ONLY_NO_ASK`, in place of
+`NAME_ONLY`'s "once I've seen your face", which nothing would keep), and
+the face is never asked for once more (`face_again` is not kept); it is learned later on the speaker route, when they say "I'm X". A
+plain yes at setup with no save called runs none and asks no face question
+(`second_provider::yes_save`, `Engine::keeping_faces_unasked`). "Forget my
+face" is unchanged. Off, the walk is as described above, the held save
+included.
+
 **A skip is said from the record.** The model may only skip `where_you_sit`,
 `how_you_sound`, `touch` and `giving_way`. For those four, the walk itself says
 the step's `skipped` line once the skip is in the record, before the next

@@ -2307,6 +2307,10 @@ struct Shared {
     /// read-back with no save called ([`yes_save`]); the walk's file when
     /// unset.
     setup_open: Option<SetupOpen>,
+    /// A face kept with nothing asked (`LAMP_FACE_NO_ASK`, names checked,
+    /// [`Engine::keeping_faces_unasked`]): a yes at setup runs no save and
+    /// asks no face question ([`yes_save`]).
+    face_no_ask: bool,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -5151,6 +5155,7 @@ impl Engine {
                 cut_window: None,
                 said_window: None,
                 setup_open: None,
+                face_no_ask: false,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
@@ -5710,6 +5715,16 @@ impl Engine {
     pub fn holding_renames_for_yes(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.rename_yes = on;
+        self
+    }
+
+    /// With `LAMP_FACE_NO_ASK` and names checked, a yes at setup with no
+    /// save called runs none and asks no face question ([`yes_save`]): the
+    /// setup face is kept only on the speaker's own proof
+    /// (`known_faces::run_speaker`). Off, as before.
+    pub fn keeping_faces_unasked(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_no_ask = on;
         self
     }
 
@@ -15600,6 +15615,14 @@ fn yes_save(
     now: Instant,
 ) -> Option<Result<HeldSave, String>> {
     if !heard {
+        return None;
+    }
+    // With `LAMP_FACE_NO_ASK` (the product owner's no-asks rule; the first
+    // builder's ruling on #7810): a yes is no proof that the face in view
+    // said the name, so it runs no save, and no face question is asked;
+    // the face is kept only on the speaker's own proof
+    // (`known_faces::run_speaker`), else the step ends with the name only.
+    if shared.face_no_ask {
         return None;
     }
     let said = said_window(shared);
