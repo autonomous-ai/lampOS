@@ -4933,9 +4933,17 @@ pub fn serve(
         // reads only words, is told it may be people's talk, with the tool
         // it leaves such talk alone with (#1712).
         if declines {
-            let heeding = heeding.clone();
+            let noting = heeding.clone();
             engine = engine.noting_the_conversation_alone(Arc::new(move |request| {
-                heeding.lock().ok()?.conversation_note_for(request)
+                noting.lock().ok()?.conversation_note_for(request)
+            }));
+            // Near the end of the lamp's day, only such a line surely
+            // someone else's is held (#7664).
+            let telling = heeding.clone();
+            engine = engine.telling_someone_elses(Arc::new(move |request| {
+                telling
+                    .lock()
+                    .is_ok_and(|heeding| heeding.surely_someone_elses(request))
             }));
         }
         // `LAMP_UNTIED_GOING_ON`: such a line with no tie to the lamp is not
@@ -7390,6 +7398,11 @@ pub(crate) struct Heeding {
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
+    /// The line let out only as the conversation going on that is surely
+    /// someone else's ([`Self::someone_else`]): near the end of the lamp's
+    /// day only such a line is held (#7664). Nothing seen or heard to tell
+    /// the speakers apart is the same person, never held.
+    someone_elses_line: Option<u64>,
     /// With it, when the caller's own follow-up was last let out: the call
     /// renewed, for the caller's lines alone ([`Self::call_for`]).
     call_renewed_at: Option<Instant>,
@@ -8487,6 +8500,7 @@ impl Heeding {
             follow_up_renews: false,
             no_face_renews: false,
             follow_up_line: None,
+            someone_elses_line: None,
             call_renewed_at: None,
             last_speakers: None,
             said_lately: std::collections::VecDeque::new(),
@@ -12037,6 +12051,7 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        self.someone_elses_line = (self.alone.is_some() && someone_else).then_some(request);
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
         // conversation going on renews nothing when it is surely someone
         // else's ([`Self::someone_else`]). Under #829's own bar another voice
@@ -12283,6 +12298,12 @@ impl Heeding {
         } else {
             CONVERSATION_ALONE
         })
+    }
+
+    /// Whether `request` was let out only as the conversation going on and
+    /// is surely someone else's, not the caller's (#7664).
+    pub(crate) fn surely_someone_elses(&self, request: u64) -> bool {
+        self.someone_elses_line == Some(request)
     }
 
     /// Whether `request` was let out only as the conversation going on,

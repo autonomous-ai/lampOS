@@ -1970,6 +1970,9 @@ struct Shared {
     /// lamp, so the spoken cut-in note is not told beside that note
     /// ([`Engine::telling_the_untied`]).
     untied: Option<Busy>,
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's ([`Engine::telling_someone_elses`], #7664).
+    someone_elses: Option<Busy>,
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
@@ -4555,20 +4558,24 @@ pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 /// sounds (`lamp_expression::RESTING_THROUGH_SOUNDS`).
 pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
 
-/// Why the answer to the lamp's name alone is held back in the night's
-/// sleep ([`Engine::resting_through_sounds`]).
 /// Why a line is held near the end of the lamp's day ([`day_alone_held`]).
-const DAY_NEAR_HELD: &str = "the lamp's day is nearly used, and the line reached it only as the conversation going on, not from the one it was talking with: not sent only to be judged (LAMP_VOICE_DAY_SHED)";
+const DAY_NEAR_HELD: &str = "the lamp's day is nearly used, and the line reached it only as the conversation going on, surely from someone other than the one it was talking with: not sent only to be judged (LAMP_VOICE_DAY_SHED)";
 
 /// Whether a line is held near the end of the lamp's day (#7664): the day
 /// at or past `day_shed::NEAR`, and the line let out only as the
-/// conversation going on, told [`worker::CONVERSATION_ALONE`]. The caller's
-/// own follow-up ([`worker::FOLLOW_UP_NOTE`]) and a line with any other
-/// sign it was said to the lamp (no note) are never held.
-fn day_alone_held(level: crate::day_shed::Level, note: Option<&str>) -> bool {
-    level.sheds() && note == Some(worker::CONVERSATION_ALONE)
+/// conversation going on, told [`worker::CONVERSATION_ALONE`], and surely
+/// someone else's (`someone_elses`: another voice, or a face not the
+/// caller's seen speaking it). The caller's own follow-up
+/// ([`worker::FOLLOW_UP_NOTE`]), a line with nothing seen or heard to tell
+/// the speakers apart (the owner whose face wasn't seen, the Reviewer-lead's
+/// P2 on #7738) and a line with any other sign it was said to the lamp (no
+/// note) are never held.
+fn day_alone_held(level: crate::day_shed::Level, note: Option<&str>, someone_elses: bool) -> bool {
+    level.sheds() && someone_elses && note == Some(worker::CONVERSATION_ALONE)
 }
 
+/// Why the answer to the lamp's name alone is held back in the night's
+/// sleep ([`Engine::resting_through_sounds`]).
 const NIGHT_REST_HELD: &str = "only the lamp's name, and the lamp asleep for the night: it stirs and is not woken by its own answer (LAMP_REST_THROUGH_SOUNDS)";
 
 /// Whether Expression's state says the night's sleep rests through sounds:
@@ -4942,6 +4949,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 untied: None,
+                someone_elses: None,
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
@@ -6748,6 +6756,17 @@ impl Engine {
     pub fn telling_the_untied(mut self, untied: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.untied = Some(untied);
+        }
+        self
+    }
+
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's, by voice or by a face seen speaking it that is not
+    /// the caller's: near the end of the lamp's day only such a line is held
+    /// ([`day_alone_held`], #7664). Before any turn only.
+    pub fn telling_someone_elses(mut self, someone_elses: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.someone_elses = Some(someone_elses);
         }
         self
     }
@@ -10516,6 +10535,10 @@ async fn spoken(
                 .conversation_alone
                 .as_ref()
                 .and_then(|note| note(request)),
+            shared
+                .someone_elses
+                .as_ref()
+                .is_some_and(|someone_elses| someone_elses(request)),
         )
     {
         heeded = Some(DAY_NEAR_HELD);
