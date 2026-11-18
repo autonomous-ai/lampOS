@@ -29,8 +29,10 @@
 //! open, is now looked up a
 //! second time through another resolver ([`ELSEWHERE`]), and its global
 //! addresses not raced before join the race, the next try to the first of
-//! them, up to [`MORE_TRIES`] tries more. `LAMP_WEATHER_SECOND_LOOKUP=off`
-//! ([`SECOND_LOOKUP_ENVIRONMENT`]) never looks a name up a second time.
+//! them, up to [`MORE_TRIES`] tries more. Only with
+//! `LAMP_WEATHER_SECOND_LOOKUP=on` ([`SECOND_LOOKUP_ENVIRONMENT`]): off
+//! unless exactly `on`, and off in the product (El's ruling on #7700,
+//! 14:23), so the product never looks a name up a second time.
 use super::{
     Error, OPENING, Result, fetch_json_on, kept_builder,
     watch::{Opening, OpeningTold, Opens},
@@ -92,13 +94,14 @@ pub(crate) const MORE_TRIES: usize = 2;
 /// to open within a forecast's 4 s after a place looked up in 1.2 s.
 pub(crate) const ELSEWHERE_AFTER: Duration = Duration::from_millis(1500);
 /// The switch for the second lookup, in the voice service's environment:
-/// on unless exactly `off` ([`second_lookup_on`]).
+/// off unless exactly `on` ([`second_lookup_on`]); no product unit sets
+/// it.
 pub const SECOND_LOOKUP_ENVIRONMENT: &str = "LAMP_WEATHER_SECOND_LOOKUP";
 
-/// Whether a name is looked up a second time another way: on unless the
-/// switch is exactly `off`.
+/// Whether a name is looked up a second time another way: only with the
+/// switch exactly `on`; unset or anything else is off.
 pub fn second_lookup_on(value: Option<&str>) -> bool {
-    value != Some("off")
+    value == Some("on")
 }
 
 /// How each try's client is made beyond the lamp's own, for the address
@@ -121,8 +124,8 @@ struct Ways {
 }
 
 impl Ways {
-    /// The lamp's: its own resolver, then Google's over HTTPS unless
-    /// [`SECOND_LOOKUP_ENVIRONMENT`] is `off`.
+    /// The lamp's: its own resolver, then Google's over HTTPS only with
+    /// [`SECOND_LOOKUP_ENVIRONMENT`] exactly `on`.
     fn lamps() -> Self {
         Self::lamps_with(second_lookup_on(
             std::env::var(SECOND_LOOKUP_ENVIRONMENT).ok().as_deref(),
@@ -1124,14 +1127,16 @@ pub(crate) mod tests {
         assert_eq!(asked_elsewhere.load(Ordering::SeqCst), 0);
     }
 
-    /// `LAMP_WEATHER_SECOND_LOOKUP`: on unless exactly `off`; off, the
+    /// `LAMP_WEATHER_SECOND_LOOKUP`: off unless exactly `on`; off, the
     /// lamp's ways have no second lookup at all.
     #[test]
-    fn the_second_lookup_is_on_unless_switched_off() {
-        assert!(second_lookup_on(None));
+    fn the_second_lookup_is_off_unless_switched_on() {
         assert!(second_lookup_on(Some("on")));
-        assert!(second_lookup_on(Some("")));
+        assert!(!second_lookup_on(None));
+        assert!(!second_lookup_on(Some("")));
         assert!(!second_lookup_on(Some("off")));
+        assert!(!second_lookup_on(Some("ON")));
+        assert!(!second_lookup_on(Some("yes")));
         assert!(Ways::lamps_with(true).elsewhere.is_some());
         assert!(Ways::lamps_with(false).elsewhere.is_none());
     }
