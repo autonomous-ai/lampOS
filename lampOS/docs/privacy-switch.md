@@ -559,6 +559,28 @@ is well (`ok`): a still switch is not a fault, and a warning would mark the
 whole lamp all day. A reading that can't be had is `warn`, `unknown:` with
 its fault; Controls' own item already says the route is closed then.
 
+## The switch's edges in the journal
+
+Each change of the level Controls reads writes one journal line
+(`privacy::EdgeLog`, #6543), so a slide test can tell a slide that never
+closed from one that chattered:
+
+```text
+lamp-controls: privacy slide closed, at_us 3500000, change 1, open for 2500 ms
+```
+
+The new level, the reading's `at_us`, the change's number since Controls
+started (the same count as health's `changes`) and how long the level
+before it lasted. Nothing else: no identity, no other data. The first
+reading is no edge, a reading at the same level writes nothing, and an
+unreadable reading leaves the last level as it was. A bouncing slide writes
+a burst of lines a few ms apart. The burst is bounded: past 20 edge lines in
+one second the rest are only counted, and once that second is over the next
+reading writes `lamp-controls: privacy slide: N more edges in the last
+second, at_us …`. So chatter writes at most 20 edge lines and one count line
+a second. The line changes nothing the switch does. Tests: `edge_log_tests`
+in `crates/controls/src/privacy.rs`.
+
 ## Muted appearance and timing
 
 During the quiet physical-mute wait a separate ring worker may show the V1
