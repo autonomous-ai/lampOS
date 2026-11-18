@@ -5024,7 +5024,9 @@ code (`made_remove::asked`):
 - **Never said removed, off or on untrue, with no call that did it**
   (#7683, `LAMP_SKILL_CLAIM_CHECKED`, `on` only, off by default, with
   `LAMP_ACTION_CLAIM_CHECKED` and `LAMP_MAKE_SKILL`; passed to the second
-  route's worker alone, not yet in the product unit). On lamp-9adf (18 Nov
+  route's worker alone; on in the product's `lamp-voice` since #7730's
+  switch-on, after a false "Space facts is off." with no call on
+  lamp-9adf). On lamp-9adf (18 Nov
   14:38, request 72) "Lamp, remove planet fact." was answered just "planet
   fact" with `calls=none`, and "Yes." (request 73) "planet fact is
   removed." with `calls=none`: nothing was asked or removed, and the skill
