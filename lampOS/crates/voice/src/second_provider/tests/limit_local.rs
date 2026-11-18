@@ -533,3 +533,33 @@ async fn a_due_timer_refused_by_the_limit_is_rung_and_without_the_switch_is_not(
         assert_eq!(script.asked.lock().unwrap().len(), 1);
     }
 }
+
+/// #7642: plain 429s that last [`LIMIT_AFTER`] ring no due timer: its chat
+/// refused, the turn says nothing and fails as before, for the consumer to
+/// offer it again; only the usage-limit word rings it.
+#[tokio::test]
+async fn plain_429s_that_last_ring_no_due_timer() {
+    let plain = || vec![Err(net::Error::Status(429))];
+    let (engine, script, _) = engine(
+        true,
+        &["Lamp, what's the weather?"],
+        vec![plain(), plain()],
+        Duration::ZERO,
+    )
+    .await;
+    let mut engine = engine.saying_reminders(true);
+    sent_with_down(&mut engine, 1).await;
+    tokio::time::pause();
+    tokio::time::advance(LIMIT_AFTER + Duration::from_secs(10)).await;
+    tokio::time::resume();
+    engine.submit(due(2, true));
+    let refused = turn(&mut engine).await;
+    assert!(
+        !refused.contains(&format!("audio:{}", LIMIT_TIMER_DONE.len())),
+        "no timer line: {refused:?}"
+    );
+    assert!(!refused.contains(&"own_words:2".to_owned()), "{refused:?}");
+    let ended = refused.last().cloned().unwrap_or_default();
+    assert!(ended.starts_with("failed:"), "{refused:?}");
+    assert_eq!(script.asked.lock().unwrap().len(), 2);
+}

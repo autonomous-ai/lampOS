@@ -1711,8 +1711,9 @@ Schedule's `get` into `Offer::timer`, passed on as `ProviderInput::Reminder`'s
 `timer`; both are sent only when true and read as false when absent, so an
 older packet is a reminder's. A timer said with others as late takes the
 reminder's line. Tests: `an_offer_without_timer_is_a_reminders_and_sent_as_before`
-(`reminders/tests.rs`), and the two in `second_provider/tests/limit_local.rs`
-named for a due timer.
+(`reminders/tests.rs`), and the three in `second_provider/tests/limit_local.rs`
+named for a due timer (the third pins that a run of plain 429s rings none:
+only the relay's `usage_limit` 429 does).
 
 Crash-uncertain attempts (no settlement ever sent) stay pending without
 re-speech while the voice that made them runs. Such an oldest entry does
