@@ -5245,7 +5245,17 @@ model is told changes: no words of the line are read. Then, in code
   made no call and was answered "Bitcoin price is back on" while it stayed
   off). While any skill they made or added is in lamp-skills' `off` file,
   each heard turn on the second route gives the model one note
-  (`made_turn::off_note`): how many are turned off, never which; that a
+  (`made_turn::off_note`): how many are turned off; in the private room
+  (`LAMP_PRIVATE_ROOM`, where every line is the owner's) each one too, by
+  its said name marked off ("space facts: off", at most 8,
+  `OFFERED_MOST`), "Each is still theirs on the lamp, only turned off:
+  never say there is no such skill" (#7562's rows on lamp-9adf, 18 Nov:
+  "Lamp, run space facts" while it was off was answered "There's no space
+  facts skill on the lamp" with no call, since the model was told how many
+  alone and a skill started by its words has no function of its own);
+  outside it, never which, as a name can carry a person's and the line may
+  not be the owner's (the private room is read with no wait: the owner's
+  voice is never waited for before round 1); that a
   line asking to use or run one calls it as for any skill, by its
   function, by `use_skill` with its name, or by `make_skill` with `run`,
   never `turn_on` alone, the lamp turning it on for the owner's ask
