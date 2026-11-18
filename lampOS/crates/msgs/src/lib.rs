@@ -88,6 +88,8 @@ mod online;
 pub use online::*;
 mod arrival;
 pub use arrival::*;
+mod attachments;
+pub use attachments::*;
 mod skill_ask;
 pub use skill_ask::*;
 mod addon;
@@ -2722,6 +2724,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(seems_topics())
         .chain(doing_topics())
         .chain(devices_topics())
+        .chain(attachments_topics())
         .chain(speaker_state_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
