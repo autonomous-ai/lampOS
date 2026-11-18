@@ -1721,7 +1721,9 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
 /// `clock`. Nothing is fetched here and no task is started;
 /// with the switch off there is no weather at all. With
 /// `LAMP_OWNER_PLACE=on`, the owner's place from the app goes over `here`
-/// while one is kept (#4333).
+/// while one is kept (#4333). With `LAMP_WEATHER_BACKUP=on` (off unless
+/// set, #7593), a forecast Open-Meteo can't be reached for comes from MET
+/// Norway.
 fn weather_asked(
     switch: Option<&str>,
     (here, country): (Option<String>, Option<String>),
@@ -1731,7 +1733,13 @@ fn weather_asked(
     use crate::second_provider::net::weather;
     weather::on(switch).then(|| {
         // A place's name is found in the lamp's own country first (#7593).
-        let weather = weather::Weather::new(here, fetch, clock).with_country(country);
+        let weather = weather::Weather::new(here, fetch, clock)
+            .with_country(country)
+            .with_backup(
+                std::env::var(weather::met::ENVIRONMENT).ok().as_deref(),
+                weather::met::met_norway(),
+                weather::met::lamp_offset(),
+            );
         Arc::new(if crate::owner_place::on_from_environment() {
             weather.with_owner_place(lamp_msgs::owner_place::FILE.into())
         } else {
