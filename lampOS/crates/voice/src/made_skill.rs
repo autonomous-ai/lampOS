@@ -9179,43 +9179,57 @@ pub fn drop_gone(keeping: &Keeping) {
 /// package with it unless another entry names it (`crate::made_clash`'s
 /// cancel, or a clash never answered): never told as made and off.
 pub fn forget_unput(directory: &Path, sha256: &str) {
-    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
-        .into_iter()
-        .partition(|entry| entry["sha256"] == sha256 && entry["on"] != true);
-    if gone.is_empty() {
-        return;
-    }
-    if let Err(error) = write_index(directory, &entries) {
-        eprintln!("lamp-voice: a made skill not put on wasn't dropped from the index: {error}");
-        return;
-    }
-    drop_packages(directory, gone, &entries);
+    index_locked(directory, || {
+        let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+            .into_iter()
+            .partition(|entry| entry["sha256"] == sha256 && entry["on"] != true);
+        if gone.is_empty() {
+            return;
+        }
+        if let Err(error) = write_index(directory, &entries) {
+            eprintln!("lamp-voice: a made skill not put on wasn't dropped from the index: {error}");
+            return;
+        }
+        drop_packages(directory, gone, &entries);
+    });
 }
 
 /// Drop from the index every kept skill called `name` but the one from
 /// `from`, their packages with them.
 fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
-    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
-        .into_iter()
-        .partition(|entry| entry["name"] == name && entry["from"] != from);
-    if gone.is_empty() {
-        return Ok(());
-    }
-    write_index(directory, &entries)?;
-    drop_packages(directory, gone, &entries);
-    Ok(())
+    index_locked(directory, || {
+        let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+            .into_iter()
+            .partition(|entry| entry["name"] == name && entry["from"] != from);
+        if gone.is_empty() {
+            return Ok(());
+        }
+        write_index(directory, &entries)?;
+        drop_packages(directory, gone, &entries);
+        Ok(())
+    })
 }
 
-/// The packages of the index entries `gone`, each unless one of `entries`,
-/// still kept, names it.
+/// The package files an index entry names: its own, and a remade skill's
+/// old one kept to be put back (its `old`, `crate::made_remake`).
+pub(crate) fn packages_named(entry: &Value) -> impl Iterator<Item = &str> {
+    [&entry["package"], &entry["old"]["package"]]
+        .into_iter()
+        .filter_map(Value::as_str)
+}
+
+/// The packages of the index entries `gone`, a remade one's kept old one
+/// too, each unless one of `entries`, still kept, names it.
 fn drop_packages(directory: &Path, gone: Vec<Value>, entries: &[Value]) {
     for entry in gone {
         // The same words make the same package: kept while one still names it.
-        if let Some(package) = entry["package"].as_str().filter(|package| {
+        for package in packages_named(&entry).filter(|package| {
             !package.is_empty()
                 && !package.contains('/')
                 && !package.starts_with('.')
-                && !entries.iter().any(|kept| kept["package"] == *package)
+                && !entries
+                    .iter()
+                    .any(|kept| packages_named(kept).any(|named| named == *package))
         }) {
             let _ = fs::remove_file(directory.join(package));
         }
@@ -9358,6 +9372,18 @@ pub fn keep_asked(
     let limits =
         limits_asked(request.request) || (reactions_on() && behaviour_trigger_of(&files.toml));
     files.toml = paced_for(&files.toml, asked, limits, repeat);
+    // An old skill remade (`crate::made_remake`): its trigger and timing
+    // exactly the old one's, or nothing is kept and the old one stays, with
+    // no repair (the first builder, 19 Nov 01:22 and 01:29 on #7820).
+    if let Some(timing) = remake_timing()
+        && !crate::made_remake::same_timing(&timing, &files.toml)
+    {
+        eprintln!(
+            "lamp-voice: an old made skill's remake was not kept: its trigger or timing would \
+             not be the old one's"
+        );
+        return Err(Refused(REMAKE_TIMING_CHANGED.into(), None));
+    }
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -9450,7 +9476,8 @@ pub fn keep_asked(
             if why == NOT_PASSED
                 && loose_on()
                 && uses.writes.is_empty()
-                && files.scripts.is_empty() =>
+                && files.scripts.is_empty()
+                && !remaking_here() =>
         {
             match loosened(&files.toml, &files.card, from, keeping) {
                 Some((toml, out)) => ending.checked_and_kept(&toml, &out),
@@ -10017,6 +10044,10 @@ fn free_name(
     )))
 }
 
+/// Why an old skill's remake kept nothing (`crate::made_remake`): the
+/// middle form could not hold its trigger and timing exactly.
+pub const REMAKE_TIMING_CHANGED: &str = "its trigger or timing can't be kept as it was";
+
 /// The most numbers [`free_name`] tries after a taken name.
 const MOST_NAME_TRIES: u32 = 99;
 
@@ -10024,6 +10055,10 @@ std::thread_local! {
     /// The name an old made skill is remade under on this thread
     /// (`crate::made_remake`), while its make runs.
     static REMAKE_AS: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// The old skill's own trigger and timing, as its `skill.toml` wrote
+    /// them (`crate::made_remake::kept_timing`), while its remake runs on
+    /// this thread: the remake's start, never one the model picks.
+    static REMAKE_TIMING: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Whether an old made skill is being remade on this thread
@@ -10032,13 +10067,22 @@ pub(crate) fn remaking_here() -> bool {
     REMAKE_AS.with(|remake| remake.borrow().is_some())
 }
 
+/// The old skill's own trigger and timing while it is remade on this thread
+/// ([`RemakeAs`]): `most_a_day`, `[trigger]` (its `cooldown` with it),
+/// `[active]` and `[quiet]`, as its `skill.toml` wrote them.
+pub(crate) fn remake_timing() -> Option<String> {
+    REMAKE_TIMING.with(|timing| timing.borrow().clone())
+}
+
 /// While held, a skill kept on this thread takes `name` (`crate::made_remake`:
-/// an old skill remade under its own name), never a free one.
+/// an old skill remade under its own name), never a free one, and starts
+/// exactly as `timing` (the old skill's own, [`remake_timing`]) says.
 pub(crate) struct RemakeAs;
 
 impl RemakeAs {
-    pub(crate) fn set(name: &str) -> Self {
+    pub(crate) fn set(name: &str, timing: &str) -> Self {
         REMAKE_AS.with(|remake| *remake.borrow_mut() = Some(name.to_owned()));
+        REMAKE_TIMING.with(|kept| *kept.borrow_mut() = Some(timing.to_owned()));
         Self
     }
 }
@@ -10046,6 +10090,7 @@ impl RemakeAs {
 impl Drop for RemakeAs {
     fn drop(&mut self) {
         REMAKE_AS.with(|remake| *remake.borrow_mut() = None);
+        REMAKE_TIMING.with(|kept| *kept.borrow_mut() = None);
     }
 }
 
@@ -10847,8 +10892,21 @@ fn remember(
 
 /// `made` kept in the index as the comment above `remember` says, with
 /// who made it (`made_with`, [`MADE_WITH`]) in its entry when its card
-/// says so.
+/// says so. Done holding the index's lock ([`index_locked`]).
 fn remember_with(
+    directory: &Path,
+    from: &str,
+    made: &Made,
+    kept: (bool, Option<&str>),
+    toml_sha256: &str,
+) -> io::Result<()> {
+    index_locked(directory, || {
+        remember_unlocked(directory, from, made, kept, toml_sha256)
+    })
+}
+
+/// [`remember_with`]'s read and write of the index.
+fn remember_unlocked(
     directory: &Path,
     from: &str,
     made: &Made,
@@ -10997,6 +11055,54 @@ pub(crate) fn write_entries(directory: &Path, entries: &[Value]) -> io::Result<(
 }
 
 /// The index written whole beside it and moved over it.
+/// The lock beside the index that [`index_locked`] holds.
+const INDEX_LOCK: &str = ".made.lock";
+
+std::thread_local! {
+    /// How deep this thread is in [`index_locked`].
+    static INDEX_HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// This thread's hold in [`index_locked`], let go when dropped.
+struct IndexHeld {
+    _lock: Option<fs::File>,
+}
+
+impl Drop for IndexHeld {
+    fn drop(&mut self) {
+        INDEX_HELD.with(|held| held.set(held.get().saturating_sub(1)));
+    }
+}
+
+/// `edit`, a read and write of the index in `directory`, done holding the
+/// index's lock ([`INDEX_LOCK`] beside it, an advisory `flock`, which holds
+/// threads and processes alike): a make's keep ([`remember_with`]), its
+/// put-on and its drops, and an old skill's remake in the background
+/// (`crate::made_remake`, `crate::make_no_asks`), so neither loses the
+/// other's entry through the one `.made.json.new` (Twelve's P2 on #7765;
+/// the same lock as #7774's). Nested on one thread, the lock held already
+/// is kept. With no lock to be had (no folder yet), done as before.
+pub(crate) fn index_locked<T>(directory: &Path, edit: impl FnOnce() -> T) -> T {
+    let nested = INDEX_HELD.with(|held| {
+        held.set(held.get() + 1);
+        held.get() > 1
+    });
+    let _held = IndexHeld {
+        _lock: (!nested)
+            .then(|| {
+                fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .write(true)
+                    .open(directory.join(INDEX_LOCK))
+                    .and_then(|file| file.lock().map(|()| file))
+                    .ok()
+            })
+            .flatten(),
+    };
+    edit()
+}
+
 fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
     let new = directory.join(format!(".{INDEX}.new"));
     let mut file = fs::File::create(&new)?;
@@ -11012,21 +11118,23 @@ fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
 /// a made skill goes on with no spoken yes (the owner, 10 Nov: the app's
 /// MAKE IT and the voice ask are the ask, #5977). Whether one was marked.
 pub fn goes_on(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<bool> {
-    let mut entries = index(directory);
-    let mut found = false;
-    for entry in &mut entries {
-        if entry["sha256"] == sha256 {
-            entry["goes_on_at_unix_ms"] = json!(now_unix_ms);
-            if let Some(entry) = entry.as_object_mut() {
-                entry.remove("not_on");
+    index_locked(directory, || {
+        let mut entries = index(directory);
+        let mut found = false;
+        for entry in &mut entries {
+            if entry["sha256"] == sha256 {
+                entry["goes_on_at_unix_ms"] = json!(now_unix_ms);
+                if let Some(entry) = entry.as_object_mut() {
+                    entry.remove("not_on");
+                }
+                found = true;
             }
-            found = true;
         }
-    }
-    if found {
-        write_index(directory, &entries)?;
-    }
-    Ok(found)
+        if found {
+            write_index(directory, &entries)?;
+        }
+        Ok(found)
+    })
 }
 
 /// The name of the kept skill `sha256` if it was marked to go on
@@ -11480,17 +11588,20 @@ pub fn put_on_within(
         // No answer in time: the helper may still put it on.
         None => refused(NOT_SAID_IN_TIME.into()),
         Some(true) => {
-            let mut entries = index(directory);
-            for entry in &mut entries {
-                if entry["sha256"] == sha256 {
-                    entry["on"] = json!(true);
-                    if let Some(entry) = entry.as_object_mut() {
-                        entry.remove("not_on");
-                        entry.remove("check_said");
+            let written = index_locked(directory, || {
+                let mut entries = index(directory);
+                for entry in &mut entries {
+                    if entry["sha256"] == sha256 {
+                        entry["on"] = json!(true);
+                        if let Some(entry) = entry.as_object_mut() {
+                            entry.remove("not_on");
+                            entry.remove("check_said");
+                        }
                     }
                 }
-            }
-            if let Err(error) = write_index(directory, &entries) {
+                write_index(directory, &entries)
+            });
+            if let Err(error) = written {
                 eprintln!("lamp-voice: a made skill is on, but not marked so: {error}");
             }
             eprintln!("lamp-voice: a made skill is on the lamp: {name}, sha256 {sha256}");

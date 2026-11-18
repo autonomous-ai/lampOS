@@ -507,10 +507,12 @@ pub fn start_purge() {
     }
 }
 
-/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`]:
-/// whether there was any.
+/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`],
+/// and with it the old skills' remake's own undo (`crate::made_remake::clear`:
+/// every remade skill's kept old one and `remake.json`), so the made skills
+/// keep one undo store (Twelve's P2 on #7820): whether there was any.
 pub fn clear(directory: &Path) -> io::Result<bool> {
-    let mut any = false;
+    let mut any = crate::made_remake::clear(directory)?;
     match fs::remove_file(directory.join(RECORDS)) {
         Ok(()) => any = true,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -624,8 +626,20 @@ pub fn remove_at_once(
     sha256: &str,
     remove: impl FnOnce(&str) -> Result<(), String>,
 ) -> Result<(), String> {
+    made_skill::index_locked(&keeping.directory, || {
+        remove_locked(keeping, name, sha256, remove)
+    })
+}
+
+/// [`remove_at_once`], holding the index's lock.
+fn remove_locked(
+    keeping: &Keeping,
+    name: &str,
+    sha256: &str,
+    remove: impl FnOnce(&str) -> Result<(), String>,
+) -> Result<(), String> {
     let entries = made_skill::entries(&keeping.directory);
-    let Some(entry) = entries
+    let Some(mut entry) = entries
         .iter()
         .find(|entry| entry["name"] == name && entry["sha256"] == sha256)
         .cloned()
@@ -649,6 +663,11 @@ pub fn remove_at_once(
         .filter(|other| !(other["name"] == name && other["sha256"] == sha256))
         .cloned()
         .collect();
+    // A remade skill's kept old one goes with it, its package too: one
+    // undo, of what was removed (Twelve's P2 on #7820).
+    if let Some(old) = entry.as_object_mut().and_then(|entry| entry.remove("old")) {
+        crate::made_remake::drop_package_of(&keeping.directory, &old, &rest);
+    }
     let record = json!({ "kind": "removed", "name": name, "entry": entry });
     // Its package kept aside: moved, or copied while another entry still
     // names the same file.

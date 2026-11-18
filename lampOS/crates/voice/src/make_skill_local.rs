@@ -3498,12 +3498,14 @@ fn cannot_asked_again(
 }
 
 /// An old made skill remade in the middle form (`crate::made_remake`,
-/// `LAMP_REMAKE_OLD_SKILLS`; the first builder's 19:50 ruling on #6811):
-/// `request`, the skill's own kept description, written by the lamp as one
-/// task for its agent exactly as a new make judged no quick reaction is
-/// ([`agent_task`]): the trigger its own model picks in one more call
-/// (`chat`), one `do.task` of the request's words, and sip-of-water's
-/// guards (`crate::make_no_cannot::skill_text`, taken while a remake runs:
+/// `LAMP_REMAKE_OLD_SKILLS`; the first builder's 19:50 ruling on #6811, and
+/// his 19 Nov 01:22 and 01:29 on #7820): `request`, the person's own kept
+/// request, written by the lamp as one task for its agent as a new make
+/// judged no quick reaction is ([`agent_task`]): its grants from its own
+/// model in one more call (`chat`), its start and timing the old skill's
+/// own (`made_skill::RemakeAs`, never the trigger that call writes), one
+/// `do.task` of the request's words, and sip-of-water's guards but on a
+/// clock (`crate::make_no_cannot::skill_text`, taken while a remake runs:
 /// `made_skill::reactions_on`). Kept from `from` as made by `engine`, the
 /// agent that does its task ([`made_skill::MADE_WITH`]), through the same
 /// checks and repairs. No DeepSeek draft is asked for, and the agent is
@@ -10196,8 +10198,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// itself, the trigger its own model picks in one more call and one
     /// task step whose words are the person's request, done by the lamp's
     /// agent when it fires; no say, no other step, sip-of-water's guards in
-    /// `[[while]]`, `made_with` the agent's. The agent is never asked to
-    /// write it.
+    /// `[[while]]` but on the lamp's clock, `made_with` the agent's. The
+    /// agent is never asked to write it.
     #[test]
     fn with_the_switch_a_make_judged_no_reaction_is_its_trigger_and_one_task_never_drafted() {
         made_skill::set_reactions_here(Some(true));
@@ -10250,6 +10252,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(!told.to_string().contains("PRIVATE-REASON-7"), "{told}");
             let table = one_task_of(&copy, request, crate::make_no_cannot::RUN);
             assert_eq!(table["trigger"]["topic"].as_str(), Some(topic));
+            // Never a guard on the lamp's clock: 9:00's run is never spent
+            // waiting (the first builder, 19 Nov 01:29).
+            if topic == "clock/local" {
+                assert!(table.get("while").is_none(), "{table:?}");
+                assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+                continue;
+            }
             let guards = table["while"].as_array().unwrap();
             assert_eq!(guards.len(), 3, "sip-of-water's guards: {table:?}");
             let topics = table["permissions"]["topics"].as_array().unwrap();
@@ -10458,50 +10467,121 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// An old skill's `skill.toml` as DeepSeek kept it for `request`: the
+    /// trigger `trigger` and a say of the model's own words each run, as
+    /// its make paced it.
+    fn old_kept(request: &str, trigger: &str) -> String {
+        made_skill::paced_for(
+            &format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\n\
+                 [permissions]\nspeak = true\n\n{trigger}\n[[do]]\n\
+                 say = {{ note = \"One short line.\" }}\n"
+            ),
+            &made_skill::asked_windows(request),
+            true,
+            None,
+        )
+    }
+
     /// An old skill remade (`crate::made_remake`, `LAMP_REMAKE_OLD_SKILLS`)
-    /// takes the middle form a new make judged no quick reaction takes (the
-    /// first builder's 19:50 ruling): one call to the lamp's own model for
-    /// its trigger, one task step of its own kept words, sip-of-water's
-    /// guards, no say; no judgement, no DeepSeek draft, the agent never
-    /// asked to write it; kept under the old skill's own name, `made_with`
-    /// the agent's, even with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off.
+    /// in the middle form (the first builder's 19:50 ruling), held to his
+    /// 19 Nov 01:22 and 01:29: its start and timing exactly the old one's,
+    /// whatever trigger the model's one call wrote (`[trigger]` with its
+    /// cooldown, `[quiet]`, `most_a_day`), one task step of the person's
+    /// own kept request word for word, sip-of-water's guards, no say; no
+    /// judgement, no DeepSeek draft, the agent never asked to write it;
+    /// kept under the old skill's own name, `made_with` the agent's, even
+    /// with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off.
     #[test]
-    fn an_old_skill_is_remade_as_its_trigger_and_one_task_with_the_guards() {
+    fn an_old_skill_is_remade_on_its_own_trigger_and_timing_as_one_task_of_its_request() {
         made_skill::set_reactions_here(Some(false));
         net_make_here(Some(true));
         let (root, keeping, copy) = keeping_copied("remade-middle");
-        const WATER: &str = "When someone sits at the desk a long while, suggest a sip of water.";
-        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        const WATER: &str = "When someone sits at the desk a long while, suggest a sip of water";
+        let old = old_kept(
+            WATER,
+            "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+             for = \"30m\"\nrearm = \"leaves\"\ncooldown = \"1h\"\n",
+        );
+        let timing = crate::made_remake::kept_timing(&old).unwrap();
+        // The model writes another trigger: it is never taken.
+        let faces = "when = \"appears\"\n";
         let (url, served) = service_sent(vec![(
             200,
-            trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+            trigger_answer("sip-at-desk", "speak", "humans/faces/tracked", faces),
         )]);
         let made = {
-            let _as = made_skill::RemakeAs::set("water");
+            let _as = made_skill::RemakeAs::set("water", &timing);
             remade_as_task(WATER, &keeping, "local:remake:1", "Hermes", chat_at(url))
         }
         .unwrap();
         let sent = served.join().unwrap();
         assert_eq!(sent.len(), 1);
-        assert!(
-            sent[0].contains("You choose, for a lamp, when a skill runs and what it needs"),
-            "{}",
-            sent[0]
-        );
         assert_eq!(made.name, "water");
         assert!(made.uses.code && made.uses.agent_task, "{:?}", made.uses);
-        let table = one_task_of(
-            &copy,
-            &crate::make_no_cannot::task_words(WATER),
-            crate::make_no_cannot::RUN,
+        // The person's request, word for word.
+        let table = one_task_of(&copy, WATER, crate::make_no_cannot::RUN);
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        assert!(
+            crate::made_remake::same_timing(&timing, &kept),
+            "{old}\n---\n{kept}"
         );
-        assert_eq!(table["trigger"]["topic"].as_str(), Some("room/presence"));
+        let old: toml::Table = toml::from_str(&old).unwrap();
+        for key in ["trigger", "quiet", "most_a_day", "active"] {
+            assert_eq!(table.get(key), old.get(key), "{key}: {kept}");
+        }
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
         assert_eq!(
             table["while"].as_array().map(Vec::len),
             Some(3),
             "{table:?}"
         );
         assert_eq!(made_with_of(&keeping, "water").as_deref(), Some("hermes"));
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7765, the first builder's 01:29: "every morning at
+    /// 8, tell me the weather" remade keeps its clock and gets no
+    /// `[[while]]` guard, so with the owner head down at 8 it still runs.
+    #[test]
+    fn a_clock_skill_remade_gets_no_guards_and_keeps_its_clock() {
+        made_skill::set_reactions_here(Some(false));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-clock");
+        const MORNING: &str = "every morning at 8, tell me the weather";
+        let old = old_kept(
+            MORNING,
+            "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+             rearm = \"ends\"\nduring = { from = \"08:00\", to = \"08:01\" }\n",
+        );
+        let timing = crate::made_remake::kept_timing(&old).unwrap();
+        let sat = "field = \"someone\"\nequals = true\n";
+        let (url, served) = service_sent(vec![(
+            200,
+            trigger_answer("morning-weather", "net, speak", "room/presence", sat),
+        )]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("morning-weather", &timing);
+            remade_as_task(MORNING, &keeping, "local:remake:2", "Hermes", chat_at(url))
+        };
+        served.join().unwrap();
+        let made = made.unwrap();
+        assert_eq!(made.name, "morning-weather");
+        let table = one_task_of(&copy, MORNING, crate::make_no_cannot::RUN);
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        assert!(table.get("while").is_none(), "{kept}");
+        assert_eq!(table["trigger"]["topic"].as_str(), Some("clock/local"));
+        assert!(
+            crate::made_remake::same_timing(&timing, &kept),
+            "{old}\n---\n{kept}"
+        );
+        // Head down at 8: no guard of the skill's own holds it back.
+        assert!(
+            !kept.contains("head_down") && !kept.contains("voice/state"),
+            "{kept}"
+        );
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
