@@ -17,8 +17,9 @@
 //!   `LAMP_MADE_SCRIPTS` on (`made_skill::scripts_on`) and only on the
 //!   owner's own ask, as its yes was held (`services::owners_yes_of`); the
 //!   cap, the pack check, the grants and the run namespace are unchanged. A
-//!   skill that sends (a write, or code that messages the phone) keeps its
-//!   read-back and yes: that yes is what lamp-services sends by. The app's
+//!   skill that sends ([`sends`]: a write, a message to the phone, or a task
+//!   granted a linked service's write) keeps its read-back and yes: that yes
+//!   is what lamp-services sends by (the first builder, 02:09 on #7819). The app's
 //!   MAKE IT alike ([`put_on`], the app's ask the owner's).
 //! - **A clash replaces** ([`replaced`]): the new one goes on, then each
 //!   skill on the lamp it clashes with is turned off by the manage helper's
@@ -250,9 +251,27 @@ pub fn put_on(
 }
 
 /// Whether `made` goes on with no yes with this switch: anything but a
-/// skill that sends (a write, or code that messages the phone).
+/// skill that sends ([`sends`]).
 pub fn keeps_no_yes(made: &Made) -> bool {
-    made.uses.writes.is_empty() && !(made.uses.code && made.uses.messages)
+    !sends(
+        !made.uses.writes.is_empty(),
+        made.uses.messages,
+        &made.uses.grants,
+    )
+}
+
+/// Whether a made skill sends, so it keeps its read-back and yes with this
+/// switch (the first builder, 02:09 on #7819: the one place the person's
+/// words go out in their name): a write step (`writes`), a message to the
+/// phone (`messages`), with code of its own or not, or a task granted a
+/// linked service's write (`gmail-write`). `made_skill`'s say-back reads
+/// the same, so it never says "on at once" of a skill that waits.
+pub fn sends(writes: bool, messages: bool, grants: &[String]) -> bool {
+    writes
+        || messages
+        || grants
+            .iter()
+            .any(|grant| made_skill::service_grant(grant).is_some_and(|(_, write)| write))
 }
 
 /// What the model is told of `made`, put on or not (`on`, `line`, from

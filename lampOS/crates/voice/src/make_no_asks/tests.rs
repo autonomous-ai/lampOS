@@ -691,6 +691,19 @@ fn a_sending_skill_keeps_its_yes() {
     made.uses.messages = true;
     assert!(!keeps_no_yes(&made));
     assert!(put_on(&keeping, &made, || true).is_none());
+    // A send with no code of its own keeps its yes too, as `made_skill`'s
+    // say-back does (the Reviewer-lead's question on #7819; the first
+    // builder, 02:09: a skill that sends keeps its read-back and yes); so
+    // does a task granted a linked service's write. A read goes on at once.
+    made.uses.code = false;
+    assert!(!keeps_no_yes(&made));
+    made.uses.messages = false;
+    made.uses.code = true;
+    made.uses.grants = vec!["speak".to_owned(), "slack-write".to_owned()];
+    assert!(!keeps_no_yes(&made));
+    assert!(put_on(&keeping, &made, || true).is_none());
+    made.uses.grants = vec!["speak".to_owned(), "slack-read".to_owned()];
+    assert!(keeps_no_yes(&made));
     assert!(!keeping.directory.join(RECORDS).exists());
     set_here(None);
     let _ = fs::remove_dir_all(&root);

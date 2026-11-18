@@ -139,10 +139,55 @@ pub const NEEDS_NET_HELD: &str = "it needs the internet, which only the lamp's a
 /// model's, which only says to the agent that the task is its own to do.
 pub const RUN: &str = "scripts/agent.py";
 
-/// [`RUN`]'s text.
+/// [`RUN`]'s text before the run-time brief ([`script`]), still read as
+/// the lamp's own in a skill kept with it.
 pub const SCRIPT: &str = "print(\"This skill's task is for the lamp's agent to do itself, with its \
 own tools and only the skill's grants; then tell the owner in a sentence or two what it found or \
 did.\")\n";
+
+/// How [`script`]'s brief begins.
+const SCRIPT_HEAD: &str = "print(\"A skill the person made has fired (";
+/// Between what fired it and the line they said when they made it.
+const SCRIPT_SAID: &str = "). When they made it, they said: «";
+/// How [`script`]'s brief ends.
+const SCRIPT_TAIL: &str = "». Do now what it is for, with your own tools and only the skill's \
+grants, never making, changing or removing a skill; then tell the owner in a sentence or two what \
+you found or did.\")\n";
+
+/// [`RUN`]'s text for a task on a trigger: the brief the agent reads at
+/// each run (the first builder, 02:09 on #7819), naming what fired it
+/// (`fire`, the trigger in plain words) and quoting the person's own make
+/// line (`words`, [`task_words`]) whole: "A skill the person made has fired
+/// (when someone comes to the desk). When they made it, they said: «Lamp,
+/// make a skill that tells me the news when I come back to my desk». Do
+/// now what it is for, …". Both are plain ([`task_plain`]: no double quote,
+/// backslash, backtick, control or format character), so the brief is one
+/// Python string and nothing in it is code.
+pub fn script(fire: &str, words: &str) -> String {
+    format!(
+        "{SCRIPT_HEAD}{}{SCRIPT_SAID}{}{SCRIPT_TAIL}",
+        task_plain(fire),
+        task_plain(words)
+    )
+}
+
+/// Whether `text` is the lamp's own [`RUN`]: [`SCRIPT`], or a brief of
+/// [`script`]'s form whose two parts hold nothing but plain text.
+pub fn is_script(text: &str) -> bool {
+    if text == SCRIPT {
+        return true;
+    }
+    let Some(middle) = text
+        .strip_prefix(SCRIPT_HEAD)
+        .and_then(|text| text.strip_suffix(SCRIPT_TAIL))
+    else {
+        return false;
+    };
+    middle.matches(SCRIPT_SAID).count() == 1
+        && !middle
+            .chars()
+            .any(|c| c.is_control() || made_skill::is_format(c) || matches!(c, '"' | '\\' | '`'))
+}
 
 /// What the make is refused as when the lamp's agent answered `cannot:`
 /// with the switch on: never its words, and always made a task
@@ -878,6 +923,12 @@ pub fn task_words(request: &str) -> String {
         .to_owned()
 }
 
+/// What a make whose line [`task_cut`] would cut is refused as
+/// ([`Uncovered::TooLong`]), said plainly.
+pub fn too_long() -> Refused {
+    Uncovered::TooLong.refused()
+}
+
 /// Whether [`task_words`] cut `request` short: more of it than the
 /// trailing punctuation it trims was left out, so its task's words are the
 /// model's own, checked ([`task_kept`]), never the request cut short (El's
@@ -1214,7 +1265,8 @@ fn task_plain(request: &str) -> String {
 
 /// The whole task skill, as a model's answer: its `skill.toml` (the grants,
 /// the trigger's `block`, `[ask]` a nudge, one `do.task` of `words` running
-/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] as [`SCRIPT`]. With
+/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] the run-time brief
+/// ([`script`]) naming what fired it and quoting `words`. With
 /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`, the
 /// first builder's 19:50 ruling on #6811), sip-of-water's guards
 /// (`made_skill::template_guards`) after the trigger: never in the middle
@@ -1230,13 +1282,17 @@ pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> St
     } else {
         String::new()
     };
+    // The run-time brief names what fired it (the first builder, 02:09 on
+    // #7819); a trigger not said plainly is refused by the make's check.
+    let fire = made_skill::fire_said(block).unwrap_or_else(|| "its trigger".to_owned());
     format!(
         "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\ngrants = [{grants}]\n\n\
          {block}\n\n{guards}[ask]\npolicy = \"nudge\"\n\n[[do]]\ntask = {{ task = \"{words}\", run = \
          \"{RUN}\" }}\n```\n\n```SKILL.md\n---\nname: {name}\ndescription: The lamp's agent \
          does a task you asked for.\n---\n\n# {name}\n\nThe lamp's agent does this task: \
-         {words}\n```\n\n```{RUN}\n{SCRIPT}```\n",
+         {words}\n```\n\n```{RUN}\n{script}```\n",
         grants = grants.join(", "),
+        script = script(&fire, words),
     )
 }
 
@@ -1284,9 +1340,10 @@ pub fn asked_files(
         crate::upload_agent::INSTRUCTIONS,
     );
     let instructions = format!(
-        "---\nname: {name}\ndescription: {words}\n---\n\n# {name}\n\nDo this for the lamp's \
-         owner, as they asked the lamp in their own words, and tell them in a sentence or two \
-         what you found or did:\n\n{words}\n"
+        "---\nname: {name}\ndescription: {words}\n---\n\n# {name}\n\nA skill the lamp's owner \
+         made has been asked for now. When they made it, they said the line below. Do now what \
+         it is for, never making, changing or removing a skill, and tell them in a sentence or \
+         two what you found or did:\n\n{words}\n"
     );
     made_skill::Files {
         toml,

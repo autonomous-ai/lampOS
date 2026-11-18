@@ -3083,15 +3083,17 @@ thread_local! {
 }
 
 /// Whether a made skill's `scripts` are exactly the lamp's own
-/// [`crate::make_no_cannot::RUN`], byte for byte its
-/// [`crate::make_no_cannot::SCRIPT`]: only then is a `do.task` running it a
-/// task for the lamp's agent; real code the model wrote at that path is
-/// the model's code (El's P2 on #7261).
+/// [`crate::make_no_cannot::RUN`]: its [`crate::make_no_cannot::SCRIPT`]
+/// byte for byte, or its run-time brief ([`crate::make_no_cannot::script`],
+/// [`crate::make_no_cannot::is_script`]: one plain Python string, nothing
+/// in it code). Only then is a `do.task` running it a task for the lamp's
+/// agent; real code the model wrote at that path is the model's code (El's
+/// P2 on #7261).
 pub(crate) fn agent_script_only(scripts: &[(String, String)]) -> bool {
     matches!(
         scripts,
         [(path, text)] if path == crate::make_no_cannot::RUN
-            && text == crate::make_no_cannot::SCRIPT
+            && crate::make_no_cannot::is_script(text)
     )
 }
 
@@ -3128,6 +3130,18 @@ impl Drop for NetCode {
     fn drop(&mut self) {
         NET_CODE.with(|kept| kept.set(self.0));
     }
+}
+
+/// What fires a made trigger `block` (its `[trigger]` table), in plain
+/// words for the run-time brief ([`crate::make_no_cannot::script`]): "when
+/// someone comes to the desk", "every day at 08:00". None when it can't be
+/// said.
+pub(crate) fn fire_said(block: &str) -> Option<String> {
+    let table: toml::Table = toml::from_str(block).ok()?;
+    let (said, _) = trigger_plainly(table.get("trigger")).ok()?;
+    let mut chars = said.chars();
+    let first = chars.next()?;
+    Some(first.to_lowercase().chain(chars).collect())
 }
 
 /// [`AGENT_SCRIPT`] set for as long as it lives, then as it was.
@@ -7024,14 +7038,16 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
         // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`): said as one,
         // waiting for the yes; with `LAMP_MAKE_NO_ASKS` on, one that sends
         // nothing goes on at once with no yes (the first builder, 01:26 on
-        // #7819), so no wait is said ([`crate::make_no_asks::keeps_no_yes`]).
+        // #7819), so no wait is said; one that sends keeps its yes (02:09),
+        // read as [`crate::make_no_asks::keeps_no_yes`] reads it.
         if agent_task(table) {
             let messages = table
                 .get("permissions")
                 .and_then(|permissions| permissions.get("messages"))
                 .and_then(toml::Value::as_bool)
                 == Some(true);
-            let at_once = crate::make_no_asks::on() && !writes && !messages;
+            let at_once =
+                crate::make_no_asks::on() && !crate::make_no_asks::sends(writes, messages, &grants);
             said.push_str(&agent_said_as(&grants, at_once));
         } else {
             said.push_str(&code_said_as(&grants, at_once));
