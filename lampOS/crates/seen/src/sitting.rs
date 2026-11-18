@@ -15,10 +15,17 @@
 //!   `humans/doing` (`lamp_msgs::HumanDoing`): every timer always present,
 //!   counting from the desk arrival when nothing has been seen, so a
 //!   skill's `[[while]] above` runs on the clock as it did without this
-//!   part. It begins again on `room/stood_up` or a forget, and when nobody
+//!   part. It begins again on `room/stood_up` or a forget, when nobody
 //!   has been at the desk for more than
 //!   [`crate::keep::KEEP_US`] (120 s; kept unsaid until then,
-//!   [`crate::keep`]): no history is kept.
+//!   [`crate::keep`]), when the gate opens again on another passing id
+//!   than the one it was kept for, and when a held sitting ends on
+//!   another face ([`crate::hold::End::OtherFace`]): no history is kept.
+//!   It begins from the arrival, but never from before the chair last
+//!   emptied (120 s closed, or a held sitting ended on another face;
+//!   [`begins_us`], [`crate::keep::Seat`]), so the next person's timers
+//!   never count the first one's time. After a stand-up, a forget or a
+//!   new id without the hold it begins from the arrival, as before.
 //! - With [`ENVIRONMENT`] on ([`more`]), the same bursts also time, on
 //!   `humans/doing_more` (`lamp_msgs::HumanDoingMore`), a topic of its own
 //!   that a skill reads only by naming it, tiredness (V1's `tired`, a yawn, and a stretch of an arm or a leg,
@@ -216,6 +223,16 @@ fn index(kind: Doing) -> Option<usize> {
 
 fn seconds(from_us: u64, now_us: u64) -> u32 {
     u32::try_from(now_us.saturating_sub(from_us) / 1_000_000).unwrap_or(u32::MAX)
+}
+
+/// When a sitting begun now counts from: `room/activity`'s arrival
+/// (`arrived_us`, a gap under two minutes forgiven, whoever's face), but
+/// never before the chair last emptied (`emptied_us`,
+/// [`crate::keep::chair_emptied`]), so someone sitting down after another
+/// person left never counts that person's time (the first builder's rule
+/// on #6543).
+pub fn begins_us(arrived_us: u64, emptied_us: Option<u64>) -> u64 {
+    emptied_us.map_or(arrived_us, |emptied| arrived_us.max(emptied))
 }
 
 impl Sitting {
@@ -545,6 +562,23 @@ mod tests {
         assert_eq!((doing.drank_s_ago, doing.break_s_ago), (60, 780));
         assert_eq!(doing.last, Doing::Drinking);
         assert!((doing.confidence - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_sitting_begun_after_the_chair_emptied_counts_from_then() {
+        // lamp-06c1, run 8 (#7506): the chair emptied at 2_100 s, and the
+        // next sitting counted `break_s_ago` from `room/activity`'s arrival
+        // 2_100 s before, the first one's time.
+        let begins = begins_us(0, Some(2_100 * S));
+        assert_eq!(begins, 2_100 * S);
+        let doing = Sitting::new(begins).doing(2_160 * S);
+        assert_eq!(
+            (doing.break_s_ago, doing.drank_s_ago, doing.ate_s_ago),
+            (60, 60, 60)
+        );
+        // Never emptied, or before the arrival: from the arrival.
+        assert_eq!(begins_us(500 * S, None), 500 * S);
+        assert_eq!(begins_us(500 * S, Some(100 * S)), 500 * S);
     }
 
     #[test]

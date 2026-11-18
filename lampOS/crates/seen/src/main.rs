@@ -32,7 +32,7 @@ use lamp_seen::{
     outlet::Outlet,
     pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
-    sitting::{BREAK_IS_STANDING, Sitting},
+    sitting::BREAK_IS_STANDING,
     switched_on,
     watch::Readings,
 };
@@ -518,7 +518,6 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             Marked::new(BusRing::on(&bus, boot_clock_id())?, outlet),
         )),
     };
-    let mut sitting: Option<Sitting> = None;
     // A break is a stand-up, not a stretch (#6543 step 2): with the switch
     // on, `stood_up_us` keeps when the last room/stood_up came, so the
     // sitting begun on their return counts its break from then.
@@ -527,7 +526,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         eprintln!("lamp-seen: a break is a stand-up, not a stretch");
     }
     let mut stood_up_us: Option<u64> = None;
-    let mut keep = keep::Keep::default();
+    // The keep, the sitting, and when the chair last emptied, so the next
+    // sitting never counts from before it (`keep::Seat`).
+    let mut seat = keep::Seat::default();
     // The sitting held while a close person is seen
     // (`hold.rs`); off, none, and every step is as without it.
     let mut holds =
@@ -622,12 +623,12 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 forgot: came.forgot,
                 recent_answer,
                 posture: posture_frames,
+                face: on_track.track.as_ref().map(|track| track.id.as_str()),
             },
         );
-        if let Some(holds) = holds.as_mut() {
-            for note in holds.notes() {
-                eprintln!("lamp-seen: {}", note.line());
-            }
+        let notes = holds.as_mut().map(hold::Hold::notes).unwrap_or_default();
+        for note in &notes {
+            eprintln!("lamp-seen: {}", note.line());
         }
         let gate = gate::may_request(&now_inputs);
         if last_gate != Some(gate) {
@@ -655,18 +656,26 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             .and_then(|(_, marked)| marked.inner().pose.as_deref())
             .is_some_and(Pose::watching);
         // What a closing wipes at once, and what it keeps unsaid for up to
-        // 120 s (`keep.rs`).
-        let plan = keep.step(&keep::Now {
-            now_us: now,
-            inputs: &now_inputs,
-            seen: &on_track,
-            stood_up: came.stood_up,
-            forgot: came.forgot,
-            posture_gate,
-            desk,
-            watching,
-            sitting: sitting.is_some(),
-        });
+        // 120 s (`keep.rs`); the sitting wiped and begun again with it.
+        let plan = seat.step(
+            &keep::Now {
+                now_us: now,
+                inputs: &now_inputs,
+                seen: &on_track,
+                stood_up: came.stood_up,
+                forgot: came.forgot,
+                posture_gate,
+                desk,
+                watching,
+            },
+            &notes,
+            &keep::Begin {
+                arrived_us: inputs.arrived_us(now),
+                more: more_doings,
+                break_is_standing,
+                stood_up_us,
+            },
+        );
         let word =
             |closed: Result<(), gate::Closed>| closed.map_or_else(|c| c.as_str(), |()| "open");
         if let Some(line) = plan.posture.line("posture's window", word(posture_gate)) {
@@ -675,7 +684,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         if let Some(line) = plan.sitting.line("the sitting's timers", word(desk)) {
             eprintln!("lamp-seen: {line}");
         }
-        if plan.sitting.wipes() && sitting.take().is_some() {
+        if plan.sitting.wipes() {
             doing_said = None;
         }
         if plan.posture.wipes()
@@ -683,14 +692,6 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             && let Some(pose) = marked.inner_mut().pose.as_mut()
         {
             pose.forget();
-        }
-        if desk.is_ok() && sitting.is_none() {
-            let begun = Sitting::with_more(inputs.arrived_us(now), more_doings);
-            sitting = Some(if break_is_standing {
-                begun.break_is_standing(now, stood_up_us)
-            } else {
-                begun
-            });
         }
         // Kept through a short closing: nothing said from it.
         let sitting_held = plan.sitting.holds();
@@ -716,7 +717,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             {
                 // Kept: the burst under way is aborted below, and
                 // what it saw is dropped, never said.
-                if let Some(sitting) = sitting.as_mut().filter(|_| !sitting_held) {
+                if let Some(sitting) = seat.sitting_mut().filter(|_| !sitting_held) {
                     for newly in sitting.saw(&finished.seen, now) {
                         if newly.check().is_ok() {
                             let _ = seen_out.publish_json(now, &newly);
@@ -748,7 +749,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 }
             }
         }
-        if let Some(sitting) = sitting.as_ref().filter(|_| !sitting_held)
+        if let Some(sitting) = seat.sitting().filter(|_| !sitting_held)
             && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
         {
             let doing = sitting.doing(now);
