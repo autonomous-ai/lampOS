@@ -80,6 +80,19 @@ pub const BACK_ON_BY_CALL: &str = "A skill turned off is turned back on by calli
      with turn_on and its name, when their line asks to turn it on, or by the lamp when the owner \
      asks to use it; never say it is on or back on unless a call's answer says so.";
 
+/// How a turn off is done, told beside a skill's state (`skill_about`'s
+/// answer, [`crate::skill_about::TURNING_OFF`]) with the switch on: #7562's
+/// rows on lamp-9adf, 18 Nov, "Lamp, turn off my space facts skill." was
+/// asked back ("Do you want it off?", "Remove space facts?"), and a skill
+/// started only by its words was said to have "nothing running to switch
+/// off". The product owner's 18:41 rule: a turn off of a named made skill
+/// acts at once, in one line with its undo. Whether a line asks it stays
+/// the model's to judge: no words are read.
+pub const TURN_OFF_AT_ONCE: &str = "A line asking to turn off, pause or stop a skill they made \
+     or added, even one that starts only when they say its words, is make_skill's turn_off with \
+     its name alone, never remove: call it at once and ask nothing first; its answer gives the \
+     one line to say, with how to undo it.";
+
 /// What the model is told when it calls the function of a skill the person
 /// made or added that is turned off (`lamp_skills::TOOL_TURNED_OFF` is
 /// this very text): it ran nothing.
@@ -1397,6 +1410,65 @@ mod tests {
             .unwrap();
         assert!(remove.contains("for good"), "{remove}");
         assert!(remove.contains("never to turn one off"), "{remove}");
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
+        made_skill::set_off_said_here(None);
+    }
+
+    /// #7562's rows on lamp-9adf, 18 Nov ("Lamp, turn off my space facts
+    /// skill." asked back "Do you want it off?", said a skill started by
+    /// its words had "nothing running to switch off", and asked "Remove
+    /// space facts?"): with the switch on, the function's description and
+    /// its `turn_off` tell that a turn off is `turn_off`, never a remove,
+    /// that one started only by their words is turned off too, and that it
+    /// is done at once with nothing asked first; with every switch on,
+    /// still within the link's bounds.
+    #[test]
+    fn a_turn_off_is_told_at_once_even_for_one_started_by_its_words() {
+        made_skill::set_off_said_here(Some(true));
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        let tool = crate::make_skill_local::tool();
+        for told in ["turn_off at once", "never remove"] {
+            assert!(
+                tool.description.contains(told),
+                "{told}: {}",
+                tool.description
+            );
+        }
+        assert!(
+            tool.description.len() <= 1_024,
+            "{}",
+            tool.description.len()
+        );
+        assert!(!tool.description.contains("yes"), "{}", tool.description);
+        let parameters = tool.parameters.unwrap();
+        assert!(
+            parameters.to_string().len() <= 4_096,
+            "{}",
+            parameters.to_string().len()
+        );
+        let off = parameters["properties"][TURN_OFF]["description"]
+            .as_str()
+            .unwrap();
+        for told in [
+            "only when they say its words",
+            "at once",
+            "Ask nothing first",
+        ] {
+            assert!(off.contains(told), "{told}: {off}");
+        }
+        for told in [
+            "turn_off",
+            "never remove",
+            "only when they say its words",
+            "at once",
+            "ask nothing",
+        ] {
+            assert!(TURN_OFF_AT_ONCE.contains(told), "{told}");
+        }
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
         made_skill::set_writes_here(None);

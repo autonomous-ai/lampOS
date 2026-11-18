@@ -2203,17 +2203,33 @@ chính `make_skill`, chỉ với `turn_off`, và bật lại chỉ với `turn_o
 như đã nghe (`made_turn::TURN_OFF`, `made_turn::TURN_ON`), là tham số của
 hàm giọng nói đã có, như việc gỡ. Một câu xin điều nào là do mô hình phán
 đoán, không bao giờ theo danh sách từ: câu cuối của mô tả hàm thành "To
-turn off, pause or stop one they made or added: turn_off, never remove;
-back on: turn_on; delete: remove; run now: run; list: made; say nothing
-first." (`make_skill_local::TURN_OFF_TOLD`, 154 byte so với 149 byte của
+turn off, pause, stop one they made or added: turn_off at once, never
+remove; on: turn_on; delete: remove; run now: run; list: made; say nothing
+first." (`make_skill_local::TURN_OFF_TOLD`, 155 byte so với 149 byte của
 câu nó thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte của liên
-kết, ở 1.023), tham số `turn_off` nói "turn off, pause or stop a skill they
-made or added (by voice, in the app or from a file), which keeps it to turn
-back on ... Never remove for this", tham số `turn_on` nói điều tương tự cho
-việc bật lại, và tham số `remove` nói "delete
+kết, ở đúng 1.024), tham số `turn_off` nói "turn off, pause or stop a skill
+they made or added (by voice, in the app or from a file), which keeps it to
+turn back on ... Never remove for this. Even one that starts only when they
+say its words is turned off this way. Call it at once. Ask nothing
+first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
+`remove` nói "delete
 or remove a skill for good, never to turn one off, pause or stop it". Lời
 gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
-thành gỡ. Sau đó, trong code (`made_turn::asked`):
+thành gỡ. **Tắt là làm ngay** (các dòng thử của #7562 trên lamp-9adf,
+18/11, đường thứ hai, DeepSeek: "Lamp, turn off my space facts skill."
+được đáp "Do you want it off? If yes, tell me…", "nothing running to
+switch off" với một kỹ năng chỉ chạy khi nói đúng câu của nó, và "Remove
+space facts?"; quy tắc 18:41 của chủ sản phẩm: tắt một kỹ năng đã tạo được
+nêu tên là làm ngay, trong một câu kèm cách hoàn tác): "at once" và các câu
+cuối của tham số ở trên, và câu trả lời cho một câu hỏi về kỹ năng
+(`about` của `use_skill`, `skill_about::told`) mang `turning_off`
+(`skill_about::TURNING_OFF`), tức `made_turn::TURN_OFF_AT_ONCE`: "A line
+asking to turn off, pause or stop a skill they made or added, even one that
+starts only when they say its words, is make_skill's turn_off with its name
+alone, never remove: call it at once and ask nothing first; its answer
+gives the one line to say, with how to undo it." Chỉ điều mô hình được báo
+thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
+(`made_turn::asked`):
 - **Chỉ của chủ đèn, và được nói ra.** Một lượt không ai nói thì không đổi
   gì; một câu không phải của chủ (`services::owner_hears`, như khi chạy)
   không đổi gì và không nêu tên kỹ năng nào ("only the lamp's owner can
