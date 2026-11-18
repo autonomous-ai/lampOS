@@ -3084,8 +3084,14 @@ cả hai người viết.
     `LAMP_TASK_NET_GATEWAY=on` có trong `lamp-voice`, `lamp-tasks` và
     `lamp-skills-manage@` (lamp-9adf, 18/11 21:37: thiếu nó, helper từ chối
     kỹ năng bitcoin-price đã lưu với "a grant the lamp doesn't have: net").
-    Khi tắt, `net` chỉ đi cùng `scripts/agent.py` của chính đèn. Test:
-    `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`.
+    Khi tắt, `net` chỉ đi cùng `scripts/agent.py` của chính đèn.
+    `code_held` vẫn từ chối `net` cùng một quyền riêng tư (`notes`, `camera`
+    và tương tự), với lời sửa "one skill can't do both: make it two
+    skills", như lamp-skills từ chối lúc nạp, nên code như vậy không bao giờ
+    được đọc lại và nhận lời đồng ý mà rồi không bật được (P2 của Twelve
+    trên #7780). Test:
+    `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`,
+    `made_skill::tests::with_gateway_net_code_granted_net_beside_a_private_grant_is_refused`.
   - **Một yêu cầu không quyền nào đáp ứng được** được nói lý do bằng lời
     thường, nêu thiếu gì rồi dừng, không bao giờ chỉ là "I couldn't make
     that one." (`Uncovered::line`). Không câu nào bảo người dùng làm điều họ
