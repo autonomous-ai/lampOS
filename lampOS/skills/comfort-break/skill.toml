@@ -16,10 +16,11 @@ version = "1.0.0"
 most_a_day = 2
 
 # What it may read and use, and nothing more: the faces, the voice's state,
-# the eyes' sitting, and a turn toward the face. One short line, worded by the voice.
+# the eyes' sitting, the drinks seen this sitting (`humans/doing_more`, the
+# `seen_more` use, #6543), and a turn toward the face. One short line, worded by the voice.
 [permissions]
 speak = true
-topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity", "humans/doing_more"]
 body = true
 
 [trigger]
@@ -29,6 +30,11 @@ near = 0.14               # at the desk, not across the room (Stretch break's li
 for = "120m"              # after Stand up's 100 minutes: for a sitting that went on
 gap = "2m"                # looking away or leaning out of view does not end the sitting
 rearm = "leaves"          # once a sitting; again only after they have left
+# Two drinks or more seen in this sitting (lamp-seen's drank_seen, #6543)
+# bring it forward, to an hour, still once a sitting; the line below never
+# mentions them. Only with LAMP_YAWN_SOONER=on and lamp-seen saying
+# humans/doing_more (LAMP_SEEN_MORE_DOINGS=on); otherwise two hours, as before.
+sooner = { topic = "humans/doing_more", field = "drank_seen", above = 1, for = "60m" }
 cooldown = "120m"
 wait = "30m"              # someone else in view, or a talk, when the time comes: once they go, within half an hour
 
@@ -60,6 +66,8 @@ topic = "room/activity"   # begins again when someone else sits down, has lasted
 field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
 above = 7199              # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 unknown = "holds"
+# With two drinks seen, the hour the trigger's sooner gives (LAMP_YAWN_SOONER=on).
+sooner = { topic = "humans/doing_more", field = "drank_seen", above = 1, above_to = 3599 }
 
 [active]                  # in the day
 from = "09:00"
@@ -95,7 +103,8 @@ body = { look_at = "face" }
 say = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
-# the values above, each key whole: on, after 90 minutes at the desk, three
+# the values above, each key whole: on, after 90 minutes at the desk (an
+# hour after two drinks seen, as above), three
 # a day at most, inside the wellbeing group's two an hour, never within 30
 # minutes of each other.
 [present]
@@ -109,6 +118,7 @@ near = 0.14
 for = "90m"
 gap = "2m"
 rearm = "leaves"
+sooner = { topic = "humans/doing_more", field = "drank_seen", above = 1, for = "60m" }
 cooldown = "90m"
 wait = "30m"
 
@@ -140,6 +150,7 @@ topic = "room/activity"
 field = "sitting_s"
 above = 5399
 unknown = "holds"
+sooner = { topic = "humans/doing_more", field = "drank_seen", above = 1, above_to = 3599 }
 
 [present.budget]
 group = "wellbeing"

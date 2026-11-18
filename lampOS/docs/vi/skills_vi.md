@@ -4237,8 +4237,8 @@ trong hai chủ đề này trong `[permissions] topics` đều bị từ chối 
 `humans/doing_more` (mệt, việc ở bàn theo loại thô
 và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
-`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
-nào đọc nó. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+`seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Nghỉ giải lao
+đọc nó, chỉ `drank_seen`, và chỉ khi `LAMP_YAWN_SOONER=on` (bên dưới). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được
@@ -4260,7 +4260,13 @@ lời nói vẫn không bao giờ nhắc tới cơ thể). Một lần thấy u�
 vai chỉ giữ một lời nhắc lại, không bao giờ thành một lời nói riêng, và không
 lưu gì về một người (quyết định của PM). Nghỉ giải lao (comfort break) không
 đọc chủ đề nào: không việc gì thấy được cho biết lần nghỉ đỡ cần hơn (thấy
-uống nước càng không). Điều kiện của Ngồi thẳng lại cũng giữ lời cảm ơn, vì
+uống nước càng không). Thay vào đó, từ hai lần uống trở lên được thấy trong
+lần ngồi thì nó đến sớm hơn, từ hai giờ còn một giờ (90 phút còn một giờ với
+`[present]`), nhờ `drank_seen` của `humans/doing_more` trên 1 trong `sooner`
+của trigger (`for = "60m"`) và của điều kiện `sitting_s` (`above_to = 3599`),
+tức quyền dùng `seen_more`; chỉ khi `LAMP_YAWN_SOONER=on`, vẫn một lần mỗi lần
+ngồi, vẫn không bao giờ khi có người khác trong khung hình, lời nói không bao
+giờ nhắc tới đồ uống (test `two_drinks_seen_bring_a_comfort_break_forward`). Điều kiện của Ngồi thẳng lại cũng giữ lời cảm ơn, vì
 `[[while]]` là của cả kỹ năng: nếu lúc đó tư thế đã được đọc là tốt, lời cảm
 ơn bị bỏ qua. Các ca: `a-sip-when-lamp-seen-saw-no-drink`,
 `quiet-after-a-drink-was-seen`, `a-sip-when-lamp-seen-went-quiet`,
