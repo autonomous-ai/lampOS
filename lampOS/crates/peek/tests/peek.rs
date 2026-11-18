@@ -1501,6 +1501,102 @@ fn monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart() {
     fs::remove_dir_all(root).unwrap();
 }
 
+/// The owner's Off (#6401, P1 privacy): systemd's SIGTERM ends every open
+/// `/events` stream and the binary within 2 s. On 0c89 an open stream kept
+/// flowing 81 s after "asked to stop", until its client gave up.
+#[test]
+fn monitor_mode_a_stop_ends_every_open_stream_and_the_binary_within_2_s() {
+    let root = PathBuf::from(format!("/tmp/lpk-mstop-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("bus")).unwrap();
+    let port = free_port();
+    let mut peek = monitor_binary(&root, port);
+    let code = admin_code(&root);
+    let form = "Content-Type: application/x-www-form-urlencoded\r\n";
+    let (status, text) = ask_port(port, "POST", "/in", form, &format!("code={code}"));
+    assert_eq!(status, 204, "{text}");
+    let session = text
+        .lines()
+        .find_map(|line| line.strip_prefix("set-cookie: "))
+        .and_then(|cookie| cookie.split(';').next())
+        .unwrap_or_else(|| panic!("no cookie: {text}"))
+        .to_owned();
+    // Two streams, kept alive as a browser or curl keeps them.
+    let mut streams: Vec<BufReader<TcpStream>> = (0..2)
+        .map(|_| {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream.set_read_timeout(Some(WAIT)).unwrap();
+            write!(
+                stream,
+                "GET /events HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nCookie: {session}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reader = BufReader::new(stream);
+            let mut line = String::new();
+            while !line.starts_with("event: ") {
+                line.clear();
+                assert_ne!(reader.read_line(&mut line).unwrap(), 0, "no event came");
+            }
+            reader
+        })
+        .collect();
+    let stopped = Instant::now();
+    let within = Duration::from_secs(2);
+    // As systemd stops the unit.
+    let signalled = Command::new("kill")
+        .args(["-TERM", &peek.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(signalled.success());
+    let mut ended = Vec::new();
+    for reader in &mut streams {
+        let mut line = String::new();
+        let end = loop {
+            let left = within.saturating_sub(stopped.elapsed());
+            if left.is_zero() {
+                break None;
+            }
+            reader.get_ref().set_read_timeout(Some(left)).unwrap();
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break Some(stopped.elapsed()),
+                Ok(_) => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    break None;
+                }
+                // Reset by a process that ended is ended too.
+                Err(_) => break Some(stopped.elapsed()),
+            }
+        };
+        ended.push(end);
+    }
+    let exited = loop {
+        if let Some(status) = peek.try_wait().unwrap() {
+            break Some((status, stopped.elapsed()));
+        }
+        if stopped.elapsed() >= within {
+            break None;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    if exited.is_none() {
+        peek.kill().unwrap();
+        peek.wait().unwrap();
+    }
+    fs::remove_dir_all(&root).unwrap();
+    assert!(
+        ended.iter().all(Option::is_some),
+        "an open stream outlived the stop by 2 s: {ended:?}"
+    );
+    let (status, _) = exited.expect("lamp-peek did not exit within 2 s of SIGTERM");
+    assert!(status.success(), "{status}");
+}
+
 /// An open stream ends when its session does (the 12 hours), not only new
 /// requests (reviewer-two's HOLD on #5943): the session is opened on a clock
 /// set back to just before its end, so the end comes within the test.
