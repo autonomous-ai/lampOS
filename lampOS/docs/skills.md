@@ -7407,6 +7407,53 @@ reset still ask. On (`crate::make_no_asks`):
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
 
+#### What a skill on the lamp already does, offered (`LAMP_MAKE_CORE_OFFER=on`, off)
+
+Off unless `LAMP_MAKE_CORE_OFFER=on`, in no product unit (#7747: on
+lamp-9adf three water reminders made by voice sat beside the core
+`sip-of-water`, none with its guards; the person asked for a better water
+reminder and got a second, worse one). `lamp-voice` passes the exact `on` to
+its `second` worker alone (`process::second_route_worker_environment`).
+On (`crate::make_core_offer`):
+
+- **The model judges, before anything is made.** A voice `make_skill` call
+  with a `request` and no `new_skill` makes nothing yet. It is told, one
+  line each, every skill on the lamp the person didn't make (core, Store or
+  pushed: its name, its `SKILL.md` description cut at 200 bytes, on or off,
+  read as `skill_about::skills` reads them) and asked whether one already
+  does what was asked: the same kind of nudge or action on the same kind of
+  moment. That is the model's judgment, never a word list (the owner's
+  ruling, 13 Nov). A lamp with none, or whose skills can't be read, makes at
+  once, as before.
+- **None does** ("remind me to call mum at 3"): the model calls again at
+  once with the same request and `new_skill` true, and the make goes on as
+  before. This costs one more round of the voice's own model on a make;
+  the read is two local folders and three records, with no socket.
+- **One does** ("remind me to drink water every hour"): nothing is made,
+  never a silent swap. The lamp says the skill already does that. One that
+  is off (turned off by voice or in the app) is offered to be turned on;
+  one that is on is said with what it does, and the person is asked
+  whether they still want a new one.
+- **A yes** to turning it on is `make_skill` with `core_on`, the name
+  alone: only heard, only the owner's line (`services::owner_hears`), and
+  only a skill offered in the last 5 minutes, matched by its folder name
+  or its spoken words ("Sip of water", "a sip of water"). The manage helper
+  turns it on with its own `{"on": NAME}`, as the app's switch does.
+- **A no, when they still want a new one**, is the same request with
+  `new_skill`: made as asked, and the offer is let go.
+- **Not yet: changing a core skill's timing.** #7747 asks for a yes that
+  changes the settings a core skill exposes (its interval, hours, a day's
+  most). No core skill exposes a setting the voice may write today, so the
+  model is told never to offer or claim one; that needs a settings record
+  in `lamp-skills` first.
+
+The app's MAKE IT is unchanged. Off, `make_skill`'s parameters and answers
+are byte for byte as before. Tests: `make_core_offer::tests`
+(`a_make_with_a_core_skill_on_the_lamp_is_offered_not_made`,
+`a_yes_turns_the_offered_core_skill_on`,
+`a_new_skill_still_wanted_is_made_as_asked_and_the_offer_let_go`,
+`the_switch_off_changes_nothing`).
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not

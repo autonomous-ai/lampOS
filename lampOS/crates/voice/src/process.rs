@@ -2586,6 +2586,8 @@ fn second_route_worker_environment(
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
+        // What a skill on the lamp already does offered, not made (#7747).
+        crate::make_core_offer::ENVIRONMENT,
         // A live read or a hard ask handed to the lamp's agent (17 Nov).
         crate::agent_asks::SERVICES_ENVIRONMENT,
         crate::agent_asks::HARD_ENVIRONMENT,
@@ -2908,6 +2910,7 @@ mod tests {
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
+            crate::make_core_offer::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
             crate::agent_asks::HARD_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
@@ -4015,6 +4018,7 @@ mod tests {
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
+                    || name == crate::make_core_offer::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
                     || name == crate::agent_asks::HARD_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
@@ -4211,6 +4215,7 @@ mod tests {
                     "LAMP_MADE_NOT_ON_TOLD=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
+                    "LAMP_MAKE_CORE_OFFER=on",
                     "LAMP_MAKE_NO_CANNOT=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
