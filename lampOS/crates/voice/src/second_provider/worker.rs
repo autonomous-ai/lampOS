@@ -10834,9 +10834,11 @@ impl Heeding {
 
     /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
     /// is held as not said to the lamp, its face and conversation then no
-    /// sign. The turned face's pitch and gaze are the eyes' newest through
-    /// the line (`LAMP_EYES_PITCH_GAZE` on lamp-eyes); none given is
-    /// unknown, which blocks nothing.
+    /// sign. Out of a conversation the turned face's pitch and gaze are the
+    /// eyes' newest through the line; in its window, the speaker's over the
+    /// line, turned or not (#7721) (`LAMP_EYES_PITCH_GAZE` on lamp-eyes);
+    /// none given is unknown, which blocks nothing and, in the window, is
+    /// journaled.
     fn not_said_to_me(
         &mut self,
         request: u64,
@@ -10848,12 +10850,18 @@ impl Heeding {
             return false;
         }
         let turned = signs.turned == Some(true);
-        let (pitch, looking) = self
+        let (pitch, looking, looks) = self
             .eyes
             .as_ref()
             .zip(line_between(said.0, said.1))
-            .map_or((None, None), |((eyes, _), (from, to))| {
-                eyes.turned_pose_between(from, to)
+            .map_or((None, None, 0), |((eyes, _), (from, to))| {
+                if signs.going_on {
+                    eyes.speaker_pose_between(from, to)
+                } else {
+                    // The newest look that gave a pose: one look, or none.
+                    let (pitch, looking) = eyes.turned_pose_between(from, to);
+                    (pitch, looking, usize::from(pitch.is_some() || looking.is_some()))
+                }
             });
         let line = crate::said_to_me::Line {
             heard,
@@ -10874,13 +10882,23 @@ impl Heeding {
                 .zip(line_between(said.0, said.1))
                 .is_some_and(|((eyes, _), (from, to))| eyes.read_silent_between(from, to)),
         };
-        let crate::said_to_me::Said::Held(held) = crate::said_to_me::judge(line) else {
+        let going_on = signs.going_on;
+        let decision = crate::said_to_me::judge(line);
+        let pose = crate::said_to_me::pose(pitch, looking, looks);
+        let words = heard.split_whitespace().count();
+        // Every decision journaled with the pose, for a row to count
+        // (#7721); the held line as before, the pose after it.
+        let crate::said_to_me::Said::Held(held) = decision else {
+            eprintln!(
+                "lamp-voice second: request {request}: said to me: let through: {}: {words} words, {}; {pose} (LAMP_SAID_TO_ME)",
+                decision.verdict(),
+                if going_on { "in the window" } else { "out of the window" },
+            );
             return false;
         };
         eprintln!(
-            "lamp-voice second: request {request}: not said to the lamp, {}: {} words, no name; the face and the conversation are no sign (LAMP_SAID_TO_ME)",
+            "lamp-voice second: request {request}: not said to the lamp, {}: {words} words, no name; the face and the conversation are no sign (LAMP_SAID_TO_ME); {pose}",
             held.reason(),
-            heard.split_whitespace().count()
         );
         signs.turned = Some(false);
         signs.going_on = false;
@@ -28155,6 +28173,49 @@ mod tests {
             judged((down, Some(false)), "Lamp, call Ada back."),
             None,
             "named"
+        );
+    }
+
+    /// #7721 (lamp-74ff, 18 Nov): in a conversation's window, Jay talks
+    /// at his phone head down (40 degrees) or with his eyes away: held. Said
+    /// facing, or with the pose unread, or naming the lamp, or a yes the
+    /// lamp waits for: answered.
+    #[test]
+    fn with_said_to_me_a_head_down_line_in_a_conversation_is_held() {
+        use lamp_msgs::SpeakingState::{No, Yes};
+        let judged = |pose: (Option<f32>, Option<bool>), words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks_posed(&eyes, now, 200, &[Some(Yes), Some(No)], &mut 0, pose);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            let signs = super::Signs {
+                going_on: true,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let verdict = heeding.heed_signs(9, (now_us, now_us + 2_200_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let line = "Tell Ada I'm running late now";
+        let down = Some(40f32.to_radians());
+        assert!(judged((down, None), line).is_some(), "head down");
+        assert!(judged((None, Some(false)), line).is_some(), "looking away");
+        assert_eq!(judged((Some(0.05), Some(true)), line), None, "facing");
+        assert_eq!(judged((None, None), line), None, "pose unread");
+        let lost = Some(std::f32::consts::FRAC_PI_2);
+        assert_eq!(judged((lost, None), line), None, "lost marks, unread");
+        assert_eq!(
+            judged((down, Some(false)), "Lamp, what time is it?"),
+            None,
+            "named"
+        );
+        assert_eq!(
+            crate::said_to_me::awaiting_yes(true, || judged((down, Some(false)), "Yes.")),
+            None,
+            "a yes awaited"
         );
     }
 
