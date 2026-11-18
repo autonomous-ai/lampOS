@@ -6868,7 +6868,11 @@ the same code for both writers.
   the middle form: the lamp writes the skill itself as one task for its
   agent (`make_no_cannot::made`): the trigger its own model picks in one
   more call (a time is a trigger), or the words that ask for it, and one
-  `do.task` whose words are the person's request, run by
+  `do.task` whose words are the person's own, the line heard for the make
+  (`thread.heard_for`, Twelve's P2 on #7819), never the voice model's
+  paraphrase in `make_skill`'s `request`, which is taken only when nothing
+  was heard (a make from the app or a typed line); the judgement and the
+  one more call are asked of the same words; run by
   `scripts/agent.py`, so the agent does all the work when it fires; no
   `say`, no other step and no timer or `[[while]]` a model wrote. On a
   trigger, but never on the lamp's clock (`clock/local`: "tell me the BTC
