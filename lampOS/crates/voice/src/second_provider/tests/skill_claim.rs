@@ -859,3 +859,52 @@ fn a_one_word_skill_said_removed_is_held() {
     assert!(went.notes.is_empty(), "{went:?}");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// Heron's P3 on #7830: the turn off that acts at once (#7562, a skill
+/// started only by its words too, `made_turn::TURN_OFF_AT_ONCE`) is backed
+/// under `LAMP_SKILL_CLAIM_CHECKED`: "Lamp, turn off my space facts skill."
+/// is `make_skill`'s `turn_off` in round 1, and "Space facts is off." with
+/// its undo is said as it is, backed by the call's `turned_off`; no note,
+/// nothing asked, and the call is kept for the next turn's history.
+#[test]
+fn a_turn_off_at_once_is_backed_by_its_turned_off() {
+    let (root, keeping) = lamp_with(
+        "skill-claim-off-at-once",
+        &[("space-facts", true), ("planet-fact", true)],
+        &[],
+    );
+    let went = went(
+        &keeping,
+        "Lamp, turn off my space facts skill.",
+        Vec::new(),
+        vec![
+            making(json!({ crate::made_turn::TURN_OFF: "space facts" })),
+            saying("Space facts is off. Say turn it back on whenever you like."),
+        ],
+    );
+    assert_eq!(
+        went.said,
+        said(&[
+            "Space facts is off.",
+            " Say turn it back on whenever you like."
+        ]),
+        "{went:?}"
+    );
+    assert!(went.said.iter().all(|line| !line.contains('?')), "{went:?}");
+    assert!(
+        !went.notes.iter().any(|note| note == SKILL_NOTE),
+        "{went:?}"
+    );
+    assert_eq!(went.turned, [("space-facts".to_owned(), true)], "{went:?}");
+    assert_eq!(went.told[0][crate::made_turn::TURN_OFF], "space-facts");
+    assert_eq!(
+        went.kept,
+        [(
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_turn::TURN_OFF: "space-facts" }),
+            Some(crate::second_provider::MADE_TURNED)
+        )],
+        "{went:?}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
