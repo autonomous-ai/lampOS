@@ -13,6 +13,10 @@ const MAY_NAME_IT: &[(&str, &str)] = &[
     ("msgs", "the type and its topic"),
     ("sim", "its stimuli, no lamp"),
     (
+        "skills",
+        "a skill's trigger on the topic, on the lamp: `count` counts coughs in memory only (#7686)",
+    ),
+    (
         "voice-eval",
         "names the topic only to count a left-out message by it (BUS_TOPICS), never reads one",
     ),

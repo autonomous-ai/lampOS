@@ -966,6 +966,24 @@
             }
           }
         },
+        "count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "at_least",
+            "within"
+          ],
+          "properties": {
+            "at_least": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 60
+            },
+            "within": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
         "yields_to": {
           "type": "object",
           "additionalProperties": false,
