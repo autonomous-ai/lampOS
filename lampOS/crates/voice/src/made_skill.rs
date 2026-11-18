@@ -1080,7 +1080,9 @@ pub const ASKS_RULES: &str = "A skill may also start when the person says words 
      yes, a no, a question or a stop. Started only by them, it has no [trigger] and no [ask], \
      and no topics; its steps are any the rules above give a skill (a send, a task for the \
      lamp's agent, its code, the light, the head, a say), each as told there. The lamp says the \
-     words back and runs it each time the person says them; a send still waits for their yes.";
+     words back and runs it each time the person says them; a send still waits for their yes. \
+     The asks line is the file's first line, never under [permissions] or any other table: \
+     asks = [\"apple file\"], then kind = \"installable\", then version, then [permissions].";
 
 /// What the lamp can't do yet with [`WRITES_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
@@ -2737,7 +2739,10 @@ pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
 /// interval, a minute at least ([`say_paced_with`]).
 pub fn paced_for(text: &str, asked: &[(u32, u32)], limits: bool, repeat: Option<u64>) -> String {
     mannered_with(
-        &say_paced_with(&topic_granted(&notes_granted(&tidied(text))), repeat),
+        &say_paced_with(
+            &topic_granted(&notes_granted(&tidied(&asks_lifted(text)))),
+            repeat,
+        ),
         asked,
         limits,
     )
@@ -2870,6 +2875,101 @@ pub fn limits_asked(request: &str) -> bool {
         "once an hour",
     ];
     LIMITS.iter().any(|limit| request.contains(limit))
+}
+
+/// A made skill's `asks` lifted back to the top of its `skill.toml`, with
+/// [`ASKS_ENVIRONMENT`] on (#7582, lamp-c0a4, 18 Nov 04:35 and 04:40:
+/// OpenClaw wrote `asks = ["..."]` after `[permissions]`, so TOML read it
+/// as a field of that table and `lamp-skills` refused the skill on
+/// "unknown field"). [`ASKS_RULES`] says the words go at the top; a model
+/// that writes them under a table means the skill's own asks. Lifted only
+/// when the top has no `asks`, the line (or the lines up to its closing
+/// `]`) sits under a table, and the text then reads as the same skill
+/// with `asks` at the top and nowhere else; otherwise it is given back as
+/// it came, for the check to say why. Off, or with nothing to lift, the
+/// text is byte for byte as it came. One journal line when lifted.
+pub fn asks_lifted(text: &str) -> String {
+    if !asks_on() {
+        return text.to_owned();
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    if table.contains_key("asks") {
+        return text.to_owned();
+    }
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let is_header = |line: &str| line.trim_start().starts_with('[');
+    let Some(first_table) = lines.iter().position(|line| is_header(line)) else {
+        return text.to_owned();
+    };
+    let starts_asks = |line: &str| {
+        let line = line.trim_start();
+        line.strip_prefix("asks")
+            .is_some_and(|rest| rest.trim_start().starts_with('='))
+    };
+    let Some(start) = lines
+        .iter()
+        .enumerate()
+        .skip(first_table)
+        .find(|(_, line)| starts_asks(line))
+        .map(|(index, _)| index)
+    else {
+        return text.to_owned();
+    };
+    // A line's text before a `#` outside a string.
+    let code = |line: &str| -> String {
+        let mut quoted = false;
+        line.chars()
+            .take_while(|&c| {
+                if c == '"' {
+                    quoted = !quoted;
+                }
+                quoted || c != '#'
+            })
+            .collect()
+    };
+    let Some(end) =
+        (start..lines.len()).find(|&index| code(lines[index]).trim_end().ends_with(']'))
+    else {
+        return text.to_owned();
+    };
+    // Lifted to the file's first line, as [`ASKS_RULES`] tells the model.
+    let mut asks: String = lines[start..=end].concat();
+    if !asks.ends_with('\n') {
+        asks.push('\n');
+    }
+    let mut lifted: Vec<&str> = Vec::with_capacity(lines.len() + 1);
+    lifted.push(&asks);
+    lifted.extend_from_slice(&lines[..first_table]);
+    lifted.extend(
+        lines
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index >= first_table && !(start..=end).contains(index))
+            .map(|(_, line)| *line),
+    );
+    let out: String = lifted.concat();
+    let Ok(read) = toml::from_str::<toml::Table>(&out) else {
+        return text.to_owned();
+    };
+    let mut expected = table.clone();
+    let mut moved = None;
+    for (_, value) in expected.iter_mut() {
+        if let Some(found) = value.as_table_mut().and_then(|inner| inner.remove("asks")) {
+            moved = Some(found);
+            break;
+        }
+    }
+    let Some(moved) = moved else {
+        return text.to_owned();
+    };
+    expected.insert("asks".into(), moved);
+    if read != expected {
+        return text.to_owned();
+    }
+    eprintln!("lamp-voice: a made skill tidied: its asks lifted to the top, out of a table");
+    out
 }
 
 /// A made skill's `skill.toml` with the fields that can't apply taken out,
@@ -15139,6 +15239,57 @@ light = { colour = "green", level = 3, for = "20s" }
     /// its own, and that it waits for the yes; asks not as lamp-skills
     /// takes them go back for a repair; off, they are taken out or refused
     /// exactly as before.
+    /// #7582, lamp-c0a4, 18 Nov 04:35 and 04:40: OpenClaw wrote the
+    /// skill's `asks` after `[permissions]`, so TOML read it as a field of
+    /// that table and `lamp-skills` refused it ("unknown field"). With
+    /// `LAMP_MADE_SKILL_ASKS` on it is lifted to the top and the skill is
+    /// kept as written there; off, or when it can't be lifted cleanly, the
+    /// text is byte for byte as it came.
+    #[test]
+    fn a_made_skills_asks_written_under_a_table_are_lifted_to_the_top() {
+        const UNDER: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n\
+            asks = [\"send my test note\"]\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        const SPREAD: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n\
+            asks = [\n  \"send my test note\", # the person's words\n  \"mail my note\",\n]\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let top = |text: &str| toml::from_str::<toml::Table>(text).unwrap();
+        let lifted = asks_lifted(UNDER);
+        assert_eq!(
+            lifted, ASKS_WRITE_TOML,
+            "the asks line first, the rest as written"
+        );
+        assert_eq!(paced(UNDER), paced(ASKS_WRITE_TOML));
+        let (_, uses) = capped_with(&paced(UNDER), false).unwrap();
+        assert_eq!(uses.writes, ["gmail"]);
+        let spread = top(&asks_lifted(SPREAD));
+        assert_eq!(
+            spread["asks"].as_array().unwrap().len(),
+            2,
+            "{}",
+            asks_lifted(SPREAD)
+        );
+        assert!(spread["permissions"].get("asks").is_none());
+        // Already at the top, or nothing to lift: as it came.
+        assert_eq!(asks_lifted(ASKS_WRITE_TOML), ASKS_WRITE_TOML);
+        let both = format!("asks = [\"send my test note\"]\n{UNDER}");
+        assert_eq!(asks_lifted(&both), both);
+        let none = UNDER.replace("asks = [\"send my test note\"]\n", "");
+        assert_eq!(asks_lifted(&none), none);
+        // Off: byte for byte.
+        set_asks_here(Some(false));
+        assert_eq!(asks_lifted(UNDER), UNDER);
+        assert_eq!(asks_lifted(SPREAD), SPREAD);
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
     #[test]
     fn a_made_skill_started_by_its_words_carries_its_asks_only_with_its_switch() {
         set_writes_here(Some(true));

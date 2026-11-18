@@ -3075,6 +3075,14 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    tối đa 8 (`made_skill::MOST_ADDED_ASKS`, các trigger phrase của nó, mục
    7), giữ cùng hình dạng; không có tool, hoặc khi công tắc tắt, chúng bị
    từ chối. Bước dọn giữ nguyên chúng.
+   Model tạo kỹ năng được cho xem đúng dạng (`asks = ["apple file"]` là
+   dòng đầu tiên của file, rồi `kind`, `version`, rồi `[permissions]`). Một
+   `asks` nó vẫn viết dưới một bảng (trên lamp-c0a4, 18/11, OpenClaw viết
+   nó sau `[permissions]` và `lamp-skills` từ chối kỹ năng vì "unknown
+   field") được nhấc lên dòng đầu tiên của file trước bước kiểm tra
+   (`made_skill::asks_lifted`, một dòng journal), chỉ khi phần đầu chưa có
+   và kỹ năng vẫn đọc như cũ với asks ở đầu; nếu không thì trả lại nguyên
+   như cũ.
 3. **Không bao giờ là của kỹ năng khác** (`made_skill::asks_taken`, lúc
    tạo, sau khi tên đã trống): một cụm trùng với ask của kỹ năng khác, hoặc
    chứa tên hay function của kỹ năng khác (đã cài, đẩy lên hoặc trong file

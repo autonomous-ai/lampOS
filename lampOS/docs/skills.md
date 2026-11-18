@@ -6614,7 +6614,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    (`capped_added`) may give them only beside its tool, at most 8
    (`made_skill::MOST_ADDED_ASKS`, its trigger phrases, item 7), held to
    the same shape; without a tool, or with the switch off, they are
-   refused. The tidy keeps them.
+   refused. The tidy keeps them. The making model is shown the form
+   (`asks = ["apple file"]` as the file's first line, then `kind`,
+   `version`, then `[permissions]`). An `asks` it still writes under a
+   table (on lamp-c0a4, 18 Nov, OpenClaw wrote it after `[permissions]`
+   and `lamp-skills` refused the skill on "unknown field") is lifted to
+   the file's first line before the check (`made_skill::asks_lifted`, one
+   journal line), only when the top has none and the skill then reads the
+   same with its asks at the top; otherwise it is given back as it came.
 3. **Never another skill's** (`made_skill::asks_taken`, at the make, after
    its name is free): a phrase that is another skill's ask, or holds
    another skill's name or function, installed, pushed or in the tools
