@@ -373,7 +373,14 @@ word ends quietly after its words, and its chat is never asked. A sound said
 close or facing the lamp but not heard as a short word is held there, where
 the Live route would answer it. One with a word in it, right after the
 lamp's own question in a conversation going on, is judged as a line there
-too: the worker reads the same thread (`worker::lamp_just_asked`). Tests:
+too: the worker reads the same thread (`worker::lamp_just_asked`). So is
+one with a word in it said while the lamp waits for a yes or no of its own
+asking (the engine's `a_yes_held`: a keep, a forget, a setup save, a
+rename, a skill's or a task's yes, a write's send), whatever its words
+(#7698: on lamp-06c1 on 18 Nov the reply to the lamp's read-back was held
+as a short sound; test
+`a_short_sound_while_the_lamp_waits_for_a_yes_is_judged_as_a_line` in
+`second_provider/tests/pause_join.rs`). Tests:
 `a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked`
 (`second_provider/tests.rs`: "¿Qué?" held with the chat never asked, "Yes."
 answered, and "¿Qué?" answered unchecked or unmarked),

@@ -10451,7 +10451,16 @@ async fn spoken(
         && !answer_awaited
         && crate::agent_tasks::awaits_yes(Instant::now())
         && (crate::services::plain_yes(&text) || crate::services::plain_no(&text));
-    let answers = asked_by_the_lamp || answer_awaited || task_answer;
+    // And a sound with a word in it while the lamp waits for a yes or no of
+    // its own asking ([`a_yes_held`]: a keep, a forget, a setup save, a
+    // rename, a skill's or a task's yes, a write's send): the person's reply
+    // to the lamp, whatever its length (#7698: on lamp-06c1 on 18 Nov the
+    // reply to the lamp's read-back was held so). The rule judges it.
+    let yes_held = marked
+        && !(asked_by_the_lamp || answer_awaited || task_answer)
+        && text.chars().any(char::is_alphanumeric)
+        && a_yes_held(&shared);
+    let answers = asked_by_the_lamp || answer_awaited || task_answer || yes_held;
     if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
@@ -10463,6 +10472,10 @@ async fn spoken(
     } else if task_answer {
         eprintln!(
             "lamp-voice second: request {request}: a short sound that is a plain yes or no to a task read back and waiting: judged as a line (#7027)"
+        );
+    } else if yes_held {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound with a word in it while the lamp waits for a yes or no of its own asking: judged as a line (#7698)"
         );
     }
     let held = marked && !answers;

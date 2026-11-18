@@ -28265,6 +28265,36 @@ mod tests {
         );
     }
 
+    /// #7698 (lamp-06c1, 18 Nov): the lamp read back what it heard and
+    /// asked; Jay's bare "Yes.", his face in view read silent, is answered
+    /// in the answer window. The control: Ada's bare "Yes." to Walter, the
+    /// lamp having asked nothing, stays held.
+    #[test]
+    fn with_said_to_me_a_read_back_then_yes_is_answered() {
+        use lamp_msgs::SpeakingState::No;
+        let judged = |lamp_asked: bool, words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks(&eyes, now, 200, &[Some(No)], &mut 0);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            let signs = super::Signs {
+                going_on: true,
+                lamp_asked,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let verdict = heeding.heed_signs(9, (now_us, now_us + 600_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        for yes in ["Yes.", "Yeah.", "No."] {
+            assert_eq!(judged(true, yes), None, "{yes} after the read-back");
+            assert!(judged(false, yes).is_some(), "{yes} with no question");
+        }
+    }
+
     /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question
     /// said facing the lamp and seen speaking is held with the head down to
     /// a phone (40 degrees) or the eyes looking away, and answered level and
