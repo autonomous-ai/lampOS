@@ -434,10 +434,30 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60 } = {}) {
     // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
     // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
     this.local = local;
+    // `app`: also serve an installed app's socket (a unix socket, `appPath`, what LAMP_APP_SOCKET names on the lamp)
+    // for `Lamp.connectApp`: no token and no key, the kernel's word on who connects is the trust, so a connection IS
+    // the app `appName` with `appGrants` (the installed manifest's, never the app's own word). The messages are
+    // nine's (#7415, piece 3): phrases.set, app.took, app.settings.get, app.panel.set, and the events phrase.heard,
+    // app.trigger and app.settings.
+    this.app = app;
+    this.appName = appName;
+    this.appVersion = appVersion;
+    this.appGrants = [...appGrants];
+    this.appPath = null;
+    this.appWs = new Set();
+    // The owner's values for the manifest's settings (`setAppSetting`), the phrases each connection listens for
+    // (`phrases.set`), the turns an app took (`app.took`), and the panel.
+    this.appSettings = { ...appSettings };
+    this.appPhrases = new Map();
+    this.appTookTurns = [];
+    this.panelRateS = panelRateS;
+    this.appPanel = null;
+    this.panelRev = 0;
+    this.panelAt = null;
     this.localPath = null;
     this.localWs = new Set();
     this.tokens = new Map();
@@ -542,6 +562,18 @@ export class FakeLamp {
       });
       await new Promise((resolve) => this.localHttp.listen(this.localPath, resolve));
     }
+    if (this.app) {
+      this.appDir = mkdtempSync(join(tmpdir(), 'lampos-fake-app-'));
+      this.appPath = join(this.appDir, 'app.sock');
+      this.appHttp = createHttpServer();
+      this.appWss = new WebSocketServer({ server: this.appHttp });
+      this.appWss.on('connection', (ws) => {
+        this.appWs.add(ws);
+        ws.on('close', () => { this.appWs.delete(ws); this.appPhrases.delete(ws); });
+        this.serve(ws);
+      });
+      await new Promise((resolve) => this.appHttp.listen(this.appPath, resolve));
+    }
   }
 
   // A one-run token for `run` with exactly `grants`, as lamp-control mints one from the owner's yes for a skill
@@ -599,6 +631,13 @@ export class FakeLamp {
         this.localHttp.closeAllConnections();
         await new Promise((resolve) => this.localHttp.close(resolve));
         rmSync(this.localDir, { recursive: true, force: true });
+      }
+      if (this.appWss) {
+        for (const ws of this.appWss.clients) ws.terminate();
+        await new Promise((resolve) => this.appWss.close(resolve));
+        this.appHttp.closeAllConnections();
+        await new Promise((resolve) => this.appHttp.close(resolve));
+        rmSync(this.appDir, { recursive: true, force: true });
       }
     } finally {
       // The folders go even if closing the server threw.
@@ -921,7 +960,10 @@ export class FakeLamp {
       try { request = JSON.parse(data.toString()); } catch { return this.refuse(ws, null, 'bad_request', 'not JSON'); }
       this.received.push(request);
       const id = Number.isInteger(request.id) && request.id >= 0 ? request.id : null;
-      if (id === null || !schema.ops.includes(request.op)) return this.refuse(ws, id, 'bad_request', 'not a v1 request');
+      const appOp = schema.appOps.includes(request.op);
+      if (id === null || (!schema.ops.includes(request.op) && !appOp)) return this.refuse(ws, id, 'bad_request', 'not a v1 request');
+      // An app's own ops: only on an app's socket.
+      if (appOp && !this.appWs.has(ws)) return this.refuse(ws, id, 'bad_request', `${request.op}: only on an app's socket`);
       // As lamp-control's protocol.rs, before grants or leases: a move it won't
       // take, or the body would drop, is refused in its words (#4217).
       if (request.op === 'move') {
@@ -941,6 +983,7 @@ export class FakeLamp {
         const refusal = lightRefusal(request);
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
+      if (request.op === 'pair' && this.appWs.has(ws)) return this.refuse(ws, id, 'bad_request', "this socket is not for pairing: it is an app's");
       if (request.op === 'pair' && this.localWs.has(ws)) return this.refuse(ws, id, 'bad_request', "this socket is not for pairing: it is a skill run's");
       if (request.op === 'pair') return this.pair(ws, request, nonce);
       if (request.op === 'hello') {
@@ -1010,6 +1053,7 @@ export class FakeLamp {
   }
 
   hello(ws, request, nonce) {
+    if (this.appWs.has(ws)) return this.helloApp(ws, request);
     if (this.localWs.has(ws) || 'token' in request) return this.helloToken(ws, request);
     const paired = this.clients.get(request.client);
     let good = false;
@@ -1025,6 +1069,22 @@ export class FakeLamp {
     const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
     this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
     return request.client;
+  }
+
+  // A hello on an app's socket (#7415): client c_0 and a zero signature, as the agent socket's, and no token; the app
+  // is known by the socket (the kernel's word on its cgroup), not by anything it sends. The reply adds the app's
+  // name and version beside the manifest's grants.
+  helloApp(ws, request) {
+    if (request.client !== 'c_0' || request.sig !== Buffer.alloc(64).toString('base64') || 'token' in request) {
+      this.refuse(ws, request.id, 'bad_request', 'on this socket hello is client c_0 and a zero sig, no token');
+      ws.close();
+      return null;
+    }
+    const client = `app_${this.appName}`;
+    this.clients.set(client, { key: Buffer.alloc(0), name: `app ${this.appName}`, grants: [...this.appGrants] });
+    const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
+    this.ok(ws, request.id, { lamp: this.lamp, grants: [...this.appGrants], limits, app: this.appName, version: this.appVersion });
+    return client;
   }
 
   // A hello on the control socket: a live one-run token and no key (client c_0, a zero signature).
@@ -1066,6 +1126,7 @@ export class FakeLamp {
   static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
 
   needs(op, request) {
+    if (op === 'phrases.set') return ['hear'];
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
     if (op === 'get') return [...new Set((request.state ?? []).map((s) => FakeLamp.STATE_GRANT[s]).filter(Boolean))];
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
@@ -1159,6 +1220,70 @@ export class FakeLamp {
     return this.ok(ws, id, { sound: clipOf(request.name, data) });
   }
 
+  // An installed app's ops and events (#7415).
+
+  appOp(ws, request) {
+    const { op, id } = request;
+    const bad = (why) => this.refuse(ws, id, 'bad_request', why);
+    const text = (value) => typeof value === 'string' && !/\p{Cc}/u.test(value);
+    if (op === 'phrases.set') {
+      const { phrases } = request;
+      if (!Array.isArray(phrases) || phrases.some((p) => typeof p !== 'string' || p.length < 1 || [...p].length > 64 || !text(p))) return bad('phrases: 1 to 64 characters each, no control characters');
+      if (new Set(phrases).size !== phrases.length) return bad('phrases: no repeats');
+      if (phrases.some((p) => (p.match(/[\p{L}\p{M}\p{N}]/gu) ?? []).length < 8)) return bad('a phrase is at least 8 letters');
+      // At most 16 an app across its connections: this connection's new list and the others' kept ones.
+      const others = new Set([...this.appPhrases].filter(([w]) => w !== ws).flatMap(([, held]) => held));
+      if (new Set([...others, ...phrases]).size > 16) return bad('at most 16 phrases');
+      this.appPhrases.set(ws, [...phrases]);
+      return this.ok(ws, id, { phrases: phrases.length });
+    }
+    if (op === 'app.took') {
+      if (typeof request.turn !== 'string' || request.turn.length < 1 || request.turn.length > 64 || !text(request.turn)) return bad('turn: 1 to 64 characters');
+      this.appTookTurns.push(request.turn);
+      return this.ok(ws, id);
+    }
+    if (op === 'app.settings.get') return this.ok(ws, id, { settings: { ...this.appSettings } });
+    // app.panel.set: text only, one a minute an app.
+    const { title, lines } = request;
+    if (typeof title !== 'string' || [...title].length < 1 || [...title].length > 40 || !Array.isArray(lines) || lines.length > 6
+      || lines.some((l) => typeof l !== 'string' || [...l].length > 80)) return bad('a title of 1 to 40 characters and at most 6 lines of 80');
+    if (!text(title) || !lines.every(text)) return bad('text, no control characters');
+    const at = this.clock();
+    if (this.panelAt !== null && at - this.panelAt < this.panelRateS * 1000) {
+      return this.refuse(ws, id, 'rate', 'one panel a minute', Math.round(this.panelRateS * 1000 - (at - this.panelAt)));
+    }
+    this.panelAt = at;
+    this.panelRev += 1;
+    this.appPanel = { title, lines: [...lines], rev: this.panelRev };
+    return this.ok(ws, id, { rev: this.panelRev });
+  }
+
+  tellApps(event, fields = {}, { phrase } = {}) {
+    const frame = JSON.stringify({ ev: event, at: now(), ...fields });
+    for (const ws of this.appWs) {
+      if (phrase !== undefined && !(this.appPhrases.get(ws) ?? []).includes(phrase)) continue;
+      ws.send(frame);
+    }
+  }
+
+  // The person said `phrase`: each app connection that listens for it (`listenFor`) is told `phrase.heard`, the
+  // phrase only, never what was said.
+  hearPhrase(phrase) { this.tellApps('phrase.heard', { phrase }, { phrase }); }
+
+  // A trigger of the app's manifest matched `phrase`: `app.trigger` with its name and a `turn` to `took`, whether or
+  // not the app ever called `listenFor`.
+  trigger(trigger, phrase, turn = 'turn-1') { this.tellApps('app.trigger', { trigger, phrase, turn }); }
+
+  // The owner changed settings in the app: the values are kept and the app is told `app.settings`, the keys that
+  // changed and every value now. (lamp-control checks a value against the manifest first.)
+  setAppSetting(changed) {
+    Object.assign(this.appSettings, changed);
+    this.tellApps('app.settings', { changed: Object.keys(changed).sort(), settings: { ...this.appSettings } });
+  }
+
+  // The owner stops, removes or updates the app: no goodbye event, the connection closes with `why`.
+  stopApp(why = 'the owner stopped the app') { for (const ws of [...this.appWs]) ws.close(1000, why); }
+
   op(ws, client, request) {
     const { op, id } = request;
     const missing = this.needs(op, request).filter((g) => !this.clients.get(client).grants.includes(g));
@@ -1183,6 +1308,7 @@ export class FakeLamp {
     if (op in this.refuses) return this.refuse(ws, id, 'refused', this.refuses[op]);
     this.requests.push(request);
     this.asker.set(id, ws);
+    if (schema.appOps.includes(op)) return this.appOp(ws, request);
     switch (op) {
       case 'subscribe':
         request.events.forEach((e) => this.subscribed.get(ws).add(e));
