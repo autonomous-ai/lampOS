@@ -12,8 +12,12 @@
 //! builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
 //! place's name, the lamp's country's two-letter code with it
 //! ([`Weather::with_country`], #7593), and the place's coordinates leave
-//! the lamp.
-use super::{Result, get_public_json_within, public::OPEN_WITHIN};
+//! the lamp, to Open-Meteo; with `LAMP_WEATHER_BACKUP=on` (off unless set,
+//! #7593), when its forecast can't be reached, the coordinates alone, to 4
+//! decimals, go to MET Norway (`api.met.no`) for the same forecast ([`met`]).
+pub mod met;
+
+use super::{Error, Result, get_public_json_within, public::OPEN_WITHIN};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -444,9 +448,26 @@ fn day_said(daily: &Value, row: usize, after: i64) -> Option<String> {
     let mut said = format!("{name} {low} to {high}°C, {}", sky(code));
     if let Some(rain) = at("precipitation_probability_max").as_i64() {
         said.push_str(&format!(", {rain}% chance of rain"));
+    } else if let Some(rain) = at("precipitation_sum").as_f64() {
+        said.push_str(&rain_said(rain));
     }
     said.push('.');
     Some(said)
+}
+
+/// A day's rain in mm, for a forecast that gives no chance of it (MET
+/// Norway's, [`met`]): "no rain" under 0.05 mm, then to a tenth of a mm
+/// below 10 and to a whole one from there.
+fn rain_said(mm: f64) -> String {
+    if mm < 0.05 {
+        return ", no rain".into();
+    }
+    let amount = if mm < 10.0 {
+        format!("{mm:.1}").trim_end_matches(".0").to_owned()
+    } else {
+        format!("{mm:.0}")
+    };
+    format!(", {amount} mm of rain")
 }
 
 /// The forecast in a few words for `place`, as it came: now, today and
@@ -538,6 +559,9 @@ pub struct Weather {
     /// first ([`chosen`]).
     country: Option<String>,
     fetch: Fetch,
+    /// The forecast's backup, MET Norway, and the lamp's zone its days are
+    /// told in ([`Weather::with_backup`]).
+    backup: Option<(Fetch, met::Offset)>,
     clock: Clock,
     kept: Mutex<Vec<Kept>>,
     /// The places names were found as, by name, kept [`PLACE_KEPT_FOR`].
@@ -553,6 +577,7 @@ impl Weather {
             owner_place: None,
             country: None,
             fetch,
+            backup: None,
             clock,
             kept: Mutex::new(Vec::new()),
             found: Mutex::new(Vec::new()),
@@ -574,6 +599,17 @@ impl Weather {
     /// but two capital letters is no country.
     pub fn with_country(mut self, country: Option<String>) -> Self {
         self.country = country.as_deref().and_then(country_code);
+        self
+    }
+
+    /// The same, a forecast Open-Meteo can't be reached for, or answers
+    /// only with a server error for ([`met::backs_up`]), fetched with `backup` (MET Norway) in what is
+    /// left of the call's [`WITHIN`], its days the lamp's own by `offset`,
+    /// only while `switch` (`LAMP_WEATHER_BACKUP`) is exactly `on` (#7593).
+    /// While it is on, Open-Meteo's forecast leaves it
+    /// [`met::LEFT_FOR_IT`]; off, Open-Meteo has the whole 6 s as before.
+    pub fn with_backup(mut self, switch: Option<&str>, backup: Fetch, offset: met::Offset) -> Self {
+        self.backup = met::on(switch).then_some((backup, offset));
         self
     }
 
@@ -726,15 +762,24 @@ impl Weather {
         let Some(url) = forecast_url(place.latitude, place.longitude) else {
             return (json!({"error": UNREACHED}), "no forecast request".into());
         };
-        let open_within = forecast_open_within(until.saturating_duration_since(Instant::now()));
-        let forecast = match (self.fetch)(url, open_within).await {
-            Ok(forecast) => Arc::new(forecast),
-            Err(error) => {
-                return (
-                    json!({"error": UNREACHED}),
-                    format!("the weather was not fetched: {error}"),
-                );
-            }
+        let left = until.saturating_duration_since(Instant::now());
+        // With a backup, its share of the 6 s is left to it (#7593).
+        let left = match self.backup {
+            Some(_) => left.saturating_sub(met::LEFT_FOR_IT),
+            None => left,
+        };
+        let (forecast, backed_up) = match (self.fetch)(url, forecast_open_within(left)).await {
+            Ok(forecast) => (Arc::new(forecast), None),
+            Err(error) => match self.backed_up(&place, &error, now, until).await {
+                Some(Ok((forecast, took))) => (Arc::new(forecast), Some(took)),
+                Some(Err(how)) => return (json!({"error": UNREACHED}), how),
+                None => {
+                    return (
+                        json!({"error": UNREACHED}),
+                        format!("the weather was not fetched: {error}"),
+                    );
+                }
+            },
         };
         // The place's today must be one of its rows, with the weather now:
         // a forecast without either is no answer, and is not kept.
@@ -748,12 +793,44 @@ impl Weather {
         };
         let answered = answer_for(&place, &forecast, day, today);
         self.keep(key, place, forecast, (today, now));
-        let how = if known {
-            "fetched, its place known"
-        } else {
-            "fetched"
+        let how = match backed_up {
+            Some(took) => format!("the forecast came from the backup service after {took} ms"),
+            None if known => "fetched, its place known".into(),
+            None => "fetched".into(),
         };
-        (answered, how.into())
+        (answered, how)
+    }
+
+    /// The forecast of `place` from the backup, when there is one and
+    /// Open-Meteo's `error` is that it couldn't be reached or answered
+    /// only with a server error ([`met::backs_up`]): fetched within what is left before `until`
+    /// less its answer's [`FORECAST_ANSWERED_IN`], in Open-Meteo's shape
+    /// ([`met::as_open_meteo`]), with how many ms it took. `None` when it
+    /// isn't asked; the journal's words when it fails too, never the place.
+    async fn backed_up(
+        &self,
+        place: &Place,
+        error: &Error,
+        now: i64,
+        until: Instant,
+    ) -> Option<std::result::Result<(Value, u128), String>> {
+        let (fetch, offset) = self.backup.as_ref().filter(|_| met::backs_up(error))?;
+        let failed = |why: &dyn std::fmt::Display| {
+            format!("the weather was not fetched: {error}; nor from the backup service: {why}")
+        };
+        let Some(url) = met::url(place.latitude, place.longitude) else {
+            return Some(Err(failed(&"no forecast request")));
+        };
+        let began = Instant::now();
+        let open_within = until
+            .saturating_duration_since(began)
+            .saturating_sub(FORECAST_ANSWERED_IN);
+        Some(match fetch(url, open_within).await {
+            Ok(answer) => met::as_open_meteo(&answer, offset(now), now)
+                .map(|forecast| (forecast, began.elapsed().as_millis()))
+                .ok_or_else(|| failed(&"its answer was not read")),
+            Err(why) => Err(failed(&why)),
+        })
     }
 
     /// Where `name` was found before, while under [`PLACE_KEPT_FOR`] old.

@@ -7221,6 +7221,47 @@ through another resolver gave N address(es) more, after N ms`), or why it
 failed, never the name. With no address more the request ends at its bound
 as before, and the call says the weather couldn't be reached within its
 6 s.
+**The backup forecast** (`LAMP_WEATHER_BACKUP`, off unless exactly `on`,
+in no unit: El's ruling on #7700, 18 Nov, keeps a new weather lookup off
+in the product; the migrate on #7665, #7593). With it on, when
+Open-Meteo's forecast can't be reached (no connection opened, after the
+DNS-over-HTTPS lookup too while `LAMP_WEATHER_DOH=on`, its name not
+found, or a step timed out) or answers only with a server error (HTTP 500
+to 599, Thirteen's P3 on #7732; `net::weather::met::backs_up`), the same
+forecast is fetched from MET Norway's Locationforecast 2.0
+(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=..&lon=..`)
+within what is left of the 6 s, less 0.8 s for its answer, over the same
+raced connection (`net::public::get_public_json_as`). Never for another
+answer Open-Meteo gave: a 4xx (429 among them) or JSON it couldn't read
+says the weather couldn't be reached, as before. While the backup is on, Open-Meteo's
+forecast leaves it 2.3 s of the 6 s (`met::LEFT_FOR_IT`: tries begun
+within 1.5 s of their bound and 0.8 s for the answer), its own open bound
+still never under 2.5 s: 2.5 s after a place looked up in 1.2 s, then
+2.3 s for MET; 2.9 s for a place known before. Only the coordinates go,
+to 4 decimals, with no key and the lamp named in the `User-Agent`, as
+MET's terms ask (`lampOS/<version> (+https://github.com/autonomous-ai/lampOS)`,
+`met::USER_AGENT`); the place's name never goes there, and the place is
+still looked up at Open-Meteo's geocoding alone. MET's answer is put in
+Open-Meteo's shape (`met::as_open_meteo`) and said, kept and told by day
+as Open-Meteo's is, in the same sentence: now is the last point at or
+before the time now (its temperature, humidity and next hour's sky; MET
+gives no feeling, so none is said); each day, in the lamp's own zone
+(`local_time::system`, so a place far from the lamp has the lamp's days),
+is the low and high of its points and their next 6 hours, its most severe
+sky, its highest chance of rain when MET gives one, and else its rain in mm
+(`2 mm of rain`, `no rain` under 0.05 mm), 7 days at most. MET's symbols
+(`symbol_code`, its `_day`, `_night` or `_polartwilight` aside) are said
+in the words of Open-Meteo's WMO codes (`met::code`): `clearsky` clear,
+`fair` mainly clear, `partlycloudy` partly cloudy, `cloudy` overcast,
+`fog` foggy, `lightrain`, `rain`, `heavyrain` light rain, rain, heavy
+rain, `lightrainshowers`, `rainshowers`, `heavyrainshowers` light showers,
+showers, heavy showers, any sleet or snow snow, anything with thunder
+thunderstorms, and a symbol not known mixed weather. The journal: `the
+forecast came from the backup service after N ms`, or `the weather was not
+fetched: …; nor from the backup service: …`, never the place. With both
+down, the call says the weather couldn't be reached within its 6 s. With
+the switch unset, `off` or any other word, MET is never asked and
+Open-Meteo's forecast has the whole 6 s, as before.
 Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day
@@ -7239,12 +7280,15 @@ one location"). The function is answered before the route's runners
 `LAMP_SECOND_FEW_TOOLS=on`, never held by the Policy, and cut at the
 bound after the skills' and before the search (`worker::chat_cut`). Texts
 from the app are not given it. Only the place's name and its coordinates
-leave the lamp. The journal: `the model may ask for the weather of any
+leave the lamp, to Open-Meteo, and, with `LAMP_WEATHER_BACKUP=on` when
+its forecast can't be reached, the coordinates alone to MET Norway
+(`api.met.no`). The journal: `the model may ask for the weather of any
 place and day, … here is Hanoi, Vietnam (LAMP_SECOND_WEATHER)` at start,
 and for each call `request N asked for weather for a place named,
 tomorrow; answered in N ms, fetched` (or `fetched, its place known`, `from
 what was kept`, `its place known, its weather from what was kept`, `no such
-place`, `the weather was not fetched: …`), never the place's name or any
+place`, `the weather was not fetched: …`, `the forecast came from the
+backup service after N ms`), never the place's name or any
 other word said. It reaches the second route's worker alone
 (`process.rs`).
 

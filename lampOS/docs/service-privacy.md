@@ -336,3 +336,24 @@ so an address it gives can't stand in for another service.
 A face kept with nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric: at the lamp it is kept only with
 the speaker's own "I'm X" proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing
 asked"); from the app's photo, only a photo of one face, never added to someone already kept ("A face from a photo").
+
+## The weather's backup service (`LAMP_WEATHER_BACKUP`)
+
+The weather can ask one more service for a forecast: MET Norway's
+Locationforecast 2.0 at `https://api.met.no/weatherapi/locationforecast/2.0/compact`
+(the Norwegian Meteorological Institute; no key, no account), over TLS with
+the lamp's verified roots and the same raced connection as Open-Meteo's
+(`net::public::get_public_json_as`, `net::weather::met`, #7593, #7732). It
+runs only with `LAMP_WEATHER_BACKUP=on` exactly; unset or any other value is
+off, and no product unit sets it, so a product lamp never asks it. Even with
+the switch on, it is asked only for a forecast Open-Meteo couldn't give: no
+connection to it opened, its name wasn't found or a step timed out, or it
+answered only with a server error (HTTP 500 to 599); never after a forecast
+Open-Meteo gave, nor for a 4xx or an answer it couldn't read
+(`met::backs_up`). What goes to it is the place's latitude and longitude, to
+4 decimals (about 11 m), and a `User-Agent` naming the program, as MET's
+terms ask (`lampOS/<version> (+https://github.com/autonomous-ai/lampOS)`,
+`met::USER_AGENT`): never the place's name, which only Open-Meteo's
+geocoding looks up, nor the country code, anything the person said, who
+asked, or anything else about them. The journal says only that the forecast
+came from the backup service and after how long, never the place.
