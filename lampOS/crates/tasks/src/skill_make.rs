@@ -1372,7 +1372,18 @@ fn answer_on_gateway(
         &switches,
     );
     let ran = gateway.run(&run, &|| {});
+    // A make cut at its deadline (or its turn ended badly) that had written
+    // its whole answer.md is still its answer (First's P3 on #7737), read
+    // before the folder goes; the voice still checks it whole.
+    let late = match &ran {
+        Err(why) if !not_ready(why) => answer_in(&folder.path),
+        _ => None,
+    };
     drop(folder);
+    if let Some(text) = late.filter(|text| !text.trim().is_empty()) {
+        eprintln!("[lamp-tasks] skill make: its turn ended badly, its written answer read");
+        return json!({"ok": true, "answer": text});
+    }
     match ran {
         // Harness or the gateway not ready yet: said to the person at
         // once in the lamp's short words, never a silent failure; the
@@ -2650,6 +2661,55 @@ mod tests {
             Some((_, AnswerFrom::File)) => panic!("taken from the file"),
             None => None,
         }
+    }
+
+    /// A gateway make turn that writes `answer` to its folder, then ends
+    /// with `ended`.
+    struct CutTurn {
+        answer: &'static str,
+        ended: Result<u64, String>,
+    }
+
+    impl MakeTurn for CutTurn {
+        fn make_turn(&self, run: &SkillRun) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            std::fs::write(folder.join(ANSWER_FILE), self.answer).unwrap();
+            self.ended.clone()
+        }
+    }
+
+    /// #7245 (First's P3 on #7737): a make cut at its deadline that had
+    /// written answer.md gives that answer, not a failure; one not ready
+    /// still says so; the folder goes either way.
+    #[test]
+    fn a_gateway_make_cut_at_its_deadline_still_gives_its_written_answer() {
+        let work = tempfile::tempdir().unwrap();
+        let line = br#"{"op":"skill_make","rules":"R","within_ms":2000}"#;
+        let make = MakeLine::parse(line).unwrap();
+        let gateway = |ended: Result<u64, String>| MakeGateway {
+            pick: Box::new(|| Ok(MakeAgent::Gateway(crate::harness::EngineKind::Openclaw))),
+            turn: Arc::new(CutTurn {
+                answer: "```skill.toml\nkind = \"installable\"\n```",
+                ended,
+            }),
+            checked: false,
+        };
+        let cut = answer_on_gateway(
+            &make,
+            work.path(),
+            &gateway(Err("deadline".into())),
+            &mut || {},
+        );
+        assert_eq!(cut["ok"], true, "{cut}");
+        assert!(cut["answer"].as_str().unwrap().contains("skill.toml"));
+        let not_ready = answer_on_gateway(
+            &make,
+            work.path(),
+            &gateway(Err(crate::gateway::NOT_READY.into())),
+            &mut || {},
+        );
+        assert_eq!(not_ready["error"], NOT_READY, "{not_ready}");
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
     }
 
     /// lamp-c0a4, 13584, OpenClaw: a make the agent can't do, said
