@@ -35,6 +35,8 @@ webpki-roots = "1"
 # lamp-skills' own loader, from its folder, as `lamp-skills list` reads them;
 # toml for what a folder that does not load says of itself.
 lamp-skills = { path = "../skills" }
+# The apps the owner installs (#7415 piece 4): the name rule and the folders and marks of root's helper, read here.
+lamp-apps = { path = "../apps" }
 # A connector a skill needs, named as a person says it (`skills.list`'s
 # `needs_link`), from lamp-services' own catalogue (`lamp_services::spoken`).
 lamp-services = { path = "../services" }

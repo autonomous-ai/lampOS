@@ -53,6 +53,7 @@ fn lamp(name: &str, on: bool) -> (Real, PathBuf) {
         consent: None,
         monitor: None,
         devices: on.then(Default::default),
+        apps: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,
