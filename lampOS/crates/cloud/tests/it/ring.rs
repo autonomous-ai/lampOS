@@ -84,6 +84,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
         consent: None,
         monitor: None,
         devices: None,
+        apps: None,
         upload: None,
         shutdown: None,
         harness_sign_in: None,

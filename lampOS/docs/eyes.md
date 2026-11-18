@@ -1134,6 +1134,25 @@ cold each time (8 to 23 times a run). On lamp-29e7 (#5522) it was 122
 times in a day and a half, and a line said while the file named nobody,
 with their face still in view, is the room's.
 
+**Held on their own id** (#7424), only with `LAMP_FACE_KNOWN_ON_ID=on`
+and the hold on (off unless set; `who::known_on_id_on`). The shrunk
+picture's print of a seated person is poor: on lamp-74ff on 16 Nov the
+owner's face scored 0.71 then 0.12 within seconds at a steady height
+(#7331), and each print under the 0.30 bar let him go, the known file
+and `known-face` removed, though his face never left the view; a check
+that could not print his face at all would have held him. With the
+switch on, a print under 0.30 keeps the held name as no print does: only
+while it is on the passing id their face had at the match and that id
+has been in every look since (`Held::keeps_print`, the same rule as
+`Held::keeps_unprinted`), and only to the 4 s bound from their last
+match, which a held print never renews. Another id, a followed id (which
+still needs 0.30), a gap whose print is not read as theirs
+(`Held::printed`), a forgotten person or the bound let go as before.
+Off, nothing changes. The lamp check: on lamp-52e6, a seated known
+person for 3 min, quiet and talking, before and after a fresh save, the
+known file naming them in at least 9 of 10 looks; the #5546 swap row
+still sends the one who sat down to the room.
+
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
 `LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
 `LAMP_FACE_REFOUND` since C65, the memory owner's call;
@@ -1658,8 +1677,14 @@ With the switch:
   no or another answer, sends nothing, before the name's own checks, and
   the model is told to ask that question (`ASK_FACE_FIRST`). A name is no
   yes to keeping a face (the first builder on #7331). Setup asks its own
-  face question, and a rename takes its own yes. Off, a new face is kept
-  on the call as before
+  face question, and a rename takes its own yes. While the eyes' known
+  file names a face at the lamp (`known_faces::known_now`, the file the
+  second voice's rename force reads), the save goes to the eyes as before:
+  a known face's "Call me Jay." is answered "known as" and the rename is
+  held for their yes, and two faces are the eyes' own refusal (#7653,
+  row-7422c on lamp-52e6;
+  `a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename`).
+  Off, a new face is kept on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).

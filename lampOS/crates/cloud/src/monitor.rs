@@ -112,16 +112,17 @@ impl Place {
     }
 }
 
-/// `monitor.set`'s helper line: exactly one field, `on`, true or false.
-pub fn line(data: &Value) -> Result<String, String> {
-    let why = || "on must be true or false, and the only field".to_owned();
-    let on = data
+/// `monitor.set`'s helper line and the app's `request_id`: `on`, true or
+/// false, and an optional `request_id` (as `wifi.set`'s), nothing else.
+pub fn line(data: &Value) -> Result<(String, Option<String>), String> {
+    let why = || "on must be true or false, and the only field besides request_id".to_owned();
+    let object = data
         .as_object()
-        .filter(|object| object.len() == 1)
-        .and_then(|object| object.get("on"))
-        .and_then(Value::as_bool)
+        .filter(|object| object.keys().all(|key| key == "on" || key == "request_id"))
         .ok_or_else(why)?;
-    Ok(json!({ "monitor": on }).to_string())
+    let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
+    let request_id = crate::settings::request_id(data)?;
+    Ok((json!({ "monitor": on }).to_string(), request_id))
 }
 
 /// `monitor.get`: what the drop-in says, writing nothing.
@@ -266,15 +267,32 @@ mod tests {
     }
 
     #[test]
-    fn a_set_is_exactly_one_boolean_on() {
-        assert_eq!(line(&json!({"on": true})).unwrap(), r#"{"monitor":true}"#);
-        assert_eq!(line(&json!({"on": false})).unwrap(), r#"{"monitor":false}"#);
+    fn a_set_is_one_boolean_on_and_an_optional_request_id() {
+        let line_of = |data: Value| line(&data).unwrap();
+        assert_eq!(
+            line_of(json!({"on": true})),
+            (r#"{"monitor":true}"#.into(), None)
+        );
+        assert_eq!(
+            line_of(json!({"on": false})),
+            (r#"{"monitor":false}"#.into(), None)
+        );
+        assert_eq!(
+            line_of(json!({"on": true, "request_id": "r-7"})),
+            (r#"{"monitor":true}"#.into(), Some("r-7".into()))
+        );
         for data in [
             json!({}),
             json!(null),
+            json!({"request_id": "r-7"}),
             json!({"on": "yes"}),
             json!({"on": 1}),
             json!({"on": true, "frames": true}),
+            json!({"on": true, "request_id": "r-7", "frames": true}),
+            json!({"on": true, "request_id": ""}),
+            json!({"on": true, "request_id": 7}),
+            json!({"on": true, "request_id": "r 7"}),
+            json!({"on": true, "request_id": "r".repeat(65)}),
         ] {
             assert!(line(&data).is_err(), "{data}");
         }

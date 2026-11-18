@@ -4774,6 +4774,87 @@ code (`made_remove::asked`):
   it is never lost: another remove gets its own question and wait. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
+- **Never said removed, off or on untrue, with no call that did it**
+  (#7683, `LAMP_SKILL_CLAIM_CHECKED`, `on` only, off by default, with
+  `LAMP_ACTION_CLAIM_CHECKED` and `LAMP_MAKE_SKILL`; passed to the second
+  route's worker alone, not yet in the product unit). On lamp-9adf (18 Nov
+  14:38, request 72) "Lamp, remove planet fact." was answered just "planet
+  fact" with `calls=none`, and "Yes." (request 73) "planet fact is
+  removed." with `calls=none`: nothing was asked or removed, and the skill
+  stayed on the lamp. The history had shown every earlier remove as words
+  alone, the lamp's "Remove moon fact?" and "moon fact is removed.", since
+  no `make_skill` call with arguments was kept for it
+  (`second_provider::kept_args`), so the model answered from those words.
+  With the switch on:
+  - **The calls are kept.** With `LAMP_HISTORY_KEEPS_CALLS` (on in the
+    product), a `make_skill` that asked a remove's question, removed a
+    skill on the yes, or turned one off or on is kept for a later turn's
+    history (`second_provider::kept_made`): its one argument (`remove`,
+    `turn_off` or `turn_on`) by the made skill's own name from its answer,
+    never the words heard, and its result as a fixed line
+    (`MADE_REMOVE_ASKED`: nothing removed yet, the question came from this
+    call; `MADE_REMOVED`; `MADE_TURNED`), each saying a new one needs its
+    own `make_skill` call. A make's call is not kept: its arguments are the
+    person's request. Off, the history is as before.
+  - **A claim is read.** The skills they made are read as each turn begins
+    (`action_claim::made_skills`): `made.json`'s names, each on when
+    `made.json` says so and lamp-skills' `off` file doesn't name it (read by
+    `skill_about::turned_off`, the reader a skill's state is told by); two
+    small local files, 0.2 to 0.4 ms together on a Mac, not yet measured on
+    a lamp. A reply that opens, bare or after a lead-in ("Okay,"), with one
+    of those names (as its words or as written, "the" before or "skill"
+    after it or not), then one of the lamp's own result words for it
+    (`action_claim::SKILL_REMOVED`: "is removed", from `removed_next`;
+    `SKILL_OFF`: "is off", and `SKILL_ON`: "is on again", from `made_turn`,
+    "is on now", from a code make's yes, and "is on", a clash's), or with a
+    clash's "I removed" before the name, closing at its sentence's end and
+    never on a '?', is a claim (`action_claim::skill_claim`), after a
+    "Done" opening too ("Done, planet fact is removed." is bound to planet
+    fact, not taken as any call's line). For off and on only a name of two
+    words or more is judged (a hyphen in its folder's name): a one-word
+    name ("music", "light") is a common noun as often as a skill. "Removed"
+    is judged for a one-word name too ("Pomodoro is removed."), as a
+    removed skill has no true state to tell. Structure only, never a
+    list of words for meaning: the names are the lamp's records, the words
+    its own lines'. "Planet fact is still there.", "Is planet fact
+    removed?", and a skill no longer listed are none. On a line asked as a
+    question only the removed forms are judged.
+  - **Bound to its own skill and kind** (`action_claim::skill_stands`,
+    Twelve's and El's P2s on #7730). Each `make_skill` outcome is kept with
+    the made skill's own name (`after_forget::status`: `removed`, a remove's
+    yes or a clash's replace; `turned_off`; `turned_on`, a turn on, or a
+    put-on: a make's or a clash's keep or replace `{"made": X, "on":
+    true}`, and a code make's yes, whose answer now names its skill the
+    same way). "X is removed."
+    stands only beside a `removed` of X in the turn: a remove that only
+    asked its question, or the removal of another skill, backs nothing.
+  - **A true state is never held.** "X is off." stands only when X is off
+    now, and "X is on." only when it is on: as the turn began, then after
+    this turn's own `turned_off` or `turned_on` of X (the last counts; a
+    `turn_on` never backs an off, nor a turn of another skill). So "Planet
+    fact is off, so it didn't run." after a run refused as it isn't on the
+    lamp, "Planet fact is on, and rain joke is off." to "Can you tell me
+    which skills are on?", and "Planet fact is off." to "Tell me about
+    planet fact." while it is off are said as they are, as are "Okay,
+    planet fact is on now." after a code make's yes and "Moon fact is on."
+    after a clash's keep. A skill removed in
+    an earlier turn is gone from `made.json`, so its name is never read.
+  - **Held, asked again once.** A claim that doesn't stand is not said, and
+    the model is asked again once with `action_claim::SKILL_NOTE` (nothing
+    changed; a `make_skill` that ran is not to be called again; call
+    `make_skill` for the remove or the turn, or say plainly it wasn't done);
+    a second claim, or one in the last round, is said as "Sorry, I didn't do
+    that. Could you ask me again?". Said in the round of its own
+    `make_skill` (the forced yes round's "Okay, planet fact is removed."
+    beside its `approve_id`, a turn or a clash's choice), the words ran
+    ahead of the call: not said, no note, and the next round says the
+    lamp's result from its answer, as a forget's words do. Beside a call
+    that changes no skill (a list, or a remove that only asks its question)
+    they are held with the note. The journal: "its reply claims a skill removed action
+    no call made … (LAMP_ACTION_CLAIM_CHECKED, a made skill's change in the
+    lamp's own result words)", or "its reply says a made skill's change
+    before its make_skill ran: not said … no note
+    (LAMP_SKILL_CLAIM_CHECKED)", never the words.
 - **No extra round trip.** The match reads two local folders and the made
   skills' index; only the yes asks the manage helper, over its local
   socket. The journal names what was found by kind only ("one made skill
@@ -4824,7 +4905,25 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `only_a_plain_yes_the_code_reads_confirms_a_remove`,
 `a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line`,
 `a_yes_over_the_question_is_asked_again_and_the_next_yes_removes`;
-`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`.
+`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`; and for a
+change said with no call (#7683),
+`action_claim::tests::a_made_skill_said_changed_is_a_claim_by_its_listed_name`,
+`a_made_skill_change_stands_only_for_its_own_skill_and_kind`,
+`the_made_skills_are_read_with_the_off_file`,
+`the_skill_result_words_are_the_producers_own`, and
+`second_provider::tests::skill_claim`:
+`a_remove_said_done_with_no_call_is_asked_again_and_never_said`,
+`a_remove_said_done_twice_with_no_call_is_said_not_done`,
+`a_turn_off_said_done_with_no_call_is_asked_again`,
+`a_turn_on_said_done_twice_with_no_call_is_said_not_done`,
+`a_remove_said_done_beside_its_question_is_held`,
+`a_real_remove_on_the_yes_is_said`, `a_skill_named_in_passing_is_said`,
+`words_beside_their_own_remove_call_are_never_told_not_done`,
+`another_skills_turn_backs_no_claim`, `a_true_off_after_a_refused_run_is_said`,
+`a_true_state_told_with_no_call_is_said`, `a_code_makes_yes_backs_its_on`,
+`a_clash_keep_backs_its_on`,
+`a_remove_said_done_beside_an_ask_only_call_is_noted`,
+`a_one_word_skill_said_removed_is_held`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"
@@ -7045,6 +7144,85 @@ in `made_skill::keep_asked`, before anything is kept, a said start too:
 The app's make has no judge and is never refused by it. In another language
 the check is skipped and journaled. `lamp-voice` passes the exact `on` to its
 `provider` and `second` workers. Off, every make is byte for byte as before.
+
+#### Nothing asked (`LAMP_MAKE_NO_ASKS=on`, off)
+
+Off unless `LAMP_MAKE_NO_ASKS=on`, in no product unit (the first builder,
+18 Nov 18:41, from the product owner: "A made skill is made and said in one
+line, with an undo ('Made it, say "remove it" to undo'), never read back
+for a yes. Offers become the action plus that one line. An unsure line is
+simply not acted on, with no 'did you say…?'"; and 18:45: a made skill's
+remove is not in the carve-out). Only "forget everything" and a factory
+reset still ask. On (`crate::make_no_asks`):
+
+- **Made, on, one line.** A voice make, plain or with code of its own, goes
+  on at once and the voice model is told to say one short line in the
+  conversation's language, the skill's name as written, with at most one
+  short clause of what it will do, and no question: "Made evening dim. Say
+  'remove it' to undo." Code goes on by its yes's own path
+  (`make_skill_local::code_on_at_once`: that package by its SHA-256, its
+  task's yes recorded for exactly the grants its code holds), whatever the
+  grants, but only with `LAMP_MADE_SCRIPTS=on` and only on the owner's own
+  ask, held as its spoken yes was (`services::owners_yes_of`); anyone
+  else's code make is kept and not on, said so with why. The cap, the pack
+  check, the grants, `LAMP_TASK_NET` and the run namespace are unchanged.
+  The app's MAKE IT alike, the app's ask the owner's. A skill that sends (a
+  write, or code that messages the phone) keeps its read-back and yes, as
+  that yes is what `lamp-services` sends by. An agent skill
+  (`LAMP_MAKE_NO_CANNOT`) goes on at once and still reads its task back
+  before its first run.
+- **A clash replaces, on the owner's ask.** A plain voice make that clashes
+  with skills on the lamp (`made_clash::found`) goes on first; a put-on that
+  fails changes nothing else. Then, on the owner's own ask alone (as a code
+  make's, `services::owners_yes_of`; Twelve's P1 on #7783), each clashing
+  skill that is on (lamp-skills' `off` file read; one already off is left
+  as it is, and an unreadable file replaces nothing) is turned off through
+  the manage helper's own `{"off": NAME}`, as the app's switch does, never
+  deleted: "Made evening dim and replaced your old rest glow. Say 'keep the
+  old one' to undo." Anyone else's make goes on beside them, which stay on:
+  "Made evening dim. Your other rest glow is still on. Say 'remove it' to
+  undo." A make with code of its own, and an agent make, never replace:
+  they go on beside. Nothing waits for a choice.
+- **A remove happens at once.** `make_skill`'s `remove`, the name matched
+  to the person's own made skills as before (`made_remove::found`), removes
+  it on the owner's ask (`services::owners_yes_now`) with no question:
+  taken off by the manage helper, then kept aside, its index entry in
+  `undo.json` and its package in `undo/` in the made skills' folder:
+  "Removed moon fact. Say 'put it back' to undo." Several skills with names
+  alike, one they didn't make, or none, remove nothing and ask nothing. The
+  answer is `{"removed": NAME}`, as a remove's yes answers.
+- **The undo.** `make_skill` takes `undo` with this switch: "last", or a
+  skill's name as heard; whether a line asks to undo is the model's
+  judgment ("remove it", "keep the old one", "put it back"), never a list
+  of words. Only the owner's ask. Each undo is bound to the one action it
+  was said for (Twelve's P2 on #7783): "last" is the latest action of all,
+  and a name the latest action of that skill or of one it replaced; either
+  only within that action's own time, else nothing is undone and that is
+  said. A make, or a put-back, within 10 minutes is removed and kept aside;
+  a replace within 10 minutes turns the old skills back on, then removes
+  the new one and keeps it aside too; a remove within 7 days is put back in
+  the index and on (`{"made": NAME, "on": true}`). A put-back with code of
+  its own goes on by its yes's own path only with `LAMP_MADE_SCRIPTS=on`;
+  with it off it is put back and stays off, and why is said. A record of a
+  replace outlives the remove of its new skill.
+- **The keep, exactly.** Every record of what was done is kept 7 days, a
+  removed skill's package with its record; at most 50 removed skills and
+  100 records in all, the oldest out first, their packages with them.
+  `lamp-voice` purges it at its start and every hour after (with
+  `LAMP_MAKE_SKILL` on, whatever this switch says), and at each make,
+  remove or undo, so a package goes at most an hour after its 7 days; a
+  package no record names (a crash's) goes at the purge. The owner's
+  "forget everything" deletes `undo.json` and `undo/` whole, as their voice
+  print goes.
+- **Unsure, not acted on.** A make judged not what was asked
+  (`LAMP_MADE_UNRELATED_REFUSED`), or a call with no request, makes nothing
+  and asks nothing: no "Could you say it again?".
+- **Never "on" while off.** A put-on that fails is said in one plain line
+  with why ("I made it but couldn't put it on: …"), and leaves nothing to
+  undo.
+
+`lamp-voice` passes the exact `on` to its `provider` and `second` workers.
+Off, every make and remove is byte for byte as before.
 
 ## V1's moves and emotions: what we take
 

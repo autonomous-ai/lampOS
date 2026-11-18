@@ -1712,20 +1712,22 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
 /// The weather the model may ask for, with `switch` (`LAMP_SECOND_WEATHER`)
 /// exactly `on` (the owner on 22 Oct): looked up with `fetch` only when a
 /// call asks, for the place and the day asked, the lamp's own place
-/// (`here`) for a call that names none, its days told from that place's
-/// own date by `clock`. Nothing is fetched here and no task is started;
+/// (`here`) for a call that names none, a name found in the lamp's
+/// `country` first (#7593), its days told from that place's own date by
+/// `clock`. Nothing is fetched here and no task is started;
 /// with the switch off there is no weather at all. With
 /// `LAMP_OWNER_PLACE=on`, the owner's place from the app goes over `here`
 /// while one is kept (#4333).
 fn weather_asked(
     switch: Option<&str>,
-    here: Option<String>,
+    (here, country): (Option<String>, Option<String>),
     fetch: crate::second_provider::net::weather::Fetch,
     clock: crate::second_provider::net::weather::Clock,
 ) -> Option<Arc<crate::second_provider::net::weather::Weather>> {
     use crate::second_provider::net::weather;
     weather::on(switch).then(|| {
-        let weather = weather::Weather::new(here, fetch, clock);
+        // A place's name is found in the lamp's own country first (#7593).
+        let weather = weather::Weather::new(here, fetch, clock).with_country(country);
         Arc::new(if crate::owner_place::on_from_environment() {
             weather.with_owner_place(lamp_msgs::owner_place::FILE.into())
         } else {
@@ -2554,7 +2556,10 @@ pub fn serve(
         std::env::var(crate::second_provider::net::weather::ENVIRONMENT)
             .ok()
             .as_deref(),
-        crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
+        (
+            crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
+            crate::local_time::country_here(),
+        ),
         crate::second_provider::net::weather::open_meteo(),
         crate::second_provider::net::weather::wall_clock(),
     );
@@ -4197,6 +4202,24 @@ pub fn serve(
             },
         ));
     }
+    // The last hour of what the lamp did, and why (#7757, LAMP_DID_KEEP, off):
+    // kept in memory for the look-up; nothing is read or kept off.
+    if crate::did_history::on() {
+        let kept = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+            .and_then(|bus| crate::did_history::watch(&bus));
+        eprintln!(
+            "lamp-voice second: {} ({})",
+            if kept.is_some() {
+                "the last hour of what the lamp did is kept in memory, up to 200 actions"
+            } else {
+                "there is no bus to read what the lamp did from, so none is kept"
+            },
+            crate::did_history::ENVIRONMENT
+        );
+    }
     if let Some(place) = named_agent {
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {
             crate::agent_tasks::named_for_work(&place, words)
@@ -4391,6 +4414,32 @@ pub fn serve(
         );
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
+    // A made skill said removed, turned off or on in the lamp's own result
+    // words, untrue and with no `make_skill` that did it, is held the same
+    // way (`LAMP_SKILL_CLAIM_CHECKED=on`, #7683), with a voice make offered:
+    // the skills read from `made.json` and lamp-skills' `off` file as each
+    // turn begins.
+    let skill_claims = action_claims
+        && crate::action_claim::skill_on()
+        && std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on");
+    if skill_claims {
+        eprintln!(
+            "lamp-voice second: a reply saying a made skill was removed, turned off or on, untrue and with no make_skill that did it, is held the same way (LAMP_SKILL_CLAIM_CHECKED)"
+        );
+    } else if crate::action_claim::skill_on() {
+        eprintln!(
+            "lamp-voice second: LAMP_SKILL_CLAIM_CHECKED does nothing without LAMP_ACTION_CLAIM_CHECKED and LAMP_MAKE_SKILL"
+        );
+    }
+    engine = engine.reading_made_names(skill_claims.then(|| {
+        let read: crate::second_provider::MadeNames = Arc::new(|| {
+            crate::action_claim::made_skills(
+                std::path::Path::new(crate::made_skill::DIRECTORY),
+                std::path::Path::new(crate::skill_about::STATE_DIR),
+            )
+        });
+        read
+    }));
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
@@ -31625,7 +31674,7 @@ mod tests {
         let (fetched, fetch) = counted_weather_fetch();
         let weather = super::weather_asked(
             Some("on"),
-            Some("Hanoi, Vietnam".into()),
+            (Some("Hanoi, Vietnam".into()), None),
             fetch,
             thursday_in_hanoi(),
         )
@@ -31686,7 +31735,8 @@ mod tests {
         for switch in [None, Some(""), Some("yes"), Some("ON")] {
             let clock = thursday_in_hanoi();
             assert!(
-                super::weather_asked(switch, Some("Hanoi".into()), fetch.clone(), clock).is_none()
+                super::weather_asked(switch, (Some("Hanoi".into()), None), fetch.clone(), clock)
+                    .is_none()
             );
         }
         let settings = crate::tools::Settings::default();

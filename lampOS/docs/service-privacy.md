@@ -311,3 +311,22 @@ matched, and all 192 previously retained drivers remained unchanged. These
 are selected host fixture results, not a full-suite, Linux, device or original
 failure-clearance result. This result paragraph was added after execution and
 is not a compiled or runtime input to these cases.
+
+## The weather's DNS-over-HTTPS lookup (`LAMP_WEATHER_DOH`)
+
+The weather (`LAMP_SECOND_WEATHER=on`) can ask one more service besides
+Open-Meteo: Google's public DNS-over-HTTPS resolver, `https://8.8.8.8/resolve`
+(Google Public DNS, `dns.google`), reached by its address over TLS with the
+lamp's verified roots (`net::public::ELSEWHERE`, #7593, #7700). It runs only
+with `LAMP_WEATHER_DOH=on` exactly; unset or any other value is off, and no
+product unit sets it, so a product lamp never asks it. Even with the switch on,
+it is asked only when an Open-Meteo request's connection has not opened: once
+1.5 s have passed from its first try with none open (`ELSEWHERE_AFTER`), or
+once a try to every address the lamp's own resolver gave has failed outright;
+a healthy open never asks it. What goes to it is the Open-Meteo host name being
+looked up (`geocoding-api.open-meteo.com` or `api.open-meteo.com`) and the
+record type (`A`, `AAAA`), the same name the lamp's own resolver is asked;
+never the place, its coordinates, the country code, anything the person said
+or who asked. Only the global unicast addresses of its answer are used
+(`net::public::global`), and each is reached as the same named host over TLS,
+so an address it gives can't stand in for another service.

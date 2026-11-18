@@ -23,6 +23,7 @@ pub mod addon;
 pub mod app_package;
 pub mod clock;
 pub mod daily;
+pub mod did;
 pub mod glow;
 pub mod holds;
 pub mod knowledge;
@@ -91,8 +92,10 @@ pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 /// and a turn's decision names the tools the lamp called for what was said
 /// (`voice/decision`); only the owner's dev monitor shows them. A skill
 /// that lists one is refused at load, and [`Permissions::refuses_reading`]
-/// refuses it too.
-pub const NEVER_READ: [&str; 2] = ["tasks/step", "voice/decision"];
+/// refuses it too. `lamp/did` is the third (#7757): what the lamp did, and why,
+/// is the voice's own to keep, and a skill triggered by it would be triggered
+/// by its own runs.
+pub const NEVER_READ: [&str; 3] = ["tasks/step", "voice/decision", "lamp/did"];
 
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
 /// ([`breaks`]): words heard, the lamp's name heard, a new push on the
@@ -2826,6 +2829,7 @@ impl Test {
 /// never came in 23 minutes and nothing said why (#1672, row 7).
 fn watch_reset(skill: &Skill, trigger: &Trigger, held_us: u64, why: String) -> Run {
     Run {
+        held: None,
         generation: None,
         skill: skill.name.clone(),
         events: vec![event(
@@ -6848,6 +6852,28 @@ pub struct Run {
     /// the item's name: what [`Engine::still`] asks again of the Policy's
     /// answer. None for a tool's run and an end.
     pub from: Option<(usize, Option<String>)>,
+    /// What held its trigger, as the engine said it, kept when its events are
+    /// published (they are taken then) so it travels with the run, queued or
+    /// asked of the Policy, to the `lamp/did` it is told on (#7757).
+    pub held: Option<String>,
+}
+
+impl Run {
+    /// A run made outside the engine's own triggers, with its `events` to say
+    /// and its `calls` to make: for the tests of what the program does with a
+    /// run it is handed.
+    pub fn made(skill: &str, events: Vec<SkillEvent>, calls: Vec<Call>) -> Run {
+        Run {
+            held: None,
+            generation: None,
+            skill: skill.to_owned(),
+            events,
+            calls,
+            ask: None,
+            queue: false,
+            from: None,
+        }
+    }
 }
 
 /// The newest values `$skill` may read: every topic's, but
@@ -7790,6 +7816,7 @@ impl Engine {
                 if let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index)) {
                     if std::mem::take(&mut watch.open) {
                         ends.push(Run {
+                            held: None,
                             generation: None,
                             skill: skill.name.clone(),
                             events: Vec::new(),
@@ -7949,6 +7976,7 @@ impl Engine {
             _ => return Err(HOW.into()),
         };
         Ok(Run {
+            held: None,
             skill: targets[0].clone(),
             events: vec![event(
                 &targets[0],
@@ -8298,6 +8326,7 @@ impl Engine {
                     watch.open = false;
                     watch.since_us = None;
                     runs.push(Run {
+                        held: None,
                         generation: None,
                         skill: skill.name.clone(),
                         events: Vec::new(),
@@ -8459,6 +8488,7 @@ impl Engine {
             watch.open = false;
             watch.since_us = None;
             ends.push(Run {
+                held: None,
                 generation: None,
                 skill: name.clone(),
                 events: Vec::new(),
@@ -9119,6 +9149,7 @@ impl Engine {
         let ends = |watch: &mut Watch, skill: &Skill, runs: &mut Vec<Run>| {
             if std::mem::take(&mut watch.open) {
                 runs.push(Run {
+                    held: None,
                     generation: None,
                     skill: skill.name.clone(),
                     events: Vec::new(),
@@ -9666,6 +9697,7 @@ impl Engine {
                     };
                     if let Some(why) = why {
                         runs.push(Run {
+                            held: None,
                             generation: None,
                             skill: skill.name.clone(),
                             events: vec![event(
@@ -9708,6 +9740,7 @@ impl Engine {
                     if watch.stood_in_us.is_none() {
                         watch.stood_in_us = Some(now_us);
                         runs.push(Run {
+                            held: None,
                             generation: None,
                             skill: skill.name.clone(),
                             events: vec![event(
@@ -9911,6 +9944,7 @@ impl Engine {
                             );
                         }
                         runs.push(Run {
+                            held: None,
                             generation: None,
                             skill: skill.name.clone(),
                             events: vec![event(
@@ -10027,6 +10061,7 @@ impl Engine {
                     match claim {
                         Ok(true) if spoken => {
                             runs.push(Run {
+                                held: None,
                                 generation: None,
                                 skill: skill.name.clone(),
                                 events: vec![event(
@@ -10064,6 +10099,7 @@ impl Engine {
                         Err(error) => {
                             self.daily_faulted = true;
                             runs.push(Run {
+                                held: None,
                                 generation: Some(self.generation.clone()),
                                 skill: skill.name.clone(),
                                 events: vec![event(
@@ -10106,6 +10142,7 @@ impl Engine {
                     };
                     if let Some(why) = why {
                         runs.push(Run {
+                            held: None,
                             generation: None,
                             skill: other.clone(),
                             events: vec![event(other, SkillStage::Answered, why, Some(false))],
@@ -10276,6 +10313,7 @@ impl Engine {
                 }
                 if waited {
                     runs.push(Run {
+                        held: None,
                         generation: None,
                         skill: other.clone(),
                         events: vec![event(
@@ -10383,6 +10421,7 @@ impl Engine {
         }
         self.tool_ran.insert(skill.name.clone(), now_us);
         Ok(Run {
+            held: None,
             generation: skill.scheduled_run(None).then(|| self.generation.clone()),
             skill: skill.name.clone(),
             events: vec![event(
@@ -10475,6 +10514,7 @@ impl Engine {
             })
             .collect();
         let run = Run {
+            held: None,
             generation: skill.scheduled_run(None).then(|| self.generation.clone()),
             skill: skill.name.clone(),
             events: vec![event(
@@ -10616,6 +10656,7 @@ fn decide(
             event(&skill.name, SkillStage::Answered, why.into(), Some(true)),
         ];
         return Run {
+            held: None,
             generation: generation.cloned(),
             skill: skill.name.clone(),
             events,
@@ -10635,6 +10676,7 @@ fn decide(
         ),
     ];
     let run = |events, calls, ask| Run {
+        held: None,
         generation: generation.cloned(),
         skill: skill.name.clone(),
         events,

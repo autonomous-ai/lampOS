@@ -35,6 +35,7 @@ mod remember_speaker;
 mod remove_words;
 mod sent_write;
 mod short_done;
+mod skill_claim;
 mod skill_named_words;
 mod skill_yes_carry;
 mod task_yes_in_code;

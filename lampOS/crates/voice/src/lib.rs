@@ -55,6 +55,7 @@ pub mod body_ask;
 pub mod body_link;
 pub mod body_motion;
 pub mod bus_out;
+pub mod did_history;
 // A developer's computer reads the microphone off the bus (`--microphone-device bus:mic1`).
 #[cfg(unix)]
 pub mod bus_capture;
@@ -107,6 +108,7 @@ pub mod made_remove;
 pub mod made_run;
 pub mod made_skill;
 pub mod made_turn;
+pub mod make_no_asks;
 pub mod make_no_cannot;
 pub mod make_skill_agent;
 pub mod make_skill_local;

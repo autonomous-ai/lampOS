@@ -380,6 +380,12 @@ pub trait Lamp {
     fn monitor(&self) -> Option<crate::monitor::Place> {
         None
     }
+
+    /// The owner's installed apps (`LAMP_STORE_APPS=on`, #7415 piece 4,
+    /// `crate::apps`): there only with the switch.
+    fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+        None
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -390,7 +396,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 78] = [
+pub const KINDS: [(&str, Switch); 85] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -493,6 +499,15 @@ pub const KINDS: [(&str, Switch); 78] = [
     (crate::monitor::KINDS[0], MONITOR),
     (crate::monitor::KINDS[1], MONITOR),
     (crate::monitor::KINDS[2], MONITOR),
+    // The apps from the Store (#7415 piece 4): the word `apps`, then each
+    // kind, with the switch.
+    (crate::apps::CAN, APPS),
+    (crate::apps::KINDS[0], APPS),
+    (crate::apps::KINDS[1], APPS),
+    (crate::apps::KINDS[2], APPS),
+    (crate::apps::KINDS[3], APPS),
+    (crate::apps::KINDS[4], APPS),
+    (crate::apps::KINDS[5], APPS),
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
@@ -514,6 +529,8 @@ const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
+/// The switch (`LAMP_STORE_APPS=on`).
+const APPS: Switch = |lamp| lamp.apps().is_some();
 /// The switch, and root's change helper for `monitor.set`.
 const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
 /// The switch, the skills page, and lamp-services there to ask.
@@ -738,7 +755,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's approximate place (#4333), with LAMP_OWNER_PLACE=on
@@ -753,7 +770,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::place_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's chosen voice and character words (#5394), with
@@ -762,7 +779,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::VOICE_KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::voice_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The app's voice preview (#7485), with LAMP_CHOSEN_VOICE=on too:
@@ -1016,7 +1033,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // app's own key.
         crate::monitor::SET_KIND if on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
-            changes.start(kind, crate::monitor::line(data)?);
+            let (line, request_id) = crate::monitor::line(data)?;
+            changes.start(kind, line, request_id);
             Ok(None)
         }
         kind if crate::monitor::KINDS.contains(&kind) && on(lamp, kind) => {
@@ -1027,6 +1045,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             } else {
                 some(crate::monitor::get(&place))
             }
+        }
+        // An app installed from the Store (#7415 piece 4): its page's kinds,
+        // answered from root's helper and lamp-control, never carried out here.
+        kind if crate::apps::KINDS.contains(&kind) && on(lamp, kind) => {
+            let apps = lamp.apps().ok_or_else(|| not_here(kind))?;
+            apps.answer(kind, data)
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
@@ -1099,6 +1123,8 @@ pub mod tests {
         pub reset: Option<&'static str>,
         /// The person's own services (Queue #4710), with their switch.
         pub services: Option<std::sync::Arc<crate::services::Services>>,
+        /// The owner's installed apps (#7415 piece 4), with their switch.
+        pub apps: Option<std::sync::Arc<crate::apps::Apps>>,
         /// lamp-services' admin socket for a skill's keys, with their switch.
         pub skill_secrets: Option<std::path::PathBuf>,
         /// lamp-control's admin socket (#5299).
@@ -1235,6 +1261,9 @@ pub mod tests {
         }
         fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
             self.services.clone()
+        }
+        fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+            self.apps.clone()
         }
         fn skill_secrets(&self) -> Option<std::path::PathBuf> {
             self.skill_secrets.clone()
@@ -2643,5 +2672,39 @@ pub mod tests {
             wifi.then(|| (std::path::PathBuf::from("/nowhere/wifi.sock"), wait)),
             keys.then(|| (std::path::PathBuf::from("/nowhere/keys.sock"), wait)),
         ))
+    }
+
+    /// The apps' kinds (#7415 piece 4) are answered, and in `can`, only with
+    /// the switch; without it each is "not on this lamp".
+    #[test]
+    fn the_apps_kinds_and_their_can_word_need_the_switch() {
+        let mut lamp = Fake::default();
+        for kind in crate::apps::KINDS {
+            assert!(!on(&lamp, kind), "{kind}");
+            assert!(
+                answer(&mut lamp, kind, &json!({"id": "x1"})).is_err(),
+                "{kind}"
+            );
+        }
+        assert!(!can(&lamp).contains(&crate::apps::CAN));
+        lamp.apps = Some(std::sync::Arc::new(crate::apps::Apps::new(Box::new(
+            crate::apps::tests::Fake::default(),
+        ))));
+        for kind in crate::apps::KINDS {
+            assert!(on(&lamp, kind), "{kind}");
+        }
+        assert!(can(&lamp).contains(&crate::apps::CAN));
+        assert_eq!(
+            answer(&mut lamp, crate::apps::LIST_KIND, &Value::Null),
+            Ok(Some(json!({"apps": []})))
+        );
+        assert!(
+            answer(
+                &mut lamp,
+                crate::apps::START_KIND,
+                &json!({"id": "nothing"})
+            )
+            .is_err()
+        );
     }
 }

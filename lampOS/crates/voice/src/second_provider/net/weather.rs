@@ -10,7 +10,9 @@
 //! weather every 15 minutes and only one location"; "what's the weather in
 //! Hanoi tomorrow?" had been answered with Ho Chi Minh City's. The first
 //! builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
-//! place's name and its coordinates leave the lamp.
+//! place's name, the lamp's country's two-letter code with it
+//! ([`Weather::with_country`], #7593), and the place's coordinates leave
+//! the lamp.
 use super::{Result, get_public_json_within, public::OPEN_WITHIN};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
@@ -52,6 +54,17 @@ const MOST_FOUND: usize = 32;
 const MOST_NAMES: usize = 8;
 /// The longest place name looked up, in characters.
 const MOST_NAME_CHARS: usize = 100;
+/// A place found anywhere goes over the first of its name in the lamp's
+/// own country ([`Weather::with_country`]) only when both say how many
+/// live there and it is a city of at least [`LARGE_CITY`] people and
+/// [`FAR_LARGER`] times as many as that one: "Sapa" asked of a lamp in
+/// Vietnam is Sa Pa, Lao Cai, not Sapa, Romania (lamp-9adf, 18 Nov,
+/// #7593), while "Paris" asked of one in the US is still Paris, France,
+/// not Paris, Texas. A place at home with no count is chosen: unknown is
+/// not small.
+const FAR_LARGER: u64 = 10;
+/// See [`FAR_LARGER`].
+const LARGE_CITY: u64 = 100_000;
 const GEOCODING: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST: &str = "https://api.open-meteo.com/v1/forecast";
 
@@ -128,9 +141,10 @@ pub fn place_query(place: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_owned())
 }
 
-/// The geocoding request for `name`.
-pub fn geocoding_url(name: &str) -> Option<String> {
-    reqwest::Url::parse_with_params(
+/// The geocoding request for `name`, anywhere, or only in `country` (its
+/// two-letter code, `countryCode`).
+pub fn geocoding_url(name: &str, country: Option<&str>) -> Option<String> {
+    let mut url = reqwest::Url::parse_with_params(
         GEOCODING,
         [
             ("name", name),
@@ -139,8 +153,41 @@ pub fn geocoding_url(name: &str) -> Option<String> {
             ("format", "json"),
         ],
     )
-    .ok()
-    .map(String::from)
+    .ok()?;
+    if let Some(country) = country {
+        url.query_pairs_mut().append_pair("countryCode", country);
+    }
+    Some(url.into())
+}
+
+/// How many people live at the first place found, as the geocoding says;
+/// `None` when it doesn't say (unknown, not none).
+fn population(answer: &Value) -> Option<u64> {
+    answer["results"][0]["population"].as_u64()
+}
+
+/// The place a name finds from its two answers, anywhere and in the
+/// lamp's own country: the one in the lamp's country while there is one,
+/// unless the one found anywhere is known to be a far larger city than
+/// the one at home is known to be ([`FAR_LARGER`]).
+fn chosen(anywhere: &Value, at_home: &Value) -> Option<Place> {
+    let Some(home) = found(at_home) else {
+        return found(anywhere);
+    };
+    if let (Some(far), Some(near)) = (population(anywhere), population(at_home))
+        && far >= LARGE_CITY
+        && far >= near.saturating_mul(FAR_LARGER)
+        && let Some(far) = found(anywhere)
+    {
+        return Some(far);
+    }
+    Some(home)
+}
+
+/// A country code as the geocoding takes it: two capital letters.
+fn country_code(code: &str) -> Option<String> {
+    let code = code.trim();
+    (code.len() == 2 && code.bytes().all(|b| b.is_ascii_uppercase())).then(|| code.to_owned())
 }
 
 /// The first place found: its latitude and longitude.
@@ -487,6 +534,9 @@ pub struct Weather {
     /// The owner's place from the app (`LAMP_OWNER_PLACE=on`, #4333), read
     /// at each call that names no place: kept, it goes over `here`.
     owner_place: Option<std::path::PathBuf>,
+    /// The lamp's own country's code ("VN"), whose places a name finds
+    /// first ([`chosen`]).
+    country: Option<String>,
     fetch: Fetch,
     clock: Clock,
     kept: Mutex<Vec<Kept>>,
@@ -501,6 +551,7 @@ impl Weather {
         Self {
             here,
             owner_place: None,
+            country: None,
             fetch,
             clock,
             kept: Mutex::new(Vec::new()),
@@ -513,6 +564,16 @@ impl Weather {
     /// looked up by name, said by its name (#4333). None kept, `here`.
     pub fn with_owner_place(mut self, file: std::path::PathBuf) -> Self {
         self.owner_place = Some(file);
+        self
+    }
+
+    /// The same, a name looked up both anywhere and in `country` (its
+    /// two-letter code, as the lamp's zone gives it,
+    /// `crate::local_time::country_here`), at once, the place in the
+    /// lamp's country chosen while there is one ([`chosen`]). Anything
+    /// but two capital letters is no country.
+    pub fn with_country(mut self, country: Option<String>) -> Self {
+        self.country = country.as_deref().and_then(country_code);
         self
     }
 
@@ -596,11 +657,8 @@ impl Weather {
         let place = match known.clone() {
             Some(place) => place,
             None => {
-                let Some(url) = geocoding_url(&query) else {
-                    return (json!({"error": NOT_FOUND}), "no such place".into());
-                };
-                let place = match (self.fetch)(url, OPEN_WITHIN).await {
-                    Ok(answer) => found(&answer),
+                let place = match self.place_found(&query).await {
+                    Ok(place) => place,
                     Err(error) => {
                         return (
                             json!({"error": UNREACHED}),
@@ -617,6 +675,34 @@ impl Weather {
         };
         self.forecast_of(key, place, known.is_some(), (day, now), until)
             .await
+    }
+
+    /// Where `query` is: looked up anywhere and, with the lamp's country
+    /// known, in it too, both at once ([`chosen`]). With one of the two
+    /// unreached, the other's; `None` when nothing was found.
+    async fn place_found(&self, query: &str) -> Result<Option<Place>> {
+        let Some(anywhere) = geocoding_url(query, None) else {
+            return Ok(None);
+        };
+        let at_home = self
+            .country
+            .as_deref()
+            .and_then(|country| geocoding_url(query, Some(country)));
+        let Some(at_home) = at_home else {
+            return (self.fetch)(anywhere, OPEN_WITHIN)
+                .await
+                .map(|answer| found(&answer));
+        };
+        let (anywhere, at_home) = tokio::join!(
+            (self.fetch)(anywhere, OPEN_WITHIN),
+            (self.fetch)(at_home, OPEN_WITHIN)
+        );
+        match (anywhere, at_home) {
+            (Ok(anywhere), Ok(at_home)) => Ok(chosen(&anywhere, &at_home)),
+            (Ok(anywhere), Err(_)) => Ok(found(&anywhere)),
+            (Err(error), Ok(at_home)) => found(&at_home).map(Some).ok_or(error),
+            (Err(error), Err(_)) => Err(error),
+        }
     }
 
     /// The forecast of `place`, found by the name `key`, from what was kept
@@ -830,13 +916,16 @@ mod tests {
     fn a_place_is_looked_up_by_its_first_part() {
         assert_eq!(place_query("Hanoi, Vietnam").as_deref(), Some("Hanoi"));
         assert_eq!(place_query(" , x"), None);
-        let url = geocoding_url("Ho Chi Minh City").unwrap();
+        let url = geocoding_url("Ho Chi Minh City", None).unwrap();
         assert!(
             url.starts_with(
                 "https://geocoding-api.open-meteo.com/v1/search?name=Ho+Chi+Minh+City&count=1"
             ),
             "{url}"
         );
+        assert!(!url.contains("countryCode"), "{url}");
+        let url = geocoding_url("Sapa", Some("VN")).unwrap();
+        assert!(url.ends_with("&countryCode=VN"), "{url}");
         let found =
             json!({"results": [{"name": "Hanoi", "latitude": 21.0245, "longitude": 105.84117}]});
         assert_eq!(coordinates(&found), Some((21.0245, 105.84117)));
@@ -1525,5 +1614,176 @@ mod tests {
             3,
             "the second call asks its forecast again, not where it is"
         );
+    }
+
+    /// One place found, as the geocoding gives it, with its country's code
+    /// and how many live there when known.
+    fn geocoded_in(name: &str, country: (&str, &str), people: Option<u64>, at: f64) -> Value {
+        let mut found = json!({"id": 1, "name": name, "latitude": at, "longitude": at,
+                               "country": country.0, "country_code": country.1});
+        if let Some(people) = people {
+            found["population"] = json!(people);
+        }
+        json!({"results": [found]})
+    }
+
+    /// A geocoding as Open-Meteo's answered on 18 Nov: "Sapa" anywhere is
+    /// Sapa, Romania, in Vietnam Sa Pa; "Paris" anywhere is Paris, France,
+    /// in the US Paris, Texas, and in Vietnam nothing. Each URL is kept.
+    fn geocoding_by_country() -> (Arc<Mutex<Vec<String>>>, Fetch) {
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let urls = asked.clone();
+        let fetch: Fetch = Arc::new(move |url: String, _| {
+            urls.lock().unwrap().push(url.clone());
+            Box::pin(async move {
+                let parsed = reqwest::Url::parse(&url).unwrap();
+                let param = |name: &str| {
+                    parsed
+                        .query_pairs()
+                        .find(|(key, _)| key == name)
+                        .map(|(_, value)| value.into_owned())
+                };
+                if parsed.host_str() != Some("geocoding-api.open-meteo.com") {
+                    return Ok(forecast(25.0));
+                }
+                let name = param("name").unwrap_or_default();
+                Ok(match (name.as_str(), param("countryCode").as_deref()) {
+                    ("Sapa", None) => geocoded_in("Sapa", ("Romania", "RO"), None, 46.0),
+                    ("Sapa", Some("VN")) => geocoded_in("Sapa", ("Vietnam", "VN"), None, 22.3),
+                    ("Paris", None) => {
+                        geocoded_in("Paris", ("France", "FR"), Some(2_138_551), 48.8)
+                    }
+                    ("Paris", Some("US")) => {
+                        geocoded_in("Paris", ("United States", "US"), Some(24_782), 33.6)
+                    }
+                    _ => json!({"generationtime_ms": 0.5}),
+                })
+            })
+        });
+        (asked, fetch)
+    }
+
+    /// lamp-9adf on 18 Nov (#7593): "Sa Pa" asked of a lamp in Vietnam was
+    /// answered for Sapa, Romania. With the lamp's country known the name
+    /// is looked up anywhere and there at once, and the place there is
+    /// chosen; a place with no match there is the one found anywhere, and
+    /// a far larger city anywhere goes over a small one there.
+    #[tokio::test]
+    async fn a_place_in_the_lamps_country_is_chosen_over_a_foreign_one() {
+        let (asked, fetch) = geocoding_by_country();
+        let in_vietnam =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("VN".into()));
+        let answered = in_vietnam.answer(&json!({"place": "Sapa"})).await;
+        assert_eq!(answered.told["place"], "Sapa, Vietnam", "{}", answered.told);
+        {
+            let urls = asked.lock().unwrap();
+            assert_eq!(urls.len(), 3, "{urls:?}");
+            assert_eq!(
+                urls.iter()
+                    .filter(|url| url.contains("countryCode=VN"))
+                    .count(),
+                1,
+                "{urls:?}"
+            );
+        }
+        let answered = in_vietnam.answer(&json!({"place": "Paris"})).await;
+        assert_eq!(answered.told["place"], "Paris, France", "{}", answered.told);
+        let in_the_us =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("US".into()));
+        let answered = in_the_us.answer(&json!({"place": "Paris"})).await;
+        assert_eq!(answered.told["place"], "Paris, France", "{}", answered.told);
+        // With no country known, one lookup, anywhere, as before.
+        asked.lock().unwrap().clear();
+        let nowhere =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("vn".into()));
+        let answered = nowhere.answer(&json!({"place": "Sapa"})).await;
+        assert_eq!(answered.told["place"], "Sapa, Romania", "{}", answered.told);
+        assert_eq!(asked.lock().unwrap().len(), 2);
+    }
+
+    /// The place chosen of two answers: the one in the lamp's country,
+    /// unless none, or the one anywhere is a city of 100,000 people or
+    /// more and ten times as many, both counts known.
+    #[test]
+    fn the_place_in_the_lamps_country_goes_first_unless_far_smaller() {
+        let named =
+            |anywhere: &Value, at_home: &Value| chosen(anywhere, at_home).map(|place| place.name);
+        let sapa_ro = geocoded_in("Sapa", ("Romania", "RO"), None, 46.0);
+        let sapa_vn = geocoded_in("Sa Pa", ("Vietnam", "VN"), Some(10_554), 22.3);
+        let none = json!({"generationtime_ms": 0.5});
+        assert_eq!(named(&sapa_ro, &sapa_vn).as_deref(), Some("Sa Pa, Vietnam"));
+        assert_eq!(named(&sapa_ro, &none).as_deref(), Some("Sapa, Romania"));
+        assert_eq!(named(&none, &none), None);
+        let town = geocoded_in("Sapa", ("Philippines", "PH"), Some(99_999), 13.0);
+        assert_eq!(named(&town, &sapa_vn).as_deref(), Some("Sa Pa, Vietnam"));
+        let city = geocoded_in("Sapa", ("Philippines", "PH"), Some(105_540), 13.0);
+        assert_eq!(named(&city, &sapa_vn).as_deref(), Some("Sapa, Philippines"));
+        let near_city = geocoded_in("Sa Pa", ("Vietnam", "VN"), Some(10_555), 22.3);
+        assert_eq!(named(&city, &near_city).as_deref(), Some("Sa Pa, Vietnam"));
+    }
+
+    /// El on #7700: a place at home the geocoding gives no count for is
+    /// unknown, not empty, and is chosen over a foreign namesake of any
+    /// size, as a home place with a count of 0 is not.
+    #[test]
+    fn a_place_at_home_with_no_count_is_chosen_over_a_foreign_city() {
+        let named =
+            |anywhere: &Value, at_home: &Value| chosen(anywhere, at_home).map(|place| place.name);
+        let home = geocoded_in("Sapa", ("Vietnam", "VN"), None, 22.3);
+        let city = geocoded_in("Sapa", ("Philippines", "PH"), Some(2_000_000), 13.0);
+        assert_eq!(named(&city, &home).as_deref(), Some("Sapa, Vietnam"));
+        let empty = geocoded_in("Sapa", ("Vietnam", "VN"), Some(0), 22.3);
+        assert_eq!(named(&city, &empty).as_deref(), Some("Sapa, Philippines"));
+        let unknown_far = geocoded_in("Sapa", ("Romania", "RO"), None, 46.0);
+        assert_eq!(
+            named(&unknown_far, &empty).as_deref(),
+            Some("Sapa, Vietnam")
+        );
+    }
+
+    /// The whole call on lamp-9adf on 18 Nov (#7593): a place looked up in
+    /// 1.2 s, then a forecast host whose one address never opens. Looked
+    /// up again another way, its forecast comes within the 6 s; with no
+    /// other way the call still ends within them, the weather unreached.
+    #[tokio::test]
+    async fn a_forecast_whose_only_address_never_opens_is_reached_another_way_within_six_seconds() {
+        let fetch_by = |elsewhere: bool| -> Fetch {
+            Arc::new(move |url: String, open_within| {
+                Box::pin(async move {
+                    if url.contains("geocoding-api") {
+                        tokio::time::sleep(Duration::from_millis(1200)).await;
+                        return canned(&url, false);
+                    }
+                    super::super::public::tests::one_address_dead(
+                        forecast(21.0).to_string(),
+                        open_within,
+                        elsewhere,
+                    )
+                    .await
+                })
+            })
+        };
+        let reached = Weather::new(None, fetch_by(true), tuesday_noon());
+        let unreached = Weather::new(None, fetch_by(false), tuesday_noon());
+        let asked = Instant::now();
+        let ((reached, reached_in), (unreached, unreached_in)) = tokio::join!(
+            async {
+                let answered = reached.answer(&json!({"place": "Hanoi"})).await;
+                (answered, asked.elapsed())
+            },
+            async {
+                let answered = unreached.answer(&json!({"place": "Hanoi"})).await;
+                (answered, asked.elapsed())
+            },
+        );
+        assert_eq!(reached.told["place"], "Hanoi, Vietnam", "{}", reached.told);
+        assert_eq!(reached.how, "fetched");
+        assert!(reached_in < WITHIN, "{reached_in:?}");
+        assert_eq!(unreached.told, json!({"error": UNREACHED}));
+        assert_eq!(
+            unreached.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert!(unreached_in <= WITHIN, "{unreached_in:?}");
     }
 }

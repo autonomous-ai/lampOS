@@ -6992,7 +6992,20 @@ of the week ahead by name. Only when it is called is the place looked up
 by its first part at Open-Meteo's geocoding
 (`geocoding-api.open-meteo.com`), then its forecast fetched from
 `api.open-meteo.com`, now and for 7 days, with no key; the two together
-within 6 s (`net::weather::WITHIN`). It answers in words the
+within 6 s (`net::weather::WITHIN`). With the lamp's country known (its
+zone's two-letter code in the system's `zone.tab`,
+`local_time::country_here`), the name is looked up anywhere and in that
+country (`countryCode`), the two requests side by side, so the call waits
+for the slower of them; the country's code goes with the name. The place
+in the lamp's country is chosen while there is one, unless both say how
+many live there and the one found anywhere is a city of at least 100,000
+people and ten times as many (`net::weather::chosen`, `FAR_LARGER`,
+`LARGE_CITY`); a place at home with no count is unknown, not small, and is
+chosen. On lamp-9adf on 18 Nov (#7593) "Sapa" asked of a lamp in Vietnam
+was answered for Sapa, Romania; now it is Sa Pa, Lao Cai, while "Paris"
+asked of a lamp in the US is still Paris, France. With one of the two
+lookups unreached the other's place is taken; with no country known it is
+one lookup, anywhere, as before. It answers in words the
 model can say: `{"place": "Hanoi, Vietnam", "weather": "In Hanoi,
 Vietnam: Tomorrow, Friday, 24 to 30°C, light rain, 60% chance of
 rain."}`; for now and for today the temperature, the sky, the feeling and
@@ -7025,6 +7038,31 @@ lamp-9adf on 17 Nov the forecast host's one address dropped the SYN of about
 half the connections for stretches; on 18 Nov (#7593) a place looked up in
 1.2 s left its forecast a fixed 2.5 s, none of 4 tries begun within 1.2 s
 opened, and the call failed in 3.7 s with more than 2 s of its 6 s unused.
+The same day the lamp's resolver (1.1.1.1) gave the forecast host one
+address, 51.81.167.44, which opened no curl of 6, while the address
+Google's resolver gives the same host, 157.90.83.168, answered in 240 ms,
+and 2 of 5 forecasts failed. A name none of whose tries has opened once a
+try to each address the lamp's resolver gave has failed outright (an IPv6
+address failing at once beside a healthy IPv4 one is not that), or once
+1.5 s have passed from the first try's start with none open (`ELSEWHERE_AFTER`: past a healthy open, as TLS ended
+0.65–1.37 s after a curl began on lamp-9adf and healthy forecast opens came
+under about 1 s, so an ordinary fetch, a slow one from Vietnam to Germany
+too, never asks it), is now looked up a second time, through Google's
+resolver over HTTPS by its own address (`ELSEWHERE`,
+`https://8.8.8.8/resolve`, its A and AAAA answers together; only the host
+name goes, as it goes to the lamp's resolver anyway). Only the global
+unicast addresses it gives are kept (no private, loopback, link-local,
+shared CGNAT, multicast, unspecified, documentation or reserved one;
+`net::public::global`), and those not raced before join the race: the next
+try goes to the first of them at once, and up to 2 tries more are begun
+(`MORE_TRIES`), all within the same bound. The second lookup runs only
+with `LAMP_WEATHER_DOH=on` (off unless exactly `on`); no product
+unit sets it, so the product has none (El's ruling on #7700, 14:23). The journal says how many
+addresses it added and after how long (`a public service's name looked up
+through another resolver gave N address(es) more, after N ms`), or why it
+failed, never the name. With no address more the request ends at its bound
+as before, and the call says the weather couldn't be reached within its
+6 s.
 Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day

@@ -25,6 +25,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)
         || crate::action_claim::unplug_tool(name, &Value::Null).is_some()
+        || name == crate::made_skill::MAKE
         || matches!(
             name,
             "light_on"
@@ -64,6 +65,55 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
     }
     if result.get("error").is_some() {
         outcome.insert("error".into(), json!(true));
+    }
+    // What `make_skill` did to a skill the person made (#7683): removed (a
+    // remove's yes, or a clash's replace that took others off), turned off
+    // or turned on (put on included), each by the made skill's own name
+    // from `made.json` as its answer gives it, never the words heard, so a
+    // claim is bound to its own skill and kind
+    // (`action_claim::skill_stands`).
+    if name == crate::made_skill::MAKE {
+        // A skill's name as lamp-skills writes one, nothing else.
+        fn made(value: &Value) -> Option<&str> {
+            value.as_str().filter(|made| {
+                !made.is_empty()
+                    && made.len() <= 64
+                    && made
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            })
+        }
+        let removed: Vec<&str> = made(&result["removed"])
+            .into_iter()
+            .chain(
+                result["replaced"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(made),
+            )
+            .collect();
+        if !removed.is_empty() {
+            outcome.insert("removed".into(), json!(removed));
+        }
+        for (field, kept, off) in [
+            (crate::made_turn::TURN_OFF, "turned_off", true),
+            (crate::made_turn::TURN_ON, "turned_on", false),
+        ] {
+            if let Some(turned) = made(&result[field])
+                && result["off"] == off
+            {
+                outcome.insert(kept.into(), json!(turned));
+            }
+        }
+        // Put on: a make or a clash's keep or replace (`{"made", "on":
+        // true}`), or a code make's yes, whose answer names the skill it put
+        // on the same way (Twelve's P2 at c881d48f19 on #7730).
+        if let Some(on) = made(&result["made"])
+            && result["on"] == true
+        {
+            outcome.insert("turned_on".into(), json!(on));
+        }
     }
     if result.get("face").is_some() {
         outcome.insert(

@@ -147,6 +147,35 @@
 //! forget that when I can see you say it."); a second claim is said as
 //! [`NOT_DONE_LINE`]. Only the first sentence that says more than a lead
 //! ("Okay.") is judged: a forget said done in a later one is a known gap.
+//!
+//! **A made skill's change said done** (#7683, [`SKILL_ENVIRONMENT`] with
+//! [`ENVIRONMENT`] and a voice make): on lamp-9adf (18 Nov 14:38, request
+//! 72) "Lamp, remove planet fact." was answered "planet fact" with
+//! `calls=none`, and "Yes." (request 73) "planet fact is removed." with
+//! `calls=none`: nothing was asked, nothing removed, and the skill stayed on
+//! the lamp. The history showed every earlier remove as words alone, the
+//! lamp's question and its result, since a `make_skill` call was never kept
+//! (`second_provider::kept_made` keeps it now). The test is structure,
+//! never a word list for meaning ([`skill_claim`]): the reply opens, bare or
+//! after a lead-in ([`LEAD_INS`]), with the name of a skill the person made
+//! (`made.json`, read as the turn begins; for off and on a name of two words
+//! or more: "music" is a common noun) and then one of the lamp's own result
+//! words for it ([`SKILL_REMOVED`]: "X is removed."; [`SKILL_OFF`]: "X is
+//! off."; [`SKILL_ON`]: "X is on again.", "X is on now.", "X is on."), or
+//! with a clash's "I removed X", closing at its sentence's end, never a
+//! '?', after a "Done" opening too. A put-on is that skill's own: a make's
+//! or a clash's `made` with `on`, and a code make's yes names it so.
+//! "Planet fact is
+//! still there." and "Is planet fact removed?" are none, and a skill gone
+//! from `made.json` is never named here. On a line the person asked as a
+//! question ([`asked_as_a_question`]) only the removed forms are judged.
+//! Each claim is bound to its own skill and kind ([`skill_stands`]): a
+//! removal stands only beside a `make_skill` that removed that very skill
+//! in the turn (never a remove that only asked its question); off or on
+//! only when it is that skill's true state, as the turn began (lamp-skills'
+//! `off` file and `made.json`'s `on`) and after this turn's own turns of
+//! it, so a true state is never held. Held, the model is told
+//! [`SKILL_NOTE`] once; a second claim is said as [`NOT_DONE_LINE`].
 
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
@@ -173,6 +202,16 @@ pub const DOING_ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_DOING";
 /// Whether [`DOING_ENVIRONMENT`] is on in this process's environment.
 pub fn doing_on() -> bool {
     std::env::var(DOING_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Where the second worker reads the switch for a made skill said removed,
+/// off or on ([`skill_claim`], #7683). `on` only, off by default, and it
+/// does nothing without [`ENVIRONMENT`] and a voice make (`LAMP_MAKE_SKILL`).
+pub const SKILL_ENVIRONMENT: &str = "LAMP_SKILL_CLAIM_CHECKED";
+
+/// Whether [`SKILL_ENVIRONMENT`] is on in this process's environment.
+pub fn skill_on() -> bool {
+    std::env::var(SKILL_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The executive's own lines after a light or volume call
@@ -242,6 +281,12 @@ pub const FORGET_NOTE: &str = "(For you to know: your last reply said something 
 /// Said when the round asked again claims again with no call.
 pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again?";
 
+/// Told before the round asked again after a made skill said removed,
+/// turned off or on with no `make_skill` that did it ([`Claim::SkillRemoved`],
+/// [`Claim::SkillOff`], [`Claim::SkillOn`], #7683). A `make_skill` that ran (a remove's
+/// question asked) is not to be called again.
+pub const SKILL_NOTE: &str = "(For you to know: your last reply said a skill they made was removed, turned off or turned on, but no make_skill call in this turn did that, so nothing changed, and those words were not said. A make_skill call that already ran in this turn: do not call it again, and say what its answer told you to say. If they asked to remove a skill they made, or to turn one off or on, and make_skill has not run for it, call make_skill now with it: a remove asks them first, and the lamp says the result. If not, or if you cannot, say plainly that you haven't done it.)";
+
 /// The kind of action a reply claims.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Claim {
@@ -285,6 +330,19 @@ pub enum Claim {
     /// only begun the fold; readiness is the skill's guarded `ready` line
     /// alone (Twelve's P2 on #6532).
     UnplugReady,
+    /// A skill the person made said removed in the lamp's own result words
+    /// ([`skill_claim`]: "Planet fact is removed."): only a `make_skill`
+    /// that removed that very skill in the turn ([`skill_stands`]) makes
+    /// it, never a call by its name (#7683).
+    SkillRemoved,
+    /// A skill the person made said off in the lamp's own result words
+    /// ([`skill_claim`]: "Planet fact is off."): it stands only when that
+    /// skill is off now ([`skill_stands`], #7683).
+    SkillOff,
+    /// A skill the person made said on in the lamp's own result words
+    /// ([`skill_claim`]: "Planet fact is on again."): it stands only when
+    /// that skill is on now ([`skill_stands`], #7683).
+    SkillOn,
 }
 
 impl Claim {
@@ -314,8 +372,14 @@ impl Claim {
                     || matches!(name, "cancel_reminder" | "snooze_reminder")
             }
             // Only by its outcome ([`unplug_in`]): a `use_skill` that ran no
-            // skill backs nothing (#6457, case B).
-            Self::Unplug | Self::UnplugReady => false,
+            // skill backs nothing (#6457, case B). A made skill's change
+            // by its outcome and its skill's state ([`skill_stands`]): a
+            // remove's call that only asked removed nothing (#7683).
+            Self::Unplug
+            | Self::UnplugReady
+            | Self::SkillRemoved
+            | Self::SkillOff
+            | Self::SkillOn => false,
         }
     }
 
@@ -333,6 +397,9 @@ impl Claim {
             Self::OffOrDown => "turning something off or down",
             Self::Unplug => "preparing to be unplugged, staying on or turning off",
             Self::UnplugReady => "the lamp made safe to unplug",
+            Self::SkillRemoved => "a skill they made removed",
+            Self::SkillOff => "a skill they made turned off",
+            Self::SkillOn => "a skill they made turned on",
         }
     }
 
@@ -350,6 +417,9 @@ impl Claim {
             Self::OffOrDown => "off or down",
             Self::Unplug => "unplug",
             Self::UnplugReady => "unplug ready",
+            Self::SkillRemoved => "skill removed",
+            Self::SkillOff => "skill off",
+            Self::SkillOn => "skill on",
         }
     }
 }
@@ -761,6 +831,205 @@ fn made_claim(text: &str, ended: bool) -> Option<bool> {
     any_of(MADE_AFTER_NAME.iter().map(|whole| open(after, whole)))
 }
 
+/// The lamp's own words for a made skill removed, after its spoken name
+/// (`skill_write_yes::removed_next`: "that moon fact is removed"). A test
+/// holds the producer to them.
+pub const SKILL_REMOVED: [&str; 1] = ["is removed"];
+
+/// The lamp's own words for a made skill turned off, after its spoken name
+/// (`made_turn::asked`: "that moon fact is off"). A test holds the producer
+/// to them.
+pub const SKILL_OFF: [&str; 1] = ["is off"];
+
+/// The lamp's own words for a made skill turned back on or put on, after
+/// its spoken name (`made_turn::asked`: "that moon fact is on again";
+/// a code make's yes, `skill_write_yes::CODE_APPROVED_NEXT`: "that it's on
+/// now"; `made_clash`'s "Done: moon fact is on"). A test holds the
+/// producers to them.
+pub const SKILL_ON: [&str; 3] = ["is on again", "is on now", "is on"];
+
+/// How a clash's replace line says the skills it took off, before their
+/// names (`made_clash`: "Done: moon fact is on, and I removed moon"), as a
+/// reply may open with it.
+const SKILL_REMOVED_BEFORE: &str = "i removed";
+
+/// The marks a run's pattern reads as its own ([`slots`]): a name holding
+/// one is never made a run.
+const RUN_MARKS: [char; 9] = ['|', '?', '*', '$', '#', '~', '%', '^', '@'];
+
+/// A skill the person made, as a turn begins (#7683): its name as
+/// `made.json` keeps it, and whether it is on now (`made.json`'s `on`, and
+/// not in lamp-skills' `off` file, `skill_about::turned_off`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MadeSkill {
+    pub name: String,
+    pub on: bool,
+}
+
+/// The skills the person made, as the turn begins (#7683): `made.json`'s
+/// names in `directory`, each on when `made.json` says so and lamp-skills'
+/// `off` file in `state` doesn't name it (`skill_about::turned_off`, the
+/// reader a skill's state is told by). An `off` file that can't be read
+/// leaves each as `made.json` says. Two small local files, read once a
+/// turn: measured on a Mac at 0.2 to 0.4 ms together for three skills
+/// (`the_made_skills_are_read_with_the_off_file`, debug and release), not
+/// yet on a lamp; a chat round takes hundreds of milliseconds.
+pub fn made_skills(directory: &std::path::Path, state: &std::path::Path) -> Vec<MadeSkill> {
+    let off = crate::skill_about::turned_off(state).unwrap_or_default();
+    crate::made_skill::entries(directory)
+        .iter()
+        .filter_map(|entry| {
+            let name = entry["name"].as_str()?;
+            Some(MadeSkill {
+                name: name.to_owned(),
+                on: entry["on"] == true && !off.contains(name),
+            })
+        })
+        .collect()
+}
+
+/// Whether the made skill `name` is judged off or on: a name of two words or
+/// more, a hyphen in its folder's name (`moon-fact`). A one-word name
+/// ("music", "light") is a common noun as often as a skill, so "Music is
+/// off." is never read as a claim about a skill called music (the
+/// Reviewer-lead's and Twelve's P3s on #7730). Structure only.
+fn judged(name: &str) -> bool {
+    name.split('-').filter(|word| !word.is_empty()).count() >= 2
+}
+
+/// The run patterns of [`skill_claim`] for the made skill `name`, each with
+/// its kind.
+fn skill_runs(name: &str, asked: bool) -> Vec<(String, Claim)> {
+    let mut patterns = Vec::new();
+    // "Removed" is read for a one-word name too ("Pomodoro is removed."):
+    // a skill that leaves `made.json` has no true "removed" state to tell,
+    // and that is not how a common noun is said (Twelve's P3 at c881d48f19
+    // on #7730). Off and on stay for two words or more ([`judged`]).
+    let judged = judged(name);
+    let spoken = crate::made_skill::spoken_name(name).to_lowercase();
+    let words = spoken.split_whitespace().collect::<Vec<_>>().join(" ");
+    for said in [words, name.to_lowercase()]
+        .iter()
+        .filter(|said| !said.is_empty() && !said.contains(RUN_MARKS))
+    {
+        let named = format!("?the {said} ?skill");
+        for tail in SKILL_REMOVED {
+            patterns.push((format!("{named} {tail} $"), Claim::SkillRemoved));
+        }
+        patterns.push((
+            format!("{SKILL_REMOVED_BEFORE} {named} $"),
+            Claim::SkillRemoved,
+        ));
+        if judged && !asked {
+            for tail in SKILL_OFF {
+                patterns.push((format!("{named} {tail} $"), Claim::SkillOff));
+            }
+            for tail in SKILL_ON {
+                patterns.push((format!("{named} {tail} $"), Claim::SkillOn));
+            }
+        }
+    }
+    patterns
+}
+
+/// Whether `text` (already [`normalised`]) opens, bare or after one of
+/// [`LEAD_INS`], with a skill the person made (`made`, its names as kept,
+/// those of two words or more alone for off and on, [`judged`]; each said as its words or
+/// as written, with "the" before or "skill" after it or not) and then one
+/// of the lamp's own result words for it, closing at its sentence's end,
+/// never on a '?' (#7683): [`SKILL_REMOVED`] or a clash's "I removed"
+/// before the name ([`Claim::SkillRemoved`]), [`SKILL_OFF`]
+/// ([`Claim::SkillOff`]) or [`SKILL_ON`] ([`Claim::SkillOn`]), the last two
+/// not on a line asked as a question (`asked`). Structure only: the names
+/// are the lamp's records, the words its own lines'. As [`claim`] says it.
+pub fn skill_claim(
+    text: &str,
+    ended: bool,
+    made: &[MadeSkill],
+    asked: bool,
+) -> Option<Option<Claim>> {
+    let patterns: Vec<(String, Claim)> = made
+        .iter()
+        .flat_map(|skill| skill_runs(&skill.name, asked))
+        .collect();
+    let runs: Vec<(&str, Claim)> = patterns
+        .iter()
+        .map(|(pattern, kind)| (pattern.as_str(), *kind))
+        .collect();
+    runs_claim(&runs, text, ended, true, false, &[])
+}
+
+/// The made skill a whole `reply` claims a change of, as [`skill_claim`]
+/// reads it: the first of `made` whose runs it fits.
+pub fn skill_claimed<'a>(reply: &str, made: &'a [MadeSkill]) -> Option<&'a MadeSkill> {
+    let mut text = normalised(reply);
+    text.truncate(text.trim_end().len());
+    made.iter().find(|skill| {
+        skill_claim(&text, true, std::slice::from_ref(*skill), false)
+            .is_some_and(|kind| kind.is_some())
+    })
+}
+
+/// The `make_skill` outcomes the turn keeps of its calls
+/// (`after_forget::status`), in order, with no error: each a made skill's
+/// name and what was done to it (`removed`, `turned_off`, `turned_on`).
+fn made_outcomes(statuses: &[serde_json::Value]) -> Vec<(&str, &'static str)> {
+    let mut done = Vec::new();
+    for status in statuses {
+        let outcome = &status["outcome"];
+        if status["tool"] != crate::made_skill::MAKE || outcome.get("error").is_some() {
+            continue;
+        }
+        for name in outcome["removed"].as_array().into_iter().flatten() {
+            if let Some(name) = name.as_str() {
+                done.push((name, "removed"));
+            }
+        }
+        for field in ["turned_off", "turned_on"] {
+            if let Some(name) = outcome[field].as_str() {
+                done.push((name, field));
+            }
+        }
+    }
+    done
+}
+
+/// Whether a made skill's change said ([`Claim::SkillRemoved`],
+/// [`Claim::SkillOff`], [`Claim::SkillOn`]) stands, bound to the very skill
+/// `reply` names and its kind (Twelve's and the Reviewer-lead's P2s on
+/// #7730): removed only beside a `make_skill` in the turn that removed that
+/// skill (a remove's yes, or a clash's replace naming it); off or on only
+/// when that is its true state now (`made`'s, as the turn began, then this
+/// turn's own turns of it, the last one counting; a removal leaves it off).
+/// A true state is never held: "Planet fact is off, so it didn't run."
+/// after a run refused for it, or "Planet fact is on." told when asked
+/// which are on.
+pub fn skill_stands(
+    kind: Claim,
+    reply: &str,
+    made: &[MadeSkill],
+    statuses: &[serde_json::Value],
+) -> bool {
+    let Some(skill) = skill_claimed(reply, made) else {
+        return false;
+    };
+    let done = made_outcomes(statuses);
+    let mut on = skill.on;
+    for (name, what) in &done {
+        if *name == skill.name {
+            on = *what == "turned_on";
+        }
+    }
+    match kind {
+        Claim::SkillRemoved => done
+            .iter()
+            .any(|(name, what)| *name == skill.name && *what == "removed"),
+        Claim::SkillOff => !on,
+        Claim::SkillOn => on,
+        _ => false,
+    }
+}
+
 /// [`claim`], and with `worded` ([`WORDED_ENVIRONMENT`]) the worded claims
 /// too ([`WORDED`]): as [`claim`] says it. A claim in the acting part's own
 /// words is judged first; without `worded` this is [`claim`] exactly.
@@ -810,6 +1079,38 @@ pub fn claim_on(
     }
 }
 
+/// [`claim_on`], and with `made` (the skills the person made, `made.json`'s,
+/// as the turn began) a made skill's change said in the
+/// lamp's own result words ([`skill_claim`], #7683). `asked`: the person's
+/// line was asked as a question ([`asked_as_a_question`]), so only its
+/// removed forms are judged. With no names this is [`claim_on`] exactly.
+pub fn claim_made_on(
+    reply: &str,
+    ended: bool,
+    (worded, forget, doing): (bool, bool, bool),
+    made: &[MadeSkill],
+    asked: bool,
+) -> Option<Option<Claim>> {
+    let found = claim_on(reply, ended, worded, forget, doing);
+    // A "Done" opening is any call's own line, and still read for a made
+    // skill's change after it: "Done, planet fact is removed." beside a
+    // remove that only asked is bound to that skill (Twelve's P3 at
+    // c881d48f19 on #7730).
+    if made.is_empty() || matches!(found, Some(Some(kind)) if kind != Claim::AnyCall) {
+        return found;
+    }
+    let mut text = normalised(reply);
+    if ended {
+        text.truncate(text.trim_end().len());
+    }
+    match (found, skill_claim(&text, ended, made, asked)) {
+        (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(Some(any)), _) => Some(Some(any)),
+        (Some(None), Some(None)) => Some(None),
+        _ => None,
+    }
+}
+
 /// [`stands`], and the claims judged by outcome by the turn's kept
 /// `statuses` (`after_forget::status`): a forget said done
 /// ([`Claim::Forgot`]) only when a forget removed something ([`forgot_in`]),
@@ -827,7 +1128,27 @@ pub fn stands_on<'a>(
         Claim::Forgot => forgot_in(statuses),
         Claim::Unplug => unplug_in(statuses) && !stayed_in(statuses),
         Claim::UnplugReady => false,
+        // Bound to its skill: [`stands_made_on`].
+        Claim::SkillRemoved | Claim::SkillOff | Claim::SkillOn => false,
         _ => stands(kind, reply, read, calls),
+    }
+}
+
+/// [`stands_on`], with a made skill's change judged against `made` (the
+/// skills the person made as the turn began) by [`skill_stands`] (#7683).
+pub fn stands_made_on<'a>(
+    kind: Claim,
+    reply: &str,
+    read: bool,
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+    statuses: &[serde_json::Value],
+    made: &[MadeSkill],
+) -> bool {
+    match kind {
+        Claim::SkillRemoved | Claim::SkillOff | Claim::SkillOn => {
+            skill_stands(kind, reply, made, statuses)
+        }
+        _ => stands_on(kind, reply, read, calls, statuses),
     }
 }
 
@@ -2693,6 +3014,265 @@ fn runs_claim(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// The made skills of the tests: planet fact on, evening dim off, and
+    /// music (one word) on.
+    fn made_here() -> Vec<MadeSkill> {
+        [
+            ("planet-fact", true),
+            ("evening-dim", false),
+            ("music", true),
+        ]
+        .into_iter()
+        .map(|(name, on)| MadeSkill {
+            name: name.to_owned(),
+            on,
+        })
+        .collect()
+    }
+
+    /// #7683 (lamp-9adf, 18 Nov 14:38): a made skill said removed, off or
+    /// on in the lamp's own result words, by a name `made.json` lists, is a
+    /// claim; one named in passing, asked about, not listed, or of one word
+    /// ("music", a common noun) is not.
+    #[test]
+    fn a_made_skill_said_changed_is_a_claim_by_its_listed_name() {
+        let made = made_here();
+        let read = |reply: &str, asked: bool| {
+            claim_made_on(reply, true, (false, false, false), &made, asked).flatten()
+        };
+        for reply in [
+            "planet fact is removed.",
+            "Planet Fact is removed",
+            "Okay, the planet fact skill is removed.",
+            "planet-fact is removed!",
+            "I removed planet fact.",
+        ] {
+            assert_eq!(read(reply, false), Some(Claim::SkillRemoved), "{reply}");
+        }
+        // A clash's replace line opens "Done:", any call's line, and is
+        // still read for its skill: an on, bound to the clash's own result.
+        let clash = normalised("Done: evening dim is on, and I removed planet fact.");
+        assert_eq!(
+            skill_claim(&clash, true, &made, false),
+            Some(Some(Claim::SkillOn))
+        );
+        assert_eq!(
+            read("Done: evening dim is on, and I removed planet fact.", false),
+            Some(Claim::SkillOn)
+        );
+        // A removal is judged on a question's line too: still listed, it
+        // was not removed.
+        assert_eq!(
+            read("planet fact is removed.", true),
+            Some(Claim::SkillRemoved)
+        );
+        for (reply, kind) in [
+            ("Planet fact is off.", Claim::SkillOff),
+            ("Sure, planet fact is on again.", Claim::SkillOn),
+            ("Evening dim is on.", Claim::SkillOn),
+        ] {
+            assert_eq!(read(reply, false), Some(kind), "{reply}");
+            // "Is planet fact on?" may be answered so.
+            assert_eq!(read(reply, true), None, "{reply}");
+        }
+        for reply in [
+            "planet fact is still there.",
+            "planet fact",
+            "Planet fact is removed?",
+            "Planet fact is on the lamp, and it tells a fact.",
+            "Remove planet fact?",
+            "moon fact is removed.",
+            "I can remove planet fact if you like.",
+            "The planet fact skill tells you a fact.",
+            // One word: a common noun as often as a skill, off or on.
+            "Music is off.",
+            "Music is on.",
+        ] {
+            assert_eq!(read(reply, false), None, "{reply}");
+        }
+        // Removed is read for one word too, and after a "Done" opening.
+        for reply in [
+            "Music is removed.",
+            "Done, planet fact is removed.",
+            "Done: planet fact is removed.",
+        ] {
+            assert_eq!(read(reply, false), Some(Claim::SkillRemoved), "{reply}");
+        }
+        assert_eq!(read("Done, it's on now.", false), Some(Claim::AnyCall));
+        // Undecided while it streams, then decided at the sentence's end.
+        assert_eq!(
+            claim_made_on("planet fact is", false, (false, false, false), &made, false),
+            None
+        );
+        assert_eq!(
+            claim_made_on(
+                "planet fact is still",
+                false,
+                (false, false, false),
+                &made,
+                false
+            ),
+            Some(None)
+        );
+        // No names: as [`claim_on`].
+        assert_eq!(
+            claim_made_on(
+                "planet fact is removed.",
+                true,
+                (false, false, false),
+                &[],
+                false
+            ),
+            Some(None)
+        );
+    }
+
+    /// #7683, Twelve's and the Reviewer-lead's P2s on #7730: each claim is
+    /// bound to its own skill and kind. A removal stands only beside a
+    /// `make_skill` that removed that very skill; off or on only as its true
+    /// state, after this turn's own turns of it. Never a call by its name.
+    #[test]
+    fn a_made_skill_change_stands_only_for_its_own_skill_and_kind() {
+        let made = made_here();
+        let status = |outcome: serde_json::Value| serde_json::json!({"tool": crate::made_skill::MAKE, "outcome": outcome});
+        let none = serde_json::Value::Null;
+        let named = [(crate::made_skill::MAKE, &none)];
+        let stands_here = |kind: Claim, reply: &str, statuses: &[serde_json::Value]| {
+            stands_made_on(kind, reply, false, named, statuses, &made)
+        };
+        let removed = "Planet fact is removed.";
+        let off = "Planet fact is off.";
+        let on = "Planet fact is on again.";
+        // Nothing done: a removal never stands, and a state stands only
+        // when true (planet fact is on).
+        assert!(!stands_here(Claim::SkillRemoved, removed, &[]));
+        assert!(!stands_here(Claim::SkillOff, off, &[]));
+        assert!(stands_here(Claim::SkillOn, on, &[]));
+        // Evening dim is off: told so, it stands.
+        assert!(stands_here(Claim::SkillOff, "Evening dim is off.", &[]));
+        assert!(!stands_here(Claim::SkillOn, "Evening dim is on.", &[]));
+        // A remove that only asked its question backs nothing: neither the
+        // removal nor an off.
+        let asked = [status(serde_json::json!({}))];
+        assert!(!stands_here(Claim::SkillRemoved, removed, &asked));
+        assert!(!stands_here(Claim::SkillOff, off, &asked));
+        // Its own removal backs it; another skill's does not, nor an error.
+        let planet = [status(serde_json::json!({"removed": ["planet-fact"]}))];
+        let evening = [status(serde_json::json!({"removed": ["evening-dim"]}))];
+        let failed = [status(
+            serde_json::json!({"removed": ["planet-fact"], "error": true}),
+        )];
+        assert!(stands_here(Claim::SkillRemoved, removed, &planet));
+        assert!(!stands_here(Claim::SkillRemoved, removed, &evening));
+        assert!(!stands_here(Claim::SkillRemoved, removed, &failed));
+        // Its own turn off backs an off; a turn on never does, nor a turn
+        // of another skill.
+        let turned_off = [status(serde_json::json!({"turned_off": "planet-fact"}))];
+        let turned_on = [status(serde_json::json!({"turned_on": "planet-fact"}))];
+        let other_off = [status(serde_json::json!({"turned_off": "moon-time"}))];
+        assert!(stands_here(Claim::SkillOff, off, &turned_off));
+        assert!(!stands_here(Claim::SkillOff, off, &turned_on));
+        assert!(!stands_here(Claim::SkillOff, off, &other_off));
+        assert!(!stands_here(Claim::SkillOn, on, &turned_off));
+        // Off at the start and turned on in the turn: on, never off.
+        let back_on = [status(serde_json::json!({"turned_on": "evening-dim"}))];
+        assert!(stands_here(
+            Claim::SkillOn,
+            "Evening dim is on again.",
+            &back_on
+        ));
+        assert!(!stands_here(
+            Claim::SkillOff,
+            "Evening dim is off.",
+            &back_on
+        ));
+        // Without the made skills, a skill's claim never stands.
+        for kind in [Claim::SkillRemoved, Claim::SkillOff, Claim::SkillOn] {
+            assert!(!stands_on(kind, removed, false, named, &planet), "{kind:?}");
+        }
+    }
+
+    /// #7683: which skills are on is read from `made.json` and lamp-skills'
+    /// `off` file, the reader a skill's state is told by.
+    #[test]
+    fn the_made_skills_are_read_with_the_off_file() {
+        let (root, keeping) = crate::make_skill_local::tests::keeping("skill-claim-off-file");
+        crate::made_remove::tests::made_here(
+            &keeping,
+            &[
+                ("planet-fact", true),
+                ("evening-dim", true),
+                ("rain-joke", false),
+            ],
+        );
+        let state = root.join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(state.join(crate::skill_about::OFF_FILE), "evening-dim\n").unwrap();
+        let started = std::time::Instant::now();
+        let read = made_skills(&keeping.directory, &state);
+        eprintln!("made_skills: {:?}", started.elapsed());
+        let on: Vec<(&str, bool)> = read
+            .iter()
+            .map(|skill| (skill.name.as_str(), skill.on))
+            .collect();
+        assert_eq!(
+            on,
+            [
+                ("planet-fact", true),
+                ("evening-dim", false),
+                ("rain-joke", false)
+            ]
+        );
+        // No `off` file: as `made.json` says.
+        let read = made_skills(&keeping.directory, &root.join("none"));
+        assert!(
+            read.iter()
+                .find(|skill| skill.name == "evening-dim")
+                .unwrap()
+                .on
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The result words a made skill's change is read by are the lamp's
+    /// own: what its producers tell the model to say after the name.
+    #[test]
+    fn the_skill_result_words_are_the_producers_own() {
+        let removed = crate::skill_write_yes::removed_next("moon fact");
+        for tail in SKILL_REMOVED {
+            assert!(removed.contains(&format!("moon fact {tail}")), "{removed}");
+        }
+        crate::skill_write_yes::clear_for_test();
+        let (root, keeping) = crate::make_skill_local::tests::keeping("skill-result-words");
+        crate::made_remove::tests::made_here(&keeping, &[("moon-fact", true)]);
+        for (off, tail) in [(true, SKILL_OFF[0]), (false, SKILL_ON[0])] {
+            let told = crate::made_turn::asked(
+                crate::made_turn::Ask {
+                    name: "moon fact",
+                    off,
+                    request: 1,
+                    heard: true,
+                },
+                &keeping,
+                || true,
+                |_, _| Ok(()),
+            );
+            let next = told["next"].as_str().unwrap_or_default();
+            assert!(next.contains(&format!("moon fact {tail}")), "{told}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+        let clash = include_str!("made_clash.rs");
+        assert!(clash.contains("Done: {new} is on, and I removed {others}."));
+        assert!(SKILL_ON.contains(&"is on"));
+        for next in [
+            crate::skill_write_yes::CODE_APPROVED_NEXT,
+            crate::skill_write_yes::CODE_ON_TASK_WAITS_NEXT,
+        ] {
+            assert!(next.contains("it's on now"), "{next}");
+        }
+        assert!(SKILL_ON.contains(&"is on now"));
+    }
 
     /// C-make (Fourteen, lamp-9adf, 11 Nov 21:28): `make_skill`'s own line
     /// said with no `make_skill` in the turn is a claim only a make backs.

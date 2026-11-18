@@ -4,9 +4,9 @@
 //! actions part and the voice's say service.
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
-    BodyGesture, Decision, GestureState, Hand, Light, LightOutranked, LightReached, LightRequest,
-    MessageOut, Pause, RequestedAudioContext, RequestedAudioOperation, SkillEvent, SkillStage,
-    Speech, StandAsked, Voice, VoiceState,
+    BodyGesture, Decision, GestureState, Hand, LampDid, Light, LightOutranked, LightReached,
+    LightRequest, MessageOut, Pause, RequestedAudioContext, RequestedAudioOperation, SkillEvent,
+    SkillStage, Speech, StandAsked, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
 use lamp_skills::requested_audio::{self, Authority};
@@ -587,6 +587,94 @@ fn say_dropped(engine: &mut Engine) {
     for line in engine.take_dropped() {
         eprintln!("lamp-skills: {line}");
     }
+}
+
+/// What `lamp/did` is told (#7757, `LAMP_DID_PUBLISH`): the facts runs fired
+/// on and the runs under way, kept by the one thread that publishes events,
+/// and where the dids go. With the switch off `out` is none and nothing is
+/// kept. A publish is never waited on.
+#[derive(Default)]
+struct Told {
+    out: Option<Publisher>,
+    teller: lamp_skills::did::Teller,
+}
+
+thread_local! {
+    static DID: RefCell<Told> = RefCell::new(Told::default());
+}
+
+/// Publish `dids`, journalling a failure only.
+fn did_told(told: &mut Told, dids: Vec<LampDid>) {
+    let Some(out) = told.out.as_mut() else {
+        return;
+    };
+    for did in dids {
+        if let Err(error) = out.publish_json(lamp_ipc::monotonic_us(), &did) {
+            eprintln!("lamp-skills: lamp/did not published: {error}");
+        }
+    }
+}
+
+/// Publish `run`'s events and take them, keeping first what held its trigger
+/// on the run itself (the reason its did carries): it then travels with the
+/// run, queued or asked of the Policy, and queued runs never swap reasons.
+fn publish_events(run: &mut lamp_skills::Run, out: &mut Publisher) {
+    if run.held.is_none() {
+        run.held = run
+            .events
+            .iter()
+            .find(|event| event.stage == SkillStage::Triggered)
+            .map(|event| event.why.clone());
+    }
+    for event in std::mem::take(&mut run.events) {
+        publish(out, event);
+    }
+}
+
+/// A run of `skill` with `calls` is refused now.
+fn did_refused(skill: &str, made: bool, calls: &[Call], held: Option<&str>) {
+    DID.with(|did| {
+        let mut did = did.borrow_mut();
+        if did.out.is_none() {
+            return;
+        }
+        let at = lamp_ipc::monotonic_us();
+        let told = did.teller.refused(skill, made, calls, held, at);
+        did_told(&mut did, told);
+    });
+}
+
+/// A run of `skill` with `calls` is under way.
+fn did_begun(skill: &str, made: bool, calls: &[Call], held: Option<&str>) {
+    DID.with(|did| {
+        let mut did = did.borrow_mut();
+        if did.out.is_some() {
+            did.teller.begin(skill, made, calls, held);
+        }
+    });
+}
+
+/// `skill`'s run ended with `last` as the engine's words on it.
+fn did_ended(skill: &str, last: &str) {
+    DID.with(|did| {
+        let mut did = did.borrow_mut();
+        if did.out.is_none() {
+            return;
+        }
+        let at = lamp_ipc::monotonic_us();
+        let told = did.teller.ended(skill, last, at);
+        did_told(&mut did, told);
+    });
+}
+
+/// A run's own end, from its thread: where how it went is known, so told
+/// (#7757) before the event is published. A refusal never comes this way:
+/// it is published where it is made and tells nothing of the run under way.
+fn publish_finished(out: &mut Publisher, event: SkillEvent) {
+    if event.stage == SkillStage::Done {
+        did_ended(&event.skill, &event.why);
+    }
+    publish(out, event);
 }
 
 fn publish(out: &mut Publisher, mut event: SkillEvent) {
@@ -1245,6 +1333,15 @@ fn serve(
     // One run a skill at a time: what is under way, by skill, and the runs
     // of a list's items waiting their turn.
     let mut runs = Runs::default();
+    // `LAMP_DID_PUBLISH=on` (#7757): every run that does something outward is
+    // told on lamp/did with the facts it fired on; off, nothing is declared.
+    if lamp_skills::did::on() {
+        let out = bus
+            .publisher_declared(LampDid::TOPIC, &LampDid::declaration(), "skills")
+            .inspect_err(|error| eprintln!("lamp-skills: lamp/did not declared: {error}"))
+            .ok();
+        DID.with(|did| did.borrow_mut().out = out);
+    }
     let mut subscribers: Vec<Subscriber> = Vec::new();
     let mut seen = None;
     let mut looked: Option<Instant> = None;
@@ -1295,7 +1392,7 @@ fn serve(
             let skill = event.skill.clone();
             let unwritten = lamp_skills::service_write::waiting(&event.why);
             let ended_unsaid = lamp_skills::ended_unsaid(&event.why);
-            publish(&mut out, event);
+            publish_finished(&mut out, event);
             // A write waiting for the owner's yes made nothing: what its
             // start spent is given back (#6066, lamp-9adf 12 Nov).
             if unwritten && engine.unwritten(&skill) {
@@ -1804,9 +1901,7 @@ fn dispatch(
     asking: &mut Asking,
 ) {
     for mut run in made {
-        for event in std::mem::take(&mut run.events) {
-            publish(out, event);
-        }
+        publish_events(&mut run, out);
         if let (Some(mut question), Some((asks, _))) = (run.ask.take(), &mut asking.gate) {
             // A hello is asked for whom it is, as the memory knows them, so
             // that the Policy holds one an hour to each person (the first
@@ -1840,9 +1935,7 @@ fn dispatch(
 /// A run the engine made: its events published, and its calls started (or,
 /// an item's, queued), or its held run told that its trigger ended.
 fn handle(mut run: Run, runs: &mut Runs, out: &mut Publisher, runner: &Runner) {
-    for event in std::mem::take(&mut run.events) {
-        publish(out, event);
-    }
+    publish_events(&mut run, out);
     if run.calls == [Call::Ends] {
         // Its run, waiting, gives back what it held. Dropping the sender
         // ends the wait as well.
@@ -1890,7 +1983,7 @@ impl Runs {
             match engine.still(&run, clock::now_us()) {
                 Some(calls) if !calls.is_empty() => {
                     let skill = run.skill.clone();
-                    let begun = start(run.skill, calls, &mut self.busy, out, runner);
+                    let begun = start(run.skill, calls, run.held, &mut self.busy, out, runner);
                     self.begun.insert(skill, begun);
                     return;
                 }
@@ -1924,7 +2017,7 @@ fn start_or_queue(
         // say began is kept for when it is done ([`Runs::unsaid`]).
         let starts = !runs.busy.contains(&run.skill);
         let skill = run.skill.clone();
-        let begun = start(run.skill, calls, &mut runs.busy, out, runner);
+        let begun = start(run.skill, calls, run.held, &mut runs.busy, out, runner);
         if starts {
             runs.begun.insert(skill, begun);
         }
@@ -1934,6 +2027,12 @@ fn start_or_queue(
     if waiting.len() < MOST_WAITING {
         waiting.push_back(run);
     } else {
+        did_refused(
+            &run.skill,
+            runner.made.borrow().contains(&run.skill),
+            &calls,
+            run.held.as_deref(),
+        );
         publish(
             out,
             SkillEvent {
@@ -2656,12 +2755,15 @@ fn unix_ms() -> u64 {
 fn start(
     skill: String,
     calls: Vec<Call>,
+    held: Option<String>,
     busy: &mut HashSet<String>,
     out: &mut Publisher,
     runner: &Runner,
 ) -> mpsc::Receiver<()> {
     let (made, made_rx) = mpsc::channel();
+    let made_here = runner.made.borrow().contains(&skill);
     if !busy.insert(skill.clone()) {
+        did_refused(&skill, made_here, &calls, held.as_deref());
         publish(
             out,
             SkillEvent {
@@ -2676,6 +2778,7 @@ fn start(
     // A run that is only tasks the lamp would not hand over now makes
     // nothing, and says so, rather than "goes on on its own".
     if let Some(why) = tasks_refused(&skill, &calls, &runner.tasks.borrow()) {
+        did_refused(&skill, made_here, &calls, held.as_deref());
         let _ = runner.finished.send(SkillEvent {
             skill,
             stage: SkillStage::Done,
@@ -2684,6 +2787,7 @@ fn start(
         });
         return made_rx;
     }
+    did_begun(&skill, made_here, &calls, held.as_deref());
     // Counted once it is under way, for the opt-in health report's skill
     // runs (`lamp_skills::usage`): one atomic add, nothing waited on.
     if let Some(runs) = runner.runs.borrow().get(&skill) {
@@ -3208,7 +3312,7 @@ fn run_now_call(
     for event in run.events {
         publish(out, event);
     }
-    let _ = start(run.skill, run.calls, &mut runs.busy, out, runner);
+    let _ = start(run.skill, run.calls, run.held, &mut runs.busy, out, runner);
 }
 
 /// The model called a skill's tool: its steps run, and the voice is told
@@ -3543,7 +3647,7 @@ fn tool_call(
         if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
             end_hold(&run.skill);
         }
-        let made = start(run.skill, made, busy, out, runner);
+        let made = start(run.skill, made, None, busy, out, runner);
         if looks {
             // Bounded: the caller waits at most `TOOL_TIMEOUT` once more.
             let _ = clock::recv_timeout(&made, MADE_BEFORE_ANSWER);
@@ -8552,6 +8656,7 @@ mod tests {
                         Call::Cue,
                         light("warm"),
                     ],
+                    None,
                     &mut HashSet::new(),
                     &mut out,
                     &runner,
@@ -8714,6 +8819,7 @@ mod tests {
         let told = start(
             "study".into(),
             vec![task()],
+            None,
             &mut HashSet::new(),
             &mut out,
             &runner,
@@ -8781,5 +8887,146 @@ mod tests {
         assert!(dance.may.permissions.body);
         let other = runner.sockets_for("other");
         assert_eq!(other.may.permissions, Permissions::default());
+    }
+    /// #7757, Heron's P1: a run told on `lamp/did` through the program's own
+    /// path (`dispatch`, which publishes and takes the run's events first)
+    /// carries the reason its trigger held on, not the person's asking.
+    #[test]
+    fn a_run_told_on_lamp_did_through_dispatch_keeps_what_its_trigger_held_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, done) = waking(&Arc::new(waker));
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let runner = Runner {
+            sockets: nowhere(dir.path(), Permissions::default()),
+            finished,
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            unplug: RefCell::default(),
+            made: RefCell::default(),
+            lively: RefCell::default(),
+            energy: Cell::new(1),
+            tasks: RefCell::default(),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            runs: RefCell::default(),
+            permissions: RefCell::default(),
+            looks: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+            proposals: None,
+        };
+        let mut out = bus
+            .publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")
+            .unwrap();
+        let mut runs = Runs::default();
+        DID.with(|did| {
+            did.borrow_mut().out = Some(
+                bus.publisher_declared(LampDid::TOPIC, &LampDid::declaration(), "skills")
+                    .unwrap(),
+            );
+        });
+        // A run is told when it ends: wait for its Done and publish it as
+        // the program's loop does.
+        let ended = |out: &mut Publisher| loop {
+            let event = done.recv_timeout(Duration::from_secs(5)).unwrap();
+            let last = event.stage == SkillStage::Done;
+            publish_finished(out, event);
+            if last {
+                break;
+            }
+        };
+        let mut heard = bus.subscribe(LampDid::TOPIC, "test").unwrap();
+        let fired = |why: &str| {
+            lamp_skills::Run::made(
+                "sip-of-water",
+                vec![SkillEvent {
+                    skill: "sip-of-water".into(),
+                    stage: SkillStage::Triggered,
+                    why: why.into(),
+                    allowed: None,
+                }],
+                vec![Call::Say("Time for a sip.".into())],
+            )
+        };
+        let mut asking = Asking {
+            gate: None,
+            waiting: HashMap::new(),
+            last: 0,
+        };
+        dispatch(
+            vec![fired("room/activity has held for 2820 s")],
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        // A second run of the skill while the first is under way is refused
+        // at once, told Refused with its own reason, and says nothing of the
+        // run under way (no word a person said in it either).
+        dispatch(
+            vec![fired("voice/heard has held for 3 s: call me Walter")],
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        let refused = heard
+            .recv(Duration::from_secs(2))
+            .unwrap()
+            .expect("the refusal is told")
+            .parse::<LampDid>()
+            .unwrap();
+        assert_eq!(refused.outcome, lamp_msgs::DidOutcome::Refused);
+        assert_eq!(refused.why, "its trigger held");
+        assert!(!refused.why.contains("Walter"));
+        // The run under way is told when it ends, with its own reason.
+        ended(&mut out);
+        let did = heard
+            .recv(Duration::from_secs(2))
+            .unwrap()
+            .expect("a did is told")
+            .parse::<LampDid>()
+            .unwrap();
+        assert_eq!(did.why, "room/activity has held for 2820 s");
+        assert_eq!(did.who, "lamp-skills:sip-of-water");
+        assert_eq!(did.what, lamp_msgs::DidWhat::Spoke);
+        // Its say was refused (the skill has no `speak`): never told as spoken.
+        assert_eq!(did.outcome, lamp_msgs::DidOutcome::Refused);
+        // Two item runs waiting for it each keep their own reason.
+        let mut first = fired("room/activity has held for 10 s");
+        first.queue = true;
+        let mut second = fired("room/activity has held for 20 s");
+        second.queue = true;
+        dispatch(
+            vec![first, second],
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        let waiting = &runs.queued["sip-of-water"];
+        assert_eq!(waiting.len(), 2);
+        assert_eq!(
+            waiting[0].held.as_deref(),
+            Some("room/activity has held for 10 s")
+        );
+        assert_eq!(
+            waiting[1].held.as_deref(),
+            Some("room/activity has held for 20 s")
+        );
+        let did = refused;
+        assert_eq!(did.why, "its trigger held");
+        assert!(!did.why.contains("Walter"));
     }
 }

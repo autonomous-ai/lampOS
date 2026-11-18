@@ -1252,6 +1252,10 @@ fn worker_command(
             role,
             var(crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT).as_deref(),
         ))
+        .envs(did_keep_worker_environment(
+            role,
+            var(crate::did_history::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -1452,6 +1456,10 @@ fn worker_command(
         .envs(made_notes_worker_environment(
             role,
             var(crate::made_skill::NOTES_ENVIRONMENT).as_deref(),
+        ))
+        .envs(make_no_asks_worker_environment(
+            role,
+            var(crate::make_no_asks::ENVIRONMENT).as_deref(),
         ))
         .envs(onboarding_worker_environment(
             role,
@@ -1693,6 +1701,17 @@ fn made_unrelated_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::UNRELATED_ENVIRONMENT, "on"))
+}
+
+// Nothing asked in a make or a remove (`LAMP_MAKE_NO_ASKS`,
+// `make_no_asks::on`), passed the same narrow way: the exact `on`, to the
+// two routes whose `make_skill` makes, removes and undoes.
+fn make_no_asks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::make_no_asks::ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -2254,6 +2273,17 @@ fn named_agent_takes_line_worker_environment(
         .then_some((crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT, "on"))
 }
 
+// The last hour of what the lamp did, and why, kept in memory
+// (`did_history::ENVIRONMENT`, #7757): the exact `on`, to the second route,
+// whose look-up reads it.
+fn did_keep_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::did_history::ENVIRONMENT, "on"))
+}
+
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
 // #6835), passed the same narrow way: the exact `on`, to the second route,
 // whose chat can be made to call a function.
@@ -2470,6 +2500,8 @@ fn second_route_worker_environment(
         crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
+        // The weather's second lookup of a name that won't open (#7593).
+        crate::second_provider::net::DOH_ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
         // A line cut at a thinking pause keeps its answer back (#4449).
         crate::pause_join::ENVIRONMENT,
@@ -2517,6 +2549,8 @@ fn second_route_worker_environment(
         crate::made_not_on::ENVIRONMENT,
         // And a light act told as under way (#7285).
         crate::action_claim::DOING_ENVIRONMENT,
+        // And a made skill said removed, off or on (#7683).
+        crate::action_claim::SKILL_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2863,6 +2897,7 @@ mod tests {
             crate::action_claim::WORDED_ENVIRONMENT,
             crate::made_not_on::ENVIRONMENT,
             crate::action_claim::DOING_ENVIRONMENT,
+            crate::action_claim::SKILL_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -3103,6 +3138,10 @@ mod tests {
             ),
             (
                 crate::made_skill::NOTES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::make_no_asks::ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {
@@ -3532,6 +3571,13 @@ mod tests {
                         "LAMP_NAMED_AGENT_TAKES_LINE",
                         ["second"].as_slice(),
                     ),
+                    // The last hour of what the lamp did, kept: the second
+                    // route alone (#7757).
+                    (
+                        did_keep_worker_environment,
+                        "LAMP_DID_KEEP",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3846,6 +3892,7 @@ mod tests {
                     crate::skill_named::ENVIRONMENT,
                     crate::told_when_asked::ENVIRONMENT,
                     crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
+                    crate::did_history::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -3929,6 +3976,7 @@ mod tests {
                 } else if name == crate::local_time::PLACE_ENVIRONMENT {
                     "Hanoi, Vietnam"
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
+                    || name == crate::second_provider::net::DOH_ENVIRONMENT
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
@@ -3958,6 +4006,7 @@ mod tests {
                     || name == crate::action_claim::WORDED_ENVIRONMENT
                     || name == crate::made_not_on::ENVIRONMENT
                     || name == crate::action_claim::DOING_ENVIRONMENT
+                    || name == crate::action_claim::SKILL_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -4156,6 +4205,7 @@ mod tests {
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_CUT_IN_WORDLESS_RESUMES=on",
                     "LAMP_DECLINE_SILENT=on",
+                    "LAMP_DID_KEEP=on",
                     "LAMP_ENDPOINT_PAUSE_JOIN=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
@@ -4312,6 +4362,7 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_CLAIM_CHECKED=on",
                     "LAMP_SKILL_KEYTERM=on",
                     "LAMP_SKILL_NAMED=on",
                     "LAMP_SKILL_RECURRING_TOLD=on",
@@ -4329,6 +4380,7 @@ mod tests {
                     "LAMP_UNTIED_GOING_ON=on",
                     "LAMP_VOICE_DAY_TALLY=on",
                     "LAMP_VOICE_LOOPBACK_SERVICES=on",
+                    "LAMP_WEATHER_DOH=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
             ),
