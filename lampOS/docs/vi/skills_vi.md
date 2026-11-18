@@ -3899,7 +3899,15 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    kèm lý do nêu tên cả hai kỹ năng (câu trả lời 2 của first builder trên
    #7249): "the words “take a photo” would start both test note and another
    skill, photo booth, so neither would start; say other words for test
-   note". Chính kỹ năng đó tạo lại thì không tính là kỹ năng khác.
+   note". Chính kỹ năng đó tạo lại thì không tính là kỹ năng khác. Lý do
+   này được nói nguyên văn cho người dùng (`made_skill::words_taken` trong
+   `plain_reason`; sửa 3 của DEFAULT-ON #7828: trên lamp-9adf người dùng
+   nghe "I couldn't make that one. Try asking for one thing…"): "I couldn't
+   make that: the words “take a photo” would start both test note and
+   another skill, photo booth, so neither would start; say other words for
+   test note.", dù công tắc `LAMP_MAKE_NO_ASKS` bật hay tắt. Khi bật, một
+   cụm trùng với kỹ năng chính người dùng tạo thì thay thế nó (xem "Không
+   hỏi gì").
 4. **Nói lại kèm các từ** (`made_skill::plainly`): "When you say “send my
    test note”, it mails me@example.com ... It starts only when you say it,
    never on its own. It waits for you to agree before it sends anything."
@@ -4053,6 +4061,22 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   on. Say 'remove it' to undo." Lần tạo có code riêng, và lần tạo của
   agent, không bao giờ thay thế: chúng được bật bên cạnh. Không chờ lựa
   chọn nào.
+- **Cụm từ trùng với kỹ năng của chính họ thì thay thế nó, khi chủ đèn yêu
+  cầu** (DEFAULT-ON của #7828, sửa 3: trên lamp-9adf "the words “flip a
+  coin” would start both coin flip and another skill, flip a coin, so
+  neither would start" đã từ chối lần tạo). Lúc tạo
+  (`made_skill::asks_taken_sparing`), một lần tạo thường bằng giọng nói
+  (không code, không ghi, không tác vụ agent) mà cụm từ sẽ khởi động các
+  kỹ năng tự tạo của chính người dùng đang bật (`made_skill::own_on`: trong
+  chỉ mục kỹ năng tự tạo, đang bật, không bao giờ là kỹ năng thêm từ tệp)
+  thì được giữ; bất kỳ kỹ năng nào khác mà cụm từ sẽ khởi động (của đèn,
+  thêm từ tệp, đẩy lên, kỹ năng tự tạo còn giữ mà chưa bật) vẫn từ chối
+  như trước. Sau đó (`make_skill_local::made_no_asks`,
+  `made_skill::own_asks_taken`), khi chính chủ đèn yêu cầu, các kỹ năng đó
+  được thay thế cùng với trùng trigger nếu có, như trên: "Made coin flip
+  and replaced your old flip a coin. Say 'keep the old one' to undo." Lần
+  tạo của người khác bị từ chối với cùng lý do và không giữ lại gì
+  (`made_skill::forget_unput`).
 - **Xóa ngay.** `remove` của `make_skill`, tên được so với các kỹ năng chính
   người dùng tạo như trước (`made_remove::found`), xóa kỹ năng khi chủ đèn
   yêu cầu (`services::owners_yes_now`) mà không hỏi: trình quản lý gỡ nó

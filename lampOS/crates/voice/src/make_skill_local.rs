@@ -1409,10 +1409,28 @@ fn made_no_asks(
     if !crate::make_no_asks::on() || !crate::make_no_asks::keeps_no_yes(made) {
         return None;
     }
-    if made_in != 0 && !made.uses.code && !made.uses.agent_task {
+    let replaces = made_in != 0 && !made.uses.code && !made.uses.agent_task;
+    // Its words would start skills the person made, kept for this
+    // (`made_skill::asks_taken_sparing`, #7828's fix 3): replaced below on
+    // the owner's ask, as a trigger clash is; anyone else's make, or one
+    // that can't replace, is refused with why, as before.
+    let words = match made_skill::own_asks_taken(keeping, made) {
+        Ok(words) => words,
+        Err(why) => return Some(words_refused(keeping, made, &why)),
+    };
+    let owner = (!words.is_empty()).then(|| replaces && owners_make(made_in));
+    if let (Some(false), Some((_, why))) = (owner, words.first()) {
+        return Some(words_refused(keeping, made, why));
+    }
+    if replaces {
         let clashes = crate::made_clash::found(keeping, made);
-        if !clashes.is_empty() {
-            let others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
+        let mut others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
+        for (skill, _) in words {
+            if !others.contains(&skill) {
+                others.push(skill);
+            }
+        }
+        if !others.is_empty() {
             // Only skills on are replaced, and only on the owner's ask
             // (Twelve's P1 on #7783); anyone else's goes on beside them.
             let (told, line) = crate::make_no_asks::clashed(
@@ -1420,7 +1438,7 @@ fn made_no_asks(
                 made,
                 &others,
                 crate::make_no_asks::turned_off_here().as_ref(),
-                || owners_make(made_in),
+                || owner.unwrap_or_else(|| owners_make(made_in)),
             );
             // No clash waits here: put on, or not, as it is told.
             let outcome = Outcome::of(told["on"].as_bool() == Some(true));
@@ -1433,6 +1451,23 @@ fn made_no_asks(
     let outcome = Outcome::of(on.is_ok());
     MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
     Some(told)
+}
+
+/// The made skill `made`, kept and not on, whose words would start skills
+/// the person made, not replaced (anyone else's make, or one that can't
+/// replace): refused as at the make, nothing of it kept, the reason `why`
+/// said as it is ([`made_skill::not_made_line`]). What the model is told,
+/// its line kept for a cut turn.
+fn words_refused(keeping: &Keeping, made: &Made, why: &str) -> Value {
+    made_skill::forget_unput(&keeping.directory, &made.sha256);
+    crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
+    eprintln!(
+        "lamp-voice: a made skill was not made: its words start a skill the person made, not replaced (LAMP_MAKE_NO_ASKS)"
+    );
+    let refused: Result<Made, Refused> = Err(Refused::new(why));
+    let line = said_line(&refused, &Ok(()), None);
+    MADE_LINE.with(|kept| kept.replace(Some((line, Outcome::Failed))));
+    told(refused, Ok(()), None)
 }
 
 /// Whether the line that asked for this thread's make is the owner's,
