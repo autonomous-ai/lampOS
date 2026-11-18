@@ -6571,16 +6571,23 @@ the same code for both writers.
   line heard; the read-back bounds this, because the owner agrees to
   exactly the words said back. Its
   grants are checked against the ones there are (`make_no_cannot::covered`):
-  `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); `net` with
+  `body`, `light`, `speak`, `air`, `device` or `notes`
+  (`make_no_cannot::FALLBACK_GRANTS`; none of them watches or listens, the
+  owner's "if a skill needs a grant, give it", 19 Nov); `net` with
   `LAMP_TASK_NET=on`, asked for or on a trigger (the owner's ruling of 17
   Nov), and only beside the lamp's own `scripts/agent.py`
   (`made_skill::code_held`, `put_on_scripts`), or beside a made skill's own
-  code with `LAMP_TASK_NET_GATEWAY=on` too (#7742, above); the camera only
-  for a task asked for by its phrase, run right then, as a regular made
-  skill may have it (`ASKED_CAMERA`; the first builder's ruling on #7261),
-  never on a trigger (`WATCHING_GRANTS`: the camera and `look`); never the
-  microphone, `hear`, `speech` or `sound` (`LISTENING_GRANTS`, sim-2 on
-  #7261); or with `LAMP_AGENT_SERVICES=on`
+  code with `LAMP_TASK_NET_GATEWAY=on` too (#7742, above); the camera and `look`
+  (`WATCHING_GRANTS`) and the microphone, `hear`, `speech` and `sound`
+  (`LISTENING_GRANTS`) only for a task asked for by its phrase, run right
+  then and bounded to that run, as a regular made skill may have the
+  camera (`ASKED_CAMERA`; the first builder's rulings on #7261 and of 19
+  Nov 00:24), never on a trigger (`Uncovered::Sensing`,
+  `Uncovered::Listening`; sim-2 on #7261); such a task is kept, and put on
+  by lamp-skills, with those and `body`, `air`, `device` and `notes`
+  beyond a file's agent grants (`upload_agent::ASKED_GRANTS`,
+  `capped_card`, its card marked `agent: asked`); or with
+  `LAMP_AGENT_SERVICES=on`
   a known service's `-read` or `-write`, linked or not: one not linked is
   made all the same, and the make's link note (`made_skill::needs_link`)
   asks for it to be linked; the run's own grant check holds it until then.
@@ -6660,9 +6667,11 @@ the same code for both writers.
       need the camera, and a skill that runs by itself can't watch or
       listen, to keep the room private. Ask me to make it for when you say
       a few words, and it can use the camera then."
-    - The microphone or another grant that listens, either way
+    - The microphone or another grant that listens on a trigger
       (`microphone`): "I can't make that one yet: it would need the
-      microphone, and a skill can't listen, to keep the room private."
+      microphone, and a skill that runs by itself can't listen, to keep the
+      room private. Ask me to make it for when you say a few words, and it
+      can listen then."
     - Nothing named, or a grant there isn't (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
     - A request longer than the words read back (`make_no_cannot::task_cut`)

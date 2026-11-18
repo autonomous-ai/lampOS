@@ -10592,7 +10592,7 @@ pub fn keep_agent_asked(
     if let Some(made) = kept(&keeping.directory, from) {
         return Ok(made);
     }
-    let (version, mut uses) = crate::upload_agent::capped(&files.toml)?;
+    let (version, mut uses) = crate::upload_agent::capped_asked(&files.toml)?;
     uses.agent_task = true;
     let grants = crate::upload_agent::grants_of_toml(&files.toml);
     let does = format!(

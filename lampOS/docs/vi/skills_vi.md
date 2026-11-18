@@ -3187,13 +3187,19 @@ cả hai người viết.
   `-read` hay `-write` của một dịch vụ đã biết, đã liên kết hay chưa: dịch vụ
   chưa liên kết vẫn được tạo, và ghi chú liên kết của lần tạo
   (`made_skill::needs_link`) nhắc liên kết nó; phép kiểm tra quyền của lần
-  chạy giữ nó cho tới lúc đó. Quyền của đèn là `light` hoặc `speak`
-  (`make_no_cannot::FALLBACK_GRANTS`); camera chỉ cho việc được gọi bằng câu
-  nói, chạy ngay lúc đó, như kỹ năng được tạo thông thường (`ASKED_CAMERA`;
-  phán quyết của first builder trên #7261), không bao giờ theo trigger
-  (`WATCHING_GRANTS`: camera và `look`); không bao giờ là micro, `hear`,
-  `speech` hay `sound` (`LISTENING_GRANTS`, sim-2 trên #7261); model chỉ
-  được đề nghị các quyền đó.
+  chạy giữ nó cho tới lúc đó. Quyền của đèn là `body`, `light`, `speak`,
+  `air`, `device` hoặc `notes` (`make_no_cannot::FALLBACK_GRANTS`; không
+  quyền nào trong đó nhìn hay nghe, câu "if a skill needs a grant, give it"
+  của chủ sở hữu, 19/11); camera và `look` (`WATCHING_GRANTS`) cùng micro,
+  `hear`, `speech` và `sound` (`LISTENING_GRANTS`) chỉ cho việc được gọi
+  bằng câu nói, chạy ngay lúc đó và giới hạn trong lần chạy đó, như kỹ năng
+  được tạo thông thường có camera (`ASKED_CAMERA`; phán quyết của first
+  builder trên #7261 và lúc 00:24 ngày 19/11), không bao giờ theo trigger
+  (`Uncovered::Sensing`, `Uncovered::Listening`; sim-2 trên #7261); việc
+  như vậy được giữ, và được lamp-skills bật, với các quyền đó cùng `body`,
+  `air`, `device` và `notes` ngoài quyền agent của một tệp
+  (`upload_agent::ASKED_GRANTS`, `capped_card`, thẻ của nó ghi `agent:
+  asked`); model chỉ được đề nghị các quyền đó.
   - **Các câu từ chối của chính brief vẫn là từ chối** (P2 của sim-2 trên
     #7261, quy tắc của #6439; chủ sở hữu: "if something can't be done, say
     exactly why"), trừ câu về gửi (`made_skill::briefs_send_refusal`), mà
@@ -3282,9 +3288,10 @@ cả hai người viết.
       the camera, and a skill that runs by itself can't watch or listen, to
       keep the room private. Ask me to make it for when you say a few words,
       and it can use the camera then."
-    - Micro hay một quyền khác nghe, dạng nào cũng vậy (`microphone`): "I
-      can't make that one yet: it would need the microphone, and a skill
-      can't listen, to keep the room private."
+    - Micro hay một quyền khác nghe theo trigger (`microphone`): "I can't
+      make that one yet: it would need the microphone, and a skill that runs
+      by itself can't listen, to keep the room private. Ask me to make it for
+      when you say a few words, and it can listen then."
     - Không nêu gì, hoặc một quyền không có (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
     - Một yêu cầu dài hơn phần đọc lại (`make_no_cannot::task_cut`) mà dòng

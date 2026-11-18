@@ -209,9 +209,12 @@ pub const ASKED_MARK: &str = "agent: asked";
 pub const FROM: &str = "what you asked the lamp for";
 
 /// The lamp's grants a task for the lamp's agent made here may hold, on a
-/// trigger or only asked for; the camera ([`ASKED_CAMERA`]) only asked for,
-/// and the internet and a service's beside them in [`covered`].
-pub const FALLBACK_GRANTS: [&str; 2] = ["light", "speak"];
+/// trigger or only asked for: none of them watches or listens, and
+/// lamp-control's task grants (`skill_task_yes::GRANTS`) carry each (the
+/// owner, 19 Nov: "if a skill needs a grant, give it"). Those that watch
+/// ([`WATCHING_GRANTS`]) or listen ([`LISTENING_GRANTS`]) only asked for,
+/// and the internet and a service's beside them, in [`covered`].
+pub const FALLBACK_GRANTS: [&str; 6] = ["body", "light", "speak", "air", "device", "notes"];
 
 /// The camera, which a task only asked for may have, run right when the
 /// person says its phrase, as a regular made skill may (the first
@@ -219,13 +222,17 @@ pub const FALLBACK_GRANTS: [&str; 2] = ["light", "speak"];
 pub const ASKED_CAMERA: &str = "camera";
 
 /// The lamp's grants that watch ([`made_skill::GRANTS`]): never given to a
-/// task that runs by itself, on a trigger ([`Uncovered::Sensing`]); of
-/// them, only [`ASKED_CAMERA`] to one only asked for.
+/// task that runs by itself, on a trigger ([`Uncovered::Sensing`]); each
+/// to one only asked for, run right when the person says its phrase
+/// ([`ASKED_CAMERA`], and `look` since the owner's "if a skill needs a
+/// grant, give it", 19 Nov).
 pub const WATCHING_GRANTS: [&str; 2] = ["camera", "look"];
 
 /// The lamp's grants that listen ([`made_skill::GRANTS`]): never given to
-/// a task for the lamp's agent made here ([`Uncovered::Listening`]; sim-2
-/// on #7261, the brief's privacy rules).
+/// a task that runs by itself, on a trigger ([`Uncovered::Listening`];
+/// sim-2 on #7261, the brief's privacy rules); each to one only asked
+/// for, bounded to the run its phrase starts (the first builder's ruling,
+/// 19 Nov 00:24).
 pub const LISTENING_GRANTS: [&str; 4] = ["microphone", "hear", "speech", "sound"];
 
 /// The name a task skill takes when the model gave none it may have.
@@ -253,7 +260,8 @@ pub enum Uncovered {
     /// The camera or another grant that watches ([`WATCHING_GRANTS`]), for
     /// a task that runs by itself, on a trigger.
     Sensing,
-    /// The microphone or another grant that listens ([`LISTENING_GRANTS`]).
+    /// The microphone or another grant that listens ([`LISTENING_GRANTS`]),
+    /// for a task that runs by itself, on a trigger.
     Listening,
     /// Anything else no grant gives.
     Other,
@@ -320,8 +328,9 @@ impl Uncovered {
                  say a few words, and it can use the camera then."
             ),
             Self::Listening => format!(
-                "{CANT_MAKE_YET} it would need the microphone, and a skill can't listen, to keep \
-                 the room private."
+                "{CANT_MAKE_YET} it would need the microphone, and a skill that runs by itself \
+                 can't listen, to keep the room private. Ask me to make it for when you say a \
+                 few words, and it can listen then."
             ),
             Self::Other => {
                 format!(
@@ -372,6 +381,10 @@ pub fn said_as_is(why: &str) -> bool {
         || KEPT_REFUSALS.iter().any(|(_, _, line)| why == *line)
 }
 
+/// How a grant that watches or listens is told to the model ([`grants_told`]).
+const ONLY_ASKED_TOLD: &str =
+    "only for a skill that runs when the person asks for it, never on a trigger";
+
 /// The grants the model may name, each in plain words, for [`system`].
 fn grants_told() -> String {
     let mut told: Vec<String> = made_skill::GRANTS
@@ -379,10 +392,13 @@ fn grants_told() -> String {
         .filter(|(name, _)| FALLBACK_GRANTS.contains(name))
         .map(|(name, words)| format!("{name} ({words})"))
         .collect();
-    told.push(format!(
-        "{ASKED_CAMERA} (the camera, only for a skill that runs when the person asks for it, never \
-         on a trigger)"
-    ));
+    // What watches or listens: only for a skill only asked for.
+    told.extend(
+        made_skill::GRANTS
+            .iter()
+            .filter(|(name, _)| WATCHING_GRANTS.contains(name) || LISTENING_GRANTS.contains(name))
+            .map(|(name, words)| format!("{name} ({words}, {ONLY_ASKED_TOLD})")),
+    );
     told.push(format!(
         "{} (the internet: anything looked up or fetched, like the weather, the news, a web page \
          or a price)",
@@ -745,10 +761,10 @@ pub fn block_kept(block: &str) -> Result<String, String> {
 }
 
 /// The grants `asked` checked against the ones there are, once each in the
-/// order named: one of [`FALLBACK_GRANTS`]; never one that listens
-/// ([`LISTENING_GRANTS`], [`Uncovered::Listening`]), nor, on a trigger, one
-/// that watches ([`WATCHING_GRANTS`], [`Uncovered::Sensing`]); for a task
-/// `only_asked`, [`ASKED_CAMERA`]; the internet with `LAMP_TASK_NET` on,
+/// order named: one of [`FALLBACK_GRANTS`]; on a trigger, never one that
+/// listens ([`LISTENING_GRANTS`], [`Uncovered::Listening`]) or watches
+/// ([`WATCHING_GRANTS`], [`Uncovered::Sensing`]); for a task `only_asked`,
+/// each of those; the internet with `LAMP_TASK_NET` on,
 /// whenever it runs; or with
 /// `LAMP_AGENT_SERVICES` on a known service's, linked or not:
 /// one not linked is made all the same, and the make's link note
@@ -776,15 +792,22 @@ pub fn covered(asked: &[String], only_asked: bool) -> Result<Vec<String>, Uncove
             grants.push(grant);
             continue;
         }
+        // What listens or watches: only for a task only asked for, run
+        // right when the person says its phrase (the first builder's
+        // ruling, 19 Nov 00:24); never on a trigger.
         if LISTENING_GRANTS.contains(&grant.as_str()) {
-            return Err(Uncovered::Listening);
-        }
-        if only_asked && grant == ASKED_CAMERA {
+            if !only_asked {
+                return Err(Uncovered::Listening);
+            }
             grants.push(grant);
             continue;
         }
-        if !only_asked && WATCHING_GRANTS.contains(&grant.as_str()) {
-            return Err(Uncovered::Sensing);
+        if WATCHING_GRANTS.contains(&grant.as_str()) {
+            if !only_asked {
+                return Err(Uncovered::Sensing);
+            }
+            grants.push(grant);
+            continue;
         }
         if made_skill::service_grant(&grant).is_some() {
             if !made_skill::agent_services_here() {
@@ -1624,17 +1647,20 @@ mod tests {
             covered_t(&grants(&["speak", "light", "speak"])),
             Ok(grants(&["speak", "light"]))
         );
-        // sim-2 on #7261 and the first builder's ruling: never a grant that
-        // listens; on a trigger, never one that watches; only asked for, the
-        // camera.
+        // sim-2 on #7261 and the first builder's rulings (19 Nov 00:24): on
+        // a trigger, never a grant that listens or watches; only asked for,
+        // each of them, bounded to the run its phrase starts.
         for listening in LISTENING_GRANTS {
-            for only_asked in [false, true] {
-                assert_eq!(
-                    covered(&grants(&["speak", listening]), only_asked),
-                    Err(Uncovered::Listening),
-                    "{listening}"
-                );
-            }
+            assert_eq!(
+                covered(&grants(&["speak", listening]), false),
+                Err(Uncovered::Listening),
+                "{listening}"
+            );
+            assert_eq!(
+                covered(&grants(&["speak", listening]), true),
+                Ok(grants(&["speak", listening])),
+                "{listening}"
+            );
         }
         for watching in WATCHING_GRANTS {
             assert_eq!(
@@ -1642,12 +1668,23 @@ mod tests {
                 Err(Uncovered::Sensing),
                 "{watching}"
             );
+            assert_eq!(
+                covered(&grants(&[watching, "speak"]), true),
+                Ok(grants(&[watching, "speak"])),
+                "{watching}"
+            );
         }
-        assert_eq!(
-            covered(&grants(&["camera", "speak"]), true),
-            Ok(grants(&["camera", "speak"]))
-        );
-        assert_eq!(covered(&grants(&["look"]), true), Err(Uncovered::Other));
+        // The owner, 19 Nov: "if a skill needs a grant, give it": none of
+        // these watches or listens, on a trigger or only asked for.
+        for grant in ["body", "air", "device", "notes"] {
+            for only_asked in [false, true] {
+                assert_eq!(
+                    covered(&grants(&["speak", grant]), only_asked),
+                    Ok(grants(&["speak", grant])),
+                    "{grant}"
+                );
+            }
+        }
         crate::skill_task_yes::set_net_here(Some(false));
         assert_eq!(
             covered_t(&grants(&["speak", "net"])),
@@ -1689,7 +1726,7 @@ mod tests {
             covered(&grants(&["light", "speak"]), true),
             Ok(grants(&["light", "speak"]))
         );
-        assert_eq!(covered(&grants(&["notes"]), true), Err(Uncovered::Other));
+        assert_eq!(covered(&grants(&["skills"]), true), Err(Uncovered::Other));
         crate::skill_task_yes::set_net_here(Some(true));
         assert_eq!(covered(&grants(&["net"]), true), Ok(grants(&["net"])));
         assert_eq!(
@@ -1931,8 +1968,9 @@ mod tests {
             ),
             (
                 Uncovered::Listening,
-                "I can't make that one yet: it would need the microphone, and a skill can't \
-                 listen, to keep the room private.",
+                "I can't make that one yet: it would need the microphone, and a skill that runs \
+                 by itself can't listen, to keep the room private. Ask me to make it for when \
+                 you say a few words, and it can listen then.",
             ),
             (
                 Uncovered::Other,
@@ -2290,10 +2328,13 @@ mod tests {
         for name in FALLBACK_GRANTS {
             assert!(system.contains(&format!("{name} (")), "{name}");
         }
-        // The camera only for a task asked for; never what listens.
+        // What watches or listens only for a task asked for, never on a
+        // trigger.
         assert!(system.contains("camera (the camera, only for a skill that runs when"));
-        for name in LISTENING_GRANTS {
-            assert!(!system.contains(&format!("{name} (")), "{name}");
+        for (name, words) in made_skill::GRANTS {
+            let only_asked = format!("{name} ({words}, {ONLY_ASKED_TOLD})");
+            let sensing = WATCHING_GRANTS.contains(&name) || LISTENING_GRANTS.contains(&name);
+            assert_eq!(system.contains(&only_asked), sensing, "{name}");
         }
         for part in [
             "net (the internet",

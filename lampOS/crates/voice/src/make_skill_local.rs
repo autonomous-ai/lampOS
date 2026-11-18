@@ -11057,16 +11057,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// sim-2 on #7261 and the first builder's ruling: the one more call
-    /// never gives a task for the lamp's agent the microphone or anything
-    /// that listens, nor, when it runs by itself on a trigger, the camera,
-    /// which it may have only asked for, run when the person says its
-    /// phrase. "Listen to the room and tell me what people say" stays the
-    /// brief's own refusal with its reason; a microphone from the model is
-    /// refused with its own, on a trigger or asked for; a camera on a
-    /// trigger is told to ask for it by a phrase; nothing is kept.
+    /// sim-2 on #7261 and the first builder's rulings (the last 19 Nov
+    /// 00:24): the one more call never gives a task for the lamp's agent
+    /// that runs by itself, on a trigger, the microphone or anything that
+    /// listens, nor the camera; one only asked for, run when the person
+    /// says its phrase, may have either. "Listen to the room and tell me
+    /// what people say" stays the brief's own refusal with its reason; a
+    /// microphone or a camera on a trigger is refused with its own, told to
+    /// ask for it by a phrase, and nothing is kept; a microphone only asked
+    /// for is made.
     #[test]
-    fn with_the_switch_a_task_never_listens_and_watches_only_when_asked() {
+    fn with_the_switch_a_task_listens_and_watches_only_when_asked() {
         no_cannot_here(Some(true));
         crate::upload_agent::set_on_here(Some(true));
         let (root, keeping) = keeping("no-cannot-sensing");
@@ -11087,10 +11088,6 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         use crate::make_no_cannot::Uncovered;
         for (answer, refused) in [
             (plant_answer("microphone, speak"), Uncovered::Listening),
-            (
-                "name: listen-room\ngrants: microphone, speak\nasks: listen to the room".to_owned(),
-                Uncovered::Listening,
-            ),
             (plant_answer("camera, speak"), Uncovered::Sensing),
         ] {
             let (url, served) = service(vec![
@@ -11109,6 +11106,39 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert_eq!(made, Err(Refused(refused.line(), None)), "{answer}");
         }
         assert!(made_skill::entries(&keeping.directory).is_empty());
+        // Only asked for, what listens or watches is made, and so is what
+        // neither does (the owner, 19 Nov: "if a skill needs a grant, give
+        // it"), each kept with its grant.
+        for (at, grant) in ["microphone", "look", "body", "notes"]
+            .into_iter()
+            .enumerate()
+        {
+            let (url, served) = service(vec![
+                (200, "cannot: a skill can't do that.".to_owned()),
+                (
+                    200,
+                    format!("name: room-{grant}\ngrants: {grant}, speak\nasks: room {grant}"),
+                ),
+            ]);
+            let (made, _) = made_and_journaled(
+                LISTEN,
+                None,
+                made_skill::brief(LISTEN).unwrap(),
+                &keeping,
+                chat_at(url),
+                &format!("local:1:{}", at + 2),
+            );
+            assert_eq!(served.join().unwrap(), 2, "{grant}");
+            let name = format!("room-{grant}");
+            assert_eq!(
+                made.map(|made| made.name).as_deref(),
+                Ok(name.as_str()),
+                "{grant}"
+            );
+            let entries = made_skill::entries(&keeping.directory);
+            let entry = entries.iter().find(|entry| entry["name"] == name).unwrap();
+            assert_eq!(entry["grants"], json!([grant, "speak"]), "{entry}");
+        }
         crate::upload_agent::set_on_here(None);
         no_cannot_here(None);
         let _ = std::fs::remove_dir_all(&root);
