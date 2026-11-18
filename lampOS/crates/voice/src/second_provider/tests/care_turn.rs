@@ -11,13 +11,27 @@ fn care_turn(
     heard: &str,
     reply: &str,
 ) -> (Vec<String>, bool) {
+    care_turn_with(care.map(Arc::new), heard, reply, None)
+}
+
+/// [`care_turn`] with the route's care shared, and the said-to-me rule
+/// `heed` when given.
+fn care_turn_with(
+    care: Option<Arc<crate::care_line::Care>>,
+    heard: &str,
+    reply: &str,
+    heed: Option<Heed>,
+) -> (Vec<String>, bool) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text(reply), Ok(ChatEvent::Done)]].into()),
         ..Script::default()
     });
     let (mut engine, _, _) = scripted(script.clone());
-    engine = engine.announcing(false).caring(care.map(Arc::new));
+    engine = engine.announcing(false).caring(care);
+    if let Some(heed) = heed {
+        engine = engine.heeding(heed);
+    }
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -83,4 +97,64 @@ fn an_ordinary_line_and_the_switch_off_go_on_as_before() {
     assert_eq!((said, told), (vec!["said:Sunny.".to_owned()], false));
     let (said, told) = care_turn(None, "honestly I want to kill myself", REPLY);
     assert_eq!((said, told), (vec![format!("said:{REPLY}")], false));
+}
+
+/// A care turn cut, stopped or taken over by a newer line never reached
+/// its end: its line is owed, and the next answer, whatever it is, is
+/// followed by it; once said, not again (the P1s on #7752).
+#[test]
+fn a_line_owed_by_a_cut_care_turn_follows_the_next_answer() {
+    let care = Arc::new(crate::care_line::Care::new(
+        crate::care_line::CareLines::shipped(),
+        Some("US".into()),
+        "en",
+    ));
+    // As `spoken` marks a care turn whose answer is then cut.
+    care.mark(Instant::now(), false);
+    let (said, told) = care_turn_with(Some(care.clone()), "sorry, go on", "I'm listening.", None);
+    let line = crate::care_line::CareLines::shipped()
+        .line(Some("US"), "en")
+        .to_owned();
+    assert!(!told, "an ordinary line is told nothing");
+    assert_eq!(
+        said,
+        ["said:I'm listening.".to_owned(), format!("said:{line}")]
+    );
+    let (said, _) = care_turn_with(Some(care), "thanks", "Of course.", None);
+    assert_eq!(said, ["said:Of course.".to_owned()], "said once");
+}
+
+/// A line of self-harm is never held by the said-to-me rule (the first
+/// builder's P2 on #7752): answered, and the line follows; an ordinary line
+/// the rule holds is still held.
+#[test]
+fn words_of_self_harm_are_never_held_by_the_said_to_me_rule() {
+    let holds: Heed = Arc::new(|_, _, _, _, _| Some("not said to the lamp"));
+    let (said, told) = care_turn_with(
+        care(Some("US")).map(Arc::new),
+        "honestly I want to kill myself",
+        REPLY,
+        Some(holds.clone()),
+    );
+    assert!(told);
+    assert_eq!(
+        said.first().map(String::as_str),
+        Some("said:I'm here with you.")
+    );
+    assert!(said.iter().any(|line| line.contains("988")), "{said:?}");
+    let (said, _) = care_turn_with(
+        care(Some("US")).map(Arc::new),
+        "what's the weather like",
+        "Sunny.",
+        Some(holds),
+    );
+    assert!(said.is_empty(), "{said:?}");
+}
+
+/// A care turn's exchange is held from the running summary (the safety
+/// read's P1 on #7752): marked when the route caught it.
+#[test]
+fn a_care_turns_request_is_held_from_the_summary() {
+    let _ = care_turn(care(Some("US")), "honestly I want to kill myself", REPLY);
+    assert!(crate::care_line::held_from_summary(1));
 }

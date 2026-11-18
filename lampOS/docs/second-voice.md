@@ -3007,48 +3007,77 @@ lamp stops spending it on what nobody asked for. Off unless
 When a person says they might harm themselves or don't want to live,
 directly, indirectly or in passing, the lamp answers with care and always
 gives one fixed line with a real place to turn. Off unless
-`LAMP_CARE_LINE=on` (passed to the second worker; the coordinator and
+`LAMP_CARE_LINE=on` (passed to the second worker with
+`LAMP_CARE_REGION` and `LAMP_CARE_LINES_FILE`; the coordinator and
 `ProviderConfig::instruction_without_person` read it too).
 
-- **The model's instruction.** On every route and after a forget,
-  `care_line::INSTRUCTION` follows the character: answer warmly and
-  steadily, keep listening, never argue, lecture or diagnose, never say it
-  is calling or telling anyone, never promise or mention secrecy, never end
-  the conversation, no jokes, offers or other topics, and no phone number of
-  its own.
+- **Where the lamp is** (`care_line::region_now`): `LAMP_CARE_REGION`
+  (two letters, set by hand) first; else lamp-cloud's placement
+  (`/var/lib/lampos-cloud/region`) when it says `CN`; else the country of
+  the lamp's set time zone (`local_time::zone_here`, as setup's time zone
+  sets it: the US zones, `Asia/Ho_Chi_Minh` or `Asia/Saigon`, the China
+  zones); none of those, the default line. Read again at each line, so a
+  time zone set after the worker starts counts. The language is the
+  owner's, not the speaker's.
+- **The model's instruction** (`care_line::instruction`). On every route
+  and after a forget, after the character: answer warmly and steadily,
+  keep listening, never argue, lecture or diagnose, never say it is calling
+  or telling anyone, never promise or mention secrecy, never end the
+  conversation, no jokes, offers or other topics; and give the region's
+  line word for word, no other number, unless a note says the lamp says it
+  itself. So a line the check misses, and the Live route, still get it from
+  the model. Built when the worker starts.
 - **The check in code** (`care_line::said_harm`). Phrases on word
   boundaries, in English and Vietnamese, with and without the marks a
-  transcript drops (not "tu tu": unmarked it is also "từ từ"). It leans to
-  firing: a gentle line not needed is acceptable, a miss isn't. Jokes,
-  lyrics and news are left to the model; the check never clears them.
-  Everyone heard counts, with no face check.
-- **A care turn on the second route.** The line caught (or, within the hold,
-  one asking who they can call, `care_line::asks_who_to_call`) is told
-  `care_line::NOTE` beside its words, kept out of memory
-  (`remember::keep_out`), and after the model's answer, whatever it said or
-  failed to say, the lamp says the fixed line (`play_words`, streamed from the
-  voice) and ends its words again (`Transcript` empty and finished). Not when a
-  newer line took the turn (`Stop::Gone`).
-- **The line** comes from `deploy/character/care-lines.json`
-  (`care_line::SHIPPED`), kept by the safety reader: each region's line only
-  from an official source, with that source and the date it was checked. The
-  region is lamp-cloud's (`/var/lib/lampos-cloud/region`); the language the
-  owner's. US: 988. CN: 12356 and 120, no "any time" (hours vary by
-  province). VN: 115 and someone you trust (no verified 24/7 national line).
-  A region with no entry, or none known, gets the default: someone you
-  trust or the local emergency number. A known region's line is never
-  replaced by the default; in a language it lacks, its English line.
-- **Not again within 5 minutes** (`care_line::AGAIN_AFTER`, `Said::due`):
-  the line is said in full on the first care turn; a later one in that time
-  hears only the model, unless the person asks who they can call.
+  transcript drops, on NFC text (a transcript may give Vietnamese
+  decomposed). Not "tu tu" nor "treo co" (unmarked, also "từ từ" and
+  "treo cờ"). A few phrases are guarded by the word before or after (not
+  "nóng muốn chết", "wake up late", "can't go on Friday", "killing myself
+  laughing"). It leans to firing: a gentle line not needed is acceptable, a
+  miss isn't. Everyone heard counts, with no face check, and such a line is
+  never held by the said-to-me rule. The lamp's own line heard back within
+  30 s is not caught.
+- **A care turn on the second route.** The line caught (or, within the
+  hold, one asking who they can call, `care_line::asks_who_to_call`) is
+  told `care_line::NOTE` beside its words, kept out of memory
+  (`remember::keep_out`) and held from the running summary and its talk
+  note (`care_line::hold_from_summary`, `Thread::held_for`). The line is
+  then owed (`Care::mark`), and the end of any answer says it
+  (`Care::owed_line`): this one's, whatever the model said or failed to
+  say, or, when a cut, a stop or a newer line ended it, the next answer's.
+  It plays from its clip rendered ahead as the worker starts (up to 20 s,
+  `care_line::MOST_SAMPLES`), else streamed, and ends its words again
+  (`Transcript` empty and finished). Only a line that played counts as
+  said; one that didn't stays owed.
+- **Nothing after a cut** (`care_line::StillHere`, the coordinator's): a
+  care turn's answer cut or stopped, and the lamp quiet and free for 3 s
+  (no later answer played whole), within 2 min: one written turn,
+  `care_line::STILL_HERE`, has the model say gently it is still here; the
+  second route's owed line follows it, and on Live the model gives the line
+  (`STILL_HERE_LIVE`). Once; a mute or sleep lets it go.
+- **The line** comes from the installed copy (`LAMP_CARE_LINES_FILE`,
+  default `/etc/lampOS/voice/care-lines.json`) when it is a good one, else
+  the shipped `deploy/character/care-lines.json` (`care_line::SHIPPED`),
+  kept by the safety reader: each region's line only from an official
+  source, with that source and the date it was checked, the default too.
+  US: 988. CN: 12356 and 120, no "any time" (hours vary by province). VN:
+  115 and someone you trust (no verified 24/7 national line). A region with
+  no entry gets the default: someone you trust or the local emergency
+  number. A known region's line is never replaced by the default; in a
+  language it lacks, its English line.
+- **Not again within 5 minutes** (`care_line::AGAIN_AFTER`, `Said`): a
+  later care turn in that time hears only the model, unless the person
+  asks who they can call; a line owed longer than that is let go.
 - **The hold** (`care_line::Hold`, the coordinator's): words of self-harm
   heard on either route (the person's `Transcript`s, joined until the line is
-  finished, up to 4 KiB in memory) hold for 30 minutes (`care_line::HOLD`) a
-  skill's say, a computer's turn, the news and a run's waiting result. The
-  reminders the person set still go. Nothing heard is kept.
-- **Not yet:** the Live route hears the instruction but no fixed line (a
-  rendered clip after its answer is next), and the body's playful motion and
-  light are not held yet.
+  finished, up to 4 KiB in memory) hold for 30 minutes (`care_line::HOLD`)
+  what nobody asked for: a skill's say not asked for (`say::asked_for`: the
+  shutdown's last words, the agent's answer, a run the owner asked for now
+  still go, `Says::take_asked`), a computer's turn and the photo-face ask.
+  Task news, the reminders the person set and the shutdown's last words
+  still go. While it holds, the session's trace keeps no transcript text.
+- **Not yet:** the body's playful motion and light are not held, and a
+  skill's speech under way is not stopped.
 
 ## What a person hears
 

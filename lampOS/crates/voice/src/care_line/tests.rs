@@ -33,6 +33,23 @@ fn direct_indirect_and_in_passing_lines_are_caught() {
         "Không có mình sẽ tốt hơn cho mọi người",
         "Mình muốn tự làm hại bản thân",
         "toi muon chet",
+        // The misses on #7752.
+        "I'm going to end it",
+        "I want to end it",
+        "I've been thinking about taking my life",
+        "I want to hang myself",
+        "I might shoot myself",
+        "I want to slit my wrists",
+        "I want to end my own life",
+        "I dont wanna live",
+        "I want to be dead",
+        "I could kill my self",
+        "I cut myself again last night",
+        "Mình không còn muốn sống nữa",
+        "Tôi muốn rạch tay",
+        "Tôi nghĩ đến chuyện treo cổ",
+        "Tôi muốn nhảy lầu",
+        "Tôi muốn kết thúc cuộc sống này",
     ] {
         assert!(said_harm(heard), "{heard}");
     }
@@ -69,8 +86,25 @@ fn ordinary_lines_are_not_caught() {
         "Bật đèn lên",
         "I hurt my knee",
         "My suicidaly long day", // not a word boundary
+        // The false hits on #7752.
+        "I don't want to wake up late",
+        "I can't go on Friday",
+        "I can't go on the trip",
+        "I cut myself chopping onions",
+        "Trời nóng muốn chết",
+        "Đói muốn chết",
+        "I'm killing myself laughing",
     ] {
         assert!(!said_harm(heard), "{heard}");
+    }
+    // The guarded phrases still catch on their own.
+    for heard in [
+        "I don't want to wake up tomorrow",
+        "I can't go on like this",
+        "Tôi muốn chết",
+        "I'm going to kill myself",
+    ] {
+        assert!(said_harm(heard), "{heard}");
     }
 }
 
@@ -155,36 +189,152 @@ fn the_line_is_not_said_again_within_five_minutes_unless_asked() {
     assert!(said.due(start + AGAIN_AFTER, false));
     assert!(asks_who_to_call("Who can I call?"));
     assert!(asks_who_to_call("Có đường dây nóng nào không?"));
+    for asked in ["What's the number?", "Who do I call?", "Tôi nên gọi ai?"] {
+        assert!(asks_who_to_call(asked), "{asked}");
+    }
     assert!(!asks_who_to_call("Call mom"));
     assert_eq!(AGAIN_AFTER, std::time::Duration::from_secs(300));
     assert_eq!(HOLD, std::time::Duration::from_secs(1800));
 }
 
-/// A care turn's line follows its answer once, in the region and language
-/// given; a turn not marked has none; the hold lasts `HOLD` from the last
-/// care turn.
+/// A care turn owes the line; any answer's end says it once, and then it
+/// is not due again within five minutes unless asked; one owed and not
+/// played stays owed (the P1s and P2 on #7752).
 #[test]
-fn a_care_turn_gets_its_line_once_and_holds_the_unasked() {
+fn a_line_is_owed_until_played_once_and_holds_the_unasked() {
     let care = Care::new(CareLines::shipped(), Some("VN".into()), "en");
     let start = std::time::Instant::now();
     assert!(!care.holds(start));
-    assert_eq!(care.line_after(7, start, false), None, "not a care turn");
-    care.mark(7, start);
-    assert!(care.marked(7));
-    let line = care.line_after(7, start, false).unwrap();
+    assert_eq!(care.owed_line(start), None, "nothing owed");
+    care.mark(start, false);
+    assert!(care.owes(start));
+    let line = care.owed_line(start).unwrap();
     assert!(line.contains("115") && line.is_ascii(), "{line}");
-    assert!(!care.marked(7), "let go once answered");
-    assert_eq!(care.line_after(7, start, false), None);
+    assert!(care.owes(start), "not played yet: still owed");
+    care.said(&line, start);
+    assert!(!care.owes(start));
+    assert_eq!(care.owed_line(start), None);
     let soon = start + std::time::Duration::from_secs(60);
-    care.mark(8, soon);
-    assert_eq!(care.line_after(8, soon, false), None, "within five minutes");
-    care.mark(9, soon);
-    assert!(
-        care.line_after(9, soon, true).is_some(),
-        "asked who to call"
-    );
+    care.mark(soon, false);
+    assert_eq!(care.owed_line(soon), None, "within five minutes");
+    assert!(!care.owes(soon), "let go, not due");
+    care.mark(soon, true);
+    assert!(care.owed_line(soon).is_some(), "asked who to call");
     assert!(care.holds(soon + HOLD - std::time::Duration::from_secs(1)));
     assert!(!care.holds(soon + HOLD));
+    // An owed line older than five minutes is let go.
+    let care = Care::new(CareLines::shipped(), None, "en");
+    care.mark(start, false);
+    assert_eq!(care.owed_line(start + AGAIN_AFTER), None);
+}
+
+/// The lamp's own line heard back is not the person's words of harm.
+#[test]
+fn the_lamps_own_line_heard_back_is_not_caught() {
+    let care = Care::new(CareLines::shipped(), Some("US".into()), "en");
+    let start = std::time::Instant::now();
+    let line = care.line();
+    assert!(said_harm(&line), "the US line names the lifeline");
+    care.said(&line, start);
+    assert!(care.own_line_heard("the Suicide and Crisis Lifeline", start));
+    assert!(!care.own_line_heard("I want to kill myself", start));
+    assert!(!care.own_line_heard(
+        "the Suicide and Crisis Lifeline",
+        start + std::time::Duration::from_secs(31)
+    ));
+}
+
+/// Where the lamp is: the hand-set region first, then lamp-cloud's CN,
+/// then the country of its set time zone; none of those, the default
+/// (both P1s on #7752: a US or VN lamp's placement is only ever empty).
+#[test]
+fn the_region_comes_from_the_set_time_zone_unless_set_or_in_china() {
+    let lines = CareLines::shipped();
+    for (zone, region) in [
+        ("America/New_York", Some("US")),
+        ("America/Indiana/Indianapolis", Some("US")),
+        ("Pacific/Honolulu", Some("US")),
+        ("Asia/Ho_Chi_Minh", Some("VN")),
+        ("Asia/Saigon", Some("VN")),
+        ("Asia/Shanghai", Some("CN")),
+        ("America/Toronto", None),
+        ("Europe/Paris", None),
+    ] {
+        assert_eq!(country_of_zone(zone), region, "{zone}");
+    }
+    let us = region_from(None, Some(""), Some("America/Chicago"));
+    assert_eq!(us.as_deref(), Some("US"));
+    assert!(lines.line(us.as_deref(), "en").contains("988"));
+    let vn = region_from(None, None, Some("Asia/Ho_Chi_Minh"));
+    assert!(lines.line(vn.as_deref(), "vi").contains("115"));
+    assert_eq!(
+        region_from(None, Some("CN\n"), Some("America/Chicago")).as_deref(),
+        Some("CN"),
+        "lamp-cloud's placement says China"
+    );
+    assert_eq!(
+        region_from(Some("vn"), Some("CN"), Some("America/Chicago")).as_deref(),
+        Some("VN"),
+        "set by hand first"
+    );
+    assert_eq!(region_from(Some("nowhere"), None, None), None);
+    assert_eq!(
+        region_from(None, Some("US"), None),
+        None,
+        "placement is CN or nothing"
+    );
+}
+
+/// Every region's entry, and the default, names its source and the date it
+/// was checked (the safety read's P3 on #7752).
+#[test]
+fn every_line_names_its_source_and_when_it_was_checked() {
+    let file: serde_json::Value = serde_json::from_str(SHIPPED).unwrap();
+    let entries = file["regions"]
+        .as_object()
+        .unwrap()
+        .values()
+        .chain([&file["default"]]);
+    for entry in entries {
+        for key in ["source", "checked"] {
+            assert!(
+                entry[key]
+                    .as_str()
+                    .is_some_and(|text| !text.trim().is_empty()),
+                "{key} in {entry}"
+            );
+        }
+    }
+}
+
+/// The coordinator's still-here turn: only after a care turn's answer was
+/// cut, once, after the quiet, never past its window, and not when a later
+/// answer played whole.
+#[test]
+fn the_still_here_turn_comes_once_after_a_cut() {
+    let mut still = StillHere::default();
+    still.settled(4, false, 0);
+    assert!(!still.take(10_000_000, true), "nothing caught");
+    still.caught(Some(5));
+    still.settled(4, false, 0);
+    assert!(!still.take(10_000_000, true), "an older turn's end");
+    still.settled(5, false, 1_000_000);
+    assert!(!still.take(2_000_000, true), "too soon");
+    assert!(!still.take(5_000_000, false), "not quiet");
+    assert!(still.take(5_000_000, true));
+    assert!(!still.take(6_000_000, true), "once");
+    still.caught(Some(7));
+    still.settled(7, true, 0);
+    assert!(
+        !still.take(10_000_000, true),
+        "played whole: its line followed"
+    );
+    still.caught(None);
+    still.settled(8, false, 0);
+    assert!(
+        !still.take(STILL_HERE_WITHIN_US, true),
+        "the moment is gone"
+    );
 }
 
 /// The coordinator's hold: words caught across pieces start it, it lasts
@@ -212,4 +362,20 @@ fn the_hold_starts_on_words_caught_across_pieces_and_lasts_its_time() {
         hold.holds(start + HOLD + std::time::Duration::from_secs(60)),
         "restarted"
     );
+}
+
+/// Vietnamese decomposed, as some transcripts give it, is caught as
+/// composed is (the safety read's P2 on #7752).
+#[test]
+fn decomposed_vietnamese_is_caught() {
+    use unicode_normalization::UnicodeNormalization as _;
+    for heard in [
+        "Tôi muốn tự tử",
+        "Mình không muốn sống nữa",
+        "Tôi chán sống",
+    ] {
+        let decomposed: String = heard.nfd().collect();
+        assert_ne!(decomposed, heard);
+        assert!(said_harm(&decomposed), "{heard}");
+    }
 }
