@@ -401,9 +401,29 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
   tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
   câu cuối cùng bên trong, rồi "There's more; ask me if you want it."
-  Không có gì theo dõi việc script của lần chạy đã tự nói qua `say` của
-  lamp-control hay chưa; agent được bảo để trống câu trả lời (một dấu gạch
-  ngang, hoặc `answer.md` trống) khi đã nói (P3 của Heron trên #7591).
+  Agent được bảo để trống câu trả lời (một dấu gạch ngang, hoặc
+  `answer.md` trống) khi script của lần chạy đã tự nói qua `say` của
+  lamp-control (P3 của Heron trên #7591). Dấu gạch ngang không được tin
+  suông (#6071): lamp-control đếm số dòng `say` của mỗi token lần chạy mà
+  giọng nói đã nói trọn (kết quả `spoken`, không tính tiếng hum hay clip),
+  và trả lời `end` của lần chạy bằng số đó (`{"ended": true, "said": N}`,
+  docs/control.md, "It ends with the run"), đọc một lần. Câu trả lời của
+  lần chạy đã kết thúc mang số đó bên cạnh câu trả lời của agent
+  (`{"ok":true,"id":N,"answer":"-","said":N}`, `Tokens::end_said`; bỏ đi
+  khi `end` không được trả lời, lamp-control không tới được). lamp-skills
+  chỉ im lặng với một dấu gạch ngang khi `said` lớn hơn 0; không có câu nào
+  được nói, hoặc không biết, thì nó nói "<Tên skill> ran, but had nothing
+  to say." (`task::told_of_run`, `task::no_say_line`) qua cùng cổng đó, ghi
+  nhật ký `skill:<name>: a dash with no say: told a fallback` (dấu gạch
+  được tin: `skill:<name>: a dash after N says: nothing told`). Trên
+  lamp-9adf, 19/11 02:44, lần chạy `flip-a-coin` trên Hermes trả lời một
+  dấu gạch ngang mà không có câu nói nào, và người dùng không nghe gì.
+  Không có công tắc: đây là sửa lỗi. Test:
+  `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
+  của lamp-control
+  `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
+  của lamp-skills `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`.
   Trên lamp-9adf, 17/11
   (build 13929, `LAMP_TASK_NET=on`), một `btc-price` tải lên được cấp
   `speak` và `net` đã tới api.coinbase.com, giữ câu trả lời 220 byte của

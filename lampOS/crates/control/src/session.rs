@@ -68,6 +68,13 @@ pub trait Parts {
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
     }
+    /// How many of `client`'s `say` lines the voice spoke whole since it
+    /// was last asked, the count let go: read once as a skill run ends
+    /// (lamp-control's admin `end`, #6071). Never cleared by [`Parts::gone`],
+    /// since a run's connection may close before its end. 0 by default.
+    fn said(&mut self, _client: &str) -> u64 {
+        0
+    }
     /// Whether a `gesture`, `move` or feeling's move gets a `done` once
     /// the body says what became of it (#4209), told in hello's `limits`
     /// as `motion_done`.

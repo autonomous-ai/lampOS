@@ -5936,7 +5936,13 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
                     |bytes| format!("{bytes} bytes of its agent's answer")
                 )
             );
-            found.set(lamp_skills::task::told(&answer));
+            // A lone dash is trusted only when the run's says were spoken;
+            // else a fallback is told (#6071). The journal's words only.
+            let (told, dash) = lamp_skills::task::told_of_run(&skill, &answer);
+            if let Some(dash) = dash {
+                eprintln!("lamp-skills: skill:{skill}: {dash}");
+            }
+            found.set(told);
             refused.set(lamp_skills::task::refusal_said(&answer));
             not_ready.set(lamp_skills::task::not_ready_line(
                 &answer,
@@ -6006,7 +6012,7 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         };
         let state = state.as_deref();
         let found = found.take();
-        tell_its_run(
+        let told = tell_its_run(
             &skill,
             found,
             failed,
@@ -6017,6 +6023,11 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             state,
             &mut room,
         );
+        // Nothing told of its run: said once, so a run's end always leaves
+        // its outcome in the journal (#6071). A refusal said has its own.
+        if told.is_none() && refused.is_none() {
+            eprintln!("lamp-skills: skill:{skill}: do.task: nothing told");
+        }
     });
 }
 

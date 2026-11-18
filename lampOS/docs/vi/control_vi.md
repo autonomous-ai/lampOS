@@ -77,6 +77,16 @@ chối và không token nào được cấp. Lời đồng ý được giữ mà
 lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
 chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
+Token kết thúc cùng lần chạy: `{"end": {"run": RUN_ID}}` (lamp-tasks, khi lần
+chạy kết thúc) đóng các kết nối của nó, dừng những gì nó còn đang yêu cầu và
+chấm dứt token, trả lời `{"ended": true, "said": N}` cho một lần chạy đang
+chạy (`{"ended": false}` nếu không có): `said` là số dòng `say` của lần chạy
+mà giọng nói đã nói trọn (kết quả `spoken`; tiếng hum hay clip không tính),
+đếm theo client trong bộ nhớ và đọc một lần lúc kết thúc (`Parts::said`,
+#6071), để lamp-skills chỉ tin câu trả lời chỉ có dấu gạch ngang của lần chạy
+sau khi đã có câu nói (docs/vi/tasks_vi.md). Dòng nhật ký kết thúc thêm
+`its says spoken: N`, chỉ là số đếm.
+
 **Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
 lamp-control, đúng `on`, bật trong các unit lamp-control, lamp-skills, lamp-tasks và lamp-services của sản phẩm; quyết định của
 chủ đèn, 13/11): khi cấp token cho một skill không có lời đồng ý task nào mà

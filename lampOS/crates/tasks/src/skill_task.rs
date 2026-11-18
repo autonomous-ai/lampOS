@@ -625,6 +625,13 @@ pub trait Tokens {
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String>;
     /// The run ended: its token is refused from now on.
     fn end(&self, run: &str);
+    /// [`Self::end`], and how many of the run's `say` lines lamp-control's
+    /// voice spoke whole (its admin `end`'s `said`, #6071): what a run's
+    /// dash-only answer is held to in lamp-skills. None when not known.
+    fn end_said(&self, run: &str) -> Option<u64> {
+        self.end(run);
+        None
+    }
     /// Whether lamp-control's recorded yes for `skill` is for exactly the
     /// folder hashed `sha256` and `grants`, [`NET_GRANT`] among them: what
     /// a run granted `net` must have before it gets its way out, since
@@ -724,6 +731,10 @@ impl Tokens for ControlTokens {
     fn end(&self, run: &str) {
         self.end_asked(run);
     }
+
+    fn end_said(&self, run: &str) -> Option<u64> {
+        self.end_asked(run)
+    }
 }
 
 impl ControlTokens {
@@ -778,10 +789,16 @@ impl ControlTokens {
                 .is_ok_and(|answer| answer["agreed"] == true)
     }
 
-    fn end_asked(&self, run: &str) {
-        if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
-            // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
-            eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+    /// `{"end": {"run"}}`: how many of the run's says the voice spoke
+    /// whole (`said`), when lamp-control answered it for a run going.
+    fn end_asked(&self, run: &str) -> Option<u64> {
+        match self.ask(&json!({"end": {"run": run}})) {
+            Ok(answer) => answer["said"].as_u64(),
+            Err(why) => {
+                // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
+                eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+                None
+            }
         }
     }
 }
@@ -1117,16 +1134,19 @@ pub trait Runner {
 
 /// Ends the token however the run ends, a panic too, and once only: the
 /// runner may end it first ([`Runner::run`]'s `end_token`).
+/// `said`: how many of its says the voice spoke whole, as its end read
+/// it ([`Tokens::end_said`]).
 struct Ending<'a> {
     tokens: &'a dyn Tokens,
     run: String,
     ended: std::cell::Cell<bool>,
+    said: std::cell::Cell<Option<u64>>,
 }
 
 impl Ending<'_> {
     fn end(&self) {
         if !self.ended.replace(true) {
-            self.tokens.end(&self.run);
+            self.said.set(self.tokens.end_said(&self.run));
         }
     }
 }
@@ -1253,8 +1273,10 @@ pub fn is_service_grant(grant: &str) -> bool {
 /// as a read's lines are said (`lamp_skills::service_read::tell`), never a
 /// turn for the model. A fixed write's run never tells, nor a run through
 /// a runner that keeps no answer (Hermes's, a make's): their answer is
-/// `{"ok":true,"id":N}` alone, as before. Nothing here knows whether the
-/// run's own script already said something through lamp-control's `say`.
+/// `{"ok":true,"id":N}` alone, as before. Whether the run's own script
+/// already said something through lamp-control's `say` is lamp-control's
+/// to count: an answer that carries the agent's carries, beside it, how
+/// many of its says were spoken whole (`said`, [`Tokens::end_said`], #6071).
 pub fn tells_answer(runner: &dyn Runner) -> bool {
     runner.answers()
 }
@@ -1509,6 +1531,7 @@ fn run_on_token(
         tokens,
         run: run_id.clone(),
         ended: std::cell::Cell::new(false),
+        said: std::cell::Cell::new(None),
     };
     let asked: BTreeSet<&String> = grants.iter().collect();
     if minted.grants.iter().collect::<BTreeSet<_>>() != asked {
@@ -1552,11 +1575,18 @@ fn run_on_token(
     drop(fresh);
     drop(run);
     drop(minted);
+    ending.end();
+    let said = ending.said.get();
     drop(ending);
     match ran {
-        Ok(id) => match found {
-            Some(answer) => json!({"ok": true, "id": id, "answer": answer}),
-            None => json!({"ok": true, "id": id}),
+        // With the run's says the voice spoke whole, when known: a
+        // dash-only answer is trusted only after one (#6071).
+        Ok(id) => match (found, said) {
+            (Some(answer), Some(said)) => {
+                json!({"ok": true, "id": id, "answer": answer, "said": said})
+            }
+            (Some(answer), None) => json!({"ok": true, "id": id, "answer": answer}),
+            (None, _) => json!({"ok": true, "id": id}),
         },
         // The one session's queue full (#7246): `busy`, as a second run
         // is, so lamp-skills' retry (#7239) still applies.
@@ -4656,6 +4686,8 @@ mod tests {
         ended: RefCell<Vec<String>>,
         /// Whether lamp-control's yes names `net` for the folder.
         net_yes: bool,
+        /// What its end says of the run's says spoken whole (#6071).
+        said: Option<u64>,
     }
 
     impl Tokens for FakeTokens {
@@ -4683,6 +4715,11 @@ mod tests {
         fn end(&self, run: &str) {
             self.live.borrow_mut().retain(|(live, _)| live != run);
             self.ended.borrow_mut().push(run.into());
+        }
+
+        fn end_said(&self, run: &str) -> Option<u64> {
+            self.end(run);
+            self.said
         }
     }
 
@@ -4798,6 +4835,40 @@ mod tests {
         let hand = HandOver::parse(&line(gmail), skills()).unwrap();
         assert!(!SkillRun::prompt(&hand).contains(TELL_LINE));
         assert_eq!(told_answer(&"a ".repeat(4_000)).len(), MOST_TOLD_BYTES - 1);
+    }
+
+    /// #6071: an ended run's answer that carries its agent's answer
+    /// carries, beside it, how many of its says lamp-control's voice spoke
+    /// whole, as the token's end read it; once each run, and nothing when
+    /// the end doesn't know.
+    #[test]
+    fn an_ended_runs_answer_carries_how_many_of_its_says_were_spoken() {
+        let told = |said: Option<u64>| {
+            let tokens = FakeTokens {
+                said,
+                ..Default::default()
+            };
+            let ran = Answering("-", RefCell::default());
+            let told = answer_agent(
+                &line(|_| {}),
+                true,
+                skills(),
+                &tokens,
+                &ran,
+                &Agent::default(),
+            );
+            assert_eq!(tokens.ended.borrow().len(), 1, "ended once");
+            told
+        };
+        assert_eq!(
+            told(Some(1)),
+            json!({"ok": true, "id": 0, "answer": "-", "said": 1})
+        );
+        assert_eq!(
+            told(Some(0)),
+            json!({"ok": true, "id": 0, "answer": "-", "said": 0})
+        );
+        assert_eq!(told(None), json!({"ok": true, "id": 0, "answer": "-"}));
     }
 
     /// A run granted `net` with the net grant on is a read of the web: it

@@ -102,6 +102,12 @@ const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
 /// longer listed was stopped.
 type Says = Arc<std::sync::Mutex<HashMap<String, HashMap<u64, Option<UnixStream>>>>>;
 
+/// How many of each client's `say` lines the voice spoke whole (its
+/// outcome `spoken`, a `done` `finished`), read once and let go when a
+/// skill run ends ([`Parts::said`]): a run's dash-only answer is trusted
+/// only when its run said something (#6071). Counts only, never words.
+type Said = Arc<std::sync::Mutex<HashMap<String, u64>>>;
+
 /// How long the voice's first answer to a `turn.end` or a `listen` may
 /// take: it waits at most 10 s on an end (`say::TURN_END_EXPIRY_MS`) and
 /// 5 s to take a mute (`control_mute::TAKE_WITHIN`).
@@ -220,6 +226,8 @@ pub struct Lamp {
     voice: Arc<Mutex<Voice>>,
     /// Each client's says still waiting on the voice, for its `stop`.
     says: Says,
+    /// Each client's says spoken whole, for its run's end ([`Said`]).
+    said: Said,
     /// The number the next say is kept under.
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
@@ -330,6 +338,7 @@ impl Lamp {
             voice: Arc::default(),
             actions: None,
             says: Says::default(),
+            said: Said::default(),
             next_say: 0,
             microphone: None,
             speaker: None,
@@ -1143,6 +1152,9 @@ impl Lamp {
             .entry(client.clone())
             .or_default()
             .insert(number, None);
+        // A `say` (words, never a sound's cue or clip) spoken whole counts
+        // for its run's end ([`Said`]).
+        let said = line.get("text").is_some().then(|| Arc::clone(&self.said));
         // Off the door's lock, connecting included (the Reviewer-lead's P3
         // on #3805: a voice whose backlog is full must not hold every
         // connection). The outcome comes when the turn ends, as `done`; a
@@ -1173,6 +1185,15 @@ impl Lamp {
             }
             let (how, why) = result;
             forget_say(&says, &client, number);
+            if how == "finished"
+                && let Some(said) = said
+            {
+                *said
+                    .lock()
+                    .expect("said")
+                    .entry(client.clone())
+                    .or_default() += 1;
+            }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -1609,6 +1630,14 @@ impl Parts for Lamp {
 
     fn motion_done(&self) -> bool {
         self.motions.is_some()
+    }
+
+    fn said(&mut self, client: &str) -> u64 {
+        self.said
+            .lock()
+            .expect("said")
+            .remove(client)
+            .unwrap_or_default()
     }
 
     fn asking(&mut self, connection: Option<u64>) {
@@ -2385,6 +2414,64 @@ mod tests {
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a run's says the voice spoke whole are counted for its end
+    /// and read once (`Parts::said`): a say spoken counts, a say dropped
+    /// and a sound's hum don't, another client's count is its own, and a
+    /// count read is let go.
+    #[test]
+    fn a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once() {
+        let dir = dir("say-said");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            for answer in [
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"dropped","why":"expired"}"#,
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let wait_for = |count: usize| {
+            for _ in 0..200 {
+                if told.lock().unwrap().len() >= count {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(told.lock().unwrap().len(), count);
+        };
+        // One at a time, so each meets its own answer.
+        for (n, (client, asked)) in [
+            ("c_run", r#"{"id":1,"op":"say","text":"Heads."}"#),
+            ("c_run", r#"{"id":2,"op":"say","text":"Tails."}"#),
+            ("c_run", r#"{"id":3,"op":"sound","name":"hum"}"#),
+            ("c_other", r#"{"id":4,"op":"say","text":"Hi."}"#),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            lamp.act(client, 0, &op(asked), 0).unwrap();
+            wait_for(n + 1);
+        }
+        voice.join().unwrap();
+        assert_eq!(lamp.said("c_run"), 1);
+        assert_eq!(lamp.said("c_run"), 0, "read once");
+        assert_eq!(lamp.said("c_other"), 1);
+        assert_eq!(lamp.said("c_nobody"), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

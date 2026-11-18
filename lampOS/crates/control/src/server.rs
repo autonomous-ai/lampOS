@@ -345,16 +345,24 @@ impl Shared {
     }
 
     /// Ends a run: its connections close, what it asked for that still goes
-    /// stops, as its `stop` would.
-    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> bool {
-        let ended = self.door.lock().expect("door").end_run(run, serial);
-        let Some(ended) = ended else {
-            return false;
+    /// stops, as its `stop` would. How many of its says the voice spoke
+    /// whole (`Parts::said`), for a run that was going.
+    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> Option<u64> {
+        let ended = self.door.lock().expect("door").end_run(run, serial)?;
+        // How many of its says the voice spoke whole, read once, before
+        // what it still asked for is stopped (#6071).
+        let said = {
+            let mut parts = self.parts.lock().expect("parts");
+            let said = parts.said(&ended.client);
+            parts.gone(&ended.client, now);
+            said
         };
-        self.parts.lock().expect("parts").gone(&ended.client, now);
         self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
-        eprintln!("lamp-control: run {run} of skill {}: {why}", ended.skill);
-        true
+        eprintln!(
+            "lamp-control: run {run} of skill {}: {why}, its says spoken: {said}",
+            ended.skill
+        );
+        Some(said)
     }
 
     /// Ends every run whose time has come.
@@ -362,7 +370,11 @@ impl Shared {
         let now = self.now_us();
         let ended = self.door.lock().expect("door").sweep_runs(now);
         for run in ended {
-            self.parts.lock().expect("parts").gone(&run.client, now);
+            {
+                let mut parts = self.parts.lock().expect("parts");
+                let _ = parts.said(&run.client);
+                parts.gone(&run.client, now);
+            }
             self.close_client(&run.client, crate::runs::CLOSED_ENDED);
             eprintln!(
                 "lamp-control: run {} of skill {}: its time is up",
@@ -2149,7 +2161,12 @@ fn admin_answer(
     }
     if let Some(end) = asked.get("end") {
         return match end["run"].as_str() {
-            Some(run) => json!({"ended": shared.end_run(run, None, now, "ended")}),
+            // `said`: its says the voice spoke whole, for a run that was
+            // going (#6071).
+            Some(run) => match shared.end_run(run, None, now, "ended") {
+                Some(said) => json!({"ended": true, "said": said}),
+                None => json!({"ended": false}),
+            },
             None => json!({"error": "end: a run, as text"}),
         };
     }
