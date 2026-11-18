@@ -424,13 +424,20 @@ impl ProviderConfig {
     /// Used after a forget, when prior personal context must not be copied.
     pub(crate) fn instruction_without_person(&self, camera: bool) -> io::Result<String> {
         // The owner's own words for the character (#5394), after it.
-        Ok(crate::chosen_voice::with_character(
+        let character = crate::chosen_voice::with_character(
             crate::language::instruction(
                 self.character(camera)?,
                 crate::language::from_environment(),
             ),
             |name| std::env::var_os(name),
-        ))
+        );
+        // `LAMP_CARE_LINE` (#7689): how to answer words of self-harm, last,
+        // on every route and after a forget alike.
+        Ok(if crate::care_line::on_from_environment() {
+            format!("{character}\n\n{}", crate::care_line::INSTRUCTION)
+        } else {
+            character
+        })
     }
 
     fn character(&self, camera: bool) -> io::Result<String> {
