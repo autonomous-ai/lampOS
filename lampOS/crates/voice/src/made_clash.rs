@@ -305,6 +305,14 @@ struct Waiting {
     /// The lamp's words in each request from the make's on, and whether
     /// that answer was cut.
     said: VecDeque<(u64, String, bool)>,
+    /// The first later line that was more than the lamp's name, its request
+    /// and words, in memory only ([`line_heard`]): the only line that may
+    /// choose a replace, and only as a plain one ([`not_a_plain_replace`]).
+    /// The question asked again clears it.
+    answer_line: Option<(u64, String)>,
+    /// Later requests whose rounds called anything but the clash's answer
+    /// ([`round_called`]), at most [`SAID_KEPT`]: no replace in one.
+    other_calls: Vec<u64>,
 }
 
 #[cfg(not(test))]
@@ -423,6 +431,8 @@ pub fn asked(
             at: now,
             echoes: Vec::new(),
             said: VecDeque::new(),
+            answer_line: None,
+            other_calls: Vec::new(),
         })
     });
     if let Some(before) = before.filter(|before| before.sha256 != made.sha256) {
@@ -515,6 +525,93 @@ pub fn echo_held(request: u64) {
             waiting.echoes.push(request);
         }
     });
+}
+
+/// The second route asks the model the person's line `line` of `request`
+/// (`name_only`: only the lamp's name, or no words). While a clash waits,
+/// its first later line that is more than the name is kept, in memory only
+/// and never journalled: the only line that may choose a replace
+/// ([`not_a_plain_replace`]). Later lines change nothing here; a keep or
+/// a cancel may still come.
+pub fn line_heard(request: u64, name_only: bool, line: &str) {
+    if name_only {
+        return;
+    }
+    kept::waiting(|waiting| {
+        if let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| request > waiting.request && waiting.answer_line.is_none())
+        {
+            waiting.answer_line = Some((request, line.to_owned()));
+        }
+    });
+}
+
+/// A round of `request` calls `calls`, before any runs
+/// (`skill_write_yes::round_called`): while a clash waits, one that calls
+/// anything but its answer (`make_skill` with a [`CLASH_ID`]) marks the
+/// request, so no replace is chosen in it: the line carried another ask.
+pub fn round_called<'a>(request: u64, calls: impl IntoIterator<Item = (&'a str, &'a Value)>) {
+    let other = calls
+        .into_iter()
+        .any(|(name, args)| name != made_skill::MAKE || !args[CLASH_ID].is_string());
+    if !other {
+        return;
+    }
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting.as_mut().filter(|waiting| request > waiting.request) else {
+            return;
+        };
+        if !waiting.other_calls.contains(&request) {
+            if waiting.other_calls.len() == SAID_KEPT {
+                waiting.other_calls.remove(0);
+            }
+            waiting.other_calls.push(request);
+        }
+    });
+}
+
+/// What may be said for a replace: the only answers that choose it, each
+/// as its words, read in code by `skill_write_yes::plain_answer` under the
+/// same ruling as a remove's yes (#7683, 18 Nov: a fixed set, since a
+/// replace takes skills off the lamp). A bare "yes" is none: the question
+/// offers three choices.
+const REPLACE_SAID: &[&[&str]] = &[
+    &["replace"],
+    &["replace", "it"],
+    &["replace", "them"],
+    &["replace", "them", "all"],
+    &["replace", "all"],
+    &["replace", "both"],
+    &["thay", "thế"],
+    &["thay", "đi"],
+];
+
+/// What may come with a replace: a plain yes before it ("Yes, replace
+/// it").
+const REPLACE_ALSO: &[&[&str]] = crate::skill_write_yes::YES_SAID;
+
+/// Why a replace in `request` is no plain choice of it, in code: not the
+/// first line after the question ([`line_heard`]), a line that is not only
+/// a plain replace (a question, or anything else asked), or a request
+/// whose rounds called anything else ([`round_called`]). None when it is
+/// one. The model's own `choice` is read first; this only ever leaves the
+/// other skills on.
+fn not_a_plain_replace(waiting: &Waiting, request: u64) -> Option<&'static str> {
+    match &waiting.answer_line {
+        Some((answer, line)) if *answer == request => {
+            let mut names = waiting.others.clone();
+            names.push(waiting.name.clone());
+            if !crate::skill_write_yes::plain_answer(line, REPLACE_SAID, REPLACE_ALSO, &names) {
+                Some("its line is not only a plain replace")
+            } else if waiting.other_calls.contains(&request) {
+                Some("its turn called something else")
+            } else {
+                None
+            }
+        }
+        _ => Some("not the line right after the question"),
+    }
 }
 
 /// The lamp said `words` in `request` (`thread::Thread::lamp_for`, as
@@ -747,10 +844,11 @@ pub fn chosen(
         Nothing,
         Late(Box<Waiting>),
         Refused(Value),
+        NotPlain(Box<Waiting>, &'static str),
         Taken(Box<Waiting>, &'static str),
     }
     let took = kept::waiting(|kept| {
-        let Some(waiting) = kept.as_ref().filter(|waiting| waiting.id == id) else {
+        let Some(waiting) = kept.as_mut().filter(|waiting| waiting.id == id) else {
             return Took::Nothing;
         };
         if now.saturating_duration_since(waiting.at) > CLASH_WITHIN {
@@ -796,14 +894,24 @@ pub fn chosen(
             eprintln!(
                 "lamp-voice: request {request}: a made skill's clash wasn't answered: its question was not heard whole"
             );
+            // Asked again: the line after it is the one that may choose.
+            waiting.answer_line = None;
             return Took::Refused(json!({
                 "error": "not chosen yet: the question was not said in full, or it was cut",
                 "next": format!("{} {}", say_whole(&waiting.question), then_choose(&waiting.id)),
             }));
         }
-        kept.take().map_or(Took::Nothing, |waiting| {
-            Took::Taken(Box::new(waiting), choice)
-        })
+        // A replace takes skills off the lamp: only a plain replace on the
+        // line right after the question, in code (#7683), else nothing is
+        // replaced and the clash ends, as a remove's yes is held.
+        let not_plain = (choice == "replace")
+            .then(|| not_a_plain_replace(waiting, request))
+            .flatten();
+        kept.take()
+            .map_or(Took::Nothing, |waiting| match not_plain {
+                Some(why) => Took::NotPlain(Box::new(waiting), why),
+                None => Took::Taken(Box::new(waiting), choice),
+            })
     });
     let (waiting, choice) = match took {
         Took::Nothing => {
@@ -821,6 +929,25 @@ pub fn chosen(
             });
         }
         Took::Refused(told) => return told,
+        Took::NotPlain(waiting, why) => {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill's clash: a replace not taken: {why}: nothing replaced, the clash dropped (#7683)"
+            );
+            let_go(&waiting, "a replace not plainly chosen");
+            let new = made_skill::spoken_name(&waiting.name);
+            let others = spoken_list(&waiting.others);
+            return json!({
+                "made": waiting.name,
+                "on": false,
+                "left": waiting.others,
+                "next": format!(
+                    "Nothing was replaced: only a plain choice to replace, right after the \
+                     lamp's question, takes a skill off. Say first, in a few words, in the \
+                     conversation's language, that you left {others} as it was and didn't put \
+                     {new} on; then do anything else they asked in that line, as for any line."
+                )
+            });
+        }
         Took::Taken(waiting, choice) => (waiting, choice),
     };
     let new = made_skill::spoken_name(&waiting.name);
@@ -1100,8 +1227,12 @@ mod tests {
     }
 
     /// A choice in a heard line `request`, on the route with the echo judge
-    /// or not (`here`).
+    /// or not (`here`). A replace's line, the first after the question, is
+    /// heard as a plain "Replace it." ([`line_heard`]).
     fn pick<'a>(id: &'a str, choice: &'a str, request: u64, here: bool) -> Answer<'a> {
+        if choice == "replace" {
+            line_heard(request, false, "Replace it.");
+        }
         Answer {
             id,
             choice: Some(choice),
@@ -1265,7 +1396,16 @@ mod tests {
         // held as the lamp's echo: that line's replace is refused.
         said_whole(&told, 4);
         echo_held(5);
-        let echoed = chosen(pick(&id, "replace", 5, true), || true, now, &hands);
+        // A line held as the echo is never asked of the model, so it is no
+        // answer line ([`line_heard`]).
+        let echo = Answer {
+            id: &id,
+            choice: Some("replace"),
+            request: 5,
+            heard: true,
+            here: true,
+        };
+        let echoed = chosen(echo, || true, now, &hands);
         assert!(
             echoed["error"].as_str().unwrap().contains("own words"),
             "{echoed}"
@@ -1283,6 +1423,108 @@ mod tests {
         assert_eq!(replaced["on"], true, "{replaced}");
         assert_eq!(*done.lock().unwrap(), ["on", "remove glow-blue-on-return"]);
         assert!(!awaited(now));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7683, by the first builder's ruling: a replace
+    /// takes skills off the lamp, so it is taken only as a plain choice of
+    /// it, read in code, on the line right after the question, with nothing
+    /// else asked. The clash question, then "Also make one that chimes
+    /// when I'm back" (the model's choice `replace` all the same): nothing
+    /// is replaced or put on, and the person is told so. A question, a
+    /// bare yes, a later line, or a round calling more replace nothing; a
+    /// plain "Yes, replace it." does.
+    #[test]
+    fn only_a_plain_replace_on_the_next_line_takes_a_skill_off() {
+        let (root, keeping) = keeping("clash-plain");
+        let done: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let remove = |_: &Keeping, name: &str| {
+            done.lock().unwrap().push(format!("remove {name}"));
+            Ok(())
+        };
+        let put_on = |_: &Keeping, _: &str| {
+            done.lock().unwrap().push("on".to_owned());
+            Ok("glow-green".to_owned())
+        };
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let clash = Clash {
+            name: "glow-blue-on-return".to_owned(),
+            shares: "the light",
+        };
+        let now = Instant::now();
+        let ask = || {
+            let told = asked(
+                &keeping,
+                &made("glow-green"),
+                std::slice::from_ref(&clash),
+                3,
+                now,
+            );
+            said_whole(&told, 3);
+            told[CLASH_ID].as_str().unwrap().to_owned()
+        };
+        let answer = |id: &str, request| {
+            chosen(
+                Answer {
+                    id,
+                    choice: Some("replace"),
+                    request,
+                    heard: true,
+                    here: true,
+                },
+                || true,
+                now,
+                &hands,
+            )
+        };
+        for line in [
+            "Also make one that chimes when I'm back",
+            "Is that the blue one?",
+            "Yes.",
+            "Replace it, and what's the weather?",
+        ] {
+            let id = ask();
+            line_heard(4, false, line);
+            let told = answer(&id, 4);
+            assert_eq!(told["on"], false, "{line}: {told}");
+            assert_eq!(
+                told["left"],
+                json!(["glow-blue-on-return"]),
+                "{line}: {told}"
+            );
+            let next = told["next"].as_str().unwrap();
+            assert!(
+                next.contains("left glow blue on return as it was"),
+                "{next}"
+            );
+            assert!(next.contains("do anything else they asked"), "{next}");
+            assert!(!awaited(now), "{line}");
+            assert!(done.lock().unwrap().is_empty(), "{line}");
+        }
+        // Not the line right after the question.
+        let id = ask();
+        line_heard(4, false, "What does it do?");
+        line_heard(5, false, "Replace it.");
+        assert_eq!(answer(&id, 5)["on"], false);
+        // A round that calls more beside the answer.
+        let id = ask();
+        line_heard(4, false, "Replace it.");
+        let choice = json!({ CLASH_ID: id, CHOICE: "replace" });
+        let play = json!({"query": "music"});
+        round_called(4, [(made_skill::MAKE, &choice), ("play_music", &play)]);
+        assert_eq!(answer(&id, 4)["on"], false);
+        assert!(done.lock().unwrap().is_empty());
+        // A plain choice of it on the next line: replaced.
+        let id = ask();
+        line_heard(4, false, "Hey Lamp, yes, replace it please.");
+        round_called(4, [(made_skill::MAKE, &choice)]);
+        let replaced = answer(&id, 4);
+        assert_eq!(replaced["on"], true, "{replaced}");
+        assert_eq!(*done.lock().unwrap(), ["on", "remove glow-blue-on-return"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 

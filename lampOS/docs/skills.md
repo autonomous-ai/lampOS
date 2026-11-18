@@ -4648,34 +4648,59 @@ code (`made_remove::asked`):
   taken as the yes, and mail count was removed. The journal: "the line
   after NAME's question was a new ask, not an answer: nothing kept, the
   wait dropped".
-- **Only a plain yes, on the next line, decided in code** (the first
-  builder's rule, 18 Nov). On lamp-9adf (stock 14083) "Remove daily
-  stretch reminder?" was followed by "Lamp, also make one that plays a
-  soft chime when I come back to my desk.", the model's forced answer was
-  `yes`, and the skill was removed before the chime was made. Whatever
-  the model answers, a `yes` removes only when, in code
-  (`skill_write_yes::not_a_plain_yes`): its line is the remove's answer
-  line, the first line after the question that was more than the lamp's
-  name (`skill_write_yes::line_heard`, `Waiting::answer_line`; an
-  `unclear` asks the question again, and the line after that is the
-  answer line then); that line has at most
-  `skill_write_yes::PLAIN_YES_MOST` (3) words past the lamp's name
-  (`skill_write_yes::line_words`: "yes", "go ahead", "yes, remove it");
-  and no round of that request calls anything but a wait's answer
-  (`skill_write_yes::round_called`, told each round's calls before any
-  runs). A bound on length and on the calls made, never a list of words:
-  "Yes, and make me a skill that …" and "Sure, play some music." fail on
-  length, "Yes, play music." with the play called beside the yes on its
-  calls. Otherwise nothing is removed, the wait is dropped, and the model
-  is told to say first that it left NAME as it is, then do anything else
-  the line asked (`skill_write_yes::remove_not_plain_next`). A second line
-  after the question that is more than the name drops a wait still open,
-  so a yes two lines later finds nothing waiting. A call the model makes
-  in a later round of the same turn, after a plain yes was taken, is not
-  seen before the remove runs: the length bound is what keeps such a line
-  out. The journal: "a yes to removing NAME not taken: WHY: nothing
-  removed, the wait dropped (#6960)", or "a remove's question was not
-  confirmed on the line right after it: dropped, nothing removed (#6960)".
+- **Only a plain yes the code reads, on the next line** (the first
+  builder's ruling on #7683, 18 Nov 12:51, after Twelve's HOLD). On
+  lamp-9adf (stock 14083) "Remove daily stretch reminder?" was followed by
+  "Lamp, also make one that plays a soft chime when I come back to my
+  desk.", the model's forced answer was `yes`, and the skill was removed
+  before the chime was made; a second time, "Which of my skills use the
+  internet?" was taken the same way. Whatever the model answers, a `yes`
+  removes only when, in code (`skill_write_yes::not_a_plain_yes`):
+  - its line is the remove's answer line, the first line after the
+    question that was more than the lamp's name
+    (`skill_write_yes::line_heard`, `Waiting::answer_line`, kept in memory
+    only, never journalled). When the question is asked again, after an
+    `unclear` or after a yes that came before it was heard whole (a "Yes."
+    over "Remove NAME?" still playing), the line after that is the answer
+    line;
+  - that line, with the lamp's name, "hey" and "please" left out, case
+    and punctuation aside, is only a plain yes from the fixed set
+    `skill_write_yes::YES_SAID` (yes, yeah, yep, yup, sure, ok/okay, go
+    ahead, do it, remove it, delete it, vâng, ừ, xoá/xóa đi). It may also
+    carry the remove's verb and the skill's own name ("Yes, remove rain
+    joke."), but no "?" and no question word (`skill_write_yes::plain_answer`).
+    "Hey Lamp, yes, remove it", "yeah, do it", "Yes please" and "ok"
+    remove; "What's the time?", "Is it the moon one?", "Sure, and make me
+    a skill that …" and "Hey Lamp, what?" don't;
+  - and no round of that request calls anything but a wait's answer
+    (`skill_write_yes::round_called`, told each round's calls before any
+    runs): "Yes." with a play called beside it removes nothing.
+
+  The fixed set is by ruling, as a "type DELETE to confirm" box is. The
+  owner's rule against yes/no word lists still holds everywhere else.
+  Here the model's own `yes` is still needed first; the code is only the
+  last gate, and it can only ever leave a skill on the lamp. Otherwise
+  nothing is removed, the wait is dropped, and the model is told to say
+  first that it left NAME as it is, then do anything else the line asked
+  (`skill_write_yes::remove_not_plain_next`). A second line after the
+  question that is more than the name drops a wait still open, so a yes
+  two lines later finds nothing waiting. The journal: "a yes to removing
+  NAME not taken: WHY: nothing removed, the wait dropped (#6960)", or "a
+  remove's question was not confirmed on the line right after it:
+  dropped, nothing removed (#6960)".
+- **A clash's replace is held the same way** (Twelve's P2 on #7683). A
+  replace takes the clashing skills off the lamp (`made_clash::chosen`),
+  so the model's `choice` "replace" is taken only when the line choosing
+  it is the first after the clash question (`made_clash::line_heard`,
+  cleared when the question is asked again) and is only a plain replace
+  (`made_clash::REPLACE_SAID`: replace, replace it/them/all/both, thay
+  thế, with a plain yes before it and the skills' names allowed, by the
+  same ruling and the same reader), and no round of that request calls
+  anything but the clash's answer (`made_clash::round_called`). Otherwise
+  nothing is replaced or put on, the clash ends (its made skill dropped,
+  as a cancel's), and the model is told to say it left the others as they
+  were and didn't put the new one on, then do anything else asked. A keep
+  or a cancel takes nothing off and is read as before.
 - **A remove that found nothing leaves nothing to say yes to** (the first
   builder's ruling, 18 Nov). On lamp-9adf "Lamp, remove the bitcoin
   warning skill." found nothing; "Yes, remove it." had the model remove
@@ -4747,6 +4772,8 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_make_line_after_the_remove_question_removes_nothing`,
 `a_yes_and_a_make_removes_nothing`, `sure_play_some_music_removes_nothing`,
 `a_question_after_the_remove_question_removes_nothing`,
+`a_question_or_more_after_the_remove_question_removes_nothing`,
+`a_plain_yes_after_the_remove_question_removes_it`,
 `a_yes_whose_round_calls_something_else_removes_nothing`,
 `a_yes_two_lines_after_the_question_removes_nothing`,
 `a_yes_after_a_remove_that_found_nothing_removes_nothing`,
@@ -4756,7 +4783,11 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_yes_is_taken_only_for_the_asked_skill`,
 `skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
 `a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`,
-`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`.
+`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`,
+`only_a_plain_yes_the_code_reads_confirms_a_remove`,
+`a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line`,
+`a_yes_over_the_question_is_asked_again_and_the_next_yes_removes`;
+`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

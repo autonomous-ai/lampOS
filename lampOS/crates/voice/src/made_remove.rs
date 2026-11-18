@@ -828,7 +828,7 @@ pub(crate) mod tests {
         yes::lamp_said(1, "Remove moon fact?");
         assert!(yes::approve_forced_now(now), "the next line must answer it");
         // "Yes, remove it.": the line right after the question, a plain yes.
-        yes::line_heard(2, false, 3);
+        yes::line_heard(2, false, "Yes, remove it.");
         assert_eq!(yes::answered(&id, 2, Some("yes"), Some("moon fax")), None);
         assert_eq!(
             crate::make_skill_local::not_owners_yes_refused(&id, || true),
@@ -960,7 +960,7 @@ pub(crate) mod tests {
             let now = Instant::now();
             let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
             yes::lamp_said(1, "Remove moon fact?");
-            yes::line_heard(2, false, 1);
+            yes::line_heard(2, false, "Yes.");
             let told = yes::answered(&id, 2, Some("yes"), named);
             assert_eq!(told.is_none(), taken, "{named:?}: {told:?}");
             if named.is_none() {
