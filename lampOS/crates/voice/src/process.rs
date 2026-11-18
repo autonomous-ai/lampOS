@@ -451,7 +451,10 @@ impl Worker {
         directory: &Path,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
-        let mut deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        // Read right after the spawn, so a timeout can say how long this
+        // worker was waited for (#7224).
+        let began = startup_now();
+        let mut deadline = began + WORKER_STARTUP_TIMEOUT;
         let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
@@ -509,9 +512,12 @@ impl Worker {
                 None => {}
             }
             if startup_now() >= deadline {
+                // The role and the wait are named, so a journal tells which
+                // worker missed its bound (#7224).
+                let waited = (startup_now() - began).as_millis();
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "worker readiness timed out",
+                    format!("worker readiness timed out ({role} after {waited} ms)"),
                 ));
             }
             std::thread::sleep(Duration::from_millis(2));
@@ -791,6 +797,51 @@ mod fixture_tests {
                 .contains("unexpected worker startup message")
         );
         assert!(moved < Duration::from_secs(1), "{moved:?}");
+    }
+
+    /// A worker that never says Ready is named in the timeout with how long
+    /// it was waited for, so a journal tells which role missed its bound
+    /// (#7224: lamp-c0a4's cold boot ended twice on a bare "timed out").
+    #[test]
+    fn a_worker_that_never_says_ready_is_named_with_how_long_it_waited() {
+        let directory = SessionDirectory::create().unwrap();
+        let dir = &directory.path;
+        let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let channels = WorkerChannels::bind(dir, "capture", parent, boot, false).unwrap();
+        let mut peer = WorkerChannels::bind(dir, "capture", parent, boot, true).unwrap();
+        peer.connect(dir, "capture", true).unwrap();
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut worker = Worker {
+            channels,
+            child,
+            boot,
+            role: "capture".into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            on_stop: None,
+            after_terminate: None,
+        };
+        // Each wait moves the startup clock on by 500 ms, as above.
+        let error = worker
+            .wait_until_ready(dir, || {
+                startup_clock::move_on(Duration::from_millis(500));
+                Ok(())
+            })
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        let said = error.to_string();
+        let waited = said
+            .strip_prefix("worker readiness timed out (capture after ")
+            .and_then(|rest| rest.strip_suffix(" ms)"))
+            .and_then(|ms| ms.parse::<u128>().ok())
+            .unwrap_or_else(|| panic!("role and wait not named: {said}"));
+        assert!((3000..4000).contains(&waited), "waited {waited} ms: {said}");
     }
 
     #[test]
