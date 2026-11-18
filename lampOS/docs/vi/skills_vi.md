@@ -3456,7 +3456,8 @@ cả hai người viết.
   ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
   của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
 - **Chỉ phản ứng nhanh ở lại với DeepSeek (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
-  tắt nếu không đặt, không có trong unit sản phẩm nào; phán quyết của
+  tắt nếu không đặt; bật trong `lamp-voice` của sản phẩm từ lần bật #7764,
+  theo yêu cầu của first builder lúc 00:16 ngày 19/11; phán quyết của
   first builder trên #6811, 18/11 16:23, và tuyến rộng hơn anh đồng ý lúc
   16:34, phán quyết 19:50 về dạng giữa, và câu "do it like V1" của chủ sở
   hữu trên #7764).** Khi đèn có agent, lần gọi đầu của lần tạo là đánh giá
@@ -3506,7 +3507,11 @@ cả hai người viết.
   judged not a quick reaction: to the agent (Hermes), its trigger and one
   task of the request; no DeepSeek draft kept`. Không tạo được (task tắt,
   quyền không công tắc nào cho), được nói rõ và không giữ gì; agent không
-  bao giờ được nhờ viết skill. Lần gọi thêm của dạng giữa từ chối nhắc việc
+  bao giờ được nhờ viết skill. Khi mất internet (đánh giá rồi lần gọi thêm
+  đều lỗi, hoặc không tới được lamp-tasks và bản nháp của DeepSeek lỗi),
+  được nói là mô hình im lặng ("I couldn't make that: the lamp's model
+  didn't answer.", `made_skill::MODEL_SILENT`) và không giữ gì: không có
+  mục `made.json`, không có gói, không bao giờ là skill làm dở. Lần gọi thêm của dạng giữa từ chối nhắc việc
   như brief (`make_no_cannot::reminder_rule`, nói bằng câu của
   `Uncovered::Reminder`, không bao giờ giữ thành task hằng ngày), và sau
   đánh giá đúng, mỗi lần DeepSeek sửa cũng phải qua `quick_reaction`, lần

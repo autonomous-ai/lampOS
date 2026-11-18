@@ -6833,7 +6833,8 @@ the same code for both writers.
   ```` ```shows/NAME.toml ```` block of the answer, within Harness's
   3,000-byte task bound (`MAX_PROMPT_BYTES`, 2,000 before #7245). Hermes's make folder and words are unchanged.
 - **Only a quick reaction stays DeepSeek's (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on`,
-  off unless set, in no product unit; the first builder's ruling on #6811,
+  off unless set; on in the product's `lamp-voice` since #7764's switch-on,
+  the first builder's ask of 19 Nov 00:16; the first builder's ruling on #6811,
   18 Nov 16:23, the wider route he said yes to at 16:34, his 19:50 ruling
   on the middle form, and the owner's "do it like V1" on #7764).** With an
   agent on the lamp, the make's first call is DeepSeek's judgement of the
@@ -6884,6 +6885,11 @@ the same code for both writers.
   the agent (Hermes), its trigger and one task of the request; no DeepSeek
   draft kept`. Not made (tasks off, a grant no switch covers), it is said
   plainly and nothing is kept; the agent is never asked to write the skill.
+  With the internet down (the judgement and then the one more call both
+  failing, or lamp-tasks unreachable and DeepSeek's draft failing), it is
+  said as the model's silence ("I couldn't make that: the lamp's model
+  didn't answer.", `made_skill::MODEL_SILENT`) and nothing is kept: no
+  `made.json` entry, no package, never a half-made skill.
   The middle form's one more call refuses a reminder as the brief does
   (`make_no_cannot::reminder_rule`, said as `Uncovered::Reminder`'s line, never
   kept as a daily task), and after a true judgement each DeepSeek repair is
@@ -6914,6 +6920,7 @@ the same code for both writers.
   `with_the_switch_a_quick_reaction_is_judged_one_and_drafted_with_reflex_steps`,
   `with_the_switch_a_true_judgement_whose_draft_is_no_reaction_goes_to_the_agent`,
   `with_the_switch_a_make_not_a_reaction_keeps_nothing_when_tasks_are_off`,
+  `with_the_switch_a_make_with_the_internet_down_keeps_nothing_and_says_so_plainly`,
   `with_the_switch_a_one_off_reminder_never_reaches_the_agents_make`,
   `with_the_switch_off_a_presence_draft_is_deepseeks_as_before`,
   `with_the_reactions_switch_a_task_on_a_trigger_keeps_the_guards_but_never_on_a_clock`,
