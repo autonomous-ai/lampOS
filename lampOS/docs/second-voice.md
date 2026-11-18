@@ -4678,7 +4678,7 @@ after a take-over, but now for every turn:
   Latency: none, bookkeeping at the verdict. Test (fails with the switch
   off): `a_no_face_follow_up_renews_the_call`.
 - **Held desk talk makes a busy room, with `LAMP_ROOM_HELD_TALK=on`**
-  (off unless set, #7332; the first builder on #7570 at 07:14 on 18 Nov).
+  (on in the product, off unless set elsewhere, #7332; the first builder on #7570 at 07:14 on 18 Nov).
   The room turns busy after three lines left alone as talk inside a
   minute (`room_told.rs`, `BUSY_RUN`, `BUSY_WITHIN_US`). With only talk
   counted (`LAMP_SPOKEN_TO`) a line the rule held as said to nobody
