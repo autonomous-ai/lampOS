@@ -3133,6 +3133,8 @@ fn second_route_worker_environment(
         crate::remember::WHOLE_ENVIRONMENT,
         // And a wellbeing nudge said stopped, snoozed or off (#7878).
         crate::action_claim::NUDGE_ENVIRONMENT,
+        // A live figure said with no lookup behind it (#7605).
+        crate::live_fact::ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -3524,6 +3526,7 @@ mod tests {
             crate::action_claim::SKILL_ENVIRONMENT,
             crate::remember::WHOLE_ENVIRONMENT,
             crate::action_claim::NUDGE_ENVIRONMENT,
+            crate::live_fact::ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -4720,6 +4723,7 @@ mod tests {
                     || name == crate::action_claim::SKILL_ENVIRONMENT
                     || name == crate::remember::WHOLE_ENVIRONMENT
                     || name == crate::action_claim::NUDGE_ENVIRONMENT
+                    || name == crate::live_fact::ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -4979,6 +4983,7 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_LIMIT_LOCAL_ASKS=on",
+                    "LAMP_LIVE_FACT_CHECKED=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
                     "LAMP_MAKE_AGENT_FIRST=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
