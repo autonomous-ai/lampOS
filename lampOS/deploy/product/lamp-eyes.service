@@ -24,6 +24,8 @@ StateDirectoryMode=0700
 # running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
 # made at lamp-control's first start, and a part started before it is not refused.
 InaccessiblePaths=-/var/lib/lampos-control
+# lamp-control's apps socket folder hidden (#7793): no ProtectSystem=strict here, so it could replace apps.sock. "-": made by the tmpfiles.
+InaccessiblePaths=-/run/lampos-apps
 # Looking is never worth a late word.
 Nice=10
 Environment=LAMP_BUS=on

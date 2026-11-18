@@ -41,6 +41,8 @@ use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
+/// What the close frame says when the app was removed.
+pub const CLOSED_REMOVED: &str = "this app was removed";
 /// What the close frame says when the owner revoked the computer.
 pub const CLOSED_REVOKED: &str = "this computer was revoked by the owner";
 /// What the close frame says when the owner changed the computer's grants (`set_grants`): it connects again
@@ -1412,7 +1414,7 @@ pub async fn serve_app_as(
     listener: tokio::net::UnixListener,
     apps: std::path::PathBuf,
     shared: Arc<Shared>,
-    who: fn(Option<i32>) -> Option<String>,
+    who: fn(Option<i32>, u32) -> Option<(String, bool)>,
     on: fn() -> bool,
 ) {
     *shared.apps_dir.lock().expect("apps_dir") = apps.clone();
@@ -1426,7 +1428,9 @@ pub async fn serve_app_as(
                 continue;
             }
         };
-        let pid = stream.peer_cred().ok().and_then(|cred| cred.pid());
+        let cred = stream.peer_cred().ok();
+        let pid = cred.as_ref().and_then(|cred| cred.pid());
+        let uid = cred.as_ref().map_or(u32::MAX, |cred| cred.uid());
         if !on() {
             eprintln!(
                 "lamp-control: app socket: refused pid {}: {}",
@@ -1435,14 +1439,14 @@ pub async fn serve_app_as(
             );
             continue;
         }
-        let Some(name) = who(pid) else {
+        let Some((name, net_unit)) = who(pid, uid) else {
             eprintln!(
                 "lamp-control: app socket: refused pid {}: in no app's unit",
                 pid.unwrap_or(-1)
             );
             continue;
         };
-        let peer = match crate::app_socket::peer_for(&apps, &name) {
+        let peer = match crate::app_socket::peer_for(&apps, &name, net_unit) {
             Ok(peer) => peer,
             Err(why) => {
                 eprintln!(
@@ -1941,6 +1945,44 @@ fn grant_names(grants: &[Grant]) -> String {
         .join(", ")
 }
 
+/// `{"app_forget": NAME}`: an app removed, what lamp-control kept of it gone
+/// and its open connections closed, so a running process cannot set a panel
+/// again at once. The apps helper's alone, with the switch `on`.
+fn forget_app_op(
+    shared: &Shared,
+    name: &str,
+    peer: crate::app_yes::Peer,
+    on: bool,
+    state: Option<&std::path::Path>,
+) -> Value {
+    if !on {
+        return json!({"refused": crate::app_yes::OFF});
+    }
+    // The helper's, or its boot start's finishing a cut remove: nothing else.
+    if !matches!(
+        peer,
+        crate::app_yes::Peer::Helper | crate::app_yes::Peer::Resume
+    ) {
+        return json!({"refused": "not the apps helper"});
+    }
+    if !lamp_skills::app_package::app_name_ok(name) {
+        return json!({"refused": "bad request: name is not an app's name"});
+    }
+    if let Some(state) = state
+        && let Err(why) = crate::app_yes::forget_settings(state, name)
+    {
+        return json!({"refused": why});
+    }
+    let client = crate::app_socket::app_client(name);
+    shared.apps.lock().expect("apps").1.forget_app(name);
+    shared.door.lock().expect("door").forget_data(&client);
+    shared.close_client(&client, CLOSED_REMOVED);
+    eprintln!(
+        "lamp-control: app {name} removed: its settings, panel and notes are gone, its connections closed"
+    );
+    json!({"ok": true})
+}
+
 fn admin_answer(
     shared: &Shared,
     line: &str,
@@ -1961,6 +2003,11 @@ fn admin_answer(
         wall_ms(),
     ) {
         return answer;
+    }
+    // A removed app's kept settings, panel and notes go: the apps helper's
+    // alone, behind the switch (the first builder's P3 on #7714).
+    if let Some(name) = asked.get(crate::app_yes::FORGET).and_then(Value::as_str) {
+        return forget_app_op(shared, name, peer, crate::app_yes::on(), folder.as_deref());
     }
     // The owner's yes to an app, and what lamp-cloud reads of apps (#7415).
     {
@@ -2403,6 +2450,88 @@ mod tests {
             },
         );
         (shared, lines, inbox, newest)
+    }
+
+    /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch
+    /// on, for an app's name; it clears what is kept and closes the app's open
+    /// connections (Heron's P3 on #7793).
+    #[test]
+    fn app_forget_is_the_helpers_and_closes_the_apps_connections() {
+        let (shared, _lines, _inbox, _newest) = stalled();
+        let state = std::env::temp_dir().join(format!("lampos-forget-op-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let client = crate::app_socket::app_client("demo");
+        let connect = |id: u64| {
+            let (outbox, _inbox) = mpsc::unbounded_channel();
+            let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+            let (body_state, _) = watch::channel(None);
+            shared.open.lock().unwrap().insert(
+                id,
+                Open {
+                    client: Some(client.clone()),
+                    outbox,
+                    frames,
+                    events: Default::default(),
+                    phrases: Vec::new(),
+                    grants: Default::default(),
+                    body_state,
+                },
+            );
+        };
+        connect(7);
+        // What is kept of the app, and of another: settings, a panel.
+        std::fs::write(
+            state.join(crate::app_yes::SETTINGS_FILE),
+            json!({"demo": {"k": 1}, "other": {"k": 2}}).to_string(),
+        )
+        .unwrap();
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let at = std::time::Instant::now();
+            apps.1.set_panel("demo", "T", &[], at).unwrap();
+            apps.1.set_panel("other", "T", &[], at).unwrap();
+        }
+        let op = |peer, on, name: &str| forget_app_op(&shared, name, peer, on, Some(&state));
+        // Off, or anyone but the helper, or a bad name: refused, nothing closed.
+        let off = op(crate::app_yes::Peer::Helper, false, "demo");
+        assert_eq!(off["refused"], crate::app_yes::OFF);
+        for peer in [
+            crate::app_yes::Peer::Cloud,
+            crate::app_yes::Peer::Voice,
+            crate::app_yes::Peer::Other,
+        ] {
+            let refused = op(peer, true, "demo");
+            assert_eq!(refused["refused"], "not the apps helper", "{peer:?}");
+        }
+        let bad = op(crate::app_yes::Peer::Helper, true, "../x");
+        assert!(bad["refused"].as_str().unwrap().contains("name"), "{bad}");
+        assert!(shared.open.lock().unwrap().contains_key(&7));
+        assert!(shared.close_reasons.lock().unwrap().is_empty());
+        // A refusal forgot nothing.
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("demo"), Some(1));
+        let kept = std::fs::read_to_string(state.join(crate::app_yes::SETTINGS_FILE)).unwrap();
+        assert!(kept.contains("demo"), "{kept}");
+        // The helper's: its connection closed, with the reason.
+        // The boot start finishing a cut remove may send it too.
+        let resumed = op(crate::app_yes::Peer::Resume, true, "demo");
+        assert_eq!(resumed, json!({"ok": true}));
+        connect(7);
+        let done = op(crate::app_yes::Peer::Helper, true, "demo");
+        assert_eq!(done, json!({"ok": true}));
+        assert!(!shared.open.lock().unwrap().contains_key(&7));
+        assert_eq!(
+            shared.close_reasons.lock().unwrap().get(&7),
+            Some(&CLOSED_REMOVED)
+        );
+        // What was kept of it is gone and the other app's stays.
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("demo"), None);
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("other"), Some(1));
+        let kept = std::fs::read_to_string(state.join(crate::app_yes::SETTINGS_FILE)).unwrap();
+        assert!(!kept.contains("demo") && kept.contains("other"), "{kept}");
+        // Another client of the door is not touched.
+        assert!(shared.open.lock().unwrap().contains_key(&1));
+        let _ = std::fs::remove_dir_all(&state);
     }
 
     fn body_state(yaw: f64) -> Out {

@@ -142,7 +142,9 @@ fn who_may_write_and_take() {
         state: None,
     };
     let yes = five("remove", "demo", json!([]));
-    for peer in [Peer::Helper, Peer::Other] {
+    // Only lamp-cloud records the owner's yes: not the voice (no spoken yes to
+    // an app exists), not the helper, not anyone else.
+    for peer in [Peer::Helper, Peer::Other, Peer::Voice] {
         let got = run(&mut yeses, &live, &place, RECORD, yes.clone(), peer, true);
         assert!(got.get("refused").is_some(), "{peer:?}");
     }
@@ -153,7 +155,7 @@ fn who_may_write_and_take() {
             &place,
             RECORD,
             yes.clone(),
-            Peer::Voice,
+            Peer::Cloud,
             true
         ),
         json!({"ok": true})
@@ -219,7 +221,18 @@ fn the_peer_is_known_by_its_cgroup() {
         )),
         Peer::Helper
     );
+    // The boot start's unit, exactly: its own peer, never the helper's.
+    assert_eq!(
+        peer_of_cgroup(&line(
+            "/lampos.slice/lampos-parts.slice/lamp-apps-start.service"
+        )),
+        Peer::Resume
+    );
     for other in [
+        "/lampos.slice/lampos-parts.slice/lamp-apps-start.service/x",
+        "/lampos.slice/lampos-parts.slice/lamp-apps-start@1.service",
+        "/lampos.slice/lampos-parts.slice/lamp-apps-start.servic",
+        "/lampapps.slice/lamp-apps-start.service",
         "/lampos.slice/lampos-parts.slice/lamp-apps-manage@12.service/x",
         "/lampos.slice/lampos-parts.slice/lamp-apps-manage@.service",
         "/lampos.slice/lampos-parts.slice/lamp-apps-manage@A.service",
@@ -350,6 +363,20 @@ fn the_panel_is_one_a_minute_and_the_socket_is_counted() {
 }
 
 #[test]
+fn a_panels_revision_goes_on_across_runs_and_a_remove_starts_it_again() {
+    let mut live = Live::default();
+    let t0 = Instant::now();
+    live.connection("demo", true);
+    assert_eq!(live.set_panel("demo", "T", &[], t0), Ok(1));
+    // The run ends and another begins: the panel is gone, the revision goes on.
+    live.connection("demo", false);
+    live.connection("demo", true);
+    assert_eq!(live.set_panel("demo", "T", &[], t0 + PANEL_EVERY), Ok(2));
+    live.forget_app("demo");
+    assert_eq!(live.set_panel("demo", "T", &[], t0 + PANEL_EVERY), Ok(1));
+}
+
+#[test]
 fn the_apps_grant_list_is_the_doors_plain_grants() {
     // `lamp_skills::app_package::GRANTS` copies the door's by hand.
     let doors: Vec<String> = crate::protocol::Grant::ALL
@@ -361,4 +388,46 @@ fn the_apps_grant_list_is_the_doors_plain_grants() {
     apps.sort();
     doors.sort();
     assert_eq!(apps, doors);
+}
+
+#[test]
+fn a_removed_apps_kept_settings_are_gone_and_the_others_stay() {
+    let apps = folder("forget-apps");
+    let state = folder("forget-state");
+    install(
+        &apps,
+        "demo",
+        json!([{"key": "loud", "type": "number", "label": "L", "default": 3, "min": 1, "max": 10}]),
+    );
+    install(
+        &apps,
+        "other",
+        json!([{"key": "loud", "type": "number", "label": "L", "default": 3, "min": 1, "max": 10}]),
+    );
+    let (mut yeses, live) = (Yeses::default(), Live::default());
+    let place = Place {
+        apps: &apps,
+        state: Some(&state),
+    };
+    for name in ["demo", "other"] {
+        let set = json!({"name": name, "values": {"loud": 8}});
+        assert_eq!(
+            run(
+                &mut yeses,
+                &live,
+                &place,
+                SETTINGS_SET,
+                set,
+                Peer::Cloud,
+                true
+            )["ok"],
+            true
+        );
+    }
+    forget_settings(&state, "demo").unwrap();
+    forget_settings(&state, "never-there").unwrap();
+    assert_eq!(settings_of(&place, "demo").unwrap()["loud"], json!(3));
+    assert_eq!(settings_of(&place, "other").unwrap()["loud"], json!(8));
+    let _ = std::fs::remove_dir_all(&apps);
+    let _ = std::fs::remove_dir_all(&state);
 }

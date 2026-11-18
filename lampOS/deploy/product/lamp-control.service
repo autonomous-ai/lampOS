@@ -74,6 +74,8 @@ RuntimeDirectoryMode=0700
 ProtectSystem=strict
 # The bus.
 ReadWritePaths=/run/lampos-bus
+# The apps' socket folder, made by the tmpfiles (lampos.conf); `-` so a lamp without it still starts.
+ReadWritePaths=-/run/lampos-apps
 ProtectHome=yes
 PrivateTmp=yes
 CapabilityBoundingSet=

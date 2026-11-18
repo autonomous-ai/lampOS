@@ -9,8 +9,8 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 
 **Status, honestly.** Built: the package format and its reader (piece 1,
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
-3a, `app_yes.rs`) and the app socket without phrases and triggers (piece 3b-1, `app_socket.rs`, [control.md](control.md)). Designed and not yet built: the
-app socket's phrases and triggers (piece 3b-2), lamp-cloud's `apps.*` kinds
+3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). Designed and not yet built: the
+app socket's `app.trigger` and its 3 s hold (piece 3b-2b, with the voice), lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
@@ -130,11 +130,25 @@ before it writes anything.
 
 Installed by `lamp-apps-manage` (root, its own sandbox; eighth's): the app's
 files read-only to it under `/opt/lampOS/apps/<name>/<version>/` with a
-`current` link; its data under `/var/lib/lampOS/apps/<name>/`, which survives
-an update and is deleted by a remove and by forget-everything; the unit
-`lampapp@<name>.service` from a template (`DynamicUser`, no new privileges,
-`Slice=lampos-apps.slice`). Companion skills are placed into the skills folder
-by the same helper with the skill checks.
+`current` link; its data in the unit's state folder
+`/var/lib/private/lampapp-<name>/` (systemd's `DynamicUser`, the units'
+`StateDirectory=lampapp-%i`, one path component), behind the link
+`/var/lib/lampapp-<name>`, which survives an update and is deleted by
+a remove and by forget-everything; the unit `lampapp@<name>.service` from a
+template (`DynamicUser`, no new privileges, `Slice=lampos-apps.slice`), or
+`lampapp-net@<name>.service` for an app whose manifest says `net: true` (the
+same template with the network). A failed or cut install is cleaned (the
+half-written version and temporary folders go, the old `current` stays). A
+remove runs in one order, every step safe to run again: mark it, stop both
+unit variants, wait until neither has a process, clear their failed state,
+delete the data, the code and the companion skills, then, only with both units
+empty, ask lamp-control `{"app_forget": NAME}` so that what it kept of the app
+(settings, panel, notes, clips, moves) goes too, and clear the mark. The boot
+start (`lamp-apps-start.service`, `lamp-apps-manage start-all`) finishes a cut
+remove the same way and may send `app_forget` as well: lamp-control accepts it
+from that unit for this op alone. (The helper's `app_forget` step is piece 2
+part C, #7813; until that is in, a remove does not send it.) Companion skills
+are placed into the skills folder by the same helper with the skill checks.
 
 ### The owner's yes
 
@@ -149,10 +163,10 @@ exactly: a changed byte, grant, `net` or `logs` never matches. `net` and `logs`
 stand outside the grants in the manifest, so they are in the key and in the
 words said back like grants: an update that turns the internet or the logs on
 is a different key and is said back as such (the owner hears "and the
-internet"), never yes'd as "no new grants". Two writers: the voice
-(a spoken yes) and lamp-cloud (the owner's tap in the phone's app, from the
-owner's signed-in account on the lamp's own channel, after the same words the
-voice would say: what it is and the grants it asks), told apart by `by`. The
+internet"), never yes'd as "no new grants". One writer: lamp-cloud
+(the owner's tap in the phone's app, from the owner's signed-in account on the
+lamp's own channel; the tap is the yes, with no separate spoken one: the
+voice's cgroup is refused). The
 helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 `app_yes_record`, `app_yes_take`, answered `{"ok":true}` or `{"refused":WHY}`
 (piece 3a, built: [control.md](control.md)).
@@ -160,8 +174,8 @@ helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 ### The app socket
 
 (Built in pieces 3b-1 and 3b-2a except `app.trigger` and the 3 s hold, which are 3b-2b; the SDK's fake lamp speaks it all. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
-`LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in a root
-0755 folder: the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`),
+`LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in the folder
+`/run/lampos-apps` that the product's `tmpfiles.d` line makes (`d /run/lampos-apps 0755 lampos lampos -`: the shared `lampos` user's, which is also lamp-cloud's and lamp-skills' user, so the folder keeps an app out, not another lampOS part, except that the three `lampos` units with no `ProtectSystem=strict` (lamp-body, lamp-eyes, lamp-tasks, where the agents' shells run) have it hidden, `InaccessiblePaths=-/run/lampos-apps`, and an install test holds every other `lampos` unit to that or to `strict`; lamp-control's unit names it `ReadWritePaths=-/run/lampos-apps` under `ProtectSystem=strict`, and it never makes the folder: its bind fails quietly without it): the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`, or `lampapp-net@<name>.service` for an app whose manifest says `net: true`, and the unit must be the manifest's: a plain unit for a `net` app, or the `net` unit for any other, is refused), and the process must still have the uid the kernel named on connect (a pid that came back as another process is no peer),
 read from `SO_PEERCRED`'s pid, never a name the app says. It speaks the door's
 WebSocket at `/v1` with no TLS and the same frames; `hello` takes any
 well-formed `client` and `sig` and answers with `app` and `version` beside
@@ -171,9 +185,9 @@ its grants allow, each refused `no_grant` without its grant, plus:
 | op | fields | answer |
 |---|---|---|
 | `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them), no phrase twice (`bad_request`, as the schema's `uniqueItems`), no field but `phrases`; an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
-| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters | `{"ok":true}` |
-| `app.settings.get` | none | `{"ok":true,"settings":{key: value,…}}`, every key with its current value |
-| `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"code":"rate","retry_ms":N}` |
+| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true}`; over the rate `{"ok":false,"error":{"code":"rate","retry_ms":N}}` |
+| `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","retry_ms":N}}` |
+| `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"error":{"code":"rate","why":"one panel a minute","retry_ms":N}}`, and the minute holds across the app's reconnects |
 
 Events (`{"ev":…}`): `phrase.heard` `{phrase}` (never what was said),
 `app.trigger` `{trigger, phrase, turn}` (a manifest trigger; the words around
