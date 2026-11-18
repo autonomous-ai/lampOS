@@ -1,6 +1,10 @@
 use super::*;
 use lamp_msgs::DeviceStatus::{Error, Ok as Fine, Refused};
 
+/// One test at a time that reads or writes `MOVING`, the process's one move
+/// in flight: every `run_stop` test and the guard's.
+static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 const WITHIN: Duration = Duration::from_millis(50);
 
 /// A cloud of the test's own: the owner's desk and bottles, answered by
@@ -492,6 +496,7 @@ fn only_commands(cloud: &Fake) -> Vec<&DeviceAsk> {
 /// S3a: a stop asks nothing of the person and goes first.
 #[test]
 fn a_stop_sends_stop_to_the_desk_and_says_so_with_the_kept_list_in_one_round_trip() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
     let mut cache = Cache::default();
     let mut cloud = fake(vec![]);
     // First time: a list, then the stop.
@@ -515,6 +520,7 @@ fn a_stop_sends_stop_to_the_desk_and_says_so_with_the_kept_list_in_one_round_tri
 
 #[test]
 fn a_stop_the_cloud_refuses_or_fails_on_is_never_said_as_stopped() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
     for (status, line) in [(Refused, STOP_REFUSED), (Error, STOP_NOT_SURE)] {
         let mut cloud = fake(vec![]);
         cloud.command = status;
@@ -543,6 +549,7 @@ fn a_stop_the_cloud_refuses_or_fails_on_is_never_said_as_stopped() {
 
 #[test]
 fn a_stop_with_no_desk_says_so_and_sends_nothing() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
     let mut cloud = fake(vec![]);
     cloud
         .rows
@@ -572,10 +579,6 @@ fn the_stop_is_declared_and_routed_with_the_switch_and_off_it_is_nobodys() {
 mod guard {
     use super::*;
     use lamp_msgs::{TouchEvent, TouchGesture};
-    use std::sync::Mutex;
-
-    /// One guard test at a time: `MOVING` is the process's one.
-    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     fn stage(name: &str) -> (std::path::PathBuf, lamp_bus::Bus) {
         let root = std::path::PathBuf::from(format!("/tmp/vdg-{name}-{}", std::process::id()));
@@ -680,6 +683,43 @@ mod guard {
         // The guard ends at its time with no stop sent.
         guard.join().unwrap();
         assert!(asks.recv(Duration::from_millis(100)).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_stop_that_was_not_taken_leaves_the_guard_armed_and_none_listening_is_away_at_once() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let (root, bus) = stage("notok");
+        let guard = arm_guard_on(
+            &bus,
+            "desk-1".into(),
+            Instant::now() + Duration::from_secs(30),
+        )
+        .expect("armed");
+        for status in [Refused, Error] {
+            let mut cloud = fake(vec![]);
+            cloud.command = status;
+            let told = run_stop(&mut cloud, &mut Cache::default(), WITHIN);
+            assert!(!told.1);
+            assert!(moving_now().is_some(), "a stop not taken keeps the guard");
+        }
+        // Nobody listening for asks on the bus: away, at once, the guard kept.
+        let began = Instant::now();
+        let mut link = Bus(Some(lamp_bus::Bus::new(&root).expect("bus")));
+        let told = run_stop(&mut link, &mut Cache::default(), Duration::from_secs(3));
+        assert_eq!(say(&told), AWAY);
+        assert!(
+            began.elapsed() < Duration::from_millis(500),
+            "{:?}",
+            began.elapsed()
+        );
+        assert!(moving_now().is_some());
+        // Taken: the move is over and the guard ends.
+        let mut cloud = fake(vec![]);
+        let told = run_stop(&mut cloud, &mut Cache::default(), WITHIN);
+        assert_eq!(say(&told), STOPPED);
+        assert!(moving_now().is_none());
+        guard.join().unwrap();
         let _ = std::fs::remove_dir_all(root);
     }
 
