@@ -1551,7 +1551,11 @@ With the switch:
     you, Marie! May I remember your face?" "Yes.") is no read-back, since
     its yes may answer only the face (`known_faces::said_back`). Otherwise
     nothing is sent and the model is told to say the name back and ask if
-    it is right (`SAY_IT_BACK`). The voice keeps that refused save
+    it is right (`SAY_IT_BACK`). With `LAMP_FACE_NO_ASK=on` the setup save
+    needs no read-back's yes and none is held: the face is kept only on the
+    speaker-bound route's proof, the eyes seeing that face say its own
+    name, and without it nothing is kept and nothing asked
+    ([onboarding.md](onboarding.md), "With nothing asked"). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
     itself once the person agrees to their face being kept
     (`known_faces::face_agreed`): a plain yes to the face question after
@@ -1740,10 +1744,19 @@ With the switch:
   call `remember_my_face` at once, not to ask, with `LAMP_REMEMBER_SPEAKER`
   on too; without it, that nothing was kept, to ask nothing and say nothing
   about it, but the plain reason if they asked for their face in words
-  (`needs_face::NAME_QUIET`). The setup walk's first save (`at_setup`, its
-  read-back and face question, `FACE_LEAVE`) is not this path and is
-  unchanged. Off, as above, the face question included
+  (`needs_face::NAME_QUIET`). The setup walk's first save (`at_setup`)
+  takes the same proof (#7810, the Reviewer-lead's HOLD and the first
+  builder's ruling): on the speaker-bound route the face seen saying its
+  own name is kept with no face question (`FACE_LEAVE` not asked) and the
+  model says the same line (`SETUP_KEPT_NO_ASK`); a face seen silent while
+  another voice says the name, another person's name, two faces in view,
+  or a save off that route keep nothing and ask nothing, not the read-back
+  nor the face question, and the step ends with the name only
+  (`SETUP_NOT_KEPT_NO_ASK`, `setup_no_ask_speaker`); a plain yes at setup
+  runs no save (`second_provider::yes_save`). Off, as above, the face question included
   (`known_faces::tests::with_no_ask_and_no_speaker_proof_nothing_is_kept_or_asked`,
+  `known_faces::tests::with_no_ask_the_setup_face_is_kept_only_on_the_speakers_proof`,
+  `remember_speaker::tests::remember_speaker_at_setup_with_no_ask_keeps_only_the_face_seen_saying_the_name`,
   `remember_speaker::tests::remember_speaker_with_no_ask_keeps_only_the_speakers_own_face`,
   `needs_face::tests::with_no_ask_a_name_goes_to_the_face_save_unasked`,
   `needs_face::tests::with_no_ask_not_speaker_bound_a_name_keeps_nothing_and_asks_nothing`).
