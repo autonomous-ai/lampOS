@@ -61,6 +61,8 @@ struct Served {
     /// Wait asynchronously for an in-flight read; never hold a blocking
     /// filesystem lock on the server's runtime thread.
     turns_read: Arc<tokio::sync::Mutex<Option<(Instant, Snapshot)>>>,
+    /// True once peek is asked to stop: every open stream ends then (#6401).
+    stopping: tokio::sync::watch::Receiver<bool>,
 }
 
 /// What the views read.
@@ -80,11 +82,45 @@ pub struct Peek {
 }
 
 pub fn router(peek: Arc<Peek>) -> Router {
+    routed(peek, tokio::sync::watch::channel(false).1)
+}
+
+/// How long a stop waits, once every stream is told to end, for the
+/// responses still open before it drops them (#6401): the owner's Off ends
+/// the page within 2 s, under the unit's `TimeoutStopSec=2s`.
+pub const STOP_WITHIN: Duration = Duration::from_secs(1);
+
+/// Serve on `listener` until `asked`: then every open `/events` stream ends
+/// at once and what is still open is dropped after [`STOP_WITHIN`], so no
+/// watcher holds the page open past a stop (#6401, P1 privacy).
+pub async fn serve(
+    listener: tokio::net::TcpListener,
+    peek: Arc<Peek>,
+    asked: impl Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    let (stop, stopping) = tokio::sync::watch::channel(false);
+    let mut stopped = stopping.clone();
+    let service = routed(peek, stopping).into_make_service_with_connect_info::<Conn>();
+    let served = axum::serve(listener, service).with_graceful_shutdown(async move {
+        asked.await;
+        stop.send_replace(true);
+    });
+    tokio::select! {
+        served = served => served,
+        _ = async {
+            let _ = stopped.wait_for(|stopping| *stopping).await;
+            tokio::time::sleep(STOP_WITHIN).await;
+        } => Ok(()),
+    }
+}
+
+fn routed(peek: Arc<Peek>, stopping: tokio::sync::watch::Receiver<bool>) -> Router {
     let served = Arc::new(Served {
         peek,
         status: tokio::sync::Mutex::new(None),
         turns: Arc::default(),
         turns_read: Arc::default(),
+        stopping,
     });
     Router::new()
         .route("/", get(index))
@@ -617,6 +653,13 @@ async fn events(
     headers: HeaderMap,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let session = cookie(&headers, monitor::SESSION_COOKIE).unwrap_or_default();
+    let mut stopping = served.stopping.clone();
+    // Ends at the stop; never without one (a router with no stop has none).
+    let stop = async move {
+        if stopping.wait_for(|stopping| *stopping).await.is_err() {
+            std::future::pending::<()>().await;
+        }
+    };
     let pushes = stream::unfold(
         (served, session, 0u32),
         |(served, session, count)| async move {
@@ -644,7 +687,7 @@ async fn events(
             ))
         },
     );
-    Sse::new(pushes.flatten())
+    Sse::new(pushes.flatten().take_until(stop))
 }
 
 #[cfg(test)]
@@ -668,6 +711,7 @@ mod tests {
             status: tokio::sync::Mutex::new(None),
             turns: Arc::default(),
             turns_read: Arc::default(),
+            stopping: tokio::sync::watch::channel(false).1,
         });
         let (held, locked) = std::sync::mpsc::channel();
         let (release, wait) = std::sync::mpsc::channel();

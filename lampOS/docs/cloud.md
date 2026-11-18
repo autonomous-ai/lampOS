@@ -3133,7 +3133,9 @@ lamp".
   `/etc/systemd/system/lamp-peek.service.d/monitor.conf`
   (`Environment=LAMP_PEEK=monitor`) and restarts `lamp-peek.service` once no
   update holds lamp-update's lock. Off stops it before the result, so no
-  page stays open once the app says off; its sessions end with it. The
+  page stays open once the app says off; its sessions end with it, and
+  every open `/events` stream ends at the stop, the unit within 2 s
+  (`TimeoutStopSec=2s`, peek.md, #6401). The
   product installs `lamp-peek.service` on every lamp, outside
   `lampos.target`, and it exits at once without the drop-in. The reset
   wipes the drop-in.
