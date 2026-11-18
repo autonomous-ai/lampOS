@@ -348,3 +348,17 @@ fn the_panel_is_one_a_minute_and_the_socket_is_counted() {
     live.connection("demo", false);
     assert!(!live.socket("demo"));
 }
+
+#[test]
+fn the_apps_grant_list_is_the_doors_plain_grants() {
+    // `lamp_skills::app_package::GRANTS` copies the door's by hand.
+    let doors: Vec<String> = crate::protocol::Grant::ALL
+        .iter()
+        .map(|grant| json!(grant).as_str().unwrap().to_owned())
+        .collect();
+    let mut apps: Vec<String> = GRANTS.iter().map(|grant| (*grant).to_owned()).collect();
+    let mut doors = doors;
+    apps.sort();
+    doors.sort();
+    assert_eq!(apps, doors);
+}
