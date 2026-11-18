@@ -10758,6 +10758,9 @@ impl Heeding {
             heard,
             name_heard: !signs.names.is_empty(),
             going_on: signs.going_on,
+            // A read-back asks for an answer, however its last sentence
+            // reads (`services::answer_awaited`).
+            lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
             turned,
             pitch,
             looking,
@@ -28069,12 +28072,12 @@ mod tests {
 
     /// #7721 (lamp-74ff, 18 Nov): in a conversation's window, Jay talks
     /// at his phone head down (40 degrees) or with his eyes away: held. Said
-    /// facing, or with the pose unread, or naming the lamp, or a yes the
-    /// lamp waits for: answered.
+    /// facing, or with the pose unread, or naming the lamp, or answering the
+    /// lamp's own question: answered.
     #[test]
     fn with_said_to_me_a_head_down_line_in_a_conversation_is_held() {
         use lamp_msgs::SpeakingState::{No, Yes};
-        let judged = |pose: (Option<f32>, Option<bool>), words: &str| {
+        let judged = |pose: (Option<f32>, Option<bool>), lamp_asked: bool, words: &str| {
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let (now, now_us) = (Instant::now(), monotonic_us());
             turned_face_looks_posed(&eyes, now, 200, &[Some(Yes), Some(No)], &mut 0, pose);
@@ -28084,6 +28087,7 @@ mod tests {
             heeding.hearing_only_said_to_me();
             let signs = super::Signs {
                 going_on: true,
+                lamp_asked,
                 ..turned_signs(crate::room_told::Room::Unknown)
             };
             let verdict = heeding.heed_signs(9, (now_us, now_us + 2_200_000), words, signs);
@@ -28092,21 +28096,32 @@ mod tests {
         };
         let line = "Tell Ada I'm running late now";
         let down = Some(40f32.to_radians());
-        assert!(judged((down, None), line).is_some(), "head down");
-        assert!(judged((None, Some(false)), line).is_some(), "looking away");
-        assert_eq!(judged((Some(0.05), Some(true)), line), None, "facing");
-        assert_eq!(judged((None, None), line), None, "pose unread");
-        let lost = Some(std::f32::consts::FRAC_PI_2);
-        assert_eq!(judged((lost, None), line), None, "lost marks, unread");
+        assert!(judged((down, None), false, line).is_some(), "head down");
+        assert!(
+            judged((None, Some(false)), false, line).is_some(),
+            "looking away"
+        );
         assert_eq!(
-            judged((down, Some(false)), "Lamp, what time is it?"),
+            judged((Some(0.05), Some(true)), false, line),
+            None,
+            "facing"
+        );
+        assert_eq!(judged((None, None), false, line), None, "pose unread");
+        let lost = Some(std::f32::consts::FRAC_PI_2);
+        assert_eq!(
+            judged((lost, None), false, line),
+            None,
+            "lost marks, unread"
+        );
+        assert_eq!(
+            judged((down, Some(false)), false, "Lamp, what time is it?"),
             None,
             "named"
         );
         assert_eq!(
-            crate::said_to_me::awaiting_yes(true, || judged((down, Some(false)), "Yes.")),
+            judged((down, Some(false)), true, "Yes."),
             None,
-            "a yes awaited"
+            "the lamp asked"
         );
     }
 

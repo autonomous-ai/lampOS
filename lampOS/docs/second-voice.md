@@ -5807,7 +5807,12 @@ after a take-over, but now for every turn:
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking while a face in view was read silent
   (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never
-  read is unknown and blocks nothing); but in the window a line whose
+  read is unknown and blocks nothing) and the lamp's own question does not
+  wait for its answer (`said_to_me::Line::lamp_asked`: its newest words
+  asked something, or a read-back waits, `services::answer_awaited`), so a
+  reply to the lamp is the conversation going on through the window,
+  whatever its length or pose; but in the window, with no question of the
+  lamp's waiting, a line whose
   speaker's head is down or up past that window (pitch outside
   `said_to_me::PITCH_DEG`) or looking away over the line is held (#7721,
   lamp-74ff, 18 Nov: the owner, head down talking at his phone just after
