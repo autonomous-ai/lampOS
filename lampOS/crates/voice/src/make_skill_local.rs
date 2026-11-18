@@ -12743,6 +12743,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             panic!("nothing is put on")
         });
         assert!(!keeping.directory.join(crate::long_make::FILE).exists());
+        assert!(
+            !keeping
+                .directory
+                .join(crate::long_make::OFFERS_FILE)
+                .exists(),
+            "no stale count left"
+        );
         assert!(!tells.has_news(at + Duration::from_secs(600), back + 900_000));
         let again =
             crate::long_make::told(&keeping, 6_811_272, note, (back + 900_000, at), || None);
@@ -12909,12 +12916,15 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Twelve's 19:40 P2 on #7774: a long make of a skill with code that
-    /// sends keeps its yes as a finished make's does, the switch to put
-    /// code on at once or not: told ready and why it's off, never "on",
-    /// never put on, and no task yes recorded with nobody's yes.
+    /// Twelve's 19:40 and 20:26 P2s on #7774: a long make of a skill with
+    /// code that sends keeps its yes as a finished make's does, the switch
+    /// to put code on at once or not: told ready and said back as an app
+    /// make's is, its yes awaited; never "on", never put on and no task yes
+    /// recorded with nobody's yes. Its person's yes, after the say-back was
+    /// heard whole, puts exactly that package on, never stranded off.
     #[test]
     fn a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded() {
+        use crate::skill_write_yes as yes;
         crate::long_make::set_on_here(Some(true));
         let (root, keeping) = keeping("run-on-sends");
         made_skill::set_scripts_here(Some(true));
@@ -12927,19 +12937,39 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             &btc,
             json!({"code": true, "grants": ["speak"], "messages": true, "speak": true}),
         );
+        // Its description says what its code may use, as a kept one's does.
+        let grants = ["speak".to_owned()];
+        made_skill::mark(
+            &keeping.directory,
+            &btc,
+            "description",
+            Some(json!(format!(
+                "Texts you the price each morning.{}",
+                made_skill::code_said_as(&grants, false)
+            ))),
+        );
+        let made = made_skill::kept_by_sha256(&keeping.directory, &btc).unwrap();
         let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
         let at = std::time::Instant::now();
         let note = tells.next(at, NOW + 5_000).unwrap();
         let key = crate::long_make::key_of(&note).unwrap().to_owned();
-        let said = crate::long_make::told(&keeping, 6_811_331, note, (NOW + 5_000, at), || None);
+        let request = 6_811_331;
+        let said = crate::long_make::told(&keeping, request, note, (NOW + 5_000, at), || None);
+        let line = format!(
+            "Your btc price skill is ready. {}",
+            made_skill::on_line(&made)
+        );
+        assert!(said.contains(&yes::say_whole(&line)), "{said}");
         assert!(
-            said.contains(&format!(
-                "Your btc price skill is ready. {}",
-                made_skill::not_on_line(made_skill::CODE_BY_VOICE)
-            )),
-            "{said}"
+            said.contains(made_skill::code_said_as(&grants, false).trim()),
+            "what its code may use: {said}"
         );
         assert!(!said.contains("and on"), "{said}");
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(
+            said.ends_with(&format!("{})", yes::then_wait(&id))),
+            "{said}"
+        );
         crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| {
             panic!("a send keeps its yes: never put on, its task's yes never recorded")
         });
@@ -12948,6 +12978,25 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             crate::long_make::read(&keeping.directory, NOW + 7_000),
             None
         );
+        // Its say-back heard whole, then their yes: exactly that package on.
+        yes::lamp_said(request, &line);
+        let asked = manage_helper(&keeping.manage);
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let agreed = yes::approve(&id, request + 1, true, true, at, |asks| {
+            assert!(asks.code, "{asks:?}");
+            assert_eq!(asks.sha256, btc);
+            code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &btc, &["speak"]))),
+                |_| Ok(json!({ "approved": 1 })),
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(asked.join().unwrap()["install_made"], btc.as_str());
+        assert_eq!(entry_of(&keeping, &btc)["on"], true);
+        crate::skill_task_yes::set_on_here(None);
         made_skill::set_code_at_once_here(None);
         made_skill::set_scripts_here(None);
         crate::long_make::set_on_here(None);

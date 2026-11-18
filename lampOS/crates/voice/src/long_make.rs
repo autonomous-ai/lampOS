@@ -29,9 +29,11 @@
 //!   put on then, its person is told why ([`not_on_line`]). One with code of
 //!   its own goes on the same way, by its yes's path with no yes asked, only
 //!   as a finished make's would (`made_skill::code_goes_on_at_once`); one
-//!   that keeps its yes (it sends, or the camera, the microphone or
-//!   hearing) or that the lamp can't run is said ready and off, never on; one that clashes is asked the clash's choice as a finished
-//!   make is ([`told`]). Not back today, it is told the next time.
+//!   that keeps its yes (every one while `LAMP_MADE_CODE_ON_AT_ONCE` is
+//!   off; one that sends, or with the camera, the microphone or hearing,
+//!   always) is read back as an app make's is, its yes awaited, never said
+//!   on; one the lamp can't run is said ready and off. One that clashes is
+//!   asked the clash's choice as a finished make is ([`told`]). Not back today, it is told the next time.
 //! - **A failure, the 10 minutes run out, or a restart** while it ran (the
 //!   mark kept `making`, [`after_start`]; run out, kept so once): one plain
 //!   line, [`not_finished_line`], at the next such moment, and nothing kept.
@@ -314,6 +316,17 @@ pub fn read(directory: &Path, now_ms: u64) -> Option<State> {
 /// Keep `marks` as the mark file in `directory`, written whole and moved
 /// over it; none removes it.
 fn write_all(directory: &Path, marks: &[State]) {
+    // The offers counted for tellings no longer marked go with them, so no
+    // stale count is left (Twelve's 20:26 P3 on #7774).
+    let mut offered = offers(directory);
+    if !offered.is_empty() {
+        let marked: Vec<String> = marks.iter().filter_map(key).collect();
+        let before = offered.len();
+        offered.retain(|offered, _| marked.contains(offered));
+        if offered.len() != before {
+            write_offers(directory, &offered);
+        }
+    }
     if marks.is_empty() {
         let _ = std::fs::remove_file(directory.join(FILE));
         return;
@@ -648,18 +661,28 @@ fn offer_counted(directory: &Path, key: &str, marked: &[String]) -> u32 {
         let times = offers.entry(key.to_owned()).or_default();
         *times += 1;
         let times = *times;
-        let kept = serde_json::to_vec(&offers)
-            .map_err(std::io::Error::other)
-            .and_then(|bytes| {
-                let new = directory.join(format!(".{OFFERS_FILE}.new"));
-                std::fs::write(&new, bytes)?;
-                std::fs::rename(&new, directory.join(OFFERS_FILE))
-            });
-        if let Err(error) = kept {
-            eprintln!("lamp-voice: a long make's offers were not kept: {error}");
-        }
+        write_offers(directory, &offers);
         times
     })
+}
+
+/// `offers` kept as [`OFFERS_FILE`] in `directory`, written whole and moved
+/// over it; none removes it.
+fn write_offers(directory: &Path, offers: &std::collections::BTreeMap<String, u32>) {
+    if offers.is_empty() {
+        let _ = std::fs::remove_file(directory.join(OFFERS_FILE));
+        return;
+    }
+    let kept = serde_json::to_vec(offers)
+        .map_err(std::io::Error::other)
+        .and_then(|bytes| {
+            let new = directory.join(format!(".{OFFERS_FILE}.new"));
+            std::fs::write(&new, bytes)?;
+            std::fs::rename(&new, directory.join(OFFERS_FILE))
+        });
+    if let Err(error) = kept {
+        eprintln!("lamp-voice: a long make's offers were not kept: {error}");
+    }
 }
 
 /// The coordinator's side: the marks read off the made skills' folder,
@@ -899,18 +922,32 @@ pub fn told(
                     crate::made_skill::not_on_line(NO_CODE_HERE)
                 ));
             }
-            // Code that keeps its yes (it sends, or the camera, the
-            // microphone or hearing): never said on nor put on with no yes,
-            // as a finished make's isn't (Twelve's P2 on #7774).
+            // Code that keeps its yes (every skill with code while
+            // `LAMP_MADE_CODE_ON_AT_ONCE` is off; one that sends, or with the
+            // camera, the microphone or hearing, always): never said on nor
+            // put on with no yes, as a finished make's isn't (Twelve's 19:40
+            // P2 on #7774). Said back as an app make's is
+            // (`make_skill_local::app_code_asked`), its yes awaited from
+            // this request on (Twelve's 20:26 P2); `may_tell` holds the
+            // owner seen alone.
             if !on && made.uses.code && !crate::made_skill::code_goes_on_at_once(&made) {
-                eprintln!(
-                    "lamp-voice: request {request}: a long make's skill with code that keeps its yes is told ready and off"
+                let id = crate::skill_write_yes::wait_for_yes_noted(
+                    crate::make_skill_local::code_asks(&made),
+                    request,
+                    now,
                 );
-                return say_only(&format!(
-                    "{} {}",
-                    ready_line(&made.name),
-                    crate::made_skill::not_on_line(crate::made_skill::CODE_BY_VOICE)
-                ));
+                eprintln!(
+                    "lamp-voice: request {request}: a long make's skill with code that keeps its yes is told ready and said back; its yes is awaited"
+                );
+                return format!(
+                    "(Nobody has spoken. {} {})",
+                    crate::skill_write_yes::say_whole(&format!(
+                        "{} {}{link}",
+                        ready_line(&made.name),
+                        crate::made_skill::on_line(&made)
+                    )),
+                    crate::skill_write_yes::then_wait(&id)
+                );
             }
             if !on && !made.uses.code {
                 let clashes = crate::made_clash::found(keeping, &made);
@@ -1011,12 +1048,14 @@ fn replace(directory: &Path, key_of_it: &str, with: Option<State>, now_ms: u64) 
 /// finished make goes on), the index's lock not held while the helper is
 /// waited for; only then is its mark taken off, every other make's kept,
 /// so a crash between leaves it told again, never lost (Twelve's P3 on
-/// #7774). Put on, or on already, `ready_untold` is taken off. Not put
-/// on, it stays off and `ready_untold`, and its mark becomes why
+/// #7774). Put on, or on already, `ready_untold` is taken off. Its put-on
+/// failing, it stays off and `ready_untold`, and its mark becomes why
 /// ([`not_on_line`]), told at the next moment, never left thinking it is
-/// on. One that clashes waits for the choice asked in that turn; one that
-/// keeps its yes stays off. A turn cut or not heard whole calls nothing:
-/// the skill stays off, untold, and is told again next time.
+/// on. One that clashes waits for the choice asked in that turn, and one
+/// with code that keeps its yes for the yes asked in it: each stays off
+/// until then, and loses `ready_untold`, as told. A turn cut or not heard
+/// whole calls nothing: the skill stays off, untold, and is told again
+/// next time.
 pub fn heard(
     keeping: &crate::made_skill::Keeping,
     told: &str,
