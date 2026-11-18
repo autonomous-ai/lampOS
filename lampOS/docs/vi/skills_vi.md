@@ -5000,7 +5000,8 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   trước tên hoặc đầu mệnh đề, được đọc sau khi bỏ các từ đệm ("the", "my",
   "run", "use", "great", "chạy", "cái", "đó", "em", "cho", "làm", …,
   `skill_write_yes::FILLERS`); từ ngay trước "skill" luôn được giữ trừ khi
-  là từ đệm ("my role play skill", "my desk lamp skill"). Không còn từ
+  là từ đệm hoặc từ trả lời, từ nối ("ừ", "okay", "and",
+  `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp skill". Không còn từ
   nào, hoặc chỉ còn các từ trong chính tên kỹ năng đang chờ, kèm "new",
   "old" hay "daily" bên cạnh (`DESCRIBING`), là cái "có" của nó ("Yes, run
   my new weather skill", "the daily weather skill", "yes, the weather

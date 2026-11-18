@@ -1156,6 +1156,20 @@ const FILLERS: &[&str] = &[
     "dùng", "mở", "bật", "cái", "đó", "này", "kia", "em", "anh", "chị", "cho", "làm",
 ];
 
+/// Words said before "skill" that never end a skill's name: the yes
+/// itself and joining words ("ừ skill thời tiết", "okay skill").
+const NEVER_A_NAMES_END: &[&str] = &[
+    "yes", "yeah", "yep", "ok", "okay", "sure", "please", "a", "an", "and", "then", "with", "có",
+    "ừ", "vâng", "được",
+];
+
+/// Whether a word right before "skill" is kept as the end of a name, even a
+/// word that comes before a name ("my role play skill", "my desk lamp
+/// skill"): any word but a filler or one that never ends a name.
+fn ends_a_name(word: &str) -> bool {
+    !FILLERS.contains(&word) && !NEVER_A_NAMES_END.contains(&word)
+}
+
 /// Describing words before "skill" that take nothing from the waiting
 /// skill's own name beside it ("my new weather skill", "the daily weather
 /// skill"), but alone are a name ("yes, the daily skill").
@@ -1269,12 +1283,12 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
             // another skill, listed or not ("my look title skill", "my
             // backup page title skill"): a false refusal only lets the wait
             // go, a false yes runs a skill's grants without consent.
-            // The word right before "skill" is always part of it unless a
-            // filler, even a word that comes before a name ("my role play
-            // skill", "my desk lamp skill"): the pre-push read's false yes.
+            // The word right before "skill" is part of the name unless it
+            // can't end one ([`ends_a_name`]), even a word that comes before
+            // a name ("my role play skill"): the pre-push read's false yes.
             let kept = at
                 .checked_sub(1)
-                .filter(|&before| !FILLERS.contains(&words[before].as_str()));
+                .filter(|&before| ends_a_name(&words[before]));
             let from = kept.unwrap_or(at);
             let start = (0..from)
                 .rev()

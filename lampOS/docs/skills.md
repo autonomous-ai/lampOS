@@ -1999,8 +1999,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   before a name or the clause's start, are read with the fillers left out
   ("the", "my", "run", "use", "great", "chạy", "cái", "đó", "em", "cho",
   "làm", …, `skill_write_yes::FILLERS`); the word right before "skill"
-  always stays unless a filler ("my role play skill", "my desk lamp
-  skill"). None left, or only the waiting skill's own name words, with
+  always stays unless a filler or a yes or joining word ("ừ", "okay",
+  "and", `NEVER_A_NAMES_END`): "my role play skill", "my desk lamp
+  skill". None left, or only the waiting skill's own name words, with
   "new", "old" or "daily" beside them (`DESCRIBING`), is its yes ("Yes, run my new weather
   skill", "the daily weather skill", "yes, the weather skill" for weather
   report, "Ừ, chạy cái skill đó đi", "Có, cái skill đó"); any other word
