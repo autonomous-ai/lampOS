@@ -150,6 +150,46 @@ pub struct Line<'a> {
     pub read_silent: bool,
 }
 
+impl Line<'_> {
+    /// This line with the eyes' signs from `from` to `to`, as the second
+    /// route's worker (`Heeding::not_said_to_me`) and the replay of saved
+    /// lamp journals (`crate::replay`, #7772) both read them: out of a
+    /// conversation's window the turned face's newest pitch and gaze; in it
+    /// the speaker's over the line, turned or not (#7721), the lone face's
+    /// pose counted only when no `another_voice` may be saying the line (the
+    /// Reviewer-lead's HOLD on #7726); a face seen speaking it (in a
+    /// conversation any face, else the turned one) and a face in view read
+    /// silent. With it, for the journal: the number of looks that gave the
+    /// pose, and whether the lone face's pose was skipped for another voice.
+    pub fn with_eyes(
+        self,
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        from: std::time::Instant,
+        to: std::time::Instant,
+        another_voice: bool,
+    ) -> (Self, usize, bool) {
+        let (pitch, looking, looks, skipped) = if self.going_on {
+            let (pitch, looking, looks) = eyes.speaker_pose_between(from, to, !another_voice);
+            let skipped = another_voice
+                && eyes.speaker_pose_between(from, to, true) != (pitch, looking, looks);
+            (pitch, looking, looks, skipped)
+        } else {
+            // The newest look that gave a pose: one look, or none.
+            let (pitch, looking) = eyes.turned_pose_between(from, to);
+            let looks = usize::from(pitch.is_some() || looking.is_some());
+            (pitch, looking, looks, false)
+        };
+        let line = Self {
+            pitch,
+            looking,
+            seen_speaking: eyes.seen_speaking_between(from, to, self.turned && !self.going_on),
+            read_silent: eyes.read_silent_between(from, to),
+            ..self
+        };
+        (line, looks, skipped)
+    }
+}
+
 /// What [`judge`] says of a line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Said {

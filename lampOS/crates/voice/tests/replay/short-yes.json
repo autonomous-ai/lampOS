@@ -1,0 +1,50 @@
+[
+{
+  "case": "7422f-R1-1-r2",
+  "source": "out-7422f-1118-1636 journal-R1-1 request 2, eyes-R1-1-name.txt; a 1-word yes to the held face rename, no eyes sample through it (unknown); the engine then dropped the rename in remember.rs, past this verdict (#7422)",
+  "line_s": [
+    18.68,
+    19.48
+  ],
+  "words": 1,
+  "yes_awaited": true,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
+,
+{
+  "case": "7422f-R2-2-r3",
+  "source": "out-7422f-1118-1636 journal-R2-2 request 3, eyes-R2-2-name.txt; a 6-word yes to the held face rename, which ran",
+  "line_s": [
+    20.49,
+    22.89
+  ],
+  "words": 6,
+  "yes_awaited": true,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
+,
+{
+  "case": "7422f-R1-1-r3",
+  "source": "out-7422f-1118-1636 journal-R1-1 request 3, eyes-R1-1-yes.txt; a 1-word yes after the rename was dropped, the face read speaking; going on taken from the lamp's question 18 s before",
+  "line_s": [
+    3.67,
+    4.47
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": [
+    "S 3.27 1 0.1 2.8 5.5 y y yes resting",
+    "S 3.52 1 0.1 4.3 5.0 y y yes listening",
+    "S 3.78 1 0.1 1.0 3.9 y y yes listening",
+    "S 4.03 1 0.1 -4.0 9.4 y y yes listening",
+    "S 4.28 1 0.1 1.8 6.1 y y yes thinking",
+    "S 4.53 2 0.1 6.6 6.9 y y yes thinking",
+    "S 4.78 2 0.1 8.5 10.6 y y yes thinking"
+  ]
+}
+]
