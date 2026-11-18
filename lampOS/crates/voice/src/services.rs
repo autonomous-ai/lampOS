@@ -1808,8 +1808,15 @@ pub(crate) fn owners_yes_now(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> bool {
+    owners_yes_of(request, heard, owner_of(lease))
+}
+
+/// [`owners_yes_now`] with the line's owner `owner` ([`owner_of`]) read
+/// already: for a check asked later, once the lease is gone
+/// (`make_skill_local`'s make with `LAMP_MAKE_NO_ASKS`, asked only for one
+/// that runs its own code).
+pub(crate) fn owners_yes_of(request: u64, heard: bool, owner: Option<String>) -> bool {
     let private_room = crate::person::private_room();
-    let owner = owner_of(lease);
     let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
         seen_saying_owner(request, owner).0
     });

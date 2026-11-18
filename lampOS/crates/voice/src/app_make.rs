@@ -619,6 +619,11 @@ pub fn make_here_with(
 /// yes's own path (`make_skill_local::code_on_at_once`), and is said as on,
 /// what its code may use, or why not; nothing waits.
 fn put_on_line(keeping: &made_skill::Keeping, made: &made_skill::Made) -> String {
+    // `LAMP_MAKE_NO_ASKS`: on at once, code too (the app's ask is the
+    // owner's), and one line with its undo; never a yes waited for.
+    if let Some((_, line)) = crate::make_no_asks::put_on(keeping, made, || true) {
+        return line;
+    }
     if made_skill::code_goes_on_at_once(made) {
         let on = crate::make_skill_local::code_on_at_once(keeping, made);
         return crate::make_skill_local::code_on_line(made, &on);

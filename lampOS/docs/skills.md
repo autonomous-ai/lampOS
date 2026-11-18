@@ -6957,6 +6957,64 @@ The app's make has no judge and is never refused by it. In another language
 the check is skipped and journaled. `lamp-voice` passes the exact `on` to its
 `provider` and `second` workers. Off, every make is byte for byte as before.
 
+#### Nothing asked (`LAMP_MAKE_NO_ASKS=on`, off)
+
+Off unless `LAMP_MAKE_NO_ASKS=on`, in no product unit (the first builder,
+18 Nov 18:41, from the product owner: "A made skill is made and said in one
+line, with an undo ('Made it, say "remove it" to undo'), never read back
+for a yes. Offers become the action plus that one line. An unsure line is
+simply not acted on, with no 'did you say…?'"; and 18:45: a made skill's
+remove is not in the carve-out). Only "forget everything" and a factory
+reset still ask. On (`crate::make_no_asks`):
+
+- **Made, on, one line.** A voice make, plain or with code of its own, goes
+  on at once and the voice model is told to say one short line in the
+  conversation's language, the skill's name as written, with at most one
+  short clause of what it will do, and no question: "Made evening dim. Say
+  'remove it' to undo." Code goes on by its yes's own path
+  (`make_skill_local::code_on_at_once`: that package by its SHA-256, its
+  task's yes recorded for exactly the grants its code holds), whatever the
+  grants, but only with `LAMP_MADE_SCRIPTS=on` and only on the owner's own
+  ask, held as its spoken yes was (`services::owners_yes_of`); anyone
+  else's code make is kept and not on, said so with why. The cap, the pack
+  check, the grants, `LAMP_TASK_NET` and the run namespace are unchanged.
+  The app's MAKE IT alike, the app's ask the owner's. A skill that sends (a
+  write, or code that messages the phone) keeps its read-back and yes, as
+  that yes is what `lamp-services` sends by. An agent skill
+  (`LAMP_MAKE_NO_CANNOT`) goes on at once and still reads its task back
+  before its first run.
+- **A clash replaces.** A voice make that clashes with skills on the lamp
+  (`made_clash::found`) goes on, then each of them is turned off through the
+  manage helper's own `{"off": NAME}`, as the app's switch does, never
+  deleted: "Made evening dim and replaced your old rest glow. Say 'keep the
+  old one' to undo." A put-on that fails turns nothing off. Nothing waits
+  for a choice.
+- **A remove happens at once.** `make_skill`'s `remove`, the name matched
+  to the person's own made skills as before (`made_remove::found`), removes
+  it on the owner's ask (`services::owners_yes_now`) with no question:
+  taken off by the manage helper, then kept aside for 7 days, its index
+  entry in `undo.json` and its package in `undo/` in the made skills'
+  folder: "Removed moon fact. Say 'put it back' to undo." Several skills
+  with names alike, one they didn't make, or none, remove nothing and ask
+  nothing.
+- **The undo.** `make_skill` takes `undo` with this switch: "last", or a
+  skill's name as heard; whether a line asks to undo is the model's
+  judgment ("remove it", "keep the old one", "put it back"), never a list
+  of words. Only the owner's ask. A make within 10 minutes is removed (and
+  kept aside); a replace within 10 minutes turns the old skills back on,
+  then removes the new one; a remove within 7 days is put back in the
+  index and on, one with code by its yes's own path. After 7 days a kept
+  package is deleted.
+- **Unsure, not acted on.** A make judged not what was asked
+  (`LAMP_MADE_UNRELATED_REFUSED`), or a call with no request, makes nothing
+  and asks nothing: no "Could you say it again?".
+- **Never "on" while off.** A put-on that fails is said in one plain line
+  with why ("I made it but couldn't put it on: …"), and leaves nothing to
+  undo.
+
+`lamp-voice` passes the exact `on` to its `provider` and `second` workers.
+Off, every make and remove is byte for byte as before.
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not
