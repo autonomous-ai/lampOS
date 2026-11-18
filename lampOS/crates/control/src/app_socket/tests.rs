@@ -54,22 +54,27 @@ fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
         assert_eq!(app_of_cgroup(&line(other)), None, "{other}");
     }
     assert_eq!(app_of(None, 0), None);
+    // The id is the name's, never a pid's.
+    assert_eq!(app_client("demo"), app_client("demo"));
+    assert_ne!(app_client("demo"), app_client("demo2"));
+    assert!(app_client("demo").starts_with("c_") && app_client("demo").len() == 18);
+}
+
+/// Reads this process's own `/proc` entry, so on Linux only (macOS has none).
+#[cfg(target_os = "linux")]
+#[test]
+fn the_handle_read_of_proc_gives_a_cgroup_for_its_own_uid_and_nothing_for_anothers() {
     // A pid whose process is not the uid the kernel named is no peer.
     assert_eq!(app_of(Some(std::process::id() as i32), u32::MAX), None);
     // The handle read gives this process's own cgroup for its own uid and
     // nothing for another's: the uid check bites, and the `openat` path works.
     let me = std::process::id() as i32;
-    // SAFETY-free: the uid of this process, from its own `/proc` entry.
     let uid = std::os::unix::fs::MetadataExt::uid(&std::fs::metadata("/proc/self").unwrap());
     let text = cgroup_text(Some(me), Some(uid)).expect("its own cgroup");
     assert!(text.contains(':'), "{text}");
     assert_eq!(cgroup_text(Some(me), Some(uid.wrapping_add(1))), None);
     assert_eq!(cgroup_text(Some(me), None), Some(text));
     assert_eq!(cgroup_text(Some(0), None), None);
-    // The id is the name's, never a pid's.
-    assert_eq!(app_client("demo"), app_client("demo"));
-    assert_ne!(app_client("demo"), app_client("demo2"));
-    assert!(app_client("demo").starts_with("c_") && app_client("demo").len() == 18);
 }
 
 #[test]

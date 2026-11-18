@@ -185,8 +185,8 @@ its grants allow, each refused `no_grant` without its grant, plus:
 | op | fields | answer |
 |---|---|---|
 | `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them), no phrase twice (`bad_request`, as the schema's `uniqueItems`), no field but `phrases`; an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
-| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true}`; over the rate `{"ok":false,"error":{"code":"rate","retry_ms":N}}` |
-| `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","retry_ms":N}}` |
+| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true}`; over the rate `{"ok":false,"error":{"code":"rate","why":"ten a second","retry_ms":N}}` |
+| `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","why":"ten reads a second","retry_ms":N}}` |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"error":{"code":"rate","why":"one panel a minute","retry_ms":N}}`, and the minute holds across the app's reconnects |
 
 Events (`{"ev":…}`): `phrase.heard` `{phrase}` (never what was said),
