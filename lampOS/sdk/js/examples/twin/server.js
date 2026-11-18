@@ -153,7 +153,9 @@ if (bodyGrant) {
 }
 console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}` : 'no body grant: the twin draws the lamp at rest and its body rows are drawn off');
 
-// One lease at a time, taken at the first drag and given back 3 s after the last.
+// One lease at a time, taken at the first drag and given back HOLD_MS after the last (the lease is taken for 30 s; the lamp's own pose
+// comes back when it is given back, so a pose set with a slider stays this long). A `let_go` message gives it back at once.
+const HOLD_MS = 25_000;
 let lease = null;
 let letGo = null;
 // The page's STOP (`stop_all`): from then on no ask goes to the lamp until a page says `resume`.
@@ -178,7 +180,7 @@ async function drag(joint, deg, final = false) {
     }
     if (halted) return; // a STOP came while the lease was being taken: nothing goes out under it
     clearTimeout(letGo);
-    letGo = setTimeout(release, 3_000);
+    letGo = setTimeout(release, HOLD_MS);
     let target = Math.max(-180, Math.min(180, deg));
     if (reachMapNow()) {
       const checked = restrict(reachMapNow(), lastRaw?.joints, joint, target, { shrink: reachShrink });
