@@ -415,10 +415,16 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     }
 }
 
+/// The field of a `busy` refusal that says a make holds the agent
+/// ([`answer_beside_make`]): the voice says so in its own line, not the
+/// failed one (`lamp_voice::agent_asks::MAKING_FIELD`). The code stays
+/// `busy`, so a caller that only reads the code asks again as before.
+pub const MAKING_FIELD: &str = "making";
+
 /// [`answer`], beside a make: with one running (`making`), an ask for a
-/// gateway agent is refused `busy` ([`MAKING`]) at once, never queued
-/// behind the make in the agent's one kept session; a Hermes ask runs on
-/// its own runner as before.
+/// gateway agent is refused `busy` ([`MAKING`], with [`MAKING_FIELD`] true)
+/// at once, never queued behind the make in the agent's one kept session; a
+/// Hermes ask runs on its own runner as before.
 pub fn answer_beside_make(
     line: &[u8],
     asks: &Asks,
@@ -428,7 +434,9 @@ pub fn answer_beside_make(
 ) -> Value {
     if making && matches!(pick(asks), Ok(MakeAgent::Gateway(_))) {
         eprintln!("[lamp-tasks] live ask: refused busy, a make holds the agent's session");
-        return refusal("busy", MAKING);
+        let mut refused = refusal("busy", MAKING);
+        refused[MAKING_FIELD] = Value::Bool(true);
+        return refused;
     }
     answer(line, asks, work, started)
 }
@@ -1060,6 +1068,8 @@ mod tests {
         let told = answer_beside_make(line, &gateway, true, dir.path(), &mut || {});
         assert_eq!(told["error"], "busy", "{told}");
         assert_eq!(told["message"], MAKING);
+        // The voice tells a make apart from another ask by this field.
+        assert_eq!(told[MAKING_FIELD], true, "{told}");
         assert!(turn.seen.lock().unwrap().is_empty());
         let told = answer_beside_make(line, &gateway, false, dir.path(), &mut || {});
         assert_eq!(told["ok"], true, "{told}");

@@ -6559,9 +6559,11 @@ the same code for both writers.
   begun after 15 s). Never when the hand-over failed at once, nor when the
   turn was cut already. The made line is the same either way.
 - **With `LAMP_MAKE_AGENT_ONE_PATH` on (#7371).** An agent's make takes
-  about a minute (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
-  result), so the waiting line says how long: "This takes about a minute.
-  I'm on it." (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
+  about a minute warm (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
+  result) and about three cold (lamp-c0a4, 18 Nov: 184 s after a gateway
+  restart), so the waiting line says how long: "This can take a few
+  minutes. I'll tell you when it's ready."
+  (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
   through the say service alike). In the turn, a make still with no answer
   85 s after its waiting line (`make_skill_agent::LONG_WAIT_AFTER`, about
   90 s from the ask) says "It's taking a bit longer, but I'm still on it."

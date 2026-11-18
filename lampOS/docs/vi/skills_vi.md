@@ -3368,8 +3368,10 @@ cả hai người viết.
   bắt đầu sau 15 giây). Không bao giờ khi lần giao thất bại ngay, hay khi
   lượt đã bị cắt. Câu báo đã tạo không đổi.
 - **Khi bật `LAMP_MAKE_AGENT_ONE_PATH` (#7371).** Một lần tạo của agent mất
-  khoảng một phút (lamp-c0a4, 16/11: 63 giây từ câu chờ tới kết quả), nên
-  câu chờ nói luôn là bao lâu: "This takes about a minute. I'm on it."
+  khoảng một phút khi đã chạy sẵn (lamp-c0a4, 16/11: 63 giây từ câu chờ tới
+  kết quả) và khoảng ba phút khi khởi động lạnh (lamp-c0a4, 18/11: 184 giây
+  sau khi gateway khởi động lại), nên câu chờ nói luôn là bao lâu: "This can
+  take a few minutes. I'll tell you when it's ready."
   (`make_skill_agent::ONE_PATH_WAITING_LINE`, trong lượt cũng như qua dịch
   vụ nói). Trong lượt, một lần tạo vẫn chưa có câu trả lời 85 giây sau câu
   chờ (`make_skill_agent::LONG_WAIT_AFTER`, khoảng 90 giây từ lúc hỏi) nói
