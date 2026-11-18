@@ -11799,6 +11799,94 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// lamp-9adf, 18 Nov: "Lamp, make a skill that reminds me to stretch
+    /// when I've been sitting a long while." was made on someone getting
+    /// up. With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more call
+    /// is told sip-of-water's sitting with a whole answer for it, and a
+    /// model answering so keeps sip-of-water's `for`, once-a-sitting `rearm`
+    /// and `cooldown` in the kept `skill.toml`, on the desk's presence. "When
+    /// I come back to my desk" keeps its arrival, never the desk left.
+    #[test]
+    fn with_the_switch_a_long_sitting_is_sip_of_waters_and_a_coming_back_an_arrival() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-sitting");
+        let shipped: toml::Table =
+            toml::from_str(include_str!("../../../skills/sip-of-water/skill.toml")).unwrap();
+        let sip = shipped["trigger"].as_table().unwrap();
+        const STRETCH: &str =
+            "Lamp, make a skill that reminds me to stretch when I've been sitting a long while.";
+        const BACK: &str = "Lamp, make a skill that tells me the news when I come back to my desk.";
+        let sat = format!(
+            "field = \"someone\"\nequals = true\nfor = \"{}\"\nrearm = \"{}\"\n\
+             cooldown = \"{}\"\n",
+            sip["for"].as_str().unwrap(),
+            sip["rearm"].as_str().unwrap(),
+            sip["cooldown"].as_str().unwrap(),
+        );
+        let back = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n\
+                    absent_for = \"5m\"\n";
+        for (at, (request, answer, name)) in [
+            (
+                STRETCH,
+                trigger_answer("stretch-break", "speak", "room/presence", &sat),
+                "stretch-break",
+            ),
+            (
+                BACK,
+                trigger_answer("desk-news", "net, speak", "room/presence", back),
+                "desk-news",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) = service_sent(vec![judgement(false), (200, answer)]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(
+                sent[1].contains("sip-of-water") && sent[1].contains("stretch"),
+                "the sitting told, with its example: {}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name, "{told}");
+            let words = crate::make_no_cannot::task_words(request);
+            let table = one_task_of(&copy, &words, crate::make_no_cannot::RUN);
+            let trigger = table["trigger"].as_table().unwrap();
+            assert_eq!(
+                trigger["topic"].as_str(),
+                Some("room/presence"),
+                "{table:?}"
+            );
+            assert_eq!(trigger["field"].as_str(), Some("someone"), "{table:?}");
+            assert_eq!(trigger["equals"].as_bool(), Some(true), "{table:?}");
+            if request == STRETCH {
+                for key in ["for", "rearm", "cooldown"] {
+                    assert_eq!(trigger.get(key), sip.get(key), "{key}: {table:?}");
+                }
+                assert!(!trigger.contains_key("when"), "{table:?}");
+            } else {
+                assert_eq!(trigger["when"].as_str(), Some("appears"), "{table:?}");
+                assert!(!trigger.contains_key("for"), "{table:?}");
+            }
+            assert_eq!(table["while"].as_array().map(Vec::len), Some(3));
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The owner's "do it like V1": a judgement with no answer, or one that
     /// isn't sure, sends the make straight to the agent's middle form,
     /// never to a DeepSeek draft.

@@ -6624,7 +6624,15 @@ the same code for both writers.
   from `made_skill::BEHAVIOUR_TEMPLATE`): `[[while]]` on `voice/state`
   `not_equals = "speaking"` for 30 s and `equals = "resting"` for 5 s, and
   on `room/activity` `state not_equals = "head_down"` with
-  `unknown = "holds"`, their topics granted by the lamp. Its grants are
+  `unknown = "holds"`, their topics granted by the lamp. The one more call
+  is also told sip-of-water's sitting, with a whole answer for "when I've
+  sat at my desk a long while, remind me to stretch"
+  (`make_no_cannot::SITTING`, `SAT_EXAMPLE`; lamp-9adf, 18 Nov, where such
+  an ask was made on someone getting up): `room/presence` `someone`
+  `equals = true` with sip-of-water's `for = "30m"`, once a sitting
+  (`rearm = "leaves"`) and `cooldown = "45m"`, never a getting up; coming
+  back to the desk stays an arrival. The model judges which by meaning;
+  off, its prompt is as before. Its grants are
   `make_no_cannot`'s (`net` only with `LAMP_TASK_NET`), it needs skills'
   tasks on (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; asked for by its
   words, `LAMP_UPLOAD_TO_AGENT`), it is said back as a task for the

@@ -3396,7 +3396,15 @@ cả hai người viết.
   (`made_skill::template_guards`, lấy từ `made_skill::BEHAVIOUR_TEMPLATE`):
   `[[while]]` trên `voice/state` `not_equals = "speaking"` 30 giây và
   `equals = "resting"` 5 giây, trên `room/activity` `state not_equals =
-  "head_down"` với `unknown = "holds"`, topic của chúng do đèn cấp. Quyền
+  "head_down"` với `unknown = "holds"`, topic của chúng do đèn cấp. Lần
+  gọi thêm cũng được cho biết cách ngồi lâu của sip-of-water, kèm một câu
+  trả lời mẫu cho "when I've sat at my desk a long while, remind me to
+  stretch" (`make_no_cannot::SITTING`, `SAT_EXAMPLE`; lamp-9adf, 18/11, khi
+  một yêu cầu như vậy bị tạo trên việc ai đó đứng dậy): `room/presence`
+  `someone` `equals = true` với `for = "30m"` của sip-of-water, mỗi lần
+  ngồi một lần (`rearm = "leaves"`) và `cooldown = "45m"`, không bao giờ là
+  đứng dậy; quay lại bàn vẫn là lúc đến. Mô hình chọn theo ý nghĩa; khi tắt,
+  prompt như trước. Quyền
   của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
   của skill bật (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; gọi bằng lời thì
   `LAMP_UPLOAD_TO_AGENT`), được nói lại như một task cho agent và chờ câu
