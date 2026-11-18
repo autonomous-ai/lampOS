@@ -155,8 +155,11 @@ pub fn near(apart: usize, name: &str) -> bool {
 /// [`near`] the whole name ("moon fax" is moon fact). Never a run inside
 /// longer words, so "moon fact" is not "moon", nor "evening dim" "moon
 /// fact" (#7545). Spelling only: no word is judged by what it means.
+/// Marks are taken off the words said first ([`unmarked`], #7634): a made
+/// skill's name is written without them (`den-ngu`), but a Vietnamese
+/// line says "đèn ngủ".
 pub fn same_name(named: &str, name: &str) -> bool {
-    let named = words_of(named).concat();
+    let named = words_of(&unmarked(named)).concat();
     !named.is_empty() && near(distance(&named, &words_of(name).concat()), name)
 }
 
@@ -253,6 +256,21 @@ fn after_none_found(request: u64, name: &str) -> bool {
         })
     });
     after && !line_names(request, name)
+}
+
+/// `said` with its letters' marks taken off ("đèn ngủ" is "den ngu"), as
+/// a skill's name is written: each letter decomposed, its combining marks
+/// left out, and "đ" as "d".
+fn unmarked(said: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    said.nfd()
+        .filter(|letter| !unicode_normalization::char::is_combining_mark(*letter))
+        .map(|letter| match letter {
+            'đ' => 'd',
+            'Đ' => 'D',
+            other => other,
+        })
+        .collect()
 }
 
 /// The person's made skills (the made skills' index), each name once with

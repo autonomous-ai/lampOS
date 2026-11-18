@@ -1131,9 +1131,15 @@ fn task_wait(waiting: &Waiting) -> bool {
 /// what comes before a name ("my look title skill", "use page title
 /// skill"). A name may hold any of them inside it (`start-the-day`); only
 /// its ends are bounded by one.
+///
+/// A yes said without its comma bounds a name too ("okay page title
+/// skill", "go ahead with weather skill", "ừ đèn ngủ skill"; the
+/// adversarial read's P2 on #7634), and "please" before one ("please page
+/// title skill") as after it.
 const BEFORE_A_NAME: &[&str] = &[
     "my", "the", "your", "our", "this", "that", "a", "an", "use", "run", "open", "try", "launch",
-    "start", "play", "what", "which", "yes", "and", "then", "lamp",
+    "start", "play", "what", "which", "yes", "yeah", "yep", "ok", "okay", "sure", "with", "go",
+    "please", "and", "then", "lamp", "có", "ừ", "vâng", "được",
 ];
 
 /// Words that bound a name said after "skill", besides [`BEFORE_A_NAME`]'s
@@ -2937,6 +2943,15 @@ mod tests {
             assert_eq!(other(own), None, "{own}");
             assert_eq!(on_lamp(own, &backup), None, "{own}");
         }
+        // A yes said without its comma still bounds another skill's name.
+        assert_eq!(
+            other_skill_named("okay timer skill", "weather", &[]),
+            Some("timer".into())
+        );
+        assert_eq!(
+            other_skill_named("yeah đèn ngủ skill", "weather", &[]),
+            Some("đèn ngủ".into())
+        );
         // A word after "skill" that names no installed skill is no name
         // (the re-read's P2 on #7634), but with no skill on the lamp read,
         // it fails closed (the final read's P3).
@@ -2959,6 +2974,18 @@ mod tests {
             ("yes, use my my diary skill", "my-diary"),
             ("yes, use skill lamp test email two", "lamp-test-email-2"),
             ("yes, use my page title backup skill", "page-title-backup"),
+            // A yes said without its comma (the adversarial read's P2 on
+            // #7634), and a Vietnamese line against the name as a made
+            // skill's is written, without marks.
+            ("okay page title skill", "page-title"),
+            ("yeah weather skill", "weather"),
+            ("go ahead with weather skill", "weather"),
+            ("sure page title skill", "page-title"),
+            ("please page title skill", "page-title"),
+            ("ừ skill thời tiết", "thoi-tiet"),
+            ("ừ đèn ngủ skill", "den-ngu"),
+            ("vâng, dùng skill đèn ngủ", "den-ngu"),
+            ("được đèn ngủ skill", "den-ngu"),
         ] {
             assert_eq!(other_skill_named(heard, skill, &[]), None, "{heard}");
             let installed = vec![skill.to_owned(), "page-title".to_owned()];

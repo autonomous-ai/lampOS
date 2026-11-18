@@ -525,3 +525,52 @@ fn with_tasks_off_no_wait_begins_and_no_line_approves() {
     assert_eq!(forced("Yes."), None);
     task_yes::set_on_here(None);
 }
+
+/// A skill's task waiting under `name`, as [`page_title`]'s.
+fn task_named(name: &str) -> TaskAsks {
+    TaskAsks {
+        name: name.into(),
+        ..page_title()
+    }
+}
+
+/// The adversarial read's P2 on #7634: a yes said without its comma, as
+/// speech-to-text may give it, is still the yes of the skill it names
+/// ("okay page title skill", "yeah weather skill", "go ahead with weather
+/// skill"), and so is a Vietnamese line naming the skill as its made name
+/// is written, without marks ("ừ đèn ngủ skill" for `den-ngu`). "okay
+/// timer skill" with weather waiting is no yes to weather.
+#[test]
+fn a_yes_said_without_its_comma_is_still_its_skills_yes() {
+    for (heard, waiting, named) in [
+        ("okay page title skill", "page-title", "page title"),
+        ("yeah weather skill", "weather", "weather"),
+        ("go ahead with weather skill", "weather", "weather"),
+        ("ừ skill thời tiết", "thoi-tiet", "thời tiết"),
+        ("ừ đèn ngủ skill", "den-ngu", "đèn ngủ"),
+    ] {
+        let task = task_named(waiting);
+        let id = said_back_unasked_as(task.clone(), Some(&task_yes::line(&task)));
+        yes::set_installed_here(Some(on_the_lamp()));
+        let went = went(
+            heard,
+            vec![answers_naming(&id, "yes", named), said("Okay.")],
+        );
+        assert_eq!(went.ran[0].2["approved"], true, "{heard}: {:?}", went.ran);
+        assert_eq!(went.approved, 1, "{heard}");
+    }
+    let task = task_named("weather");
+    let id = said_back_unasked_as(task.clone(), Some(&task_yes::line(&task)));
+    yes::set_installed_here(Some(on_the_lamp()));
+    let went = went(
+        "okay timer skill",
+        vec![
+            answers_naming(&id, "yes", "weather"),
+            said("Okay, the timer."),
+        ],
+    );
+    assert_eq!(went.approved, 0, "{:?}", went.ran);
+    assert_eq!(went.ran[0].2["approved"], false, "{:?}", went.ran);
+    yes::set_installed_here(None);
+    task_yes::set_on_here(None);
+}

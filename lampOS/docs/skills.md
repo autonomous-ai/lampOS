@@ -1978,10 +1978,16 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   a skill other than the waiting one is never its yes, whatever skill the
   model named. At each "skill" or "skills" in a clause, code reads the
   runs of up to six words right before it or right after it whose both
-  ends sit at the clause's edge, a bounding word ("my", "the", "use",
-  "run", "yes", "and", "please", …, `skill_write_yes::BEFORE_A_NAME`,
-  `AFTER_A_NAME`) or "skill", and matches each by the same match
-  (`made_remove::same_name`) against the waiting skill and the skills on
+  ends sit at the clause's edge, a bounding word or "skill". Before or
+  after a name: "my", "the", "use", "run", "please", "and", and a yes said
+  without its comma ("yes", "yeah", "yep", "ok", "okay", "sure", "go",
+  "with", "có", "ừ", "vâng", "được"), so "okay page title skill" and "go
+  ahead with weather skill" are still the yes (`skill_write_yes::BEFORE_A_NAME`);
+  after a name only, also "now", "too", "for", "to", "is", "instead"
+  (`AFTER_A_NAME`). It matches each run by the same match
+  (`made_remove::same_name`, with marks taken off the words said first,
+  since a made skill's name is written without them: "ừ đèn ngủ skill"
+  names `den-ngu`) against the waiting skill and the skills on
   the lamp (`made_remove::names_on`: the made ones and the skills and
   pushed folders', read only for a line said with "skill" while a task
   waits). The longest match wins: a run naming another installed skill,

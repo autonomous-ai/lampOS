@@ -4979,10 +4979,16 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   nhắc tới kỹ năng khác với kỹ năng đang chờ không bao giờ là cái "có" của
   nó, dù mô hình nêu kỹ năng nào. Tại mỗi "skill" hoặc "skills" trong một
   mệnh đề, code đọc các đoạn tối đa sáu từ ngay trước hoặc ngay sau nó mà
-  cả hai đầu nằm ở mép mệnh đề, một từ giới hạn ("my", "the", "use",
-  "run", "yes", "and", "please", …, `skill_write_yes::BEFORE_A_NAME`,
-  `AFTER_A_NAME`) hoặc "skill", và so khớp từng đoạn theo cùng phép so
-  khớp (`made_remove::same_name`) với kỹ năng đang chờ và các kỹ năng
+  cả hai đầu nằm ở mép mệnh đề, một từ giới hạn hoặc "skill". Trước hoặc
+  sau một tên: "my", "the", "use", "run", "please", "and", và một lời đồng
+  ý nói không có dấu phẩy ("yes", "yeah", "yep", "ok", "okay", "sure",
+  "go", "with", "có", "ừ", "vâng", "được"), nên "okay page title skill" và
+  "go ahead with weather skill" vẫn là cái "có"
+  (`skill_write_yes::BEFORE_A_NAME`); chỉ sau một tên, thêm "now", "too",
+  "for", "to", "is", "instead" (`AFTER_A_NAME`). Code so khớp từng đoạn
+  theo cùng phép so khớp (`made_remove::same_name`, bỏ dấu khỏi các từ đã
+  nói trước, vì tên kỹ năng đã tạo được viết không dấu: "ừ đèn ngủ skill"
+  là `den-ngu`) với kỹ năng đang chờ và các kỹ năng
   trên đèn (`made_remove::names_on`: các kỹ năng đã tạo và các thư mục
   skills và pushed, chỉ đọc cho câu có "skill" khi một task đang chờ).
   Khớp dài nhất thắng: một đoạn nêu tên một kỹ năng khác đã cài, dài hơn
