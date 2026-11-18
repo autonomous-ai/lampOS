@@ -5527,6 +5527,35 @@ Vì vậy Đứng dậy và Vươn vai giữ lời nhắc sau một lần thật
 khi quay lại trong khoảng trống 2 phút của trigger, và không còn giữ sau một
 lần vươn vai tại bàn. Ca: `quiet-after-a-stand-up` của Vươn vai.
 
+**"Tôi vừa uống nước"** (c6972988862 của người xây dựng đầu tiên: "'I just
+had water' snoozes the water nudge for 30 minutes through
+`wellbeing_nudges`"). Việc uống chỉ được thấy với người đã đồng ý trong ứng
+dụng, nên với mọi người khác điều kiện `drank_s_ago` của Uống ngụm nước
+không giúp được. `[stop.done]` của nó (`how = "just_drank"`, `for = "30m"`)
+cho hàm chung duy nhất của nhóm wellbeing, `wellbeing_nudges`, cách thứ tư,
+`just_drank`, mà mô hình được dặn nghĩa là "they say they already had a
+drink (water, tea, anything), not a question or plan ("not yet", "later"):
+no water nudge for 30 minutes, the others as before". `when` chung
+của các kỹ năng wellbeing, điều mô hình thấy trước tiên khi bật
+`LAMP_USE_SKILL_SUMMARY`, cũng nêu nó: "When asked to snooze, turn off or on
+again the lamp's wellbeing nudges (water, eyes, stand up, a break, a meal,
+sit back, wind down), or told they just had a drink. Not for reminders:
+cancel_reminder." Khi được gọi như vậy, Uống ngụm nước không tự bắt đầu gì
+trong 30 phút, một lần tạm hoãn như của `snooze`, trong bộ nhớ, được giữ qua
+một lần khởi động lại ngắn bên cạnh các lần giữ và quên khi khởi động lại
+máy. Một cơ hội đến trong lúc nghỉ được giữ lại, như trong giờ yên lặng,
+không bị bỏ: nó đến khi lúc nghỉ kết thúc, trong khi lần ngồi vẫn còn, nên
+với `rearm = "leaves"`, "tôi vừa uống nước" một phút sau khi ngồi xuống dời
+lời nhắc uống của lần ngồi đó sang phút 31 thay vì làm mất nó (P2 của người
+review trên #7753). Các lời nhắc wellbeing khác vẫn như cũ, có hay không có
+`all`, và một lần tạm hoãn dài hơn đã có thì được giữ (khi đó nó bỏ cơ hội,
+như một lần tạm hoãn). Kiểm thử
+`wellbeing_nudges_takes_just_drank_for_the_water_nudge_alone`,
+`just_drank_rests_the_water_nudge_30_minutes_and_no_other`, và
+`a_just_drank_rest_keeps_its_chance_across_a_restart`
+(`crates/skills/tests/it/holds.rs`). Mô tả đầy đủ của `[stop.done]` ở
+[skills.md](../skills.md), hàng `[stop]`.
+
 ## Một con số từ lần đọc trong ghi chú (#6543, B3)
 
 `note` của một bảng `say` có thể nêu một trường của chủ đề mà lần đọc của nó
