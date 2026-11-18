@@ -476,3 +476,52 @@ fn a_yes_naming_its_own_skill_or_none_is_the_tasks_yes() {
     yes::set_installed_here(None);
     task_yes::set_on_here(None);
 }
+
+/// #7634 with a guest: the line naming another skill is no yes whoever
+/// says it (read before the owner check, as a new ask is); a guest's line
+/// naming page title's own skill is a yes in words, but never the
+/// owner's, so the owner check drops the wait and approves nothing.
+#[test]
+fn a_guests_line_approves_nothing_either_way() {
+    let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+    yes::set_installed_here(Some(on_the_lamp()));
+    yes::line_heard(1, false, "Yes, and use my weather skill.");
+    let told = yes::answered(&id, 1, Some("yes"), Some("page-title")).unwrap();
+    assert_eq!(told["approved"], false, "{told}");
+    assert!(!yes::waits(&id));
+
+    let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+    yes::set_installed_here(Some(on_the_lamp()));
+    yes::line_heard(1, false, "Yes, use my page title skill.");
+    assert_eq!(yes::answered(&id, 1, Some("yes"), Some("page title")), None);
+    let refused = crate::make_skill_local::not_owners_yes_refused(&id, || false).unwrap();
+    assert_eq!(refused["error"], crate::services::OTHER_VOICE, "{refused}");
+    assert!(!yes::waits(&id));
+    yes::set_installed_here(None);
+    task_yes::set_on_here(None);
+}
+
+/// #7634 with a skill's tasks switched off (`LAMP_SKILL_TASKS` not on): no
+/// task's wait begins, so a line naming another skill, or a yes, finds
+/// nothing waiting and approves nothing.
+#[test]
+fn with_tasks_off_no_wait_begins_and_no_line_approves() {
+    yes::clear_for_test();
+    task_yes::set_on_here(Some(false));
+    let refused = task_yes::asked_aloud(
+        "page-title",
+        task_yes::Here {
+            quiet_hours: false,
+            owner_sees_alone: true,
+            asked_by_voice: false,
+        },
+        |_| Ok(Some(page_title())),
+        |_| Ok(()),
+        1_000,
+    );
+    assert_eq!(refused.unwrap_err(), task_yes::OFF);
+    yes::line_heard(1, false, "Lamp, use my look title skill.");
+    assert!(!yes::awaited(Instant::now()));
+    assert_eq!(forced("Yes."), None);
+    task_yes::set_on_here(None);
+}
