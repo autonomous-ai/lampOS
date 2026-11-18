@@ -755,7 +755,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's approximate place (#4333), with LAMP_OWNER_PLACE=on
@@ -770,7 +770,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::place_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's chosen voice and character words (#5394), with
@@ -779,7 +779,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::VOICE_KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::voice_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The app's voice preview (#7485), with LAMP_CHOSEN_VOICE=on too:
@@ -1033,7 +1033,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // app's own key.
         crate::monitor::SET_KIND if on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
-            changes.start(kind, crate::monitor::line(data)?);
+            let (line, request_id) = crate::monitor::line(data)?;
+            changes.start(kind, line, request_id);
             Ok(None)
         }
         kind if crate::monitor::KINDS.contains(&kind) && on(lamp, kind) => {
