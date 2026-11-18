@@ -3705,7 +3705,9 @@ as a Harness task with the agent's own tools
   `"remake":true`. Since the middle form (the first builder's 19:50 ruling)
   a remake is written by the lamp and sends no make here, so none is
   marked today; the cancel stays for any such make.
-  A person's make refused `busy` sends `{"op":"skill_make_cancel"}`, on
+  With `LAMP_REMAKE_OLD_SKILLS` on, a person's make refused `busy` sends
+  `{"op":"skill_make_cancel"}` (with the switch off no remake runs, so no
+  cancel is sent and no cancel line is journaled), on
   the same socket (lamp-voice as root alone, as every line), nothing else
   in it (`bad_request`). A remake's make is ended at once: its run's
   process group killed, or its Harness session closed, as at its deadline

@@ -94,9 +94,25 @@ pub const NOT_ASKED_ALOUD: &str =
 /// What the model is told of an answer that isn't the owner's.
 pub const NOT_OWNER: &str = "only the lamp's owner can have their old skills remade or put back";
 
+#[cfg(test)]
+std::thread_local! {
+    /// [`ENVIRONMENT`] as a test of this thread sets it.
+    static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
 /// Whether the switch is on in this process's environment.
 pub fn on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
     on_with(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+/// [`on`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_on_here(on: Option<bool>) {
+    ON_HERE.with(|here| here.set(on));
 }
 
 /// Whether the switch's value `value` turns it on: exactly `on`.
@@ -1675,12 +1691,52 @@ mod tests {
         json!({"ok": false, "error": "busy", "message": "busy"})
     }
 
+    /// [`ENVIRONMENT`] as this test's thread has it, until dropped.
+    struct SwitchHere;
+
+    impl SwitchHere {
+        fn set(on: bool) -> Self {
+            set_on_here(Some(on));
+            Self
+        }
+    }
+
+    impl Drop for SwitchHere {
+        fn drop(&mut self) {
+            set_on_here(None);
+        }
+    }
+
+    /// With the switch off a person's make refused busy is as before the
+    /// remake: no cancel is sent, so no cancel line is written either.
+    #[test]
+    fn with_the_switch_off_a_busy_make_sends_no_cancel() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let _off = SwitchHere::set(false);
+        let tasks = scripted(
+            "off",
+            |n| match n {
+                1 => busy(),
+                _ => json!({"ok": true, "answer": "made"}),
+            },
+            json!({"ok": true, "cancelled": true}),
+        );
+        let agent = tasks.agent(Duration::from_secs(5));
+        let why = agent.write("S", "B", false).unwrap_err().to_string();
+        assert_eq!(
+            crate::make_skill_agent::not_made_try(&why),
+            made_skill::AGENT_BUSY_TRY
+        );
+        assert_eq!(tasks.ops(), ["skill_make"]);
+    }
+
     /// The reviewer's follow-up on #7765: a person's make refused busy
     /// while a remake runs cancels the remake's make and is sent again at
     /// once, never waiting for the remake's run to end.
     #[test]
     fn a_persons_make_during_a_remake_cancels_it_and_starts_at_once() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let _on = SwitchHere::set(true);
         let tasks = scripted(
             "cancel",
             |n| match n {
@@ -1713,6 +1769,7 @@ mod tests {
     #[test]
     fn a_failed_cancel_says_the_waiting_line_then_waits_within_the_deadline() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let _on = SwitchHere::set(true);
         let tasks = scripted(
             "failed",
             |n| match n {
@@ -1762,6 +1819,7 @@ mod tests {
     #[test]
     fn the_retry_never_passes_the_deadline() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let _on = SwitchHere::set(true);
         let tasks = scripted(
             "deadline",
             |_| busy(),
@@ -1808,6 +1866,7 @@ mod tests {
         use lamp_tasks::skill_task::{Runner, SkillRun};
         use std::sync::Arc;
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let _on = SwitchHere::set(true);
         /// The remake's run holds until cancelled; the person's writes
         /// its answer at once, and when it started is kept.
         #[derive(Default)]

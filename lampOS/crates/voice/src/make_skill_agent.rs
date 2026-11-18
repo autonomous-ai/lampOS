@@ -600,7 +600,8 @@ impl Agent {
             if !busy || remake {
                 return written;
             }
-            if !cancel_asked {
+            // With the switch off no remake runs: nothing is cancelled.
+            if !cancel_asked && crate::made_remake::on() {
                 cancel_asked = true;
                 if self.cancel_remake() && left() >= LEAST_WITHIN {
                     eprintln!(

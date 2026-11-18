@@ -1150,11 +1150,34 @@ agent (`lamp_tasks::skill_make`).
 - **Các câu trả lời:** `{"ok":true,"started":true}` khi lần chạy sắp bắt đầu
   (giọng nói chỉ nói câu chờ khi đó), rồi `{"ok":true,"answer"}`. Nếu không,
   một lời từ chối: `off`, `bad_request`, `too_long`, `busy`, `not_held_off`,
-  `no_namespace`, `run_failed` hoặc `no_answer`. Giọng nói không giao gì
+  `no_namespace`, `run_failed`, `no_answer` hoặc, với một lần làm lại bị
+  hủy, `cancelled`. Giọng nói không giao gì
   khi gặp `off`, `not_held_off`, `no_namespace` hoặc không có socket (bản
   cũ). Nhật ký chỉ ghi kết quả:
   `[lamp-tasks] skill make: refused <code>: <why>`, lý do dạng cố định của
   lời từ chối (`journal_line`), không bao giờ ghi luật hay câu trả lời.
+- **Lệnh hủy** (phần tiếp theo của #7765, `skill_make::CANCEL_OP`): một lần
+  tạo mà lamp-voice gửi khi nó làm lại một kỹ năng cũ (`made_remake`) được
+  đánh dấu `"remake":true`. Từ dạng ở giữa (phán quyết 19:50 của người xây
+  dựng đầu tiên), một lần làm lại do chính đèn viết và không gửi lần tạo nào
+  tới đây, nên hôm nay không lần tạo nào được đánh dấu; lệnh hủy vẫn được giữ
+  cho mọi lần tạo như vậy.
+  Khi `LAMP_REMAKE_OLD_SKILLS` bật, một lần tạo của một người bị từ chối
+  `busy` gửi `{"op":"skill_make_cancel"}` (khi công tắc tắt thì không có lần
+  làm lại nào chạy, nên không gửi lệnh hủy nào và không ghi dòng hủy nào vào
+  nhật ký), trên cùng socket (chỉ lamp-voice với quyền root, như mọi dòng),
+  không có gì khác trong đó (`bad_request`). Lần tạo của một lần làm lại bị
+  kết thúc ngay: nhóm tiến trình của lần chạy bị kill, hoặc phiên Harness của
+  nó bị đóng, như khi tới hạn (`SkillRun::cancel`). Thư mục của nó bị xóa và
+  không giữ lại gì; kết nối riêng của nó được báo `cancelled`. Chỗ được giải
+  phóng, lần chạy của nó được chờ tối đa 0,75 s (`CANCEL_WAIT`). Câu trả lời,
+  `{"ok":true,"cancelled":true}`, tới trong vòng một giây. Lần tạo của một
+  người không bao giờ bị hủy: bị từ chối `not_remake`, nó tiếp tục. Khi không
+  có lần nào đang chạy: `nothing`. Nhận thêm một kết nối
+  (`MOST_CONNECTIONS`, 3), cho một lần tạo bị hủy vẫn đang kết thúc.
+  Kiểm thử: `a_cancel_stops_a_remakes_make_at_once_and_frees_the_slot`,
+  `a_persons_make_is_never_cancelled_and_a_cancel_of_nothing_answers_plainly`,
+  `a_makes_line_may_mark_it_a_remake`, `a_cancelled_run_is_killed_at_once`.
 - **Kiểm thử:** `skill_make::tests`: một lần tạo chạy trong thư mục riêng,
   luật nằm ở đó và câu trả lời được đọc lại, môi trường chỉ có home riêng,
   thư mục bị xóa; home của mỗi lần tạo lúc bắt đầu chỉ có cấu hình nhà cung
