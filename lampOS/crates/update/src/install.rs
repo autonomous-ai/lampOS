@@ -970,8 +970,10 @@ pub fn region_servers(
 
 /// sysstat's collection off (#7254): Debian's `sysstat` timers start
 /// `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
-/// once a day, which write `/var/log/sysstat` on the lamp's SD card for
-/// nothing any part reads (lamp-c0a4 kept about 30 MB by 18 Nov). Each gets a
+/// once a day, which write `/var/log/sysstat` for nothing any part reads.
+/// `/var/log` is the lamp's 47 MB RAM log disk (zram): on lamp-06c1 it reached
+/// 81 %, and past 75 % the base cuts the journal to 5 MB (Friday's reading on
+/// #7254); lamp-c0a4 kept about 30 MB of sysstat by 18 Nov. Each gets a
 /// drop-in that runs it only while [`SYSSTAT_ON_PATH`] is there: a triggered
 /// run then skips at once, nothing is removed, and anyone debugging turns it
 /// back on with that one file.
@@ -980,7 +982,7 @@ pub const SYSSTAT_DROPINS: [&str; 2] = [
     "/etc/systemd/system/sysstat-collect.service.d/lampos.conf",
     "/etc/systemd/system/sysstat-summary.service.d/lampos.conf",
 ];
-pub const SYSSTAT_DROPIN: &str = "# lamp-update (#7254): sysstat's collection writes the SD card every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n\
+pub const SYSSTAT_DROPIN: &str = "# lamp-update (#7254): sysstat's collection fills /var/log, the lamp's 47 MB RAM log disk, every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n\
 [Unit]\n\
 ConditionPathExists=/etc/lampOS/sysstat-on\n";
 
