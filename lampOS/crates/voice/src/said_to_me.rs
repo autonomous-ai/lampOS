@@ -28,6 +28,11 @@
 //! held rename, forget or setup save, a read-back's send, a skill's yes:
 //! the engine's `a_yes_held`, told for the judging by [`awaiting_yes`]): a
 //! reply to the lamp's own question is said to it, however short ("Yes.").
+//! Nor, in a live conversation, a line said when the lamp's own newest
+//! words asked something or a read-back waits for its answer
+//! ([`Line::lamp_asked`], as the rule reads it): the answer window is the
+//! conversation going on, whatever the line's length (#7698: on lamp-06c1 on
+//! 18 Nov a bare "Yes." to the lamp's read-back was held, many times).
 //!
 //! Anything else loses those signs and is journaled `held: <reason>`
 //! ([`Held`]). A lip smack heard as one or two words while the owner faced
@@ -469,5 +474,46 @@ mod tests {
             Said::Held(Held::NotFacingInConversation).verdict(),
             "held: not facing in a conversation (pitch)"
         );
+    }
+
+    /// #7698: the lamp read back what it heard and asked; the person's bare
+    /// "Yes." in the answer window, their face in view read silent, is the
+    /// conversation going on. A question pending makes no line said to the
+    /// lamp outside the window.
+    #[test]
+    fn a_bare_yes_to_the_lamps_own_question_is_answered_in_its_window() {
+        let answer = |heard| Line {
+            heard,
+            going_on: true,
+            lamp_asked: true,
+            read_silent: true,
+            ..Line::default()
+        };
+        for heard in ["Yes.", "Yeah.", "No."] {
+            assert_eq!(judge(answer(heard)), Said::InConversation, "{heard}");
+        }
+        // Past the window, no conversation: the question carries nothing.
+        let late = Line {
+            going_on: false,
+            turned: true,
+            ..answer("Yes.")
+        };
+        assert_eq!(judge(late), Said::Held(Held::NotSeenSpeaking));
+    }
+
+    /// #7698's control: two people talking, Jay and Ada, the lamp asked
+    /// nothing; Ada's bare "Yes." to Jay, her face read silent to the lamp,
+    /// stays held, in a conversation's window or out of one.
+    #[test]
+    fn a_bare_yes_with_no_question_pending_between_two_people_stays_held() {
+        let between = Line {
+            heard: "Yes.",
+            going_on: true,
+            lamp_asked: false,
+            read_silent: true,
+            ..Line::default()
+        };
+        assert_eq!(judge(between), Said::Held(Held::NotSeenSpeaking));
+        assert_eq!(judge(facing("Yes.", true)), Said::Held(Held::Short));
     }
 }
