@@ -37,8 +37,10 @@
 //!   just done, or a name as heard. A make within [`UNDO_WITHIN`] is
 //!   removed (and kept aside); a replace within it puts the old ones back
 //!   on and removes the new one; a remove within [`KEPT_FOR`] is put back
-//!   and on. Only the owner's ask. A make whose words name a skill kept
-//!   aside puts that one back, never a new one ([`put_back_named`]).
+//!   and on. Only the owner's ask. A name is matched to the skills of the
+//!   records as a remove's is (`made_remove::named_alone`, #7830's numbers
+//!   too), so "put the flip a coin skill back" puts that one back, never
+//!   a later one beside it; a make never puts back (Heron's P2 on #7836).
 //! - **Unsure, not acted on.** A made skill judged not what was asked
 //!   (`LAMP_MADE_UNRELATED_REFUSED`), or a call with no request, makes
 //!   nothing and asks nothing ([`NOT_ACTED`]).
@@ -121,6 +123,13 @@ pub const AT_ONCE_TOLD: &str =
 /// which the conversation's note of what was just made names.
 pub const REMOVE_AT_ONCE_TOLD: &str = " Call it at once, never asking first or for a yes; ask \
      which only when two skills they made fit the words alike, never of \"it\".";
+
+/// What `make_skill`'s `undo` adds (#7828's fix 2, the first builder's
+/// call on #7836): a removed skill asked back, by any words, is the undo
+/// with its name, never a make; the model judges the words, and the code
+/// never puts back from a make's (Heron's P2 on #7836).
+pub const UNDO_RESTORE_TOLD: &str = " When the person asks to put back or restore a skill they \
+     removed, call it with that skill, and never make it again.";
 
 /// Why a skill with code of its own isn't put on for anyone but the owner.
 pub const NOT_OWNERS_CODE: &str =
@@ -287,16 +296,26 @@ pub fn made_told(
 /// replaced) are replaced, and only on the owner's ask (`owner`, asked only
 /// then; Twelve's P1 on #7783): each turned off by the manage helper, never
 /// deleted, so "keep the old one" turns them back on ([`undo`]). Anyone
-/// else's make goes on beside them, which stay on. What the model is told,
+/// else's make goes on beside them, which stay on. `first`, those its words
+/// would start, were turned off already ([`words_turned_off`]): replaced
+/// as these are, and back on if it doesn't go on. What the model is told,
 /// and the one line.
 pub fn clashed(
     keeping: &Keeping,
     made: &Made,
-    others: &[String],
+    (others, first): (&[String], &[String]),
     off: Option<&BTreeSet<String>>,
     owner: impl FnOnce() -> bool,
 ) -> (Value, String) {
     if let Err(why) = made_skill::put_on(keeping, made) {
+        // Those turned off for it first come back on.
+        for back in first {
+            if let Err(error) = crate::made_turn::turned_by_helper(&keeping.manage, back, false) {
+                eprintln!(
+                    "lamp-voice: a skill turned off for a make that didn't go on stays off: {error}"
+                );
+            }
+        }
         let line = made_skill::not_on_line(&why);
         return (
             json!({
@@ -317,7 +336,8 @@ pub fn clashed(
             .collect(),
         None => Vec::new(),
     };
-    if on_others.is_empty() || !owner() {
+    let replace_others = !on_others.is_empty() && owner();
+    if first.is_empty() && !replace_others {
         noted(
             &keeping.directory,
             json!({ "kind": "made", "name": made.name, "sha256": made.sha256 }),
@@ -342,9 +362,10 @@ pub fn clashed(
         });
         return (told, line);
     }
-    let mut turned = Vec::new();
+    // Those turned off for its words first (`first`) are replaced too.
+    let mut turned = first.to_vec();
     let mut still_on = Vec::new();
-    for other in &on_others {
+    for other in on_others.iter().filter(|_| replace_others) {
         match crate::made_turn::turned_by_helper(&keeping.manage, other, true) {
             Ok(()) => turned.push(other.clone()),
             Err(why) => still_on.push((other.clone(), why)),
@@ -402,6 +423,43 @@ pub fn clashed(
         );
     }
     (told, line)
+}
+
+/// The person's own made skills a make's words would start (`words`, by
+/// name with why: `made_skill::own_asks_taken`), turned off before it goes
+/// on (Heron's P3 2 on #7836), so it never goes on beside one its words
+/// would start too. Those on (`off`, lamp-skills' `off` file as read) are
+/// turned off by the manage helper; those off already are left. Which were
+/// turned off; or, with the file unreadable or one not turned off, the
+/// why to refuse it by, those turned off before then back on.
+pub fn words_turned_off(
+    keeping: &Keeping,
+    words: &[(String, String)],
+    off: Option<&BTreeSet<String>>,
+) -> Result<Vec<String>, String> {
+    let Some((_, why)) = words.first() else {
+        return Ok(Vec::new());
+    };
+    let Some(off) = off else {
+        eprintln!(
+            "lamp-voice: a made skill's words start a skill the person made, and which are off can't be read: refused (LAMP_MAKE_NO_ASKS)"
+        );
+        return Err(why.clone());
+    };
+    let mut turned: Vec<String> = Vec::new();
+    for (skill, why) in words.iter().filter(|(skill, _)| !off.contains(skill)) {
+        if let Err(error) = crate::made_turn::turned_by_helper(&keeping.manage, skill, true) {
+            eprintln!(
+                "lamp-voice: a skill a made skill's words would start wasn't turned off: refused (LAMP_MAKE_NO_ASKS): {error}"
+            );
+            for back in &turned {
+                let _ = crate::made_turn::turned_by_helper(&keeping.manage, back, false);
+            }
+            return Err(why.clone());
+        }
+        turned.push(skill.clone());
+    }
+    Ok(turned)
 }
 
 #[cfg(test)]
@@ -811,15 +869,35 @@ pub fn undo(keeping: &Keeping, asked: &str, now_unix_ms: u64) -> Value {
     let all = records(&keeping.directory, now_unix_ms);
     let asked = asked.trim();
     let last = asked.is_empty() || asked.eq_ignore_ascii_case(LAST);
+    // The skill a name asks for, among every skill the records name, as a
+    // remove finds one (`made_remove::named_alone`, #7830's numbers too):
+    // "flip a coin" is never flip a coin 2 removed after it.
+    let skills_of = |record: &Value| -> Vec<String> {
+        record["name"]
+            .as_str()
+            .into_iter()
+            .chain(
+                record["others"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str),
+            )
+            .map(str::to_owned)
+            .collect()
+    };
+    let mut named: Vec<String> = all.iter().flat_map(skills_of).collect();
+    named.sort();
+    named.dedup();
+    let named = if last {
+        None
+    } else {
+        made_remove::named_alone(asked, &named)
+    };
     let is_named = |record: &Value| {
-        let near = |name: &str| made_remove::near(made_remove::apart(asked, name), name);
-        record["name"].as_str().is_some_and(near)
-            || record["others"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .any(near)
+        named
+            .as_ref()
+            .is_some_and(|named| skills_of(record).contains(named))
     };
     let Some(record) = all
         .iter()
@@ -989,88 +1067,6 @@ fn put_back(keeping: &Keeping, record: &Value) -> Value {
             "next": said(&format!("I put {spoken} back, but it stays off: {why}.")),
         }),
     }
-}
-
-/// The skill they made and removed, kept aside within [`KEPT_FOR`], that
-/// a make's `words` name (#7828's DEFAULT-ON, fix 2: on lamp-9adf "Put the
-/// flip a coin skill back", just removed, was called as a make and made a
-/// new one): its latest record. Matched by spelling over each of `words`
-/// (the model's request, the line heard) as a remove's name is
-/// (`made_remove::apart`, `made_remove::near`), never by a list of words:
-/// the nearest alone, a name inside another named as it is written being
-/// that other's part ("moon fact" is moon fact, never moon beside it).
-/// None when two kept aside are as near, or a skill they made of that
-/// name is listed again.
-pub fn kept_named(keeping: &Keeping, words: &[&str], now_unix_ms: u64) -> Option<Value> {
-    let listed: BTreeSet<String> = made_skill::entries(&keeping.directory)
-        .iter()
-        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
-        .collect();
-    let kept: Vec<Value> = records(&keeping.directory, now_unix_ms)
-        .into_iter()
-        .filter(|record| record["kind"] == "removed" && in_window(record, now_unix_ms))
-        .collect();
-    let mut named: Vec<(usize, String)> = Vec::new();
-    for record in &kept {
-        let Some(name) = record["name"].as_str() else {
-            continue;
-        };
-        if listed.contains(name) || named.iter().any(|(_, seen)| seen == name) {
-            continue;
-        }
-        let apart = words
-            .iter()
-            .filter(|words| !words.trim().is_empty())
-            .map(|words| made_remove::apart(words, name))
-            .min();
-        if let Some(apart) = apart.filter(|apart| made_remove::near(*apart, name)) {
-            named.push((apart, name.to_owned()));
-        }
-    }
-    let best = named.iter().map(|(apart, _)| *apart).min()?;
-    let mut tied: Vec<&str> = named
-        .iter()
-        .filter(|(apart, _)| *apart == best)
-        .map(|(_, name)| name.as_str())
-        .collect();
-    if best == 0 {
-        let whole = tied.clone();
-        tied.retain(|name| !whole.iter().any(|long| made_remove::inside(name, long)));
-    }
-    let [name] = tied.as_slice() else {
-        return None;
-    };
-    kept.iter()
-        .rev()
-        .find(|record| record["name"] == *name)
-        .cloned()
-}
-
-/// A make whose `words` name a skill they removed, kept aside
-/// ([`kept_named`]), puts that one back and on, as "put it back" does
-/// ([`undo`]), never making a new one, on the owner's ask alone (`owner`,
-/// asked only when one is named). What the model is told; none with the
-/// switch off, when the words name none, or for anyone else's ask, which
-/// is then made as any make is.
-pub fn put_back_named(
-    keeping: &Keeping,
-    words: &[&str],
-    owner: impl FnOnce() -> bool,
-) -> Option<Value> {
-    if !on() {
-        return None;
-    }
-    let record = kept_named(keeping, words, now_unix_ms())?;
-    if !owner() {
-        eprintln!(
-            "lamp-voice: a make named a skill kept aside, not on the owner's ask: made as any make (LAMP_MAKE_NO_ASKS)"
-        );
-        return None;
-    }
-    eprintln!(
-        "lamp-voice: a make named a skill they removed, kept aside: put back, never made anew (LAMP_MAKE_NO_ASKS)"
-    );
-    Some(put_back(keeping, &record))
 }
 
 /// `record` dropped from the records.
