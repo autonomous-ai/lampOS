@@ -419,10 +419,14 @@ pub fn set_english_here(english: Option<bool>) {
 /// The switch for a skill made by the lamp's agent unless it is a quick
 /// reaction (the first builder's ruling on #6811, 18 Nov 16:23, points 1
 /// to 3, with the scope asked after it: only quick reactions stay with
-/// DeepSeek): `on` only, off unless set, in no product unit. On, a voice
-/// or app make whose DeepSeek draft is not a quick reaction
-/// ([`quick_reaction`]) is made by the lamp's agent with sip-of-water's
-/// guards as its template (`crate::make_skill_local`); a `[[while]]` on
+/// DeepSeek; his 19:50 ruling, the middle form; the owner's "do it like V1"
+/// on #7764): `on` only, off unless set, in no product unit. On, a voice
+/// or app make is first judged a quick reaction or not by DeepSeek
+/// ([`REACTION_JUDGE`]); only one judged so is drafted, and a draft that
+/// is no quick reaction ([`quick_reaction`]) is never kept. Any other is
+/// written by the lamp as one task for its agent, on the trigger its own
+/// model picks, with sip-of-water's guards ([`template_guards`],
+/// `crate::make_skill_local`, `crate::make_no_cannot::skill_text`); a `[[while]]` on
 /// [`GUARD_TOPICS`] is a guard, granted and said plainly ([`guards_said`]);
 /// a skill on a presence or person topic ([`BEHAVIOUR_TOPICS`]) keeps the
 /// lamp's manners even loosened; and who made it is written
@@ -527,6 +531,37 @@ pub fn quick_reaction(toml: &str) -> bool {
         && !says_a_marker(&table)
 }
 
+/// What the lamp's own model is told for a make's first call with
+/// [`reactions_on`] (the owner's "do it like V1" on #7764): a judgement of
+/// the request's meaning alone, never a draft and never a word list: is it
+/// a quick reaction? Judged one, DeepSeek drafts it, the draft still held
+/// to [`quick_reaction`]; judged none, unsure or no answer, the make goes
+/// straight to the lamp's agent ([`reaction_judged`]).
+pub const REACTION_JUDGE: &str = "You judge, for a desk lamp, what kind of skill a person \
+asks it to make, by what the request means, in any language. A quick reaction is one the person \
+starts themselves, by saying a phrase, touching or patting the lamp or pressing its button, and \
+that only changes the lamp's light, moves its body, says fixed words or hums. Anything else is \
+not one: a skill that needs the internet, a sensor or the camera, a time of day, reading or \
+sending anything, remembering, or thinking about what to say or do. A one-off reminder or timer \
+is the lamp's own timer, never a skill: judge it a quick reaction, so the lamp tells the person \
+so. Answer only one line of JSON and nothing else: {\"quick_reaction\": true or false, \
+\"reason\": \"a few words\"}.";
+
+/// The judgement's request ([`REACTION_JUDGE`]): the person's words alone.
+pub fn reaction_brief(request: &str) -> String {
+    format!("Request: {}", request.trim())
+}
+
+/// The model's judgement ([`REACTION_JUDGE`]) read: `quick_reaction`'s
+/// value in its one JSON object, fenced or not; `None` when there is none
+/// or it isn't a bool. Its reason is never read, so never journaled.
+pub fn reaction_judged(answer: &str) -> Option<bool> {
+    let from = answer.find('{')?;
+    let to = answer.rfind('}')?;
+    let judged: Value = serde_json::from_str(answer.get(from..=to)?).ok()?;
+    judged.get("quick_reaction")?.as_bool()
+}
+
 /// Whether a say step's words begin, in any case, with the make's own
 /// marker: [`crate::make_no_cannot::NEEDS_NET`] or [`CANNOT`], the model's
 /// line for what no step does, written as words to say (lamp-9adf, 18
@@ -580,9 +615,10 @@ fn behaviour_trigger_of(toml: &str) -> bool {
     })
 }
 
-/// What the lamp's agent is told, beside its rules, for a make that isn't
-/// a quick reaction (#6811, point 2): sip-of-water's guards for a behaviour
-/// nudge, as a whole skill the lamp's check takes. Its line is exact words,
+/// Sip-of-water's guards for a behaviour nudge (#6811, point 2), as a
+/// whole skill the lamp's check takes: since the middle form (19:50), the
+/// source of the guards a task the lamp writes keeps ([`template_guards`]),
+/// no longer told to the agent. Its line is exact words,
 /// as a made skill's say is ([`say_text`]), never sip-of-water's note for
 /// the voice to word: a made skill's say is said as written.
 pub const BEHAVIOUR_TEMPLATE: &str = "A nudge on a sitting, an arrival or a leaving \
@@ -655,6 +691,21 @@ pub fn behaviour_template_toml() -> &'static str {
         .split_once("```skill.toml\n")
         .and_then(|(_, rest)| rest.split_once("```"))
         .map_or("", |(toml, _)| toml)
+}
+
+/// [`BEHAVIOUR_TEMPLATE`]'s `[[while]]` guards alone, as TOML: what a task
+/// the lamp writes on a trigger keeps with [`reactions_on`] (the first
+/// builder's 19:50 ruling on #6811, the middle form;
+/// `crate::make_no_cannot::skill_text`), its topics granted as any guard's
+/// ([`topic_granted`]).
+pub fn template_guards() -> &'static str {
+    let toml = behaviour_template_toml();
+    toml.find("[[while]]")
+        .and_then(|from| {
+            let guards = &toml[from..];
+            guards.find("\n[active]").map(|to| guards[..to].trim())
+        })
+        .unwrap_or_default()
 }
 
 /// The `[[while]]`s of `table` said plainly when each is one of the lamp's
@@ -18884,6 +18935,33 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             "the internet: what a place",
         );
         assert!(quick_reaction(&inside), "{inside}");
+    }
+
+    /// The owner's "do it like V1" on #7764: the first call's judgement
+    /// read as the model's bool alone; anything else is unsure.
+    #[test]
+    fn a_reaction_judgement_is_read_as_its_bool_alone() {
+        for (answer, judged) in [
+            (
+                "{\"quick_reaction\": true, \"reason\": \"a pat\"}",
+                Some(true),
+            ),
+            (
+                "```json\n{\"quick_reaction\": false, \"reason\": \"a price\"}\n```",
+                Some(false),
+            ),
+            ("{\"quick_reaction\": \"yes\"}", None),
+            ("{\"reason\": \"a pat\"}", None),
+            ("true", None),
+            ("", None),
+            ("{not json}", None),
+        ] {
+            assert_eq!(reaction_judged(answer), judged, "{answer}");
+        }
+        assert_eq!(
+            reaction_brief("  when I pat you, glow "),
+            "Request: when I pat you, glow"
+        );
     }
 
     #[test]
