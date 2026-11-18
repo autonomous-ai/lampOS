@@ -1995,17 +1995,21 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   skill page title backup" with `page-title-backup` on the lamp is not
   page title's yes); else a run naming the waiting skill is its own name
   ("yes, use my lamp test email two skill", "Có, dùng skill page title").
-  With neither, and the lamp's skills read, the line names no other
-  skill: words before or after "skill" that name no installed skill take
-  nothing from the yes ("Yes, run my new weather skill", "the daily
-  weather skill", "Ừ, chạy cái skill đó đi", "Có, cái skill đó", "yes,
-  run the skill again"). With none read (none listed, or the folders
-  unread) it fails closed: the words before "skill", back to a word that
-  comes before a name or the clause's start, name another skill unless a
-  run of them is the waiting skill's own name ("my new weather skill" for
-  weather) or they are one filler ("great", "nice", "same", "new", "old",
-  "chạy", "dùng", "mở", "bật", …, `skill_write_yes::FILLERS`); with none
-  before it, the words right after "skill" do
+  With neither, the words before "skill", back to a word that comes
+  before a name or the clause's start, are read with the fillers left out
+  ("the", "my", "run", "use", "new", "daily", "great", "chạy", "cái", "đó",
+  "em", "cho", "làm", …, `skill_write_yes::FILLERS`): none left, or only
+  the waiting skill's own name words, is its yes ("Yes, run my new weather
+  skill", "the daily weather skill", "yes, the weather skill" for weather
+  report, "Ừ, chạy cái skill đó đi", "Có, cái skill đó"); any other word
+  left names another skill, listed or not ("Lamp, use my look title
+  skill." even when look title is not on the lamp: being made, refused at
+  load or misheard; "my backup page title skill"). Safety first: a false
+  yes runs a skill's grants without consent, a false refusal only lets
+  the wait go. After "skill", with the lamp's skills read, words that name
+  no installed skill are nothing ("yes, run the skill again"); with none
+  read (none listed, or the folders unread) the words right after it fail
+  closed
   (`skill_write_yes::other_skill_named`, marked per request by
   `line_heard`). Its `yes` is read as `new_ask`: nothing kept, the wait
   let go, and the line answered as its own ask (the named skill used or
@@ -2013,12 +2017,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   plain "Yes." are still page title's yes; "Yes, and use my weather
   skill." with weather on the lamp is not. Accepted limits: a line without
   the word "skill" is not read (its `named` alone binds it, #7545); "kỹ
-  năng" is not read; with the skills read, a skill that is not listed
-  (one refused at load and gone from the folders) is no other skill, so
-  "use my look title skill" is left to `named`, and words in another
-  order than an installed name ("my backup page title skill" with
-  `page-title-backup`) are no match; with none read, one word before
-  "skill" that is not a filler ("Yes, awesome skill.") fails closed. A
+  năng" is not read; a describing word that is not a filler ("Yes,
+  awesome skill.", "my old-style weather skill") fails closed. A
   remove's wait is not read for another skill: it keeps its own rule, a
   plain yes on the line right after its question (#7683), so "Yes, and
   remove the joke time skill too." removes nothing. The

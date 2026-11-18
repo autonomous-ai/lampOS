@@ -261,7 +261,7 @@ fn after_none_found(request: u64, name: &str) -> bool {
 /// `said` with its letters' marks taken off ("đèn ngủ" is "den ngu"), as
 /// a skill's name is written: each letter decomposed, its combining marks
 /// left out, and "đ" as "d".
-fn unmarked(said: &str) -> String {
+pub(crate) fn unmarked(said: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
     said.nfd()
         .filter(|letter| !unicode_normalization::char::is_combining_mark(*letter))

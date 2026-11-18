@@ -4996,19 +4996,23 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   page title backup" khi có `page-title-backup` trên đèn không phải cái
   "có" của page title); nếu không, một đoạn nêu tên kỹ năng đang chờ là
   tên của chính nó ("yes, use my lamp test email two skill", "Có, dùng
-  skill page title"). Nếu không có cả hai và đã đọc được các kỹ năng trên
-  đèn, câu đó không nhắc tới kỹ năng nào khác: các từ trước hoặc sau
-  "skill" không nêu tên kỹ năng đã cài nào thì không lấy mất cái "có"
-  ("Yes, run my new weather skill", "the daily weather skill", "Ừ, chạy
-  cái skill đó đi", "Có, cái skill đó", "yes, run the skill again"). Khi
-  không đọc được kỹ năng nào (không có trong danh sách, hoặc không đọc
-  được thư mục) thì thất bại theo hướng an toàn: các từ trước "skill",
-  lùi về tới một từ đứng trước tên hoặc đầu mệnh đề, là tên kỹ năng khác,
-  trừ khi một đoạn trong đó là chính tên kỹ năng đang chờ ("my new weather
-  skill" cho weather) hoặc chỉ là một từ đệm ("great", "nice", "same",
-  "new", "old", "chạy", "dùng", "mở", "bật", …,
-  `skill_write_yes::FILLERS`); nếu không có từ nào trước nó thì là các từ
-  ngay sau "skill" (`skill_write_yes::other_skill_named`, được đánh dấu
+  skill page title"). Nếu không có cả hai, các từ trước "skill", lùi về tới một từ đứng
+  trước tên hoặc đầu mệnh đề, được đọc sau khi bỏ các từ đệm ("the", "my",
+  "run", "use", "new", "daily", "great", "chạy", "cái", "đó", "em", "cho",
+  "làm", …, `skill_write_yes::FILLERS`): không còn từ nào, hoặc chỉ còn
+  các từ trong chính tên kỹ năng đang chờ, là cái "có" của nó ("Yes, run
+  my new weather skill", "the daily weather skill", "yes, the weather
+  skill" cho weather report, "Ừ, chạy cái skill đó đi", "Có, cái skill
+  đó"); còn bất kỳ từ nào khác thì là tên kỹ năng khác, có trong danh sách
+  hay không ("Lamp, use my look title skill." kể cả khi look title không
+  có trên đèn: đang được tạo, bị từ chối lúc nạp hoặc nghe nhầm; "my
+  backup page title skill"). An toàn trước: một cái "có" sai chạy quyền
+  của một kỹ năng mà không có sự đồng ý, còn một lời từ chối sai chỉ bỏ
+  việc chờ. Sau "skill", khi đã đọc được các kỹ năng trên đèn, các từ
+  không nêu tên kỹ năng đã cài nào thì không là gì ("yes, run the skill
+  again"); khi không đọc được kỹ năng nào (không có trong danh sách, hoặc
+  không đọc được thư mục) các từ ngay sau nó thất bại theo hướng an toàn
+  (`skill_write_yes::other_skill_named`, được đánh dấu
   theo từng request bởi `line_heard`). `yes` của nó được đọc là
   `new_ask`: không giữ gì, bỏ việc chờ, và câu đó được trả lời như một yêu
   cầu riêng (kỹ năng được nhắc tới được dùng hoặc hỏi). "yes, use my page
@@ -5016,13 +5020,8 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   là cái "có" của page title; "Yes, and use my weather skill." khi có
   weather trên đèn thì không. Giới hạn được chấp nhận: câu không có từ
   "skill" thì không được đọc (chỉ `named` gắn nó, #7545); "kỹ năng" không
-  được đọc; khi đã đọc được các kỹ năng, một kỹ năng không có trong danh
-  sách (bị từ chối lúc nạp và không còn trong thư mục) không phải kỹ năng
-  khác, nên "use my look title skill" được để cho `named`, và các từ theo
-  thứ tự khác với một tên đã cài ("my backup page title skill" khi có
-  `page-title-backup`) không khớp; khi không đọc được kỹ năng nào, một từ
-  trước "skill" không phải từ đệm ("Yes, awesome skill.") thất bại theo
-  hướng an toàn. Việc chờ gỡ kỹ năng không được đọc để tìm kỹ năng khác:
+  được đọc; một từ mô tả không phải từ đệm ("Yes, awesome skill.") thất
+  bại theo hướng an toàn. Việc chờ gỡ kỹ năng không được đọc để tìm kỹ năng khác:
   nó giữ quy tắc riêng, một cái "có" đơn thuần ở ngay câu sau câu hỏi
   (#7683), nên "Yes, and remove the joke time skill too." không gỡ gì.
   Nhật ký: "… was a new ask, not an answer (a

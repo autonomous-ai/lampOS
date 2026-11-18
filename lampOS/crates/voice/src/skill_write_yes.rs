@@ -1146,11 +1146,15 @@ const BEFORE_A_NAME: &[&str] = &[
 /// ("use skill page title please").
 const AFTER_A_NAME: &[&str] = &["please", "now", "too", "for", "to", "is", "instead"];
 
-/// One word before "skill" that is never a skill's name when it names no
-/// skill on the lamp: "great skill", "the same skill", and the Vietnamese
-/// verbs said before it ("Có, chạy skill đi").
+/// Words before "skill" that name no skill (#7634): what is said around a
+/// name, English and Vietnamese ("run my new weather skill", "Ừ, chạy cái
+/// skill đó đi", "Vâng, em chạy skill đi", "great skill"). Left out, what
+/// remains is read against the waiting skill's own name words
+/// ([`other_skill_named`]).
 const FILLERS: &[&str] = &[
-    "great", "nice", "the", "that", "this", "same", "new", "old", "chạy", "dùng", "mở", "bật",
+    "great", "nice", "the", "that", "this", "same", "new", "old", "daily", "my", "run", "use",
+    "start", "open", "chạy", "dùng", "mở", "bật", "cái", "đó", "này", "kia", "em", "anh", "chị",
+    "cho", "làm",
 ];
 
 /// The most words a skill's name is said in, before or after "skill".
@@ -1183,23 +1187,32 @@ fn bounds(word: &str) -> bool {
 ///   (`page-title-backup`, not `page-title`). Else a run naming `skill`
 ///   names its own: "yes, use my lamp test email two skill",
 ///   "Có, dùng skill page title".
-/// - **Else, with the lamp's skills read:** nothing. Words before or after
-///   "skill" that name no installed skill are never another's ("Yes, run
-///   my new weather skill", "the daily weather skill", "Ừ, chạy cái skill
-///   đó đi", "yes, run the skill again"), so the yes stands.
-/// - **Else, with none read** (`installed` empty: none listed, or the
-///   folders unread), it fails closed: the words before "skill", back to a
-///   word that comes before a name ([`BEFORE_A_NAME`]) or the clause's
-///   start, at most [`NAME_WORDS`], name another skill unless a run of
-///   them is `skill`'s own name ("my new weather skill" for weather) or
-///   they are one filler ([`FILLERS`]: "great skill"); "my look title
-///   skill" names look title. With none before it, the words right after
-///   "skill", up to a bounding word, name another.
+/// - **Else, before "skill":** the words back to a word that comes before
+///   a name ([`BEFORE_A_NAME`]) or the clause's start, at most
+///   [`NAME_WORDS`], fillers ([`FILLERS`]) left out. None left ("Ừ, chạy
+///   cái skill đó đi", "great skill"), or only `skill`'s own name words
+///   ("Yes, run my new weather skill", "the weather skill" for weather
+///   report): its own. Any other word left names another skill, listed
+///   or not ("my look title skill", "my backup page title skill"): safety
+///   first, as a false yes runs a skill's grants without consent.
+/// - **Else, after "skill":** with the lamp's skills read, words that name
+///   no installed skill are nothing ("yes, run the skill again"); with
+///   none read (`installed` empty), the words right after it, up to a
+///   bounding word, fail closed as another's.
 ///
 /// A line with no "skill" names none, nor does "kỹ năng". Spelling only:
 /// no word is judged by what it means.
 pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Option<String> {
     let own = |run: &[String]| crate::made_remove::same_name(&run.join(" "), skill);
+    // A word as a made skill's name is written: marks off, a number word
+    // as digits ("two" is "2").
+    let said_word =
+        |word: &str| crate::made_skill::name_digits(&crate::made_remove::unmarked(word));
+    let own_words: Vec<String> = crate::made_skill::name_digits(skill)
+        .split('-')
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect();
     let another = |run: &[String]| {
         let said = run.join(" ");
         installed
@@ -1235,21 +1248,14 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
             {
                 return Some(other.join(" "));
             }
-            if own_most > 0 {
-                continue;
-            }
-            // With the lamp's skills read, only a run naming one of them is
-            // another skill (above): words naming none ("my new weather
-            // skill", "cái skill đó") take nothing from the yes.
-            if !installed.is_empty() {
-                continue;
-            }
-            // With none read (none listed, or the folders unread), it fails
-            // closed: the words right before "skill" name another skill
-            // unless they hold the waiting one's own name ("my new weather
-            // skill" for weather) or are one filler ("great skill"), and
-            // the words right after it name another, as a name after
-            // "skill" can't be told from a word like "again".
+            // The words right before "skill", back to a word that comes
+            // before a name or the clause's start, fillers left out. None
+            // left ("Ừ, chạy cái skill đó đi"), or only the waiting skill's
+            // own name words ("my new weather skill", "the weather skill"
+            // for weather report): its own. Any other word left names
+            // another skill, listed or not ("my look title skill", "my
+            // backup page title skill"): a false refusal only lets the wait
+            // go, a false yes runs a skill's grants without consent.
             let start = (0..at)
                 .rev()
                 .take(NAME_WORDS)
@@ -1257,14 +1263,27 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
                 .last();
             if let Some(start) = start {
                 let name = &words[start..at];
-                let holds_own = (0..name.len())
-                    .any(|from| (from + 1..=name.len()).any(|to| own(&name[from..to])));
-                if holds_own {
-                    continue;
-                }
-                if name.len() > 1 || !FILLERS.contains(&name[0].as_str()) {
+                let left: Vec<&String> = name
+                    .iter()
+                    .filter(|word| !FILLERS.contains(&word.as_str()))
+                    .collect();
+                if !left.is_empty() {
+                    if left
+                        .iter()
+                        .all(|word| own_words.contains(&said_word(word.as_str())))
+                    {
+                        continue;
+                    }
                     return Some(name.join(" "));
                 }
+            }
+            // After "skill", its own name ("use my skill page title") or,
+            // with the lamp's skills read, words naming no installed skill
+            // take nothing from the yes; with none read, the words right
+            // after it fail closed, as a name after "skill" can't be told
+            // from "again".
+            if own_most > 0 || !installed.is_empty() {
+                continue;
             }
             let after: Vec<&str> = words[at + 1..]
                 .iter()
@@ -2957,49 +2976,39 @@ mod tests {
             ("Ừ, chạy cái skill đó đi", "page-title", &backup[..]),
             ("Có, cái skill đó", "page-title", &backup[..]),
             ("Vâng, em chạy skill đi", "page-title", &backup[..]),
+            ("Yes, great skill.", "page-title", &backup[..]),
+        ] {
+            assert_eq!(read(heard, skill, installed), None, "{heard}");
+        }
+        // Safety first (the coordinator's ruling on #7634): any other word
+        // before "skill" names another skill, listed or not.
+        for (heard, skill, installed, named) in [
+            ("okay timer skill", "weather", &weather[..], "timer"),
+            (
+                "Lamp, use my look title skill.",
+                "page-title",
+                &backup[..],
+                "look title",
+            ),
             (
                 "yes, use my backup page title skill",
                 "page-title",
                 &backup[..],
+                "backup page title",
             ),
-            ("Yes, awesome skill.", "page-title", &backup[..]),
-            ("Lamp, use my look title skill.", "page-title", &backup[..]),
+            ("Yes, awesome skill.", "page-title", &backup[..], "awesome"),
         ] {
-            assert_eq!(read(heard, skill, installed), None, "{heard}");
+            assert_eq!(read(heard, skill, installed), Some(named.into()), "{heard}");
         }
-        assert_eq!(
-            read("okay timer skill", "weather", &weather),
-            Some("timer".into())
-        );
         assert_eq!(
             read("Lamp, use my look title skill.", "page-title", &look),
             Some("look title".into())
         );
-        // With none read, it fails closed, but words holding the waiting
-        // skill's own name are still its yes.
+        // With none read, the same, and the words after "skill" fail closed.
         for heard in ["Yes, run my new weather skill", "the daily weather skill"] {
             assert_eq!(other_skill_named(heard, "weather", &[]), None, "{heard}");
         }
-        assert_eq!(other("Ừ, chạy cái skill đó đi"), Some("chạy cái".into()));
-        for own in [
-            "yes, use my page title",
-            "Yes, use my page title skill.",
-            "Yes, use my page title skills.",
-            "yes page title skill",
-            "use the page tidle skill",
-            "Có, dùng skill page title",
-            "yes, use the skill page title",
-            "Yes.",
-            "Yes, that skill.",
-            "What skill is that?",
-            "Yes, great skill.",
-            // Not read (accepted limits): no "skill", or "kỹ năng".
-            "Yes, and use my weather.",
-            "Có, dùng kỹ năng thời tiết",
-        ] {
-            assert_eq!(other(own), None, "{own}");
-            assert_eq!(on_lamp(own, &backup), None, "{own}");
-        }
+        assert_eq!(other("Ừ, chạy cái skill đó đi"), Some("đó đi".into()));
         // A yes said without its comma still bounds another skill's name.
         assert_eq!(
             other_skill_named("okay timer skill", "weather", &[]),

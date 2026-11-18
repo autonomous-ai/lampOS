@@ -428,6 +428,9 @@ fn a_yes_with_another_skills_name_is_not_a_tasks_yes() {
         // The longest installed name wins (the re-read's P1 on #7634).
         ("yes, use skill page title backup", "page-title"),
         ("yes, use my page title backup skill", "page-title"),
+        // Words in another order than an installed name are still another
+        // skill's (the coordinator's safety-first ruling on #7634).
+        ("yes, use my backup page title skill", "page-title"),
     ] {
         let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
         yes::set_installed_here(Some(on_the_lamp()));
@@ -621,6 +624,24 @@ fn describing_words_before_its_own_name_are_still_its_yes() {
         assert_eq!(went.ran[0].2["approved"], true, "{heard}: {:?}", went.ran);
         assert_eq!(went.approved, 1, "{heard}");
     }
+    yes::set_installed_here(None);
+    task_yes::set_on_here(None);
+}
+
+/// The coordinator's safety-first ruling on #7634: with the lamp's skills
+/// read and look title not among them (being made, refused at load, or
+/// misheard), tonight's line is still no yes to page title's task.
+#[test]
+fn a_skill_not_listed_named_before_skill_is_still_no_yes() {
+    let id = said_back_unasked_as(page_title(), Some(&task_yes::line(&page_title())));
+    yes::set_installed_here(Some(vec!["page-title".into(), "timer".into()]));
+    let went = went(
+        "Lamp, use my look title skill.",
+        vec![answers_naming(&id, "yes", "page-title"), said("Okay.")],
+    );
+    assert_eq!(went.approved, 0, "{:?}", went.ran);
+    assert_eq!(went.ran[0].2["approved"], false, "{:?}", went.ran);
+    assert!(!yes::waits(&id));
     yes::set_installed_here(None);
     task_yes::set_on_here(None);
 }
