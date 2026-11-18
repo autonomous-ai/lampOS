@@ -13,15 +13,19 @@
 //!   skill ([`after_make`]) or turned one off or on ([`after_turn`]) keeps
 //!   its name, for the line's person when the line is the owner's
 //!   (`services::owner_of`, as a turn is the owner's alone): another
-//!   person's make never counts. While their conversation lasts (no gap of
-//!   [`KEPT_FOR`] between their lines, as the thread's own
-//!   `thread::REMEMBERED_FOR`), each heard line of theirs is told one short
-//!   note ([`note`]): what the lamp made or turned with them in it, newest
-//!   first, by name. Which one a line means is the model's to judge, never
-//!   a list of words (the owner's ruling, 13 Nov): the note says the newest
-//!   that fits, and to ask which, naming them, when more than one was made
-//!   in this conversation. In the per-turn notes, never in `make_skill`'s
-//!   description, which stays within its bytes.
+//!   person's make never counts. For [`KEPT_FOR`] after each make or turn
+//!   (never carried on by their lines), each heard line of theirs is told
+//!   one short note ([`note`]): what the lamp made or turned with them,
+//!   newest first, by name, and which call does what with it: `make_skill`
+//!   to turn it off, on or remove it, and to use it as for any skill, its
+//!   own function, `use_skill` with its name or `make_skill` `run` (as
+//!   `made_turn::off_note` says, #7562), never a second make. Which one
+//!   a line means is the model's to judge, never a list of words (the
+//!   owner's ruling, 13 Nov): the note says the newest that fits, and to
+//!   ask which, naming them, when more than one was made in this
+//!   conversation; a line about anything else is answered as it is. In the
+//!   per-turn notes, never in `make_skill`'s description, which stays
+//!   within its bytes.
 //! - **Candidates, this conversation's first.** A turn whose name found none
 //!   offers theirs (`made_turn::CANDIDATES`); those made or turned in this
 //!   conversation come first, each marked [`IN_THIS_CONVERSATION`], and the
@@ -30,16 +34,19 @@
 //!   than pick one: a line that means one made just now never gets a guess.
 //!
 //! No file, no round trip: a few names in this process's memory, and the
-//! made skills' index read only to leave out one no longer kept. The
+//! made skills' index read only to leave out one no longer kept (a skill
+//! removed since, or every one once a factory reset emptied the made
+//! skills' folder; the memory itself goes when `lamp-voice` restarts). The
+//! owner's "forget everything" clears it ([`forget_with_everything`]). The
 //! journal names no skill.
 use crate::made_skill;
 use crate::made_turn::{CANDIDATES, TURN_OFF, TURN_ON};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
-/// How long a conversation lasts with no line of the person's: as the
-/// thread's own (`thread::REMEMBERED_FOR`), the second route's
-/// conversation quiet this long is over.
+/// How long a make or a turn is told after it was done, as the thread's
+/// own `thread::REMEMBERED_FOR` (10 minutes): the person's lines never
+/// carry it on.
 pub const KEPT_FOR: Duration = crate::thread::REMEMBERED_FOR;
 
 /// The answer's key that marks a candidate made or turned in this
@@ -77,9 +84,15 @@ pub struct Event {
 
 struct Talk {
     person: String,
-    last: Instant,
     /// Oldest first.
     events: Vec<Event>,
+}
+
+impl Talk {
+    /// When the newest of its events was done.
+    fn last(&self) -> Option<Instant> {
+        self.events.last().map(|event| event.at)
+    }
 }
 
 /// Each person's conversation: what the lamp made and turned in it.
@@ -89,10 +102,19 @@ pub struct Conversations {
 }
 
 impl Conversations {
-    /// Conversations quiet longer than [`KEPT_FOR`] at `now`, dropped.
+    /// Makes and turns done longer than [`KEPT_FOR`] before `now`, and the
+    /// conversations left with none, dropped.
     fn ended(&mut self, now: Instant) {
-        self.talks
-            .retain(|talk| now.saturating_duration_since(talk.last) <= KEPT_FOR);
+        for talk in &mut self.talks {
+            talk.events
+                .retain(|event| now.saturating_duration_since(event.at) <= KEPT_FOR);
+        }
+        self.talks.retain(|talk| !talk.events.is_empty());
+    }
+
+    /// Every conversation's, forgotten.
+    fn clear(&mut self) {
+        self.talks.clear();
     }
 
     /// `name` `done` in `person`'s conversation at `now`.
@@ -103,20 +125,18 @@ impl Conversations {
             None => {
                 if self.talks.len() >= PEOPLE
                     && let Some(oldest) =
-                        (0..self.talks.len()).min_by_key(|at| self.talks[*at].last)
+                        (0..self.talks.len()).min_by_key(|at| self.talks[*at].last())
                 {
                     self.talks.remove(oldest);
                 }
                 self.talks.push(Talk {
                     person: person.to_owned(),
-                    last: now,
                     events: Vec::new(),
                 });
                 self.talks.len() - 1
             }
         };
         let talk = &mut self.talks[at];
-        talk.last = now;
         talk.events
             .retain(|event| !(event.name == name && event.done == done));
         talk.events.push(Event {
@@ -129,19 +149,8 @@ impl Conversations {
         }
     }
 
-    /// `person`'s line heard at `now`: their conversation goes on, and what
-    /// was made and turned in it, oldest first (none once it ended).
-    pub fn heard(&mut self, person: &str, now: Instant) -> Vec<Event> {
-        self.ended(now);
-        let Some(talk) = self.talks.iter_mut().find(|talk| talk.person == person) else {
-            return Vec::new();
-        };
-        talk.last = now;
-        talk.events.clone()
-    }
-
-    /// What was made and turned in `person`'s conversation at `now`, oldest
-    /// first, without carrying it on.
+    /// What was made and turned in `person`'s conversation within
+    /// [`KEPT_FOR`] of `now`, oldest first. Reading it carries nothing on.
     pub fn of(&mut self, person: &str, now: Instant) -> Vec<Event> {
         self.ended(now);
         self.talks
@@ -162,19 +171,25 @@ std::thread_local! {
         std::cell::RefCell::new(Conversations::default());
 }
 
-/// This process's conversations (a test's own thread's in a test).
+/// This process's conversations, shared by every thread of the second
+/// worker: a tool call's thread keeps, a later line's thread reads.
+fn shared<R>(each: impl FnOnce(&mut Conversations) -> R) -> R {
+    let mut kept = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    each(&mut kept)
+}
+
+/// This process's conversations ([`shared`]; a test's own thread's in a
+/// test, so parallel tests never share them).
 fn with<R>(each: impl FnOnce(&mut Conversations) -> R) -> R {
     #[cfg(test)]
     {
-        let _ = &CONVERSATIONS;
         FOR_TEST.with(|kept| each(&mut kept.borrow_mut()))
     }
     #[cfg(not(test))]
     {
-        let mut kept = CONVERSATIONS
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        each(&mut kept)
+        shared(each)
     }
 }
 
@@ -254,9 +269,14 @@ pub fn note(events: &[Event], now: Instant) -> Option<String> {
     Some(format!(
         "(For you to know, not to answer: in this conversation with them, newest first, the \
          lamp {}. When their line means a skill of theirs without saying its name, it means the \
-         newest of these that fits what they ask: call make_skill with that name, as if they \
-         had said it, and never list their skills for it.{which} When none of these fits, ask \
-         which skill they mean.)",
+         newest of these that fits what they ask, as if they had said that name: to turn it \
+         off, turn it on or remove it, call make_skill with turn_off, turn_on or remove and \
+         that name; to use or run it, call it as for any skill, by its own function, by \
+         use_skill with that name, or by make_skill with run and that name, never a second make \
+         of it. Never list their skills for it.{which} When their line means a \
+         skill of theirs and none of these fits, ask which skill they mean. A line about \
+         anything else, the light, music or a timer, is answered as it is: no question about \
+         skills, and no skill turned on for it.)",
         done.join("; ")
     ))
 }
@@ -390,10 +410,42 @@ pub fn after_turn(
     told
 }
 
+/// The made skills' folder whose index a note is held to: the product's
+/// (a test's own, or none, in a test).
+fn made_directory() -> Option<std::path::PathBuf> {
+    #[cfg(test)]
+    {
+        MADE_HERE.with(|here| here.borrow().clone())
+    }
+    #[cfg(not(test))]
+    {
+        Some(std::path::PathBuf::from(made_skill::DIRECTORY))
+    }
+}
+
+#[cfg(test)]
+std::thread_local! {
+    /// [`made_directory`] as a test of this thread sets it.
+    static MADE_HERE: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// `events` with those of a skill no longer in the made skills' index in
+/// `directory` left out: one removed since, or all of them once a factory
+/// reset emptied the folder (no index, none kept).
+fn still_kept(mut events: Vec<Event>, directory: &std::path::Path) -> Vec<Event> {
+    let names: Vec<String> = made_skill::entries(directory)
+        .iter()
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect();
+    events.retain(|event| names.contains(&event.name));
+    events
+}
+
 /// The [`note`] the owner's heard line `request` (its memory scope
-/// `lease`) is told at `now`, their conversation carried on: none with the
-/// switch off, for anyone else's line, or with nothing made or turned in
-/// it. A skill no longer in the made skills' index is left out.
+/// `lease`) is told at `now`: none with the switch off, for anyone else's
+/// line, or with nothing made or turned within [`KEPT_FOR`]. A skill no
+/// longer in the made skills' index is left out ([`still_kept`]).
 pub fn note_here(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
@@ -403,18 +455,12 @@ pub fn note_here(
         return None;
     }
     let person = crate::services::owner_of(lease)?;
-    let mut events = with(|kept| kept.heard(&person, now));
+    let mut events = with(|kept| kept.of(&person, now));
     if events.is_empty() {
         return None;
     }
-    if let Some(keeping) = made_skill::Keeping::when(true)
-        && keeping.directory.join(made_skill::INDEX).is_file()
-    {
-        let names: Vec<String> = made_skill::entries(&keeping.directory)
-            .iter()
-            .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
-            .collect();
-        events.retain(|event| names.contains(&event.name));
+    if let Some(directory) = made_directory() {
+        events = still_kept(events, &directory);
     }
     let note = note(&events, now)?;
     eprintln!(
@@ -422,6 +468,40 @@ pub fn note_here(
         newest(&events).len()
     );
     Some(note)
+}
+
+/// The owner's "forget everything about me", marked by the second route's
+/// guard: what the lamp made and turned with them goes too, as their voice
+/// print does. Another person's forget, an unmarked one, or one whose
+/// memory was not emptied, leaves it; `told` is as it was either way.
+pub fn forget_with_everything(
+    told: (Value, bool),
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !lease.everything_marked() {
+        return told;
+    }
+    forget_if(told, lease.admitted_person(), &crate::person::owner_ids())
+}
+
+/// [`forget_with_everything`] once its mark is judged: every conversation
+/// kept is cleared when `admitted`, the line's person, is one of `owners`
+/// and `told` says their memory was emptied.
+pub(crate) fn forget_if(
+    told: (Value, bool),
+    admitted: Option<&str>,
+    owners: &[String],
+) -> (Value, bool) {
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
+    if emptied && theirs {
+        with(Conversations::clear);
+        eprintln!(
+            "lamp-voice: the skills made or turned in the conversation: forgotten with everything"
+        );
+    }
+    told
 }
 
 #[cfg(test)]
@@ -455,7 +535,7 @@ mod tests {
     }
 
     fn heard(person: &str, now: Instant) -> Option<String> {
-        note(&with(|kept| kept.heard(person, now)), now)
+        note(&with(|kept| kept.of(person, now)), now)
     }
 
     /// The row of #7660: a make of daily stretch reminder, then "turn off
@@ -480,8 +560,33 @@ mod tests {
             told.contains("the lamp made daily stretch reminder (just now)"),
             "{told}"
         );
-        assert!(told.contains("call make_skill with that name"), "{told}");
-        assert!(told.contains("never list their skills"), "{told}");
+        assert!(
+            told.contains(
+                "to turn it off, turn it on or remove it, call make_skill with turn_off, turn_on \
+                 or remove and that name"
+            ),
+            "{told}"
+        );
+        assert!(
+            told.contains(
+                "to use or run it, call it as for any skill, by its own function, by use_skill \
+                 with that name, or by make_skill with run and that name, never a second make \
+                 of it"
+            ),
+            "{told}"
+        );
+        assert!(told.contains("Never list their skills"), "{told}");
+        // "It" about the light is no skill's: never a question about skills.
+        assert!(
+            told.contains("When their line means a skill of theirs and none of these fits"),
+            "{told}"
+        );
+        assert!(
+            told.contains(
+                "A line about anything else, the light, music or a timer, is answered as it is"
+            ),
+            "{told}"
+        );
         assert!(!told.contains("coffee"), "{told}");
         // The model's call with that name turns it off.
         let mut helper = Vec::new();
@@ -682,17 +787,31 @@ mod tests {
         );
     }
 
-    /// A conversation quiet for [`KEPT_FOR`] is over: nothing is told after
-    /// it; lines within it carry it on.
+    /// Heron's P3 on #7715: a make is told for [`KEPT_FOR`] after it, and
+    /// the owner's lines in between never carry it on.
     #[test]
-    fn a_conversation_quiet_too_long_is_over() {
+    fn a_make_is_told_for_ten_minutes_after_it_never_carried_on_by_lines() {
         let now = Instant::now();
         kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
-        let later = now + KEPT_FOR - Duration::from_secs(1);
-        assert!(heard(OWNER, later).is_some());
-        assert!(heard(OWNER, later + KEPT_FOR - Duration::from_secs(1)).is_some());
+        for minute in 1..10 {
+            assert!(
+                heard(OWNER, now + Duration::from_secs(60 * minute)).is_some(),
+                "{minute}"
+            );
+        }
+        assert_eq!(heard(OWNER, now + KEPT_FOR + Duration::from_secs(1)), None);
+        // A turn later keeps the turn for its own ten minutes, never the
+        // make's.
+        let off = json!({ TURN_OFF: "water-reminder", "off": true, "next": "Say it is off." });
+        let _ = kept_from_turn(off, Some(OWNER), now + Duration::from_secs(300));
+        let told = heard(OWNER, now + KEPT_FOR + Duration::from_secs(60)).unwrap();
+        assert!(told.contains("turned water reminder off"), "{told}");
+        assert!(!told.contains("made water reminder"), "{told}");
         assert_eq!(
-            heard(OWNER, later + KEPT_FOR * 2 + Duration::from_secs(2)),
+            heard(
+                OWNER,
+                now + Duration::from_secs(300) + KEPT_FOR + Duration::from_secs(1)
+            ),
             None
         );
     }
@@ -719,5 +838,78 @@ mod tests {
         assert!(note_here(1, None, now).is_some());
         made_skill::set_off_said_here(None);
         crate::person::set_private_room_for_test(None);
+    }
+
+    /// Heron's P3 on #7715: a skill removed since its make is never named,
+    /// and with the made skills' folder emptied (a factory reset), none is.
+    #[test]
+    fn a_skill_removed_since_is_not_named() {
+        let (root, keeping) = keeping("just-made-removed");
+        made_here(&keeping, &[("coffee-time", true), ("water-reminder", true)]);
+        let now = Instant::now();
+        kept_from_make(&made_told("daily-stretch-reminder"), Some(OWNER), now);
+        kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
+        let events = still_kept(with(|kept| kept.of(OWNER, now)), &keeping.directory);
+        let told = note(&events, now).unwrap();
+        assert!(told.contains("made water reminder"), "{told}");
+        assert!(!told.contains("daily stretch"), "{told}");
+        // Through the note the line is told.
+        made_skill::set_off_said_here(Some(true));
+        crate::person::set_private_room_for_test(Some(true));
+        let owner = crate::services::owner_of(None).unwrap();
+        kept_from_make(&made_told("daily-stretch-reminder"), Some(&owner), now);
+        MADE_HERE.with(|here| *here.borrow_mut() = Some(keeping.directory.clone()));
+        assert_eq!(note_here(1, None, now), None);
+        kept_from_make(&made_told("water-reminder"), Some(&owner), now);
+        let told = note_here(1, None, now).unwrap();
+        assert!(
+            told.contains("made water reminder") && !told.contains("daily stretch"),
+            "{told}"
+        );
+        // The folder emptied: none named.
+        std::fs::remove_dir_all(&keeping.directory).unwrap();
+        assert_eq!(note_here(1, None, now), None);
+        MADE_HERE.with(|here| *here.borrow_mut() = None);
+        made_skill::set_off_said_here(None);
+        crate::person::set_private_room_for_test(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The product's conversations are one for the whole worker: what one
+    /// thread keeps (a tool call's), another reads (a later line's).
+    #[test]
+    fn what_one_thread_keeps_another_reads() {
+        let person = format!("cross-thread-{}", std::process::id());
+        let now = Instant::now();
+        let keeper = person.clone();
+        std::thread::spawn(move || {
+            shared(|kept| kept.keep(&keeper, "water-reminder", Done::Made, now));
+        })
+        .join()
+        .unwrap();
+        let reader = person.clone();
+        let read = std::thread::spawn(move || shared(|kept| kept.of(&reader, now)))
+            .join()
+            .unwrap();
+        assert_eq!(read.len(), 1, "{read:?}");
+        assert_eq!(read[0].name, "water-reminder");
+        assert_eq!(read[0].done, Done::Made);
+        shared(|kept| kept.talks.retain(|talk| talk.person != person));
+    }
+
+    /// The owner's "forget everything" clears what the lamp made and turned
+    /// with them; another person's, or one that emptied nothing, leaves it.
+    #[test]
+    fn forget_everything_clears_it() {
+        let now = Instant::now();
+        kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
+        let emptied = || (json!({"forgotten": true}), true);
+        let owners = [OWNER.to_owned()];
+        let _ = forget_if(emptied(), Some("guest-7660"), &owners);
+        let _ = forget_if((json!({"forgotten": false}), true), Some(OWNER), &owners);
+        assert!(heard(OWNER, now).is_some());
+        let told = forget_if(emptied(), Some(OWNER), &owners);
+        assert_eq!(told, emptied());
+        assert_eq!(heard(OWNER, now), None);
     }
 }
