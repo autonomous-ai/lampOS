@@ -469,7 +469,7 @@ fn a_yes_on_a_line_with_more_removes_nothing(test: &str, line: &str, then: (&str
 /// plays a soft chime when I come back to my desk." was forced to an
 /// answer, the model's yes was taken (`request 60: a made skill removed on
 /// the person's yes (#6960)`), and the skill was lost before the chime was
-/// made. A line that long is no plain yes: nothing is removed, and the
+/// made. A make is no plain yes: nothing is removed, and the
 /// make goes on.
 #[test]
 fn a_make_line_after_the_remove_question_removes_nothing() {
@@ -497,7 +497,66 @@ fn a_yes_and_a_make_removes_nothing() {
     );
 }
 
-/// "Sure, play some music": a yes with another ask, four words, removes
+/// The first builder's ruling on #7683 (Twelve's HOLD): the model's yes
+/// on a question or a line asking more never removes, read in code.
+/// Each line after "Remove moon fact?", the model's forced answer `yes`:
+/// nothing is removed, and the person is told it was left as it is.
+#[test]
+fn a_question_or_more_after_the_remove_question_removes_nothing() {
+    for (at, line) in [
+        "What's the time?",
+        "Is it the moon one?",
+        "Sure, and make me a skill that tells a joke at noon.",
+        "Hey Lamp, what?",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (root, keeping, id) =
+            asked_to_remove(&format!("remove-plain-not-{at}"), Some("Remove moon fact?"));
+        let (told, helper) = went(
+            &keeping,
+            line,
+            vec![answers(&id, "yes"), said("I left moon fact as it is.")],
+        );
+        assert_eq!(told[0]["left"], "moon-fact", "{line}: {told:?}");
+        assert!(told[0].get("removed").is_none(), "{line}: {told:?}");
+        assert!(helper.is_empty(), "{line}: {helper:?}");
+        assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"], "{line}");
+        yes::clear_for_test();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+/// A plain yes the code reads removes it: with the lamp's name and "hey",
+/// "please", or the verb said with it.
+#[test]
+fn a_plain_yes_after_the_remove_question_removes_it() {
+    for (at, line) in [
+        "Hey Lamp, yes, remove it",
+        "yeah, do it",
+        "Yes please",
+        "ok",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (root, keeping, id) =
+            asked_to_remove(&format!("remove-plain-yes-{at}"), Some("Remove moon fact?"));
+        let (told, helper) = went(
+            &keeping,
+            line,
+            vec![answers(&id, "yes"), said("Moon fact is removed.")],
+        );
+        assert_eq!(told[0]["removed"], "moon-fact", "{line}: {told:?}");
+        assert_eq!(helper, ["moon-fact"], "{line}");
+        assert_eq!(kept(&keeping), ["evening-dim"], "{line}");
+        yes::clear_for_test();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+/// "Sure, play some music": a yes with another ask removes
 /// nothing.
 #[test]
 fn sure_play_some_music_removes_nothing() {
@@ -524,14 +583,14 @@ fn a_question_after_the_remove_question_removes_nothing() {
     );
 }
 
-/// "Yes, play music.": short, but its round calls the play beside the
-/// yes, so the line carried another ask, by its call: nothing removed.
+/// A plain "Yes.", but its round calls a play beside the yes, so the turn
+/// carried another ask, by its call: nothing removed.
 #[test]
 fn a_yes_whose_round_calls_something_else_removes_nothing() {
     let (root, keeping, id) = asked_to_remove("remove-strict-beside", Some("Remove moon fact?"));
     let (told, helper) = went(
         &keeping,
-        "Yes, play music.",
+        "Yes.",
         vec![
             vec![
                 Ok(ChatEvent::ToolCalls(vec![
