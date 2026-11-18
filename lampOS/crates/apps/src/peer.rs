@@ -1,7 +1,8 @@
 //! Who is on the other end of a connection, by what the kernel says of it:
 //! the peer's user and process (`SO_PEERCRED`), its cgroup (`/proc/<pid>/cgroup`)
 //! and its start time. Used both ways: the helper admits only lamp-cloud and
-//! the voice, and takes the owner's yes only from lamp-control itself.
+//! the voice as askers, and takes the owner's tap-written yes only from
+//! lamp-control itself.
 //!
 //! The lamps run kernel 5.15 (75c9: 5.15.147): it has NO `SO_PEERPIDFD` (added
 //! in 6.5), so a pid read after the connection can in principle belong to a
