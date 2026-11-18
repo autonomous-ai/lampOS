@@ -783,3 +783,93 @@ fn make_and_remove_are_told_at_once_and_never_asked_first() {
     made_skill::set_scripts_here(None);
     set_here(None);
 }
+
+/// Fix 2 of #7828's DEFAULT-ON (lamp-9adf, 19 Nov: "Put the flip a coin
+/// skill back", just removed, was called as a make and made a new one): a
+/// make whose words name a skill they removed, kept aside, puts that one
+/// back and on, "flip a coin is back on.", and the making model is never
+/// asked. Matched by spelling as a remove's name is, so "moon fact" is
+/// moon fact, never moon beside it. Anyone else's line, or one naming no
+/// skill kept aside, is a make as before; off, nothing is put back.
+#[test]
+fn a_make_naming_a_skill_kept_aside_puts_it_back() {
+    set_here(Some(true));
+    set_owner_here(Some(true));
+    crate::skill_write_yes::clear_for_test();
+    let (root, keeping) = keeping("no-asks-named-back");
+    crate::made_remove::tests::made_here(
+        &keeping,
+        &[("flip-a-coin", true), ("moon", true), ("moon-fact", true)],
+    );
+    for name in ["flip a coin", "moon", "moon fact"] {
+        let told = removing(name, &keeping, || true, |_| Ok(()));
+        assert!(told["removed"].is_string(), "{name}: {told}");
+    }
+    for name in ["flip-a-coin", "moon", "moon-fact"] {
+        let _ = fs::remove_dir_all(keeping.installed.join(name));
+    }
+    assert!(names(&keeping).is_empty());
+    const BACK: &str = "put the flip a coin skill back";
+    // Off: a make as before, which the making model is asked for.
+    set_here(Some(false));
+    let (url, served) = service(Vec::new());
+    let told = make_with(8, Some(BACK), BACK, &keeping, chat_at(url), NOW, || None);
+    served.join().unwrap();
+    assert!(told.get("put_back").is_none(), "{told}");
+    assert!(names(&keeping).is_empty());
+    let _ = take_said_line();
+    // Anyone else's line: nothing put back.
+    set_here(Some(true));
+    set_owner_here(Some(false));
+    let (url, served) = service(Vec::new());
+    let told = make_with(9, Some(BACK), BACK, &keeping, chat_at(url), NOW, || None);
+    served.join().unwrap();
+    assert!(told.get("put_back").is_none(), "{told}");
+    assert!(names(&keeping).is_empty());
+    let _ = take_said_line();
+    // The owner's: put back and on, the making model never asked.
+    set_owner_here(Some(true));
+    for (at, (words, name, said)) in [
+        (BACK, "flip-a-coin", "flip a coin is back on."),
+        (
+            "bring back my moon fact skill",
+            "moon-fact",
+            "moon fact is back on.",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (url, served) = service(Vec::new());
+        let asked = helper(&keeping.manage, 1);
+        let told = make_with(
+            10 + at as u64,
+            Some(words),
+            words,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 0, "{words}: {told}");
+        assert_eq!(
+            (&told["made"], &told["on"], &told["put_back"]),
+            (&json!(name), &json!(true), &json!(true)),
+            "{words}: {told}"
+        );
+        assert_eq!(quoted(told["next"].as_str().unwrap()), said);
+        assert!(asked.join().unwrap()[0]["install_made"].is_string());
+    }
+    assert_eq!(names(&keeping), ["flip-a-coin", "moon-fact"]);
+    // A make naming no skill kept aside is a make.
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(12, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["made"], "evening-dim", "{told}");
+    asked.join().unwrap();
+    let _ = take_said_line();
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}

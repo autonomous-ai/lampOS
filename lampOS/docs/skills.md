@@ -7813,6 +7813,20 @@ reset still ask. On (`crate::make_no_asks`):
   its own goes on by its yes's own path only with `LAMP_MADE_SCRIPTS=on`;
   with it off it is put back and stays off, and why is said. A record of a
   replace outlives the remove of its new skill.
+- **A removed skill named again is put back, never made anew** (#7828's
+  DEFAULT-ON, fix 2: on lamp-9adf "Put the flip a coin skill back", just
+  removed, was called as a make and made a new one). Before a voice make
+  asks the making model anything (`make_no_asks::put_back_named`, from
+  `make_skill_local::make_with_by`), its words, the model's `request` and
+  the line heard, are matched to the skills they removed and kept aside
+  within 7 days (`make_no_asks::kept_named`), by spelling as a remove's
+  name is (`made_remove::apart`, `made_remove::near`), never by a list of
+  words: the nearest alone, a name inside another named as it is written
+  being that other's part ("bring back my moon fact skill" is moon fact,
+  never moon). On the owner's ask it is put back and on, as "put it back"
+  does: "flip a coin is back on.", with `{"made": NAME, "on": true,
+  "put_back": true}`. Two kept aside as near, one whose name a listed
+  skill has again, or anyone else's ask, is a make as before.
 - **The keep, exactly.** Every record of what was done is kept 7 days, a
   removed skill's package with its record; at most 50 removed skills and
   100 records in all, the oldest out first, their packages with them.

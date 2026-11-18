@@ -1400,6 +1400,18 @@ fn make_with_by(
     linked: impl FnOnce() -> Option<Vec<String>>,
     agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
+    // A make naming a skill they removed, kept aside, puts it back, never
+    // making a new one (`LAMP_MAKE_NO_ASKS`, #7828's fix 2: "Put the flip
+    // a coin skill back" made it again), on the owner's ask. By voice only.
+    if made_in != 0
+        && let Some(told) = crate::make_no_asks::put_back_named(
+            keeping,
+            &[request, heard.unwrap_or_default()],
+            || owners_make(made_in),
+        )
+    {
+        return told;
+    }
     // One ask makes one skill: a call for an ask made or being made a
     // moment ago, carried into the next line after its turn was cut, makes
     // nothing again ([`OneAsk`]). By voice only: `made_in` 0 is no

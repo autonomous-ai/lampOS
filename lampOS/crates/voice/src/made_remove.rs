@@ -290,7 +290,7 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
 
 /// Whether every word of `short` lies inside `long`'s words, in a row
 /// ("moon" in "moon fact"), and `long` has more.
-fn inside(short: &str, long: &str) -> bool {
+pub(crate) fn inside(short: &str, long: &str) -> bool {
     let (short, long) = (words_of(short), words_of(long));
     short.len() < long.len() && long.windows(short.len().max(1)).any(|run| run == short)
 }
