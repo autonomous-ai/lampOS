@@ -2591,6 +2591,9 @@ pub fn serve(
     } else {
         declare
     };
+    // Seen activity's offer is never made during setup's walk (#6543),
+    // whatever `LAMP_SECOND_WHILE_THEY_APPLY` says.
+    let declare = without_desk_offer_in_walk(declare);
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -2626,6 +2629,7 @@ pub fn serve(
     } else {
         spoken_declare
     };
+    let spoken_declare = without_desk_offer_in_walk(spoken_declare);
     // A few emotion tags, given to the voice only when it reads them
     // (ElevenLabs, with a model that reads them, the speech socket's too),
     // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
@@ -4933,9 +4937,17 @@ pub fn serve(
         // reads only words, is told it may be people's talk, with the tool
         // it leaves such talk alone with (#1712).
         if declines {
-            let heeding = heeding.clone();
+            let noting = heeding.clone();
             engine = engine.noting_the_conversation_alone(Arc::new(move |request| {
-                heeding.lock().ok()?.conversation_note_for(request)
+                noting.lock().ok()?.conversation_note_for(request)
+            }));
+            // Near the end of the lamp's day, only such a line surely
+            // someone else's is held (#7664).
+            let telling = heeding.clone();
+            engine = engine.telling_someone_elses(Arc::new(move |request| {
+                telling
+                    .lock()
+                    .is_ok_and(|heeding| heeding.surely_someone_elses(request))
             }));
         }
         // `LAMP_UNTIED_GOING_ON`: such a line with no tie to the lamp is not
@@ -6203,6 +6215,27 @@ pub(crate) fn applying(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lam
     tools
 }
 
+/// `declare` without seen activity's offer (`seen_yes::OFFER`) while
+/// setup's walk is under way ([`crate::onboarding::under_way_now`], told to
+/// this worker with each turn), always, not behind a switch: the offer asks
+/// the owner to let pictures go to the cloud, and setup's walk is no time to
+/// ask it (the first builder's condition on #7506). Without the offer the
+/// owner's yes (`look_at_my_desk`) has nothing to answer, so it is refused
+/// as before an offer.
+fn without_desk_offer_in_walk(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || no_desk_offer_in_walk(declare(), crate::onboarding::under_way_now()))
+}
+
+/// `tools` without `seen_yes::OFFER` while `walk`.
+fn no_desk_offer_in_walk(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lamp_gemini::Tool> {
+    if walk {
+        tools.retain(|tool| tool.name != crate::seen_yes::OFFER);
+    }
+    tools
+}
+
 #[cfg(test)]
 mod while_they_apply_tests {
     use super::*;
@@ -6238,6 +6271,45 @@ mod while_they_apply_tests {
         // A late call is still the walk's: routed by its name, whatever the
         // request was given.
         assert!(crate::onboarding::is_tool(crate::onboarding::STEP));
+    }
+
+    /// Seen activity's offer is left out of every request while setup's
+    /// walk is under way, with or without `LAMP_SECOND_WHILE_THEY_APPLY`,
+    /// and given again once it ends (#6543, the first builder's condition
+    /// on #7506).
+    #[test]
+    fn the_desk_offer_is_never_made_during_setups_walk() {
+        let mut declared = vec![lamp_gemini::Tool {
+            name: "light_on".into(),
+            description: "Turn the light on.".into(),
+            parameters: None,
+            silent: false,
+        }];
+        declared.extend(crate::onboarding::tools());
+        declared.extend(crate::seen_yes::tools());
+        let all = names(&declared);
+        let source = declared.clone();
+        let plain = without_desk_offer_in_walk(Arc::new(move || source.clone()));
+        let source = declared.clone();
+        let they_apply =
+            without_desk_offer_in_walk(while_they_apply(Arc::new(move || source.clone())));
+        crate::onboarding::set_under_way(true);
+        for declare in [&plain, &they_apply] {
+            let told = names(&declare());
+            assert!(
+                !told.iter().any(|name| name == crate::seen_yes::OFFER),
+                "during the walk: {told:?}"
+            );
+            assert!(told.iter().any(|name| name == "light_on"), "{told:?}");
+        }
+        crate::onboarding::set_under_way(false);
+        assert_eq!(names(&plain()), all, "after the walk");
+        assert!(
+            names(&they_apply())
+                .iter()
+                .any(|name| name == crate::seen_yes::OFFER),
+            "after the walk, with the switch"
+        );
     }
 }
 
@@ -7390,6 +7462,11 @@ pub(crate) struct Heeding {
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
+    /// The line let out only as the conversation going on that is surely
+    /// someone else's ([`Self::someone_else`]): near the end of the lamp's
+    /// day only such a line is held (#7664). Nothing seen or heard to tell
+    /// the speakers apart is the same person, never held.
+    someone_elses_line: Option<u64>,
     /// With it, when the caller's own follow-up was last let out: the call
     /// renewed, for the caller's lines alone ([`Self::call_for`]).
     call_renewed_at: Option<Instant>,
@@ -8487,6 +8564,7 @@ impl Heeding {
             follow_up_renews: false,
             no_face_renews: false,
             follow_up_line: None,
+            someone_elses_line: None,
             call_renewed_at: None,
             last_speakers: None,
             said_lately: std::collections::VecDeque::new(),
@@ -12037,6 +12115,7 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        self.someone_elses_line = (self.alone.is_some() && someone_else).then_some(request);
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
         // conversation going on renews nothing when it is surely someone
         // else's ([`Self::someone_else`]). Under #829's own bar another voice
@@ -12283,6 +12362,12 @@ impl Heeding {
         } else {
             CONVERSATION_ALONE
         })
+    }
+
+    /// Whether `request` was let out only as the conversation going on and
+    /// is surely someone else's, not the caller's (#7664).
+    pub(crate) fn surely_someone_elses(&self, request: u64) -> bool {
+        self.someone_elses_line == Some(request)
     }
 
     /// Whether `request` was let out only as the conversation going on,
@@ -31501,7 +31586,7 @@ mod tests {
     ) {
         let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count = fetched.clone();
-        let fetch: crate::second_provider::net::weather::Fetch = Arc::new(move |url: String| {
+        let fetch: crate::second_provider::net::weather::Fetch = Arc::new(move |url: String, _| {
             count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Box::pin(async move {
                 Ok(if url.contains("geocoding-api") {

@@ -378,6 +378,22 @@ impl Bridge {
         }
     }
 
+    /// An ask handed to the session but not to the MQTT client (its queue was
+    /// full): it was never sent, so it is answered `busy` at once, not left
+    /// to the 8 s `timeout`: a stop above all.
+    pub fn unsent(&mut self, req_id: &str) {
+        if self.out.remove(req_id).is_some() {
+            self.lines
+                .push("devices: an ask could not be handed to the client".into());
+            self.answer(
+                req_id,
+                DeviceAnswer::None {
+                    why: NoAnswer::Busy,
+                },
+            );
+        }
+    }
+
     /// The asks waiting or out.
     pub fn pending(&self) -> usize {
         self.waiting.len() + self.out.len()
@@ -557,6 +573,11 @@ pub struct Polled {
 impl Link {
     /// Takes the asks on the bus, sends what is due up (nothing, answered
     /// `away`, with the broker not `connected`), and puts the answers back.
+    /// The ask `req_id` went to the session but not to the client.
+    pub fn unsent(&mut self, req_id: &str) {
+        self.bridge.unsent(req_id);
+    }
+
     pub fn poll(&mut self, bus: &lamp_bus::Bus, now_ms: u64, connected: bool) -> Polled {
         if self.asks.is_none() {
             self.asks = bus
@@ -1191,6 +1212,30 @@ mod tests {
             bridge.down(EVENT, &sip, T0 + n as u64);
         }
         assert_eq!(bridge.drain().events.len(), EVENTS_PER_MINUTE - 1);
+    }
+
+    #[test]
+    fn an_ask_the_client_would_not_take_is_answered_busy_at_once_not_after_the_timeout() {
+        let cloud = FakeCloud::ok();
+        let mut seq = 0;
+        let mut bridge = listed(&cloud, &mut seq);
+        voice(&mut bridge, &mut seq, stop("st", "desk-1"), T0);
+        let sent = bridge.due(T0, true);
+        assert_eq!(sent.len(), 1);
+        bridge.unsent("st");
+        assert_eq!(
+            bridge.drain().answers,
+            vec![DevicesAnswer {
+                req_id: "st".into(),
+                answer: DeviceAnswer::None {
+                    why: NoAnswer::Busy
+                }
+            }]
+        );
+        assert_eq!(bridge.pending(), 0);
+        // One that was never out is no business of this.
+        bridge.unsent("nobody");
+        assert!(bridge.drain().answers.is_empty());
     }
 
     #[test]

@@ -259,7 +259,7 @@ None of them counts on a quoted line or inside a fenced code block. Without one,
   A HOLD with no sha still holds. A READ-OK with no sha makes the PR not eligible.
 - A marker later in the first 400 characters counts only with a commit of 9 or more characters right after it.
   It does not count when it is quoted (backticks or quotation marks), in brackets, after a possessive ("the Reviewer-lead's READ-OK …"),
-  or named as a noun ("your HOLD …", "the/that/this/their/for …").
+  or named as a noun ("your HOLD …", "the/that/this/their/for …"), or when a sentence says it is lifted or limited ("lift only HOLD …", "this lifts/clears/replaces HOLD …").
 - A marker on a Markdown quote line (`> READ-OK …`, on any line, the first too) or inside a fenced code block (```` ``` ```` or `~~~`) never counts.
 - The signature is the reader's name: "Sixth, 09:16" (an optional "The"), the name right after the marker's commit,
   the name that opens the next line ("Sixth: …"; a capitalised word or "<word> builder", never a label such as "Tests:", "Why:" or "Fail-first:"),
@@ -269,6 +269,7 @@ None of them counts on a quoted line or inside a fenced code block. Without one,
 
 - The PR is eligible on its newest READ-OK when no HOLD stands.
   A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase). The patch-id is taken with no context lines. This holds for TWO READS too.
+  For TWO READS, a READ-OK also counts on a head whose code is the head's but whose docs differ (Markdown files under a `docs/` folder; a rebase that merged the PR's own docs rows), provided at least one reader has read the head's own patch. Every other file counts as code: a skill's SKILL.md or README.md, a guide or prompt the product loads, and the model, schemas and fixtures that also live in `docs/`. A PR of docs alone never carries a read this way. One reader's restate then covers the docs, and the other's earlier read still covers the code. Such a head never carries a row or "no row needed".
 - A signed HOLD is keyed on the login plus the signed name. It stands until the same login and name post a later READ-OK.
   Words alone ("this clears my HOLD" in a comment that is not a READ-OK) never lift it.
 - An unsigned HOLD stands until that login posts a later READ-OK whose first 400 characters say the HOLD is lifted or cleared

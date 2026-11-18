@@ -892,6 +892,11 @@ pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
 /// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
 pub const ROOM_HELD_TALK_ENVIRONMENT: &str = "LAMP_ROOM_HELD_TALK";
 
+/// A held rename's one- or two-word yes read by the short-line rule, with
+/// `LAMP_NAME_LEARN_FIX` (`LAMP_RENAME_SHORT_YES=on`, #7419,
+/// [`held_rename::SHORT_YES_ENVIRONMENT`]).
+pub const RENAME_SHORT_YES_ENVIRONMENT: &str = "LAMP_RENAME_SHORT_YES";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
@@ -1970,6 +1975,9 @@ struct Shared {
     /// lamp, so the spoken cut-in note is not told beside that note
     /// ([`Engine::telling_the_untied`]).
     untied: Option<Busy>,
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's ([`Engine::telling_someone_elses`], #7664).
+    someone_elses: Option<Busy>,
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
@@ -4555,6 +4563,22 @@ pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 /// sounds (`lamp_expression::RESTING_THROUGH_SOUNDS`).
 pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
 
+/// Why a line is held near the end of the lamp's day ([`day_alone_held`]).
+const DAY_NEAR_HELD: &str = "the lamp's day is nearly used, and the line reached it only as the conversation going on, surely from someone other than the one it was talking with: not sent only to be judged (LAMP_VOICE_DAY_SHED)";
+
+/// Whether a line is held near the end of the lamp's day (#7664): the day
+/// at or past `day_shed::NEAR`, and the line let out only as the
+/// conversation going on, told [`worker::CONVERSATION_ALONE`], and surely
+/// someone else's (`someone_elses`: another voice, or a face not the
+/// caller's seen speaking it). The caller's own follow-up
+/// ([`worker::FOLLOW_UP_NOTE`]), a line with nothing seen or heard to tell
+/// the speakers apart (the owner whose face wasn't seen, the Reviewer-lead's
+/// P2 on #7738) and a line with any other sign it was said to the lamp (no
+/// note) are never held.
+fn day_alone_held(level: crate::day_shed::Level, note: Option<&str>, someone_elses: bool) -> bool {
+    level.sheds() && someone_elses && note == Some(worker::CONVERSATION_ALONE)
+}
+
 /// Why the answer to the lamp's name alone is held back in the night's
 /// sleep ([`Engine::resting_through_sounds`]).
 const NIGHT_REST_HELD: &str = "only the lamp's name, and the lamp asleep for the night: it stirs and is not woken by its own answer (LAMP_REST_THROUGH_SOUNDS)";
@@ -4930,6 +4954,7 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 untied: None,
+                someone_elses: None,
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
@@ -6740,6 +6765,17 @@ impl Engine {
         self
     }
 
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's, by voice or by a face seen speaking it that is not
+    /// the caller's: near the end of the lamp's day only such a line is held
+    /// ([`day_alone_held`], #7664). Before any turn only.
+    pub fn telling_someone_elses(mut self, someone_elses: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.someone_elses = Some(someone_elses);
+        }
+        self
+    }
+
     /// With `LAMP_TASKS_NAMED_ASK=on` (#1722): a line whose own words ask
     /// one of the staff by name (`named`) has its round 1 call of
     /// `start_agent_task` given to that one, whoever the call named; one
@@ -8000,6 +8036,7 @@ impl Engine {
                 late_by_ms,
                 also,
                 again,
+                ids,
                 ..
             } => {
                 // Deferred unless this route is the lamp's only voice and the
@@ -8024,6 +8061,12 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // Each one its known creator set rang: their linked record
+                // (`LAMP_SERVICE_RECORDS_REMINDERS`).
+                crate::service_records::reminder_rows::said(
+                    &ids,
+                    crate::service_records::unix_ms(),
+                );
                 // Reminder data is not something to remember because it
                 // was said (as on the Live route).
                 crate::remember::keep_out(request);
@@ -9776,6 +9819,11 @@ async fn spoken(
             // Each id with the eyes' boot, the known face's too: after the
             // eyes start again a passing id names someone else (#3037).
             let speakers = eyes.speakers_with_boot(begun, finishing);
+            // A held rename's short yes, with `LAMP_NAME_LEARN_FIX` and
+            // `LAMP_RENAME_SHORT_YES` (#7419).
+            let short_yes = shared.name_learn_fix && held_rename::short_yes_from_environment();
+            let rename_speakers =
+                renaming.then(|| held_rename::yes_speakers(eyes, begun, finishing, short_yes));
             let (eyes, known) = (eyes.clone(), known.clone());
             let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
                 .await
@@ -9798,8 +9846,8 @@ async fn spoken(
                     crate::speaking_faces::saw_line(seen);
                 }
             }
-            if renaming {
-                held_rename::keep_sight(&shared, (request, speakers.clone(), pair.clone()));
+            if let Some(rename_speakers) = rename_speakers {
+                held_rename::keep_sight(&shared, (request, rename_speakers, pair.clone()));
             }
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
@@ -10487,6 +10535,30 @@ async fn spoken(
         && shared.night_rest.as_ref().is_some_and(|night| night())
     {
         heeded = Some(NIGHT_REST_HELD);
+    }
+    // `LAMP_VOICE_DAY_SHED` (#7664): near the end of the lamp's day, a line
+    // let out only as the conversation going on, by someone other than the
+    // one the lamp was talking with (`worker::CONVERSATION_ALONE`, never the
+    // caller's own follow-up), is held, not sent to the model only to be
+    // judged. A named line, a turn, a tap, a face or the caller's follow-up
+    // still goes: the owner's own talk is never shed.
+    if heeded.is_none()
+        && !echoed
+        && !held
+        && !empty
+        && day_alone_held(
+            crate::day_shed::worker_level(),
+            shared
+                .conversation_alone
+                .as_ref()
+                .and_then(|note| note(request)),
+            shared
+                .someone_elses
+                .as_ref()
+                .is_some_and(|someone_elses| someone_elses(request)),
+        )
+    {
+        heeded = Some(DAY_NEAR_HELD);
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {
@@ -11207,13 +11279,20 @@ async fn spoken(
     // "Lamp ơi"), or as the coordinator reads a line of the name alone
     // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
     // alone, or no words at all.
-    crate::skill_write_yes::line_heard(
-        request,
-        called
-            || text.trim().is_empty()
-            || name_alone(&text)
-            || crate::attention::only_the_name(&text),
-    );
+    // Its words too: only a plain yes the code reads confirms a made
+    // skill's remove (`skill_write_yes::plain_answer`, #7683), and only a
+    // plain replace a clash's replace (`made_clash::line_heard`).
+    let name_only = called
+        || text.trim().is_empty()
+        || name_alone(&text)
+        || crate::attention::only_the_name(&text);
+    crate::skill_write_yes::line_heard(request, name_only, &text);
+    crate::made_clash::line_heard(request, name_only, &text);
+    // A remove on the line right after one that found nothing is asked
+    // only when this line names the skill (`made_remove::line_heard`).
+    if !name_only {
+        crate::made_remove::line_heard(request, &text);
+    }
     let called = called.then(|| {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and the model is told so"
@@ -14296,9 +14375,11 @@ fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -
 /// as a forget is ([`hold_forget`]), so the same rules let it go: only a
 /// plain yes on the next spoken turn, from the same session's person,
 /// within `remember::HELD_FORGET_FOR`, with their face seen saying it and
-/// no other ([`take_held_forget`]); the conversation's end, a forget,
-/// another face or anything else drops it. Only where the eyes read
-/// speaking: without them nothing is held. What the model is told.
+/// no other, or with `LAMP_KEEP_QUIETLY_ONE_FACE` on a line theirs by the
+/// face-in-view rule, no face seen saying it ([`take_held_forget`]); the
+/// conversation's end, a forget, another face or anything else drops it.
+/// Only where the eyes read speaking: without them nothing is held. What
+/// the model is told.
 fn hold_carried_keep(
     shared: &Shared,
     (request, said): (u64, &str),
@@ -14710,6 +14791,21 @@ fn take_held_forget(
             }
         };
     }
+    // A held keep's yes on a line theirs by the face-in-view rule
+    // (`ScopeLease::by_one_face`: their known face the one face in view, or
+    // the line carried and read as theirs, no face seen speaking it, no
+    // other voice heard), with `LAMP_KEEP_QUIETLY_ONE_FACE`: the memory
+    // owner's rule, "mouth detection only blocks the forget and nothing
+    // else". Its person is the line's own (`line_person`), since such a
+    // line holds no forget asker; another face seen speaking the yes is
+    // never theirs. A held forget's yes is unchanged.
+    let keep_by_face = held.call.name == crate::remember::REMEMBER
+        && by_one_face
+        && crate::keep_quietly::one_face_on()
+        && !sight
+            .as_ref()
+            .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
+    let asker = if keep_by_face { line_person } else { asker };
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -14751,6 +14847,8 @@ fn take_held_forget(
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
         Some("the eyes don't read who speaks")
+    } else if keep_by_face {
+        None
     } else if by_one_face {
         // A line theirs only by their face alone in view
         // (`LAMP_PERSON_SCOPE_ONE_FACE`) is no yes to a forget: nothing saw
@@ -14782,7 +14880,15 @@ fn take_held_forget(
             );
             Taken::Nothing
         }
-        None => Taken::Runs(held.call, held.line, false),
+        None => {
+            if keep_by_face {
+                eprintln!(
+                    "lamp-voice second: request {request}: their yes keeps the keep held in request {}: no face was seen saying it, their face the one face in view or the line carried (LAMP_KEEP_QUIETLY_ONE_FACE)",
+                    held.request
+                );
+            }
+            Taken::Runs(held.call, held.line, false)
+        }
     }
 }
 
@@ -15911,6 +16017,38 @@ async fn dont_know_first(
     match note {
         Some(note) => DontKnow::Recalled(note),
         None => DontKnow::Pass(held),
+    }
+}
+
+/// What of a reply's held opening (`claim_held`) may be said now, while
+/// it streams: `None` holds on. A keep said back on a line that is only a
+/// yes (`yes`) whose sentences name a found thing
+/// (`remember::said_kept_found_to`, beside a `recall` of this request that
+/// `found` it) lets only those sentences be said; the rest stays held and
+/// is judged on its own, so a later "Your bike is kept too." never
+/// inherits "Yes, Pip is kept."'s found thing (Second's P2 at c60b1a7b21
+/// on #5701). The opening claims ("Kept: …") still hold those sentences.
+/// Otherwise the hold ends at the first opening that claims no keep.
+fn claim_released(
+    claim_held: &mut Option<String>,
+    yes: bool,
+    found: &[Vec<String>],
+    asked: Option<&str>,
+    faces: bool,
+) -> Option<String> {
+    let held = claim_held.as_mut()?;
+    if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
+        return match crate::remember::claims_a_keep_said(&held[..end], false, faces, false) {
+            Some(false) => {
+                let rest = held.split_off(end);
+                Some(std::mem::replace(held, rest))
+            }
+            _ => None,
+        };
+    }
+    match crate::remember::claims_a_keep_said(held, false, faces, yes) {
+        Some(false) => claim_held.take(),
+        _ => None,
     }
 }
 
@@ -17100,14 +17238,27 @@ async fn answer(
         let done_already = (heard && !held_forget_ran)
             .then(|| crate::remember::heard::done_already(request, scope.as_ref()))
             .flatten();
-        if let Some((note, _)) = &done_already {
+        if let Some((Some(note), _)) = &done_already {
             messages.push(Message::system(note.clone()));
         }
+        // The done write backs the turn whether or not its note was told: a
+        // bare "Okay." gets no note, yet its "Pip is kept." is true
+        // (Thirteen's P2 on #5701).
         let mut kept_now = held_keep_ran
             || carried.kept
-            || done_already
-                .as_ref()
-                .is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten);
+            || crate::remember::heard::done_backs_a_keep(done_already.as_ref());
+        // What a `recall` of this request found, each thing's words: then
+        // a reply to a line that is only a yes may say back that one of
+        // them is kept ("Yes, Pip is kept."), true of what was found; a
+        // keep said of anything else stays a claim, and the opening claims
+        // stay (the first builder's P3 on #5607, as S13 req 339 answered a
+        // yes with a `recall`; Thirteen's P2 on #5701).
+        let mut recall_found: Vec<Vec<String>> = vec![];
+        // What this yes answers, which a found thing said kept must hold
+        // (Thirteen's P2 on #5701: blue asked, the old red found).
+        let yes_answers = yes_line
+            .then(|| crate::remember::heard::yes_answers(request, scope.as_ref()))
+            .flatten();
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = carried.other;
@@ -17507,10 +17658,14 @@ async fn answer(
                             && round == 1
                             && let Some((status, word)) = refusal
                         {
-                            let limited = shared
-                                .down
-                                .as_ref()
-                                .and_then(|down| down.refused(status, word.is_some()));
+                            let limited = shared.down.as_ref().and_then(|down| {
+                                // A spent day read on the relay's answers
+                                // (`LAMP_VOICE_DAY_SHED`, #7664) is its word
+                                // too: the limit at the first 429.
+                                let spent = crate::day_shed::worker_level()
+                                    == crate::day_shed::Level::Spent;
+                                down.refused(status, word.is_some() || spent)
+                            });
                             if let Some(lasted) = limited {
                                 say_limit(shared, (request, heard, named), lasted, word.flatten())
                                     .await?;
@@ -17622,15 +17777,16 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::remember::claims_a_keep_said(
-                                    held,
-                                    false,
-                                    shared.face_claims,
+                                match claim_released(
+                                    &mut claim_held,
                                     yes_line,
+                                    &recall_found,
+                                    yes_answers.as_deref(),
+                                    shared.face_claims,
                                 ) {
-                                    Some(false) => claim_held.take().unwrap_or_default(),
+                                    Some(said) => said,
                                     // Undecided, or a claim: held.
-                                    _ => continue,
+                                    None => continue,
                                 }
                             }
                         };
@@ -18092,16 +18248,15 @@ async fn answer(
                         None => held,
                         Some(claim) => {
                             claim.push_str(&held);
-                            match crate::remember::claims_a_keep_said(
-                                claim,
-                                false,
-                                shared.face_claims,
+                            // Undecided, or a claim: judged below.
+                            claim_released(
+                                &mut claim_held,
                                 yes_line,
-                            ) {
-                                Some(false) => claim_held.take().unwrap_or_default(),
-                                // Undecided, or a claim: judged below.
-                                _ => String::new(),
-                            }
+                                &recall_found,
+                                yes_answers.as_deref(),
+                                shared.face_claims,
+                            )
+                            .unwrap_or_default()
                         }
                     };
                     let piece = held_for_a_claim(&mut action_held, piece);
@@ -18151,16 +18306,15 @@ async fn answer(
                             None => held,
                             Some(claim) => {
                                 claim.push_str(&held);
-                                match crate::remember::claims_a_keep_said(
-                                    claim,
-                                    false,
-                                    shared.face_claims,
+                                // Undecided, or a claim: judged below.
+                                claim_released(
+                                    &mut claim_held,
                                     yes_line,
-                                ) {
-                                    Some(false) => claim_held.take().unwrap_or_default(),
-                                    // Undecided, or a claim: judged below.
-                                    _ => String::new(),
-                                }
+                                    &recall_found,
+                                    yes_answers.as_deref(),
+                                    shared.face_claims,
+                                )
+                                .unwrap_or_default()
                             }
                         };
                         let piece = held_for_a_claim(&mut action_held, piece);
@@ -18185,8 +18339,66 @@ async fn answer(
             // lead's P2 on #3628). Alone, the model is told once and asked
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
-            if let Some(held) = claim_held.take().filter(|held| !held.is_empty()) {
-                let claim = crate::remember::keep_claim_said(&held, shared.face_claims, yes_line);
+            if let Some(mut held) = claim_held.take().filter(|held| !held.is_empty()) {
+                // Sentences whose said-back keeps name a found thing are
+                // said; what follows them is judged here on its own, never
+                // under their found thing (Second's P2 at c60b1a7b21 on
+                // #5701), as `claim_released` does while the reply streams.
+                if let Some(end) = yes_line
+                    .then(|| {
+                        crate::remember::said_kept_found_to(
+                            &held,
+                            &recall_found,
+                            yes_answers.as_deref(),
+                            true,
+                        )
+                    })
+                    .flatten()
+                    .filter(|end| {
+                        *end < held.len()
+                            && crate::remember::claims_a_keep_said(
+                                &held[..*end],
+                                true,
+                                shared.face_claims,
+                                false,
+                            ) == Some(false)
+                    })
+                {
+                    let rest = held.split_off(end);
+                    for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
+                        if let Some(sentence) = said_quietly(
+                            &mut quiet,
+                            &mut offer_hold,
+                            sentence,
+                            remember_ran,
+                            request,
+                        ) {
+                            queue.push(sentence).await?;
+                        }
+                    }
+                    held = rest;
+                }
+                // A preference said saved beside a light's, volume's or
+                // rule's call of this round is that call's ("Done, your
+                // light preference is saved."), never a said-back keep
+                // (Thirteen's P3 on #5701).
+                let settings_saved = crate::remember::said_saved_preference(&held)
+                    && calls.iter().any(|call| {
+                        crate::tools::is_light_or_volume(&call.name)
+                            || call.name == crate::rules::KEEP_RULE
+                    });
+                let claim = crate::remember::keep_claim_said(
+                    &held,
+                    shared.face_claims,
+                    yes_line
+                        && !settings_saved
+                        && !crate::remember::said_kept_found(
+                            &held,
+                            &recall_found,
+                            yes_answers.as_deref(),
+                            true,
+                        ),
+                );
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
                 // with no call) is kept by `remember_my_face`: one in this
@@ -18223,6 +18435,15 @@ async fn answer(
                     None => false,
                 };
                 if claimed && !remembers {
+                    // A found keep's sentences said before this claim
+                    // ("Yes, Pip is kept.") go out now, whatever becomes of
+                    // the claim after them (Second's P2 at c60b1a7b21).
+                    if let Some(rest) = split.finish()
+                        && let Some(rest) =
+                            said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                    {
+                        queue.push(rest).await?;
+                    }
                     if !calls.is_empty() {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, its other calls run"
@@ -18483,6 +18704,13 @@ async fn answer(
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
             }
+            // A round that calls anything but a wait's answer: no made
+            // skill's remove is confirmed in this request (#6960), told
+            // before any of its calls runs.
+            crate::skill_write_yes::round_called(
+                request,
+                calls.iter().map(|call| (call.name.as_str(), &call.args)),
+            );
             // The photo face's answer called: no yes is held for it after.
             if calls
                 .iter()
@@ -19335,6 +19563,7 @@ async fn answer(
                     short_line = None;
                     answered_at_once = false;
                     kept_now = confirmed_other_call;
+                    recall_found.clear();
                     remember_ran = false;
                     keep_claim_asked = false;
                     keep_claim_note = None;
@@ -19438,6 +19667,9 @@ async fn answer(
                         at: (shared.clock)(),
                         asker: keep_asker(scope.as_ref()),
                     });
+                }
+                if call.name == crate::remember::RECALL {
+                    recall_found.extend(crate::remember::recall_found_words(&answer.told));
                 }
                 if call.name != crate::remember::RECALL && did {
                     kept_now = true;

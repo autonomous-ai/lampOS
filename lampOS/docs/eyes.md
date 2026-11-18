@@ -1767,7 +1767,20 @@ With the switch:
     every other guard stand, and nothing is renamed without the yes to the
     question asked again. On lamp-74ff a line began over the question,
     none of it played, and the rename was dropped in silence
-    (`a_rename_question_cut_before_its_name_keeps_the_hold`). A line carried into the
+    (`a_rename_question_cut_before_its_name_keeps_the_hold`). With
+    `LAMP_RENAME_SHORT_YES` too (off in the product until its ROW with a
+    person), a yes no face was read saying is read again by the
+    short-line rule of `LAMP_VOICE_SHORT_LINE_SPEAKER` (whether or not that
+    switch is on; `held_rename::yes_speakers`,
+    `SpeakingFaces::short_line_speakers_with_boot`): a one- or two-word
+    yes spans under the three looks a line needs, so on lamp-52e6 (13658,
+    17 Nov) the asker's yes was nobody's, the one-face count (also three
+    looks) took no one either, and the rename ran only on the third try
+    (#7419). Their face read still before it and speaking in it now says
+    it; another face's short yes is still "another face was seen saying
+    the yes", and nobody in view is still nobody's
+    (`a_short_yes_from_the_askers_face_runs_the_rename_with_the_fix`).
+    Only the held rename's sight and its asked note read it. A line carried into the
     asker's conversation going on and read as theirs
     (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
     own face the one face in view, none seen saying it, no other voice

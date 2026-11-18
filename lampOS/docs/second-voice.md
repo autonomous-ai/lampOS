@@ -602,7 +602,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   fallback is persistence: the route keeps when the first 429 before any
   word came, and a 429 that comes `LIMIT_AFTER` (2 min) or more after it,
   with no chat round begun between, is a usage limit too (a rate burst's
-  per-minute window passes well within 2 min). Either says "I've hit my
+  per-minute window passes well within 2 min). With `LAMP_VOICE_DAY_SHED`
+  on (#7664), a day last read spent (`X-Usage-Day-Used` 1, "The lamp's
+  day" below) makes the first 429 a usage limit too. Either says "I've hit my
   usage limit." (`DOWN_LINE_LIMIT`, V1's `PhraseLLMLimit`) instead of the
   slow line, and with a time back it says when, in the lamp's local time
   (`local_time::offset_here`) and the owner's language
@@ -2831,6 +2833,54 @@ order is kept. A written turn is the same from the chat on.
   while the line is coming, AwaitingResponse before any answer audio,
   Responding after.
 
+### The lamp's day (`LAMP_VOICE_DAY_SHED`, #7664)
+
+A lamp's day allowance should last its owner's day, so near its end the
+lamp stops spending it on what nobody asked for. Off unless
+`LAMP_VOICE_DAY_SHED=on` (the coordinator's unit; it hands the worker
+`--day-shed`); off, the header is not even read.
+
+- **The reading.** The relay sends `X-Usage-Day-Used`, the share of the
+  lamp's day used (three decimals, 0 to 1; exactly 1 on a day-limit
+  refusal), on chat answers, HTTP speech and the proxy. The worker reads it
+  on every answer in `net::post`, success or refusal (`day_shed::heard`).
+  Only a finite value from 0 to 1 is kept, and a bad one changes nothing.
+  A 2xx without it clears the reading (no day limit, or the check failed
+  open: harmless for shedding), and a refusal without it keeps it. The
+  reading is for one UTC day, the relay's: tomorrow it starts from nothing.
+- **Where it is kept.** When the reading changes, the worker writes it to
+  `/run/lampos-voice/day-used.json` (`day_shed::FILE`, the voice's runtime
+  folder, gone at a reboot): the day and the share, nothing heard or said.
+  The coordinator reads that file at most once a second (`day_shed::Look`).
+  A missing, unreadable or other day's file means not shedding. The journal
+  says each change of level once: `the lamp's day is 0.85 used: what
+  nobody asked for is shed`.
+- **From 0.8 (`NEAR`), what nobody asked for is shed:**
+  - A line let out only as the conversation going on
+    (`worker::CONVERSATION_ALONE`) that is surely someone else's (its voice
+    print under 0.30 against the caller's, or a face not the caller's seen
+    speaking it, not turned to the lamp: `Heeding::surely_someone_elses`) is
+    held, not sent to the model only to be judged (`DAY_NEAR_HELD`). With
+    nothing seen or heard to tell the speakers apart it is the same person
+    and goes, so the owner's follow-up with no face read speaking is never
+    held. The caller's own follow-up (`worker::FOLLOW_UP_NOTE`), a named
+    line, a turn, a tap and a face still go.
+  - In the coordinator, a say the model must word waits for a new day or
+    its own expiry (`Says::take_near_day_end`): a skill's note, an
+    add-on's quoted line, a made skill's line, a text not said as it is.
+    The shed take only ever takes what `Says::take` takes; a kind left to
+    its own taker (a sound, an exact line, a skill's `from` ask, a
+    computer's turn) is taken there as before. A reminder the person set,
+    the onboarding, fixed words, sounds, every line of a skill the owner's
+    voice ran now (`made_run::answers_now`, whatever its words) and the
+    lamp's agent's lines (`say::AGENT_SKILL`: its answer and its fixed
+    lines answer the owner's own ask) go on.
+  - News of handed-over work is told as before: it answers work the person
+    asked for.
+  - Nothing is said about being near the limit.
+- **At 1.0 (`SPENT`)**, the same, and the first 429 says the usage limit at
+  once (above), not after `LIMIT_AFTER`.
+
 ## What a person hears
 
 When the coordinator switches (below):
@@ -3981,7 +4031,58 @@ after a take-over, but now for every turn:
   sentence names a reminder, alarm, timer or setting ("Okay, your
   reminder for seven is saved.", "Got it, your settings are saved.":
   the Reviewer-lead's P3 on #5607, so a `set_reminder` it set is never
-  said "not kept"); "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
+  said "not kept"); a preference saved is a kept thing, so "Your
+  preference for green tea is saved." stays a claim (Thirteen's P3 on
+  #5607), except beside a light's, volume's or `keep_rule` call of the
+  same round, where "Done, your light preference is saved." is that
+  call's (`remember::said_saved_preference`, Thirteen's P3 on #5701,
+  `a_preference_said_saved_beside_a_light_call_is_that_calls`). A
+  `recall` of the same request lifts the said-back rule only for a keep
+  that names what it found and what the yes answers
+  (`remember::said_kept_found`: each word of the said-back sentence and
+  of the line the yes answers, `heard::yes_answers` with its lead-in
+  ("Keep in mind …") left out unless a negation comes before it ("I
+  never said remember that …" stays whole), past "kept", "name",
+  "called" and the like, is one found thing's), judged only on a finished
+  sentence (ended by `.`, `!` or `?`, or the reply's end), so a streaming
+  "Yes, Pip is kept" lets nothing out before it ends: "Yes, please." to
+  "My goldfish is called Pip." answered with a `recall` that found Pip,
+  then "Yes, Pip is kept.", is said, true of what was found; "Yes, that's
+  kept." after a recall that found the old red bike, "Yes, your bike is
+  kept." after one that found the goldfish, the same after "My bike is
+  blue now." with the old red bike found, and "Yes, Pip is kept, and your
+  bike is kept too." streamed in two pieces, stay claims; a negated line
+  answered ("My bike is not red.", "isn't", "never", "no") never matches a
+  plain found thing, and a negated found thing ("Their bike is not red",
+  "They don't like coffee") never matches a plain line: the negation must
+  be equal on both sides (`remember::negates`, Thirteen's P2s on #5701).
+  The keep's own sentence must say it the same way too: "Yes, your bike
+  is red, kept." never confirms "My bike is not red." with the not-red
+  bike found.
+  A number counts however short (`remember::said_kept_words`), so "Yes,
+  your daughter is 13, kept." after "My daughter is 13." with the old 12
+  found, or locker 51 for a found 15, stays a claim. A decimal is one
+  number ("1.5" is not "5.1"), and its `.` ends no sentence. Only what
+  was kept backs a keep: a found thing's `asked_to_remember`, an active
+  `recorded_observation` or a fact's `text`, never an exchange's `heard`
+  or `you_said` (`remember::recall_found_words`), so an old exchange that
+  heard "My goldfish is called Pip." with nothing kept leaves "Yes, Pip
+  is kept." a claim, even when the recall finds the offer's own
+  exchange. "cannot" negates, and a found thing also negates with
+  "nothing", "nobody", "none" or "without" (`remember::found_negates`):
+  "Yes, your daughter can eat peanuts, kept." after "My daughter can eat
+  peanuts now." with "Their daughter cannot eat peanuts" found stays a
+  claim (Heron's P2s at 8baef46c8f on #5701). Each finished keep
+  sentence is judged on its own: only the sentences up to the last keep
+  that names a found thing are said (`remember::said_kept_found_to`,
+  `second_provider::claim_released`), and what follows stays held and is
+  judged again, so "Yes, Pip is kept. Your bike is kept too." says
+  "Yes, Pip is kept." and holds the bike as a claim (Second's P2s at
+  c60b1a7b21 on #5701). An opening claim ("Kept: …") stays one (the first
+  builder's P3 on #5607, `a_found_recall_lets_a_yes_say_it_is_kept`). A
+  done keep or change backs the turn's keep (`kept_now`) even when a bare
+  "Okay." after it is not told to confirm, so "Great, Pip is kept." is
+  said there (Thirteen's P2 on #5701). "I've saved that." still is a claim. The softer claims count too (K3: lamp-06c1,
   28 Oct night, "Noted — you work at a library now, not the bakery." and
   "All right, I'll keep it in mind." with no call): "Noted" with what was
   noted after a dash or colon, or "noted that"; "I'll keep it/that in
@@ -6890,7 +6991,7 @@ of the week ahead by name. Only when it is called is the place looked up
 by its first part at Open-Meteo's geocoding
 (`geocoding-api.open-meteo.com`), then its forecast fetched from
 `api.open-meteo.com`, now and for 7 days, with no key; the two together
-within the search's 3 s (`net::weather::WITHIN`). It answers in words the
+within 6 s (`net::weather::WITHIN`). It answers in words the
 model can say: `{"place": "Hanoi, Vietnam", "weather": "In Hanoi,
 Vietnam: Tomorrow, Friday, 24 to 30°C, light rain, 60% chance of
 rain."}`; for now and for today the temperature, the sky, the feeling and
@@ -6907,7 +7008,23 @@ yesterday's as today's after its midnight. A forecast whose rows lack the
 place's today is no answer. A place not found
 answers `{"error": "I couldn't find that place"}`, and a failed lookup or
 fetch says the weather couldn't be reached: never another place's
-weather, nor any older than it is kept. A call waits up to 6 s for its place and forecast (`net::weather::WITHIN`; two of five took past 3 s on lamp-4ace on 22 Oct). Each place's forecast is kept 10
+weather, nor any older than it is kept. A call waits up to 6 s for its place and forecast (`net::weather::WITHIN`; two of five took past 3 s on lamp-4ace on 22 Oct).
+Each request's connection is raced as happy eyeballs race theirs
+(`net::public`): a try on a new socket of its own begins at once, the next
+400 ms later while none has opened, later ones further apart (0, 0.4, 1 and
+2 s, `GAPS`; drawn in so the last begins at least 1.5 s before the bound,
+`TRY_OPENS_IN`), spread over every address the name has, at most 4
+(`MOST_TRIES`); the first whose TCP and TLS handshakes end is asked. The
+place's lookup must open within 2.5 s (`OPEN_WITHIN`, tries at 0, 0.4, 1 and
+1.4 s); the forecast within what is left of the 6 s less 0.8 s for its
+answer (`net::weather::forecast_open_within`, `FORECAST_ANSWERED_IN`), never
+less than 2.5 s: 4 s after a place looked up in 1.2 s, 5.2 s for a place
+known before. A first try that opens is asked at once, as before. On
+lamp-9adf on 17 Nov the forecast host's one address dropped the SYN of about
+half the connections for stretches; on 18 Nov (#7593) a place looked up in
+1.2 s left its forecast a fixed 2.5 s, none of 4 tries begun within 1.2 s
+opened, and the call failed in 3.7 s with more than 2 s of its 6 s unused.
+Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day
 fetches again, with at most 16 places kept, the oldest out

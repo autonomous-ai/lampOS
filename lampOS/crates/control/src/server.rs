@@ -201,6 +201,14 @@ pub struct Shared {
     /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
     /// [`crate::task_yes`]): none, and the yes requests are refused.
     task_yes: Mutex<Option<PathBuf>>,
+    /// The owner's yeses to apps and what lamp-control holds of them
+    /// ([`crate::app_yes`]), in memory only.
+    apps: Mutex<(crate::app_yes::Yeses, crate::app_yes::Live)>,
+    /// Where the installed apps are (`crate::app_yes::APPS_DIR` unless the
+    /// app socket was served from another place).
+    apps_dir: Mutex<PathBuf>,
+    /// Whether apps are on, as the app socket reads it.
+    apps_on: Mutex<fn() -> bool>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
@@ -382,6 +390,9 @@ impl Shared {
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
             task_yes: Mutex::new(None),
+            apps: Mutex::default(),
+            apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+            apps_on: Mutex::new(crate::app_yes::on),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -628,6 +639,9 @@ impl Shared {
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
+                apps: Mutex::default(),
+                apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+                apps_on: Mutex::new(crate::app_yes::on),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
@@ -908,6 +922,14 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
+    fn tell_client(&self, client: &str, event: &Value) {
+        for each in self.open.lock().expect("open").values() {
+            if each.client.as_deref() == Some(client) {
+                let _ = each.outbox.send(event.clone());
+            }
+        }
+    }
+
     fn close_client(&self, client: &str, why: &'static str) {
         let mut open = self.open.lock().expect("open");
         let mut reasons = self.close_reasons.lock().expect("close reasons");
@@ -1215,7 +1237,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote, None, false).await;
+                connection(socket, shared, remote, None, false, None).await;
             }
         });
     }
@@ -1290,7 +1312,7 @@ pub async fn serve_agent(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, Some(client), false).await;
+                connection(socket, shared, false, Some(client), false, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
         });
@@ -1356,9 +1378,115 @@ pub async fn serve_run(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, None, true).await;
+                connection(socket, shared, false, None, true, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+/// The app socket (`crate::app_socket`): the same WebSocket protocol on a unix
+/// socket with no TLS, for the apps installed on this lamp. The kernel names
+/// the peer (`SO_PEERCRED`), and its cgroup the app; a peer in no app's unit,
+/// an app not installed or with a manifest that does not load, or any
+/// connection while apps are off, is closed before a byte is read and said in
+/// the journal.
+pub async fn serve_app(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+) {
+    serve_app_as(
+        listener,
+        apps,
+        shared,
+        crate::app_socket::app_of,
+        crate::app_yes::on,
+    )
+    .await;
+}
+
+/// [`serve_app`] with who the peer is and whether apps are on given, so a
+/// test can name an app without a cgroup.
+pub async fn serve_app_as(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+    who: fn(Option<i32>) -> Option<String>,
+    on: fn() -> bool,
+) {
+    *shared.apps_dir.lock().expect("apps_dir") = apps.clone();
+    *shared.apps_on.lock().expect("apps_on") = on;
+    let held = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let pid = stream.peer_cred().ok().and_then(|cred| cred.pid());
+        if !on() {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: {}",
+                pid.unwrap_or(-1),
+                crate::app_socket::OFF
+            );
+            continue;
+        }
+        let Some(name) = who(pid) else {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: in no app's unit",
+                pid.unwrap_or(-1)
+            );
+            continue;
+        };
+        let peer = match crate::app_socket::peer_for(&apps, &name) {
+            Ok(peer) => peer,
+            Err(why) => {
+                eprintln!(
+                    "lamp-control: app socket: refused {name} (pid {}): {why}",
+                    pid.unwrap_or(-1)
+                );
+                continue;
+            }
+        };
+        {
+            let mut held = held.lock().expect("held");
+            let all: usize = held.values().sum();
+            let mine = held.entry(name.clone()).or_default();
+            if *mine >= crate::app_socket::MOST_EACH || all >= crate::app_socket::MOST {
+                eprintln!("lamp-control: app socket: refused {name}: too many connections");
+                continue;
+            }
+            *mine += 1;
+        }
+        eprintln!(
+            "lamp-control: app {name} {}: a connection from pid {}",
+            peer.version,
+            pid.unwrap_or(-1)
+        );
+        let (shared, held) = (shared.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(FRAME_MAX))
+                .max_frame_size(Some(FRAME_MAX));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                shared.apps.lock().expect("apps").1.connection(&name, true);
+                connection(socket, shared.clone(), false, None, false, Some(peer)).await;
+                let mut apps = shared.apps.lock().expect("apps");
+                apps.1.connection(&name, false);
+            }
+            if let Some(count) = held.lock().expect("held").get_mut(&name) {
+                *count = count.saturating_sub(1);
+            }
         });
     }
 }
@@ -1384,6 +1512,7 @@ async fn connection<S>(
     remote: bool,
     local: Option<String>,
     run: bool,
+    app: Option<crate::app_socket::AppPeer>,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -1403,6 +1532,7 @@ async fn connection<S>(
         match &local {
             Some(client) => door.open_local(client),
             None if run => door.open_run(),
+            None if app.is_some() => door.open_app(app.clone().expect("app")),
             None => door.open(),
         }
     };
@@ -1467,16 +1597,86 @@ async fn connection<S>(
                         }
                         _ => break,
                     };
+                    // The ops only an app has, answered before the door parses
+                    // a frame, once it has said hello.
+                    if let Some(name) = session.app_name().map(str::to_owned)
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_socket::is_app_op(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            )
+                        } else {
+                            let state = shared.task_yes.lock().expect("task_yes").clone();
+                            let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+                            let place = crate::app_yes::Place {
+                                apps: &apps_dir,
+                                state: state.as_deref(),
+                            };
+                            let mut apps = shared.apps.lock().expect("apps");
+                            crate::app_socket::answer(
+                                &mut apps.1,
+                                &place,
+                                &name,
+                                &frame,
+                                (*shared.apps_on.lock().expect("apps_on"))(),
+                                std::time::Instant::now(),
+                            )
+                            .unwrap_or_else(|| {
+                                crate::protocol::refused(
+                                    None,
+                                    &crate::protocol::Error::new(
+                                        crate::protocol::ErrorCode::BadRequest,
+                                        "an op has an id and a name",
+                                    ),
+                                )
+                            })
+                        };
+                        if socket.send(Message::text(reply.to_string())).await.is_err() {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
                     let now = shared.now_us();
                     let wall = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|since| since.as_secs())
                         .unwrap_or_default();
+                    // An app's `phrases.set` is the door's own `subscribe` to
+                    // `phrase.heard` (or its `unsubscribe`), so its limits,
+                    // its `hear` grant and its rate are the door's; only
+                    // the reply is the app's.
+                    let (door_text, phrases_set) = if session.app_name().is_some() {
+                        match crate::app_socket::phrases_set_as_subscribe(text.as_str()) {
+                            crate::app_socket::PhrasesSet::NotOurs => (text.to_string(), None),
+                            crate::app_socket::PhrasesSet::Door(door, count) => (door, Some(count)),
+                            crate::app_socket::PhrasesSet::Refused(reply) => {
+                                if socket.send(Message::text(reply.to_string())).await.is_err() {
+                                    break;
+                                }
+                                quiet_until = tokio::time::Instant::now() + quiet;
+                                continue;
+                            }
+                        }
+                    } else {
+                        (text.to_string(), None)
+                    };
                     let mut outcome = {
                         let mut door = shared.door.lock().expect("door");
                         let mut parts = shared.parts.lock().expect("parts");
-                        door.handle(&mut session, text.as_str(), parts.as_mut(), now, wall)
+                        door.handle(&mut session, &door_text, parts.as_mut(), now, wall)
                     };
+                    if let Some(count) = phrases_set {
+                        for reply in &mut outcome.send {
+                            crate::app_socket::phrases_reply(reply, count);
+                        }
+                    }
                     if let Some(client) = session.client() {
                         let grants = shared
                             .door
@@ -1714,11 +1914,12 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
         // that may record the person's yes to a skill's task.
         let from_the_voice =
             crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
+        let peer = crate::app_yes::peer_of(stream.peer_cred().ok().and_then(|peer| peer.pid()));
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line, from_the_voice);
+                let answer = admin_answer(&shared, &line, from_the_voice, peer);
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -1745,7 +1946,12 @@ fn grant_names(grants: &[Grant]) -> String {
 /// skill's notes deleted.
 pub const NOTES_FORGET_SKILLS: &str = "notes_forget_skills";
 
-fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
+fn admin_answer(
+    shared: &Shared,
+    line: &str,
+    from_the_voice: bool,
+    peer: crate::app_yes::Peer,
+) -> Value {
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
@@ -1775,6 +1981,46 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
         wall_ms(),
     ) {
         return answer;
+    }
+    // The owner's yes to an app, and what lamp-cloud reads of apps (#7415).
+    {
+        let mut apps = shared.apps.lock().expect("apps");
+        let (yeses, live) = &mut *apps;
+        let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+        let place = crate::app_yes::Place {
+            apps: &apps_dir,
+            state: folder.as_deref(),
+        };
+        if let Some(answer) = crate::app_yes::answer(
+            yeses,
+            live,
+            &place,
+            &asked,
+            peer,
+            crate::app_yes::on(),
+            std::time::Instant::now(),
+        ) {
+            // The owner changed settings: the app is told at once, whole map.
+            if let (Some(name), Some(changed)) = (
+                asked
+                    .get(crate::app_yes::SETTINGS_SET)
+                    .and_then(|set| set.get("name"))
+                    .and_then(Value::as_str),
+                answer.get("changed").and_then(Value::as_array),
+            ) && !changed.is_empty()
+                && let Some(settings) = crate::app_yes::settings_of(&place, name)
+            {
+                let changed: Vec<String> = changed
+                    .iter()
+                    .filter_map(|key| key.as_str().map(str::to_owned))
+                    .collect();
+                shared.tell_client(
+                    &crate::app_socket::app_client(name),
+                    &crate::app_socket::settings_event(&changed, &settings),
+                );
+            }
+            return answer;
+        }
     }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
@@ -1941,7 +2187,7 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
             "listening": shared.listening.load(Ordering::Relaxed),
         });
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget or notes_forget_skills"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state, app_settings_set or notes_forget_skills"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
@@ -2216,10 +2462,16 @@ mod tests {
             notes.set(client, key, &json!(1)).unwrap().wait().unwrap();
         }
         let file = |client: &str| crate::notes::Notes::path(&folder, client).unwrap();
-        admin_answer(&shared, r#"{"task_yes_forget":"apple-facts"}"#, false);
+        let other = crate::app_yes::Peer::Other;
+        admin_answer(
+            &shared,
+            r#"{"task_yes_forget":"apple-facts"}"#,
+            false,
+            other,
+        );
         assert!(!file(&apple).exists());
         assert!(file(&plant).exists());
-        let forgot = admin_answer(&shared, r#"{"notes_forget_skills":true}"#, false);
+        let forgot = admin_answer(&shared, r#"{"notes_forget_skills":true}"#, false, other);
         assert_eq!(forgot, json!({"forgot": 1}));
         assert!(!file(&plant).exists());
         assert!(file("c_1").exists());

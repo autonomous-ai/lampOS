@@ -11,7 +11,7 @@
 //! Hanoi tomorrow?" had been answered with Ho Chi Minh City's. The first
 //! builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
 //! place's name and its coordinates leave the lamp.
-use super::{Result, get_public_json};
+use super::{Result, get_public_json_within, public::OPEN_WITHIN};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -30,6 +30,11 @@ pub const NAME: &str = "weather";
 /// it is checking meanwhile, and a right answer a little later is the owner's
 /// choice ("quality first").
 pub const WITHIN: Duration = Duration::from_secs(6);
+/// What a forecast's open bound leaves of [`WITHIN`] for its answer once
+/// its connection is open: the request sent and the answer read over it,
+/// about two round trips of lamp-9adf's 0.33 s (18 Nov) and Open-Meteo's
+/// own work; an estimate, not timed on its own on a lamp.
+pub const FORECAST_ANSWERED_IN: Duration = Duration::from_millis(800);
 /// A place's forecast is answered from what was kept while it is this
 /// fresh, never older.
 pub const KEPT_FOR: Duration = Duration::from_secs(10 * 60);
@@ -93,13 +98,27 @@ pub fn declaration() -> lamp_gemini::Tool {
     }
 }
 
-/// How a request's JSON answer is fetched: from Open-Meteo on the lamp
-/// ([`open_meteo`]), and a canned one in a test.
-pub type Fetch = Arc<dyn Fn(String) -> BoxFuture<'static, Result<Value>> + Send + Sync>;
+/// How a request's JSON answer is fetched, its connection open within the
+/// bound given: from Open-Meteo on the lamp ([`open_meteo`]), and a canned
+/// one in a test.
+pub type Fetch = Arc<dyn Fn(String, Duration) -> BoxFuture<'static, Result<Value>> + Send + Sync>;
 
 /// Open-Meteo's answers, fetched over HTTPS with no key.
 pub fn open_meteo() -> Fetch {
-    Arc::new(|url| Box::pin(async move { get_public_json(&url).await }))
+    Arc::new(|url, open_within| {
+        Box::pin(async move { get_public_json_within(&url, open_within).await })
+    })
+}
+
+/// How long a forecast fetched with `left` of the call's [`WITHIN`] still
+/// to come may take to open its connection: all but
+/// [`FORECAST_ANSWERED_IN`] of it, never less than a place's own
+/// [`OPEN_WITHIN`]. lamp-9adf on 18 Nov (#7593): a place looked up in
+/// 1.2 s left its forecast 4.8 s, but the forecast's one address opened
+/// none of its tries in a fixed 2.5 s and the call failed in 3.7 s; with
+/// this it has 4 s. A forecast of a place known before has 5.2 s.
+pub fn forecast_open_within(left: Duration) -> Duration {
+    left.saturating_sub(FORECAST_ANSWERED_IN).max(OPEN_WITHIN)
 }
 
 /// The name a place is looked up by: its first part ("Hanoi" for "Hanoi,
@@ -531,24 +550,32 @@ impl Weather {
             day.said()
         );
         let now = (self.clock)();
-        let (told, how) = match tokio::time::timeout(WITHIN, self.looked_up(place, day, now)).await
-        {
-            Ok(answered) => answered,
-            Err(_) => (
-                json!({"error": UNREACHED}),
-                format!("not reached within {} ms", WITHIN.as_millis()),
-            ),
-        };
+        let until = Instant::now() + WITHIN;
+        let (told, how) =
+            match tokio::time::timeout_at(until, self.looked_up(place, day, now, until)).await {
+                Ok(answered) => answered,
+                Err(_) => (
+                    json!({"error": UNREACHED}),
+                    format!("not reached within {} ms", WITHIN.as_millis()),
+                ),
+            };
         Answered { told, asked, how }
     }
 
-    /// The call's answer, its days told from the place's own day at `now`.
-    async fn looked_up(&self, place: Option<&str>, day: Day, now: i64) -> (Value, String) {
+    /// The call's answer, its days told from the place's own day at `now`,
+    /// the call cut at `until`.
+    async fn looked_up(
+        &self,
+        place: Option<&str>,
+        day: Day,
+        now: i64,
+        until: Instant,
+    ) -> (Value, String) {
         if place.is_none()
             && let Some(owner) = self.owner_here()
         {
             let key = owner.name.to_lowercase();
-            return self.forecast_of(key, owner, true, day, now).await;
+            return self.forecast_of(key, owner, true, (day, now), until).await;
         }
         let Some(name) = place.or(self.here.as_deref()) else {
             return (json!({"error": NO_HERE}), "no place, and none here".into());
@@ -572,7 +599,7 @@ impl Weather {
                 let Some(url) = geocoding_url(&query) else {
                     return (json!({"error": NOT_FOUND}), "no such place".into());
                 };
-                let place = match (self.fetch)(url).await {
+                let place = match (self.fetch)(url, OPEN_WITHIN).await {
                     Ok(answer) => found(&answer),
                     Err(error) => {
                         return (
@@ -588,19 +615,21 @@ impl Weather {
                 place
             }
         };
-        self.forecast_of(key, place, known.is_some(), day, now)
+        self.forecast_of(key, place, known.is_some(), (day, now), until)
             .await
     }
 
     /// The forecast of `place`, found by the name `key`, from what was kept
-    /// or fetched; `known`, its place was known before this call.
+    /// or fetched, its connection open within what is left before `until`
+    /// ([`forecast_open_within`]); `known`, its place was known before this
+    /// call.
     async fn forecast_of(
         &self,
         key: String,
         place: Place,
         known: bool,
-        day: Day,
-        now: i64,
+        (day, now): (Day, i64),
+        until: Instant,
     ) -> (Value, String) {
         if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
@@ -611,7 +640,8 @@ impl Weather {
         let Some(url) = forecast_url(place.latitude, place.longitude) else {
             return (json!({"error": UNREACHED}), "no forecast request".into());
         };
-        let forecast = match (self.fetch)(url).await {
+        let open_within = forecast_open_within(until.saturating_duration_since(Instant::now()));
+        let forecast = match (self.fetch)(url, open_within).await {
             Ok(forecast) => Arc::new(forecast),
             Err(error) => {
                 return (
@@ -899,7 +929,7 @@ mod tests {
             let asked = Arc::new(Mutex::new(Vec::new()));
             let failing = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let (urls, fails) = (asked.clone(), failing.clone());
-            let fetch: Fetch = Arc::new(move |url: String| {
+            let fetch: Fetch = Arc::new(move |url: String, _| {
                 urls.lock().unwrap().push(url.clone());
                 let fails = fails.load(std::sync::atomic::Ordering::Relaxed);
                 Box::pin(async move { canned(&url, fails) })
@@ -1147,7 +1177,7 @@ mod tests {
     /// the weather couldn't be reached.
     #[tokio::test(start_paused = true)]
     async fn the_weather_not_reached_in_time_is_an_error() {
-        let slow: Fetch = Arc::new(|_| Box::pin(std::future::pending()));
+        let slow: Fetch = Arc::new(|_, _| Box::pin(std::future::pending()));
         let waited = Instant::now();
         let answered = Weather::new(None, slow, tuesday_noon())
             .answer(&json!({"place": "Hanoi"}))
@@ -1155,6 +1185,93 @@ mod tests {
         assert_eq!(answered.told, json!({"error": UNREACHED}));
         assert_eq!(answered.how, "not reached within 6000 ms");
         assert_eq!(waited.elapsed(), WITHIN);
+    }
+
+    /// A fetcher whose place is found after `looked_up_in` and whose
+    /// forecast connection never opens: each fails as the race does once
+    /// its open bound has passed. Each bound asked with is kept, the
+    /// place's first.
+    fn never_opening_forecast(looked_up_in: Duration) -> (Arc<Mutex<Vec<Duration>>>, Fetch) {
+        let bounds = Arc::new(Mutex::new(Vec::new()));
+        let kept = bounds.clone();
+        let fetch: Fetch = Arc::new(move |url: String, open_within| {
+            kept.lock().unwrap().push(open_within);
+            Box::pin(async move {
+                if url.contains("geocoding-api") {
+                    tokio::time::sleep(looked_up_in).await;
+                    return canned(&url, false);
+                }
+                tokio::time::sleep(open_within).await;
+                Err(super::super::Error::Timeout("connection"))
+            })
+        });
+        (bounds, fetch)
+    }
+
+    /// lamp-9adf on 18 Nov (#7593): a place looked up in 1.2 s, its
+    /// forecast's connection unopened in a fixed 2.5 s, and the call failed
+    /// in 3.7 s. The place's lookup opens within [`OPEN_WITHIN`] as before;
+    /// the forecast within what is left of the 6 s less
+    /// [`FORECAST_ANSWERED_IN`], 4 s, and a forecast that never opens ends
+    /// there, inside the call's bound. A place known before leaves its
+    /// forecast 5.2 s.
+    #[tokio::test(start_paused = true)]
+    async fn the_forecast_may_open_within_what_is_left_of_the_six_seconds() {
+        let (bounds, fetch) = never_opening_forecast(Duration::from_millis(1200));
+        let weather = Weather::new(None, fetch, tuesday_noon());
+        let waited = Instant::now();
+        let answered = weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(answered.told, json!({"error": UNREACHED}));
+        assert_eq!(
+            answered.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert_eq!(waited.elapsed(), Duration::from_millis(5200));
+        assert!(waited.elapsed() < WITHIN);
+        assert_eq!(
+            *bounds.lock().unwrap(),
+            [OPEN_WITHIN, Duration::from_millis(4000)]
+        );
+        let waited = Instant::now();
+        let answered = weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(
+            answered.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert_eq!(waited.elapsed(), WITHIN - FORECAST_ANSWERED_IN);
+        assert_eq!(
+            bounds.lock().unwrap()[2],
+            WITHIN - FORECAST_ANSWERED_IN,
+            "where Hanoi is was kept: its forecast alone, 5.2 s to open"
+        );
+    }
+
+    /// A place looked up slowly (4 s) leaves its forecast no less than
+    /// [`OPEN_WITHIN`] to open, and the call is cut at its 6 s all the same.
+    #[tokio::test(start_paused = true)]
+    async fn a_slow_place_leaves_its_forecast_the_usual_bound_and_the_call_ends_at_six_seconds() {
+        let (bounds, fetch) = never_opening_forecast(Duration::from_secs(4));
+        let waited = Instant::now();
+        let answered = Weather::new(None, fetch, tuesday_noon())
+            .answer(&json!({"place": "Hanoi"}))
+            .await;
+        assert_eq!(answered.told, json!({"error": UNREACHED}));
+        assert_eq!(answered.how, "not reached within 6000 ms");
+        assert_eq!(waited.elapsed(), WITHIN);
+        assert_eq!(*bounds.lock().unwrap(), [OPEN_WITHIN, OPEN_WITHIN]);
+    }
+
+    /// The forecast's open bound: all but [`FORECAST_ANSWERED_IN`] of what
+    /// is left, never less than [`OPEN_WITHIN`].
+    #[test]
+    fn the_forecast_opens_within_what_is_left_less_its_answer() {
+        assert_eq!(forecast_open_within(WITHIN), Duration::from_millis(5200));
+        assert_eq!(
+            forecast_open_within(Duration::from_millis(4800)),
+            Duration::from_millis(4000)
+        );
+        assert_eq!(forecast_open_within(Duration::from_secs(2)), OPEN_WITHIN);
+        assert_eq!(forecast_open_within(Duration::ZERO), OPEN_WITHIN);
     }
 
     /// A follow-up within 10 minutes ("and Saturday?") is answered from what
@@ -1292,7 +1409,7 @@ mod tests {
     fn honolulu_fetch() -> (Arc<std::sync::atomic::AtomicUsize>, Fetch) {
         let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count = fetched.clone();
-        let fetch: Fetch = Arc::new(move |url: String| {
+        let fetch: Fetch = Arc::new(move |url: String, _| {
             count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Box::pin(async move {
                 Ok(if url.contains("geocoding-api") {

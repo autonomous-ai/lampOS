@@ -259,8 +259,10 @@ lamp's owner owns the device; the lamp holds no token. `lamp-cloud` takes the
 asks from the voice's `devices/ask` and puts the replies on `devices/answer`
 and the news on `devices/event` ([msgs.md](msgs.md), "The devices contract"):
 only a device the last list gave is asked about, a `stop` goes first and
-cancels commands still waiting, an ask not answered in 8 s is answered
-`timeout`, and none is kept for a reconnect (`crates/cloud/src/devices.rs`).
+cancels commands still waiting (it has its own limit of 60 a minute, apart from
+the 20 of the others), an ask not answered in 8 s is answered `timeout`, one the
+MQTT client would not take (its queue full) is answered `busy` at once, and
+none is kept for a reconnect (`crates/cloud/src/devices.rs`).
 
 ### The light: V1's colours on this lamp's
 
@@ -2933,7 +2935,7 @@ until its lamp check. Both yeses stay off by default.
   which has the slide) is a slide lamp: no `room_sounds` in either reply,
   and a set of it refused. Seen activity (#6543, `seen_activity`) the same
   way, only where lamp-seen looks: `lamp-cloud`'s own
-  `LAMP_SEEN_ACTIVITY=on` exactly; lamp-seen reads its yes every 2 s, so
+  `LAMP_SEEN_ACTIVITY=on` exactly, which the product unit sets; lamp-seen reads its yes every 2 s, so
   nothing restarts ([onboarding.md](onboarding.md), "Seen activity").
 - **Reading** (`consent.get`): the files in `/var/lib/lampOS/consent`, which
   `lampos` may read (0750 `root:lampos`, files 0640), with the readers' rule:

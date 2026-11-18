@@ -36,6 +36,15 @@
 //!   posture line once. Posture sends no frame until it has begun for the
 //!   kept yes ([`SaidBack::said_posture`]); activity needs either line. A
 //!   forget then a new yes owes it again, as any new yes does.
+//! - **Tiredness, desk work and celebrating.** With `LAMP_SEEN_MORE_DOINGS`
+//!   on ([`SaidBack::with_more`]), the on line owed is [`MORE_ON_LINE`]
+//!   ([`POSTURE_MORE_ON_LINE`] with posture on too), which names all the
+//!   lamp then reads: drinks, meals and breaks, yawns and stretches, desk
+//!   work and at what, and celebrating (the first builder's condition on
+//!   #6543). The record keeps that it did, and a yes whose line did not
+//!   name them is owed it once, as posture's. `humans/doing_more` is
+//!   neither timed nor said until it has begun for the kept yes, and not
+//!   while the opt-in is off ([`SaidBack::said_more`]).
 use crate::opt_in::{Said, Store};
 use lamp_msgs::consent::Kept;
 use std::io::{BufRead, BufReader, Write};
@@ -52,6 +61,12 @@ pub const ON_LINE: &str = "I'll look now and then to see if you're eating, drink
 /// (`LAMP_SEEN_POSTURE`): the same line with posture named. Awaiting the
 /// PM's wording (docs/seen.md); this constant is the one place to change it.
 pub const POSTURE_ON_LINE: &str = "I'll look now and then to see if you're eating, drinking or slouching, and now and then how you're sitting, so I can remind you to sit back. I keep none of the pictures.";
+/// Said instead of [`ON_LINE`] with `LAMP_SEEN_MORE_DOINGS` on: every
+/// reading the lamp then makes named. Awaiting the PM's wording, as
+/// [`POSTURE_ON_LINE`]'s; this constant is the one place to change it.
+pub const MORE_ON_LINE: &str = "I'll look now and then to see if you're eating, drinking, taking a break or slouching, if you yawn or stretch, what you're working on at the desk, and if you're celebrating. I keep none of the pictures.";
+/// [`MORE_ON_LINE`] with posture named too, with both switched on.
+pub const POSTURE_MORE_ON_LINE: &str = "I'll look now and then to see if you're eating, drinking, taking a break or slouching, if you yawn or stretch, what you're working on at the desk, and if you're celebrating, and now and then how you're sitting, so I can remind you to sit back. I keep none of the pictures.";
 /// Said word for word when the opt-in turns off, a forget's included.
 pub const OFF_LINE: &str = "Okay, I've stopped looking at the desk.";
 /// The say service's `skill`: logged and traced only.
@@ -70,8 +85,26 @@ pub const CANCEL_LINE: &str = r#"{"cancel":true}"#;
 /// The line that says `said`.
 pub fn line(said: Said) -> &'static str {
     match said {
-        Said::On { posture: false, .. } => ON_LINE,
-        Said::On { posture: true, .. } => POSTURE_ON_LINE,
+        Said::On {
+            posture: false,
+            more: false,
+            ..
+        } => ON_LINE,
+        Said::On {
+            posture: true,
+            more: false,
+            ..
+        } => POSTURE_ON_LINE,
+        Said::On {
+            posture: false,
+            more: true,
+            ..
+        } => MORE_ON_LINE,
+        Said::On {
+            posture: true,
+            more: true,
+            ..
+        } => POSTURE_MORE_ON_LINE,
         Said::Off => OFF_LINE,
     }
 }
@@ -127,6 +160,9 @@ pub struct SaidBack {
     withdrawn: bool,
     /// Posture is switched on: the on line owed names it.
     posture: bool,
+    /// `LAMP_SEEN_MORE_DOINGS` is on: the on line owed names tiredness,
+    /// desk work and celebrating.
+    more: bool,
 }
 
 impl SaidBack {
@@ -137,6 +173,12 @@ impl SaidBack {
             posture,
             ..Self::default()
         }
+    }
+
+    /// The same, with `LAMP_SEEN_MORE_DOINGS` on or not: on, the on line
+    /// owed is [`MORE_ON_LINE`] (or [`POSTURE_MORE_ON_LINE`]).
+    pub fn with_more(self, more: bool) -> Self {
+        Self { more, ..self }
     }
 
     /// One step at `now_us`: `opted_in` as the gate takes it, `kept` as the
@@ -198,19 +240,18 @@ impl SaidBack {
     }
 
     /// The line owed now, if any: on for a kept yes not said back (with
-    /// posture on, not said back naming posture), off only after an on
-    /// line was said.
+    /// posture on, not said back naming posture, and the same for
+    /// tiredness, desk work and celebrating), off only after an on line was
+    /// said.
     fn owed(&self, opted_in: bool, kept: &Kept, store: &impl Store) -> Option<Said> {
         let last = self.last(store);
         if opted_in {
             let said = last.is_some_and(|last| {
-                if self.posture {
-                    last.names_posture_for(kept)
-                } else {
-                    last.is_on_for(kept)
-                }
+                last.is_on_for(kept)
+                    && (!self.posture || last.names_posture_for(kept))
+                    && (!self.more || last.names_more_for(kept))
             });
-            (!said).then(|| Said::on_for(kept, self.posture))
+            (!said).then(|| Said::on_for(kept, self.posture, self.more))
         } else {
             matches!(last, Some(Said::On { .. })).then_some(Said::Off)
         }
@@ -227,6 +268,16 @@ impl SaidBack {
     pub fn said_posture(&self, kept: &Kept, store: &impl Store) -> bool {
         self.last(store)
             .is_some_and(|last| last.names_posture_for(kept))
+    }
+
+    /// Whether `humans/doing_more` may be timed and said: the opt-in is on
+    /// (`opted_in`, as the gate takes it) and a line naming tiredness, desk
+    /// work and celebrating has begun for `kept`. Off, none of it is.
+    pub fn said_more(&self, opted_in: bool, kept: &Kept, store: &impl Store) -> bool {
+        opted_in
+            && self
+                .last(store)
+                .is_some_and(|last| last.names_more_for(kept))
     }
 }
 
@@ -426,6 +477,7 @@ mod tests {
         Said::On {
             for_at_unix_s: Some(at),
             posture: false,
+            more: false,
         }
     }
 
@@ -433,7 +485,147 @@ mod tests {
         Said::On {
             for_at_unix_s: Some(at),
             posture: true,
+            more: false,
         }
+    }
+
+    fn on_more(at: u64, posture: bool) -> Said {
+        Said::On {
+            for_at_unix_s: Some(at),
+            posture,
+            more: true,
+        }
+    }
+
+    #[test]
+    fn more_doings_on_says_a_line_naming_every_reading() {
+        // Off: the lines as before.
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        let mut back = SaidBack::default().with_more(false);
+        say(&mut back, true, &yes(7), &store, &mut voice, 0, on(7));
+        assert_eq!(voice.asked, [ON_LINE]);
+        assert!(!back.said_more(true, &yes(7), &store));
+        // On: the line names drinks, meals and breaks, yawns and stretches,
+        // desk work and celebrating, with posture's or without.
+        for (posture, line_said) in [(false, MORE_ON_LINE), (true, POSTURE_MORE_ON_LINE)] {
+            let store = Memory::default();
+            let mut voice = Voice::default();
+            let mut back = SaidBack::with_posture(posture).with_more(true);
+            assert!(!back.said_more(true, &yes(7), &store), "nothing before it");
+            say(
+                &mut back,
+                true,
+                &yes(7),
+                &store,
+                &mut voice,
+                0,
+                on_more(7, posture),
+            );
+            assert_eq!(voice.asked, [line_said]);
+            assert!(back.said_on(&yes(7), &store));
+            assert_eq!(back.said_posture(&yes(7), &store), posture);
+            assert!(back.said_more(true, &yes(7), &store));
+            assert_eq!(*store.said.borrow(), Some(on_more(7, posture)), "kept");
+            for word in [
+                "eating",
+                "drinking",
+                "break",
+                "yawn",
+                "stretch",
+                "working",
+                "desk",
+                "celebrating",
+                "none of the pictures",
+            ] {
+                assert!(line_said.contains(word), "{word}: {line_said}");
+            }
+            assert!(line_said.len() <= 900);
+        }
+    }
+
+    #[test]
+    fn more_doings_on_after_the_plain_line_owes_the_more_line_once() {
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        say(
+            &mut SaidBack::default(),
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            0,
+            on(7),
+        );
+        // Switched on (a restart with LAMP_SEEN_MORE_DOINGS=on).
+        let mut back = SaidBack::default().with_more(true);
+        assert!(back.said_on(&yes(7), &store), "activity's gate stays open");
+        assert!(!back.said_more(true, &yes(7), &store), "nothing said yet");
+        say(
+            &mut back,
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            10,
+            on_more(7, false),
+        );
+        assert_eq!(voice.asked, [ON_LINE, MORE_ON_LINE]);
+        assert!(back.said_more(true, &yes(7), &store));
+        // Once: not again, after a restart either.
+        assert_eq!(
+            SaidBack::default()
+                .with_more(true)
+                .step(true, &yes(7), &store, &mut voice, 20),
+            Step::Idle
+        );
+        // Posture switched on later owes the line naming both.
+        let mut both = SaidBack::with_posture(true).with_more(true);
+        say(
+            &mut both,
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            30,
+            on_more(7, true),
+        );
+        assert_eq!(voice.asked, [ON_LINE, MORE_ON_LINE, POSTURE_MORE_ON_LINE]);
+    }
+
+    #[test]
+    fn the_opt_in_off_stops_more_doings() {
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        let mut back = SaidBack::default().with_more(true);
+        say(
+            &mut back,
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            0,
+            on_more(7, false),
+        );
+        assert!(back.said_more(true, &yes(7), &store));
+        // Off, with the yes still kept (a forget before the voice removes
+        // it): nothing at once, before the off line is said.
+        assert!(!back.said_more(false, &yes(7), &store));
+        say(&mut back, false, &yes(7), &store, &mut voice, 10, Said::Off);
+        assert!(!back.said_more(true, &yes(7), &store), "the off line said");
+        // A new yes: nothing until its own line naming them began.
+        assert!(!back.said_more(true, &yes(30), &store));
+        say(
+            &mut back,
+            true,
+            &yes(30),
+            &store,
+            &mut voice,
+            20,
+            on_more(30, false),
+        );
+        assert!(back.said_more(true, &yes(30), &store));
+        assert_eq!(voice.asked, [MORE_ON_LINE, OFF_LINE, MORE_ON_LINE]);
     }
 
     #[test]
@@ -875,6 +1067,8 @@ mod tests {
         assert_eq!(line(Said::Off), OFF_LINE);
         assert_eq!(line(on(1)), ON_LINE);
         assert_eq!(line(on_posture(1)), POSTURE_ON_LINE);
+        assert_eq!(line(on_more(1, false)), MORE_ON_LINE);
+        assert_eq!(line(on_more(1, true)), POSTURE_MORE_ON_LINE);
         assert!(POSTURE_ON_LINE.len() <= 900);
         assert!(OFF_LINE.len() <= 900);
         let ask: serde_json::Value = serde_json::from_str(ask_line(ON_LINE).trim()).unwrap();

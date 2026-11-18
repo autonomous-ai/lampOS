@@ -1180,6 +1180,10 @@ fn worker_command(
             role,
             var(crate::service_records::task_rows::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_records_reminders_worker_environment(
+            role,
+            var(crate::service_records::reminder_rows::ENVIRONMENT).as_deref(),
+        ))
         .envs(service_read_ids_worker_environment(
             role,
             var(crate::service_read_ids::ENVIRONMENT).as_deref(),
@@ -1859,6 +1863,18 @@ fn service_records_tasks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::task_rows::ENVIRONMENT, "on"))
+}
+
+// Reminder rows (the linked-service memory plan, slice 6), passed the same
+// narrow way: the exact `on`, to the second route alone, where reminders
+// are set and said with their records. It acts only beside
+// `LAMP_SERVICE_RECORDS` (`service_records::reminder_rows::on`).
+fn service_records_reminders_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::reminder_rows::ENVIRONMENT, "on"))
 }
 
 // A calendar read's event ids kept for the next request (tracker row
@@ -2634,6 +2650,8 @@ fn second_route_worker_environment(
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
         crate::owner_link::ENVIRONMENT,
+        // A held rename's short yes, with it (#7419).
+        crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -2932,6 +2950,7 @@ mod tests {
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
+            crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -3359,6 +3378,12 @@ mod tests {
                     (
                         service_records_tasks_worker_environment,
                         "LAMP_SERVICE_RECORDS_TASKS",
+                        ["second"].as_slice(),
+                    ),
+                    // Reminder rows: the second route alone.
+                    (
+                        service_records_reminders_worker_environment,
+                        "LAMP_SERVICE_RECORDS_REMINDERS",
                         ["second"].as_slice(),
                     ),
                     // A read's event ids kept: the second route alone.
@@ -3839,6 +3864,7 @@ mod tests {
                     crate::service_contacts::ENVIRONMENT,
                     crate::service_records::redo::ENVIRONMENT,
                     crate::service_records::task_rows::ENVIRONMENT,
+                    crate::service_records::reminder_rows::ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -4021,6 +4047,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
+                    || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                     || name == lamp_msgs::chosen_voice::ENVIRONMENT
@@ -4225,6 +4252,7 @@ mod tests {
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
                     "LAMP_REMINDERS_ASKED=on",
+                    "LAMP_RENAME_SHORT_YES=on",
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_ROOM_HELD_TALK=on",
                     "LAMP_SAID_TO_ME=on",
@@ -4278,6 +4306,7 @@ mod tests {
                     "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
+                    "LAMP_SERVICE_RECORDS_REMINDERS=on",
                     "LAMP_SERVICE_RECORDS_TASKS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
                     "LAMP_SERVICE_REDO=on",

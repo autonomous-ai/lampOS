@@ -586,6 +586,30 @@ yours."; no answer, "I couldn't reach the desk." or "I'm not online right
 now, so I can't reach your devices." The Hydrate never speaks unasked: these
 functions answer a question and the sips (`devices/event`) are not told.
 
+
+### `desk_stop`, the stop (#7470 S3a)
+
+Beside the two reads, with `LAMP_DEVICES=on`: `desk_stop`, no argument, which
+sends `Stop` to the desk at once. It needs no yes, no presence and no
+person's own words: stopping a desk grants nothing. The desk is the one in
+flight, else the first desk of the kept list (so a stop is one round trip, the
+list read only when none is kept); it is told within 3 s: "Okay, I've told the
+desk to stop.", or "I can't stop that desk.", or, when the cloud did not say,
+"I couldn't reach the desk, so I'm not sure it stopped." (`ok` is that the
+stop was handed to the desk). It is the model's way to stop; the fast ways,
+in code, are below.
+
+**The touch guard.** A move in flight arms a guard (`arm_guard`, S3b calls it
+when a move's command goes; nothing in S3a does): it listens to `controls/touch`
+BEFORE the move goes, and any contact with the lamp (its head, its button),
+from Controls, enabled, valid and later than the arming, sends `Stop` on
+`devices/ask` straight away, once, and ends the guard; it also ends at its
+time (60 s) or when a stop was *taken* by the desk (`ok`): a stop that ended "not sure", refused or away leaves the guard armed, the last fallback. The guard is the voice process's own (`MOVING` is per process): it stops only a move that process began, never a desk moved from the app. With nobody listening for asks on the bus (lamp-cloud down) a stop is answered "away" at once, not after its whole wait. Timed in a test on a real bus from
+the touch on the bus to the `Stop` on the bus: under 100 ms (the guard looks
+every 20 ms); lamp-cloud then sends it up (`stop` goes first, past every cap,
+tested under 100 ms to the send); the cloud's and the desk's own legs are
+measured only on a real desk (the row on lamp-0c89).
+
 ## `reports_stop`, a system function
 
 With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,
@@ -597,11 +621,15 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 45 of the lamp's own
+unit sets it: a product lamp's chat request offers 50 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 27 with these two among them (and `set_role` and `end_role`
+voice's own 32 with these two among them (and lamp-services' three since
+`LAMP_SERVICES` is on in the product, `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
-since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
+since `LAMP_SLEEP_ASKED` is on in the product, #6853, and seen activity's
+`look_at_my_desk` and `stop_looking_at_my_desk` since `LAMP_SEEN_ACTIVITY` is
+on in the product, #6543; its `offer_desk_noticing` only with
+`LAMP_SEEN_VOICE_OFFER=on`, off in the product), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
@@ -613,8 +641,9 @@ skills' functions that are not a core skill's, the last first (the skills'
 tools file lists them by name, `lamp_skills::tools_file`), then the
 weather, then the search (`chat_cut`). A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
-own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
-the time, the light scenes and the search on lamp-4ace). On the product's
+own, 64 (`second_provider::MAX_TOOLS`, 48 from 22 Oct, when Live's bound
+had left out the time, the light scenes and the search on lamp-4ace, until
+#7433, when a product lamp's 52 were past it). On the product's
 chat route nothing is left out: its skills are one function, `use_skill`
 (`LAMP_USE_SKILL=on` since #2826), however many are installed. With the
 switch off and installable skills added it was past 48 (lamp-9adf, 6 Nov:
@@ -624,7 +653,7 @@ left, so its last are left out, and the cut then takes `reports_state`;
 `reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
 core skill, so it is a core name and never the one cut. Whatever is cut is
 said once, at start, on a plain journal line naming the bound (`past the
-bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
+bound of 32, left out: …` on Live, 64 on the chat route); only the lamp's own
 and core skills' functions alone past it are an error line (`alone are past
 the bound of 32; left out: …`). Tests:
 `with_reports_on_dance_stays_at_the_bound`

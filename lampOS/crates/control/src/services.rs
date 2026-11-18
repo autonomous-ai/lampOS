@@ -50,8 +50,17 @@ impl Services {
     }
 
     /// The one line lamp-services' tools socket takes for skill `skill`'s
-    /// run: its `service_read` or `service_write`, `service` among the args.
-    pub fn line(skill: &str, write: bool, service: &str, args: &Map<String, Value>) -> String {
+    /// run `run`: its `service_read` or `service_write`, `service` among the
+    /// args. The run's id goes beside it, for lamp-services' `--run-calls`
+    /// (the linked-service memory plan, slice 4); an older lamp-services
+    /// passes over it.
+    pub fn line(
+        skill: &str,
+        run: &str,
+        write: bool,
+        service: &str,
+        args: &Map<String, Value>,
+    ) -> String {
         let mut args = args.clone();
         args.insert("service".to_owned(), json!(service));
         json!({
@@ -59,6 +68,7 @@ impl Services {
             "name": if write { "service_write" } else { "service_read" },
             "args": args,
             "skill": skill,
+            "run": run,
         })
         .to_string()
     }
@@ -110,18 +120,19 @@ mod tests {
         let args: Map<String, Value> =
             serde_json::from_str(r#"{"what":"search","query":"is:unread"}"#).unwrap();
         let read: Value =
-            serde_json::from_str(&Services::line("mail-count", false, "gmail", &args)).unwrap();
+            serde_json::from_str(&Services::line("mail-count", "r1", false, "gmail", &args))
+                .unwrap();
         assert_eq!(
             read,
-            json!({"op":"call","name":"service_read","skill":"mail-count",
+            json!({"op":"call","name":"service_read","skill":"mail-count","run":"r1",
                 "args":{"what":"search","query":"is:unread","service":"gmail"}})
         );
         let write: Value =
-            serde_json::from_str(&Services::line("s", true, "github", &Map::new())).unwrap();
+            serde_json::from_str(&Services::line("s", "r1", true, "github", &Map::new())).unwrap();
         assert_eq!(write["name"], "service_write");
         // A fixed write's run (LAMP_SKILL_WRITE_AGENT): its run's id beside
         // it, and nothing else changed.
-        let line = Services::line("arrive-mail", true, "gmail", &args);
+        let line = Services::line("arrive-mail", "task-1", true, "gmail", &args);
         let fixed: Value = serde_json::from_str(&Services::fixed_write(&line, "task-1")).unwrap();
         let mut expected: Value = serde_json::from_str(&line).unwrap();
         expected["fixed_write_run"] = json!("task-1");

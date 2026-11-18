@@ -3340,6 +3340,80 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
     }
 }
 
+/// The memory owner's rule (17 Nov, "mouth detection only blocks the
+/// forget and nothing else"), with `LAMP_KEEP_QUIETLY_ONE_FACE`: a held
+/// keep (a carried line's, `LAMP_CONVERSATION_CARRIED_SAVES`) is let go by
+/// its person's plain yes on a line theirs by their face alone in view,
+/// none seen speaking it, as their mouth seen saying it lets it go. Off, or
+/// another face seen speaking the yes, or no face-in-view rule, or another
+/// person: it stays dropped. A held forget's yes is unchanged.
+#[tokio::test]
+async fn a_held_keeps_yes_on_their_one_face_line_keeps_it_with_the_switch() {
+    let script = Arc::new(Script::default());
+    let (engine, _, _) = scripted(script);
+    let eyes = Arc::new(SpeakingFaces::default());
+    let path = known_file("held-keep-one-face", &eyes);
+    let engine = engine.confirming_forgets_by_sight(eyes, path.clone());
+    let asker = (7, crate::remember::person_id("A"));
+    let other = (7, crate::remember::person_id("B"));
+    let take = |name: &str, on: bool, by_one_face: bool, speakers: &[&str], line: &HeldAsker| {
+        crate::keep_quietly::set_one_face_for_test(on);
+        let now = Instant::now();
+        if let Ok(mut hold) = engine.shared.held_forget.lock() {
+            hold.held = Some(HeldForget {
+                call: call(
+                    "k1",
+                    name,
+                    json!({"text": "I start at the bank on Monday."}),
+                ),
+                request: 1,
+                asker: asker.clone(),
+                at: now,
+                asked: true,
+                spelling: false,
+                carried: true,
+                line: Some("I start at the bank on Monday.".to_owned()),
+                asked_again: false,
+                one_face: false,
+                near: None,
+            });
+            hold.sight = Some((
+                2,
+                speakers.iter().map(|id| (*id).to_owned()).collect(),
+                None,
+            ));
+        }
+        // A line theirs by one face alone has no forget asker.
+        let taken = take_held_forget(
+            &engine.shared,
+            2,
+            true,
+            "Yes.",
+            ((!by_one_face).then_some(line), Some(line)),
+            by_one_face,
+            now,
+        );
+        crate::keep_quietly::set_one_face_for_test(false);
+        matches!(taken, Taken::Runs(..))
+    };
+    let keep = crate::remember::REMEMBER;
+    assert!(!take(keep, false, true, &[], &asker), "off: unseen");
+    assert!(take(keep, true, true, &[], &asker), "their one face: kept");
+    assert!(
+        !take(keep, true, true, &["f9"], &asker),
+        "another face seen"
+    );
+    assert!(!take(keep, true, false, &[], &asker), "no one-face rule");
+    assert!(!take(keep, true, true, &[], &other), "another person");
+    let forget = crate::remember::FORGET;
+    assert!(
+        !take(forget, true, true, &[], &asker),
+        "a forget: unchanged"
+    );
+    let _ = std::fs::remove_file(known_face_of(&path));
+    let _ = std::fs::remove_file(path);
+}
+
 /// Thirteen's P2 on #6673: the natural answers to "Shall I forget what you
 /// kept about …?" run the held one-face forget, as plain yeses do, in
 /// English and Vietnamese, and the forget said back alone counts as the

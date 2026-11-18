@@ -14,6 +14,7 @@
 //! checked there against an independent NumPy specification.
 use crate::{
     BLOCK, RATE,
+    body_sounds::BodyScores,
     pcm::CaptureStamp,
     privacy::{Permit, PublicationGate},
 };
@@ -23,6 +24,7 @@ use lamp_msgs::{
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use sha2::{Digest, Sha256};
 use std::{
+    cell::Cell,
     collections::VecDeque,
     io::Read,
     path::{Path, PathBuf},
@@ -121,6 +123,13 @@ const SPEECH: usize = 0;
 const MUSIC: usize = 132;
 const LAUGHTER: usize = 13;
 const FOOTSTEPS: usize = 48;
+// The body sounds of a person (#7685), by `yamnet_class_map.csv`'s index:
+// Wheeze 37, Cough 42, Throat clearing 43, Sneeze 44, Sniff 45.
+const WHEEZE: usize = 37;
+const COUGH: usize = 42;
+const THROAT_CLEAR: usize = 43;
+const SNEEZE: usize = 44;
+const SNIFF: usize = 45;
 /// The door group, whose highest score is `door` (#2562): Door (348),
 /// Sliding door (351), Slam (352) and Knock (353). A knock on a door is
 /// AudioSet's Knock, not Door. Tap (354) is left out: desk taps and typing
@@ -417,6 +426,14 @@ impl tract_onnx::data_resolver::ModelDataResolver for PinnedData {
 
 pub struct Model {
     plan: Arc<TypedRunnableModel>,
+    /// Whether the body sounds are scored (`LAMP_EARS_BODY_SOUNDS=on`):
+    /// off, five sigmoids are not even taken.
+    body: bool,
+    /// The body scores of the patch `score` just scored (#7685), for the
+    /// detector in the same worker thread and no one else: they are never in
+    /// `SoundScores`, so never on `ears/classes`. Taken (and so cleared) once
+    /// per patch by `take_body`.
+    last_body: Cell<Option<BodyScores>>,
 }
 
 impl Model {
@@ -445,10 +462,28 @@ impl Model {
             .into_optimized()
             .and_then(|model| model.into_runnable())
             .map_err(said)?;
-        Ok(Self { plan })
+        Ok(Self {
+            plan,
+            body: false,
+            last_body: Cell::new(None),
+        })
+    }
+
+    /// Score a person's body sounds too (#7685, `LAMP_EARS_BODY_SOUNDS=on`).
+    pub fn with_body_sounds(mut self, on: bool) -> Self {
+        self.body = on;
+        self
+    }
+
+    /// The body scores of the patch `score` scored last, once: the worker
+    /// hands them to the detector and to nothing else (#7685). None with the
+    /// switch off, or when that patch failed.
+    pub fn take_body(&self) -> Option<BodyScores> {
+        self.last_body.take()
     }
 
     pub fn score(&self, features: &[f32]) -> Result<SoundScores, String> {
+        self.last_body.set(None);
         let input = Tensor::from_shape(&[1, 1, FRAMES, MELS], features)
             .map_err(|error| error.to_string())?;
         let output = self
@@ -464,6 +499,15 @@ impl Model {
         let logits = view
             .as_slice()
             .ok_or("classifier output is not contiguous")?;
+        if self.body {
+            self.last_body.set(Some(BodyScores {
+                cough: sigmoid(logits[COUGH]),
+                throat_clear: sigmoid(logits[THROAT_CLEAR]),
+                sneeze: sigmoid(logits[SNEEZE]),
+                sniff: sigmoid(logits[SNIFF]),
+                wheeze: sigmoid(logits[WHEEZE]),
+            }));
+        }
         Ok(SoundScores {
             speech: sigmoid(logits[SPEECH]),
             music: sigmoid(logits[MUSIC]),
@@ -669,6 +713,10 @@ impl Window {
 pub struct Classified {
     pub classes: SoundClasses,
     pub fence: u64,
+    /// The body sounds this patch held, told one by one on `ears/body`
+    /// (#7685); empty with the switch off, and only the pump publishes them,
+    /// under the same authority and age bound as the scores.
+    pub body: Vec<lamp_msgs::BodySound>,
 }
 
 impl Classified {
@@ -707,6 +755,7 @@ impl Status {
                 reason: self.reason,
             },
             fence: 0,
+            body: Vec::new(),
         });
     }
 
@@ -841,6 +890,7 @@ pub fn serve(
                             },
                         },
                         fence: patch.fence,
+                        body: Vec::new(),
                     });
                 }
                 Err(_) => {

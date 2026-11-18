@@ -26,6 +26,9 @@ LAMP_EARS_CLASSES=on scores speech, music and laughter on ears/classes with the
 pinned YAMNet at LAMP_EARS_CLASSES_MODEL (yamnet.onnx, yamnet.data beside it),
 only with LAMP_PRIVACY_CONTROLS=on (a lamp with a slide); without it, and with
 no-slide, no classifier runs.
+LAMP_EARS_BODY_SOUNDS=on (with it) also scores a person's cough, throat clearing, sneeze, sniff
+and wheeze and tells each one heard, with its score and time and nothing else, on ears/body;
+a class with no measured bar is never told. They stay on the lamp.
 Ears remains the only microphone reader; an explicit bus recorder may retain PCM.
 
 lamp-ears check FILE... runs the same listening over files of sound (16 kHz, one channel,

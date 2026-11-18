@@ -133,7 +133,8 @@ class Running:
         if self.group():
             try:
                 os.killpg(self.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            # macOS answers EPERM, not ESRCH, for a group whose leader has exited but isn't reaped yet (#7729).
+            except (ProcessLookupError, PermissionError):
                 pass
         try:
             self.proc.wait(30)

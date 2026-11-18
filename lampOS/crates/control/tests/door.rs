@@ -3603,3 +3603,184 @@ async fn a_speaker_stream_off_through_the_door_tells_the_voice_to_cut_the_sound(
         CUT.lock().unwrap()
     );
 }
+
+// --- An installed app's socket (#7415 piece 3b) ---
+
+fn install_app(apps: &std::path::Path, name: &str, grants: Value) {
+    let dir = apps.join(name).join("current");
+    std::fs::create_dir_all(&dir).unwrap();
+    let manifest = json!({
+        "format": 2, "kind": "app", "name": name, "title": "T", "version": "2.0.1",
+        "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+        "grants": grants, "triggers": [],
+        "settings": [{"key": "loud", "type": "number", "label": "L", "default": 3, "min": 1, "max": 10}],
+        "files": []
+    });
+    std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+}
+
+fn is_demo(_: Option<i32>) -> Option<String> {
+    Some("demo".to_owned())
+}
+
+fn is_ghost(_: Option<i32>) -> Option<String> {
+    Some("ghost".to_owned())
+}
+
+fn is_nobody(_: Option<i32>) -> Option<String> {
+    None
+}
+
+fn apps_on() -> bool {
+    true
+}
+
+fn apps_off() -> bool {
+    false
+}
+
+async fn app_socket(
+    lamp: &Lamp,
+    file: &str,
+    who: fn(Option<i32>) -> Option<String>,
+    on: fn() -> bool,
+) -> std::path::PathBuf {
+    let path = lamp.dir.join(file);
+    let apps = lamp.dir.join("apps");
+    install_app(&apps, "demo", json!(["speak", "light", "hear"]));
+    lamp.shared.set_task_yes_folder(lamp.dir.clone());
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(server::serve_app_as(
+        listener,
+        apps,
+        lamp.shared.clone(),
+        who,
+        on,
+    ));
+    path
+}
+
+async fn app_ask(socket: &mut AgentSocket, frame: Value) -> Value {
+    socket.send(Message::text(frame.to_string())).await.unwrap();
+    agent_next(socket).await.expect("an answer")
+}
+
+#[tokio::test]
+async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() {
+    let lamp = lamp("app-sock").await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    // The owner's value, kept where lamp-cloud's op keeps it.
+    std::fs::write(lamp.dir.join("app-settings.json"), r#"{"demo":{"loud":7}}"#).unwrap();
+    let mut socket = agent_connect(&path).await.unwrap();
+    // The app ops come after hello.
+    let welcome = agent_next(&mut socket).await.unwrap();
+    assert_eq!(welcome["ev"], "welcome");
+    let early = app_ask(&mut socket, json!({"id": 9, "op": "app.settings.get"})).await;
+    assert_eq!(early["error"]["code"], "no_hello", "{early}");
+    let hello = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    let hello = app_ask(&mut socket, hello).await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    assert_eq!(hello["app"], "demo", "{hello}");
+    assert_eq!(hello["version"], "2.0.1", "{hello}");
+    let mut grants: Vec<String> = serde_json::from_value(hello["grants"].clone()).unwrap();
+    grants.sort();
+    assert_eq!(grants, ["hear", "light", "speak"], "{hello}");
+    let settings = app_ask(&mut socket, json!({"id": 2, "op": "app.settings.get"})).await;
+    assert_eq!(settings["settings"], json!({"loud": 7}), "{settings}");
+    let panel = json!({"id": 3, "op": "app.panel.set", "title": "Lesson", "lines": ["one"]});
+    assert_eq!(app_ask(&mut socket, panel.clone()).await["rev"], 1);
+    let again = app_ask(
+        &mut socket,
+        json!({"id": 4, "op": "app.panel.set", "title": "T", "lines": []}),
+    )
+    .await;
+    assert_eq!(again["error"]["code"], "rate", "{again}");
+    assert_eq!(
+        app_ask(
+            &mut socket,
+            json!({"id": 5, "op": "app.took", "turn": "t1"})
+        )
+        .await["ok"],
+        true
+    );
+    // A grant its manifest lacks is refused as the door refuses it.
+    let camera = app_ask(&mut socket, json!({"id": 6, "op": "camera.snapshot"})).await;
+    assert_eq!(camera["error"]["code"], "no_grant", "{camera}");
+    // It is no paired computer.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert!(listed["clients"].as_array().unwrap().is_empty(), "{listed}");
+    // Phrases it listens for, replace-whole, are the door's own: heard on the
+    // bus, told as the phrase and never the words.
+    let set = json!({"id": 7, "op": "phrases.set", "phrases": ["start the lesson"]});
+    let set = app_ask(&mut socket, set).await;
+    assert_eq!(set["ok"], true, "{set}");
+    assert_eq!(set["phrases"], 1, "{set}");
+    assert!(set.get("events").is_none(), "{set}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "ok start the lesson now please".into(),
+    )]);
+    let heard = agent_next(&mut socket).await.unwrap();
+    assert_eq!(heard["ev"], "phrase.heard", "{heard}");
+    assert_eq!(heard["phrase"], "start the lesson", "{heard}");
+    // Too short is the door's refusal; none unsubscribes.
+    let short = app_ask(
+        &mut socket,
+        json!({"id": 8, "op": "phrases.set", "phrases": ["hi"]}),
+    )
+    .await;
+    assert_eq!(short["error"]["code"], "bad_request", "{short}");
+    // A repeat and an unknown field are refused in the app socket's own words.
+    let twice = json!({"id": 10, "op": "phrases.set", "phrases": ["lesson time", "lesson time"]});
+    let twice = app_ask(&mut socket, twice).await;
+    assert_eq!(twice["error"]["why"], "phrases: no phrase twice", "{twice}");
+    let extra = json!({"id": 11, "op": "phrases.set", "phrases": ["lesson time"], "x": 1});
+    let extra = app_ask(&mut socket, extra).await;
+    assert_eq!(
+        extra["error"]["why"], "phrases.set takes only phrases",
+        "{extra}"
+    );
+    let none = app_ask(
+        &mut socket,
+        json!({"id": 9, "op": "phrases.set", "phrases": []}),
+    )
+    .await;
+    assert_eq!(none["phrases"], 0, "{none}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "start the lesson".into(),
+    )]);
+    assert!(agent_next(&mut socket).await.is_none());
+    // A second connection of the app: its panel stays until the last one goes.
+    drop(socket);
+}
+
+#[tokio::test]
+async fn the_ops_only_an_app_has_are_not_the_doors_on_any_other_socket() {
+    let lamp = lamp("app-sock-door").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "booth", "r1").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    let got = app_ask(&mut socket, json!({"id": 2, "op": "app.settings.get"})).await;
+    assert_eq!(got["error"]["code"], "bad_request", "{got}");
+}
+
+#[tokio::test]
+async fn a_peer_in_no_apps_unit_or_for_an_app_not_installed_or_with_apps_off_is_closed() {
+    let lamp = lamp("app-sock-refused").await;
+    for (file, who, on) in [
+        (
+            "nobody.sock",
+            is_nobody as fn(Option<i32>) -> Option<String>,
+            apps_on as fn() -> bool,
+        ),
+        ("ghost.sock", is_ghost, apps_on),
+        ("off.sock", is_demo, apps_off),
+    ] {
+        let path = app_socket(&lamp, file, who, on).await;
+        match agent_connect(&path).await {
+            Err(_) => {}
+            Ok(mut socket) => assert!(agent_next(&mut socket).await.is_none(), "{file}"),
+        }
+    }
+}

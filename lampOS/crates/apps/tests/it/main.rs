@@ -5,6 +5,7 @@ mod facts;
 mod install;
 mod launcher;
 mod lock;
+mod manage;
 mod name;
 mod remove;
 mod staging;

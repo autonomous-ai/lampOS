@@ -103,6 +103,16 @@ fn went(
     heard: &str,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> (Vec<Value>, Vec<String>) {
+    went_in(keeping, 1, heard, rounds)
+}
+
+/// [`went`], `heard` asked in `request`.
+fn went_in(
+    keeping: &crate::made_skill::Keeping,
+    request: u64,
+    heard: &str,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+) -> (Vec<Value>, Vec<String>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(rounds.into()),
@@ -161,9 +171,9 @@ fn went(
         .build()
         .unwrap()
         .block_on(async {
-            engine.submit(start(1));
-            engine.submit(audio(1, 1));
-            engine.submit(end(1));
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
             turn(&mut engine).await
         });
     let told = told.lock().unwrap().clone();
@@ -384,13 +394,13 @@ fn a_yes_naming_another_skill_removes_nothing_and_is_answered() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
-/// El's P2 on #7561: "Yes, and remove the evening dim one too." The yes
-/// names moon fact among others, so it is moon fact's: moon fact is
-/// removed, and the rest of the line is answered in the next round, never
-/// lost to "ask nothing, call nothing": evening dim gets its own question
-/// and wait, and nothing more is removed without its own yes.
+/// El's P2 on #7561, under the first builder's strict rule (18 Nov): "Yes,
+/// and remove the evening dim one too." is more than a plain yes, so moon
+/// fact is not removed, whatever the model answered: the person hears it
+/// was left as it is, and the rest of the line is answered in the next
+/// round, never lost: evening dim gets its own question and wait.
 #[test]
-fn a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other() {
+fn a_yes_with_a_second_remove_removes_nothing_and_asks_the_other() {
     let (root, keeping, id) = asked_to_remove("remove-words-yes-and", Some("Remove moon fact?"));
     let (told, helper) = went(
         &keeping,
@@ -398,22 +408,321 @@ fn a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other() {
         vec![
             answers_naming(&id, "yes", "moon fact"),
             removes("evening dim"),
-            said("Moon fact is removed. Remove evening dim?"),
+            said("I left moon fact as it is. Remove evening dim?"),
         ],
     );
     assert_eq!(told.len(), 2, "{told:?}");
-    assert_eq!(told[0]["removed"], "moon-fact", "{told:?}");
+    assert_eq!(told[0]["left"], "moon-fact", "{told:?}");
+    assert!(told[0].get("removed").is_none(), "{told:?}");
     let next = told[0]["next"].as_str().unwrap();
-    assert!(next.contains("moon fact is removed"), "{next}");
+    assert!(next.contains("left moon fact as it is"), "{next}");
     assert!(!next.to_lowercase().contains("call nothing"), "{next}");
-    assert!(next.contains("asked for more"), "{next}");
-    assert_eq!(helper, ["moon-fact"]);
-    assert_eq!(kept(&keeping), ["evening-dim"]);
+    assert!(helper.is_empty(), "{helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"]);
     assert_eq!(told[1]["remove"], "evening-dim", "{told:?}");
     assert!(
         yes::awaited(Instant::now()),
         "evening dim waits for its own yes"
     );
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// A round calling `name` with `args`.
+fn calls(name: &str, args: Value) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call("c3", name, args)])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// The person's `line` after "Remove moon fact?", the model's forced
+/// round a yes naming no skill, as DeepSeek answered on lamp-9adf, then
+/// `then`, the call that line asks for: moon fact is not removed, the
+/// person is told it was left as it is, and the line's own ask runs.
+fn a_yes_on_a_line_with_more_removes_nothing(test: &str, line: &str, then: (&str, Value)) {
+    let (root, keeping, id) = asked_to_remove(test, Some("Remove moon fact?"));
+    let (told, helper) = went(
+        &keeping,
+        line,
+        vec![
+            answers(&id, "yes"),
+            calls(then.0, then.1),
+            said("I left moon fact as it is. Done."),
+        ],
+    );
+    assert_eq!(told.len(), 2, "{line}: {told:?}");
+    assert_eq!(told[0]["approved"], false, "{line}: {told:?}");
+    assert_eq!(told[0]["left"], "moon-fact", "{line}: {told:?}");
+    let next = told[0]["next"].as_str().unwrap();
+    assert!(next.contains("left moon fact as it is"), "{next}");
+    assert!(next.contains("do anything else they asked"), "{next}");
+    assert!(helper.is_empty(), "{line}: {helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"], "{line}");
+    assert!(!yes::waits(&id), "{line}");
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// lamp-9adf, 18 Nov, stock 14083, the chain's step 5: after "Remove daily
+/// stretch reminder?" (asked of an off ask), "Lamp, also make one that
+/// plays a soft chime when I come back to my desk." was forced to an
+/// answer, the model's yes was taken (`request 60: a made skill removed on
+/// the person's yes (#6960)`), and the skill was lost before the chime was
+/// made. A make is no plain yes: nothing is removed, and the
+/// make goes on.
+#[test]
+fn a_make_line_after_the_remove_question_removes_nothing() {
+    a_yes_on_a_line_with_more_removes_nothing(
+        "remove-strict-make",
+        "Lamp, also make one that plays a soft chime when I come back to my desk.",
+        (
+            crate::made_skill::MAKE,
+            json!({"request": "play a soft chime when I come back to my desk"}),
+        ),
+    );
+}
+
+/// "Yes, and make me a skill that …": a yes with a make on it, longer
+/// than a plain yes, removes nothing.
+#[test]
+fn a_yes_and_a_make_removes_nothing() {
+    a_yes_on_a_line_with_more_removes_nothing(
+        "remove-strict-yes-make",
+        "Yes, and make me a skill that tells a joke at noon.",
+        (
+            crate::made_skill::MAKE,
+            json!({"request": "tell a joke at noon"}),
+        ),
+    );
+}
+
+/// The first builder's ruling on #7683 (Twelve's HOLD): the model's yes
+/// on a question or a line asking more never removes, read in code.
+/// Each line after "Remove moon fact?", the model's forced answer `yes`:
+/// nothing is removed, and the person is told it was left as it is.
+#[test]
+fn a_question_or_more_after_the_remove_question_removes_nothing() {
+    for (at, line) in [
+        "What's the time?",
+        "Is it the moon one?",
+        "Sure, and make me a skill that tells a joke at noon.",
+        "Hey Lamp, what?",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (root, keeping, id) =
+            asked_to_remove(&format!("remove-plain-not-{at}"), Some("Remove moon fact?"));
+        let (told, helper) = went(
+            &keeping,
+            line,
+            vec![answers(&id, "yes"), said("I left moon fact as it is.")],
+        );
+        assert_eq!(told[0]["left"], "moon-fact", "{line}: {told:?}");
+        assert!(told[0].get("removed").is_none(), "{line}: {told:?}");
+        assert!(helper.is_empty(), "{line}: {helper:?}");
+        assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"], "{line}");
+        yes::clear_for_test();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+/// A plain yes the code reads removes it: with the lamp's name and "hey",
+/// "please", or the verb said with it.
+#[test]
+fn a_plain_yes_after_the_remove_question_removes_it() {
+    for (at, line) in [
+        "Hey Lamp, yes, remove it",
+        "yeah, do it",
+        "Yes please",
+        "ok",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (root, keeping, id) =
+            asked_to_remove(&format!("remove-plain-yes-{at}"), Some("Remove moon fact?"));
+        let (told, helper) = went(
+            &keeping,
+            line,
+            vec![answers(&id, "yes"), said("Moon fact is removed.")],
+        );
+        assert_eq!(told[0]["removed"], "moon-fact", "{line}: {told:?}");
+        assert_eq!(helper, ["moon-fact"], "{line}");
+        assert_eq!(kept(&keeping), ["evening-dim"], "{line}");
+        yes::clear_for_test();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+/// "Sure, play some music": a yes with another ask removes
+/// nothing.
+#[test]
+fn sure_play_some_music_removes_nothing() {
+    a_yes_on_a_line_with_more_removes_nothing(
+        "remove-strict-play",
+        "Sure, play some music.",
+        ("play_music", json!({"query": "some music"})),
+    );
+}
+
+/// lamp-9adf, 18 Nov, the second repro: "Remove btc price?" (asked on a
+/// "Yes, remove it." after a remove that found nothing), then "Which of my
+/// skills use the internet?" was taken as the yes and the skill removed.
+/// A question is no plain yes: nothing is removed, and it is answered.
+#[test]
+fn a_question_after_the_remove_question_removes_nothing() {
+    a_yes_on_a_line_with_more_removes_nothing(
+        "remove-strict-question",
+        "Which of my skills use the internet?",
+        (
+            crate::made_skill::MAKE,
+            json!({ crate::made_list::LIST: true }),
+        ),
+    );
+}
+
+/// A plain "Yes.", but its round calls a play beside the yes, so the turn
+/// carried another ask, by its call: nothing removed.
+#[test]
+fn a_yes_whose_round_calls_something_else_removes_nothing() {
+    let (root, keeping, id) = asked_to_remove("remove-strict-beside", Some("Remove moon fact?"));
+    let (told, helper) = went(
+        &keeping,
+        "Yes.",
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![
+                    call(
+                        "c1",
+                        crate::made_skill::MAKE,
+                        json!({ yes::APPROVE_ID: id, yes::ANSWER: "yes", yes::NAMED: yes::NAMED_NONE }),
+                    ),
+                    call("c2", "play_music", json!({"query": "music"})),
+                ])),
+                Ok(ChatEvent::Done),
+            ],
+            said("I left moon fact as it is. Playing music."),
+        ],
+    );
+    assert_eq!(told[0]["left"], "moon-fact", "{told:?}");
+    assert!(helper.is_empty(), "{helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"]);
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Twelve's lamp with nothing waiting: moon fact and evening dim made.
+fn nothing_asked(test: &str) -> (std::path::PathBuf, crate::made_skill::Keeping) {
+    let (root, keeping, _) = asked_to_remove(test, None);
+    yes::clear_for_test();
+    (root, keeping)
+}
+
+/// lamp-9adf, 18 Nov, the second repro, the first builder's ruling: a
+/// remove whose name was never found leaves nothing waiting, and a later
+/// yes can't pick another skill. "Lamp, remove the bitcoin warning
+/// skill." found nothing; "Yes, remove it." had the model remove an older
+/// skill by its exact name, asking "Remove btc price?"; and "Which of my
+/// skills use the internet?" was taken as its yes. Now the yes asks
+/// nothing, nothing waits, and nothing is removed.
+#[test]
+fn a_yes_after_a_remove_that_found_nothing_removes_nothing() {
+    let (root, keeping) = nothing_asked("remove-none-found-chain");
+    let (told, _) = went_in(
+        &keeping,
+        1,
+        "Lamp, remove the bitcoin warning skill.",
+        vec![
+            removes("bitcoin warning"),
+            said("I don't have anything like that to remove."),
+        ],
+    );
+    assert_eq!(told[0]["error"], crate::made_remove::NO_MADE, "{told:?}");
+    assert!(!yes::awaited(Instant::now()));
+    let (told, _) = went_in(
+        &keeping,
+        2,
+        "Yes, remove it.",
+        vec![removes("moon fact"), said("Nothing is removed.")],
+    );
+    let id = told[0][yes::APPROVE_ID].as_str().map(str::to_owned);
+    let rounds = match &id {
+        Some(id) => vec![answers(id, "yes"), said("Done.")],
+        None => vec![said("None of them do.")],
+    };
+    let (_, helper) = went_in(&keeping, 3, "Which of my skills use the internet?", rounds);
+    assert!(helper.is_empty(), "{helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"]);
+    assert!(id.is_none(), "{told:?}");
+    assert!(
+        told[0].get(crate::made_remove::REMOVE).is_none(),
+        "{told:?}"
+    );
+    assert_eq!(
+        told[0]["error"],
+        crate::made_remove::NONE_FOUND_BEFORE,
+        "{told:?}"
+    );
+    assert!(!yes::awaited(Instant::now()), "nothing waits");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// After a remove that found nothing, a line that names one of theirs
+/// asks it as ever: "Oh, remove the moon fact skill then." is the
+/// person's own ask, its question and wait.
+#[test]
+fn a_line_naming_a_skill_after_a_remove_that_found_nothing_asks_it() {
+    let (root, keeping) = nothing_asked("remove-none-found-named");
+    let (told, _) = went_in(
+        &keeping,
+        1,
+        "Lamp, remove the bitcoin warning skill.",
+        vec![
+            removes("bitcoin warning"),
+            said("I found nothing like that."),
+        ],
+    );
+    assert_eq!(told[0]["error"], crate::made_remove::NO_MADE, "{told:?}");
+    let (told, helper) = went_in(
+        &keeping,
+        2,
+        "Oh, remove the moon fact skill then.",
+        vec![removes("moon fact"), said("Remove moon fact?")],
+    );
+    assert_eq!(told[0][crate::made_remove::REMOVE], "moon-fact", "{told:?}");
+    assert!(yes::awaited(Instant::now()));
+    assert!(helper.is_empty(), "{helper:?}");
+    yes::clear_for_test();
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Only the very next line can confirm a remove: a line in between that
+/// answers nothing (the model called nothing for the wait), then "Yes.",
+/// removes nothing; the wait was dropped at the second line.
+#[test]
+fn a_yes_two_lines_after_the_question_removes_nothing() {
+    let (root, keeping, id) = asked_to_remove("remove-strict-late", Some("Remove moon fact?"));
+    let (told, _) = went_in(
+        &keeping,
+        1,
+        "What time is it?",
+        vec![said("It's three o'clock.")],
+    );
+    assert!(told.is_empty(), "{told:?}");
+    assert!(yes::waits(&id), "the next line called nothing for it");
+    let (told, helper) = went_in(
+        &keeping,
+        2,
+        "Yes.",
+        vec![answers(&id, "yes"), said("Okay.")],
+    );
+    assert!(told[0].get("removed").is_none(), "{told:?}");
+    assert!(told[0]["error"].is_string(), "{told:?}");
+    assert!(helper.is_empty(), "{helper:?}");
+    assert_eq!(kept(&keeping), ["moon-fact", "evening-dim"]);
+    assert!(!yes::waits(&id));
     yes::clear_for_test();
     let _ = std::fs::remove_dir_all(&root);
 }

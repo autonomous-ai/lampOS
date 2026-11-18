@@ -676,6 +676,10 @@ pub(crate) struct Tar {
     pub folder: Option<String>,
 }
 
+/// The longest path a package's tar may name, in bytes: a skill's own are
+/// a few parts of at most 100 each.
+const MOST_PATH_BYTES: usize = 1024;
+
 /// Reads a package's tar, `depth` parts of path at most inside the folder.
 pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
@@ -695,6 +699,11 @@ pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
         let mut entry = entry.map_err(|error| format!("not a tar: {error}"))?;
         let name = String::from_utf8(entry.path_bytes().into_owned())
             .map_err(|_| "a path that is not UTF-8".to_owned())?;
+        // No refusal below echoes a path longer than this: one a tar header
+        // can make megabytes long never reaches a log line or the owner.
+        if name.len() > MOST_PATH_BYTES {
+            return Err(format!("a path of more than {MOST_PATH_BYTES} bytes"));
+        }
         let kind = entry.header().entry_type();
         let path = name.trim_end_matches('/').to_owned();
         // The skill's folder, and only it, before the first `/`; its path
@@ -727,7 +736,7 @@ pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
             ));
         }
         let size = entry.size();
-        total += size;
+        total = total.saturating_add(size);
         if total > MOST_BYTES || files.len() >= MOST_FILES {
             return Err(format!(
                 "more than {MOST_FILES} files or {MOST_BYTES} bytes: too big for a skill"

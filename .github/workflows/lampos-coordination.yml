@@ -1,0 +1,41 @@
+name: lampOS coordination tools
+
+# The train bot's own scripts (.github/tools/coordination: lib.sh, markers.py,
+# reads2.py, rows.py and the rest) decide which pull requests ride a train. Their
+# tests ran only on the PM's machine, so a change to them could merge without
+# them (the Reviewer-lead's note on #7710, 18 Nov). This runs the whole suite
+# on any change to those scripts or to this file. The tests make their own git
+# repositories in a temporary folder and need git, zsh, jq and python3; no
+# network and no token. On macOS, as the bot itself runs: train-bot.sh and
+# asks-for-me.sh use BSD `date -j` (the Reviewer-lead's P2 on #7729, where the
+# Linux runner failed test_lanes on GNU date).
+on:
+  pull_request:
+    branches: [lamp-voice]
+    paths:
+      - '.github/tools/coordination/**'
+      - '.github/workflows/lampos-coordination.yml'
+  push:
+    branches: [lamp-voice]
+    paths:
+      - '.github/tools/coordination/**'
+      - '.github/workflows/lampos-coordination.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-coordination-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
+
+jobs:
+  tests:
+    name: lampOS coordination — the train bot's tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # macOS has zsh and BSD date, and the runner image has git, jq and python3.
+      - name: The whole suite
+        run: python3 -I -m unittest discover -s .github/tools/coordination/tests

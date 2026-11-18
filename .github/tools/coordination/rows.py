@@ -132,7 +132,8 @@ def rows(items, heads, writers, pr=None, switch_on=False):
     """items: dicts {login, body} in posting order. heads: the head sha, or a list of it and earlier heads with the same
     patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed",
     "row-incomplete <parts>" (the newest incomplete row's) or "none"."""
-    heads = [heads] if isinstance(heads, str) else [h for h in heads if h]
+    # 18 Nov: a "code:<sha>" head (lib.sh's code_patch_of) counts for reads only, never for a row or "no row needed".
+    heads = [heads] if isinstance(heads, str) else [h for h in heads if h and not h.startswith("code:")]
     found, short, stale = "none", None, None
     for c in items:
         if c.get("pr_body") or not is_writer(c, writers):

@@ -36,6 +36,14 @@ class Row(unittest.TestCase):
         for body in ("ROW 7017", "ROW 70160", "ROW #701", "ROW %s" % HEAD[:10], "ROW"):
             self.assertEqual(rows([c("writer-a", body + WHOLE)], HEAD, W, "7016"), "none", body)
 
+    def test_a_code_head_never_carries_a_row_or_no_row_needed(self):
+        # 18 Nov: "code:<sha>" heads (lib.sh's code_patch_of) are for reads only.
+        row = c("writer-a", "ROW 7016 %s on lamp-52e6 build 12701: PASS" % EARLIER[:10] + J)
+        none = c("writer-a", "READ-OK %s\nno row needed: tests only" % EARLIER)
+        self.assertEqual(rows([none], [HEAD, "code:" + EARLIER], W, "7016"), "none")
+        self.assertEqual(rows([none], [HEAD, EARLIER], W, "7016"), "no-row-needed")
+        self.assertEqual(rows([row], [HEAD, "code:" + EARLIER], W, "7016", switch_on=True), "row-stale " + EARLIER[:10])
+
     def test_without_pr_a_row_never_counts(self):
         self.assertEqual(rows([c("writer-a", "ROW 7016" + WHOLE)], HEAD, W, None), "none")
 

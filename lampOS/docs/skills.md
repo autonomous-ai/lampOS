@@ -68,7 +68,8 @@ samples and the region most often bad) ([msgs.md](msgs.md)). `lamp-seen`
 publishes them, coming with #6543 phases 2 and 3. A skill that names one in
 `[permissions] topics` shows the `seen` use, private ([cloud.md](cloud.md)).
 `humans/doing_more` (tiredness, desk work as a coarse kind and celebrating,
-said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`) is a topic of its
+said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`, on in the product)
+is a topic of its
 own: a skill naming it shows the `seen_more` use, private and apart from
 `seen`, so a skill given `humans/doing` never receives it. No skill reads it
 yet. **The owner's seen_more yes** (#6543): a skill that names it receives
@@ -122,7 +123,8 @@ trigger's `for`, with no margin: if lamp-seen's desk arrival (begun again on
 `room/stood_up`) starts later than the sitting the trigger counts (which
 survives gaps up to 2 minutes), the nudge waits for the timer, and a wait past
 the trigger's `wait` loses that sitting's nudge.
-With `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 step 2, [seen.md](seen.md)) a
+With `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 step 2, on in the product,
+[seen.md](seen.md)) a
 break is a stand-up, not a stretch: `break_s_ago` counts from their return
 after `room/stood_up`, and a stretch seen no longer restarts it. So Stand up
 and Stretch break hold after a real stand-up, even one back within the
@@ -254,7 +256,7 @@ must not leave a step silently undone)*.
 | `trigger.lively` | no | `true` or `false` (the default) (#6893, Music sway): under `LAMP_BODY_ENERGY=on`, its `cooldown` and `rearm` follow the character's energy level (`lamp_body::energy::GESTURE`): at level 1 as written; at 2 to 5 the cooldown is at most 20, 15, 10 and 6 minutes (never longer than written), and from level 4 its `rearm` is dropped (a playlist never stays under the line). Above level 1 its skill's gestures and moves say `"lively": true`, so the body drops them while lamp-control holds it. Test: `music_sway_follows_the_energy_level_and_level_one_is_as_written` |
 | `trigger.wait` | no | With `rearm` or `when = "appears"`, at most `1h`: a chance held back by a `[[while]]` condition (someone talking) is kept while the trigger still holds, for at most this long, and taken at the trigger's first message after every condition holds again: the lamp acts once the talk ends, within the same sitting, instead of giving up its turn (#1021). It began waiting when the chance came, or for a chance kept through the `[quiet]` hours, when they end; the trigger stopping (past its `gap`) ends it. A chance let go past its `wait` says so once in the journal (below). Without it, a chance held back by a condition is spent, and says only a `not run: its while did not hold` line in the journal (below). A chance held back by `absent_for` or the cooldown is spent either way |
 | `trigger.rise` | no | `{ by = N, within = D }` (#1684): the trigger holds only while its `field`'s newest reading is at least N (more than 0) above the lowest reading of its topic in the D before it (1 s to 1 h), the newest itself not among them. With `above`, that level must hold too (Smoky air, as designed: `above = 150`, `rise = { by = 100, within = "3m" }`); without it, any number does. Not with `equals`, `below` or `each`. It goes with `for`, `gap`, `rearm`, `cooldown`, `wait` and `[quiet]` as any trigger does. A message with no number in the field (`null`, as the air part sends a value its sensor does not know yet) is passed over as if it never came: it neither breaks the hold nor counts as one, and nothing is compared with it. With no reading in the D before (the topic silent that long, or the program just started or reloaded), nothing rose: a sensor that comes back high after a dropout longer than D is not a rise. A gap shorter than D is not a dropout: what came before it is still compared. A reading of 0 is a reading. The readings are kept for each trigger, at most 3,600 (past that the oldest goes, which can only make a rise smaller), and begin again at every reload *(chosen: an edit may change the field or the while)*. With the Policy asked, its answer finds the rise as the newest reading had it. Tests (`crates/skills/tests/it/skills.rs`, `a_rise_*`): 80 to 400 at once speaks once, after its `for`; 80 to 300 over 30 minutes (22 in any 3) never; haze at 130 and 170 by turns never; a 15 s puff to 300 never; 40 to 140 never (no level); 5 minutes of silence or of `null`, then 400, never; a second rise before 10 minutes under the rearm line never, one after it does, unless the cooldown holds |
-| `trigger.sooner` | no | `{ topic = T, field = F, above = N, for = D }` (#3709): while F of T's newest value that still lasts is above N, the trigger needs to have held only D, shorter than its own `for` (which it must have; 0 or longer is refused when it loads). It may also be a list of such tables (#6543), `sooner = [{ … }, { … }]`: each is checked when it loads as one alone is (an empty list is refused), and of those holding at a moment the shortest `for` wins; one table and a list of that one table behave alike. Each entry's topic is read only if `[permissions] topics` lists it. With `rearm` it still takes one chance each time it holds: brought forward, never twice. Kept only with `LAMP_YAWN_SOONER=on` in `lamp-skills`; off, it is read, checked and ignored. Stretch break has `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: a yawn the eyes saw this sitting (`LAMP_EYES_YAWN=on`) brings its stretch to 30 minutes, as V1's yawn rule did. Tests: `a_yawn_in_the_sitting_brings_the_stretch_forward_once`, `a_list_of_sooners_brings_the_trigger_to_the_shortest_holding` |
+| `trigger.sooner` | no | `{ topic = T, field = F, above = N, for = D }` (#3709): while F of T's newest value that still lasts is above N, the trigger needs to have held only D, shorter than its own `for` (which it must have; 0 or longer is refused when it loads). It may also be a list of such tables (#6543), `sooner = [{ … }, { … }]`: each is checked when it loads as one alone is (an empty list is refused), and of those holding at a moment the shortest `for` wins; one table and a list of that one table behave alike. Each entry's topic is read only if `[permissions] topics` lists it. With `rearm` it still takes one chance each time it holds: brought forward, never twice. Kept only with `LAMP_YAWN_SOONER=on` in `lamp-skills` (on in the product unit, #6543); off, it is read, checked and ignored. Stretch break has `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: a yawn the eyes saw this sitting (`LAMP_EYES_YAWN=on`) brings its stretch to 30 minutes, as V1's yawn rule did. With `LAMP_EYES_YAWN` in no product unit the eyes count no yawn, so in the product it does nothing yet. Tests: `a_yawn_in_the_sitting_brings_the_stretch_forward_once`, `a_list_of_sooners_brings_the_trigger_to_the_shortest_holding` |
 | `trigger.name` | no | What a step's `on` calls it: lowercase letters, digits and `_`, a different one for each trigger (#1021) |
 | `trigger.each` with `trigger.key` | no | `each` names a field that is a list, and `key` the field that names one of its items (`each = "settled"`, `key = "task"` on `tasks/status`). The `field` test is then of each item on its own, and `when` must be `appears`: a run for each item that holds where, in the trigger's last message, it did not or was not in the list. So an item new to the list that holds counts (every item of #1048's `settled` is first seen already settled), and so does one that leaves and comes back. What is there at the first message since the program started is not news: it only says what is there *(chosen: a restart must not tell everything again)*. At a reload the items begin again from the topic's value the program keeps, so what was there then is not news and the next message, the next change, is compared with it (the reviewer on #1042); with no value kept yet, the topic's first message only says what is there, as at the start. A missing list is an empty one. Each item's run is asked about on its own, and two in one message are two runs, in the items' order across the skill's triggers: by number when the key is a number (task 9 before task 10), else by text. Not with `near`, `absent_for`, `for`, `gap`, `rearm`, `cooldown` or `wait`, which are timed over the whole topic *(chosen)*. Nor in a skill with `[quiet]` or a dim `until = "ends"`: an item's run has no quiet hours and no end of its own, so quiet would be passed over and a held dim would keep the skill busy *(chosen, the reviewer on #1042)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), its answer starts the item's run only if that item is still in the list and holds |
 | `[[while]]` | no | Conditions that must also hold, all of them, on the newest value of each topic while that value lasts: a `topic` with `field` and one of `equals`, `not_equals` (anything else, #1140), `above` or `below`, or `humans/faces/tracked` with `present = true`, or `humans/faces/tracked` with `faces_at_most`, 1 to 8 (#3504: at most that many faces in a list the eyes said whole, so `faces_at_most = 1` holds with nobody else in view; alone, with no field or `present`; test `faces_at_most_loads_on_the_faces_alone_and_is_refused_elsewhere`); with `for`, it has also held that long, by the messages of its topic since this program started. `unknown = "holds"` (with a field's test, without `for` or `present`) makes it hold while its topic has said nothing yet, as on a lamp without the part that says it (#1677); a value that has run out still does not hold. `unknown = "holds_stale"` (with a field's test, without `present`; `for` is allowed) makes it hold while its topic has said nothing yet *and* on a value that has run out, a topic gone quiet (#6543, for `humans/doing`); a fresh value is judged on itself as ever, and a fresh value after one that ran out begins its `for` from itself, not from the old value. So with `for`, the condition closes for that long when the topic comes back (lamp-seen restarting, say), though it held while the topic was gone. Opt-in: `"holds"` keeps its meaning, and only the skills reading `humans/doing` or `humans/posture` use `"holds_stale"` (above, "Topics a skill can read"). Test `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out`. It begins again after a value that expired, and when a reload changes the condition. `through` (with `equals` and `for`, #1672) lists values of the field its clock is carried through: during a spell of one of them it does not hold, so nothing runs then, but its `for` is not begun again either; `broken_by` (with `through`) lists the topics whose messages do begin it again, only `voice/heard` with a letter or a digit in its text, `name/heard` (any hearing of the lamp's name, with no words written down too), `body/hand` with a new push (`pushed` going true: a push held, or said again and again, begins it once, as it begins) and `controls/touch` with `enabled` true, read as the skill's own (in `[permissions] topics`). `through` never lists the value it equals. Both only with `LAMP_REST_THROUGH_SOUNDS=on` ([switches.md](switches.md)); off, they are checked and ignored, and the `broken_by` topics are not listened to. `sooner` (#6543), on a condition with `above` and no `for`: `{ topic = T, field = F, above = N, above_to = M }`, or a list of such tables as a trigger's `sooner` takes (an empty one refused): while F of T's newest value that still lasts is above N, the condition's own `above` is M, which must be below it (refused when it loads otherwise). It changes only the number: the topic and field it judges stay the condition's own, so a sooner cannot add a condition or swap one, and its own condition is only `above`. The skill names each lower `above` itself; of those holding at a moment the lowest wins, and with none holding it is its own `above` again. Each entry's topic is read only if `[permissions] topics` lists it. Kept only with `LAMP_YAWN_SOONER=on`, as a trigger's `sooner`; off, it is read, checked and ignored. The journal says it once as it happens, numbers and topics only: `<skill> while <topic> <field> above 7199 lowered to 3599 (sooner humans/doing_more drank_seen above 1)` when a sooner lowers it or another lowers it further or less, and `<skill> while <topic> <field> above 7199 again, from 3599: no sooner holds` when it goes back (a sooner's value that ran out too, at the next tick). Test `a_whiles_sooner_lowers_its_own_above_to_the_lowest_holding` |
@@ -4671,6 +4673,74 @@ code (`made_remove::asked`):
   taken as the yes, and mail count was removed. The journal: "the line
   after NAME's question was a new ask, not an answer: nothing kept, the
   wait dropped".
+- **Only a plain yes the code reads, on the next line** (the first
+  builder's ruling on #7683, 18 Nov 12:51, after Twelve's HOLD). On
+  lamp-9adf (stock 14083) "Remove daily stretch reminder?" was followed by
+  "Lamp, also make one that plays a soft chime when I come back to my
+  desk.", the model's forced answer was `yes`, and the skill was removed
+  before the chime was made; a second time, "Which of my skills use the
+  internet?" was taken the same way. Whatever the model answers, a `yes`
+  removes only when, in code (`skill_write_yes::not_a_plain_yes`):
+  - its line is the remove's answer line, the first line after the
+    question that was more than the lamp's name
+    (`skill_write_yes::line_heard`, `Waiting::answer_line`, kept in memory
+    only, never journalled). When the question is asked again, after an
+    `unclear` or after a yes that came before it was heard whole (a "Yes."
+    over "Remove NAME?" still playing), the line after that is the answer
+    line;
+  - that line, with the lamp's name, "hey" and "please" left out, case
+    and punctuation aside, is only a plain yes from the fixed set
+    `skill_write_yes::YES_SAID` (yes, yeah, yep, yup, sure, ok/okay, go
+    ahead, do it, remove it, delete it, vâng, ừ, xoá/xóa đi). It may also
+    carry the remove's verb and the skill's own name ("Yes, remove rain
+    joke."), but no "?" and no question word (`skill_write_yes::plain_answer`).
+    "Hey Lamp, yes, remove it", "yeah, do it", "Yes please" and "ok"
+    remove; "What's the time?", "Is it the moon one?", "Sure, and make me
+    a skill that …" and "Hey Lamp, what?" don't;
+  - and no round of that request calls anything but a wait's answer
+    (`skill_write_yes::round_called`, told each round's calls before any
+    runs): "Yes." with a play called beside it removes nothing.
+
+  The fixed set is by ruling, as a "type DELETE to confirm" box is. The
+  owner's rule against yes/no word lists still holds everywhere else.
+  Here the model's own `yes` is still needed first; the code is only the
+  last gate, and it can only ever leave a skill on the lamp. Otherwise
+  nothing is removed, the wait is dropped, and the model is told to say
+  first that it left NAME as it is, then do anything else the line asked
+  (`skill_write_yes::remove_not_plain_next`). A second line after the
+  question that is more than the name drops a wait still open, so a yes
+  two lines later finds nothing waiting. The journal: "a yes to removing
+  NAME not taken: WHY: nothing removed, the wait dropped (#6960)", or "a
+  remove's question was not confirmed on the line right after it:
+  dropped, nothing removed (#6960)".
+- **A clash's replace is held the same way** (Twelve's P2 on #7683). A
+  replace takes the clashing skills off the lamp (`made_clash::chosen`),
+  so the model's `choice` "replace" is taken only when the line choosing
+  it is the first after the clash question (`made_clash::line_heard`,
+  cleared when the question is asked again) and is only a plain replace
+  (`made_clash::REPLACE_SAID`: replace, replace it/them/all/both, thay
+  thế, with a plain yes before it and the skills' names allowed, by the
+  same ruling and the same reader), and no round of that request calls
+  anything but the clash's answer (`made_clash::round_called`). Otherwise
+  nothing is replaced or put on, the clash ends (its made skill dropped,
+  as a cancel's), and the model is told to say it left the others as they
+  were and didn't put the new one on, then do anything else asked. A keep
+  or a cancel takes nothing off and is read as before.
+- **A remove that found nothing leaves nothing to say yes to** (the first
+  builder's ruling, 18 Nov). On lamp-9adf "Lamp, remove the bitcoin
+  warning skill." found nothing; "Yes, remove it." had the model remove
+  `btc-price`, an older skill, by its exact name ("Remove btc price?"),
+  and "Which of my skills use the internet?" was taken as that yes. A
+  remove that finds none of theirs, or one they didn't make, waits for
+  nothing; the second route keeps the person's next line in memory only
+  (`made_remove::line_heard`, never journalled), and a remove in that
+  turn or on that next line that finds one of theirs is asked only when
+  the line names it itself, by the same spelling match as a remove's name
+  (`made_remove::apart`, `near`): "Oh, remove the moon fact skill then."
+  asks it, "Yes, remove it." does not (`made_remove::NONE_FOUND_BEFORE`:
+  the model says nothing is removed and that they can say its name). The
+  journal: "a remove right after one that found nothing, its line not
+  naming the skill found: nothing asked (#6960)".
 - **Removed only on the yes.** `yes` takes it off: one that is on, its
   folder in the skills folder gone on as that very package (its
   `.package.json`'s SHA-256 the one kept), through the manage helper's own
@@ -4686,11 +4756,10 @@ code (`made_remove::asked`):
   SHA-256 is said not removed. Taken off but `made.json` not written, the
   lamp says NAME "is off the lamp, but still listed among the skills they
   made", and the journal says so too (`"still_listed"`). The lamp says "NAME is removed."
-  (`skill_write_yes::removed_next`); if the same line asked for more
-  ("Yes, and remove the joke one too", El's P2 on #7561), the model does
-  that in the same turn, as for any line, so it is never lost: another
-  remove gets its own question and wait, and nothing more is removed
-  without its own yes. `no` keeps it and ends the wait ("NAME
+  (`skill_write_yes::removed_next`). A line that asks for more ("Yes, and
+  remove the joke one too", El's P2 on #7561) is no plain yes (above), so
+  nothing is removed; the model still does the rest in the same turn, so
+  it is never lost: another remove gets its own question and wait. `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
 - **No extra round trip.** The match reads two local folders and the made
@@ -4724,13 +4793,26 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `the_forced_round_may_answer_that_the_line_is_a_new_ask`,
 `a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
 `a_yes_naming_another_skill_removes_nothing_and_is_answered`,
-`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; and
+`a_yes_with_a_second_remove_removes_nothing_and_asks_the_other`,
+`a_make_line_after_the_remove_question_removes_nothing`,
+`a_yes_and_a_make_removes_nothing`, `sure_play_some_music_removes_nothing`,
+`a_question_after_the_remove_question_removes_nothing`,
+`a_question_or_more_after_the_remove_question_removes_nothing`,
+`a_plain_yes_after_the_remove_question_removes_it`,
+`a_yes_whose_round_calls_something_else_removes_nothing`,
+`a_yes_two_lines_after_the_question_removes_nothing`,
+`a_yes_after_a_remove_that_found_nothing_removes_nothing`,
+`a_line_naming_a_skill_after_a_remove_that_found_nothing_asks_it`; and
 `made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
 `a_yes_naming_another_skill_removes_nothing`,
 `a_yes_is_taken_only_for_the_asked_skill`,
 `skill_write_yes::tests::a_new_ask_ends_a_tasks_wait_agreeing_nothing`,
 `a_yes_naming_another_skill_agrees_nothing_on_a_tasks_wait`,
-`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`.
+`a_yes_naming_the_asked_skill_is_its_yes_never_a_new_ask`,
+`only_a_plain_yes_the_code_reads_confirms_a_remove`,
+`a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line`,
+`a_yes_over_the_question_is_asked_again_and_the_next_yes_removes`;
+`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`.
 
 **Turned off and on by voice** (#7445, with `LAMP_MADE_SKILL_OFF_SAID` on
 alone: on lamp-9adf, build 13252, "Lamp, turn off the coffee time skill"

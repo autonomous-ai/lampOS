@@ -67,6 +67,12 @@ const NOT_PASSED: &[(&str, &str)] = &[
     // `tools::arguments_from_environment`, run by the coordinator: each
     // reaches the Live worker as an argument.
     ("LAMP_TOOLS", "the coordinator's, given as an argument"),
+    // `day_shed::arguments_from_environment`, run by the coordinator: the
+    // worker starts its day reader on the flag (#7664).
+    (
+        "LAMP_VOICE_DAY_SHED",
+        "the coordinator's, given as an argument",
+    ),
     (
         "LAMP_ACTIONS_DIR",
         "the coordinator's, given as an argument",
@@ -128,6 +134,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
     (
         "LAMP_SEEN_POSTURE",
         "the coordinator's, given as an argument (--seen-posture, #6543)",
+    ),
+    (
+        "LAMP_SEEN_VOICE_OFFER",
+        "the coordinator's, given as an argument (--seen-voice-offer, #6543)",
     ),
     // `thread::arguments_from_environment`, the same way.
     (

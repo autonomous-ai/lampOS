@@ -4709,6 +4709,7 @@ fn provider_arguments(
     arguments.extend(crate::seems_told::arguments_from_environment());
     arguments.extend(crate::doing_told::arguments_from_environment());
     arguments.extend(crate::health_told::arguments_from_environment());
+    arguments.extend(crate::day_shed::arguments_from_environment());
     if keep_link {
         arguments.push(crate::provider_worker::KEEP_LINK_FLAG.to_owned());
     }
@@ -6598,6 +6599,9 @@ fn conversation_with_gate_inner(
     // With `LAMP_SECOND_REFUSED_HOLD=on`: the model service refusing every
     // turn is said once and held, not failed turn by turn (#4265).
     let refused_hold = model_refusing::switched_on();
+    // `LAMP_VOICE_DAY_SHED` (#7664): the lamp's day as the worker read it
+    // on the relay's answers, looked at once a second at most.
+    let mut day_look = crate::day_shed::Look::from_environment();
     let mut model_refusing = model_refusing::ModelRefusing::default();
     // With `LAMP_SIGNED_OUT=on`: the login no longer accepted is said, and
     // turns wait for a new one.
@@ -7659,6 +7663,15 @@ fn conversation_with_gate_inner(
         let paused = (rig.paused)();
         // Nothing the lamp starts by itself is sent while signed out.
         let unasked_paused = paused || signed_out.holds();
+        // Near the end of the lamp's day, what nobody asked for is shed: a
+        // say the model must word waits (`Says::take_near_day_end`, #7664).
+        // Reminders the person set, fixed words, sounds, a line of a skill
+        // the owner ran now, the agent's lines and the news of work the
+        // person handed over (it answers them, the first builder's P2 on
+        // #7738) go on.
+        let day_sheds = day_look
+            .level(std::time::Instant::now(), crate::day_shed::wall_ms())
+            .sheds();
         if paused != was_paused {
             was_paused = paused;
             refused_while_paused = false;
@@ -13008,6 +13021,8 @@ fn conversation_with_gate_inner(
             && let Some((turn, priority, ticket, quoted)) =
                 if refused_hold && model_refusing.holds(say_now_us) {
                     says.take_while_refused(say_now_us)
+                } else if day_sheds {
+                    says.take_near_day_end(say_now_us)
                 } else {
                     says.take(say_now_us)
                 }
@@ -15743,6 +15758,13 @@ fn commit_reminder_turn(
         late_by_ms: offer.late_by_ms,
         also: offer.also_texts(),
         again: offer.again,
+        ids: if crate::service_records::reminder_rows::asked() {
+            std::iter::once(offer.token.key.id)
+                .chain(offer.also.iter().map(|joined| joined.token.key.id))
+                .collect()
+        } else {
+            Vec::new()
+        },
     };
     current.reminder = Some(reminders.admitted(
         offer,

@@ -1152,6 +1152,44 @@ receipts, interruption, process restart, privacy changes, and the chosen
 consumer's persistent deduplication. The implementation below adds Voice and
 Actions only; installation and on-lamp qualification remain First's work.
 
+### Reminder rows in the person's memory (`LAMP_SERVICE_RECORDS_REMINDERS`)
+
+The linked-service memory plan, slice 6. Off unless
+`LAMP_SERVICE_RECORDS_REMINDERS=on` beside `LAMP_SERVICE_RECORDS=on`, on the
+second route only (`voice/src/service_records/reminder_rows.rs`). The
+Schedule itself is unchanged: the voice writes the rows, through its linked
+outbox ([memory-days.md](memory-days.md)), and no Schedule request is added.
+
+| When | Key and action | Written for |
+|---|---|---|
+| `set_reminder` or `repeat_reminder` answered `committed` | `r-<id>-set`, `reminder_set` | The setter the voice names beside the call (`schedule_whose::caller`), a known person (`p-` id) only |
+| The second route begins to say it (`ProviderInput::Reminder`'s `ids`) | `r-<id>-fired`, `reminder_fired` | Its creator, as kept at the set |
+| `cancel_reminder` answered `committed` with `cancelled: true` | `r-<id>-dismissed`, `reminder_dismissed` | Its creator, whoever cancelled it |
+
+- **No creator, nothing.** A reminder set as the room's (nobody sure, an
+  unknown face, the room's line, the private room's `everyone`) is never
+  written, nor its ring or cancel. A ring or cancel of an id the voice did
+  not see set (another route, before a restart) gives nothing.
+- **Each row:** service `schedule`, status `done`, `source_kind`
+  `reminder`, `source_ref` `{service:"lamp-schedule", id:"<id>"}`, the
+  summary the reminder's own text (one line, at most 160 bytes), and the
+  set's time as its deed time, so a forget after the set wins over a later
+  ring.
+- **Bounds:** at most 32 reminders followed, oldest let go first, in
+  memory only. Timers are not kept. A repeating reminder keeps its first
+  ring's row: the memory keeps a `done` row as it is.
+- **Ids on the due request:** the coordinator adds the offer's Schedule id,
+  then its joined ones', to `ProviderInput::Reminder` only with this switch
+  on, so off the packet is as before.
+- **Forget:** a forget of everything, or about a thing the reminder's text
+  matches, lets it go before its rows are sent, and the memory's forget
+  clears the rows. The Schedule's items are never touched by it.
+
+Tests: `the_creator_is_mapped`, `an_unknown_creator_gives_nothing`,
+`off_nothing_is_kept`, `only_a_committed_reminder_is_kept`,
+`the_summary_is_the_text_in_one_short_line`, `the_followed_are_bounded`
+and `a_forget_lets_them_go` (`service_records/reminder_rows.rs`).
+
 ## Optional Voice consumer
 
 **Late ones are said together, once, at a pause (29e7, 2 Nov).** When the

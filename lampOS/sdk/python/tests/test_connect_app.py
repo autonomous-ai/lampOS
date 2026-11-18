@@ -199,3 +199,58 @@ def test_the_owner_stopping_the_app_closes_with_the_reason_and_no_event():
                 assert seen == []
 
     run(go())
+
+
+def test_off_unsubscribes_a_door_event_on_an_apps_socket():
+    # Heron's P2 on #7672: `on()` subscribes a door event there, so `off()` must take it back.
+    async def go():
+        async with FakeLamp(app=True, app_grants=("speak", "hear", "look")) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                handler = lambda event: None
+                await lamp.on("person.arrived", handler)
+                lamp.off("person.arrived", handler)
+                await settle()
+                assert [r["op"] for r in fake.requests] == ["subscribe", "unsubscribe"]
+                # phrase.heard and the app's own events were never subscribed: nothing to take back.
+                lamp.on("app.trigger", handler)
+                lamp.off("app.trigger", handler)
+                await settle()
+                assert [r["op"] for r in fake.requests] == ["subscribe", "unsubscribe"]
+
+    run(go())
+
+
+def test_on_phrase_heard_with_phrases_on_an_apps_socket_points_to_listen_for():
+    async def go():
+        async with FakeLamp(app=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                with pytest.raises(LampError) as refused:
+                    lamp.on("phrase.heard", lambda event: None, phrases=["lesson time"])
+                assert refused.value.code == "bad_request" and "listen_for" in str(refused.value)
+
+    run(go())
+
+
+def test_a_refused_listen_for_leaves_no_handler_behind():
+    async def go():
+        async with FakeLamp(app=True, app_grants=("speak",)) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                with pytest.raises(LampError):
+                    await lamp.listen_for(["lesson time"], lambda event: None)
+                assert not lamp._handlers.get("phrase.heard")
+
+    run(go())
+
+
+def test_an_empty_panel_line_is_refused_by_the_sdk_and_the_fake_alike():
+    async def go():
+        async with FakeLamp(app=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                with pytest.raises(LampError) as refused:
+                    await lamp.panel("ok", ["a", "", "b"])
+                assert refused.value.code == "bad_request"
+                with pytest.raises(LampError) as refused:
+                    await lamp.request("app.panel.set", title="ok", lines=["a", "", "b"])
+                assert refused.value.code == "bad_request"
+
+    run(go())

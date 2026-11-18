@@ -242,6 +242,29 @@ impl Step {
         }
     }
 
+    /// A step as the model may give it to `redo_setup`, said as it is
+    /// spoken: lowercased and trimmed, spaces and hyphens as `_`, a leading
+    /// "the " and a trailing " step" gone, and a few clear names. On
+    /// lamp-06c1 on 18 Nov "where", "sitting", "where you sit" and "who you
+    /// are" were each refused, and the owner said it again and again.
+    /// `all` is never taken here: a whole redo stays explicit.
+    pub fn spoken(said: &str) -> Option<Self> {
+        let lower = said.trim().to_lowercase();
+        let mut name = lower.replace([' ', '-'], "_");
+        while name.contains("__") {
+            name = name.replace("__", "_");
+        }
+        let name = name.strip_prefix("the_").unwrap_or(&name);
+        let name = name.strip_suffix("_step").unwrap_or(name);
+        Self::named(name).or(match name {
+            "where" | "sit" | "sitting" | "seat" | "where_i_sit" => Some(Self::WhereYouSit),
+            "who" | "name" | "my_name" | "who_i_am" => Some(Self::WhoYouAre),
+            "pet" | "head" => Some(Self::Touch),
+            "voice" | "sound" | "how_i_sound" => Some(Self::HowYouSound),
+            _ => None,
+        })
+    }
+
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
     /// is passed over until its part can be measured from here. Privacy,
     /// how they sound (#1803) and giving way (#1800) have their own
@@ -6232,6 +6255,36 @@ fn run_in(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
     (told, answered)
 }
 
+/// One step's `redo_setup`: privacy only with `all`, and a step out of the
+/// walk's order refused (#5499), so the lamp never says it will redo and then
+/// says nothing (the Reviewer-lead's P3 on #5521). The order is the one read
+/// as this worker started ([`installed_order`]).
+/// `Ok` is the runner's mailbox line; `Err` what the model is told instead.
+fn redo_one(step: Step, order: Option<&[Step]>) -> Result<Value, Value> {
+    if step == Step::Privacy {
+        return Err(
+            json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
+        );
+    }
+    if order.is_some_and(|order| !order.contains(&step)) {
+        return Err(
+            json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
+        );
+    }
+    Ok(json!({"redo_step": step.name()}))
+}
+
+/// No step `redo_setup` knows: the step ids in the order named, so a one-step
+/// redo needs no guess (El's P3 on #5521).
+fn refuse_redo(order: Option<&[Step]>) -> (Value, bool) {
+    let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
+    if let Some(order) = order {
+        let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
+        error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
+    }
+    (json!({ "error": error }), true)
+}
+
 fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
     let line = match call.name.as_str() {
         // One step, or the whole walk only when it was asked for by name:
@@ -6239,36 +6292,14 @@ fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
         // step, which reopened every step (#3754).
         REDO => match call.args.get("step").and_then(Value::as_str) {
             Some(REDO_ALL) => json!({"redo": true}),
-            Some(name) if Step::named(name) == Some(Step::Privacy) => {
-                return (
-                    json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
-                    true,
-                );
-            }
-            // A step out of the walk's order, which the runner refuses
-            // (#5499): said refused, so the lamp never says it will redo
-            // and then says nothing (the Reviewer-lead's P3 on #5521). The
-            // order is the one read as this worker started ([`installed_order`]).
-            Some(name)
-                if Step::named(name)
-                    .is_some_and(|step| order.is_some_and(|order| !order.contains(&step))) =>
-            {
-                return (
-                    json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
-                    true,
-                );
-            }
-            Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
-            // The step ids in the order named, so a one-step redo needs no
-            // guess (El's P3 on #5521).
-            _ => {
-                let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
-                if let Some(order) = order {
-                    let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
-                    error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
-                }
-                return (json!({ "error": error }), true);
-            }
+            Some(said) => match Step::spoken(said) {
+                Some(step) => match redo_one(step, order) {
+                    Ok(line) => line,
+                    Err(error) => return (error, true),
+                },
+                None => return refuse_redo(order),
+            },
+            None => return refuse_redo(order),
         },
         STEP => {
             let step = call.args.get("step").and_then(Value::as_str);
@@ -7199,7 +7230,7 @@ mod tests {
         // step, and every step but privacy was reopened.
         for args in [
             json!({}),
-            json!({"step": "touch step"}),
+            json!({"step": "dance step"}),
             json!({"step": "privacy"}),
         ] {
             let redo = ToolCall {
@@ -7213,6 +7244,141 @@ mod tests {
         }
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
         assert_eq!(*room.walk.kept(), before, "nothing reopened");
+    }
+
+    /// The four steps of the walk, as `skill.toml`'s `order` has them.
+    const WALK: [Step; 4] = [
+        Step::WhereYouSit,
+        Step::WhoYouAre,
+        Step::Touch,
+        Step::HowYouSound,
+    ];
+
+    /// What one `redo_setup` with `step` told the model, and what it put in
+    /// the runner's mailbox.
+    fn redo_named(name: &str, step: &str) -> (Value, String) {
+        let walk = file(name);
+        let call = ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({ "step": step }),
+        };
+        let (told, answered) = run_in(&walk, &call, Some(&WALK));
+        assert!(answered, "{step}");
+        (
+            told,
+            std::fs::read_to_string(mailbox_of(&walk)).unwrap_or_default(),
+        )
+    }
+
+    fn assert_redoes(name: &str, said: &[&str], id: &str) {
+        for step in said {
+            let (told, mailbox) = redo_named(name, step);
+            assert_eq!(told, json!({"ok": true}), "{step}: {told}");
+            assert_eq!(
+                mailbox.trim(),
+                json!({ "redo_step": id }).to_string(),
+                "{step}"
+            );
+        }
+    }
+
+    /// lamp-06c1, 18 Nov ~12:20-12:55 (stable 14072/14100): the model gave
+    /// `redo_setup` "where", "sitting" and "where you sit", each refused, and
+    /// only `where_you_sit` redid the step; the owner said it again and again.
+    #[test]
+    fn a_redo_takes_where_you_sit_by_its_spoken_names() {
+        assert_redoes(
+            "redo-sit-names",
+            &[
+                "where",
+                "sitting",
+                "where you sit",
+                "Where You Sit",
+                " the where-you-sit step ",
+                "sit",
+                "seat",
+                "where i sit",
+            ],
+            "where_you_sit",
+        );
+    }
+
+    /// The same lamp, the same hour: "who you are" four times, each refused.
+    #[test]
+    fn a_redo_takes_who_you_are_by_its_spoken_names() {
+        assert_redoes(
+            "redo-who-names",
+            &[
+                "who you are",
+                "the who you are step",
+                "who",
+                "name",
+                "my name",
+                "who i am",
+            ],
+            "who_you_are",
+        );
+    }
+
+    #[test]
+    fn a_redo_takes_touch_by_its_spoken_names() {
+        assert_redoes(
+            "redo-touch-names",
+            &["pet", "head", "Touch", "the touch step"],
+            "touch",
+        );
+    }
+
+    #[test]
+    fn a_redo_takes_how_you_sound_by_its_spoken_names() {
+        assert_redoes(
+            "redo-sound-names",
+            &[
+                "voice",
+                "sound",
+                "how i sound",
+                "how you sound",
+                "how-you-sound",
+            ],
+            "how_you_sound",
+        );
+    }
+
+    /// A whole redo stays explicit: only `all` exactly, as before.
+    #[test]
+    fn a_whole_redo_still_needs_all_exactly() {
+        let (told, mailbox) = redo_named("redo-all-exact", "all");
+        assert_eq!(told, json!({"ok": true}), "{told}");
+        assert_eq!(mailbox.trim(), json!({"redo": true}).to_string());
+        for step in [
+            "All",
+            " all ",
+            "the all step",
+            "everything",
+            "the whole setup",
+        ] {
+            let (told, mailbox) = redo_named("redo-all-loose", step);
+            assert!(told["error"].is_string(), "{step}: {told}");
+            assert!(mailbox.is_empty(), "{step}: {mailbox}");
+        }
+    }
+
+    /// A name that is no step's still reopens nothing and is told the ids.
+    #[test]
+    fn a_redo_of_an_unknown_name_is_still_refused() {
+        for step in ["dance", "the lights step", "", "where you are"] {
+            let (told, mailbox) = redo_named("redo-unknown-name", step);
+            assert!(
+                told["error"].as_str().is_some_and(|error| error
+                    .starts_with("Nothing was redone.")
+                    && error.ends_with(
+                        "The steps are: where_you_sit, who_you_are, touch, how_you_sound."
+                    )),
+                "{step}: {told}"
+            );
+            assert!(mailbox.is_empty(), "{step}: {mailbox}");
+        }
     }
 
     /// Ticks every quarter second for `for_us` with what the body says on

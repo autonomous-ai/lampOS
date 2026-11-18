@@ -657,13 +657,33 @@ off until a yes, spoken or in the app.
 The owner's yes to lamp-seen looking now and then at what they do at the
 desk (eating, drinking, slouching), kept beside the two above and in their
 shape, but given at any time, never asked at onboarding. Only with
-`LAMP_SEEN_ACTIVITY=on`, lamp-seen's own switch (off unless set); off, no
-function is declared and the app has no such key.
+`LAMP_SEEN_ACTIVITY=on`, lamp-seen's own switch (off unless set; on in the
+product units, lamp-seen's, the voice's and lamp-cloud's); off, no
+function is declared and the app has no such key. The voice's offer,
+`offer_desk_noticing`, has a switch of its own, `LAMP_SEEN_VOICE_OFFER`
+(`on` only; off unless set, and off in the product, the first builder on
+#7506): without it the offer is not declared and a call of it is nobody's,
+so no spoken yes can be taken (`look_at_my_desk` is refused, its note telling the model the yes is in
+the app, under Desk noticing, and naming no undeclared function) and the
+yes comes from the app; "stop looking"
+(`stop_looking_at_my_desk`) works either way (test
+`with_the_voice_offer_off_no_request_is_offered_the_desk_offer`). With it on, the offer never comes
+during setup's walk: on the second route `offer_desk_noticing` is left out
+of every chat request while the walk is under way
+(`onboarding::under_way_now`), always, not behind
+`LAMP_SECOND_WHILE_THEY_APPLY`, and given again once it ends; with no offer
+`look_at_my_desk` is refused (test
+`the_desk_offer_is_never_made_during_setups_walk`).
+
+**Without the yes** (the first builder, c6948639068): Without your yes, the lamp still keeps, on the lamp only, how long you've sat at the desk; it sends nothing. Once a
+remembered face sits at the desk, lamp-seen says the sitting's local timers on
+`humans/doing` (the clock and the face only, whatever the opt-in); no
+picture is taken or sent and nothing from the cloud is in them.
 
 | | Room sounds | Seen activity |
 |---|---|---|
 | Key, file | `room_sounds`, `room-sounds.json` | `seen_activity`, `seen-activity.json` |
-| Asked | once, at onboarding, on a no-slide lamp | when the person asks the lamp to notice what they do at the desk ("keep an eye on whether I eat"): the model's `offer_desk_noticing` gives it the disclosure to say word for word (`SEEN_DISCLOSURE`, the PM's wording on #6543 with the lead's "you or anyone else" (#1711): "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?"; with `LAMP_SEEN_POSTURE=on`, ", and how you're sitting" after "take a break"), and keeps the offer pending when it was said aloud. The offer counts only when the lamp played the disclosure whole: every word of it, in order, in the lamp's words as played for that turn (`thread`'s `lamp_for`), and the answer not cut, interrupted or barged in (`heard_only`), as a write's read-back is checked (`services::read_back_said`). An offer whose words a newer line cut short, answered in that line's place (a held line's, or one that only declined with `LAMP_CUT_ASK_ANSWERED`), goes with them (`seen_yes::answered_in_place`, as `services::answered_in_place` keeps a read-back): the replay must play the disclosure whole and uncut itself, and the line after it answers the offer (lamp-06c1, 17 Nov: a 0-word line cut the offer before any word of it, the replay played it whole, and the owner's yes found no offer). **Owed before the switch goes on:** "deleted once they're checked" waits on the backend's written retention confirmation (#6912). An ordinary look ("look at my desk, where are my keys?") is never an offer |
+| Asked | once, at onboarding, on a no-slide lamp | when the person asks the lamp to notice what they do at the desk ("keep an eye on whether I eat"): the model's `offer_desk_noticing` gives it the disclosure to say word for word (`SEEN_DISCLOSURE`, the PM's wording on #6543 with the lead's "you or anyone else" (#1711), naming what the yes covers by the first builder's c6957770745: "I can notice when you eat, drink, take a break, look tired or celebrate, and I react to what I notice. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be labelled, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?"; with `LAMP_SEEN_POSTURE=on`, ", and how you're sitting" after "celebrate"), and keeps the offer pending when it was said aloud. The offer counts only when the lamp played the disclosure whole: every word of it, in order, in the lamp's words as played for that turn (`thread`'s `lamp_for`), and the answer not cut, interrupted or barged in (`heard_only`), as a write's read-back is checked (`services::read_back_said`). An offer whose words a newer line cut short, answered in that line's place (a held line's, or one that only declined with `LAMP_CUT_ASK_ANSWERED`), goes with them (`seen_yes::answered_in_place`, as `services::answered_in_place` keeps a read-back): the replay must play the disclosure whole and uncut itself, and the line after it answers the offer (lamp-06c1, 17 Nov: a 0-word line cut the offer before any word of it, the replay played it whole, and the owner's yes found no offer). Retention: confirmed by the owner, who runs the perception server, and accepted by the backend on #6912 (c6906610629). An ordinary look ("look at my desk, where are my keys?") is never an offer |
 | Spoken yes taken | the model's `setup_step` `done` after a clear yes | the model's `look_at_my_desk` (`seen_yes.rs`), only in the very next turn after the offer played whole (the offer goes at the next turn either way, and with no offer pending the call is refused), and only for the owner's own spoken line: seen saying it, or in their voice (`services::owners_yes_now`); in the private room (`LAMP_PRIVACY_ROOM`), their voice by the judge (`services::owners_voice_now`), so a television's line is none. A guest's, a typed or a later yes is refused and nothing is written |
 | Written by | the onboarding storage worker | the same writer (`storage::keep_yes`), from the voice's provider worker: whole, temporary file, mode set, group set, synced, renamed; 0640 root:lampos (0600 with no `lampos` group), `{"version":1,"seen_activity":"yes","at_unix_s":N,"by":"voice"}`. A yes already kept is left as it is |
 | Said back | the walk's or the model's words | by lamp-seen alone, on and off (its said-back record); the model is told to add nothing |
@@ -878,8 +898,19 @@ redone alone; it goes with `all`. A call that names no step, or a step the
 walk doesn't know, reopens nothing and tells the model to ask which,
 naming the step IDs in the `order` (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
-reopened every step). Skipping one step is `setup_step … skipped`; skipping
-the rest is that for each step.
+reopened every step). The step may be said as it is spoken, not only as
+its ID (lamp-06c1, 18 Nov ~12:20-12:55: "where", "sitting", "where you
+sit" and "who you are" four times were each refused, and the owner said it
+again and again): the name is lowercased and trimmed, spaces and hyphens
+become `_`, and a leading "the " and a trailing " step" go, so "the who
+you are step" is `who_you_are`. A few clear names are taken too:
+"where", "sit", "sitting", "seat" and "where i sit" are `where_you_sit`;
+"who", "name", "my name" and "who i am" are `who_you_are`; "pet" and
+"head" are `touch`; "voice", "sound" and "how i sound" are
+`how_you_sound`. `all` is still taken only exactly, so a whole redo stays
+explicit, and any other name reopens nothing as above. The IDs are still
+not put in the schema as an enum (#5499, above). Skipping one step is
+`setup_step … skipped`; skipping the rest is that for each step.
 
 ## Where it is kept
 

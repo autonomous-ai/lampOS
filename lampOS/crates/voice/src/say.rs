@@ -394,6 +394,58 @@ impl Outcome {
     }
 }
 
+/// Which says [`Says::take_of`] may take.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Taking {
+    All,
+    /// While the model service refuses: fixed words only.
+    Refused,
+    /// Near the end of the lamp's day: all but [`unasked_worded`].
+    NearDayEnd,
+}
+
+/// A say nobody asked for that the model must word (#7664): a skill's
+/// note, an add-on's quoted line, a made skill's line, a text not said as
+/// it is, or the news. Never a reminder the person set, the onboarding, a
+/// sound, an exact line, a line of a skill the owner's voice ran now
+/// (`crate::made_run::answers_now`, whatever its words: a made skill's
+/// `Made` line answers the run, the first builder's P1 on #7738), or one of
+/// the lamp's agent's lines ([`AGENT_SKILL`], a reserved name): its answer
+/// and its fixed lines answer the owner's own ask (`crate::agent_asks`,
+/// the Reviewer-lead's P2 on #7738).
+fn unasked_worded(request: &Request) -> bool {
+    if request.skill == AGENT_SKILL || crate::made_run::answers_now(&request.skill, Instant::now())
+    {
+        return false;
+    }
+    match &request.words {
+        Words::Note(_) | Words::Quoted(_) | Words::Made(_) => true,
+        Words::Text(text) => crate::onboarding::said_as_is(text).is_none(),
+        _ => false,
+    }
+}
+
+/// Whether `request` is taken by [`Says::take`] as a turn: every kind but
+/// those left to their own takers (a skill's `from` ask, sounds, exact
+/// lines, a computer's turn, a stream).
+fn taken_as_a_turn(request: &Request) -> bool {
+    !matches!(
+        request.words,
+        Words::From(_)
+            | Words::SoundAt(_)
+            | Words::Recording(_)
+            | Words::Cached(_)
+            | Words::Sound(_)
+            | Words::Exact(_)
+            | Words::ExactSound { .. }
+            | Words::ClipAt(_)
+            | Words::TurnStart { .. }
+            | Words::TurnEnd(_)
+            | Words::Listen(_)
+            | Words::Stream { .. }
+    )
+}
+
 /// What to say: an instruction the model phrases, words to say as they
 /// are, or words the voice keeps itself; or a skill's own sound, no words:
 /// its path as asked, then its samples once the client's thread read it.
@@ -2228,23 +2280,7 @@ impl Says {
     /// The next say of its own: a `from` ask waits for its source, and a
     /// sound is taken by [`Self::take_sound`].
     fn next_index(&self) -> Option<usize> {
-        self.next_of(|request| {
-            !matches!(
-                request.words,
-                Words::From(_)
-                    | Words::SoundAt(_)
-                    | Words::Recording(_)
-                    | Words::Cached(_)
-                    | Words::Sound(_)
-                    | Words::Exact(_)
-                    | Words::ExactSound { .. }
-                    | Words::ClipAt(_)
-                    | Words::TurnStart { .. }
-                    | Words::TurnEnd(_)
-                    | Words::Listen(_)
-                    | Words::Stream { .. }
-            )
-        })
+        self.next_of(taken_as_a_turn)
     }
 
     /// Whether a turn start waits, not yet expired at `now_us`.
@@ -2517,7 +2553,7 @@ impl Says {
     /// answered `expired` first, so that none begins after it (the reviewer
     /// on #954).
     pub fn take(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
-        self.take_of(now_us, false)
+        self.take_of(now_us, Taking::All)
     }
 
     /// [`Self::take`] while the model service refuses and turns are held
@@ -2526,19 +2562,33 @@ impl Says {
     /// asked. A note or a quoted line needs the model to word it: it waits
     /// for the service, or for its own expiry.
     pub fn take_while_refused(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
-        self.take_of(now_us, true)
+        self.take_of(now_us, Taking::Refused)
     }
 
-    fn take_of(&mut self, now_us: u64, refused: bool) -> Option<(String, u8, Ticket, bool)> {
+    /// [`Self::take`] near the end of the lamp's day (`LAMP_VOICE_DAY_SHED`,
+    /// #7664): what nobody asked for that the model must word waits, for
+    /// its own expiry or a new day ([`unasked_worded`]); a reminder the
+    /// person set, the lamp's onboarding, fixed words, sounds, and a line
+    /// that answers the owner's own run now are taken as ever.
+    pub fn take_near_day_end(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, Taking::NearDayEnd)
+    }
+
+    fn take_of(&mut self, now_us: u64, taking: Taking) -> Option<(String, u8, Ticket, bool)> {
         self.expire(now_us);
         let waiting = loop {
-            let next = if refused {
-                self.next_of(|request| match &request.words {
+            let next = match taking {
+                Taking::Refused => self.next_of(|request| match &request.words {
                     Words::Text(text) => crate::onboarding::said_as_is(text).is_some(),
                     _ => false,
-                })
-            } else {
-                self.next_index()
+                }),
+                // Only what `take` itself takes, never a kind left to its
+                // own taker (the first builder's P1 on #7738: taken here, it
+                // had no turn and was lost unanswered).
+                Taking::NearDayEnd => {
+                    self.next_of(|request| taken_as_a_turn(request) && !unasked_worded(request))
+                }
+                Taking::All => self.next_index(),
             };
             let waiting = self.waiting.remove(next?);
             let lost = match waiting.guard.as_ref() {
@@ -2559,7 +2609,7 @@ impl Says {
         );
         let (who, question) = (waiting.request.who, waiting.request.question);
         let turn = match &waiting.request.words {
-            Words::Text(text) if refused => crate::onboarding::said_as_is(text),
+            Words::Text(text) if taking != Taking::All => crate::onboarding::said_as_is(text),
             words => words.turn(),
         };
         Some((
@@ -4734,6 +4784,97 @@ mod tests {
             },
             answered,
         )
+    }
+
+    /// #7664: near the end of the lamp's day, a skill's note and an add-on's
+    /// quoted line, which the model must word and nobody asked for, wait; a
+    /// skill's fixed words are taken past them, said as they are; once the
+    /// day is open again, the note is taken as ever.
+    #[test]
+    fn near_the_day_end_a_skills_note_waits_and_its_fixed_words_go() {
+        let (mut says, ask) = Says::by_hand();
+        let (note, _note_answered) = asked("fig-facts", 9, 10_000_000);
+        let (mut quoted, _quoted_answered) = asked("partner", 9, 10_000_000);
+        quoted.request.words = Words::Quoted("A partner's line.".into());
+        let (mut text, _text_answered) = asked("stand-up", 5, 10_000_000);
+        text.request.words = Words::Text("Time to stand up.".into());
+        ask.send(note).unwrap();
+        ask.send(quoted).unwrap();
+        ask.send(text).unwrap();
+        says.poll(100);
+        let (turn, _, ticket, _) = says.take_near_day_end(100).unwrap();
+        assert_eq!(ticket.skill, "stand-up");
+        assert_eq!(
+            Some(turn),
+            crate::onboarding::said_as_is("Time to stand up."),
+            "said as it is, no chat"
+        );
+        assert!(
+            says.take_near_day_end(100).is_none(),
+            "the note and quoted line wait"
+        );
+        let (_, _, ticket, _) = says.take(100).unwrap();
+        assert_eq!(ticket.skill, "fig-facts", "the day open again");
+    }
+
+    /// Near the day's end, a kind left to its own taker (a sound, an exact
+    /// line, a skill's `from` ask) is never taken by the shed take and lost
+    /// with no turn: it stays waiting beside the shed note (the first
+    /// builder's P1 on #7738).
+    #[test]
+    fn near_the_day_end_kinds_left_to_their_own_takers_stay_waiting() {
+        let (mut says, ask) = Says::by_hand();
+        let (note, _note_answered) = asked("fig-facts", 9, 10_000_000);
+        let (mut exact, _exact_answered) = asked("prepare-unplug", 9, 10_000_000);
+        exact.request.words = Words::ExactSound {
+            samples: vec![1; 8],
+            text: None,
+        };
+        let (mut from, _from_answered) = asked("reminders", 8, 10_000_000);
+        from.request.words = Words::From(Source::Schedule);
+        ask.send(note).unwrap();
+        ask.send(exact).unwrap();
+        ask.send(from).unwrap();
+        says.poll(100);
+        assert!(says.take_near_day_end(100).is_none());
+        assert_eq!(says.waiting(), 3, "nothing lost");
+    }
+
+    /// A made skill's `Made` line while the owner's voice ran it now
+    /// answers their own run: near the day's end it still goes (the first
+    /// builder's P1 on #7738).
+    #[test]
+    fn near_the_day_end_the_line_of_a_skill_the_owner_ran_now_goes() {
+        let skill = "moon-time-7738";
+        let (mut made, _made_answered) = asked(skill, 9, 10_000_000);
+        made.request.words = Words::Made("Tell them the moon's phase.".into());
+        let (mut says, ask) = Says::by_hand();
+        ask.send(made).unwrap();
+        says.poll(100);
+        assert!(says.take_near_day_end(100).is_none(), "not run now: shed");
+        crate::made_run::ran_now(skill, Instant::now());
+        let (_, _, ticket, _) = says.take_near_day_end(100).unwrap();
+        assert_eq!(ticket.skill, skill);
+    }
+
+    /// The lamp's agent's fixed line (`crate::agent_asks`'s `FAILED_LINE`,
+    /// a note) answers the owner's own ask: near the day's end it still
+    /// goes, while a skill's note waits (the Reviewer-lead's P2 on #7738).
+    #[test]
+    fn near_the_day_end_the_agents_line_to_the_owners_ask_still_goes() {
+        let (mut says, ask) = Says::by_hand();
+        let (note, _note_answered) = asked("fig-facts", 9, 10_000_000);
+        let (agent, _agent_answered) = asked(AGENT_SKILL, 5, 10_000_000);
+        assert!(matches!(agent.request.words, Words::Note(_)));
+        ask.send(note).unwrap();
+        ask.send(agent).unwrap();
+        says.poll(100);
+        let (_, _, ticket, _) = says.take_near_day_end(100).unwrap();
+        assert_eq!(ticket.skill, AGENT_SKILL);
+        assert!(
+            says.take_near_day_end(100).is_none(),
+            "the skill's note waits"
+        );
     }
 
     #[test]

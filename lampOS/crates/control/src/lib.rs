@@ -14,6 +14,8 @@
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
 pub mod agent;
+pub mod app_socket;
+pub mod app_yes;
 pub mod body_info;
 pub mod body_lease;
 pub mod body_state;

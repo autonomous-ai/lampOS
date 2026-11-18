@@ -1767,14 +1767,51 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   tên và SHA-256 đó thì được nói là chưa gỡ. Đã gỡ khỏi đèn mà không ghi
   được `made.json` thì đèn nói NAME "is off the lamp, but still listed
   among the skills they made", và journal cũng ghi vậy (`"still_listed"`). Đèn nói "NAME is removed."
-  (`skill_write_yes::removed_next`); nếu cùng câu đó hỏi thêm ("Yes, and
-  remove the joke one too", P2 của El trên #7561), mô hình làm điều đó
-  ngay trong lượt, như với mọi câu, nên nó không bao giờ bị mất: việc gỡ
-  khác có câu hỏi và việc chờ riêng, và không gì khác bị gỡ khi chưa có cái
-  "có" của riêng nó. `no` giữ nó và kết thúc việc chờ
+  (`skill_write_yes::removed_next`). Một câu hỏi thêm ("Yes, and remove
+  the joke one too", P2 của El trên #7561) không phải cái "có" đơn thuần
+  (bên dưới), nên không gì bị gỡ; mô hình vẫn làm phần còn lại ngay trong
+  lượt, nên nó không bị mất: việc gỡ kia có câu hỏi và việc chờ riêng.
+  `no` giữ nó và kết thúc việc chờ
   ("NAME stays", `remove_declined_next`); `unclear` hỏi lại một lần, ngắn,
   "remove NAME, yes or no?" (`remove_unclear_next`), và `unclear` lần hai
   giữ nó.
+- **Chỉ một cái "có" đơn thuần mà code đọc được, ở câu ngay sau** (phán
+  quyết của first builder trên #7683, 18/11 12:51, sau HOLD của Twelve).
+  Trên lamp-9adf (stock 14083) sau "Remove daily stretch reminder?", câu
+  "Lamp, also make one that plays a soft chime when I come back to my
+  desk." được mô hình trả lời `yes` và kỹ năng bị gỡ; lần thứ hai, "Which
+  of my skills use the internet?" cũng vậy. Dù mô hình trả lời gì, một
+  `yes` chỉ gỡ khi, trong code (`skill_write_yes::not_a_plain_yes`): câu
+  của nó là câu trả lời của việc gỡ, câu đầu tiên sau câu hỏi mà không chỉ
+  là tên đèn (`skill_write_yes::line_heard`, `Waiting::answer_line`, chỉ
+  giữ trong bộ nhớ; câu hỏi được hỏi lại, vì `unclear` hay vì một cái
+  "có" đến khi câu hỏi chưa được nghe trọn, thì câu sau đó là câu trả lời);
+  câu đó, bỏ tên đèn, "hey" và "please", chỉ gồm một câu trong tập cố định
+  `skill_write_yes::YES_SAID` (yes, yeah, yep, yup, sure, ok/okay, go
+  ahead, do it, remove it, delete it, vâng, ừ, xoá/xóa đi), có thể kèm
+  động từ gỡ và chính tên kỹ năng ("Yes, remove rain joke."), không có
+  "?" và không có từ hỏi (`skill_write_yes::plain_answer`); và không vòng
+  nào của lượt đó gọi gì khác ngoài câu trả lời của việc chờ
+  (`skill_write_yes::round_called`). Một danh sách cố định theo phán quyết,
+  như ô "gõ DELETE để xác nhận": quy tắc của owner cấm danh sách từ có/không
+  vẫn đúng ở mọi chỗ khác, và ở đây cái `yes` của mô hình vẫn cần trước,
+  code chỉ là cửa cuối và chỉ có thể để kỹ năng lại trên đèn. Nếu không,
+  không gì bị gỡ, việc chờ bị bỏ, và mô hình được bảo nói trước rằng đã để
+  NAME như cũ, rồi làm những gì câu đó hỏi
+  (`skill_write_yes::remove_not_plain_next`). Câu thứ hai sau câu hỏi bỏ
+  việc chờ còn mở, nên cái "có" hai câu sau không tìm thấy gì. Một lần
+  thay khi trùng (`made_clash`) được giữ cùng cách: chỉ một lựa chọn thay
+  đơn thuần (`made_clash::REPLACE_SAID`: replace, replace it/them/all,
+  thay thế) ở câu ngay sau câu hỏi, không hỏi gì khác, mới gỡ các kỹ năng
+  kia; nếu không, không gì bị thay hay bật, và việc trùng kết thúc.
+- **Việc gỡ không tìm thấy gì thì không để lại gì để nói "có"** (phán
+  quyết của first builder, 18/11). Trên lamp-9adf "Lamp, remove the
+  bitcoin warning skill." không tìm thấy gì; "Yes, remove it." khiến mô
+  hình gỡ `btc-price`, một kỹ năng cũ hơn ("Remove btc price?"). Sau một
+  việc gỡ không tìm thấy kỹ năng nào của họ, một việc gỡ trong lượt đó hay
+  ở câu ngay sau chỉ được hỏi khi chính câu đó nêu tên kỹ năng tìm được
+  (`made_remove::line_heard`, `apart`, `near`); nếu không, không gì được
+  hỏi (`made_remove::NONE_FOUND_BEFORE`).
 - **Không thêm vòng mạng nào.** Việc so khớp đọc hai thư mục cục bộ và chỉ
   mục kỹ năng đã tạo; chỉ cái "có" mới hỏi helper quản lý, qua socket cục
   bộ của nó. Journal chỉ ghi loại tìm được ("one made skill by the nearest
@@ -1806,7 +1843,21 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `the_forced_round_may_answer_that_the_line_is_a_new_ask`,
 `a_new_ask_after_remove_moon_fact_keeps_it_and_is_answered`,
 `a_yes_naming_another_skill_removes_nothing_and_is_answered`,
-`a_yes_with_a_second_remove_removes_the_asked_one_and_asks_the_other`; và
+`a_yes_with_a_second_remove_removes_nothing_and_asks_the_other`,
+`a_make_line_after_the_remove_question_removes_nothing`,
+`a_yes_and_a_make_removes_nothing`,
+`a_question_or_more_after_the_remove_question_removes_nothing`,
+`a_plain_yes_after_the_remove_question_removes_it`,
+`sure_play_some_music_removes_nothing`,
+`a_question_after_the_remove_question_removes_nothing`,
+`a_yes_whose_round_calls_something_else_removes_nothing`,
+`a_yes_two_lines_after_the_question_removes_nothing`,
+`a_yes_after_a_remove_that_found_nothing_removes_nothing`,
+`a_line_naming_a_skill_after_a_remove_that_found_nothing_asks_it`;
+`skill_write_yes::tests::only_a_plain_yes_the_code_reads_confirms_a_remove`,
+`a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line`,
+`a_yes_over_the_question_is_asked_again_and_the_next_yes_removes`;
+`made_clash::tests::only_a_plain_replace_on_the_next_line_takes_a_skill_off`; và
 `made_remove::tests::a_new_ask_after_the_question_drops_the_remove_and_keeps_it`,
 `a_yes_naming_another_skill_removes_nothing`,
 `a_yes_is_taken_only_for_the_asked_skill`,
@@ -3663,6 +3714,14 @@ Anh, "Its keys, given in the app".
 
 Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 
+## Trigger đến sớm hơn (`trigger.sooner`, #3709, `LAMP_YAWN_SOONER`, bật trong sản phẩm)
+
+| Khóa | Bắt buộc | Ý nghĩa |
+|------|----------|---------|
+| `trigger.sooner` | không | `{ topic = T, field = F, above = N, for = D }` (#3709): trong khi F của giá trị mới nhất còn hạn của T lớn hơn N, trigger chỉ cần đã giữ D, ngắn hơn `for` của chính nó (trigger phải có `for`; D bằng 0 hoặc dài hơn bị từ chối lúc nạp). Nó cũng có thể là một danh sách các bảng như vậy (#6543), `sooner = [{ … }, { … }]`: mỗi bảng được kiểm tra lúc nạp như khi đứng một mình (danh sách rỗng bị từ chối), và trong các bảng đang giữ tại một thời điểm, `for` ngắn nhất thắng; một bảng và danh sách chỉ có bảng đó hoạt động như nhau. Chủ đề của mỗi mục chỉ được đọc nếu `[permissions] topics` liệt kê nó. Với `rearm`, mỗi lần giữ nó vẫn chỉ lấy một cơ hội: được đưa lên sớm, không bao giờ hai lần. Chỉ có hiệu lực với `LAMP_YAWN_SOONER=on` trong `lamp-skills` (bật trong unit sản phẩm, #6543); tắt thì nó được đọc, kiểm tra và bỏ qua. Stretch break có `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`: một cái ngáp mà eyes thấy trong lần ngồi này (`LAMP_EYES_YAWN=on`) đưa lời nhắc vươn vai về 30 phút, như luật ngáp của V1. Vì `LAMP_EYES_YAWN` chưa có trong unit sản phẩm nào, eyes không đếm cái ngáp nào, nên trong sản phẩm nó chưa làm gì. Test: `a_yawn_in_the_sitting_brings_the_stretch_forward_once`, `a_list_of_sooners_brings_the_trigger_to_the_shortest_holding` |
+
+`sooner` của một điều kiện `[[while]]` (#6543, cùng `LAMP_YAWN_SOONER=on`) hạ `above` của chính điều kiện đó xuống con số kỹ năng tự nêu, xem [skills.md](../skills.md).
+
 ## Điều kiện `[[while]]` khi chủ đề đã hết hạn (`unknown = "holds_stale"`, #6543)
 
 | Giá trị | Ý nghĩa |
@@ -4403,7 +4462,8 @@ của tool) và `voice/decision` (các tool mà một lượt nói đã gọi) n
 trong hai chủ đề này trong `[permissions] topics` đều bị từ chối lúc nạp
 (`[permissions] topics: <topic> is never a skill's to read`).
 `humans/doing_more` (mệt, việc ở bàn theo loại thô
-và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`) là một chủ
+và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`, bật trong
+sản phẩm) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Chưa kỹ năng
 nào đọc nó. **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
@@ -4462,7 +4522,8 @@ của trigger, không có khoảng dư: nếu lúc đến bàn của lamp-seen (
 khi có `room/stood_up`) muộn hơn lần ngồi mà trigger đếm (lần ngồi này vẫn
 giữ qua các khoảng trống tới 2 phút), lời nhắc phải chờ bộ đếm, và chờ quá
 `wait` của trigger thì mất lời nhắc của lần ngồi đó.
-Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, [seen.md](../seen.md)),
+Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, bật trong sản phẩm,
+[seen.md](../seen.md)),
 nghỉ giải lao là đứng dậy, không phải vươn vai: `break_s_ago` đếm từ lúc
 người đó quay lại sau `room/stood_up`, và thấy vươn vai không còn đặt lại nó.
 Vì vậy Đứng dậy và Vươn vai giữ lời nhắc sau một lần thật sự đứng dậy, kể cả
