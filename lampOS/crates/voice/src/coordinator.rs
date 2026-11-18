@@ -7664,9 +7664,11 @@ fn conversation_with_gate_inner(
         // Nothing the lamp starts by itself is sent while signed out.
         let unasked_paused = paused || signed_out.holds();
         // Near the end of the lamp's day, what nobody asked for is shed: a
-        // say the model must word waits (`Says::take_near_day_end`), and
-        // news is not told (#7664). Reminders the person set, fixed words,
-        // sounds and a line answering the owner's own run go on.
+        // say the model must word waits (`Says::take_near_day_end`, #7664).
+        // Reminders the person set, fixed words, sounds, a line of a skill
+        // the owner ran now, the agent's lines and the news of work the
+        // person handed over (it answers them, the first builder's P2 on
+        // #7738) go on.
         let day_sheds = day_look
             .level(std::time::Instant::now(), crate::day_shed::wall_ms())
             .sheds();
@@ -14025,7 +14027,6 @@ fn conversation_with_gate_inner(
                 || said_at_us
                     .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
             && !room.busy()
-            && !day_sheds
             && reply.is_none()
             && provider_queue.is_empty()
             && !admission.owns_stream()
