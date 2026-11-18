@@ -6595,6 +6595,15 @@ the same code for both writers.
   `made_with_is_the_lamps_line_for_each_engine_and_the_models_is_dropped`,
   and lamp-skills' `a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker`
   (the real checker and the manage helper).
+- **A say of the make's own marker is never kept (lamp-9adf, 18 Nov:
+  `zorbo-coin-price`, a say of "internet: current price of Zorbo coin"
+  read aloud).** A `say` whose text begins, in any case after trimming,
+  with `internet:` or `cannot:` is no quick reaction, so with the route on
+  the lamp's agent makes it, and is refused at the made-skill check
+  (`made_skill::SAY_IS_MARKER`, with repair lines that the marker line is
+  the whole answer), always, whatever the switches. Tests:
+  `a_say_of_the_models_marker_is_no_quick_reaction`,
+  `a_say_of_the_models_marker_is_never_kept`.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
   off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's
