@@ -47,6 +47,10 @@ pub struct Times {
     pub health_every: Duration,
     /// How often the board is read and its numbers published.
     pub board_every: Duration,
+    /// How long the board's zones read cool before the self-test's heat
+    /// fail of the board is cleared ([`parts::HEAT_CLEARS_AFTER`] on a
+    /// lamp, #7718 item 5).
+    pub heat_clears_after: Duration,
 }
 
 impl Times {
@@ -60,6 +64,7 @@ impl Times {
             report_every: Duration::from_secs(1).min(stale_after / 3),
             health_every: Duration::from_secs(5),
             board_every: Duration::from_secs(5),
+            heat_clears_after: parts::HEAT_CLEARS_AFTER,
         }
     }
 }
@@ -151,6 +156,12 @@ pub enum Note {
     },
     /// A message on `lamp/selftest` was no run, or not a whole one.
     SelfTestUnreadable,
+    /// The self-test's heat fail of the board is cleared: its zones have
+    /// read cool for `heat_clears_after` since (#7718 item 5). The hottest zone
+    /// as it read then, `zone C`.
+    SelfTestBoardCooled {
+        hottest: String,
+    },
 }
 
 impl fmt::Display for Note {
@@ -204,6 +215,12 @@ impl fmt::Display for Note {
                 f,
                 "a message on {} is not a whole run: it is passed over",
                 SelfTest::TOPIC
+            ),
+            Self::SelfTestBoardCooled { hottest } => write!(
+                f,
+                "the self-test's heat fail of the board is cleared: its zones have read {} °C \
+                 or more under its limit since (hottest now {hottest})",
+                parts::HEAT_CLEARS_BELOW_C
             ),
         }
     }
@@ -367,7 +384,20 @@ impl Serve<'_> {
             });
             self.unread = unread;
         }
-        if let Some(state) = reading.state() {
+        let state = reading.state();
+        // The self-test's heat fail of the board, cleared once these same
+        // zones have read cool for half a minute (#7718 item 5). A board
+        // that could not be read, or readings more than two periods apart,
+        // begin that half minute again (the reviewers on #7740, P3).
+        if let Some(hottest) = self.selftest.cooled(
+            state.as_ref().map(|state| &state.temperature_c),
+            Instant::now(),
+            self.options.times.heat_clears_after,
+            self.options.times.board_every * 2,
+        ) {
+            (self.say)(Note::SelfTestBoardCooled { hottest });
+        }
+        if let Some(state) = state {
             let at_us = self.at_us();
             if self.board_out.publish(at_us, &state, self.say) {
                 self.totals.boards += 1;

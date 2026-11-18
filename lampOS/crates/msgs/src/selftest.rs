@@ -45,6 +45,15 @@ pub enum Occasion {
     OnDemand,
 }
 
+/// The values beside a `board` part that failed on heat (#7718 item 5):
+/// the hottest zone, what it read and the limit it was judged against, in
+/// degrees Celsius. `lamp-health` reads the same zones itself every 5 s and
+/// clears that fail once the board has cooled; the board's other fails
+/// (a full disk, `board/state` gone stale) carry none of these.
+pub const BOARD_HOT_ZONE: &str = "hot_zone";
+pub const BOARD_HOT_C: &str = "hot_c";
+pub const BOARD_HOT_LIMIT_C: &str = "hot_limit_c";
+
 /// One part's result.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PartResult {

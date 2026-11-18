@@ -161,6 +161,7 @@ impl Rig {
                 report_every: ms(50),
                 health_every: ms(300),
                 board_every: ms(100),
+                heat_clears_after: ms(300),
             },
             online: false,
             reach: None,
@@ -1016,6 +1017,9 @@ fn every_note_is_one_line_about_the_program_or_the_lamps_level() {
             kind: io::ErrorKind::PermissionDenied,
         },
         Note::SelfTestUnreadable,
+        Note::SelfTestBoardCooled {
+            hottest: "cpul_thermal_zone 74 °C".into(),
+        },
     ]
     .iter()
     .map(Note::to_string)
@@ -1038,6 +1042,7 @@ fn every_note_is_one_line_about_the_program_or_the_lamps_level() {
             "more than 64 parts report: the newcomers are not kept",
             "lamp/selftest cannot be received from (permission denied): the health goes on without it",
             "a message on lamp/selftest is not a whole run: it is passed over",
+            "the self-test's heat fail of the board is cleared: its zones have read 5 °C or more under its limit since (hottest now cpul_thermal_zone 74 °C)",
         ]
     );
     assert!(lines.iter().all(|line| !line.contains('\n')));
@@ -1057,6 +1062,9 @@ fn the_lamps_own_times_follow_from_the_stale_time() {
         )
     );
     assert_eq!(serve::DEFAULT_STALE_AFTER, Duration::from_secs(5));
+    // The self-test's heat fail of the board clears after half a minute
+    // of cool readings on a lamp (#7718 item 5).
+    assert_eq!(times.heat_clears_after, Duration::from_secs(30));
     assert_eq!(Diagnostic::declaration().period(), Some(times.report_every));
     assert_eq!(Health::declaration().period(), Some(times.health_every));
     assert_eq!(BoardState::declaration().period(), Some(times.board_every));
@@ -1239,6 +1247,86 @@ fn a_part_the_selftest_failed_is_in_the_lamps_health_until_a_run_passes() {
         Some("passed; 1 not checked")
     );
     assert_eq!((health.level, health.message.as_str()), (Level::Ok, ""));
+    rig.stop();
+}
+
+/// #7718 item 5, lamp-0c89 on 18 Nov: the passive run failed the board at
+/// 92 °C under the setup walk, and the lamp stayed `error` with its zones
+/// back at 74 °C, since nothing checked again for six hours. The heat fail
+/// stands while the board stays hot, or only a little under the limit, and
+/// is cleared once the zones `lamp-health` reads itself have been cool for
+/// the clearing time; the self-test's item is then well, and says why.
+#[test]
+fn a_board_the_selftest_failed_on_heat_is_well_again_once_it_has_cooled() {
+    let mut hot = selftest(&[
+        ("voice_mic", Verdict::Pass, ""),
+        ("board", Verdict::Fail, "cpul_thermal_zone is at 92 °C"),
+    ]);
+    hot.parts[1] = hot.parts[1]
+        .clone()
+        .with(lamp_msgs::BOARD_HOT_ZONE, "cpul_thermal_zone")
+        .with(lamp_msgs::BOARD_HOT_C, "92.0")
+        .with(lamp_msgs::BOARD_HOT_LIMIT_C, "85.0");
+    let at = |rig: &Rig, milli_c: i64| rig.board_is(|reading| reading.zones[0].milli_c = milli_c);
+    let mut rig = Rig::with(
+        "selftest-heat",
+        |_| {},
+        None,
+        |rig| {
+            // Still hot as the run comes: past the processors' first trip
+            // point, 70, and short of their second, 90, so the board's own
+            // item is a warning and the self-test's fail is the lamp's.
+            rig.board_is(|reading| reading.zones[0].milli_c = 88_000);
+            let mut out = rig
+                .bus
+                .publisher_declared(SelfTest::TOPIC, &SelfTest::declaration(), "selftest")
+                .unwrap();
+            out.publish_json(0, &hot).unwrap();
+        },
+    );
+    let failing = "selftest: 1 part failing: the computer (cpul_thermal_zone is at 92 °C)";
+    let health = rig.health_where("the heat fail is in it", |health| {
+        item(health, "selftest").is_some()
+    });
+    assert_eq!(
+        (health.level, health.message.as_str()),
+        (Level::Error, failing)
+    );
+    // Under the limit but within its margin, for longer than the clearing
+    // time (ten board readings): the fail stands.
+    at(&rig, 82_000);
+    thread::sleep(ms(1_000));
+    let (health, _) = rig.next();
+    assert_eq!(
+        (health.level, health.message.as_str()),
+        (Level::Error, failing)
+    );
+    // Cool: cleared, and said.
+    at(&rig, 74_000);
+    rig.said("the heat fail cleared", |note| {
+        *note
+            == Note::SelfTestBoardCooled {
+                hottest: "cpul_thermal_zone 74 °C".into(),
+            }
+    });
+    let health = rig.health_where("the lamp is well again", |health| {
+        level_of(health, "selftest") == Some(Level::Ok)
+    });
+    assert_eq!(
+        item(&health, "selftest").map(|item| item.message.as_str()),
+        Some(
+            "passed; the computer was hot during the run and has cooled (cpul_thermal_zone 74 °C)"
+        )
+    );
+    // The board's own item still says its live heat: 74 °C is past the
+    // processors' first trip point, 70, so the lamp is `warn`, not `error`.
+    assert_eq!(
+        (health.level, health.message.as_str()),
+        (
+            Level::Warn,
+            "board: cpul_thermal_zone is at 74 °C: the board slows itself down from 70"
+        )
+    );
     rig.stop();
 }
 

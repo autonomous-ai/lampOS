@@ -267,6 +267,18 @@ pub fn mark_off(health: &mut Health, off: &[(String, String)]) {
 /// The name the self-test's newest run has among the lamp's parts.
 pub const SELFTEST: &str = "selftest";
 
+/// A board the self-test failed on heat is cleared once its hottest zone
+/// reads this far under the limit the self-test judged it by
+/// (`lamp_msgs::BOARD_HOT_LIMIT_C`, 85 °C today, so under 80) ...
+pub const HEAT_CLEARS_BELOW_C: f32 = 5.0;
+/// ... on every board reading for this long (six readings at 5 s), the
+/// half minute the self-test's own second look waits (`AGAIN_AFTER`). A
+/// processor working through a load dips for a reading or two; a board
+/// that has cooled stays cool (#7718 item 5: lamp-0c89's zones read 92 °C
+/// under the setup walk at 14:37 and 74 °C twelve minutes later, while
+/// the fail stood until the next run, six hours on).
+pub const HEAT_CLEARS_AFTER: Duration = Duration::from_secs(30);
+
 /// The self-test's runs as they came (`lamp/selftest`), as one item of the
 /// lamp's health (#812: a lamp says a part has failed before its person
 /// finds out). Each part keeps its last *checked* verdict: a part that
@@ -296,6 +308,21 @@ pub struct SelfTests {
     /// The same line with short names (`usb_hub_said_short`), to stand
     /// before failed parts.
     hub_short: Option<String>,
+    /// While the board's kept fail is the self-test's heat fail: the zone
+    /// it failed on and the limit it was judged by, from the run's
+    /// `hot_zone` and `hot_limit_c` (#7718 item 5). A board fail without
+    /// both (a full disk, `board/state` stale, a self-test from before the
+    /// values) is never cleared by heat.
+    board_hot: Option<(String, f32)>,
+    /// When the board was last read (or found unreadable), to tell a gap
+    /// in the readings (the reviewers on #7740, P3).
+    last_reading: Option<Instant>,
+    /// Since when every board reading has been under that limit by
+    /// [`HEAT_CLEARS_BELOW_C`].
+    cool_since: Option<Instant>,
+    /// The heat fail last cleared, as `zone C`, said in the `ok` item until
+    /// the next run.
+    cooled: Option<String>,
 }
 
 impl SelfTests {
@@ -375,12 +402,107 @@ impl SelfTests {
                 self.hub_short = value("usb_hub_said_short");
             }
         }
+        // The board's heat (#7718 item 5): a run that failed it on heat
+        // keeps its limit, and the half minute of cool readings begins
+        // again; a run that passed it, or failed it otherwise, keeps none;
+        // a run that could not check it leaves things as they were.
+        if let Some(board) = test.parts.iter().find(|part| part.part == "board") {
+            match board.verdict {
+                Verdict::Fail => {
+                    let value = |key: &str| {
+                        board
+                            .values
+                            .iter()
+                            .find(|value| value.key == key)
+                            .map(|value| value.value.as_str())
+                    };
+                    let zone = value(lamp_msgs::BOARD_HOT_ZONE).filter(|zone| !zone.is_empty());
+                    let limit = value(lamp_msgs::BOARD_HOT_LIMIT_C)
+                        .and_then(|limit| limit.parse::<f32>().ok())
+                        .filter(|limit| limit.is_finite());
+                    self.board_hot = zone
+                        .zip(limit)
+                        .map(|(zone, limit)| (zone.to_owned(), limit));
+                    self.cool_since = None;
+                }
+                Verdict::Pass | Verdict::NotFitted => {
+                    self.board_hot = None;
+                    self.cool_since = None;
+                }
+                Verdict::NotChecked => {}
+            }
+        }
+        if !self.failed.iter().any(|(name, _, _, _)| name == "board") {
+            self.board_hot = None;
+            self.cool_since = None;
+        }
+        self.cooled = None;
         let unchecked = test
             .parts
             .iter()
             .filter(|part| part.verdict == Verdict::NotChecked)
             .count();
         self.newest = Some((test.started, unchecked));
+    }
+
+    /// Take one board reading (`board/state`'s zones, as `lamp-health`
+    /// reads them every 5 s, `at` when read; `None` when the board could
+    /// not be read): while the board's kept fail is the self-test's heat
+    /// fail, it is cleared once every reading for `after`
+    /// ([`HEAT_CLEARS_AFTER`] on a lamp) has been cool (#7718 item 5). The
+    /// board check reads these same zones from `board/state`, so this is
+    /// that check made again, later. A reading is cool when the zone the
+    /// run failed on is in it with a plausible temperature (over 0 °C),
+    /// and its hottest zone is [`HEAT_CLEARS_BELOW_C`] or more under the
+    /// self-test's limit: a hot zone whose sensor stopped answering is
+    /// dropped from `board/state`, and must not pass for cool (the
+    /// reviewers on #7740, P2). A reading that is not cool, no reading, or
+    /// a gap longer than `longest_gap` since the last one (P3) begins the
+    /// half minute again; a board that stays hot keeps its fail. Gives the
+    /// hottest zone, as `zone C`, when it clears.
+    pub fn cooled(
+        &mut self,
+        temperature_c: Option<&BTreeMap<String, f32>>,
+        at: Instant,
+        after: Duration,
+        longest_gap: Duration,
+    ) -> Option<String> {
+        let gap = self
+            .last_reading
+            .replace(at)
+            .map(|last| at.saturating_duration_since(last));
+        let (failed_zone, limit) = self.board_hot.clone()?;
+        let line = limit - HEAT_CLEARS_BELOW_C;
+        let own_cool = |zones: &BTreeMap<String, f32>| {
+            zones
+                .get(&failed_zone)
+                .is_some_and(|c| c.is_finite() && *c > 0.0 && *c < line)
+        };
+        let hottest = temperature_c
+            .filter(|zones| own_cool(zones))
+            .and_then(|zones| {
+                zones
+                    .iter()
+                    .filter(|(_, c)| c.is_finite())
+                    .max_by(|a, b| a.1.total_cmp(b.1))
+            });
+        let Some((zone, &c)) = hottest.filter(|(_, c)| **c < line) else {
+            self.cool_since = None;
+            return None;
+        };
+        if gap.is_some_and(|gap| gap > longest_gap) {
+            self.cool_since = None;
+        }
+        let since = *self.cool_since.get_or_insert(at);
+        if at.saturating_duration_since(since) < after {
+            return None;
+        }
+        self.failed.retain(|(name, _, _, _)| name != "board");
+        self.board_hot = None;
+        self.cool_since = None;
+        let said = format!("{zone} {c:.0} °C");
+        self.cooled = Some(said.clone());
+        Some(said)
     }
 
     /// The item, once a run has come: `error` naming each part still
@@ -407,10 +529,18 @@ impl SelfTests {
                 (Some(hub), None) => (Level::Warn, hub.clone()),
                 (None, Some(before)) => (Level::Warn, before),
                 (None, None) => {
-                    let message = match unchecked {
+                    let mut message = match unchecked {
                         0 => "passed".to_owned(),
                         n => format!("passed; {n} not checked"),
                     };
+                    // A heat fail cleared by the board's later readings
+                    // is said, so the run's own fail on `lamp/selftest`
+                    // is not taken for a contradiction (#7718 item 5).
+                    if let Some(cooled) = &self.cooled {
+                        message.push_str(&format!(
+                            "; the computer was hot during the run and has cooled ({cooled})"
+                        ));
+                    }
                     (Level::Ok, message)
                 }
             }
@@ -1089,6 +1219,332 @@ mod tests {
             Some("one"),
         ));
         assert_eq!(same.item(50.0).unwrap().level, Level::Error);
+    }
+
+    /// A run that failed the board on heat, as the self-test says it since
+    /// #7718 item 5: its zone, reading and limit beside the reason.
+    fn hot_board(started: f64, c: f32) -> SelfTest {
+        let mut test = run(
+            &[(
+                "board",
+                Verdict::Fail,
+                &format!("cpul_thermal_zone is at {c:.0} °C"),
+            )],
+            started,
+        );
+        test.parts[0] = test.parts[0]
+            .clone()
+            .with(lamp_msgs::BOARD_HOT_ZONE, "cpul_thermal_zone")
+            .with(lamp_msgs::BOARD_HOT_C, format!("{c:.1}"))
+            .with(lamp_msgs::BOARD_HOT_LIMIT_C, "85.0");
+        test
+    }
+
+    fn zones(cpu: f32) -> BTreeMap<String, f32> {
+        BTreeMap::from([
+            ("cpul_thermal_zone".to_owned(), cpu),
+            ("skin_zone".to_owned(), 38.0),
+        ])
+    }
+
+    /// No gap in the readings restarts the 30 s: for the tests of the rule
+    /// itself, whose readings are minutes apart.
+    const ANY_GAP: Duration = Duration::MAX;
+    /// Twice the lamp's 5 s board reading, as `serve` passes it.
+    const READ_GAP: Duration = Duration::from_secs(10);
+
+    fn level(tests: &SelfTests) -> Level {
+        tests.item(2_000.0).unwrap().level
+    }
+
+    /// #7718 item 5, lamp-0c89 on 18 Nov: a heat fail under the setup walk
+    /// (92 °C) is cleared once every reading for the clearing time has the
+    /// hottest zone 5 °C or more under the limit (74 °C there), and the ok
+    /// item says so until the next run.
+    #[test]
+    fn a_heat_fail_clears_once_the_board_has_read_cool_long_enough() {
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        assert_eq!(level(&tests), Level::Error);
+        let t0 = Instant::now();
+        assert_eq!(
+            tests.cooled(Some(&zones(74.0)), t0, HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(
+                Some(&zones(74.0)),
+                t0 + Duration::from_secs(29),
+                HEAT_CLEARS_AFTER,
+                ANY_GAP
+            ),
+            None
+        );
+        assert_eq!(level(&tests), Level::Error);
+        assert_eq!(
+            tests.cooled(
+                Some(&zones(74.0)),
+                t0 + HEAT_CLEARS_AFTER,
+                HEAT_CLEARS_AFTER,
+                ANY_GAP
+            ),
+            Some("cpul_thermal_zone 74 °C".to_owned())
+        );
+        let item = tests.item(2_000.0).unwrap();
+        assert_eq!(
+            (item.level, item.message.as_str()),
+            (
+                Level::Ok,
+                "passed; the computer was hot during the run and has cooled (cpul_thermal_zone 74 °C)"
+            )
+        );
+        // Said once; nothing more to clear.
+        assert_eq!(
+            tests.cooled(
+                Some(&zones(74.0)),
+                t0 + Duration::from_secs(60),
+                HEAT_CLEARS_AFTER,
+                ANY_GAP
+            ),
+            None
+        );
+        // The next run says what it found, and the note goes.
+        tests.take(&run(&[("board", Verdict::Pass, "")], 3_000.0));
+        assert_eq!(tests.item(3_001.0).unwrap().message, "passed");
+    }
+
+    /// A board that stays hot keeps its fail: at the limit or over it, or
+    /// under it by less than the margin, however long; and a hot reading
+    /// (or one with no zone) begins the cool half minute again.
+    #[test]
+    fn a_board_that_stays_hot_keeps_its_heat_fail() {
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        let t0 = Instant::now();
+        for (n, c) in [(0, 92.0), (60, 85.0), (120, 82.0), (180, 80.0), (240, 90.0)] {
+            let at = t0 + Duration::from_secs(n);
+            assert_eq!(
+                tests.cooled(Some(&zones(c)), at, HEAT_CLEARS_AFTER, ANY_GAP),
+                None,
+                "{c}"
+            );
+        }
+        assert_eq!(level(&tests), Level::Error);
+        // Cool for 20 s, a peak, then cool again: the half minute counts
+        // from after the peak.
+        let t1 = t0 + Duration::from_secs(300);
+        let at = |s: u64| t1 + Duration::from_secs(s);
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(0), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(20), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&zones(88.0)), at(25), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(30), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&BTreeMap::new()), at(35), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(40), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(65), HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(level(&tests), Level::Error);
+        assert!(
+            tests
+                .cooled(Some(&zones(70.0)), at(70), HEAT_CLEARS_AFTER, ANY_GAP)
+                .is_some()
+        );
+        assert_eq!(level(&tests), Level::Ok);
+        // The board heats past the limit again: the next run that fails
+        // it on heat makes the lamp error again, and the clock starts over.
+        tests.take(&hot_board(3_000.0, 95.0));
+        assert_eq!(level(&tests), Level::Error);
+        assert_eq!(
+            tests.cooled(Some(&zones(70.0)), at(80), HEAT_CLEARS_AFTER, ANY_GAP),
+            None,
+            "the cool half minute begins again with the run"
+        );
+    }
+
+    /// The reviewers on #7740 (P2): a reading counts as cool only if the
+    /// zone the run failed on is in it, and reads a plausible temperature.
+    /// A hot zone whose sensor stops answering is dropped from
+    /// `board/state` (`board::read`), and the live board item is blind to
+    /// it too: the other zones reading cool must not clear its fail.
+    #[test]
+    fn a_heat_fail_never_clears_while_its_own_zone_is_missing_or_implausible() {
+        let t0 = Instant::now();
+        let every_5_s = |tests: &mut SelfTests, reading: &BTreeMap<String, f32>| {
+            (0..=12)
+                .filter_map(|n| {
+                    tests.cooled(
+                        Some(reading),
+                        t0 + Duration::from_secs(5 * n),
+                        HEAT_CLEARS_AFTER,
+                        READ_GAP,
+                    )
+                })
+                .next()
+        };
+        let others_cool = BTreeMap::from([
+            ("cpub_thermal_zone".to_owned(), 60.0),
+            ("skin_zone".to_owned(), 38.0),
+        ]);
+        // With its own zone cool too, the same readings clear it.
+        let mut all_cool = others_cool.clone();
+        all_cool.insert("cpul_thermal_zone".to_owned(), 70.0);
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        assert!(every_5_s(&mut tests, &all_cool).is_some());
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        assert_eq!(
+            every_5_s(&mut tests, &others_cool),
+            None,
+            "hot_zone missing"
+        );
+        assert_eq!(level(&tests), Level::Error);
+        for implausible in [-273.0, 0.0, f32::NAN] {
+            let mut reading = others_cool.clone();
+            reading.insert("cpul_thermal_zone".to_owned(), implausible);
+            let mut tests = SelfTests::default();
+            tests.take(&hot_board(1_000.0, 92.0));
+            assert_eq!(every_5_s(&mut tests, &reading), None, "{implausible}");
+            assert_eq!(level(&tests), Level::Error, "{implausible}");
+        }
+    }
+
+    /// The reviewers on #7740 (P3): "every reading for 30 s" means readings
+    /// that came about every 5 s. Two cool readings 30 s apart with none
+    /// between (the board unread, or `lamp-health` stalled) clear nothing:
+    /// a gap over twice the reading period begins the 30 s again.
+    #[test]
+    fn a_gap_in_the_readings_begins_the_cool_half_minute_again() {
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        let t0 = Instant::now();
+        let at = |s: u64| t0 + Duration::from_secs(s);
+        let cool = |tests: &mut SelfTests, s: u64| {
+            tests.cooled(Some(&zones(70.0)), at(s), HEAT_CLEARS_AFTER, READ_GAP)
+        };
+        assert_eq!(cool(&mut tests, 0), None);
+        assert_eq!(cool(&mut tests, 30), None);
+        assert_eq!(level(&tests), Level::Error);
+        // The board unread for one reading (`state()` None) begins it again.
+        for s in (35..=55).step_by(5) {
+            assert_eq!(cool(&mut tests, s), None, "{s}");
+        }
+        assert_eq!(
+            tests.cooled(None, at(60), HEAT_CLEARS_AFTER, READ_GAP),
+            None
+        );
+        for s in (65..=90).step_by(5) {
+            assert_eq!(cool(&mut tests, s), None, "{s}");
+        }
+        assert_eq!(level(&tests), Level::Error);
+        // Readings every 5 s, 30 s of them since the unread one: cleared.
+        assert!(cool(&mut tests, 95).is_some());
+        assert_eq!(level(&tests), Level::Ok);
+    }
+
+    /// Only the self-test's heat fail clears by heat: a full disk, a stale
+    /// `board/state`, or a heat fail from a self-test before the values
+    /// (no `hot_limit_c`) all stand until a run passes the board; and a
+    /// cool board clears the board alone, never another part's fail.
+    #[test]
+    fn only_a_heat_fail_of_the_board_clears_by_cooling() {
+        let t0 = Instant::now();
+        let later = t0 + Duration::from_secs(600);
+        for reason in [
+            "the disk is all but full: 1.0% free",
+            "the newest board/state is 40.0 s old: lamp-health stopped giving it",
+            // A self-test from before #7718: the reason alone.
+            "cpul_thermal_zone is at 92 °C",
+        ] {
+            let mut tests = SelfTests::default();
+            tests.take(&run(&[("board", Verdict::Fail, reason)], 1_000.0));
+            tests.cooled(Some(&zones(50.0)), t0, HEAT_CLEARS_AFTER, ANY_GAP);
+            assert_eq!(
+                tests.cooled(Some(&zones(50.0)), later, HEAT_CLEARS_AFTER, ANY_GAP),
+                None
+            );
+            assert_eq!(level(&tests), Level::Error, "{reason}");
+        }
+        // A heat fail beside a failed ring: the board clears, the ring stays.
+        let mut tests = SelfTests::default();
+        let mut both = hot_board(1_000.0, 92.0);
+        both.parts.push(lamp_msgs::PartResult::new(
+            "ring",
+            Verdict::Fail,
+            "red did not light",
+        ));
+        both.verdict = SelfTest::verdict_of(&both.parts);
+        tests.take(&both);
+        tests.cooled(Some(&zones(60.0)), t0, HEAT_CLEARS_AFTER, ANY_GAP);
+        assert!(
+            tests
+                .cooled(Some(&zones(60.0)), later, HEAT_CLEARS_AFTER, ANY_GAP)
+                .is_some()
+        );
+        let item = tests.item(2_000.0).unwrap();
+        assert_eq!(
+            (item.level, item.message.as_str()),
+            (
+                Level::Error,
+                "1 part failing: the light ring (red did not light)"
+            )
+        );
+        // A later run that fails the board on its disk: no heat to clear.
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        tests.take(&run(
+            &[(
+                "board",
+                Verdict::Fail,
+                "the disk is all but full: 1.0% free",
+            )],
+            2_000.0,
+        ));
+        tests.cooled(Some(&zones(50.0)), t0, HEAT_CLEARS_AFTER, ANY_GAP);
+        assert_eq!(
+            tests.cooled(Some(&zones(50.0)), later, HEAT_CLEARS_AFTER, ANY_GAP),
+            None
+        );
+        assert_eq!(level(&tests), Level::Error);
+        // A run that could not check the board keeps its heat fail, and
+        // the board may still clear it.
+        let mut tests = SelfTests::default();
+        tests.take(&hot_board(1_000.0, 92.0));
+        tests.take(&run(
+            &[(
+                "board",
+                Verdict::NotChecked,
+                "nothing was ever said on board/state",
+            )],
+            2_000.0,
+        ));
+        assert_eq!(level(&tests), Level::Error);
+        tests.cooled(Some(&zones(50.0)), t0, HEAT_CLEARS_AFTER, ANY_GAP);
+        assert!(
+            tests
+                .cooled(Some(&zones(50.0)), later, HEAT_CLEARS_AFTER, ANY_GAP)
+                .is_some()
+        );
+        assert_eq!(level(&tests), Level::Ok);
     }
 
     /// A failed run makes a well lamp `error`, with the item first and the
