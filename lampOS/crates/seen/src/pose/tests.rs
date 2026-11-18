@@ -568,17 +568,20 @@ fn as_serve(
         asleep: Some(false),
         ..inputs
     });
-    let plan = keep.step(&crate::keep::Now {
-        now_us: now,
-        inputs: &inputs,
-        seen: &on_track,
-        stood_up,
-        forgot: false,
-        posture_gate: gate,
-        desk,
-        watching: pose.watching(),
-        sitting: sitting.is_some(),
-    });
+    let plan = keep.step(
+        &crate::keep::Now {
+            now_us: now,
+            inputs: &inputs,
+            seen: &on_track,
+            stood_up,
+            forgot: false,
+            posture_gate: gate,
+            desk,
+            watching: pose.watching(),
+        },
+        sitting.is_some(),
+        false,
+    );
     if plan.sitting.wipes() {
         *sitting = None;
     }
