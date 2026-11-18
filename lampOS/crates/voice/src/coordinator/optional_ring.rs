@@ -311,7 +311,7 @@ impl OptionalRing {
     }
 
     /// A restart's startup thread is still running.
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(super) fn restart_pending(&self) -> bool {
         self.restart
             .as_ref()
@@ -556,6 +556,9 @@ mod tests {
         }
     }
 
+    // A real fake ring child: off Linux the ring startup starts none
+    // (`ring_not_on_this_os`), as in `process::ring_startup_tests` (#7597).
+    #[cfg(target_os = "linux")]
     #[test]
     fn failed_startup_is_inhibited_through_late_ready_and_bounded_reaping() {
         use crate::process::ring_startup_tests::{ChildFixture, await_exit};
