@@ -63,6 +63,7 @@ impl ChildFixture {
             lines[2].parse().unwrap(),
         ))
     }
+    #[cfg(target_os = "linux")]
     pub fn connect_peer(&self) -> Option<WorkerChannels> {
         let (parent, boot, _) = self.identity()?;
         let path = self.directory.path.join("ring");
