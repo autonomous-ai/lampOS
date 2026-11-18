@@ -11,6 +11,9 @@ publish.workspace = true
 # file and no root yet: nothing here is wired to a lamp.
 [dependencies]
 libc = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

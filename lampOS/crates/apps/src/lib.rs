@@ -13,14 +13,18 @@
 pub mod effects;
 pub mod entry;
 pub mod facts;
+pub mod install;
 pub mod layout;
+pub mod lock;
 pub mod name;
+pub mod package;
 pub mod remove;
 pub mod staging;
 pub mod state;
 pub mod sweep;
 #[doc(hidden)]
 pub mod testing;
+pub mod yes;
 
 /// The fixed launcher, root's, shipped beside the helper (never in a
 /// package): `python3 -I` drops the app's `src/` from `sys.path`, so this
