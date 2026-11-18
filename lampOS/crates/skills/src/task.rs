@@ -365,7 +365,7 @@ pub fn agent_from_file(folder: &Path, pushed: bool) -> bool {
             .lines()
             .any(|line| line.trim() == lamp_voice::made_skill::ADDED_FROM_FILE)
         && lamp_voice::upload_agent::is_agent_card(&card)
-        && lamp_voice::upload_agent::capped_with(&toml, agent_services_on()).is_ok()
+        && lamp_voice::upload_agent::capped_card(&toml, &card, agent_services_on()).is_ok()
         && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
 }
 

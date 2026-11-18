@@ -748,3 +748,33 @@ fn a_file_reading_a_service_and_reaching_the_internet_is_refused() {
         );
     }
 }
+
+/// The owner's "if a skill needs a grant, give it" and the first builder's
+/// ruling (19 Nov 00:24): a task for the lamp's agent made here from the
+/// person's own ask, only asked for, its card marked `agent: asked`, may
+/// carry the body, the air, the device, its notes, `look` and what listens,
+/// kept here and again as lamp-skills puts it on; a file's agent skill is
+/// held to its own grants, as before.
+#[test]
+fn a_task_made_here_only_asked_may_carry_every_grant_a_file_may_not() {
+    let toml = |grant: &str| {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\ntool = \"t\"\n\
+             grants = [\"speak\", \"{grant}\"]\n\n[[do]]\ntask = {{ task = \"x\", run = \
+             \"{INSTRUCTIONS}\" }}\n"
+        )
+    };
+    let file = format!("---\nname: t\n---\n\nmade: here\n{MARK}\n");
+    let asked = format!("{file}{}\n", crate::make_no_cannot::ASKED_MARK);
+    assert!(is_asked_card(&asked) && !is_asked_card(&file));
+    for grant in ASKED_GRANTS {
+        let text = toml(grant);
+        assert!(capped_asked(&text).is_ok(), "{grant}");
+        assert!(capped_card(&text, &asked, false).is_ok(), "{grant}");
+        assert!(capped_card(&text, &file, false).is_err(), "{grant}");
+        assert!(capped_with(&text, false).is_err(), "{grant}");
+    }
+    assert!(capped_asked(&toml("body")).unwrap().1.body);
+    // Never a grant no task may hold.
+    assert!(capped_asked(&toml("skills")).is_err());
+}
