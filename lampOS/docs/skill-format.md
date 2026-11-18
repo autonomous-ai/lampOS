@@ -118,7 +118,9 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[[do]]` | list | the steps |
 
 A skill needs a trigger or a tool, and at least one step. It says, sounds
-or cues at most once a run.
+or cues at most once a run. Its `[[do]]` steps all start together, never one
+after another: a light's `for` holds that light and does not wait. Colours in
+turn are a light show (`show`), or a `task` step's code.
 
 **The lamp's own tables.** `[unplug]`, `[onboarding]` and `[startle]`
 need a core grant (`prepare_unplug`, `onboarding`, `startle`), so only a

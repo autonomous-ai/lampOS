@@ -946,7 +946,10 @@ agent (`lamp_tasks::skill_make`).
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
   `switches`, luật (system prompt và brief) tối đa 48 KiB và không có NUL,
-  `within_ms` từ 1 đến 120 giây.
+  `within_ms` từ 1 giây đến 45 phút (`MOST_WITHIN`; chủ sở hữu, 18/11,
+  #7245: lần tạo của agent được chờ, quá thì nói là không tạo được). Lần
+  tạo trên agent gateway (OpenClaw) khi bật phiên giữ sẵn được gõ vào phiên
+  giữ sẵn của đèn, không mở phiên mới (`HarnessRunner::run`, `makes`).
 - **Hướng dẫn (`"guide":true`, `LAMP_MAKE_AGENT_GUIDE` của lamp-voice,
   tắt):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
   skill-creator của đèn (`skill_make::GUIDE`, từ `skill_make_guide.md`: bản

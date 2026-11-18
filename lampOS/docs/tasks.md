@@ -3571,7 +3571,10 @@ as a Harness task with the agent's own tools
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
   (`MakeLine::parse`): no other field but `guide` and `switches`, the
   rules (the system prompt and the brief) at most 48 KiB with no NUL,
-  `within_ms` from 1 to 120 s.
+  `within_ms` from 1 s to 45 minutes (`MOST_WITHIN`; the owner, 18 Nov,
+  #7245: an agent's make is waited for, then said as not made). A make on
+  a gateway agent (OpenClaw) with the kept session on is typed into the
+  lamp's kept session, not a new one (`HarnessRunner::run`, `makes`).
 - **The guide (`"guide":true`, lamp-voice's `LAMP_MAKE_AGENT_GUIDE`,
   off):** only when the line says `true` (a boolean, `false` by default),
   the lamp's skill-creator guide (`skill_make::GUIDE`, from

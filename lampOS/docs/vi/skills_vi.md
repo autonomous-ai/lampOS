@@ -1044,22 +1044,29 @@ sau:
    [skills.md](../skills.md), `do.remind`): `{ at = "HH:MM", words = "..." }`
    đặt một lời nhắc qua `set_reminder` của phần actions (lần `HH:MM` địa
    phương kế tiếp), hoặc `{ in = D, words = "..." }` đặt một hẹn giờ qua
-   `set_timer` (D tính từ lần chạy, từ `1m` đến `24h`), cùng lời gọi giọng nói
+   `set_timer` (D tính từ lần chạy, từ `1m` đến `24h`), hoặc `{ every = D,
+   words = "..." }` đặt một lời nhắc lặp qua `repeat_reminder` với
+   `every = "interval"` (#7245: D là số phút tròn, từ `15m` đến `24h`, theo
+   `MIN_EVERY_MINUTES` và `MAX_EVERY_MINUTES` của lịch; nói mỗi D cho đến khi
+   huỷ bằng giọng nói; cần `LAMP_SCHEDULE_EVERY=on` trong `lamp-actions` và
+   `lamp-schedule`), cùng lời gọi giọng nói
    dùng khi có người hỏi, với `LAMP_SCHEDULE_TOOLS=on` trong `lamp-actions`.
    Cần tên hàm đó trong `[permissions] actions`, kiểm tra lúc nạp và lại lúc
    gọi. `words` là chữ cố định của kỹ năng, không bao giờ do mô hình viết lúc
    chạy, cùng giới hạn của câu nói trong kỹ năng tự tạo: tối đa 120 ký tự, một
    hoặc hai câu, không địa chỉ web, không dấu ngoặc kép, ngoặc nhọn hay dấu
    backtick, không ký tự điều khiển hay định dạng; sai thì kỹ năng bị từ chối
-   lúc nạp. Chỉ trong kỹ năng do trigger khởi động, không có `tool`. Phép lịch
+   lúc nạp. Chỉ trong kỹ năng do trigger hoặc chính lời của nó (`asks`) khởi động, không
+   có `tool`; tên hàm cần là `set_reminder`, `set_timer` hoặc `repeat_reminder`. Phép lịch
    sự: một kỹ năng đặt tối đa 3 cái trong 24 giờ bất kỳ (`remind::MOST_A_DAY`),
    và không bao giờ chồng: trước khi đặt nó đọc `list_reminders`, và cùng lời
    đã đặt mà chưa nói thì không đặt mới; danh sách không đọc trọn được thì không
    đặt gì. Đọc lại là của lịch: journal ghi `set, due HH:MM` chỉ khi câu trả
    lời là `committed`, không bao giờ ghi lời nhắc. Lời gọi không nêu người gọi,
    nên lời nhắc là của phòng: nói với ai đang ở bên đèn khi đến giờ. Nó không
-   đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Kỹ năng tự tạo chưa tạo
-   được bước này; phần nói lại của nó đến sau.
+   đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Agent tạo kỹ năng (#7245)
+   được dạy bước này trong `guide.md`, `format.md` và các ví dụ `break-timer`,
+   `water-breaks`.
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
@@ -2458,10 +2465,14 @@ cả hai người viết.
   `shows/` là tệp mà kỹ năng tự tạo không được có, như trước. Thư mục tạo
   kỹ năng của agent gateway (OpenClaw, `put_for_gateway`) còn có
   `format.md`, toàn bộ `docs/skill-format.md` của bản build này
-  (`lamp_tasks::skill_make::FORMAT`), và `examples/`, ba kỹ năng hoàn
-  chỉnh (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu
-  nói theo `asks`, một show ba màu, một task ghi chú với script của nó),
-  mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
+  (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, toàn bộ tài liệu SDK
+  Python của đèn (`skill_make::SDK`, `sdk/python/README.md`, để code của
+  kỹ năng dùng được mọi hàm), và `examples/`, bảy kỹ năng hoàn chỉnh
+  (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu nói
+  theo `asks`, cử chỉ và câu nói khi ngồi lâu, tung đồng xu bằng code, câu
+  nói lặp mỗi 30 phút khi có người, hẹn giờ nghỉ bằng `remind`, nhắc uống
+  nước mỗi 30 phút bằng `remind every`, và script dẫn ba nhịp thở bằng đèn
+  và giọng nói), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
   nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
   ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
   của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
