@@ -970,6 +970,104 @@ async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_mor
     );
 }
 
+/// #6811 (`LAMP_MAKE_MAY_RUN_ON`, the first builder's 17:23): a make with
+/// no answer a minute after its waiting line is let run on: the lamp says
+/// [`crate::long_make::RUN_ON_LINE`] once, in place of the long-wait line,
+/// and the turn ends while the make goes on, the model told it was said.
+/// One that answers first is waited for as before; off, as before.
+#[tokio::test]
+async fn a_make_past_a_minute_says_its_line_once_and_frees_the_turn() {
+    let said = |run_on: Option<Duration>, request: u64, makes_for: Duration| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let directory = std::env::temp_dir().join(format!("run-on-turn-{request}"));
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            let directory = directory.clone();
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    crate::long_make::begin(request, &directory);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(makes_for).await;
+                    if crate::long_make::settle(request).is_some() {
+                        return json!({"settled_after_let_go": true});
+                    }
+                }
+                json!({"ok": true})
+            })
+        });
+        let engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_on_one_path(Some(Duration::from_millis(30)))
+        .running_on_after(run_on);
+        let mut engine = engine;
+        engine.submit(written(request, "Make me x."));
+        let began = Instant::now();
+        let said = turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>();
+        let _ =
+            std::fs::remove_dir_all(std::env::temp_dir().join(format!("run-on-turn-{request}")));
+        (said, began.elapsed())
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let run_on = format!("said:{}", crate::long_make::RUN_ON_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    // Past its minute (here 30 ms): its one line, no long-wait line, and
+    // the turn ends long before the make does.
+    let (lines, took) = said(
+        Some(Duration::from_millis(30)),
+        6_811_301,
+        Duration::from_secs(3),
+    )
+    .await;
+    assert_eq!(
+        lines,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting.clone(),
+            run_on.clone()
+        ]
+    );
+    assert!(
+        took < Duration::from_secs(2),
+        "the turn was freed: {took:?}"
+    );
+    // Its answer within the minute: waited for, as before.
+    let (lines, _) = said(
+        Some(Duration::from_secs(60)),
+        6_811_302,
+        Duration::from_millis(100),
+    )
+    .await;
+    assert!(!lines.contains(&run_on), "{lines:?}");
+    // The switch off: the long-wait line, and the turn waits for the make.
+    let (lines, took) = said(None, 6_811_303, Duration::from_millis(400)).await;
+    assert!(!lines.contains(&run_on), "{lines:?}");
+    assert!(lines.contains(&long), "{lines:?}");
+    assert!(took >= Duration::from_millis(400));
+}
+
 /// lamp-c0a4, 16 Nov (#7371): after the one run path's waiting line the
 /// turn stays open for the make, about 80 s, and its generation never
 /// completed, so the lamp's playback never ended and it showed speaking

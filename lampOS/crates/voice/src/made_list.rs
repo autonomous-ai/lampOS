@@ -83,6 +83,26 @@ pub fn listed(
         eprintln!("lamp-voice: request {request}: made skills not listed: no one asked aloud");
         return json!({ "error": NOT_ASKED_ALOUD });
     }
+    // With `LAMP_MAKE_MAY_RUN_ON` (#6811): "is my skill ready?" told the
+    // truth of the long make too, its name to the owner alone.
+    if crate::long_make::on() {
+        let owner = owner_hears();
+        let long =
+            crate::long_make::status(&keeping.directory, crate::app_make::now_unix_ms(), owner);
+        let mut told = listed_by(keeping, request, || owner);
+        told["long_make"] = long;
+        told["next"] = json!(format!(
+            "{} {}",
+            crate::long_make::STATUS_NEXT,
+            told["next"].as_str().unwrap_or_default()
+        ));
+        return told;
+    }
+    listed_by(keeping, request, owner_hears)
+}
+
+/// [`listed`], asked aloud.
+fn listed_by(keeping: &Keeping, request: u64, owner_hears: impl FnOnce() -> bool) -> Value {
     let (made, added) = on(keeping);
     // Counts only: the journal holds no skill's name.
     eprintln!(

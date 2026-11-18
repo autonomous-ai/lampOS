@@ -2463,6 +2463,12 @@ pub fn serve(
         // last stopped told as not made, and the queue's own thread.
         crate::make_queue::told_after_restart(say_made_line, say_service_answers);
         crate::make_queue::start(run_queued, say_made_line);
+        // A long make cut by this restart is told as not finished (#6811).
+        if crate::long_make::on()
+            && let Some(keeping) = crate::made_skill::Keeping::from_environment()
+        {
+            crate::long_make::after_start(&keeping.directory, crate::app_make::now_unix_ms());
+        }
     }
     // A live ask handed to the lamp's agent (`LAMP_SERVICES_TO_AGENT`,
     // `LAMP_HARD_ASKS_TO_AGENT`) goes through this worker's tasks part.
@@ -4559,6 +4565,15 @@ pub fn serve(
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
+    // An agent make past a minute runs on, and its person is told when
+    // it's ready (`LAMP_MAKE_MAY_RUN_ON=on`, #6811).
+    let run_on = crate::long_make::on();
+    if run_on {
+        eprintln!(
+            "lamp-voice second: an agent make with no answer a minute after its waiting line runs on up to 10 minutes; its person is told when it's ready, the skill off until then (LAMP_MAKE_MAY_RUN_ON)"
+        );
+    }
+    engine = engine.running_on_after(run_on.then_some(crate::long_make::RUN_ON_AFTER));
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
@@ -15008,6 +15023,9 @@ pub async fn run(
                     // request on, only for the very note the say service
                     // kept.
                     *text = crate::skill_task_yes::asked_in_here(*request, std::mem::take(text));
+                    // A long make's news, told by the coordinator at its
+                    // person's idle moment: acted on here (#6811).
+                    *text = crate::long_make::told_here(*request, std::mem::take(text));
                 }
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).

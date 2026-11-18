@@ -3435,6 +3435,72 @@ cả hai người viết.
   nên khi tuyến bật thì agent của đèn tạo nó, và luôn bị từ chối ở bước
   kiểm tra skill tự tạo (`made_skill::SAY_IS_MARKER`, kèm dòng sửa rằng
   dòng dấu là cả câu trả lời), bất kể công tắc. Kiểm thử: như bản tiếng Anh.
+- **Lần tạo lâu chạy tiếp, và người dùng được báo khi xong
+  (`LAMP_MAKE_MAY_RUN_ON=on`, tắt nếu không đặt, không có trong unit sản
+  phẩm nào; yêu cầu của Fourteen trên #6811, 18/11 17:21, và first builder
+  đồng ý lúc 17:23).** Trước đó phần của agent dừng ở 120 giây
+  (`make_skill_agent::MAKE_WITHIN` và `skill_make::MOST_WITHIN` của
+  lamp-tasks): quá thời gian người dùng nghe `AGENT_LATE_TRY` và công việc
+  bị bỏ. Khi bật (`crate::long_make`):
+  - **Sau một phút.** Lần tạo bằng giọng nói đã chuyển cho lượt tạo của
+    agent (khi bật `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`: lần tạo cần dịch vụ
+    liên kết, hoặc bản nháp phản ứng nhanh mà DeepSeek không giữ được; lần
+    gọi thêm của dạng giữa là của mô hình riêng của đèn, trong lượt, và
+    không bao giờ chạy tiếp) mà 60 giây
+    (`long_make::RUN_ON_AFTER`) sau câu chờ vẫn chưa có trả lời thì được
+    chạy tiếp (`long_make::let_go`): đèn nói một lần "This one's taking a
+    while. I'll tell you when it's ready." thay cho câu chờ lâu, và lượt
+    giọng nói kết thúc, mô hình được báo câu đã nói và không nói thêm.
+    Người dùng được tự do nói chuyện khác. Lần tạo trả lời trước đó vẫn
+    được chờ như cũ. Câu này là một câu cố định của đèn
+    (`language::FIXED_LINES`), nói bằng ngôn ngữ của chủ; các câu khác được
+    giao cho mô hình nói bằng ngôn ngữ của cuộc hội thoại.
+  - **Chạy tiếp** trong lamp-tasks tối đa 10 phút: dòng `skill_make` được
+    đánh dấu `"may_run_on":true`, mỗi câu trả lời 300 giây
+    (`long_make::WRITE_WITHIN`) trong 600 giây (`long_make::MAKE_WITHIN`),
+    và lamp-tasks chỉ nhận `within_ms` tới `skill_make::RUN_ON_MOST_WITHIN`
+    (600 giây) cho dấu đó; mọi lần tạo khác, và MAKE IT của app, vẫn 120
+    giây. Mỗi lần một: khi một lần đang chạy tiếp (dấu `long-make.json`
+    cạnh `made.json` ghi `making`), yêu cầu tạo mới được trả lời "I'm still
+    making your <name> skill." (tên bản nháp của DeepSeek, hoặc "your
+    skill"), không tạo gì.
+  - **Xong.** Cùng các kiểm tra và sửa như mọi lần tạo của agent. Lần tạo
+    lâu đã xong được giữ nhưng tắt, `"ready_untold": true` trong mục
+    `made.json` (thứ app đọc về skill tự tạo, nên hiện ngay), dấu ghi
+    `made`; lần tạo không bao giờ tự bật nó.
+  - **Báo cho đúng người.** Coordinator đưa ra như lượt nói của chính đèn
+    (`long_make::Tells`, admission basis `long_make_told`) chỉ khi
+    `long_make::may_tell` đúng: thấy khuôn mặt của chủ
+    (`long_make::owner_seen_now`), không có hội thoại đang diễn ra (15 giây
+    không ai nói với đèn hay đèn nói, `task_news::quiet_for_news`), không
+    trong giờ yên lặng (`run_write_yes::quiet_hours_now`), có người ở đèn;
+    phòng không bận, không nợ câu nào. Hôm nay họ không quay lại thì chờ lần
+    sau, bao lâu cũng được. Worker xử lý ghi chú của lượt đó
+    (`long_make::told_here`): "Your <name> skill is ready." và phần đọc lại
+    (`made_skill::on_line`), kèm lời nhắc liên kết cho dịch vụ nó đọc mà
+    chưa liên kết, như câu của lần tạo xong. Skill có code riêng chờ câu
+    đồng ý nói ra, được hỏi lúc đó (`skill_write_yes::wait_for_yes_noted`,
+    như của app); skill trùng với một skill trên đèn được hỏi câu hỏi trùng
+    (`made_clash::asked`), như lần tạo xong. Worker không bật và không xóa
+    gì: chỉ khi coordinator thấy chính lượt đó được phát trọn (mọi từ được
+    phát, không ai chen lượt, `long_make::heard_through`) thì
+    `long_make::heard` mới bật skill thường, bỏ `ready_untold` và xóa dấu,
+    nên chỉ báo một lần. Bị cắt hoặc bị nói đè thì skill vẫn tắt, chưa báo,
+    và được báo lại ở lúc phù hợp kế tiếp (sớm nhất hai phút sau).
+  - **Lỗi, hết 10 phút, hoặc khởi động lại** khi đang chạy (worker của
+    tuyến thứ hai đọc dấu `making` khi khởi động, `long_make::after_start`;
+    dấu `making` quá 11 phút được đọc là hết giờ): một câu rõ ràng ở lúc phù
+    hợp kế tiếp, "I couldn't finish your <name> skill.", và không giữ gì.
+    Không bao giờ dùng bản nháp của DeepSeek: lần chạy tiếp mà agent không
+    tạo được được nói là lỗi của agent.
+  - **"Skill của tôi xong chưa?"** Danh sách skill của người dùng trong
+    `make_skill` (`made: true`, mô tả của nó nêu câu hỏi này) mang
+    `long_make`: `still_making` với `minutes_so_far`, `made`, `not_made`,
+    hoặc `none_being_made`, tên chỉ nói với chủ; mô hình tự hiểu ý câu hỏi,
+    không danh sách từ.
+
+  Tắt: mọi lần tạo, câu nói và giới hạn giữ nguyên từng byte như trước.
+  Kiểm thử: như bản tiếng Anh.
 - **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
   nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần

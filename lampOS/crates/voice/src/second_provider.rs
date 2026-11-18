@@ -1982,6 +1982,10 @@ struct Shared {
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
     /// off, today's line and no second.
     one_path_wait: Option<Duration>,
+    /// [`Engine::running_on_after`] (#6811): how long after its waiting
+    /// line a make with no answer yet is let run on, the turn ending after
+    /// [`crate::long_make::RUN_ON_LINE`]; none is off, as before.
+    run_on_after: Option<Duration>,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -5147,6 +5151,7 @@ impl Engine {
                 nudge_claims: false,
                 made_names: None,
                 one_path_wait: None,
+                run_on_after: None,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -6598,6 +6603,19 @@ impl Engine {
     pub fn waiting_on_one_path(mut self, after: Option<Duration>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.one_path_wait = after;
+        }
+        self
+    }
+
+    /// `LAMP_MAKE_MAY_RUN_ON=on` ([`crate::long_make::ENVIRONMENT`], #6811),
+    /// with `after` ([`crate::long_make::RUN_ON_AFTER`]): a voice make with
+    /// no answer `after` its waiting line is let run on
+    /// ([`crate::long_make::let_go`]), [`crate::long_make::RUN_ON_LINE`]
+    /// said once in place of the long-wait line, and the turn ends, the
+    /// model told it was said. None: as before. Before any turn only.
+    pub fn running_on_after(mut self, after: Option<Duration>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.run_on_after = after;
         }
         self
     }
@@ -16679,6 +16697,7 @@ async fn said_while_made<T>(
     request: u64,
     made: bool,
     answering: impl std::future::Future<Output = T>,
+    let_go: impl FnOnce() -> T,
 ) -> Result<T, Stop> {
     if !made {
         return Ok(answering.await);
@@ -16699,6 +16718,26 @@ async fn said_while_made<T>(
     // On the one run path its generation completes once it is played, so
     // the lamp thinks while the make goes on; else as before.
     queue.push_ending(line.to_owned(), wait.is_some()).await?;
+    // `LAMP_MAKE_MAY_RUN_ON` (#6811): still no answer a minute after its
+    // waiting line, the make runs on in lamp-tasks and this turn ends, its
+    // one line said in place of the long-wait line; the person is free to
+    // talk. A make that settled first is waited for as before.
+    if let Some(after) = queue.shared.run_on_after {
+        tokio::select! {
+            answer = &mut answering => return Ok(answer),
+            () = tokio::time::sleep(after) => {}
+        }
+        if crate::long_make::let_go(request, crate::app_make::now_unix_ms()) {
+            eprintln!(
+                "lamp-voice second: request {request}: the make has no answer {} s after its waiting line: it runs on, its one line is said, and the turn ends",
+                after.as_secs()
+            );
+            let line = queue.shared.fixed(crate::long_make::RUN_ON_LINE);
+            queue.push_ending(line.to_owned(), true).await?;
+            return Ok(let_go());
+        }
+        return Ok(answering.await);
+    }
     // With the one run path (#7371): one more line, once, only if the make
     // runs long; the ring and body show thinking meanwhile.
     let Some(after) = wait else {
@@ -21155,7 +21194,10 @@ async fn answer(
                         ),
                     }
                 };
-                let mut answer = said_while_made(&mut queue, request, made_call, answering).await?;
+                let mut answer = said_while_made(&mut queue, request, made_call, answering, || {
+                    crate::tools::ToolAnswer::plain(crate::long_make::let_go_told())
+                })
+                .await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
