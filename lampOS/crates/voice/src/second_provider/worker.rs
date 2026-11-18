@@ -31501,7 +31501,7 @@ mod tests {
     ) {
         let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count = fetched.clone();
-        let fetch: crate::second_provider::net::weather::Fetch = Arc::new(move |url: String| {
+        let fetch: crate::second_provider::net::weather::Fetch = Arc::new(move |url: String, _| {
             count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Box::pin(async move {
                 Ok(if url.contains("geocoding-api") {
