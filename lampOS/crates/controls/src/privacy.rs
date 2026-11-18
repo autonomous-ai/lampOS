@@ -433,12 +433,86 @@ impl Monitor {
 /// The item health shows for the switch itself (the first builder on #2143).
 pub const SWITCH_ITEM: &str = "privacy switch";
 
+/// Edge lines written in one second before the rest are only counted.
+pub const EDGE_LINES_PER_S: u32 = 20;
+const EDGE_WINDOW_US: u64 = 1_000_000;
+
+/// One journal line per change of the slide's level (#6543), so a slide
+/// test can tell a slide that never closed from one that chattered. Fed
+/// every level read; the first read is no edge, and a read at the same
+/// level writes nothing. Each line holds the new level, `at_us`, the
+/// change's number since Controls started and how long the level before it
+/// lasted, and nothing else. A bouncing slide writes a burst of lines a few
+/// ms apart; past [`EDGE_LINES_PER_S`] in one second the rest are counted,
+/// and one `N more edges in the last second` line is written once that
+/// second is over, at the next reading. So chatter writes at most
+/// [`EDGE_LINES_PER_S`] edge lines and one count line a second.
+#[derive(Debug, Default)]
+pub struct EdgeLog {
+    /// The last level read (true is closed) and when it began.
+    level: Option<(bool, u64)>,
+    changes: u64,
+    window_us: u64,
+    written: u32,
+    held_back: u64,
+}
+
+impl EdgeLog {
+    /// How often the level read has changed since Controls started.
+    pub fn changes(&self) -> u64 {
+        self.changes
+    }
+
+    /// The lines to write for a level read at `at_us`; most reads write none.
+    pub fn read(&mut self, at_us: u64, closed: bool) -> Vec<String> {
+        let mut lines = Vec::new();
+        let window_over = at_us.saturating_sub(self.window_us) >= EDGE_WINDOW_US;
+        if window_over && self.held_back > 0 {
+            lines.push(format!(
+                "privacy slide: {} more edges in the last second, at_us {at_us}",
+                self.held_back
+            ));
+            self.held_back = 0;
+        }
+        let Some((was, since)) = self.level else {
+            self.level = Some((closed, at_us));
+            return lines;
+        };
+        if was == closed {
+            return lines;
+        }
+        self.changes += 1;
+        self.level = Some((closed, at_us));
+        if window_over {
+            self.window_us = at_us;
+            self.written = 0;
+        }
+        if self.written < EDGE_LINES_PER_S {
+            self.written += 1;
+            lines.push(format!(
+                "privacy slide {}, at_us {at_us}, change {}, {} for {} ms",
+                said(closed),
+                self.changes,
+                said(was),
+                at_us.saturating_sub(since) / 1_000
+            ));
+        } else {
+            self.held_back += 1;
+        }
+        lines
+    }
+}
+
+fn said(closed: bool) -> &'static str {
+    if closed { "closed" } else { "open" }
+}
+
 pub struct Source {
     reader: Box<dyn Reader>,
     pub monitor: Monitor,
-    /// The switch's last level read, and how often it has changed since
-    /// Controls started, for [`Self::health`].
-    moved: (Option<bool>, u64),
+    /// The switch's levels read: how often they changed since Controls
+    /// started, for [`Self::health`], and a journal line per change.
+    moved: EdgeLog,
 }
 
 impl Source {
@@ -446,7 +520,7 @@ impl Source {
         Self {
             reader,
             monitor: Monitor::new(clock),
-            moved: (None, 0),
+            moved: EdgeLog::default(),
         }
     }
 
@@ -455,11 +529,9 @@ impl Source {
         let sample = self.reader.read(now())?;
         let received = now();
         if let Some(muted) = sample.muted {
-            let (last, changes) = &mut self.moved;
-            if last.is_some_and(|last| last != muted) {
-                *changes += 1;
+            for line in self.moved.read(sample.stamp.at_us, muted) {
+                eprintln!("lamp-controls: {line}");
             }
-            *last = Some(muted);
         }
         let _ = self.monitor.observe(received, sample.clone());
         Some((received, sample))
@@ -473,7 +545,7 @@ impl Source {
     /// already says the route is closed then.
     pub fn health(&mut self, now: u64) -> Diagnostic {
         let sample = self.monitor.snapshot(now);
-        let changes = self.moved.1;
+        let changes = self.moved.changes();
         let report = match sample.muted {
             Some(muted) => {
                 let level = if muted { "closed" } else { "open" };
@@ -566,5 +638,84 @@ mod reopening_tests {
             (sample.muted, sample.fault),
             (None, Some(ControlFault::Missing))
         );
+    }
+}
+
+#[cfg(test)]
+mod edge_log_tests {
+    use super::*;
+
+    #[test]
+    fn open_closed_open_writes_two_lines_with_levels_and_durations() {
+        let mut log = EdgeLog::default();
+        assert!(
+            log.read(1_000_000, false).is_empty(),
+            "the first read is no edge"
+        );
+        assert_eq!(
+            log.read(3_500_000, true),
+            ["privacy slide closed, at_us 3500000, change 1, open for 2500 ms"]
+        );
+        assert_eq!(
+            log.read(4_250_000, false),
+            ["privacy slide open, at_us 4250000, change 2, closed for 750 ms"]
+        );
+        assert_eq!(log.changes(), 2);
+    }
+
+    #[test]
+    fn no_line_while_the_level_stays() {
+        let mut log = EdgeLog::default();
+        for at in 0..1_000u64 {
+            assert!(log.read(at * POLL_US, true).is_empty());
+        }
+        assert_eq!(log.changes(), 0);
+    }
+
+    #[test]
+    fn chatter_writes_twenty_lines_then_one_count_a_second() {
+        let mut log = EdgeLog::default();
+        log.read(10_000_000, false);
+        let mut lines = Vec::new();
+        // 100 flips 5 ms apart: half a second of chatter.
+        for n in 1..=100u64 {
+            let at = 10_000_000 + n * POLL_US;
+            lines.extend(log.read(at, n % 2 == 1));
+        }
+        assert_eq!(lines.len(), EDGE_LINES_PER_S as usize);
+        assert!(lines[0].starts_with("privacy slide closed, at_us 10005000, change 1, open for"));
+        assert!(lines[19].contains("change 20,"));
+        // Still within the second: nothing more.
+        assert!(log.read(10_900_000, false).is_empty());
+        // The second is over: one count line, and the slide has settled.
+        assert_eq!(
+            log.read(11_005_000, false),
+            ["privacy slide: 80 more edges in the last second, at_us 11005000"]
+        );
+        assert!(
+            log.read(12_500_000, false).is_empty(),
+            "the count is said once"
+        );
+        assert_eq!(log.changes(), 100);
+        // A later edge is written again, with how long the level lasted.
+        assert_eq!(
+            log.read(13_000_000, true),
+            ["privacy slide closed, at_us 13000000, change 101, open for 2500 ms"]
+        );
+    }
+
+    #[test]
+    fn chatter_for_seconds_stays_within_the_bound() {
+        let mut log = EdgeLog::default();
+        log.read(0, false);
+        let mut lines = 0;
+        // A flip every 5 ms up to 3 s: 600 edges. Each of the seconds from
+        // 0, 1 and 2 s writes 20 edge lines and its count line; the last
+        // edge, at 3 s, opens a fourth second and writes its own line.
+        for n in 1..=600u64 {
+            lines += log.read(n * POLL_US, n % 2 == 1).len();
+        }
+        assert_eq!(lines, 3 * (EDGE_LINES_PER_S as usize + 1) + 1);
+        assert_eq!(log.changes(), 600);
     }
 }
