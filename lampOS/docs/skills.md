@@ -7621,8 +7621,9 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    as "I couldn't make that one. Try asking for one thing…"): "I couldn't
    make that: the words “take a photo” would start both test note and
    another skill, photo booth, so neither would start; say other words for
-   test note.", with `LAMP_MAKE_NO_ASKS` on or off. With it on, words that
-   clash with the person's own made skill replace it ("Nothing asked").
+   test note.", with `LAMP_MAKE_NO_ASKS` on alone (Heron's P3 1 on #7836:
+   off, it is heard as before). With it on, words that clash with the
+   person's own made skill replace it ("Nothing asked").
 4. **Said back with the words** (`made_skill::plainly`): "When you say
    “send my test note”, it mails me@example.com from your Gmail, subject
    “Test note”, saying “This is my test note.”. It starts only when you say
@@ -7808,10 +7809,15 @@ reset still ask. On (`crate::make_no_asks`):
   other skill its words would start (the lamp's own, one added from a
   file, a pushed one, a made one kept and not on) refuses it as before.
   Then (`make_skill_local::made_no_asks`, `made_skill::own_asks_taken`),
-  on the owner's own ask, those skills are replaced together with any
-  trigger clash, as above: "Made coin flip and replaced your old flip a
-  coin. Say 'keep the old one' to undo." Anyone else's make is refused
-  with the same reason and nothing of it kept (`made_skill::forget_unput`).
+  on the owner's own ask, those skills that are on are turned off first
+  (`make_no_asks::words_turned_off`), then it goes on, and they are
+  replaced together with any trigger clash, as above: "Made coin flip and
+  replaced your old flip a coin. Say 'keep the old one' to undo." Anyone
+  else's make is refused with the same reason and nothing of it kept
+  (`made_skill::forget_unput`); so is one whose old skill can't be turned
+  off (lamp-skills' `off` file unreadable, or the helper's refusal, those
+  turned off before then back on), never on beside it (Heron's P3 2 on
+  #7836). A put-on that fails turns them back on.
 - **A remove happens at once.** `make_skill`'s `remove`, the name matched
   to the person's own made skills as before (`made_remove::found`), removes
   it on the owner's ask (`services::owners_yes_now`) with no question:
@@ -7834,20 +7840,22 @@ reset still ask. On (`crate::make_no_asks`):
   its own goes on by its yes's own path only with `LAMP_MADE_SCRIPTS=on`;
   with it off it is put back and stays off, and why is said. A record of a
   replace outlives the remove of its new skill.
-- **A removed skill named again is put back, never made anew** (#7828's
-  DEFAULT-ON, fix 2: on lamp-9adf "Put the flip a coin skill back", just
-  removed, was called as a make and made a new one). Before a voice make
-  asks the making model anything (`make_no_asks::put_back_named`, from
-  `make_skill_local::make_with_by`), its words, the model's `request` and
-  the line heard, are matched to the skills they removed and kept aside
-  within 7 days (`make_no_asks::kept_named`), by spelling as a remove's
-  name is (`made_remove::apart`, `made_remove::near`), never by a list of
-  words: the nearest alone, a name inside another named as it is written
-  being that other's part ("bring back my moon fact skill" is moon fact,
-  never moon). On the owner's ask it is put back and on, as "put it back"
-  does: "flip a coin is back on.", with `{"made": NAME, "on": true,
-  "put_back": true}`. Two kept aside as near, one whose name a listed
-  skill has again, or anyone else's ask, is a make as before.
+- **A removed skill asked back by name is the undo, never a make**
+  (#7828's DEFAULT-ON, fix 2: on lamp-9adf "Put the flip a coin skill
+  back", just removed, was called as a make and made a new one). `undo`'s
+  description says "When the person asks to put back or restore a skill
+  they removed, call it with that skill, and never make it again."
+  (`make_no_asks::UNDO_RESTORE_TOLD`); whether a line asks that is the
+  model's judgment. A name given to `undo` is matched to every skill the
+  records name as a remove's name is (`made_remove::named_alone`: near by
+  spelling, with `LAMP_MADE_SKILL_OFF_SAID` on never a name whose numbers
+  differ, a name inside another named as it is written being that
+  other's part), so "flip a coin" puts flip a coin back even when flip a
+  coin 2 was removed after it: "flip a coin is back on.", with
+  `{"made": NAME, "on": true, "put_back": true}`. Several as near, or
+  none, undo nothing. A make never puts a skill back (Heron's P2 on #7836:
+  "make a water reminder" put back water reminder 2): its words go to the
+  making model as any make's.
 - **The keep, exactly.** Every record of what was done is kept 7 days, a
   removed skill's package with its record; at most 50 removed skills and
   100 records in all, the oldest out first, their packages with them.
@@ -7872,8 +7880,8 @@ reset still ask. On (`crate::make_no_asks`):
   (`make_no_asks::AT_ONCE_TOLD`); its `remove` parameter adds "Call it at
   once, never asking first or for a yes; ask which only when two skills
   they made fit the words alike, never of "it"."
-  (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` names "put NAME back"
-  beside "put it back", never a new make. With every switch the product's
+  (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` adds
+  `make_no_asks::UNDO_RESTORE_TOLD`. With every switch the product's
   unit sets on, the description stays within the link's 1,024 bytes and
   the parameters within its 4,096.
 

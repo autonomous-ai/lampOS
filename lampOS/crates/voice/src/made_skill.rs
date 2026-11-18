@@ -1091,7 +1091,8 @@ fn taken_why(ask: &str, name: &str, skill: &str) -> String {
 
 /// Whether `why` is [`taken_why`]'s: a made skill's words that would start
 /// another skill too, said to the person as it is (#7828's fix 3: on
-/// lamp-9adf it was heard as "Try asking for one thing").
+/// lamp-9adf it was heard as "Try asking for one thing"), with
+/// `LAMP_MAKE_NO_ASKS` on alone (Heron's P3 1 on #7836): off, as before.
 pub fn words_taken(why: &str) -> bool {
     why.starts_with(TAKEN_HEAD) && why.contains(TAKEN_BOTH) && why.contains(TAKEN_NEITHER)
 }
@@ -1990,7 +1991,7 @@ pub fn plain_reason(why: &str) -> String {
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
         || why == UNRELATED
-        || words_taken(why)
+        || (crate::make_no_asks::on() && words_taken(why))
     {
         return why.to_owned();
     }
