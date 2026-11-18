@@ -5229,8 +5229,10 @@ becomes a remove. Then, in code (`made_turn::asked`):
   off). While any skill they made or added is in lamp-skills' `off` file,
   each heard turn on the second route gives the model one note
   (`made_turn::off_note`): how many are turned off, never which; that a
-  line asking to use or run one calls its function as for any skill, the
-  lamp turning it on for the owner's ask (below); and
+  line asking to use or run one calls it as for any skill, by its
+  function, by `use_skill` with its name, or by `make_skill` with `run`,
+  never `turn_on` alone, the lamp turning it on for the owner's ask
+  (below); and
   `made_turn::BACK_ON_BY_CALL` ("A skill turned off is turned back on by
   calling make_skill with turn_on and its name, when their line asks to
   turn it on, or by the lamp when the owner asks to use it; never say it is
@@ -5268,7 +5270,8 @@ becomes a remove. Then, in code (`made_turn::asked`):
   reading). "Turn on btc price and run it" turns it on in either order;
   a run called after the turn on in the same turn goes to the skill and
   is tried again as above. Off, or unheard, the function's answer is told
-  as it is.
+  as it is. If that run again is refused otherwise (any `error` but still
+  off), the turn on is undone, as below.
 - **The run now turns it on too** (#7562's row on lamp-9adf, 18 Nov: "Lamp,
   use my space facts skill." was the model's `make_skill` `run`, refused
   `made_run::STOPPED`, "it is turned off or snoozed"). With the switch on,
@@ -5278,9 +5281,41 @@ becomes a remove. Then, in code (`made_turn::asked`):
   `made_run::told_turned_on`: still a run, with the same undo line
   (`made_turn::undo_line`). A snoozed skill, not in the `off` file, is never
   turned on and stays "didn't run now". A call with `turn_on` and `run`
-  together is the run; a `turn_on` answer tells the model to call `run` when
-  the line asked to use it, and a run after the model's own `turn_on` of
-  that skill in the turn carries the undo line too. Switch off, as before.
+  together of one skill (`made_run::one_skill`: the same name as written,
+  or the same made skill found by each) is the run; of two skills, nothing
+  is done and the model is told `made_run::two_skills`, to call each again
+  alone (Heron's P3), never one done and the other dropped. A `turn_on`
+  answer tells the model to call `run` when the line asked to use it, and
+  a run after the model's own `turn_on` of that skill in the turn carries
+  the undo line too, once in the turn: a run of it again after is told as
+  any run. Switch off, as before.
+- **Through `use_skill` too** (#7562's row on lamp-9adf, 18 Nov: after
+  "turn it off", "Lamp, tell me a space fact with my space facts skill."
+  was the model's `use_skill`, which names no made skill, since a made
+  skill has a trigger and no function; it was told no skill has that name,
+  and the lamp said it "may have been deleted"). With the switch on and a
+  heard line, a `use_skill` call whose `skill` names no skill's function is
+  matched to the owner's made skills as a run's name is
+  (`made_run::off_named`, `made_remove::found`); one in lamp-skills' `off`
+  file (never a snooze) is `make_skill`'s run now of it
+  (`made_run::use_skill_off_here`, `made_run::asked_here`): the owner's
+  alone, turned on for the ask, run, said with the undo line, the journal
+  naming it `tools::MADE_RUN_WHOM`. One on, one not theirs, or the switch
+  off: the refusal as before.
+- **A failed run leaves it off** (Heron's P2 on #7562). A skill turned on
+  for the ask whose run is then refused otherwise than still off (it does
+  something only at its own moment, "it has nothing to do but at its own
+  moment", or `made_run::NOT_ANSWERED`) is turned off again, as the owner
+  had it: in `made_run::asked_turning` by the manage helper's own off
+  (`TurnsOn::turn_off`, `made_turn::turned_by_helper`), and on the second
+  route, after the lamp's own turn on for a function or the model's own
+  `turn_on` then its run (`made_turn::failed_after_turn_on`; a plain
+  refusal of a run carries the skill as `made_run::NOT_RAN`), by the lamp's
+  own `make_skill` `turn_off` (`made_turn::off_again`, id `OFF_AGAIN_ID`).
+  The model is told `made_turn::not_run_still_off`: it didn't run, why,
+  and it is still off, with no undo; it is never run again in the turn. A
+  turn off that fails leaves it on: `made_turn::not_run_left_on`, it
+  didn't run, why, and the undo line.
 - **Said off or back on only after its turn** (#7562's row on lamp-9adf,
   18 Nov 10:57: "Lamp, turn off my bitcoin price skill." found nothing
   near btc price and offered theirs, and the model, with no second call,

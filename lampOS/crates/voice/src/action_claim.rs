@@ -3253,6 +3253,7 @@ pub(crate) mod tests {
                     off,
                     request: 1,
                     heard: true,
+                    state: None,
                 },
                 &keeping,
                 || true,
