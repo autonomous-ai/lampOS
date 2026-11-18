@@ -60,6 +60,8 @@ mod ears;
 pub use ears::*;
 mod body_sound;
 pub use body_sound::*;
+mod lamp_did;
+pub use lamp_did::*;
 mod sound_classes;
 pub use sound_classes::*;
 mod air;
@@ -2652,6 +2654,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(privacy_topics())
         .chain(sound_class_topics())
         .chain(body_sound_topics())
+        .chain(lamp_did_topics())
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(reports_topics())
