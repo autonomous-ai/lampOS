@@ -143,24 +143,6 @@ pub fn asking(socket: &Path, name: &str) -> bool {
     taken
 }
 
-/// With `LAMP_FACE_NO_ASK`: a face from a photo still unconfirmed at the
-/// lamp (one added before the eyes kept photos at once, or by eyes without
-/// the switch) is kept with no question: the eyes are told it was asked,
-/// then its yes, which they take only for that face at the lamp now. It is
-/// an app's photo, so nothing is said; `true` if the eyes kept it.
-pub fn keep_unasked(socket: &Path, name: &str) -> bool {
-    if !asking(socket, name) {
-        return false;
-    }
-    let kept = crate::tools::exchange(socket, &json!({"photo_yes": name}), DEADLINE)
-        .is_some_and(|answer| answer["error"].is_null() && answer["remembered"].is_string());
-    eprintln!(
-        "lamp-voice: a face added from a photo was at the lamp; {} with nothing asked (LAMP_FACE_NO_ASK)",
-        if kept { "kept" } else { "not kept" }
-    );
-    kept
-}
-
 /// The asked mark for `name` let go: a new face under that name.
 fn forget_name(name: &str) {
     if let Ok(mut asked) = ASKED.lock()
@@ -198,15 +180,12 @@ struct WatchState {
 
 impl Watch {
     pub fn start(socket: std::path::PathBuf) -> Self {
-        Self::start_every(socket, LOOK_EVERY, crate::known_faces::face_no_ask_on())
+        Self::start_every(socket, LOOK_EVERY)
     }
 
     /// [`Self::start`], looking every `every`: a test's short period. The
-    /// lamp's is [`LOOK_EVERY`] (#1806). With `no_ask`
-    /// (`LAMP_FACE_NO_ASK`, the first builder 18:50), a face from a photo
-    /// still unconfirmed at the lamp is kept with no question and nothing
-    /// said ([`keep_unasked`]): [`Self::asked`] never has a question to say.
-    fn start_every(socket: std::path::PathBuf, every: Duration, no_ask: bool) -> Self {
+    /// lamp's is [`LOOK_EVERY`] (#1806).
+    fn start_every(socket: std::path::PathBuf, every: Duration) -> Self {
         let state = std::sync::Arc::new(Mutex::new(WatchState::default()));
         let shared = state.clone();
         std::thread::spawn(move || {
@@ -216,12 +195,6 @@ impl Watch {
                     Ok(mut state) if !state.stop => state.want.take(),
                     _ => return,
                 };
-                let (keep, want) = if no_ask { (want, None) } else { (None, want) };
-                if let Some(name) = keep
-                    && !was_asked(&name)
-                {
-                    keep_unasked(&socket, &name);
-                }
                 // A name asked already is not asked again: the loop can
                 // want it once more while the eyes are still answering the
                 // first (Mobile on lamp-0c89, #1968: asked twice, 16 s
@@ -581,7 +554,7 @@ mod tests {
             }
         });
         forget_asked();
-        let watch = Watch::start_every(socket.clone(), LOOKS, false);
+        let watch = Watch::start_every(socket.clone(), LOOKS);
         let looks = || {
             lines
                 .lock()
@@ -640,7 +613,7 @@ mod tests {
             |_| json!({"photo_here": "Quillo", "asked": true}),
         );
         forget_asked();
-        let watch = Watch::start_every(socket.clone(), LOOKS, false);
+        let watch = Watch::start_every(socket.clone(), LOOKS);
         // Until the eyes' first answer is taken in, then three more of their
         // looks, not a fixed 2.5 s (#1806): their mark is in each.
         let until = std::time::Instant::now() + Duration::from_secs(5);
@@ -751,53 +724,5 @@ mod tests {
         assert_eq!(*lines.lock().unwrap(), [json!({"photo_here": true})]);
         let _ = std::fs::remove_file(&empty);
         let _ = std::fs::remove_file(socket);
-    }
-
-    /// `LAMP_FACE_NO_ASK` (the first builder 18:50): a face from a photo
-    /// still unconfirmed at the lamp is kept with no question: the eyes get
-    /// its asked mark and its yes, and the voice has nothing to say. Off,
-    /// the question is said and no yes is sent.
-    #[test]
-    fn with_no_ask_a_face_from_a_photo_is_kept_and_nothing_is_asked() {
-        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
-        for no_ask in [true, false] {
-            let (socket, lines) = eyes(&format!("no-ask-{no_ask}"), |line| {
-                if line.get("photo_here").is_some() {
-                    json!({"photo_here": "Lan"})
-                } else if line.get("photo_yes").is_some() {
-                    json!({"remembered": "Lan"})
-                } else {
-                    json!({"asked": true})
-                }
-            });
-            forget_asked();
-            let watch = Watch::start_every(socket.clone(), LOOKS, no_ask);
-            let until = std::time::Instant::now() + Duration::from_secs(3);
-            let mut said = None;
-            let sent_yes = || lines.lock().unwrap().contains(&json!({"photo_yes": "Lan"}));
-            while std::time::Instant::now() < until && said.is_none() && !sent_yes() {
-                said = watch.asked();
-                if let Some(name) = watch.to_ask() {
-                    watch.ask(name);
-                }
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            // A few more passes, for a question that should never come.
-            std::thread::sleep(Duration::from_millis(300));
-            let said = said.or_else(|| watch.asked());
-            let lines = lines.lock().unwrap().clone();
-            assert!(lines.contains(&json!({"photo_asked": "Lan"})), "{no_ask}");
-            if no_ask {
-                assert_eq!(said, None, "nothing asked");
-                assert!(lines.contains(&json!({"photo_yes": "Lan"})));
-                assert!(was_asked("Lan"), "kept once, never again");
-            } else {
-                assert_eq!(said.as_deref(), Some("Lan"), "off: asked as before");
-                assert!(!lines.contains(&json!({"photo_yes": "Lan"})));
-            }
-            drop(watch);
-            forget_asked();
-            let _ = std::fs::remove_file(socket);
-        }
     }
 }
