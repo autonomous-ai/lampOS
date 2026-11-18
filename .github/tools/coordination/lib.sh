@@ -97,16 +97,17 @@ coord_switch_on() {
 # the same patch by range-diff.
 patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 
-# code_patch_of COMMIT: patch_of with the docs left out (any `docs/` folder and README.md files), "none" for a change of
+# code_patch_of COMMIT: patch_of with the docs left out (Markdown files under a `docs/` folder), "none" for a change of
 # docs alone. 18 Nov (Jarvis's ask on #6543): a rebase that merges a PR's own docs rows with rows another train touched
 # changes its patch but not its code. coord_same_patch then names such a head "code:<sha>", and reads2.py counts a
 # READ-OK on it only beside a read of the head's own patch: one reader's restate covers the docs, and the other's
-# earlier read still covers the code. 15:1x (the Reviewer-lead's P2 on #7710): not every .md is docs. The product
-# loads some (`include_str!` guides, a skill's SKILL.md, the realtime prompts), so only docs paths are left out.
+# earlier read still covers the code. 15:1x and 15:2x (the Reviewer-lead's P2s on #7710): only Markdown under docs/
+# is docs. Every other file counts as code: a skill's SKILL.md or README.md (the product installs them), an
+# `include_str!` guide, the realtime prompts, and whatever else lives in docs/ (the model the sim ships, the protocol
+# schemas the SDKs copy, test fixtures).
 code_patch_of() {
   local b p; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1
-  p=$(git diff -U0 $b $1 -- . ':(exclude,glob)**/docs/**' ':(exclude,glob)**/README.md' ':(exclude,glob)README.md' \
-      | git patch-id --stable | cut -d' ' -f1) || return 1
+  p=$(git diff -U0 $b $1 -- . ':(exclude,glob)**/docs/**/*.md' | git patch-id --stable | cut -d' ' -f1) || return 1
   print -r -- ${p:-none}
 }
 
