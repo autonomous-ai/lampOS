@@ -4214,6 +4214,18 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
 - **Không bao giờ nói "bật" khi đang tắt.** Bật không được thì nói một câu
   rõ ràng kèm lý do ("I made it but couldn't put it on: …"), và không để
   lại gì để hoàn tác.
+- **Gọi ngay, không bao giờ hỏi trước** (DEFAULT-ON của #7828, sửa 1: trên
+  route thứ hai của lamp-9adf mô hình vẫn hỏi "Do you want me to make it
+  again?", "Did you mean the flip-a-coin skill? Say the word and I'll
+  remove it." và, với "remove it", "Which one…?"). Mô tả của `make_skill`
+  kết thúc bằng "Make or remove at once, never asking first, even of one
+  they have: your line gives the undo." (`make_no_asks::AT_ONCE_TOLD`);
+  tham số `remove` thêm "Call it at once, never asking first or for a yes;
+  ask which only when two skills they made fit the words alike, never of
+  "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` nêu "put NAME back"
+  bên cạnh "put it back", không bao giờ là một lần tạo mới. Với mọi công
+  tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
+  các tham số trong 4.096 byte.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.
