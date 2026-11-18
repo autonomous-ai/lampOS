@@ -2367,54 +2367,77 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   you just made." được trả lời "I found no skill of yours with a name like
   'water skill'"; sau khi tạo "daily stretch reminder", câu "Hmm, actually,
   turn off the skill you just made." liệt kê cả 25 kỹ năng của họ; "turn it
-  back on" chỉ nhận "Yes?"). Một lời gọi `make_skill` đã tạo một kỹ năng
+  back on" chỉ nhận "Yes?"). Khi `LAMP_MADE_SKILL_OFF_SAID` bật
+  (`made_skill::off_said_on`), một lời gọi `make_skill` đã tạo một kỹ năng
   (`just_made::after_make`) hoặc tắt/bật một kỹ năng
   (`just_made::after_turn`) giữ tên của nó trong bộ nhớ của tiến trình, cho
   người nói câu đó khi đó là câu của chủ đèn (`services::owner_of`; trong
   phòng riêng là bất kỳ ai nói): kỹ năng người khác tạo không bao giờ được
-  tính. Khi cuộc trò chuyện của họ còn tiếp diễn (không có khoảng lặng
-  `just_made::KEPT_FOR`, 10 phút, chính `REMEMBERED_FOR` của thread, giữa
-  các câu của họ), mỗi câu nghe được của họ trên tuyến thứ hai được kèm một
-  ghi chú (`just_made::note`): "(For you to know, not to answer: in this
-  conversation with them, newest first, the lamp turned water reminder off
-  (just now); made daily stretch reminder (4 minutes ago). When their line
-  means a skill of theirs without saying its name, it means the newest of
-  these that fits what they ask: call make_skill with that name, as if they
-  had said it, and never list their skills for it. ... When none of these
-  fits, ask which skill they mean.)", tối đa 3 kỹ năng, mỗi kỹ năng theo
-  việc làm sau cùng với nó. Khi có hơn một kỹ năng được tạo trong cuộc trò
-  chuyện, ghi chú thêm "ask once which they mean, naming them (A or B), and
-  call nothing" cho câu chỉ một kỹ năng đã tạo mà không nói là cái nào. Ghi
-  chú nằm trong các ghi chú mỗi lượt, không bao giờ trong mô tả của
-  `make_skill`, nên mô tả giữ nguyên số byte. Một lần tắt/bật mà tên không
-  khớp kỹ năng nào và đưa ra `candidates` thì đặt những kỹ năng đã tạo hoặc
-  tắt/bật trong cuộc trò chuyện này lên đầu, mỗi cái đánh dấu
-  `in_this_conversation` ("made just now", "turned off 2 minutes ago"), và
-  bảo mô hình chọn cái mới nhất phù hợp (và hỏi cái nào khi hơn một kỹ năng
-  đã tạo đều phù hợp); khi không có gì được tạo hay tắt/bật trong cuộc trò
-  chuyện, mô hình được bảo "None of theirs was made, turned off or turned
-  on in this conversation: ... ask which skill they mean and call nothing;
-  never choose one for them." (`just_made::candidates`). Bản thân việc
-  tắt/bật vẫn như trước: chỉ của chủ đèn, câu trả lời của chính nó, không
-  cần "có". Ghi chú không thêm cổng nào của riêng nó: `turn_on` của mô hình
-  cho kỹ năng nó nêu tên chạy theo phán đoán của mô hình, nên "turn it back
-  on" bật nó, còn "use the one you just made" khi kỹ năng đang tắt sẽ gọi
-  hàm của nó, và đèn bật nó lên rồi chạy ngay trong cùng lượt với câu
-  "Water reminder was off, so I turned it on. Say 'turn it off' to undo."
-  (#7562, `made_turn::on_for_ask`). Không có danh sách từ: câu nói chỉ kỹ năng nào là do mô hình
-  phán đoán. Kỹ năng không còn trong chỉ mục kỹ năng đã tạo bị bỏ khỏi ghi
-  chú; không nói gì khi công tắc tắt, với câu của người khác, hoặc khi
-  không có gì được tạo hay tắt/bật. Không có tệp và không thêm vòng gọi.
-  Kiểm thử: `just_made::tests::*`
+  tính. Mỗi lần tạo hay tắt/bật được nhắc trong `just_made::KEPT_FOR`, 10
+  phút (chính `REMEMBERED_FOR` của thread), kể từ lúc làm; các câu nói của
+  người đó không bao giờ kéo dài thời gian này. Mỗi câu nghe được của họ
+  trên tuyến thứ hai được kèm một ghi chú (`just_made::note`): "(For you to
+  know, not to answer: in this conversation with them, newest first, the
+  lamp turned water reminder off (just now); made daily stretch reminder (4
+  minutes ago). When their line means a skill of theirs without saying its
+  name, it means the newest of these that fits what they ask, as if they
+  had said that name: to turn it off, turn it on or remove it, call
+  make_skill with turn_off, turn_on or remove and that name; to use or run
+  it, call it as for any skill, by its own function, by use_skill with that
+  name, or by make_skill with run and that name, never a second make of
+  it. Never list their skills for it. ... When their line means a skill
+  of theirs and none of these fits, ask which skill they mean. A line about
+  anything else, the light, music or a timer, is answered as it is: no
+  question about skills, and no skill turned on for it.)", tối đa 3 kỹ
+  năng, mỗi kỹ năng theo việc làm sau cùng với nó. Khi có hơn một kỹ năng
+  được tạo trong cuộc trò chuyện, ghi chú thêm "ask once which they mean,
+  naming them (A or B), and call nothing" cho câu chỉ một kỹ năng đã tạo mà
+  không nói là cái nào. Ghi chú nằm trong các ghi chú mỗi lượt, không bao
+  giờ trong mô tả của `make_skill`, nên mô tả giữ nguyên số byte. Một lần
+  tắt/bật mà tên không khớp kỹ năng nào và đưa ra `candidates` thì đặt
+  những kỹ năng đã tạo hoặc tắt/bật trong cuộc trò chuyện này lên đầu, mỗi
+  cái đánh dấu `in_this_conversation` ("made just now", "turned off 2
+  minutes ago"), và bảo mô hình chọn cái mới nhất phù hợp (và hỏi cái nào
+  khi hơn một kỹ năng đã tạo đều phù hợp); khi không có gì được tạo hay
+  tắt/bật trong cuộc trò chuyện, mô hình được bảo "None of theirs was made,
+  turned off or turned on in this conversation: ... ask which skill they
+  mean and call nothing; never choose one for them."
+  (`just_made::candidates`). Bản thân việc tắt/bật vẫn như trước: chỉ của
+  chủ đèn, câu trả lời của chính nó, không cần "có". Ghi chú không thêm
+  cổng nào của riêng nó: `turn_on` của mô hình cho kỹ năng nó nêu tên chạy
+  theo phán đoán của mô hình, nên "turn it back on" bật nó, còn "use the
+  one you just made" khi kỹ năng đang tắt sẽ gọi hàm của nó hoặc `use_skill` với tên của nó, và đèn bật nó
+  lên rồi chạy ngay trong cùng lượt với câu "Water reminder was off, so I
+  turned it on. Say 'turn it off' to undo." (#7562,
+  `made_turn::on_for_ask`, `made_run::use_skill_off_here`). Không có danh sách từ: câu nói chỉ kỹ năng nào
+  là do mô hình phán đoán. Kỹ năng không còn trong chỉ mục kỹ năng đã tạo
+  không bao giờ được nêu tên (`just_made::still_kept`): kỹ năng đã xóa từ
+  đó, hoặc mọi kỹ năng khi khôi phục cài đặt gốc đã làm trống thư mục kỹ
+  năng đã tạo (bản thân bộ nhớ mất khi `lamp-voice` khởi động lại). Câu
+  "forget everything" của chủ đèn, được guard của tuyến thứ hai đánh dấu và
+  bộ nhớ của họ đã được xóa, cũng xóa nó, như dấu giọng của họ
+  (`just_made::forget_with_everything`, cạnh các bước khác trong
+  `tools.rs`). Ghi chú chỉ dành cho mô hình, là ghi chú hệ thống "not to
+  answer": không câu trả lời công cụ nào và không câu nói nào mang nó, và
+  câu của chủ đèn về chuyện khác được trả lời như bình thường. Không nói gì
+  khi công tắc tắt, với câu của người khác, hoặc khi không có gì được tạo
+  hay tắt/bật trong 10 phút đó; khi công tắc tắt thì không giữ gì. Không
+  có tệp và không thêm vòng gọi. Kiểm
+  thử: `just_made::tests::*`
   (`a_make_then_the_skill_you_just_made_is_told_by_name_and_turned_off`,
   `turn_it_back_on_right_after_means_the_one_just_turned_off`,
   `two_makes_in_the_conversation_ask_which_naming_both`,
   `no_make_in_the_conversation_asks_and_never_guesses`,
   `another_persons_make_doesnt_count`,
-  `a_conversation_quiet_too_long_is_over`) và
+  `a_make_is_told_for_ten_minutes_after_it_never_carried_on_by_lines`,
+  `a_failed_make_keeps_nothing_and_the_switch_off_tells_nothing`,
+  `a_skill_removed_since_is_not_named`,
+  `what_one_thread_keeps_another_reads`, `forget_everything_clears_it`) và
   `second_provider::tests::just_made_note`
   (`turn_it_back_on_after_the_note_turns_it_on`,
-  `use_the_one_you_just_made_turns_it_on_and_runs_it_with_the_undo_line`).
+  `use_the_one_you_just_made_turns_it_on_and_runs_it_with_the_undo_line`,
+  `run_the_one_you_just_made_calls_its_function_never_a_second_make`,
+  `ten_owner_lines_about_other_things_say_nothing_of_the_skill`).
 - **Đã tạo hay đã thêm đều như nhau** (#7594: trên lamp-9adf, 17/11 lúc
   23:1x, "Lamp, turn off my btc price skill", một kỹ năng thêm từ một
   `SKILL.md` trong ứng dụng, được trả lời "I can't turn skills off myself,
