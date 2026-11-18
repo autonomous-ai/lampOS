@@ -1256,6 +1256,10 @@ fn worker_command(
             role,
             var(crate::did_history::ENVIRONMENT).as_deref(),
         ))
+        .envs(app_triggers_worker_environment(
+            role,
+            var(crate::app_triggers::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2265,6 +2269,17 @@ fn did_keep_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::did_history::ENVIRONMENT, "on"))
+}
+
+// A final line that is a running app's trigger is told to that app
+// (`app_triggers::ENVIRONMENT`, #7415 piece 6): the exact `on`, to the second
+// route, whose spoken line it is.
+fn app_triggers_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::app_triggers::ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -3555,6 +3570,13 @@ mod tests {
                         "LAMP_DID_KEEP",
                         ["second"].as_slice(),
                     ),
+                    // A final line that is a running app's trigger told to
+                    // it: the second route alone (#7415 piece 6).
+                    (
+                        app_triggers_worker_environment,
+                        "LAMP_APP_TRIGGERS",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -3870,6 +3892,7 @@ mod tests {
                     crate::told_when_asked::ENVIRONMENT,
                     crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
                     crate::did_history::ENVIRONMENT,
+                    crate::app_triggers::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -4163,6 +4186,7 @@ mod tests {
                     "LAMP_ACTION_CLAIM_DOING=on",
                     "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
+                    "LAMP_APP_TRIGGERS=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",

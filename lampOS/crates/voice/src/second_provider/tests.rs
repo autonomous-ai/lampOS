@@ -4,6 +4,7 @@ use super::*;
 mod action_claim;
 mod after_forget;
 mod agent_tasks_named;
+mod app_triggers_in_code;
 mod chat_second_try;
 mod checking_line;
 mod clash_note;
