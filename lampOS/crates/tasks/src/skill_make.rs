@@ -1931,9 +1931,15 @@ impl MakeHandOvers {
         // A live ask has its own one place, beside a make's.
         if crate::voice_ask::is_ask(&line) {
             let answered = match &self.asks {
-                Some(asks) => crate::voice_ask::answer(&line, asks, &self.work, &mut || {
-                    write_answer(stream, &json!({"ok": true, "started": true}));
-                }),
+                Some(asks) => crate::voice_ask::answer_beside_make(
+                    &line,
+                    asks,
+                    running.load(Ordering::Acquire),
+                    &self.work,
+                    &mut || {
+                        write_answer(stream, &json!({"ok": true, "started": true}));
+                    },
+                ),
                 None => refusal(
                     "off",
                     "an ask for the lamp's agent is off on this lamp (LAMP_HARD_ASKS_TO_AGENT, LAMP_SERVICES_TO_AGENT)",

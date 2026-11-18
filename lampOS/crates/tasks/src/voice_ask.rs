@@ -86,6 +86,12 @@ pub const LEAST_WITHIN: Duration = crate::skill_make::LEAST_WITHIN;
 pub const MOST_WITHIN: Duration = Duration::from_secs(120);
 /// What a second ask is told while one runs.
 pub const BUSY: &str = "the lamp's agent is already on an ask; one is taken at a time";
+/// What an ask for a gateway agent is told while a make runs (#7245): the
+/// make holds the agent's one kept session for up to
+/// `skill_make::MOST_WITHIN`, so the ask would wait behind it past its own
+/// [`MOST_WITHIN`] with nothing said; refused at once, the voice says its
+/// line then.
+pub const MAKING: &str = "the lamp's agent is making a skill; one is taken at a time";
 /// A gateway agent's ask is an answer only (Heron's P2 on #7509): its turn
 /// has the owner's Gateway's tools and messaging channels, and the lamp
 /// asked no yes for an action.
@@ -407,6 +413,24 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => told(read),
     }
+}
+
+/// [`answer`], beside a make: with one running (`making`), an ask for a
+/// gateway agent is refused `busy` ([`MAKING`]) at once, never queued
+/// behind the make in the agent's one kept session; a Hermes ask runs on
+/// its own runner as before.
+pub fn answer_beside_make(
+    line: &[u8],
+    asks: &Asks,
+    making: bool,
+    work: &Path,
+    started: &mut dyn FnMut(),
+) -> Value {
+    if making && matches!(pick(asks), Ok(MakeAgent::Gateway(_))) {
+        eprintln!("[lamp-tasks] live ask: refused busy, a make holds the agent's session");
+        return refusal("busy", MAKING);
+    }
+    answer(line, asks, work, started)
 }
 
 /// The lamp's default agent for an ask now ([`Asks::agent`]), or its
@@ -1011,6 +1035,48 @@ mod tests {
         assert_eq!(chat(&long, false), None);
         std::fs::write(dir.path().join(crate::skill_make::ANSWER_FILE), "Seven.").unwrap();
         assert_eq!(chat("Six.", false), Some(("Seven.".into(), File)));
+    }
+
+    /// #7245 (Twelve's P2 on #7737): while a make runs, an ask for a
+    /// gateway agent is refused `busy` at once and no turn is typed; a
+    /// Hermes ask still runs; with no make running the gateway ask runs.
+    #[test]
+    fn an_ask_for_a_gateway_agent_while_a_make_runs_is_busy_at_once() {
+        let dir = work();
+        let agent = || Arc::new(Agent::default());
+        let line = br#"{"op":"voice_ask","ask":"plan my trip","within_ms":5000}"#;
+        let picks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let turn = Arc::new(Turn {
+            answer: Some("Planned."),
+            ..Turn::default()
+        });
+        let gateway = picking(
+            asks(agent(), agent(), Arc::new(Minting::default()), on()),
+            Ok(MakeAgent::Gateway(EngineKind::Openclaw)),
+            turn.clone(),
+            Some(EngineKind::Openclaw),
+            picks.clone(),
+        );
+        let told = answer_beside_make(line, &gateway, true, dir.path(), &mut || {});
+        assert_eq!(told["error"], "busy", "{told}");
+        assert_eq!(told["message"], MAKING);
+        assert!(turn.seen.lock().unwrap().is_empty());
+        let told = answer_beside_make(line, &gateway, false, dir.path(), &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(turn.seen.lock().unwrap().len(), 1);
+        let open = Arc::new(Agent {
+            answer: Some("Open."),
+            ..Default::default()
+        });
+        let hermes = picking(
+            asks(open, agent(), Arc::new(Minting::default()), on()),
+            Ok(MakeAgent::Hermes),
+            Arc::new(Turn::default()),
+            Some(EngineKind::Hermes),
+            picks,
+        );
+        let told = answer_beside_make(line, &hermes, true, dir.path(), &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
     }
 
     #[test]
