@@ -38,6 +38,8 @@ Environment=LAMP_SKILL_TASKS=on
 Environment=LAMP_SKILL_SECRETS=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# On OpenClaw too (#7742): a net run's own egress socket, relayed in its skill-start fence alone.
+Environment=LAMP_TASK_NET_GATEWAY=on
 # The lamp's agent's connectors (#6648, docs/services.md "The lamp's agent's connectors"): Hermes's config.yaml
 # gets mcp_servers.lamp-services at start, reaching a linked service only by a skill run's one-run token and grants;
 # a write waits for the owner's spoken yes. The same line in lamp-skills, lamp-skills-manage@, lamp-voice and
