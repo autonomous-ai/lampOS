@@ -83,11 +83,33 @@ impl ReportsState {
     }
 }
 
-/// The reports' two topics.
+/// One answer's wait (`voice/turn_time`, #6256 F8): from when the voice
+/// decided the person had finished to its answer's first audio, in whole
+/// milliseconds. Only with `LAMP_REPORT_COUNTERS=on` in the voice; read by
+/// `lamp-cloud` into the opt-in report's `voice_turn_ms` buckets, and only
+/// with the person's yes. A number only.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceTurnTime {
+    pub after_ms: u64,
+}
+
+impl VoiceTurnTime {
+    pub const TYPE: &str = "lamp_msgs/VoiceTurnTime";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/turn_time";
+
+    /// Something that happened and is over, kept by nobody.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The reports' topics.
 pub fn reports_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (ReportsRequest::TOPIC, ReportsRequest::declaration()),
         (ReportsState::TOPIC, ReportsState::declaration()),
+        (VoiceTurnTime::TOPIC, VoiceTurnTime::declaration()),
     ]
 }
 
@@ -129,6 +151,11 @@ mod tests {
                 ..Default::default()
             }
         );
+        assert_eq!(
+            serde_json::to_string(&VoiceTurnTime { after_ms: 1_240 }).unwrap(),
+            r#"{"after_ms":1240}"#
+        );
+        assert_eq!(reports_topics().len(), 3);
         for (topic, declaration) in reports_topics() {
             assert_eq!(crate::declaration_of(topic), Some(declaration));
         }

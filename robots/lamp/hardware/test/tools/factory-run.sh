@@ -143,7 +143,8 @@ done
 if [[ -n $cam ]]; then rec "CAMERA_4B=PASS $cam 01da:5875"
 elif [[ -e /home/orangepi/NO_CAMERA_OK ]]; then rec "CAMERA_4B=FAIL no camera, rest tested anyway"; say "WARN no camera (4b): testing the rest"
 else fail "no camera 01da:5875 on any USB port (4b)"; fi
-systemctl cat lamp-update | grep -q lampos-stable && rec "UPDATE_CHANNEL_4F=PASS lampos-stable" || fail "lamp-update is not on lampos-stable (4f)"
+# The stable feed: its CDN mirror (#6256 F2) or the GitHub release it mirrors
+systemctl cat lamp-update | grep -Eq 'cdn\.autonomous\.ai/lampos/stable/|releases/download/lampos-stable/' && rec "UPDATE_CHANNEL_4F=PASS the stable feed" || fail "lamp-update is not on the stable feed (4f)"
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
 

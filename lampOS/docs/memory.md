@@ -262,7 +262,9 @@ socket is refused before the eyes forget anything.
   or a group memory's own user can't give the socket, EPERM) is logged as
   `the forget socket is not open` and left out: memory still serves its
   own socket, and an app removal answers that memory was kept. So memory's
-  user must be in that group too, as lamp-cloud's. The main socket stays
+  user must be in that group too, as lamp-cloud's. The product unit opens
+  it at `/run/lampos-memory/forget.sock` for `lampos`, lamp-cloud's group,
+  which memory's user is in (A8, #6852). The main socket stays
   0600. A line on it must be exactly
   `{"op":"forget_person","person":ID}`, those two keys and an id of the
   shape above; it is re-encoded before the store sees it
@@ -850,7 +852,13 @@ answer to that question, by that person, within its 30 s. A yes after its
 says why after "not the same person": "no one known on the line", "theirs,
 in a later session" or "another person" (`second_provider::not_theirs`, ids
 never said; Thirteen's row on #5627, a yes 42 s after the hold read as
-another person's). Any no, keep,
+another person's). A yes in time from no one known on the line (no face in
+view, an unknown face, a line carried in their conversation going on) is
+dropped and kept, and, as for an unseen yes, the model is told once that it
+did not count, that nothing was forgotten and it is still kept, and that it
+may ask them once to say it facing the lamp (`remember::unknown_yes_told`,
+#7454: on lamp-06c1 the model was told nothing and could say it was
+forgotten). Any no, keep,
 wait, "đừng" or a question is no yes. If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
@@ -1887,7 +1895,35 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `thread::tests::lamp_words_for_parts_the_talk_going_on_from_the_ones_before`.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
-  journal: the kept list is the record of that.
+  journal: the kept list is the record of that. The exchange is marked out
+  (`remember::keep_out`, from `tools::keeps_out`) before the call runs.
+  - **A keep that kept nothing gives its line back**
+    (`LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on`, the second route; off unless
+    set). On lamp-06c1 on 17 Nov (build 13894) the nightly seed lost lines
+    this way: the model kept a date or a habit quietly, the keep was refused
+    (`keep_quietly::unheard`: not seen said, or words the person didn't
+    say), and the exchange had already been marked out, so the line was
+    stored nowhere, neither a kept thing nor an exchange. With the switch, a
+    `remember` whose own keep-out marked the exchange, and that was then
+    answered with nothing kept and nothing held for a yes (`remembered` not
+    true, no `held`: the quiet-keep refusals, `remember::heard::yes_alone`,
+    `needs_face::NOT_KEPT`, the memory's own refusal), takes the mark back (`remember::keep_back`,
+    decided after the call in `tools::keep_back_if_kept_nothing`). The
+    exchange is then journalled as if `remember` had never been called, in
+    the scope and for the person it carries. Unchanged: a keep that kept or
+    is held for a yes (so nothing is stored twice), every forget, an
+    exchange marked out before the call (another keep or a forget in the
+    request, a gap's or a carried line's hold, a written reminder), a held
+    keep run on the person's yes (`remember::heard::released`), a call with
+    no answer (the memory may have kept it) and a scope no longer current.
+    A guest's personal line refused by `needs_face::NOT_KEPT` then lands
+    in the room's journal, as plain talk would.
+    One journal line, no words. The Live route is unchanged. Tests:
+    `tools::tests::a_quiet_keep_refused_as_not_seen_leaves_its_exchange_in_with_the_switch`,
+    `tools::tests::a_quiet_keep_refused_for_unsaid_words_leaves_its_exchange_in`,
+    `tools::tests::a_keep_that_kept_still_keeps_its_exchange_out_with_the_switch`,
+    `tools::tests::only_a_remember_that_kept_nothing_gives_its_line_back`,
+    `remember::tests::a_kept_out_exchange_given_back_keeps_its_own_person`.
 - **What is kept is what was said** (#2176, row 10;
   `LAMP_MEMORY_KEEP_HEARD=on`, both voice routes and both clients; off
   unless set, on in the product by the memory owner's call on 5 Nov). The model writes the sentence `remember {text}` keeps, and

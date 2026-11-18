@@ -6752,6 +6752,8 @@ fn conversation_with_gate_inner(
     // audio is what follows them, a wait cue or the down line before them
     // being no answer (`AnswerAudio`).
     let mut answer_audio = AnswerAudio::default();
+    // Each answer's wait, for the opt-in report counters (#6256 F8).
+    let mut turn_time_out = crate::turn_time_out::TurnTimeOut::from_environment();
     leases.keep(rig, owner, &mut stalls)?;
     // A face added from a photo, asked about once at the lamp
     // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
@@ -6848,6 +6850,12 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // The lamp's agent's answer to a full read is said only while the
+    // owner is seen alone, looked at by the say client here
+    // (`LAMP_SERVICES_TO_AGENT`, `agent_asks`).
+    if lifetime.continuous() {
+        crate::agent_asks::count_faces_here();
+    }
     // Told at the first pause of a second, not after 15 s with no turn
     // (#560, `LAMP_TASK_NEWS_AT_PAUSE=on`).
     let news_at_pause = crate::task_news::at_pause(
@@ -8806,6 +8814,9 @@ fn conversation_with_gate_inner(
                                 json!({"kind":"answer_first_audio","turn":request,"at_us":now_us,
                                 "after_decision_ms":after}),
                             )?;
+                            if let Some(after_ms) = after {
+                                turn_time_out.told(after_ms);
+                            }
                         }
                         let received_frames = samples.len();
                         current.append_provider_packet(samples, received_at_us, spoken);

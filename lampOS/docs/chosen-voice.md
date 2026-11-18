@@ -75,10 +75,12 @@ words). No word is logged.
 It is kept in `/etc/lampOS/setup/energy` (644 root): the level on the first
 line, `chosen` or `derived` on the second; removed when the words are
 cleared, wiped by the reset. A change of the energy alone restarts nothing.
-`lamp-cloud` reads the file every 5 s and says it on `character/energy`
-(`lamp_msgs/Energy {level, chosen}`, [msgs.md](msgs.md)); inert data, so no
-switch of its own: the body reads it only with its own switch (#6893's later
-pieces).
+`lamp-cloud` reads the file every 0.5 s and says it on `character/energy`
+(`lamp_msgs/Energy {level, chosen}`, [msgs.md](msgs.md)) at once when it
+changes and every 5 s otherwise, so a level the app sets is said within
+half a second and the body, reading once a second, has it within about
+1.5 s (#7438); inert data, so no switch of its own: the body reads it only
+with its own switch (#6893's later pieces).
 
 ## The character words' rules
 

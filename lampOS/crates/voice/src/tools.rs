@@ -243,6 +243,9 @@ pub struct Settings {
     /// The person may stop health and crash reports by voice
     /// ([`crate::reports_stop`], `LAMP_REPORTS=on`, #1683).
     pub reports_stop: bool,
+    /// The owner's desk and Hydrate bottles read by voice
+    /// ([`crate::devices_tools`], `LAMP_DEVICES=on`, #7470).
+    pub devices: bool,
     /// Typed local recording offers for an explicitly spoken request.
     pub requested_audio: bool,
     /// The person may put the lamp to sleep by voice
@@ -322,6 +325,11 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::reports_stop::arguments(
         std::env::var(crate::reports_stop::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ));
+    flags.extend(crate::devices_tools::arguments(
+        std::env::var(crate::devices_tools::ENVIRONMENT)
             .ok()
             .as_deref(),
     ));
@@ -546,6 +554,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::reports_stop::FLAG
     {
         settings.reports_stop = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::devices_tools::FLAG
+    {
+        settings.devices = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -851,6 +865,30 @@ pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
     skills_after(settings, &core_tools(settings))
 }
 
+/// Whether a call, by its name and arguments, starts a skill made to start
+/// on what the person tells the lamp ([`crate::made_skill::is_said`],
+/// #6526): a call of it, or of `use_skill` naming it. Never a question
+/// about a skill ([`crate::skill_about`]), which runs none, and never with
+/// `LAMP_MADE_SKILL_SAID` off. Reads the skills' catalogs.
+pub fn starts_said(settings: &Settings, name: &str, args: &Value) -> bool {
+    if !crate::made_skill::said_on() {
+        return false;
+    }
+    let skill = if name == crate::use_skill::NAME {
+        if crate::skill_about::on() && args.get(crate::skill_about::ABOUT).is_some() {
+            return false;
+        }
+        args.get("skill").and_then(Value::as_str)
+    } else {
+        Some(name)
+    };
+    skill.is_some_and(|skill| {
+        skill_tools(settings)
+            .iter()
+            .any(|tool| tool.name == skill && crate::made_skill::is_said(&tool.description))
+    })
+}
+
 fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
     // The skills' after the executive's: a name already told stays its, and
     // a name the skills' own folder gives is its ([`skills_folders`]).
@@ -888,6 +926,11 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
+        // An ask handed to the lamp's agent (`LAMP_HARD_ASKS_TO_AGENT`,
+        // the second route's worker alone): off, nothing more.
+        if crate::agent_asks::hard_on() {
+            tools.push(crate::agent_asks::tool());
+        }
     }
     // A skill made by the lamp's own model: its function is the voice's
     // own, with or without the tasks part. It goes on as soon as it is
@@ -914,6 +957,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.reports_stop {
         tools.push(crate::reports_stop::tool());
         tools.push(crate::reports_stop::state_tool());
+    }
+    if settings.devices {
+        tools.extend(crate::devices_tools::tools());
     }
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
@@ -987,11 +1033,14 @@ pub fn is_skills(settings: &Settings, route: &Route) -> bool {
 }
 
 /// A name the voice routes itself, whether or not it is switched on.
-fn voices_own(name: &str) -> bool {
+pub(crate) fn voices_own(name: &str) -> bool {
     name == NOT_FOR_ME
         || name == THE_TIME
         || crate::remember::is_tool(name)
         || crate::agent_tasks::is_tool(name)
+        // Only while it is offered (`LAMP_HARD_ASKS_TO_AGENT`): off, a
+        // skill's tool of that name is the skill's.
+        || (crate::agent_asks::is_tool(name) && crate::agent_asks::hard_on())
         || crate::known_faces::is_tool(name)
         || crate::photo_faces::is_tool(name)
         || crate::marked::is_tool(name)
@@ -999,6 +1048,7 @@ fn voices_own(name: &str) -> bool {
         || name == crate::use_skill::NAME
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
+        || crate::devices_tools::is_tool(name)
         || crate::sleep_asked::is_tool(name)
         || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
@@ -1111,6 +1161,10 @@ pub enum Route {
     /// Whether reports are sent, and who stopped them and when, read from
     /// `lamp-cloud`'s `reports/state`: answered here, at once.
     ReportsState,
+    /// The owner's desk or bottle read through `lamp-cloud` on the bus
+    /// ([`crate::devices_tools`]): waits for the cloud, so it runs off the
+    /// turn like the other slow routes.
+    Devices(crate::devices_tools::Read),
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -1126,6 +1180,10 @@ pub enum Route {
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
     Services(PathBuf),
+    /// An ask handed to the lamp's agent ([`crate::agent_asks`],
+    /// `LAMP_HARD_ASKS_TO_AGENT`): answered at once with the holding line,
+    /// the agent's answer told when it comes.
+    AgentAsk,
     /// Nobody here runs that.
     Nobody,
 }
@@ -1243,6 +1301,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             .clone()
             .map_or(Route::Nobody, Route::Services);
     }
+    if crate::agent_asks::is_tool(name) {
+        return if settings.tasks.is_some() && crate::agent_asks::hard_on() {
+            Route::AgentAsk
+        } else {
+            Route::Nobody
+        };
+    }
     if crate::sleep_asked::is_tool(name) {
         return if settings.sleep_asked {
             Route::Sleep
@@ -1253,6 +1318,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::seen_yes::is_tool(name) {
         return if settings.seen_activity {
             Route::SeenActivity(settings.seen_posture)
+        } else {
+            Route::Nobody
+        };
+    }
+    if let Some(read) = crate::devices_tools::read_of(name) {
+        return if settings.devices {
+            Route::Devices(read)
         } else {
             Route::Nobody
         };
@@ -1286,6 +1358,77 @@ pub fn route(settings: &Settings, name: &str) -> Route {
 /// being asked to keep or forget something is not itself something to keep.
 pub fn keeps_out(route: &Route, name: &str) -> bool {
     matches!(route, Route::Memory(..)) && name != crate::remember::RECALL
+}
+
+/// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`: only the exact value `on`; off. On
+/// the second route, a `remember` that kept nothing gives its line back to
+/// the journal ([`keep_back_if_kept_nothing`]).
+pub const REFUSED_KEEP_ENVIRONMENT: &str = "LAMP_REFUSED_KEEP_KEEPS_EXCHANGE";
+static REFUSED_KEEP_ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// The switch for one test's own thread ([`set_refused_keep_for_test`]):
+    /// the process switch is read once, and other tests read it off.
+    static REFUSED_KEEP_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` is on in this process, read once.
+pub fn refused_keep_keeps_exchange() -> bool {
+    #[cfg(test)]
+    if REFUSED_KEEP_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *REFUSED_KEEP_ON
+        .get_or_init(|| std::env::var(REFUSED_KEEP_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// The switch on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_refused_keep_for_test(on: bool) {
+    REFUSED_KEEP_FOR_TEST.with(|cell| cell.set(on));
+}
+
+/// Whether a `remember` answered `told` kept nothing and holds nothing: not
+/// `remembered`, and no keep `held` for a yes. A forget or recall is never.
+fn kept_nothing(name: &str, told: &Value) -> bool {
+    name == crate::remember::REMEMBER && told["remembered"] != true && told.get("held").is_none()
+}
+
+/// With `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` (lamp-06c1, 17 Nov, build
+/// 13894): a `remember` whose own [`keeps_out`] took request `request`'s
+/// exchange out of the journal (`marked`) and that then kept nothing, told
+/// so (`answered`: a refusal such as `keep_quietly::unheard`'s or
+/// `remember::heard::yes_alone`'s, or the memory's own "not kept"), gives
+/// the exchange back, as if `remember` had never been called. A line whose
+/// quiet keep was refused was otherwise stored nowhere. Decided after the
+/// call: a keep that kept, or is held for a yes, stays out, so nothing is
+/// stored twice; an exchange kept out before the call (another keep or a
+/// forget in the request, a gap's or a carried line's hold, a written
+/// reminder) stays out; a held keep run on the person's yes
+/// (`remember::heard::released`), a call with no answer (it may have kept)
+/// and a scope no longer current change nothing. Only the mark goes: the
+/// exchange keeps the scope and person it carries. Off, nothing changes.
+fn keep_back_if_kept_nothing(
+    call: &ToolCall,
+    request: u64,
+    marked: bool,
+    (told, answered): (&Value, bool),
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+) {
+    if marked
+        && answered
+        && refused_keep_keeps_exchange()
+        && kept_nothing(&call.name, told)
+        && crate::remember::heard::released(lease).is_none()
+        && spoken_scope_current(lease, request, context)
+    {
+        crate::remember::keep_back(request);
+        eprintln!(
+            "lamp-voice second: request {request}: a remember that kept nothing leaves its exchange in the journal (LAMP_REFUSED_KEEP_KEEPS_EXCHANGE)"
+        );
+    }
 }
 
 /// One call answered to the end, for a voice route that waits for each
@@ -1428,12 +1571,18 @@ fn answer_inner(
         }
         Route::Nobody => ToolAnswer::plain(unavailable()),
         route => {
-            if keeps_out(&route, &call.name) {
-                crate::remember::keep_out(request);
-            }
+            let marked = keeps_out(&route, &call.name) && crate::remember::keep_out(request);
             let began = std::time::Instant::now();
             let (whom, mut answer, answered) =
                 run_spoken_call_inner(settings, &route, call, request, heard, context, lease);
+            keep_back_if_kept_nothing(
+                call,
+                request,
+                marked,
+                (&answer.told, answered),
+                lease,
+                context,
+            );
             // Kept only for the second voice's spoken turn, which takes it
             // out before its model reads the answer; the key is never a
             // model's (#1390).
@@ -2560,6 +2709,27 @@ fn run_call_with_scope(
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
+        Route::Devices(read) => (
+            "the devices",
+            // The kept list is copied out and back: the lock is never held
+            // across the wait for the cloud.
+            {
+                let mut cache = crate::devices_tools::CACHE
+                    .lock()
+                    .map(|cache| cache.clone())
+                    .unwrap_or_default();
+                let told = crate::devices_tools::run(
+                    &mut crate::devices_tools::Bus::of_the_lamp(),
+                    &mut cache,
+                    *read,
+                    crate::devices_tools::ANSWER_WITHIN,
+                );
+                if let Ok(mut kept) = crate::devices_tools::CACHE.lock() {
+                    *kept = cache;
+                }
+                told
+            },
+        ),
         Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(
@@ -2608,6 +2778,10 @@ fn run_call_with_scope(
         Route::Services(folder) => (
             "the services",
             crate::services::run(folder, call, request, heard, lease),
+        ),
+        Route::AgentAsk => (
+            "the lamp's agent",
+            (crate::agent_asks::run(call, request, heard, lease), true),
         ),
         Route::SeenActivity(posture) => (
             "the seen activity yes",
@@ -3423,6 +3597,7 @@ mod tests {
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
+            devices: false,
         };
         let mut tools = declared(&settings);
         tools.push(crate::attention::name_tool());
@@ -3760,6 +3935,7 @@ mod tests {
                 mark: None,
                 onboarding: None,
                 reports_stop: false,
+                devices: false,
             }
         );
         assert_eq!(rest, ["--session", "7"]);
@@ -4335,6 +4511,172 @@ mod tests {
         }
     }
 
+    /// A known person's own scope for request `request`, as the second
+    /// route admits a line: `name`'s, never held by a gap.
+    fn own_scope(request: u64, name: &str) -> std::sync::Arc<crate::memory_scope::RequestScope> {
+        std::sync::Arc::new(crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([0x51; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            crate::memory_scope::ScopeSnapshot::of(name),
+        ))
+    }
+
+    /// A `remember` of `text` asked in heard line `request` (`line`), the
+    /// person's face `seen` saying it or not, with `LAMP_KEEP_QUIETLY` on and
+    /// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` as `on`: what the model is told,
+    /// and whether the exchange is kept out of the journal after.
+    fn quiet_keep(request: u64, line: &str, text: &str, seen: bool, on: bool) -> (Value, bool) {
+        let name = "Refused Keep Mai";
+        crate::thread::THREAD.lock().unwrap().line_of(request, line);
+        let person = crate::remember::person_id(name);
+        let speakers: &[String] = if seen { &["b9/f1".to_owned()] } else { &[] };
+        crate::keep_quietly::saw(
+            request,
+            &person,
+            speakers,
+            Some((name.to_owned(), "b9/f1".to_owned())),
+            false,
+        );
+        assert_eq!(crate::keep_quietly::seen_saying(request, &person), seen);
+        let owner = own_scope(request, name);
+        let lease = owner.lease();
+        // No memory answers here: a refusal never reaches it.
+        let settings = Settings {
+            memory: Some(PathBuf::from("/nonexistent/refused-keep-memory.sock")),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "keep".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": text}),
+        };
+        crate::keep_quietly::set_on_for_test(true);
+        set_refused_keep_for_test(on);
+        let told = answer_inner(&settings, &call, request, true, None, Some(&lease), false).told;
+        crate::keep_quietly::set_on_for_test(false);
+        set_refused_keep_for_test(false);
+        (told, crate::remember::kept_out(request))
+    }
+
+    /// lamp-06c1, 17 Nov, build 13894, the seed's haircut line: the model
+    /// kept a date quietly on a line the person was not seen saying, the
+    /// keep was refused (`keep_quietly::NOT_SEEN`), and its exchange had
+    /// been kept out of the journal before the call ran, so the line was
+    /// stored nowhere. With `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE` the exchange
+    /// is journalled; off, it stays out, as before.
+    #[test]
+    fn a_quiet_keep_refused_as_not_seen_leaves_its_exchange_in_with_the_switch() {
+        let line = "I'm getting my hair cut on Thursday at five.";
+        let text = "Getting a haircut on Thursday at five.";
+        for (request, on) in [(13_894_101_u64, true), (13_894_102, false)] {
+            let (told, kept_out) = quiet_keep(request, line, text, false, on);
+            assert_eq!(told, crate::keep_quietly::not_seen(), "{on}");
+            assert_eq!(kept_out, !on, "switch {on}: the exchange kept out");
+        }
+    }
+
+    /// lamp-06c1, 17 Nov, build 13894, the seed's second bouldering line:
+    /// seen said, but the quiet keep had words the person did not say
+    /// (`keep_quietly::NOT_KEPT`): with the switch its exchange is
+    /// journalled.
+    #[test]
+    fn a_quiet_keep_refused_for_unsaid_words_leaves_its_exchange_in() {
+        let (told, kept_out) = quiet_keep(
+            13_894_103,
+            "I'm going bouldering again this Friday.",
+            "Goes bouldering with friends every Friday evening as a weekly habit.",
+            true,
+            true,
+        );
+        assert_eq!(told, crate::keep_quietly::not_kept());
+        assert!(!kept_out, "the exchange is journalled");
+    }
+
+    /// A keep that kept still keeps its exchange out, with the switch on:
+    /// the line is stored once, as the kept thing, never twice.
+    #[test]
+    fn a_keep_that_kept_still_keeps_its_exchange_out_with_the_switch() {
+        let request = 13_894_104;
+        let dir = schedule_directory("refused-keep-kept");
+        let socket = dir.join("memory.sock");
+        let owner = own_scope(request, "Refused Keep Mai");
+        let lease = owner.lease();
+        let served = scoped_reply(&socket, owner.clone(), false, json!({"ok":true,"id":1}));
+        let settings = Settings {
+            memory: Some(socket),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "keep".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": "My bike is blue."}),
+        };
+        set_refused_keep_for_test(true);
+        let told = answer_inner(&settings, &call, request, true, None, Some(&lease), false).told;
+        set_refused_keep_for_test(false);
+        served.join().unwrap();
+        assert_eq!(told["remembered"], true, "{told}");
+        assert!(crate::remember::kept_out(request), "no double");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Only a `remember` that kept nothing and holds nothing gives its line
+    /// back: a keep that kept or is held for a yes, and any forget, never.
+    /// An exchange kept out before the call (another keep or a forget in
+    /// the request, a gap's hold) stays out.
+    #[test]
+    fn only_a_remember_that_kept_nothing_gives_its_line_back() {
+        let remember = crate::remember::REMEMBER;
+        assert!(kept_nothing(remember, &crate::keep_quietly::not_seen()));
+        assert!(kept_nothing(remember, &crate::keep_quietly::not_kept()));
+        assert!(kept_nothing(
+            remember,
+            &json!({"remembered": false, "note": crate::remember::heard::YES_ALONE})
+        ));
+        assert!(kept_nothing(remember, &unavailable()));
+        assert!(!kept_nothing(remember, &json!({"remembered": true})));
+        assert!(!kept_nothing(
+            remember,
+            &json!({"remembered": true, "note": crate::remember::ALREADY_KEPT})
+        ));
+        assert!(!kept_nothing(remember, &crate::remember::held_keep_told()));
+        for forget in [crate::remember::FORGET, crate::remember::FORGET_EVERYTHING] {
+            assert!(
+                !kept_nothing(forget, &json!({"forgotten": false})),
+                "{forget}"
+            );
+        }
+        // Kept out before this call: the refused keep leaves it out.
+        let request = 13_894_105;
+        assert!(crate::remember::keep_out(request));
+        let marked = crate::remember::keep_out(request);
+        assert!(!marked);
+        let call = ToolCall {
+            id: "keep".into(),
+            name: remember.into(),
+            args: json!({"text": "x"}),
+        };
+        set_refused_keep_for_test(true);
+        keep_back_if_kept_nothing(
+            &call,
+            request,
+            marked,
+            (&crate::keep_quietly::not_seen(), true),
+            None,
+            None,
+        );
+        // No answer (the memory may have kept it): out too.
+        let other = 13_894_106;
+        assert!(crate::remember::keep_out(other));
+        keep_back_if_kept_nothing(&call, other, true, (&unavailable(), false), None, None);
+        set_refused_keep_for_test(false);
+        assert!(crate::remember::kept_out(request));
+        assert!(crate::remember::kept_out(other));
+    }
+
     #[test]
     fn scoped_memory_with_audio_context_keeps_admitted_identity_and_suppresses_late_reply() {
         for revoke in [false, true] {
@@ -4891,6 +5233,51 @@ mod tests {
             Route::Nobody
         );
         assert!(declared(&Settings::default()).is_empty());
+        // `LAMP_HARD_ASKS_TO_AGENT` (17 Nov): off, no `ask_agent` and
+        // nobody runs it; on, it is offered beside the tasks part's and
+        // routed to the lamp's agent, never with no tasks part.
+        let names = |settings: &Settings| -> Vec<String> {
+            declared(settings)
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        crate::agent_asks::set_on_here(Some((true, false)));
+        assert!(!names(&with).contains(&crate::agent_asks::TOOL.to_owned()));
+        assert_eq!(route(&with, crate::agent_asks::TOOL), Route::Nobody);
+        crate::agent_asks::set_on_here(Some((false, true)));
+        assert_eq!(
+            names(&with).last().map(String::as_str),
+            Some(crate::agent_asks::TOOL)
+        );
+        assert_eq!(route(&with, crate::agent_asks::TOOL), Route::AgentAsk);
+        assert_eq!(
+            route(&Settings::default(), crate::agent_asks::TOOL),
+            Route::Nobody
+        );
+        assert!(declared(&Settings::default()).is_empty());
+        // Not heard live: nothing is handed over.
+        let ask = ToolCall {
+            id: "1".into(),
+            name: crate::agent_asks::TOOL.into(),
+            args: serde_json::json!({"ask": "plan a three-day trip to Hue"}),
+        };
+        assert_eq!(
+            crate::agent_asks::run(&ask, 9, false, None)["error"],
+            crate::services::NOT_HEARD
+        );
+        // Heard, but not the owner's own line (Heron's P2 6 on #7509):
+        // nothing is handed over, as a `service_read` is held.
+        assert_eq!(
+            crate::agent_asks::run(&ask, 9, true, None)["error"],
+            crate::agent_asks::OWNER_ONLY_NEXT
+        );
+        // With the switch on, a skill's tool named so is the voice's own;
+        // off, the name is a skill's like any other (Heron's P3).
+        assert!(voices_own(crate::agent_asks::TOOL));
+        crate::agent_asks::set_on_here(Some((false, false)));
+        assert!(!voices_own(crate::agent_asks::TOOL));
+        crate::agent_asks::set_on_here(None);
     }
 
     #[test]
@@ -5835,6 +6222,58 @@ mod tests {
         let (whom, (_, answered)) = run_call(&route(&settings, &juggle.name), &juggle, 7, true);
         assert_eq!((whom, answered), (crate::use_skill::NAME, true));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7448: a call starts a said start when it calls a skill whose card
+    /// is a said start's ([`crate::made_skill::is_said`]), itself or through
+    /// `use_skill`, with `LAMP_MADE_SKILL_SAID` on; never another skill, a
+    /// question about one, or with the switch off.
+    #[test]
+    fn a_said_start_is_found_by_its_card_itself_or_through_use_skill() {
+        let dir = schedule_directory("ssd");
+        let said = format!(
+            "Use it when they say they're busy{}it turns the light red.",
+            crate::made_skill::SAID_TO_YOU
+        );
+        std::fs::write(
+            dir.join(CATALOG_FILE),
+            json!({"tools":[
+                {"name":"written_busy_light","description":said},
+                {"name":"dance","description":"Dance."}]})
+            .to_string(),
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let through = |skill: &str| json!({"skill": skill});
+        crate::made_skill::set_said_here(Some(true));
+        crate::skill_about::set_on_here(Some(true));
+        assert!(starts_said(&settings, "written_busy_light", &json!({})));
+        assert!(starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &through("written_busy_light")
+        ));
+        assert!(!starts_said(&settings, "dance", &json!({})));
+        assert!(!starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &through("dance")
+        ));
+        assert!(!starts_said(
+            &settings,
+            crate::use_skill::NAME,
+            &json!({"skill": "written_busy_light", crate::skill_about::ABOUT: "state"})
+        ));
+        assert!(!starts_said(&settings, crate::use_skill::NAME, &json!({})));
+        crate::made_skill::set_said_here(Some(false));
+        assert!(!starts_said(&settings, "written_busy_light", &json!({})));
+        crate::made_skill::set_said_here(None);
+        crate::skill_about::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A reader's P2 on #5505: a search skill (look-for-things' `[search]`,

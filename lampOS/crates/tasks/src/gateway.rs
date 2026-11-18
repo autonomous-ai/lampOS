@@ -60,6 +60,13 @@ pub trait Probe: Send {
     fn not_ready(&self) -> String {
         format!("the OpenClaw Gateway did not answer on 127.0.0.1:{PORT}")
     }
+
+    /// Whether the last look found the Gateway's port answering, though it
+    /// may not serve yet. A probe of the port alone is ready exactly when it
+    /// answers, so its wait needs no bound of its own for the port.
+    fn port_answered(&self) -> bool {
+        true
+    }
 }
 
 /// The real Gateway on loopback [`PORT`] ([`answers`]).
@@ -307,6 +314,10 @@ impl Probe for Serving {
         read
     }
 
+    fn port_answered(&self) -> bool {
+        self.port_answered
+    }
+
     fn not_ready(&self) -> String {
         if self.port_answered {
             format!(
@@ -425,6 +436,68 @@ pub struct Gateway {
     probe: Box<dyn Probe>,
     ready_within: Duration,
     ready_every: Duration,
+    /// How long the port alone is waited for, when shorter than
+    /// `ready_within`: past it, a Gateway whose port never answered and
+    /// whose unit is not up ([`Gateway::with_unit`]) is not starting, so its
+    /// wait ends here, as a spoken task's does (#6577). With it set, the
+    /// ready bound counts from the port's first answer (#7550).
+    port_within: Option<Duration>,
+    /// Whether the Gateway's unit is up (active or activating) now: `None`
+    /// when it can't be told. Only asked past `port_within`.
+    unit_up: Option<Box<dyn Fn() -> Option<bool> + Send>>,
+}
+
+/// The lamp's Gateway unit, run by lamp-update.
+pub const GATEWAY_UNIT: &str = "lamp-openclaw-gateway.service";
+
+/// Whether [`GATEWAY_UNIT`] is up now, by its `ActiveState`: `active`,
+/// `activating` or `reloading` is up (a Gateway starting has a running unit
+/// long before its port answers: 51-53 s on lamp-c0a4, #7550); `inactive`,
+/// `failed` or `deactivating` is not; `None` when systemctl fails or says
+/// something else.
+pub fn unit_up_of(state: &str) -> Option<bool> {
+    match state.trim() {
+        "active" | "activating" | "reloading" => Some(true),
+        "inactive" | "failed" | "deactivating" => Some(false),
+        _ => None,
+    }
+}
+
+/// How long [`gateway_unit_up`] waits for systemctl: past it, the state
+/// is unknown, and the wait ends at the port's bound (the first builder on
+/// #7568).
+pub const UNIT_SHOW_WITHIN: Duration = Duration::from_secs(2);
+
+/// [`unit_up_of`] the Gateway unit's state, read now (`systemctl show
+/// lamp-openclaw-gateway.service -p ActiveState --value`), at most
+/// [`UNIT_SHOW_WITHIN`]: None when it fails or takes longer (killed).
+fn gateway_unit_up() -> Option<bool> {
+    let mut shown = std::process::Command::new("systemctl")
+        .args(["show", GATEWAY_UNIT, "-p", "ActiveState", "--value"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let began = Instant::now();
+    let status = loop {
+        match shown.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if began.elapsed() < UNIT_SHOW_WITHIN => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            _ => {
+                let _ = shown.kill();
+                let _ = shown.wait();
+                return None;
+            }
+        }
+    };
+    // A state is one short word: the pipe holds it whole after the exit.
+    let mut out = String::new();
+    shown.stdout.take()?.read_to_string(&mut out).ok()?;
+    status.success().then_some(())?;
+    unit_up_of(&out)
 }
 
 impl Gateway {
@@ -433,9 +506,31 @@ impl Gateway {
     }
 
     /// A skill's run's wait (#7170): until the Gateway serves its RPCs
-    /// ([`Serving::lamp`]), at most [`SERVING_WITHIN`].
+    /// ([`Serving::lamp`]), at most [`SERVING_WITHIN`] from its port's
+    /// first answer (#7550: a Gateway started mid-wait has its whole start);
+    /// but a Gateway whose port has not answered by [`READY_WITHIN`] and
+    /// whose unit is not up is stopped, and given up then, as a spoken
+    /// task's is (#6577, lamp-fc4b, 17 Nov: a stopped Gateway held a skill's
+    /// run 240 s, and the person heard nothing all that time).
     pub fn serving() -> Self {
         Self::with_bounds(Box::new(Serving::lamp()), SERVING_WITHIN, READY_EVERY)
+            .with_port_within(READY_WITHIN)
+            .with_unit(Box::new(gateway_unit_up))
+    }
+
+    /// With the port alone waited for at most `within` while the Gateway's
+    /// unit is not up, and the ready bound counted from the port's first
+    /// answer.
+    pub fn with_port_within(mut self, within: Duration) -> Self {
+        self.port_within = Some(within);
+        self
+    }
+
+    /// With the Gateway's unit looked at by `up` past the port's bound: up,
+    /// the Gateway is starting and is waited for to the ready bound.
+    pub fn with_unit(mut self, up: Box<dyn Fn() -> Option<bool> + Send>) -> Self {
+        self.unit_up = Some(up);
+        self
     }
 
     pub fn with_bounds(
@@ -447,6 +542,8 @@ impl Gateway {
             probe,
             ready_within,
             ready_every,
+            port_within: None,
+            unit_up: None,
         }
     }
 
@@ -470,10 +567,35 @@ impl Gateway {
         deadline: Instant,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), String> {
-        let until = deadline.min(Instant::now() + self.ready_within);
+        let began = Instant::now();
+        let mut until = deadline.min(began + self.ready_within);
+        // Whether the port has answered in this wait: once it has, the
+        // Gateway is up or starting, and only `until` bounds it.
+        let mut port_seen = false;
+        // Whether the unit was found up past the port's bound: the Gateway
+        // is starting, so the port is waited for to `until`.
+        let mut starting = false;
         loop {
             if cancelled() {
                 return Err("the OpenClaw wait was cancelled".into());
+            }
+            if let Some(within) = self.port_within
+                && !port_seen
+                && !starting
+                && began.elapsed() >= within
+            {
+                starting = self.unit_up.as_ref().is_some_and(|up| up() == Some(true));
+                if !starting {
+                    return Err(format!(
+                        "{} within {} s",
+                        self.probe.not_ready(),
+                        within.as_secs()
+                    ));
+                }
+                eprintln!(
+                    "tasks: the OpenClaw Gateway's port has not answered in {} s, but its unit is up: waited for as it starts",
+                    within.as_secs()
+                );
             }
             if Instant::now() >= until {
                 return Err(format!(
@@ -481,8 +603,18 @@ impl Gateway {
                     self.probe.not_ready()
                 ));
             }
+            // A port look is bounded by its own short I/O bounds, so the
+            // port's bound is never overrun by more than one look.
             if self.probe.ready_until(until, cancelled) && !cancelled() && Instant::now() < until {
                 return Ok(());
+            }
+            if !port_seen && self.probe.port_answered() {
+                port_seen = true;
+                // The serving bound from the port's first answer (#7550), so
+                // a Gateway that came up mid-wait has its whole start.
+                if self.port_within.is_some() {
+                    until = deadline.min(Instant::now() + self.ready_within);
+                }
             }
             thread::sleep(
                 self.ready_every
@@ -1238,6 +1370,200 @@ mod tests {
         )
     }
 
+    /// #6577, lamp-fc4b, 17 Nov 18:53: a stopped Gateway never answers on
+    /// its port; a skill's run is given up at the port's bound, as a spoken
+    /// task is, not held to the serving bound, and no approvals read runs.
+    #[test]
+    fn a_gateway_whose_port_never_answers_is_given_up_at_the_ports_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        let (argv, at) = read_script(dir.path(), Some(1));
+        let port = Fake::default();
+        let mut waited = serving(argv, &port, Duration::from_secs(20))
+            .with_port_within(Duration::from_millis(200));
+        let began = Instant::now();
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            panic!("never sent to a Gateway that does not answer")
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::NotSent { .. }),
+            "{outcome:?}"
+        );
+        assert!(
+            began.elapsed() < Duration::from_secs(5),
+            "given up at the port's bound, not the serving bound: {:?}",
+            began.elapsed()
+        );
+        assert_eq!(runs(&at), 0, "no approvals read without the port");
+    }
+
+    /// The port answering within its bound, the wait goes on to the serving
+    /// bound: a Gateway still starting (#7170) is not given up at the port's
+    /// bound, so a slow approvals read is waited out, and one never served
+    /// ends only at the serving bound.
+    #[test]
+    fn a_gateway_answering_on_its_port_is_waited_for_to_the_serving_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        // Served from the fourth read, the reads spaced past the port's bound.
+        let (argv, at) = read_script(dir.path(), Some(4));
+        let port = Fake {
+            ready_from: Some(2),
+            ..Fake::default()
+        };
+        let mut waited = Gateway::with_bounds(
+            Box::new(Serving::new(
+                Box::new(port.clone()),
+                Box::new(ApprovalsRead::new(
+                    argv,
+                    Duration::from_secs(5),
+                    Duration::from_millis(150),
+                )),
+            )),
+            Duration::from_secs(20),
+            Duration::from_millis(1),
+        )
+        .with_port_within(Duration::from_millis(100));
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            assert_eq!(runs(&at), 4, "sent once the approvals read answered");
+            LaunchOutcome::Created {
+                agent_id: "x".into(),
+            }
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::Created { .. }),
+            "{outcome:?}"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let (argv, at) = read_script(dir.path(), None);
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut waited = serving(argv, &port, Duration::from_millis(600))
+            .with_port_within(Duration::from_millis(100));
+        let began = Instant::now();
+        let outcome = launch_with(Some(&mut waited), &launch(EngineKind::Openclaw), || {
+            panic!("never sent before the approvals read answers")
+        });
+        assert!(
+            matches!(outcome, LaunchOutcome::NotSent { .. }),
+            "{outcome:?}"
+        );
+        assert!(
+            began.elapsed() >= Duration::from_millis(600),
+            "held to the serving bound once the port answered: {:?}",
+            began.elapsed()
+        );
+        // Read at least once: the port answered, so the read was tried (how
+        // often within 600 ms depends on how fast `sh` starts).
+        assert!(runs(&at) >= 1, "the approvals read was tried");
+    }
+
+    /// A port that answers from `after` on, timed from its making.
+    #[derive(Clone)]
+    struct TimedPort {
+        from: Instant,
+        after: Duration,
+    }
+
+    impl Probe for TimedPort {
+        fn ready(&mut self) -> bool {
+            self.from.elapsed() >= self.after
+        }
+    }
+
+    /// #7550, lamp-fc4b, 17 Nov 18:49: a Gateway started mid-wait has a
+    /// running unit long before its port answers (51-53 s on lamp-c0a4).
+    /// Past the port's bound with the unit up, it is waited for; and its
+    /// serving bound counts from the port's first answer, so its whole start
+    /// fits.
+    #[test]
+    fn a_gateway_starting_mid_wait_is_waited_for_and_has_its_whole_start() {
+        // The port answers at 300 ms, past its 100 ms bound; the read is
+        // served on its second run, 200 ms after its first, so at about
+        // 500 ms: past a 400 ms serving bound from the wait's start, within
+        // one from the port's answer.
+        let wait = |unit: Option<bool>, dir: &Path| {
+            let (argv, at) = read_script(dir, Some(2));
+            let gateway = Gateway::with_bounds(
+                Box::new(Serving::new(
+                    Box::new(TimedPort {
+                        from: Instant::now(),
+                        after: Duration::from_millis(300),
+                    }),
+                    Box::new(ApprovalsRead::new(
+                        argv,
+                        Duration::from_secs(5),
+                        Duration::from_millis(200),
+                    )),
+                )),
+                Duration::from_millis(400),
+                Duration::from_millis(1),
+            )
+            .with_port_within(Duration::from_millis(100))
+            .with_unit(Box::new(move || unit));
+            (gateway, at)
+        };
+
+        // A skill's run waits with its own deadline (14 minutes), as
+        // `skill_task` calls it, not `launch_with`'s ready bound.
+        let far = || Instant::now() + Duration::from_secs(20);
+        let dir = tempfile::tempdir().unwrap();
+        let (mut waited, at) = wait(Some(true), dir.path());
+        let began = Instant::now();
+        let waited_out = waited.before_launch_until(far(), &|| false);
+        assert_eq!(waited_out, Ok(()));
+        assert!(
+            began.elapsed() >= Duration::from_millis(400),
+            "served past the bound from the wait's start: {:?}",
+            began.elapsed()
+        );
+        assert_eq!(runs(&at), 2);
+
+        // The unit down, or not told: a stopped Gateway, given up at the
+        // port's bound, before its port would answer.
+        for unit in [Some(false), None] {
+            let dir = tempfile::tempdir().unwrap();
+            let (mut waited, at) = wait(unit, dir.path());
+            let began = Instant::now();
+            let given_up = waited.before_launch_until(far(), &|| false);
+            assert!(
+                given_up
+                    .as_ref()
+                    .is_err_and(|why| why.ends_with("within 0 s")),
+                "{unit:?}: {given_up:?}"
+            );
+            assert!(
+                began.elapsed() < Duration::from_millis(300),
+                "{unit:?}: {:?}",
+                began.elapsed()
+            );
+            assert_eq!(runs(&at), 0);
+        }
+    }
+
+    #[test]
+    fn the_gateway_units_state_says_whether_it_is_up() {
+        for up in ["active", "activating", "reloading", "active\n"] {
+            assert_eq!(unit_up_of(up), Some(true), "{up}");
+        }
+        for down in ["inactive", "failed", "deactivating\n"] {
+            assert_eq!(unit_up_of(down), Some(false), "{down}");
+        }
+        for unknown in ["", "maintenance", "who"] {
+            assert_eq!(unit_up_of(unknown), None, "{unknown}");
+        }
+    }
+
+    /// The lamp's skill-run wait has the port's bound of a spoken task.
+    #[test]
+    fn the_lamps_serving_wait_gives_up_a_silent_port_as_a_spoken_task_does() {
+        let waited = Gateway::serving();
+        assert_eq!(waited.port_within, Some(READY_WITHIN));
+        assert_eq!(waited.ready_within, SERVING_WITHIN);
+        assert!(READY_WITHIN < SERVING_WITHIN);
+    }
+
     /// #7170, lamp-c0a4: a Gateway answering on its port but still
     /// starting does not serve `exec.approvals.get`; a run's
     /// `harness new openclaw` is held until it does, then sent.
@@ -1683,8 +2009,33 @@ mod tests {
     fn a_task_never_starts_or_stops_the_gateway_unit() {
         let unit = concat!("lamp-openclaw-", "gateway");
         let manager = concat!("system", "ctl");
+        // The Gateway's unit is only looked at, never started or stopped:
+        // gateway.rs reads its state (`systemctl show`, #7550), that unit's
+        // `ActiveState` only, within 2 s, and runs no other verb of the unit
+        // manager (the first builder on #7568).
+        let gateway = include_str!("gateway.rs");
+        let shown = concat!(
+            "[\"sh",
+            "ow\", GATEWAY_UNIT, \"-p\", \"ActiveState\", \"--value\"]"
+        );
+        assert_eq!(
+            gateway
+                .matches(concat!("Command::new(\"system", "ctl\")"))
+                .count(),
+            1
+        );
+        assert!(
+            gateway.contains(shown),
+            "the one systemctl run is a show of ActiveState"
+        );
+        assert_eq!(UNIT_SHOW_WITHIN, Duration::from_secs(2));
+        for verb in [
+            "start", "stop", "restart", "kill", "reload", "enable", "disable", "mask",
+        ] {
+            let arg = format!("\"{verb}\", GATEWAY_UNIT");
+            assert!(!gateway.contains(&arg), "gateway.rs runs systemctl {verb}");
+        }
         for (name, source, any_manager) in [
-            ("gateway.rs", include_str!("gateway.rs"), false),
             ("runtime.rs", include_str!("runtime.rs"), false),
             ("main.rs", include_str!("main.rs"), false),
             // Harness's own daemon is reached through the user manager

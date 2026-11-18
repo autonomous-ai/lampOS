@@ -101,6 +101,8 @@ Environment=LAMP_UPLOAD_TO_AGENT=on
 # A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): skills.secrets, skills.secret_set
 # and skills.secret_unset, handed to lamp-services' admin socket; the same line there, in lamp-voice and lamp-tasks.
 Environment=LAMP_SKILL_SECRETS=on
+# A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
+Environment=LAMP_TASK_NET=on
 Environment=LAMP_APP_UPDATE=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.
@@ -132,6 +134,9 @@ Environment=LAMP_APP_UPDATE_EVENTS=on
 Environment=LAMP_PHOTO_FACES=on
 Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# Memory's narrow socket (A8, #6852; cloud.md "The faces it knows"): face.remove forgets the person's memories
+# too, never reading them. Asked only with LAMP_FACES_PAGE=on; lamp-memory.service opens it for this group.
+Environment=LAMP_MEMORY_FORGET_SOCKET=/run/lampos-memory/forget.sock
 # The owner's dev monitor from the app (#5883, #6401; cloud.md "The dev monitor"): monitor.set/get/link in `can`, so the
 # app shows its switch. The monitor itself stays off until the owner turns it on in the app. On for every lamp: the lead's call (16 Nov).
 Environment=LAMP_APP_MONITOR=on

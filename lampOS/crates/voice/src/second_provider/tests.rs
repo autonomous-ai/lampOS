@@ -8249,6 +8249,72 @@ async fn a_held_call_is_not_run_and_the_model_is_told_so() {
     );
 }
 
+/// #7448: a `use_skill` call the said-start hold names, by its request,
+/// name and arguments, is not run, and the model is told it was not done,
+/// as for a held call; a call it doesn't name runs.
+#[tokio::test]
+async fn a_held_said_start_is_not_run_and_the_model_is_told_so() {
+    let busy = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                crate::use_skill::NAME,
+                json!({"skill": "written_busy_light"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Ugh, I am so busy today, nothing but meetings.".to_owned()),
+                Ok("Lamp, I'm busy.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                busy(),
+                vec![Ok(ChatEvent::Done)],
+                busy(),
+                vec![Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let calls: Calls = Arc::default();
+    let seen = calls.clone();
+    let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async { json!({"ok": true}) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .holding_said_starts(Arc::new(|request, name, args| {
+        request == 1 && name == crate::use_skill::NAME && args["skill"] == "written_busy_light"
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert!(calls.lock().unwrap().is_empty(), "the light was not set");
+    assert_eq!(
+        script.asked.lock().unwrap()[1].last().unwrap(),
+        &Message::tool("c1".to_owned(), crate::policy_holds::held().to_string())
+    );
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(calls.lock().unwrap().len(), 1, "the named line ran it");
+}
+
 /// #1712: with the first words cut, the answer's first piece is said once
 /// that many words have come, before its sentence ends; the rest of the
 /// sentence follows. Without it, the whole sentence.
@@ -14373,6 +14439,7 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
         "That's enough.",
         "Okay, enough.",
     ] {
+        let before = crate::agent_asks::forgets();
         let asked = asked_with(
             stop,
             |engine| engine.telling_cut_ins(true).ending_spoken_stops(true),
@@ -14382,7 +14449,11 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
         )
         .await;
         assert!(asked.is_empty(), "{stop}: {asked:?}");
+        // An ask with the lamp's agent is stopped with it (Heron's P2 4 on
+        // #7509).
+        assert_eq!(crate::agent_asks::forgets(), before + 1, "{stop}");
     }
+    let before = crate::agent_asks::forgets();
     let off = asked_with(
         "Stop them.",
         |engine| engine.telling_cut_ins(true),
@@ -14392,6 +14463,8 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
     )
     .await;
     assert_eq!(off.len(), 1, "{off:?}");
+    // Asked of the model: nothing is stopped.
+    assert_eq!(crate::agent_asks::forgets(), before);
     let quiet = asked_with(
         "Stop them.",
         |engine| engine.ending_spoken_stops(true),

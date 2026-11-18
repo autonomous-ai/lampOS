@@ -28,8 +28,24 @@
 //!   close person's answer within [`FIRST_ANSWER_US`] of its beginning
 //!   while the face is lost, `room/stood_up`, the
 //!   privacy slide or capture muted, sleep, the opt-in off (or its line
-//!   withdrawn), a forget, or [`MOST_US`] since the gate was last open on
-//!   a face in view.
+//!   withdrawn), a forget, [`MOST_US`] since the gate was last open on
+//!   a face in view, or **another face once the chair emptied**
+//!   ([`End::OtherFace`]): since the face was lost, at least one pose
+//!   answer showed no close person, and then the one face in view comes
+//!   back under another passing id than the one the hold was open on (or
+//!   with none known, as when it began on two faces). `serve` then wipes
+//!   the sitting and posture's window as the keep's
+//!   [`crate::keep::Why::OtherFace`] does, and the next sitting counts
+//!   from that wipe ([`crate::keep::Seat`]): someone sitting down after
+//!   the first one left never takes on their time (lamp-06c1, run 8: the
+//!   owner hid, one answer had no close person, another face came; the
+//!   first builder's rule on #6543). With a close person in every answer
+//!   it is the same body in the chair, and a new id is them looking back
+//!   up (the eyes give a face turned away and back a new passing id as a
+//!   rule, eyes.md): the hold goes on, on the new id (Heron's P1 on
+//!   #7635). With two faces in view no id is matched and nothing ends. It
+//!   compares two passing ids from the eyes and never asks whose face it
+//!   is.
 //! - **The first answer** (lamp-06c1, run 4: the face lost seconds after
 //!   every beginning, the first answer ~30 s away): a hold begins with the
 //!   newest pose answer when its frame went under [`crate::pose::EVERY_US`]
@@ -39,9 +55,12 @@
 //!   for at most [`FIRST_ANSWER_US`] since it began; no more frames go than
 //!   posture's and activity's own rates.
 //! - **Nothing kept**: what the pose answer says is read for its two
-//!   shoulders and dropped; no frame, no point and no id is kept.
+//!   shoulders and dropped; no frame and no point is kept. The passing id
+//!   of the one face in view the last step the gate was open on one is
+//!   held in memory only, never said, as [`crate::keep::Away`] holds it.
 //! - **The journal** ([`Note`]): began, goes on (with the newest answer's
-//!   shoulders as a share of the width), and ended (why).
+//!   shoulders as a share of the width), and ended (why, e.g. `another
+//!   face in view than the one it was held for`).
 //!
 //! Without posture (`LAMP_SEEN_POSTURE` off) no pose answer ever comes, so
 //! a hold ends when the face is lost, with no wait, and nothing changes.
@@ -103,6 +122,11 @@ pub enum End {
     Gate(Closed),
     /// [`MOST_US`] since the gate was last open on a face.
     TooLong,
+    /// Another face than the one it was held for came into view after
+    /// the face was lost and an answer showed no close person: the
+    /// sitting and posture's window are wiped
+    /// ([`crate::keep::Why::OtherFace`]).
+    OtherFace,
 }
 
 impl End {
@@ -114,6 +138,7 @@ impl End {
             End::Forgot => "forgot",
             End::Gate(closed) => closed.as_str(),
             End::TooLong => "10 min since the gate was open on a face",
+            End::OtherFace => "another face in view than the one it was held for",
         }
     }
 }
@@ -173,6 +198,10 @@ pub struct Now<'a> {
     /// Posture's frames go (`LAMP_SEEN_POSTURE`): without it no answer
     /// comes, and a lost face ends a hold with no [`FIRST_ANSWER_US`] wait.
     pub posture: bool,
+    /// The passing id of the one face in view
+    /// ([`crate::watch::Readings::on_track`]); `None` for no face, two, or
+    /// not known.
+    pub face: Option<&'a str>,
 }
 
 struct Held {
@@ -187,6 +216,15 @@ struct Held {
     share: Option<f32>,
     /// Holding the gate open without the face at the last step.
     opening: bool,
+    /// The passing id of the one face in view the last step the gate was
+    /// open on one (in memory only, never said), as [`crate::keep::Away`]
+    /// keeps it.
+    face: Option<String>,
+    /// The gate's presence rule has not held since that step.
+    away: bool,
+    /// While away, an answer showed no close person: the chair may have
+    /// emptied.
+    far_while_away: bool,
 }
 
 /// The hold's state.
@@ -225,6 +263,7 @@ impl Hold {
         };
         held.close_seen |= close(share);
         held.share = share;
+        held.far_while_away |= held.away && !close(share);
         held.far_in_row = if close(share) {
             0
         } else {
@@ -254,6 +293,13 @@ impl Hold {
             Some(End::Gate(Closed::PrivacyClosed))
         } else if inputs.asleep == Some(true) {
             Some(End::Gate(Closed::Asleep))
+        } else if held.away
+            && held.far_while_away
+            && now
+                .face
+                .is_some_and(|face| held.face.as_deref() != Some(face))
+        {
+            Some(End::OtherFace)
         } else if open {
             None
         } else if now.now_us.saturating_sub(held.recognised_us) >= MOST_US {
@@ -279,10 +325,19 @@ impl Hold {
             self.notes.push(Note::Ended(end));
         }
         if open {
+            let face = now.face.map(str::to_owned);
             match self.held.as_mut() {
                 Some(held) => {
                     held.recognised_us = now.now_us;
                     held.opening = false;
+                    // Back on one face (the same id, or a new one with a
+                    // close person in every answer: them looking back
+                    // up); with two in view, nothing to match yet.
+                    if face.is_some() {
+                        held.face = face;
+                        held.away = false;
+                        held.far_while_away = false;
+                    }
                 }
                 None => {
                     self.held = Some(Held {
@@ -292,6 +347,9 @@ impl Hold {
                         far_in_row: 0,
                         share: None,
                         opening: false,
+                        face,
+                        away: false,
+                        far_while_away: false,
                     });
                     self.notes.push(Note::Began);
                     // The newest answer, when its frame went under 30 s
@@ -306,6 +364,7 @@ impl Hold {
         let Some(held) = self.held.as_mut() else {
             return false;
         };
+        held.away = true;
         // The privacy lease or the lamp's state not known this step:
         // closed as today, still held.
         if gate::may_request(&clear(now.inputs)).is_err() {
@@ -321,6 +380,14 @@ impl Hold {
         }
         true
     }
+}
+
+/// Whether these notes end a hold on another face
+/// ([`End::OtherFace`]): `serve` then wipes the sitting and posture's
+/// window as the keep does, and the next sitting counts from then
+/// ([`crate::keep::Seat::step`]).
+pub fn ended_on_other_face(notes: &[Note]) -> bool {
+    notes.contains(&Note::Ended(End::OtherFace))
 }
 
 /// `serve`'s wiring of one step (`main.rs`): the pose answers since the

@@ -33,6 +33,7 @@ fn now(now_us: u64, inputs: &Inputs) -> Now<'_> {
         forgot: false,
         recent_answer: None,
         posture: true,
+        face: None,
     }
 }
 
@@ -283,6 +284,7 @@ fn stood_up_privacy_sleep_opt_in_and_forget_end_it_at_once() {
             forgot,
             recent_answer: None,
             posture: true,
+            face: None,
         };
         assert!(!hold.step(&step), "{end:?}");
         assert!(!hold.held(), "{end:?}");
@@ -350,17 +352,20 @@ fn held_a_second_face_or_a_guest_goes_on_and_the_keep_wipes_nothing() {
     ] {
         let inputs = wire(Some(&mut hold), &[CLOSE], &now(at, &inputs));
         assert_eq!(gate::may_request(&inputs), Ok(()));
-        let plan = Keep::default().step(&keep::Now {
-            now_us: at,
-            inputs: &inputs,
-            seen: &seen,
-            stood_up: false,
-            forgot: false,
-            posture_gate: Ok(()),
-            desk: Ok(()),
-            watching: true,
-            sitting: true,
-        });
+        let plan = Keep::default().step(
+            &keep::Now {
+                now_us: at,
+                inputs: &inputs,
+                seen: &seen,
+                stood_up: false,
+                forgot: false,
+                posture_gate: Ok(()),
+                desk: Ok(()),
+                watching: true,
+            },
+            true,
+            false,
+        );
         assert_eq!(plan.hard, None);
         assert_eq!(plan.posture, keep::Step::Open);
     }
@@ -383,17 +388,20 @@ fn the_owner_leaving_and_a_guest_sitting_within_1_5_s_ends_at_the_10_min_re_chec
     // a face, then the guest's own face wipes them as another face.
     fn keep_step(keep: &mut Keep, at: u64, inputs: &Inputs, seen: &OnTrack) -> keep::Plan {
         let gate = gate::may_request(inputs);
-        keep.step(&keep::Now {
-            now_us: at,
-            inputs,
-            seen,
-            stood_up: false,
-            forgot: false,
-            posture_gate: gate,
-            desk: gate,
-            watching: true,
-            sitting: true,
-        })
+        keep.step(
+            &keep::Now {
+                now_us: at,
+                inputs,
+                seen,
+                stood_up: false,
+                forgot: false,
+                posture_gate: gate,
+                desk: gate,
+                watching: true,
+            },
+            true,
+            false,
+        )
     }
     let mut hold = Hold::default();
     let mut keep = Keep::default();
@@ -450,4 +458,197 @@ fn the_owner_leaving_and_a_guest_sitting_within_1_5_s_ends_at_the_10_min_re_chec
             keep::Step::Wiped(keep::Why::OtherFace)
         )
     );
+}
+
+/// One step at `at` with `face` the one face in view's passing id.
+fn with_face<'a>(at: u64, inputs: &'a Inputs, face: Option<&'a str>) -> Now<'a> {
+    Now {
+        face,
+        ..now(at, inputs)
+    }
+}
+
+/// The keep's step, as `serve` steps it after the hold.
+fn keep_after(
+    keep: &mut Keep,
+    at: u64,
+    inputs: &Inputs,
+    seen: &OnTrack,
+    hold: &[Note],
+) -> keep::Plan {
+    let gate = gate::may_request(inputs);
+    keep.step(
+        &keep::Now {
+            now_us: at,
+            inputs,
+            seen,
+            stood_up: false,
+            forgot: false,
+            posture_gate: gate,
+            desk: gate,
+            watching: true,
+        },
+        true,
+        ended_on_other_face(hold),
+    )
+}
+
+fn guest() -> OnTrack {
+    OnTrack {
+        track: Some(Track {
+            id: "f2".into(),
+            edges: [0.3, 0.3, 0.5, 0.6],
+        }),
+    }
+}
+
+#[test]
+fn held_after_the_face_lost_and_a_far_answer_another_face_ends_it_and_wipes_the_sitting() {
+    // lamp-06c1, run 8 (#7506): the owner hid, the hold went on on a
+    // stale close answer, then one answer had no close person (07:20:33),
+    // and another face came into view under its own passing id: it took
+    // on the owner's sitting. The first builder's rule on #6543: the next
+    // person's timers never count the first one's time.
+    let mut hold = Hold::default();
+    let mut keep = Keep::default();
+    let opened = open();
+    let inputs = wire(Some(&mut hold), &[], &with_face(0, &opened, Some("f1")));
+    let notes = hold.notes();
+    assert_eq!(notes, [Note::Began]);
+    let plan = keep_after(&mut keep, 0, &inputs, &track(), &notes);
+    assert_eq!(
+        (plan.posture, plan.sitting),
+        (keep::Step::Open, keep::Step::Open)
+    );
+    // The owner hides: no face, a close answer, then one far one.
+    let lost = face_lost();
+    for (at, answers) in [(S, &[CLOSE][..]), (29 * S, &[FAR][..])] {
+        let inputs = wire(Some(&mut hold), answers, &with_face(at, &lost, None));
+        assert_eq!(gate::may_request(&inputs), Ok(()), "held at {at}");
+        let notes = hold.notes();
+        assert!(!ended_on_other_face(&notes));
+        let plan = keep_after(&mut keep, at, &inputs, &OnTrack::default(), &notes);
+        assert_eq!(
+            (plan.posture, plan.sitting),
+            (keep::Step::Open, keep::Step::Open)
+        );
+    }
+    // Another face comes into view at 41 s: the hold ends on it, and the
+    // sitting and posture's window are wiped; a hold begins afresh for it.
+    let inputs = wire(
+        Some(&mut hold),
+        &[],
+        &with_face(41 * S, &opened, Some("f2")),
+    );
+    assert_eq!(gate::may_request(&inputs), Ok(()), "open on its own");
+    let notes = hold.notes();
+    assert_eq!(notes, [Note::Ended(End::OtherFace), Note::Began]);
+    assert_eq!(
+        notes[0].line(),
+        "held sitting ended (another face in view than the one it was held for)"
+    );
+    assert!(ended_on_other_face(&notes));
+    let plan = keep_after(&mut keep, 41 * S, &inputs, &guest(), &notes);
+    assert_eq!(
+        (plan.posture, plan.sitting),
+        (
+            keep::Step::Wiped(keep::Why::OtherFace),
+            keep::Step::Wiped(keep::Why::OtherFace)
+        )
+    );
+}
+
+#[test]
+fn held_with_a_close_person_throughout_the_owner_back_on_a_new_id_goes_on() {
+    // Heron's P1 on #7635: the eyes give a face turned away and back a new
+    // passing id as a rule. The owner reads face-down as f1, close in
+    // every answer, and looks up as f3: the same body, the hold goes on.
+    let mut hold = Hold::default();
+    let mut keep = Keep::default();
+    let opened = open();
+    let lost = face_lost();
+    let inputs = wire(Some(&mut hold), &[], &with_face(0, &opened, Some("f1")));
+    keep_after(&mut keep, 0, &inputs, &track(), &hold.notes());
+    for at in [S, 30 * S, 60 * S] {
+        let inputs = wire(Some(&mut hold), &[CLOSE], &with_face(at, &lost, None));
+        let plan = keep_after(&mut keep, at, &inputs, &OnTrack::default(), &hold.notes());
+        assert_eq!(
+            (plan.posture, plan.sitting),
+            (keep::Step::Open, keep::Step::Open)
+        );
+    }
+    let up = OnTrack {
+        track: Some(Track {
+            id: "f3".into(),
+            edges: [0.3, 0.3, 0.5, 0.6],
+        }),
+    };
+    let inputs = wire(
+        Some(&mut hold),
+        &[CLOSE],
+        &with_face(70 * S, &opened, Some("f3")),
+    );
+    let notes = hold.notes();
+    assert!(
+        !notes.iter().any(|note| matches!(note, Note::Ended(_))),
+        "{notes:?}"
+    );
+    assert!(hold.held());
+    let plan = keep_after(&mut keep, 70 * S, &inputs, &up, &notes);
+    assert_eq!(
+        (plan.posture, plan.sitting),
+        (keep::Step::Open, keep::Step::Open)
+    );
+    // Two faces in view after a far answer: no one face to match, nothing
+    // ends; the hold now keeps f3, so f3 alone again goes on too.
+    let two = Inputs {
+        faces: Some(2),
+        ..open()
+    };
+    wire(Some(&mut hold), &[FAR], &with_face(80 * S, &lost, None));
+    wire(Some(&mut hold), &[CLOSE], &with_face(85 * S, &two, None));
+    wire(
+        Some(&mut hold),
+        &[],
+        &with_face(90 * S, &opened, Some("f3")),
+    );
+    assert!(!ended_on_other_face(&hold.notes()));
+    assert!(hold.held());
+    // A far answer after the next loss, then another id: ended.
+    wire(Some(&mut hold), &[CLOSE], &with_face(91 * S, &lost, None));
+    wire(Some(&mut hold), &[FAR], &with_face(120 * S, &lost, None));
+    wire(
+        Some(&mut hold),
+        &[],
+        &with_face(125 * S, &opened, Some("f2")),
+    );
+    assert!(ended_on_other_face(&hold.notes()));
+}
+
+#[test]
+fn held_with_no_one_face_kept_any_face_after_a_far_answer_ends_it() {
+    // Begun on two faces, no id known: as the keep, a face after the loss
+    // is another face than one it was held for, once the chair may have
+    // emptied; with only close answers it goes on.
+    let two = Inputs {
+        faces: Some(2),
+        ..open()
+    };
+    for (answer, ends) in [(FAR, true), (CLOSE, false)] {
+        let mut hold = Hold::default();
+        wire(Some(&mut hold), &[], &with_face(0, &two, None));
+        hold.answer(CLOSE);
+        wire(Some(&mut hold), &[], &with_face(S, &face_lost(), None));
+        wire(
+            Some(&mut hold),
+            &[answer],
+            &with_face(20 * S, &face_lost(), None),
+        );
+        wire(
+            Some(&mut hold),
+            &[],
+            &with_face(21 * S, &open(), Some("f1")),
+        );
+        assert_eq!(ended_on_other_face(&hold.notes()), ends, "{answer:?}");
+    }
 }

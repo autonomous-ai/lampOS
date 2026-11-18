@@ -689,6 +689,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts
     "73d29d8ffa197507ad12bcf41037e12a2a9e5f25c9444a82243c1a07c6ff8666", // #6893: the energy beside the character words
     "622eb88154730d0ee596b9ef048e2120ce9eb67ee33393b1503a1a4d53cdf199", // #6543: lamp-seen's state folder and its opt-in, seen-activity.json
     "ca5d00537b7b28afcffc8465df192928ebdde49411310b0706b83977505e74f1", // #5883: the owner's dev monitor (lamp-peek's drop-in)
@@ -964,6 +965,50 @@ pub fn region_servers(
         && let Err(why) = host.refresh(&["systemctl", "try-restart", "systemd-timesyncd"])
     {
         say(&format!("systemctl try-restart systemd-timesyncd: {why}"));
+    }
+    Ok(())
+}
+
+/// sysstat's collection off (#7254): Debian's `sysstat` timers start
+/// `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
+/// once a day, which write `/var/log/sysstat` for nothing any part reads.
+/// `/var/log` is the lamp's 47 MB RAM log disk (zram): on lamp-06c1 it reached
+/// 81 %, and past 75 % the base cuts the journal to 5 MB (Friday's reading on
+/// #7254); lamp-c0a4 kept about 30 MB of sysstat by 18 Nov. Each gets a
+/// drop-in that runs it only while [`SYSSTAT_ON_PATH`] is there: a triggered
+/// run then skips at once, nothing is removed, and anyone debugging turns it
+/// back on with that one file.
+pub const SYSSTAT_ON_PATH: &str = "/etc/lampOS/sysstat-on";
+pub const SYSSTAT_DROPINS: [&str; 2] = [
+    "/etc/systemd/system/sysstat-collect.service.d/lampos.conf",
+    "/etc/systemd/system/sysstat-summary.service.d/lampos.conf",
+];
+pub const SYSSTAT_DROPIN: &str = "# lamp-update (#7254): sysstat's collection fills /var/log, the lamp's 47 MB RAM log disk, every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n\
+[Unit]\n\
+ConditionPathExists=/etc/lampOS/sysstat-on\n";
+
+/// [`SYSSTAT_DROPINS`] written with [`SYSSTAT_DROPIN`] (#7254), then
+/// `systemctl daemon-reload` only after a change, so the next trigger reads
+/// them; a reload that fails is said. Written on a lamp without sysstat too:
+/// a drop-in for a unit that isn't there does nothing. Run by install and by
+/// `lamp-region.service` at boot, which starts `update/current` (as
+/// [`region_servers`] is), so a lamp in a home gets them on its first boot
+/// after a round: a round writes the product's units, not install's other
+/// files.
+pub fn sysstat_quiet(
+    root: &Path,
+    host: &mut dyn Host,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let wrote = changed.len();
+    for path in SYSSTAT_DROPINS {
+        put(root, path, SYSSTAT_DROPIN.as_bytes(), 0o644, changed)?;
+    }
+    if changed.len() > wrote
+        && let Err(why) = host.refresh(&["systemctl", "daemon-reload"])
+    {
+        say(&format!("systemctl daemon-reload: {why}"));
     }
     Ok(())
 }
@@ -1995,6 +2040,9 @@ pub fn install(
     // end of the install.
     if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
         say(&format!("the region's name and time servers: {why}"));
+    }
+    if let Err(why) = sysstat_quiet(&config.root, host, &mut changed, say) {
+        say(&format!("sysstat's drop-ins: {why}"));
     }
 
     let before = state.clone();

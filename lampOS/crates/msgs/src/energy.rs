@@ -29,7 +29,8 @@ impl Energy {
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "character/energy";
 
-    /// The newest replaces the last, every five seconds. A setting, not a
+    /// The newest replaces the last, at once on a change and at least every
+    /// five seconds (`lamp-cloud`'s `tell_energy`, #7438). A setting, not a
     /// reading: it never goes stale, so a reader keeps the last it heard.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest).every(Duration::from_secs(5))

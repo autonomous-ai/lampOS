@@ -4513,7 +4513,8 @@ after a take-over, but now for every turn:
   switch such a line is talk for the busy room, its run and its end
   clock, as a line the Policy held as not the lamp's is
   (`RoomTold::count_held_not_spoken_to`, `judged`); it ends no
-  conversation (`talked_past_the_lamp`), a held line the lamp then
+  conversation (`talked_past_the_lamp`), however many are judged before
+  they close (the newest eight kept; the Reviewer-lead's P2 on #7636), a held line the lamp then
   carries or answers is no talk, and nothing else of
   `LAMP_NAME_OR_FOLLOW_UP` comes with it. Its cost: a lone voice's held
   lines count too, so one person talking to themselves, three lines in a
@@ -4521,7 +4522,8 @@ after a take-over, but now for every turn:
   nobody is talk for the busy room`. Latency: none, bookkeeping at the
   verdict. Tests (the first fails with the switch off):
   `with_the_switch_held_not_spoken_to_lines_make_the_room_busy`,
-  `with_the_switch_a_held_line_carried_or_answered_is_no_talk`. Not yet
+  `with_the_switch_a_held_line_carried_or_answered_is_no_talk`,
+  `with_the_switch_held_lines_judged_before_either_closes_end_no_conversation`. Not yet
   shown on a lamp: the first builder's row on lamp-52e6.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
@@ -4768,7 +4770,10 @@ after a take-over, but now for every turn:
   finished, each call with its result, go with its words, and a held line
   answering them only goes on from them: `request M goes on from K messages
   of the cut answer's finished rounds`. A round still waiting on a call is
-  not carried. Words joined with new ones start again (#5026, lamp-0529,
+  not carried. A seen activity offer the cut answer gave goes with its
+  words (`seen_yes::answered_in_place`, #6543): the line answering them
+  must play the disclosure whole itself, and the line after it answers the
+  offer. Words joined with new ones start again (#5026, lamp-0529,
   3 Nov: a search, a page and a second search were lost to a 0-word line,
   and the answer came from the model's memory). A connected service's send
   (`service_write` with its `send_id`, `services::may_send`) is the one call

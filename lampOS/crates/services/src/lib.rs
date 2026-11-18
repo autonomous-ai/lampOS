@@ -50,6 +50,19 @@ pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
 /// `service_read` and a `service_write` that is only prepared and held for
 /// the person's spoken yes ([`serve::Services::run_tool`]).
 pub const SKILL_TASKS_ENVIRONMENT: &str = "LAMP_SKILL_TASKS";
+/// The switch for a live spoken ask of a linked service handed to the
+/// lamp's agent (the owner's ruling, 17 Nov: connector work goes to
+/// Hermes, never the second route's own model), read by lamp-voice,
+/// lamp-tasks and lamp-control: off unless `on`, and only with
+/// `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and `LAMP_SKILL_TASKS` on. Nothing
+/// of this program's changes with it: the agent's run calls the tools'
+/// socket through lamp-control as any skill run's does, under
+/// [`VOICE_ASK_SKILL`].
+pub const SERVICES_TO_AGENT_ENVIRONMENT: &str = "LAMP_SERVICES_TO_AGENT";
+/// The skill name a live ask's run carries (lamp-control's token, this
+/// program's run calls and the skills' write bounds): no skill folder is
+/// ever named so, and [`skill_writes::skill_name_ok`] takes it.
+pub const VOICE_ASK_SKILL: &str = "voice-ask";
 /// The switch for changing and cancelling a Google Calendar event by its
 /// id (`update_event`, `delete_event`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.

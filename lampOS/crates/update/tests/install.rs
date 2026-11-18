@@ -2134,6 +2134,38 @@ fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
     assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
+/// A made skill started on a request said to the lamp (#6526,
+/// `LAMP_MADE_SKILL_SAID`): `on` once in the two units that read it,
+/// `lamp-voice` (makes the skill, both routes) and `lamp-skills`' manage
+/// helper (holds its said start as it is put on,
+/// `made_skill::written_capped`), and in no other product unit: with it on
+/// in the voice alone, such a skill would be refused at install.
+#[test]
+fn the_product_turns_a_said_start_on_in_its_two_units() {
+    let name = lamp_voice::made_skill::SAID_ENVIRONMENT;
+    assert_eq!(name, "LAMP_MADE_SKILL_SAID");
+    let owners = ["lamp-voice.service", "lamp-skills-manage@.service"];
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
 /// A made skill's write goes out after its owner's yes in the product
 /// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
 /// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`
@@ -2490,8 +2522,7 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
 /// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
 /// once, in the four units whose part reads it (lamp-cloud's upload,
 /// lamp-voice's keep, lamp-skills' load and its manage helper's install),
-/// each beside what it needs, and in no other; `LAMP_TASK_NET` stays off,
-/// in no unit.
+/// each beside what it needs, and in no other.
 #[test]
 fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
     let readers: [(&str, &[&str]); 4] = [
@@ -2533,10 +2564,6 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
             usize::from(needs.is_some()),
             "{unit}"
         );
-        assert!(
-            !service.iter().any(|line| line.contains("LAMP_TASK_NET")),
-            "{unit} sets LAMP_TASK_NET"
-        );
         let Some(needs) = needs else {
             continue;
         };
@@ -2564,8 +2591,8 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
 /// grants (`task::grants_of`), a made skill's own code and an uploaded
 /// agent skill (`task::origin_refuses`), a write step, a made skill's
 /// lamp-written limits left out (`shed_made_manners`) and a skill's
-/// `[present]` values. Each is set `on` once in both units, and the
-/// network grant (`LAMP_TASK_NET`, read by `grants_of` too) in neither.
+/// `[present]` values. Each is set `on` once in both units, and so is the
+/// network grant (`LAMP_TASK_NET`, read by `grants_of` too, #7200).
 #[test]
 fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     let loading = [
@@ -2607,9 +2634,49 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
             );
         }
         let net = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| **line == format!("Environment={net}=on"))
+                .count(),
+            1,
+            "{unit} lacks {net}"
+        );
+    }
+}
+
+/// A skill's task reaches the public web on 80 and 443 with its owner's
+/// spoken yes (#7200, the first builder's three checks): `LAMP_TASK_NET=on`
+/// once in the six units whose part reads it, and no other product unit
+/// names it: `lamp-tasks` (the run's egress socket, `skill_task::NET_SWITCH`),
+/// `lamp-skills` and its manage helper (`net` loaded as a task grant and
+/// said back), `lamp-control` (`net` kept in the owner's yes, never in a
+/// token), `lamp-voice` (`skill_task_yes::NET_ENVIRONMENT`, said back and
+/// asked) and `lamp-cloud` (the skills page loads with lamp-skills' loader).
+#[test]
+fn the_product_lets_a_skills_task_reach_the_public_web() {
+    let name = lamp_voice::skill_task_yes::NET_ENVIRONMENT;
+    assert_eq!(name, "LAMP_TASK_NET");
+    let switch = format!("Environment={name}=on");
+    let readers = [
+        "lamp-tasks.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-control.service",
+        "lamp-voice.service",
+        "lamp-cloud.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+    }
+    for reader in readers {
         assert!(
-            !lines.iter().any(|line| line.contains(net)),
-            "{unit} sets {net}"
+            install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
+            "{reader} is not a product unit"
         );
     }
 }
@@ -8720,12 +8787,11 @@ fn any_other_lamp_keeps_its_fallback_and_gets_no_time_drop_in() {
             "{region:?}"
         );
         assert!(!lamp.on(install::TIMESYNCD_PATH).exists(), "{region:?}");
+        // Only sysstat's reload (#7254), never the region's own.
         assert!(
-            !lamp
-                .host
-                .calls
-                .iter()
-                .any(|call| call.starts_with("refresh")),
+            !lamp.host.calls.iter().any(|call| {
+                call.starts_with("refresh") && call != "refresh systemctl daemon-reload"
+            }),
             "{region:?}: {:?}",
             lamp.host.calls
         );
@@ -8789,5 +8855,103 @@ fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
         "WantedBy=multi-user.target",
     ] {
         assert!(service.lines().any(|kept| kept == line), "{line}");
+    }
+}
+
+/// #7254: install writes sysstat's two drop-ins, each running its unit only
+/// while `/etc/lampOS/sysstat-on` is there, and reloads systemd once; a run
+/// with them unchanged writes and reloads nothing.
+#[test]
+fn sysstats_collection_is_off_until_its_file_and_written_once() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    for path in install::SYSSTAT_DROPINS {
+        assert_eq!(
+            fs::read_to_string(lamp.on(path)).unwrap(),
+            install::SYSSTAT_DROPIN,
+            "{path}"
+        );
+        let mode = fs::metadata(lamp.on(path)).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o644, "{path}");
+    }
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 1);
+    // Again: nothing written, no reload.
+    let mut changed = Vec::new();
+    let mut said = Vec::new();
+    install::sysstat_quiet(
+        &lamp.root,
+        &mut lamp.host,
+        &mut changed,
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(changed.is_empty(), "{changed:?}");
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 1);
+    assert!(said.is_empty(), "{said:?}");
+}
+
+/// #7254: the drop-ins' bytes, pinned: the condition is the only setting,
+/// and the line says why and how to turn it back on.
+#[test]
+fn sysstats_drop_in_bytes_are_pinned() {
+    assert_eq!(
+        install::SYSSTAT_DROPIN,
+        "# lamp-update (#7254): sysstat's collection fills /var/log, the lamp's 47 MB RAM log disk, every 10 minutes for nothing the lamp reads; touch /etc/lampOS/sysstat-on to collect again.\n[Unit]\nConditionPathExists=/etc/lampOS/sysstat-on\n"
+    );
+    assert_eq!(
+        install::SYSSTAT_DROPINS,
+        [
+            "/etc/systemd/system/sysstat-collect.service.d/lampos.conf",
+            "/etc/systemd/system/sysstat-summary.service.d/lampos.conf",
+        ]
+    );
+    assert!(install::SYSSTAT_DROPIN.contains(install::SYSSTAT_ON_PATH));
+}
+
+/// #7254: a lamp without sysstat gets the same files, harmless with no unit
+/// to drop into, and a drop-in changed on the lamp is put back.
+#[test]
+fn a_lamp_without_sysstat_gets_the_same_harmless_drop_ins() {
+    let mut lamp = Lamp::new(188, &[]);
+    assert!(
+        !lamp
+            .on("/lib/systemd/system/sysstat-collect.service")
+            .exists()
+    );
+    let mut changed = Vec::new();
+    install::sysstat_quiet(&lamp.root, &mut lamp.host, &mut changed, &mut |_| {}).unwrap();
+    assert_eq!(
+        changed,
+        install::SYSSTAT_DROPINS.map(|path| format!("wrote {path}"))
+    );
+    fs::write(lamp.on(install::SYSSTAT_DROPINS[0]), "[Unit]\n").unwrap();
+    let mut changed = Vec::new();
+    install::sysstat_quiet(&lamp.root, &mut lamp.host, &mut changed, &mut |_| {}).unwrap();
+    assert_eq!(changed, [format!("wrote {}", install::SYSSTAT_DROPINS[0])]);
+    assert_eq!(asked(&lamp, "systemctl daemon-reload"), 2);
+}
+
+/// #7254: `lamp-region.service`, the boot one-shot a lamp in a home runs
+/// from `update/current`, may write both drop-ins (its `ReadWritePaths`
+/// holds `/etc`).
+#[test]
+fn the_region_unit_may_write_sysstats_drop_ins() {
+    let service = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-region.service")
+        .unwrap()
+        .1;
+    let writes: Vec<&str> = service
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .map(|at| at.trim_start_matches('-'))
+        .collect();
+    for path in install::SYSSTAT_DROPINS {
+        assert!(
+            writes.iter().any(|at| path.starts_with(&format!("{at}/"))),
+            "{path} not in {writes:?}"
+        );
     }
 }

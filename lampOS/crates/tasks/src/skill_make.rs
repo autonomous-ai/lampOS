@@ -804,6 +804,25 @@ fn put_with(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder
     Ok(made)
 }
 
+/// A live ask's folder in `work` (`crate::voice_ask`): a make's, its
+/// rules the ask's, its fresh home's config with the lamp's agent's
+/// connectors only when `services`.
+pub(crate) fn put_ask(work: &Path, rules: &str, services: bool) -> std::io::Result<MadeFolder> {
+    let made = fresh_home_for(work, services)?;
+    file_in(&made.fd, RULES_FILE, rules)?;
+    Ok(made)
+}
+
+/// A live ask's folder on a gateway agent (`crate::voice_ask`, OpenClaw):
+/// `make-<run id>` in `work`, 0700, with only the ask's rules, 0600, byte
+/// for byte (never [`without_check`]: the person's words are a line of
+/// them), and no home, as the gateway agent runs in its own.
+pub(crate) fn put_ask_on_gateway(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
+    let made = fresh_folder(work, FOLDER_HEAD)?;
+    file_in(&made.fd, RULES_FILE, rules)?;
+    Ok(made)
+}
+
 /// #7245: a gateway agent's make's folder in `work`, `make-<run id>`,
 /// 0700, with the rules and, when `guide`, the guide, each 0600: no home,
 /// as the gateway agent runs in its own. With V1's tools (`checked`) the
@@ -1380,7 +1399,7 @@ pub const NOT_READY_LINE: &str = "I'm still getting ready. Give me a minute and 
 /// Whether a gateway make's run was refused because Harness or the gateway
 /// isn't ready yet: Harness not set up or with no lamp target, or the
 /// gateway not answering ([`crate::gateway::NOT_READY`]).
-fn not_ready(why: &str) -> bool {
+pub(crate) fn not_ready(why: &str) -> bool {
     why.contains(crate::gateway::NOT_READY)
         || why.starts_with("Harness isn't set up")
         || why.starts_with("the lamp has no Harness target")
@@ -1565,7 +1584,10 @@ impl Runner for MakeHermes {
         if self.hermes.folder != self.make_work || !(own || one_path) {
             return Err(NO_NAMESPACE.into());
         }
-        if self.egress.is_some() && !has(&self.ns, crate::egress::NS_LINE) {
+        if self.egress.is_some()
+            && !(has(&self.ns, crate::egress::NS_LINE)
+                && has(&self.ns, crate::egress::NS_OWN_SKILL_LINE))
+        {
             return Err(crate::egress::NO_EGRESS.into());
         }
         Ok(())
@@ -1639,7 +1661,7 @@ impl MakeHermes {
             .ok_or_else(|| "a run granted net has no folder of its own".to_owned())?;
         let until = std::time::Instant::now() + run.deadline;
         let served = grant
-            .open(name, until)
+            .open_for(name, until, &run.folder)
             .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
         let mut hermes = self.hermes.clone();
         hermes
@@ -1765,13 +1787,21 @@ pub struct MakeHandOvers {
     /// `None`, every make to [`Self::runner`].
     pub one_path: Option<Arc<MakeGateway>>,
     pub caller: fn(Option<&lamp_ipc::caller::Caller>) -> bool,
+    /// A live spoken ask's line (`"op":"voice_ask"`, `crate::voice_ask`),
+    /// taken only with one of its switches on; `None`, refused `off` as
+    /// any line that is not a make's.
+    pub asks: Option<Arc<crate::voice_ask::Asks>>,
 }
 
 impl MakeHandOvers {
     /// The lamp's: [`MAKE_SOCKET`], the lamp's Hermes in its namespace
     /// ([`lamp_runner`], the network as [`NET_SWITCH`] says) and its work
     /// folder, lamp-voice alone as caller.
-    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
+    pub fn lamp(
+        home: &Path,
+        harness: crate::skill_task::SkillHarnessSlot,
+        default_engine: crate::voice_ask::DefaultEngineSlot,
+    ) -> Self {
         let held = held(std::env::var(NET_SWITCH).ok().as_deref());
         eprintln!(
             "[lamp-tasks] skill make: a make's run on the lamp's Hermes (its namespace path only; a gateway agent's make on the one run path is its gateway's own turn) {}",
@@ -1781,13 +1811,37 @@ impl MakeHandOvers {
                 "keeps the network (LAMP_MAKE_AGENT_NET is not held)"
             }
         );
-        let runner = lamp_runner(home, held);
+        let runner: Arc<MakeHermes> = Arc::new(lamp_runner(home, held));
+        let gateway = Arc::new(MakeGateway::lamp(home, harness));
+        let switches = crate::voice_ask::Switches::of_env();
+        // A live ask on the lamp's default agent, picked as a make on the
+        // one run path picks it: the lamp's Hermes on the same runner as a
+        // make, one with a linked service's grants always held off the
+        // network; a gateway agent through the same one turn.
+        let asks = switches.any().then(|| {
+            eprintln!(
+                "[lamp-tasks] skill make: live asks for the lamp's agent are taken (hard asks {}, linked services {})",
+                switches.hard, switches.services
+            );
+            Arc::new(crate::voice_ask::Asks {
+                switches,
+                open: runner.clone(),
+                held: Arc::new(lamp_runner(home, true)),
+                agent: Some(gateway.clone()),
+                default_engine: Box::new(move || {
+                    default_engine.get().and_then(|engine| engine())
+                }),
+                tokens: Arc::new(crate::skill_task::ControlTokens::default()),
+                asking: AtomicBool::new(false),
+            })
+        });
         Self {
             socket: PathBuf::from(MAKE_SOCKET),
             work: runner.hermes.folder.clone(),
-            runner: Arc::new(runner),
-            one_path: Some(Arc::new(MakeGateway::lamp(home, harness))),
+            runner,
+            one_path: Some(gateway),
             caller: caller_may,
+            asks,
         }
     }
 
@@ -1874,6 +1928,24 @@ impl MakeHandOvers {
                 return;
             }
         };
+        // A live ask has its own one place, beside a make's.
+        if crate::voice_ask::is_ask(&line) {
+            let answered = match &self.asks {
+                Some(asks) => crate::voice_ask::answer(&line, asks, &self.work, &mut || {
+                    write_answer(stream, &json!({"ok": true, "started": true}));
+                }),
+                None => refusal(
+                    "off",
+                    "an ask for the lamp's agent is off on this lamp (LAMP_HARD_ASKS_TO_AGENT, LAMP_SERVICES_TO_AGENT)",
+                ),
+            };
+            eprintln!(
+                "{}",
+                journal_line(&answered).replace("skill make:", "live ask:")
+            );
+            write_answer(stream, &answered);
+            return;
+        }
         if running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
@@ -2788,7 +2860,11 @@ mod tests {
     #[test]
     fn a_make_is_started_through_the_marked_namespace_held_or_not() {
         let dir = tempfile::tempdir().unwrap();
-        let lamp = MakeHandOvers::lamp(Path::new("/var/lib/lampos-tasks"), Default::default());
+        let lamp = MakeHandOvers::lamp(
+            Path::new("/var/lib/lampos-tasks"),
+            Default::default(),
+            Default::default(),
+        );
         assert_eq!(
             lamp.work,
             Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp")
@@ -3097,6 +3173,7 @@ mod tests {
             runner: Arc::new(writing(None)),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3139,6 +3216,7 @@ mod tests {
             runner: Arc::new(writing(Some("A"))),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3163,6 +3241,7 @@ mod tests {
             runner: Arc::new(writing(None)),
             one_path: None,
             caller: |_| true,
+            asks: None,
         }
         .start(false, Arc::default())
         .unwrap();

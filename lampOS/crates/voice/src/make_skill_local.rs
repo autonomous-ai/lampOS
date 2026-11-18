@@ -2429,6 +2429,13 @@ pub fn take_said_line() -> Option<String> {
     MADE_LINE.with(|kept| kept.take())
 }
 
+/// Tests: the line [`take_said_line`] gives next on this thread, as a make
+/// of another kind (one with code, cut) would leave it.
+#[cfg(test)]
+pub fn set_said_line(line: String) {
+    MADE_LINE.with(|kept| kept.replace(Some(line)));
+}
+
 /// The one short line of a make that kept `made`, `on` or not; or not
 /// made and why: the line [`told`] gives the model, as written. One that
 /// sends or writes, made and on, is [`made_skill::cut_write_line`]: this
@@ -9473,7 +9480,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "bitcoin-price", "{told}");
         let next = told["next"].as_str().unwrap();
         let uses = crate::skill_task_yes::uses_said(&["net".to_owned(), "speak".to_owned()]);
-        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(uses.contains("reaches the public internet"), "{uses}");
         assert!(
             next.contains(&format!(
                 "I can have the lamp's agent do that, as bitcoin price: only when you ask for it, \
@@ -9619,7 +9626,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{description}"
         );
         let uses = crate::skill_task_yes::uses_said(&grants);
-        assert!(uses.contains("reaches the internet"), "{uses}");
+        assert!(uses.contains("reaches the public internet"), "{uses}");
         assert!(
             description.ends_with(&format!(
                 "The lamp's agent does it, and {uses}. It runs only once you agree."

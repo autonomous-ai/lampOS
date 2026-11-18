@@ -1120,6 +1120,25 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `/etc/resolv.conf`), `ProtectHome`, `PrivateTmp` and `NoNewPrivileges`.
    A round that brings the two units enables them; they run from the next
    boot.
+   **sysstat's collection off** (#7254; `install::sysstat_quiet`, also
+   `lamp-update region`). Debian's `sysstat` timers start
+   `sysstat-collect.service` every 10 minutes and `sysstat-summary.service`
+   daily, writing `/var/log/sysstat` for nothing any part reads. `/var/log` is
+   the lamp's 47 MB RAM log disk (zram): on lamp-06c1 it reached 81 %, and past
+   75 % the base cuts the journal to 5 MB (Friday's reading on #7254);
+   lamp-c0a4 kept about 30 MB of sysstat by 18 Nov. Install writes
+   `/etc/systemd/system/sysstat-collect.service.d/lampos.conf` and
+   `/etc/systemd/system/sysstat-summary.service.d/lampos.conf`, 0644, each a
+   comment line, `[Unit]` and `ConditionPathExists=/etc/lampOS/sysstat-on`,
+   then `systemctl daemon-reload`, only after a change (a failed reload is
+   said). A triggered run then skips at once and nothing is removed;
+   `touch /etc/lampOS/sysstat-on` turns collection back on, and removing it
+   off again. A lamp without sysstat gets the same files, harmless with no
+   unit to drop into. A round writes the product's own units, not install's
+   other files, so a lamp in a home gets these the way the region's do:
+   `lamp-region.service` runs `update/current`'s `lamp-update region` at every
+   boot, which writes them too. They reach it at its first boot after a
+   round. What sysstat has already kept stays (#7254's second part).
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does
@@ -1350,7 +1369,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
        hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
        the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
-       are under `deploy/harness/`, copied on 13 Nov 2026, and compiled in
+       are under `deploy/harness/`, copied on 13 Nov 2026 (the four
+       manifests again on 17 Nov 2026, when Harness's CDN had moved the files
+       they name from `storage.googleapis.com` to `cdn.autonomous.ai`, #6256
+       F7, #7423: a lamp downloads those files), and compiled in
        (`product::INSTALLER`, `product::MANIFESTS`), each with its
        SHA-256. Every pinned install, the build's own pin or the env pair,
        checks all five against their SHA-256s before anything runs
@@ -1539,8 +1561,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        the hold's two lines out of the launcher instead of putting them in
        (`Harness's launcher unpinned: this lamp follows the lamp-voice
        feed, …`), and lamp-tasks writes no hold (tasks.md, "Dev and beta
-       lamps: the hold lifted"). A stable lamp (`lampos-stable`, every
-       product lamp), any other feed, and a lamp whose feed `systemctl show
+       lamps: the hold lifted"). A stable lamp (`lampos-stable` or its CDN
+       mirror, every product lamp), any other feed, and a lamp whose feed `systemctl show
        lamp-update.service --property=ExecStart` can't give keep the hold
        exactly as above. The pin itself is unchanged: a canary lamp still
        installs the build's pin, and a move to a newer pin moves only a

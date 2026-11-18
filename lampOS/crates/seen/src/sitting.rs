@@ -15,10 +15,17 @@
 //!   `humans/doing` (`lamp_msgs::HumanDoing`): every timer always present,
 //!   counting from the desk arrival when nothing has been seen, so a
 //!   skill's `[[while]] above` runs on the clock as it did without this
-//!   part. It begins again on `room/stood_up` or a forget, and when nobody
+//!   part. It begins again on `room/stood_up` or a forget, when nobody
 //!   has been at the desk for more than
 //!   [`crate::keep::KEEP_US`] (120 s; kept unsaid until then,
-//!   [`crate::keep`]): no history is kept.
+//!   [`crate::keep`]), when the gate opens again on another passing id
+//!   than the one it was kept for, and when a held sitting ends on
+//!   another face ([`crate::hold::End::OtherFace`]): no history is kept.
+//!   It begins from the arrival, but never from before the chair last
+//!   emptied (120 s closed, or a held sitting ended on another face;
+//!   [`begins_us`], [`crate::keep::Seat`]), so the next person's timers
+//!   never count the first one's time. After a stand-up, a forget or a
+//!   new id without the hold it begins from the arrival, as before.
 //! - With [`ENVIRONMENT`] on ([`more`]), the same bursts also time, on
 //!   `humans/doing_more` (`lamp_msgs::HumanDoingMore`), a topic of its own
 //!   that a skill reads only by naming it, tiredness (V1's `tired`, a yawn, and a stretch of an arm or a leg,
@@ -28,6 +35,10 @@
 //!   `emotional` (laughing, crying, singing) is never said. The same topic
 //!   says how many drinks and how much eating were newly seen this sitting,
 //!   the sightings `humans/doing_seen` says: a count only of what was seen.
+//!   And `desk_s`, this sitting's desk-work time: the time between two
+//!   bursts in a row that both saw desk work, each gap up to
+//!   [`DESK_GAP_US`] (the burst period); a burst without desk work ends the
+//!   run. A number only, wiped with the sitting.
 use crate::wire::{ActionAnswer, group};
 use lamp_msgs::{DeskWork, Doing, DoingSeen, HumanDoing, HumanDoingMore};
 
@@ -192,8 +203,19 @@ pub struct Sitting {
     tired_last_burst: bool,
     desk_work_us: Option<u64>,
     desk_work: DeskWork,
+    /// When the last burst that answered saw desk work; `None` when it did
+    /// not, so a burst without desk work ends the run.
+    desk_run_us: Option<u64>,
+    /// This sitting's desk-work time so far ([`DESK_GAP_US`] per gap at
+    /// most).
+    desk_total_us: u64,
     celebrate_us: Option<u64>,
 }
+
+/// The most one gap between two desk-work bursts adds to `desk_s`: the
+/// burst period, so a burst missed (busy, failed, paused) never counts the
+/// long gap it leaves.
+pub const DESK_GAP_US: u64 = crate::activity::EVERY_US;
 
 fn index(kind: Doing) -> Option<usize> {
     KINDS.iter().position(|(k, _)| *k == kind)
@@ -201,6 +223,16 @@ fn index(kind: Doing) -> Option<usize> {
 
 fn seconds(from_us: u64, now_us: u64) -> u32 {
     u32::try_from(now_us.saturating_sub(from_us) / 1_000_000).unwrap_or(u32::MAX)
+}
+
+/// When a sitting begun now counts from: `room/activity`'s arrival
+/// (`arrived_us`, a gap under two minutes forgiven, whoever's face), but
+/// never before the chair last emptied (`emptied_us`,
+/// [`crate::keep::chair_emptied`]), so someone sitting down after another
+/// person left never counts that person's time (the first builder's rule
+/// on #6543).
+pub fn begins_us(arrived_us: u64, emptied_us: Option<u64>) -> u64 {
+    emptied_us.map_or(arrived_us, |emptied| arrived_us.max(emptied))
 }
 
 impl Sitting {
@@ -223,6 +255,8 @@ impl Sitting {
             tired_last_burst: false,
             desk_work_us: None,
             desk_work: DeskWork::Nothing,
+            desk_run_us: None,
+            desk_total_us: 0,
             celebrate_us: None,
         }
     }
@@ -252,6 +286,16 @@ impl Sitting {
         if let Some(kind) = more.desk_work {
             self.desk_work_us = Some(now_us);
             self.desk_work = kind;
+            // Both this burst and the one before saw desk work: the time
+            // between them was desk work, up to one burst period.
+            if let Some(before) = self.desk_run_us {
+                self.desk_total_us = self
+                    .desk_total_us
+                    .saturating_add(now_us.saturating_sub(before).min(DESK_GAP_US));
+            }
+            self.desk_run_us = Some(now_us);
+        } else {
+            self.desk_run_us = None;
         }
         if more.celebrate {
             self.celebrate_us = Some(now_us);
@@ -343,6 +387,7 @@ impl Sitting {
             ate_seen: self.ate_seen,
             desk_work_s_ago: since(self.desk_work_us),
             desk_work: self.desk_work,
+            desk_s: u32::try_from(self.desk_total_us / 1_000_000).unwrap_or(u32::MAX),
             celebrate_s_ago: since(self.celebrate_us),
         })
     }
@@ -480,6 +525,8 @@ mod tests {
                 tired_last_burst: false,
                 desk_work_us: None,
                 desk_work: DeskWork::Nothing,
+                desk_run_us: None,
+                desk_total_us: 0,
                 celebrate_us: None,
             }
         );
@@ -515,6 +562,23 @@ mod tests {
         assert_eq!((doing.drank_s_ago, doing.break_s_ago), (60, 780));
         assert_eq!(doing.last, Doing::Drinking);
         assert!((doing.confidence - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_sitting_begun_after_the_chair_emptied_counts_from_then() {
+        // lamp-06c1, run 8 (#7506): the chair emptied at 2_100 s, and the
+        // next sitting counted `break_s_ago` from `room/activity`'s arrival
+        // 2_100 s before, the first one's time.
+        let begins = begins_us(0, Some(2_100 * S));
+        assert_eq!(begins, 2_100 * S);
+        let doing = Sitting::new(begins).doing(2_160 * S);
+        assert_eq!(
+            (doing.break_s_ago, doing.drank_s_ago, doing.ate_s_ago),
+            (60, 60, 60)
+        );
+        // Never emptied, or before the arrival: from the arrival.
+        assert_eq!(begins_us(500 * S, None), 500 * S);
+        assert_eq!(begins_us(500 * S, Some(100 * S)), 500 * S);
     }
 
     #[test]
@@ -686,6 +750,7 @@ mod tests {
                 ate_seen: 0,
                 desk_work_s_ago: 300,
                 desk_work: DeskWork::Nothing,
+                desk_s: 0,
                 celebrate_s_ago: 300,
             })
         );
@@ -750,8 +815,55 @@ mod tests {
                 ate_seen: 0,
                 desk_work_s_ago: 60,
                 desk_work: DeskWork::Nothing,
+                desk_s: 0,
                 celebrate_s_ago: 60,
             })
         );
+    }
+
+    #[test]
+    fn desk_time_counts_gaps_between_desk_bursts_capped_at_the_period() {
+        let desk = More {
+            desk_work: Some(DeskWork::Computer),
+            ..More::default()
+        };
+        let reading = More {
+            desk_work: Some(DeskWork::Reading),
+            ..More::default()
+        };
+        let none = More::default();
+        let desk_s = |sitting: &Sitting| sitting.doing_more(10_000 * S).unwrap().desk_s;
+        // Two desk bursts 60 s apart: 60. One alone: 0.
+        let mut sitting = Sitting::with_more(0, true);
+        sitting.saw_more(&desk, 100 * S);
+        assert_eq!(desk_s(&sitting), 0, "one burst alone is no span");
+        sitting.saw_more(&desk, 160 * S);
+        assert_eq!(desk_s(&sitting), 60);
+        // Another kind of desk work still runs on.
+        sitting.saw_more(&reading, 220 * S);
+        assert_eq!(desk_s(&sitting), 120);
+        // A gap longer than the burst period (a burst missed) counts only
+        // the period.
+        sitting.saw_more(&desk, 400 * S);
+        assert_eq!(desk_s(&sitting), 180);
+        assert_eq!(DESK_GAP_US, 60 * S);
+        // A burst without desk work between stops the run: neither gap
+        // around it counts, and the next pair counts again.
+        sitting.saw_more(&none, 460 * S);
+        sitting.saw_more(&desk, 520 * S);
+        assert_eq!(desk_s(&sitting), 180);
+        sitting.saw_more(&desk, 580 * S);
+        assert_eq!(desk_s(&sitting), 240);
+        // A new sitting (a stand-up, the sitting's end: `main` makes a new
+        // one) begins at 0, and its first desk burst starts no span.
+        let mut again = Sitting::with_more(600 * S, true);
+        assert_eq!(desk_s(&again), 0);
+        again.saw_more(&desk, 640 * S);
+        assert_eq!(desk_s(&again), 0);
+        // Off: never counted, never said.
+        let mut off = Sitting::new(0);
+        off.saw_more(&desk, 60 * S);
+        off.saw_more(&desk, 120 * S);
+        assert_eq!(off.doing_more(200 * S), None);
     }
 }

@@ -72,6 +72,14 @@ const LOCAL_SOCKET = '/run/lampos-control/control.sock';
 // `LAMPOS_AGENT_SOCKET` names another place.
 export const AGENT_SOCKET = '/run/lampos-agent/agent.sock';
 
+// An installed app's socket (#7415): the lamp makes one for each Store app and names it in the app's own
+// `LAMP_APP_SOCKET`; the kernel's word on who connects is the trust, so no pairing, key or token.
+export const APP_SOCKET = '/run/lampos-apps/apps.sock';
+// What an app's panel takes (lamp-control checks them again).
+const PANEL_TITLE_MAX = 40;
+const PANEL_LINES_MAX = 6;
+const PANEL_LINE_MAX = 80;
+
 function agentSocket() {
   const path = process.env.LAMPOS_AGENT_SOCKET || AGENT_SOCKET;
   try { return statSync(path).isSocket() ? path : null; } catch { return null; }
@@ -175,7 +183,7 @@ function noEvent(name, on = false) {
 }
 
 function check(op, fields) {
-  if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
+  if (!schema.ops.includes(op) && !schema.appOps.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
   if (op === 'say' && typeof fields.text === 'string') {
     // Any control character (Unicode Cc, as Rust's char::is_control), a newline
     // or tab too: the door and the voice refuse them.
@@ -458,6 +466,9 @@ export class Lamp {
     // The run this connection is for, when the lamp says (a token's `hello`).
     this.run = hello.run ?? null;
     this.skill = hello.skill ?? null; // and the skill it runs for
+    // The installed app this connection is and its version, when the lamp says (an app socket's hello or welcome).
+    this.app = hello.app ?? welcome.app ?? null;
+    this.appVersion = hello.version ?? welcome.version ?? null;
     this.nextId = 1;
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
@@ -557,6 +568,29 @@ export class Lamp {
     try {
       // The usual hello with no key: client c_0, a zero signature, and the token.
       const hello = { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)), token };
+      debug.frame('->', hello);
+      ws.send(JSON.stringify(hello));
+      reply = await next();
+    } catch (error) { ws.close(); throw error; }
+    if (!reply.ok) { ws.close(); throw fromReply(reply.error); }
+    return new Lamp(ws, welcome, reply, frames);
+  }
+
+  // Connect, as an app the owner installed from the Store, to the socket the lamp made for it: `path`, or
+  // `LAMP_APP_SOCKET`, or `/run/lampos-apps/apps.sock`. No pairing, key or token: the lamp knows the app by its
+  // cgroup, so hello is client c_0 and a zero signature, neither read, and the grants are the installed manifest's.
+  // `lamp.app` and `lamp.appVersion` are the app's name and version. No socket is `no_app_socket`.
+  static async connectApp({ path } = {}) {
+    path ??= process.env.LAMP_APP_SOCKET || APP_SOCKET;
+    let isSocket = false;
+    try { isSocket = statSync(path).isSocket(); } catch { /* none */ }
+    if (!isSocket) {
+      throw new LampError(`no app socket at ${path}: pass \`path\`, or set LAMP_APP_SOCKET (the lamp sets it for an installed app)`, { code: 'no_app_socket' });
+    }
+    const { ws, welcome, next, frames } = await open(undefined, undefined, undefined, path);
+    let reply;
+    try {
+      const hello = { id: 0, op: 'hello', client: 'c_0', sig: b64(Buffer.alloc(64)) };
       debug.frame('->', hello);
       ws.send(JSON.stringify(hello));
       reply = await next();
@@ -753,7 +787,8 @@ export class Lamp {
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
-    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
+    const appEvent = this.app !== null && schema.appEvents.includes(event);
+    if (!schema.events.includes(event) && !appEvent && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
       && !MICROPHONE_EVENTS.includes(event) && !SPEAKER_EVENTS.includes(event)) {
       throw noEvent(event, true);
     }
@@ -769,7 +804,8 @@ export class Lamp {
     }
     this.handlers.set(event, [...(this.handlers.get(event) ?? []), registered]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
-    if (!schema.events.includes(event)) return Promise.resolve();
+    // On an app's socket nothing is subscribed: `listenFor` turns `phrase.heard` on, and the app's own events come unasked.
+    if (!schema.events.includes(event) || (this.app !== null && event === 'phrase.heard')) return Promise.resolve();
     // A refused subscription takes its handler back off, so a later `on()`
     // for the event, once granted, doesn't call both.
     return this.subscribe([event]).catch((error) => {
@@ -793,7 +829,7 @@ export class Lamp {
       return Promise.resolve();
     }
     this.handlers.delete(event);
-    return schema.events.includes(event) ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
+    return schema.events.includes(event) && this.app === null ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
   }
 
   subscribe(events, phrases) {
@@ -809,6 +845,38 @@ export class Lamp {
   }
 
   // The states asked for (presence, light, mood, lamp), by name: the reply's `state`.
+  // An installed app's own calls (#7415; `connectApp`).
+
+  // The phrases this app listens for, replaced whole (`[]` clears them): at most 16, each 8 letters at least, the
+  // `hear` grant. `handler(event)`, when given, is called for each `phrase.heard`: the phrase matched, never what
+  // was said. The manifest's triggers (`app.trigger`) are matched whether or not this is ever called.
+  async listenFor(phrases, handler) {
+    const short = shortPhrase(phrases);
+    if (short) throw short;
+    if (handler) this.handlers.set('phrase.heard', [...(this.handlers.get('phrase.heard') ?? []), handler]);
+    return this.request('phrases.set', { phrases: [...phrases] });
+  }
+
+  // Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A say, gesture or light within 3 s
+  // counts as well; with neither, the voice answers itself.
+  took(turn) { return this.request('app.took', { turn }); }
+
+  // The owner's value for every key of the manifest's settings, by key. A change comes as the event `app.settings`
+  // (`changed`, and every value now); lamp-control checked each value against the schema first.
+  async settings() { return (await this.request('app.settings.get')).settings ?? {}; }
+
+  // The app's panel in the owner's app: a title (40 characters at most) and up to 6 lines of 80, plain text, no
+  // control characters. One a minute: over it, `rate` with `retry_ms`. Resolves to the panel's revision.
+  async panel(title, lines = []) {
+    const bad = (why) => new LampError(`panel: ${why}`, { code: 'bad_request' });
+    if (typeof title !== 'string' || title.length < 1 || [...title].length > PANEL_TITLE_MAX
+      || lines.length > PANEL_LINES_MAX || lines.some((line) => [...line].length > PANEL_LINE_MAX)) {
+      throw bad(`a title of 1 to ${PANEL_TITLE_MAX} characters and at most ${PANEL_LINES_MAX} lines of ${PANEL_LINE_MAX}`);
+    }
+    if (/\p{Cc}/u.test(title) || lines.some((line) => /\p{Cc}/u.test(line))) throw bad('text, no control characters');
+    return (await this.request('app.panel.set', { title, lines: [...lines] })).rev;
+  }
+
   async get(...states) { return (await this.request('get', { state: states })).state ?? {}; }
   // The air sensor's newest reading (the `air` grant), and `known`; only
   // `{ known: false }` with no reading. Each change past a step comes as

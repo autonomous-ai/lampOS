@@ -210,18 +210,37 @@ pub fn asks_about_keeping(answer: &str) -> bool {
 /// it may ask them once to say it themselves, with no explanation (rule 8:
 /// no lecture, no nagging).
 pub fn unseen_yes_told(name: &str) -> String {
-    let (what, example) = match name {
-        crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
-        FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
-        // A carried line's held keep: nothing was kept.
-        REMEMBER => {
-            return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
-        }
-        _ => ("that", "Yes, forget that."),
-    };
+    // A carried line's held keep: nothing was kept.
+    if name == REMEMBER {
+        return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
+    }
+    let (what, example) = forget_told_what(name);
     format!(
         "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it themselves, for example \"{example}\". Do not explain why, and do not call {name} now.)"
     )
+}
+
+/// What the model is told when a held one-face forget's yes is dropped for
+/// no one known on the line (#7454: on lamp-06c1 on 17 Nov a yes not seen
+/// spoken was dropped, the model told nothing, and it could answer "Done,
+/// I've forgotten it."): as [`unseen_yes_told`], the yes did not count,
+/// nothing was forgotten and it is still kept, and they may say it facing
+/// the lamp.
+pub fn unknown_yes_told(name: &str) -> String {
+    let (what, example) = forget_told_what(name);
+    format!(
+        "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+    )
+}
+
+/// What a dropped yes's forget `name` keeps, and an example of saying it
+/// ([`unseen_yes_told`], [`unknown_yes_told`]).
+fn forget_told_what(name: &str) -> (&'static str, &'static str) {
+    match name {
+        crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
+        FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
+        _ => ("that", "Yes, forget that."),
+    }
 }
 
 /// What the model is told of a spoken `forget_everything`, which is always
@@ -6007,16 +6026,30 @@ fn room_facts(socket: &Path, within: Duration) -> Option<lamp_msgs::Rules> {
 /// The request used a function that keeps or forgets, or its line was held
 /// only by a known face's gap (`LAMP_FACE_GAP_HOLD`): its exchange stays out
 /// of the journal. Marking a request again keeps one entry, so a long
-/// answer marked at each piece pushes no other request out.
-pub fn keep_out(request: u64) {
+/// answer marked at each piece pushes no other request out. True only when
+/// this call marked it: it was not kept out before.
+pub fn keep_out(request: u64) -> bool {
+    let Ok(mut kept_out) = KEPT_OUT.lock() else {
+        return false;
+    };
+    if kept_out.contains(&request) {
+        return false;
+    }
+    if kept_out.len() == 16 {
+        kept_out.pop_front();
+    }
+    kept_out.push_back(request);
+    true
+}
+
+/// Undoes the [`keep_out`] of `request`, so its exchange is journalled as
+/// if no memory call had kept it out: with
+/// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`, a `remember` that kept nothing
+/// (`tools::keep_back_if_kept_nothing`). The exchange keeps the scope and
+/// person it carries; only the mark goes.
+pub fn keep_back(request: u64) {
     if let Ok(mut kept_out) = KEPT_OUT.lock() {
-        if kept_out.contains(&request) {
-            return;
-        }
-        if kept_out.len() == 16 {
-            kept_out.pop_front();
-        }
-        kept_out.push_back(request);
+        kept_out.retain(|kept| *kept != request);
     }
 }
 
@@ -27072,6 +27105,41 @@ mod tests {
             assert_eq!(sources, vec![index as u64 + 10]);
         }
         assert!(work.try_recv().is_err());
+    }
+
+    /// `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE`: a request kept out and then
+    /// given back ([`keep_back`]) is journalled in the scope and for the
+    /// person its exchange carries, never another's; [`keep_out`] says
+    /// whether it marked the request.
+    #[test]
+    fn a_kept_out_exchange_given_back_keeps_its_own_person() {
+        // Requests no other test names.
+        let (back, still) = (u64::MAX - 170, u64::MAX - 171);
+        assert!(keep_out(back));
+        assert!(!keep_out(back), "marked once");
+        assert!(keep_out(still));
+        keep_back(back);
+        assert!(!kept_out(back));
+        assert!(kept_out(still));
+        let done = |request, whose: &str| FinishedExchange {
+            request,
+            age: Duration::from_secs(3),
+            heard: "My haircut is on Thursday.".to_owned(),
+            said: "Nice.".to_owned(),
+            whose: Some(whose.to_owned()),
+        };
+        let (jobs, work) = sync_channel(4);
+        hand_on(
+            vec![done(back, "p-hers"), done(still, "p-hers")],
+            NOW,
+            &jobs,
+        );
+        let Ok(Job::Exchange { person, heard, .. }) = work.try_recv() else {
+            panic!("the given-back exchange is journalled")
+        };
+        assert_eq!(person.as_deref(), Some("p-hers"));
+        assert_eq!(heard, "My haircut is on Thursday.");
+        assert!(work.try_recv().is_err(), "the one still kept out is not");
     }
 
     #[test]

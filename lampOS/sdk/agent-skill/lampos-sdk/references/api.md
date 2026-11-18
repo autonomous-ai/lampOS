@@ -18,6 +18,11 @@ naming every public call, tool, event and error code they have.
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
 | keep running across the lamp's restarts (every update) | `await Lamp.keep_connected(setup)`: connects, runs `setup(lamp)`, connects again after each close; raises on what can't mend (`NotPaired`, `no_grant`, ...) | `await Lamp.keepConnected(setup, { signal })` | — (an agent's tools have no setup to keep: lamp-mcp's README says how it meets a restart) |
+| an app installed from the Store, on the lamp itself (#7415; lamp-control's app socket is nine's piece 3) | `await Lamp.connect_app()` (the socket in `LAMP_APP_SOCKET`; no pairing, key or token; the grants are the installed manifest's) | `await Lamp.connectApp()` (the same socket, `{ path }`) | — | — |
+| an installed app's phrases, replaced whole (at most 16, 8 letters each; `hear`) | `await lamp.listen_for(["lesson time"], handler)`; the event `phrase.heard` (the phrase only) | `await lamp.listenFor(["lesson time"], handler)` | — | `hear` |
+| an installed app's manifest trigger and taking its turn | `lamp.on("app.trigger", handler)`, then `await lamp.took(event["turn"])` | `lamp.on('app.trigger', handler)`, then `await lamp.took(event.turn)` | — | — |
+| an installed app's settings, and the owner changing one | `await lamp.settings()`; `lamp.on("app.settings", handler)` | `await lamp.settings()`; `lamp.on('app.settings', handler)` | — | — |
+| an installed app's panel in the owner's app (title, at most 6 lines, one a minute) | `await lamp.panel("Title", ["line"])` | `await lamp.panel('Title', ['line'])` | — | — |
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 

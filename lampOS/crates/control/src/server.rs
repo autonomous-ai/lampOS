@@ -252,8 +252,31 @@ impl Shared {
     /// lamp's) mints a token that names none: its run may say hello and
     /// nothing that needs a grant. No yes, or one that no longer holds, is
     /// refused.
+    ///
+    /// `{"mint": {"ask": ["<code>-read", ...], "run", "expires_in_ms"?}}`
+    /// instead: a live spoken ask lamp-tasks runs on the lamp's agent
+    /// (`LAMP_SERVICES_TO_AGENT`), minted as the skill
+    /// `lamp_services::VOICE_ASK_SKILL` for exactly the linked service
+    /// grants asked ([`crate::runs::SkillYes::ask_grants`]), never another.
     fn mint(&self, asked: &Value, now: u64) -> Value {
-        let (Some(skill), Some(run)) = (asked["skill"].as_str(), asked["run"].as_str()) else {
+        let ask = match asked.get("ask") {
+            None => None,
+            Some(Value::Array(grants)) => {
+                match grants.iter().map(Value::as_str).collect::<Option<Vec<_>>>() {
+                    Some(grants) => Some(grants.into_iter().map(str::to_owned).collect::<Vec<_>>()),
+                    None => return json!({"error": "mint: an ask's grants are text"}),
+                }
+            }
+            Some(_) => return json!({"error": "mint: an ask is a list of grants"}),
+        };
+        let skill = match &ask {
+            Some(_) if asked.get("skill").is_some() => {
+                return json!({"error": "mint: an ask or a skill, not both"});
+            }
+            Some(_) => Some(crate::task_yes::VOICE_ASK_SKILL),
+            None => asked["skill"].as_str(),
+        };
+        let (Some(skill), Some(run)) = (skill, asked["run"].as_str()) else {
             return json!({"error": "mint: a skill and a run, both text"});
         };
         if !crate::runs::plain(skill) || !crate::runs::plain(run) {
@@ -269,11 +292,19 @@ impl Shared {
         let Some(yes) = self.yes.lock().expect("yes").clone() else {
             return json!({"error": "skill runs are off on this lamp"});
         };
-        let grants = match yes.grants(skill) {
+        let grants = match &ask {
+            Some(asked) => yes.ask_grants(asked),
+            None => yes.grants(skill),
+        };
+        let grants = match grants {
             Ok(grants) => grants,
             Err(why) => return json!({"error": why}),
         };
-        let fixed_write = yes.fixed_write(skill);
+        let fixed_write = if ask.is_some() {
+            None
+        } else {
+            yes.fixed_write(skill)
+        };
         let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
             return json!({"error": "no token could be made"});
         };

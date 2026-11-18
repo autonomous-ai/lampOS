@@ -162,6 +162,12 @@ LOCAL_SOCKET = "/run/lampos-control/control.sock"
 # with no pairing. `LAMPOS_AGENT_SOCKET` names another place.
 AGENT_SOCKET = "/run/lampos-agent/agent.sock"
 AGENT_SOCKET_ENV = "LAMPOS_AGENT_SOCKET"
+# An installed app's socket (#7415): the lamp gives each Store app one, named by this variable in the app's own
+# environment; the kernel's word on who connects is the trust, so there is no pairing, key or token.
+APP_SOCKET_ENV = "LAMP_APP_SOCKET"
+APP_SOCKET = "/run/lampos-apps/apps.sock"
+# What an app's panel takes (lamp-control checks them again).
+PANEL_TITLE_MAX, PANEL_LINES_MAX, PANEL_LINE_MAX = 40, 6, 80
 
 
 def _agent_socket() -> str | None:
@@ -214,7 +220,7 @@ SAY_MAX_BYTES = 900
 
 def _check(op: str, fields: dict) -> None:
     """The names the schema enumerates, checked before sending."""
-    if op not in schema.ops():
+    if op not in schema.ops() and op not in schema.app_ops():
         raise LampError(f"no op {op!r} in v{schema.VERSION}", code="bad_request")
     text = fields.get("text")
     if op == "say" and isinstance(text, str):
@@ -661,6 +667,10 @@ class Lamp:
         # The run this connection is for, when the lamp says (a token's `hello`).
         self.run: str | None = hello.get("run")
         self.skill: str | None = hello.get("skill")  # and the skill it runs for
+        # The installed app this connection is and its version, when the lamp says (an app socket's `hello`, or its
+        # `welcome`): `connect_app`.
+        self.app: str | None = hello.get("app") or welcome.get("app")
+        self.app_version: str | None = hello.get("version") or welcome.get("version")
         self._waiting: dict[int, asyncio.Future] = {}
         self._done: dict[int, asyncio.Future] = {}
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
@@ -771,6 +781,40 @@ class Lamp:
             else:
                 sig = keyring.hello(welcome["nonce_bytes"])
                 hello = {"id": 0, "op": "hello", "client": pairing.client, "sig": b64(sig)}
+            debug.frame("->", hello)
+            await ws.send(json.dumps(hello))
+            reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            debug.frame("<-", reply)
+        except BaseException:
+            await ws.close()
+            raise
+        if not reply.get("ok"):
+            await ws.close()
+            raise from_reply(reply.get("error", {}))
+        return cls(ws, welcome, reply)
+
+    @classmethod
+    async def connect_app(cls, *, path: str | None = None) -> "Lamp":
+        """Connect, as an app the owner installed from the Store, to the socket the lamp made for it: `path`, or
+        `LAMP_APP_SOCKET` in the environment (the unit sets it), or `/run/lampos-apps/apps.sock`. No pairing, key or
+        token: the lamp knows the app by the kernel's word on who connects (its own cgroup), so `hello` is client `c_0`
+        and a zero signature, neither read, and the grants are the installed manifest's, never the app's own word.
+        `lamp.app` and `lamp.app_version` are the app's name and version, as the lamp says them. No socket is
+        `no_app_socket`, in words that name the variable."""
+        path = path or os.environ.get(APP_SOCKET_ENV) or APP_SOCKET
+        try:
+            is_socket = stat.S_ISSOCK(os.stat(path).st_mode)
+        except OSError:
+            is_socket = False
+        if not is_socket:
+            raise LampError(
+                f"no app socket at {path}: pass `path`, or set {APP_SOCKET_ENV} (the lamp sets it for an installed app)",
+                code="no_app_socket",
+            )
+        ws = await unix_connect(path, uri=f"ws://localhost/v{schema.VERSION}", max_size=1 << 20, ping_interval=KEEPALIVE_S)
+        try:
+            welcome = await _welcome(ws)
+            hello = {"id": 0, "op": "hello", "client": "c_0", "sig": b64(bytes(64))}
             debug.frame("->", hello)
             await ws.send(json.dumps(hello))
             reply = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
@@ -1042,14 +1086,17 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
+        is_app_event = self.app is not None and event in schema.app_events()
+        if event not in schema.events() and not is_app_event and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
             raise _no_event(event, on=True)
         _short_phrase(phrases)
         # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
         self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
-        if event not in schema.events():
+        # On an app's socket nothing is subscribed: `listen_for` turns `phrase.heard` on, and the app's own events come
+        # unasked.
+        if event not in schema.events() or (self.app is not None and event == "phrase.heard"):
             done = asyncio.get_running_loop().create_future()
             done.set_result({})
             return Subscription(done)
@@ -1090,7 +1137,7 @@ class Lamp:
             handlers.remove(handler)
         if not handlers:
             self._handlers.pop(event, None)
-            if event in schema.events():
+            if event in schema.events() and self.app is None:
                 task = asyncio.ensure_future(self.request("unsubscribe", events=[event]))
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
@@ -1107,6 +1154,42 @@ class Lamp:
         for event in events:
             self._handlers.pop(event, None)
         return await self.request("unsubscribe", events=events)
+
+    # An installed app's own calls (#7415; `connect_app`).
+
+    async def listen_for(self, phrases: list[str], handler: Handler | None = None) -> dict:
+        """The phrases this app listens for, replaced whole (an empty list clears them): at most 16 an app, each 8
+        letters at least (the `hear` grant). `handler(event)`, when given, is called for each `phrase.heard`: the
+        phrase matched, never what was said. The app's manifest triggers (`app.trigger`) are matched whether or not this
+        is ever called. Only on an app's socket."""
+        _short_phrase(phrases)
+        if handler is not None:
+            self._handlers["phrase.heard"].append(handler)
+        return await self.request("phrases.set", phrases=list(phrases))
+
+    async def took(self, turn: str) -> dict:
+        """Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A `say`, gesture or light within
+        3 s of the trigger counts as well; with neither, the voice answers itself."""
+        return await self.request("app.took", turn=turn)
+
+    async def settings(self) -> dict:
+        """The owner's values for every key of the manifest's settings (the default for one never set), by key. The
+        schema is in the app's own manifest. A change comes as the event `app.settings` (`lamp.on("app.settings", ...)`),
+        `changed` and every value now; lamp-control checked each against the schema first, so a bad value never arrives."""
+        return (await self.request("app.settings.get")).get("settings", {})
+
+    async def panel(self, title: str, lines: list[str] | None = None) -> int:
+        """The app's panel in the owner's app: a title (40 characters at most) and up to 6 lines of 80, plain text,
+        no control characters. One a minute: over it, the lamp's `rate` with `retry_ms`. Returns the panel's revision."""
+        lines = list(lines or [])
+        if not (1 <= len(title) <= PANEL_TITLE_MAX) or len(lines) > PANEL_LINES_MAX or any(len(line) > PANEL_LINE_MAX for line in lines):
+            raise LampError(
+                f"panel: a title of 1 to {PANEL_TITLE_MAX} characters and at most {PANEL_LINES_MAX} lines of {PANEL_LINE_MAX}",
+                code="bad_request",
+            )
+        if any(unicodedata.category(c) == "Cc" for c in [*title, *"".join(lines)]):
+            raise LampError("panel: text, no control characters", code="bad_request")
+        return (await self.request("app.panel.set", title=title, lines=lines))["rev"]
 
     async def get(self, *states: str) -> dict:
         """The states asked for (`presence`, `light`, `mood`, `lamp`, `body`),

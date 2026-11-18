@@ -3430,7 +3430,7 @@ fn yes_in_code(
 /// to the model as before, when the yes is not taken or the tasks part did
 /// not start it. Blocking, bounded by [`DEADLINE`]: for a thread of its
 /// own, before the chat round.
-pub fn yes_taken(place: &Place, request: u64, words: &str) -> Option<String> {
+pub fn yes_taken(place: &Place, request: u64, words: &str, person: Option<&str>) -> Option<String> {
     let pending = PENDING.lock().ok()?.clone()?;
     let now = Instant::now();
     let read_back = crate::thread::THREAD
@@ -3453,7 +3453,15 @@ pub fn yes_taken(place: &Place, request: u64, words: &str) -> Option<String> {
         name: CONFIRM.into(),
         args: json!({}),
     };
-    let (told, _) = run(place, &call, request, true, DEADLINE);
+    // Whose yes it was, for its linked record: the owner as the line's
+    // scope found them, or nobody.
+    let asker = Asker {
+        heard: true,
+        owner: person.is_some(),
+        person: person.map(str::to_owned),
+        lease: None,
+    };
+    let (told, _) = run_asked(place, &call, request, &asker, DEADLINE);
     if told.get("handing_over") != Some(&json!(true)) {
         eprintln!(
             "lamp-voice: tasks: request {request}: task {}: a plain yes to its read-back was not started in code ({}); the line goes to the model (#7027)",
@@ -4306,6 +4314,7 @@ pub fn run(
     let asker = Asker {
         heard,
         owner: false,
+        person: None,
         lease: None,
     };
     run_asked(place, call, request, &asker, deadline)
@@ -4319,6 +4328,9 @@ pub struct Asker<'a> {
     /// The line is the lamp's owner's own, heard: as the services hold a
     /// read (`services::owner_of`; in the private room, whoever speaks).
     pub owner: bool,
+    /// The owner's memory id when [`Self::owner`]: whose yes a hand-over
+    /// was, for its linked record (`LAMP_SERVICE_RECORDS_TASKS`).
+    pub person: Option<String>,
     /// The request's memory scope, revoked at its end or by a cut-in: a
     /// look asked again stops with it. None where the route keeps none.
     pub lease: Option<&'a crate::memory_scope::ScopeLease>,
@@ -4328,9 +4340,11 @@ impl Asker<'_> {
     /// [`Asker`] for a line with its memory scope `lease`: the owner as
     /// the services find them ([`crate::services::owner_of`]).
     pub fn of<'a>(heard: bool, lease: Option<&'a crate::memory_scope::ScopeLease>) -> Asker<'a> {
+        let person = heard.then(|| crate::services::owner_of(lease)).flatten();
         Asker {
             heard,
-            owner: heard && crate::services::owner_of(lease).is_some(),
+            owner: person.is_some(),
+            person,
             lease,
         }
     }
@@ -4475,6 +4489,7 @@ fn run_for(
     let asker = Asker {
         heard,
         owner: false,
+        person: None,
         lease: None,
     };
     run_for_asked(place, staff, call, request, &asker, deadline)
@@ -4937,6 +4952,21 @@ fn run_for_asked(
                         pending.engine.as_deref(),
                         lamp_msgs::HandStage::Started,
                     );
+                    // Its linked record, for the person whose yes it was
+                    // (`LAMP_SERVICE_RECORDS_TASKS`); a skill's brief is
+                    // the lamp's own make, never one.
+                    if let Some(store) = status.get("store_id").and_then(Value::as_str)
+                        && !crate::made_skill::is_brief(&pending.text)
+                    {
+                        crate::service_records::task_rows::handed_over(
+                            asker.person.as_deref(),
+                            &place.directory.join("request.sock"),
+                            store,
+                            pending.id,
+                            &pending.text,
+                            crate::service_records::unix_ms(),
+                        );
+                    }
                     if same_turn {
                         eprintln!(
                             "lamp-voice: tasks: request {request}: task {} started on a yes in the turn that prepared it, after its read-back in words",
@@ -7310,6 +7340,7 @@ pub(crate) mod tests {
             let asker = Asker {
                 heard,
                 owner: heard,
+                person: None,
                 lease: None,
             };
             run_asked(place, call, request, &asker, wait)
@@ -7434,6 +7465,7 @@ pub(crate) mod tests {
             let asker = Asker {
                 heard,
                 owner: heard,
+                person: None,
                 lease: None,
             };
             run_asked(place, call, request, &asker, wait)
@@ -7547,6 +7579,7 @@ pub(crate) mod tests {
             let guest = Asker {
                 heard: true,
                 owner: false,
+                person: None,
                 lease: None,
             };
             let (told, answered) = run_asked(&on, &call, 3, &guest, PEER_WAIT);
@@ -7557,6 +7590,7 @@ pub(crate) mod tests {
             let nobody = Asker {
                 heard: false,
                 owner: false,
+                person: None,
                 lease: None,
             };
             let (told, _) = run_asked(&on, &call, 4, &nobody, PEER_WAIT);
@@ -13971,6 +14005,82 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Linked records, slice 3 (`LAMP_SERVICE_RECORDS_TASKS`): a task
+    /// started on the owner's heard yes is their `prepared` task row, keyed
+    /// by the tasks part's store and task, its summary the work as asked.
+    #[test]
+    fn a_hand_over_on_the_owners_yes_is_their_task_row() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        crate::service_records::on_for_test(true);
+        crate::service_records::task_rows::on_for_test(true);
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-row-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"fruits","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &place,
+            &call(
+                START,
+                json!({"task":"List five fruits and write them to fruits.md"}),
+            ),
+            1,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        // The model's own call, still with no row: nothing waits yet.
+        assert!(crate::service_records::linked::waiting().is_empty());
+        let owner = Asker {
+            heard: true,
+            owner: true,
+            person: Some("p-0123456789abcdef".into()),
+            lease: None,
+        };
+        let (told, _) = run_asked(&place, &call(CONFIRM, json!({})), 3, &owner, PEER_WAIT);
+        assert!(told["handing_over"] == json!(true), "{told}");
+        let rows = crate::service_records::linked::waiting();
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].person, "p-0123456789abcdef");
+        assert_eq!(rows[0].key, "t-s1-7");
+        assert_eq!(
+            rows[0].summary,
+            "List five fruits and write them to fruits.md"
+        );
+        assert_eq!(rows[0].status, crate::service_records::Status::Prepared);
+        assert_eq!(rows[0].source_ref["id"], "s1:7");
+        crate::service_records::task_rows::forgot(None);
+        crate::service_records::forgot(None);
+        crate::service_records::task_rows::on_for_test(false);
+        crate::service_records::on_for_test(false);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     /// Heron's P2 on #6572: a yes said at length is no new ask. Each line
     /// starts the task waiting, with `LAMP_TASKS_ONE_YES` on and off, and
     /// nothing is cancelled.
@@ -14419,7 +14529,18 @@ pub(crate) mod tests {
             thread.lamp(8, MOON_BACK, now);
             thread.line_of(9, "Yes.");
         }
-        let note = yes_taken(&place, 9, "Yes.").expect("the yes is taken in code");
+        // With task rows on, the person whose yes it was is the row's.
+        crate::service_records::on_for_test(true);
+        crate::service_records::task_rows::on_for_test(true);
+        let note = yes_taken(&place, 9, "Yes.", Some("p-0123456789abcdef"))
+            .expect("the yes is taken in code");
+        let rows = crate::service_records::linked::waiting();
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].person, "p-0123456789abcdef");
+        assert_eq!(rows[0].key, "t-s1-4");
+        crate::service_records::forgot(None);
+        crate::service_records::task_rows::on_for_test(false);
+        crate::service_records::on_for_test(false);
         assert!(note.contains("Claude Code"), "{note}");
         assert!(note.contains(CONFIRM), "{note}");
         // #7267: prepared in request 8, started by the yes in request 9.
@@ -14458,7 +14579,7 @@ pub(crate) mod tests {
         };
         assert!(!yes_in_the_same_turn_now(&again, 9, true));
         // Nor is another yes in a later request taken: nothing waits.
-        assert!(yes_taken(&place, 10, "Yes.").is_none());
+        assert!(yes_taken(&place, 10, "Yes.", None).is_none());
         assert!(seen.try_recv().is_err(), "nothing more asked");
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         std::fs::remove_dir_all(directory).unwrap();
@@ -14490,10 +14611,10 @@ pub(crate) mod tests {
             std::process::id()
         ));
         let place = correcting(&directory, false);
-        assert!(yes_taken(&place, 9, "Yes, but make it six fruits.").is_none());
-        assert!(yes_taken(&place, 8, "Yes.").is_none());
+        assert!(yes_taken(&place, 9, "Yes, but make it six fruits.", None).is_none());
+        assert!(yes_taken(&place, 8, "Yes.", None).is_none());
         let typed = crate::messages::REQUESTS_FROM + 9;
-        assert!(yes_taken(&place, typed, "Yes.").is_none());
+        assert!(yes_taken(&place, typed, "Yes.", None).is_none());
         assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(4));
         *PENDING.lock().unwrap() = None;
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();

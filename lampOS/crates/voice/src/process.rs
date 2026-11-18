@@ -451,7 +451,10 @@ impl Worker {
         directory: &Path,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
-        let mut deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        // Read right after the spawn, so a timeout can say how long this
+        // worker was waited for (#7224).
+        let began = startup_now();
+        let mut deadline = began + WORKER_STARTUP_TIMEOUT;
         let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
@@ -509,9 +512,12 @@ impl Worker {
                 None => {}
             }
             if startup_now() >= deadline {
+                // The role and the wait are named, so a journal tells which
+                // worker missed its bound (#7224).
+                let waited = (startup_now() - began).as_millis();
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "worker readiness timed out",
+                    format!("worker readiness timed out ({role} after {waited} ms)"),
                 ));
             }
             std::thread::sleep(Duration::from_millis(2));
@@ -791,6 +797,51 @@ mod fixture_tests {
                 .contains("unexpected worker startup message")
         );
         assert!(moved < Duration::from_secs(1), "{moved:?}");
+    }
+
+    /// A worker that never says Ready is named in the timeout with how long
+    /// it was waited for, so a journal tells which role missed its bound
+    /// (#7224: lamp-c0a4's cold boot ended twice on a bare "timed out").
+    #[test]
+    fn a_worker_that_never_says_ready_is_named_with_how_long_it_waited() {
+        let directory = SessionDirectory::create().unwrap();
+        let dir = &directory.path;
+        let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let channels = WorkerChannels::bind(dir, "capture", parent, boot, false).unwrap();
+        let mut peer = WorkerChannels::bind(dir, "capture", parent, boot, true).unwrap();
+        peer.connect(dir, "capture", true).unwrap();
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut worker = Worker {
+            channels,
+            child,
+            boot,
+            role: "capture".into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            on_stop: None,
+            after_terminate: None,
+        };
+        // Each wait moves the startup clock on by 500 ms, as above.
+        let error = worker
+            .wait_until_ready(dir, || {
+                startup_clock::move_on(Duration::from_millis(500));
+                Ok(())
+            })
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        let said = error.to_string();
+        let waited = said
+            .strip_prefix("worker readiness timed out (capture after ")
+            .and_then(|rest| rest.strip_suffix(" ms)"))
+            .and_then(|ms| ms.parse::<u128>().ok())
+            .unwrap_or_else(|| panic!("role and wait not named: {said}"));
+        assert!((3000..4000).contains(&waited), "waited {waited} ms: {said}");
     }
 
     #[test]
@@ -1124,6 +1175,10 @@ fn worker_command(
         .envs(service_redo_worker_environment(
             role,
             var(crate::service_records::redo::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_records_tasks_worker_environment(
+            role,
+            var(crate::service_records::task_rows::ENVIRONMENT).as_deref(),
         ))
         .envs(service_read_ids_worker_environment(
             role,
@@ -1794,6 +1849,18 @@ fn service_redo_worker_environment(
         .then_some((crate::service_records::redo::ENVIRONMENT, "on"))
 }
 
+// Harness task rows (the linked-service memory plan, slice 3), passed the
+// same narrow way: the exact `on`, to the second route alone, where the
+// hand-over's yes is heard. It acts only beside `LAMP_SERVICE_RECORDS`
+// (`service_records::task_rows::on`).
+fn service_records_tasks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::task_rows::ENVIRONMENT, "on"))
+}
+
 // A calendar read's event ids kept for the next request (tracker row
 // C132), passed the same narrow way: the exact `on`, to the second route
 // alone, the one that prepares writes.
@@ -2460,6 +2527,8 @@ fn second_route_worker_environment(
         crate::remember::doubted::UNDOES_ENVIRONMENT,
         // A keep with a near spelling of a heard word asks first (C37).
         crate::remember::heard::NEAR_ENVIRONMENT,
+        // A remember that kept nothing gives its line back to the journal.
+        crate::tools::REFUSED_KEEP_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
@@ -2484,6 +2553,9 @@ fn second_route_worker_environment(
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
+        // A live read or a hard ask handed to the lamp's agent (17 Nov).
+        crate::agent_asks::SERVICES_ENVIRONMENT,
+        crate::agent_asks::HARD_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2787,6 +2859,7 @@ mod tests {
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::remember::heard::NEAR_ENVIRONMENT,
+            crate::tools::REFUSED_KEEP_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
@@ -2799,6 +2872,8 @@ mod tests {
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
+            crate::agent_asks::SERVICES_ENVIRONMENT,
+            crate::agent_asks::HARD_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -3280,6 +3355,12 @@ mod tests {
                         "LAMP_SERVICE_REDO",
                         ["second"].as_slice(),
                     ),
+                    // Harness task rows: the second route alone.
+                    (
+                        service_records_tasks_worker_environment,
+                        "LAMP_SERVICE_RECORDS_TASKS",
+                        ["second"].as_slice(),
+                    ),
                     // A read's event ids kept: the second route alone.
                     (
                         service_read_ids_worker_environment,
@@ -3757,6 +3838,7 @@ mod tests {
                     crate::service_records::told::ENVIRONMENT,
                     crate::service_contacts::ENVIRONMENT,
                     crate::service_records::redo::ENVIRONMENT,
+                    crate::service_records::task_rows::ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -3865,6 +3947,7 @@ mod tests {
                     || name == crate::dont_know::ENVIRONMENT
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
                     || name == crate::remember::heard::NEAR_ENVIRONMENT
+                    || name == crate::tools::REFUSED_KEEP_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
@@ -3877,6 +3960,8 @@ mod tests {
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
+                    || name == crate::agent_asks::SERVICES_ENVIRONMENT
+                    || name == crate::agent_asks::HARD_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -4050,6 +4135,7 @@ mod tests {
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
+                    "LAMP_HARD_ASKS_TO_AGENT=on",
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
@@ -4132,6 +4218,7 @@ mod tests {
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on",
                     "LAMP_REGION_FILE=/var/lib/lampos-cloud/region",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_REMARK_ABOUT_IT=on",
@@ -4185,9 +4272,11 @@ mod tests {
                     "LAMP_SECOND_WHILE_THEY_APPLY=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
+                    "LAMP_SERVICES_TO_AGENT=on",
                     "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
+                    "LAMP_SERVICE_RECORDS_TASKS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",

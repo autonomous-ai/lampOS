@@ -232,8 +232,8 @@ fn least_say_cooldown_secs() -> u64 {
 }
 
 /// The switch for a made skill that starts on a request said to the lamp
-/// (#6526, the first builder's design): `on` only, off unless set, in no
-/// product unit. Off, the making model is never told of a said start, any
+/// (#6526, the first builder's design): `on` only, off unless set, on in
+/// the product. Off, the making model is never told of a said start, any
 /// `[said]` in its answer is refused as any part a made skill can't have,
 /// and a trigger on what the microphone hears stays what the lamp can't do
 /// yet ([`topic_cant_yet`]), exactly as before. On, "when I tell you I'm
@@ -244,7 +244,7 @@ fn least_say_cooldown_secs() -> u64 {
 /// matched and no words kept. A trigger on `voice/heard` or `name/heard`
 /// is refused as before, switch on or off. Read by the two routes, the
 /// app's make and the manage helper ([`put_on_cap`]): set it alike in
-/// `lamp-voice` and `lamp-skills-manage@`.
+/// `lamp-voice` and `lamp-skills-manage@`, as the product does.
 pub const SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_SAID";
 
 thread_local! {
@@ -5266,7 +5266,17 @@ pub fn claims_a_file(toml: &str, scripts: &[(String, String)]) -> Option<String>
 thread_local! {
     /// [`PYTHON`] as a test of this thread sets it.
     static PYTHON_HERE: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+    /// [`PARSE_WITHIN`] for a test of this thread that set its own Python.
+    static PARSE_WITHIN_HERE: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) };
 }
+
+/// How long a test's own Python ([`set_python_here`]) is waited for: a test
+/// that expects a real parse result must not race [`PARSE_WITHIN`] on a
+/// loaded runner, where Python's start alone can pass 2 s (#7585). The
+/// bound itself is tested only by a slow Python's case, with its own short
+/// one.
+#[cfg(test)]
+const TEST_PARSE_WITHIN: Duration = Duration::from_secs(10);
 
 /// The Python [`scripts_parse`] parses with: [`PYTHON`], or a test's.
 fn python() -> PathBuf {
@@ -5277,9 +5287,21 @@ fn python() -> PathBuf {
     PathBuf::from(PYTHON)
 }
 
-/// [`python`] for this test's thread alone.
+/// How long [`scripts_parse`] waits for one script's parse:
+/// [`PARSE_WITHIN`], or [`TEST_PARSE_WITHIN`] once a test set its Python.
+fn parse_within() -> Duration {
+    #[cfg(test)]
+    if let Some(within) = PARSE_WITHIN_HERE.with(std::cell::Cell::get) {
+        return within;
+    }
+    PARSE_WITHIN
+}
+
+/// [`python`] for this test's thread alone, waited for [`TEST_PARSE_WITHIN`]
+/// while it is set.
 #[cfg(test)]
 pub(crate) fn set_python_here(python: Option<PathBuf>) {
+    PARSE_WITHIN_HERE.with(|here| here.set(python.as_ref().map(|_| TEST_PARSE_WITHIN)));
     PYTHON_HERE.with(|here| *here.borrow_mut() = python);
 }
 
@@ -5394,11 +5416,12 @@ fn parsed(python: &Path, text: &str, within: Duration) -> Parse {
 /// script as it is: the person's yes still stands before it runs.
 fn scripts_parse(scripts: &[(String, String)]) -> Result<(), Refused> {
     let python = python();
+    let within = parse_within();
     for (path, text) in scripts
         .iter()
         .filter(|(path, _)| path.ends_with(RUNNABLE_ENDING))
     {
-        match parsed(&python, text, PARSE_WITHIN) {
+        match parsed(&python, text, within) {
             Parse::Parses => {}
             Parse::Unchecked(why) => {
                 eprintln!("lamp-voice: a made skill's {path} was not parsed: {why}");
@@ -8121,13 +8144,33 @@ impl Said {
     }
 
     /// Its card's description, what the voice's model reads in its
-    /// `use_skill` line: the `when` line first, so a short line keeps it.
+    /// `use_skill` line: the `when` line first, so a short line keeps it,
+    /// then [`SAID_TO_YOU`], which tells the model the person's telling is
+    /// the ask, and marks the line as a said start's ([`is_said`]).
     fn description(&self) -> String {
         format!(
-            "Use it {}, a request said to you, never talk in the room: it turns the light {}.",
+            "Use it {}{SAID_TO_YOU}it turns the light {}.",
             self.when, self.colour
         )
     }
+}
+
+/// What a said start's description says after its `when` line
+/// ([`Said::description`]). On lamp-9adf (17 Nov, #7448's row) "a request
+/// said to you, never talk in the room" lost to the model's own reading of
+/// "Lamp, I'm busy.": a plain statement, not a request, answered in words
+/// ("I'll keep quiet and let you work.") with no call, 4 times in 4. So it
+/// says the person's telling is the ask, and talk the lamp only overhears
+/// is not.
+pub const SAID_TO_YOU: &str = ", said to you, never talk in the room you only overhear; their \
+                               telling you so is the ask, even a plain statement with nothing \
+                               asked: ";
+
+/// Whether a skill's description is a said start's ([`SAID_TO_YOU`]): what
+/// `use_skill` tells the voice's model of such skills, with
+/// [`SAID_ENVIRONMENT`] on (`crate::use_skill`).
+pub fn is_said(description: &str) -> bool {
+    description.contains(SAID_TO_YOU)
 }
 
 /// A said start in the making model's answer (#6526): none when its
@@ -14722,8 +14765,9 @@ light = { colour = "green", level = 3, for = "20s" }
         let section = crate::use_skill::section(std::slice::from_ref(&tool), &Default::default());
         assert!(
             section.contains(
-                "- written_busy: Use it when they say they're busy or in a meeting, a request \
-                 said to you, never talk in the room: it turns the light red.\n"
+                "- written_busy: Use it when they say they're busy or in a meeting, said to you, \
+                 never talk in the room you only overhear; their telling you so is the ask, even \
+                 a plain statement with nothing asked: it turns the light red.\n"
             ),
             "{section}"
         );
@@ -16980,7 +17024,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         let dir = scratch("made-code-parse-bounds");
         let missing = dir.join("no-python");
         assert!(matches!(
-            parsed(&missing, "x = 1\n", PARSE_WITHIN),
+            parsed(&missing, "x = 1\n", TEST_PARSE_WITHIN),
             Parse::Unchecked(_)
         ));
         let slow = dir.join("slow-python");
@@ -17006,15 +17050,15 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         .unwrap();
         fs::set_permissions(&broken, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(matches!(
-            parsed(&broken, "x = 1\n", PARSE_WITHIN),
+            parsed(&broken, "x = 1\n", TEST_PARSE_WITHIN),
             Parse::Unchecked(_)
         ));
         if let Some(python) = a_python_here() {
             assert!(matches!(
-                parsed(&python, MAIN_PY, PARSE_WITHIN),
+                parsed(&python, MAIN_PY, TEST_PARSE_WITHIN),
                 Parse::Parses
             ));
-            match parsed(&python, FOR_PY, PARSE_WITHIN) {
+            match parsed(&python, FOR_PY, TEST_PARSE_WITHIN) {
                 Parse::Not { line, error } => {
                     assert_eq!(line, Some(3));
                     assert!(error.starts_with("SyntaxError"), "{error}");
@@ -17026,7 +17070,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             let mark = dir.join("ran");
             let writes = format!("open({:?}, 'w').write('ran')\n", mark.display().to_string());
             assert!(matches!(
-                parsed(&python, &writes, PARSE_WITHIN),
+                parsed(&python, &writes, TEST_PARSE_WITHIN),
                 Parse::Parses
             ));
             assert!(!mark.exists());

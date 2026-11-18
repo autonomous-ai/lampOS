@@ -289,6 +289,30 @@ thấy thì không giữ gì, như trước, nên lời "có" về cách viết 
 ý ghi nhớ. Trước đây lamp giữ "They said: … renunculus" trong khi nói
 "ranunculus", và không hỏi.
 
+Câu có gọi `remember` hay `forget` không vào nhật ký: nó bị đánh dấu ở ngoài
+(`remember::keep_out`) trước khi lệnh chạy. Với
+`LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on` (chỉ đường thứ hai; tắt nếu không đặt),
+một `remember` mà chính nó đánh dấu câu ở ngoài, rồi được trả lời là không giữ
+gì và không giữ chờ lời "có" nào (`remembered` không phải true, không có
+`held`: các lần từ chối giữ lặng lẽ của `keep_quietly::unheard`,
+`remember::heard::yes_alone`, `needs_face::NOT_KEPT`, hay lời từ chối của chính bộ nhớ), thì bỏ dấu ấy
+(`remember::keep_back`, quyết định sau khi lệnh trả lời, trong
+`tools::keep_back_if_kept_nothing`). Câu được ghi vào nhật ký như thể chưa từng
+gọi `remember`, trong phạm vi và cho người mà câu mang theo, không bao giờ cho
+người khác. Trên lamp-06c1 ngày 17/11 (bản 13894), buổi gieo dữ liệu ban đêm mất
+câu cắt tóc theo cách này: lệnh giữ lặng lẽ bị từ chối vì mắt không thấy người
+ấy nói, và câu đã bị đánh dấu ở ngoài, nên không còn ở đâu cả. Không đổi: một
+lệnh giữ đã giữ hay đang chờ lời "có" (nên không gì bị lưu hai lần), mọi lệnh
+quên, câu đã bị đánh dấu ở ngoài trước lệnh (một lệnh giữ hay quên khác trong
+cùng yêu cầu, câu giữ qua khoảng trống hay câu được mang tiếp, lời nhắc viết),
+lệnh giữ đang chờ chạy theo lời "có" của người ấy, lệnh không có câu trả lời
+(bộ nhớ có thể đã giữ), và phạm vi không còn hiện hành. Câu riêng của một
+vị khách bị `needs_face::NOT_KEPT` từ chối thì vào nhật ký của căn phòng, như
+lời nói thường. Nhật ký ghi một dòng,
+không có lời nào. Đường Live không đổi. Chi tiết:
+[memory.md](../memory.md), "Asking it to keep or forget something is not
+itself kept".
+
 ## Truy xuất theo khoảng ngày
 
 `LAMP_MEMORY_RECALL_V2=on` (#2176; tắt nếu không đặt, chỉ với client Days, cả
@@ -581,9 +605,10 @@ Phía voice của đường ghi cho những bản ghi chỉ voice mới biết l
 việc Harness, lệnh ghi của agent và lời nhắc (các lát sau). Voice xếp hàng
 mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 `summary` và `deed_unix_ms`, qua socket gốc của chính nó
-(`lamp-voice` `service_records::linked`). Hiện chưa có gì đưa vào: mỗi bên
-ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
-`_REMINDERS`), và khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+(`lamp-voice` `service_records::linked`). Mỗi bên ghi đến cùng công tắc
+riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
+[tasks_vi.md](tasks_vi.md)); dòng của agent và lời nhắc đến sau (`_AGENT`,
+`_REMINDERS`). Khi `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
   connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
@@ -611,8 +636,12 @@ ghi đến cùng công tắc riêng (`LAMP_SERVICE_RECORDS_TASKS`, `_AGENT`,
   khi gửi lần quên và lần nữa khi có trả lời, quên về một điều thì so với
   dịch vụ, hành động và tóm tắt của thay đổi; memory từ chối việc làm trước
   một lần quên (lát 1).
-- **Quay về bản cũ.** Chưa có gì gọi tới, nên voice cũ chỉ khác ở chỗ không
-  có dữ kiện `linked_dropped`.
+- **Lần quên tới cả dòng việc.** Cùng các lần quên đó bỏ theo dõi những
+  việc Harness của người đó (hay khớp với điều đó), nên kết quả đến sau
+  không bao giờ được ghi (lát 3).
+- **Quay về bản cũ.** Chỉ dòng việc gọi tới, sau công tắc riêng của nó, nên
+  voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
+  dòng việc.
 
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
@@ -1184,7 +1213,13 @@ lý do sau "not the same person": "no one known on the line" (không ai được
 nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
 "another person" (người khác) (`second_provider::not_theirs`, không bao giờ
 ghi id; hàng của Thirteen trên #5627, một lời «có» 42 giây sau khi giữ bị đọc
-là của người khác). Bất kỳ lời «không», «giữ», «khoan»,
+là của người khác). Một lời «có» kịp lúc mà không ai được nhận ra trên câu
+(không có mặt trong khung, một khuôn mặt lạ, một câu được mang theo trong cuộc
+trò chuyện đang diễn ra của họ) bị bỏ và điều ấy vẫn được giữ; như với lời
+«có» không thấy miệng, mô hình được báo một lần rằng lời ấy không tính, không
+gì bị quên và điều ấy vẫn được giữ, và nó có thể hỏi họ một lần nói lại khi
+nhìn vào đèn (`remember::unknown_yes_told`, #7454: trên lamp-06c1 mô hình
+không được báo gì và có thể nói là đã quên). Bất kỳ lời «không», «giữ», «khoan»,
 «đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
 không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
 và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi
@@ -1798,3 +1833,11 @@ nhận, thêm `people` là các id bộ nhớ đã hỏi; hoặc `refused: LÝ D
 là 0 chỉ khi cả khuôn mặt lẫn bộ nhớ đều đã đi; 1 trong mọi trường hợp khác
 (kể cả bộ nhớ trả `kept`); 2 khi gọi sai. `LAMP_FACES_PAGE` và các unit giữ
 nguyên.
+
+Unit product mở sẵn socket hẹp của bộ nhớ (A8, #6852): `lamp-memory.service`
+chạy với `--forget-socket /run/lampos-memory/forget.sock --forget-group lampos`
+(`lampos` là nhóm của lamp-cloud, và user của bộ nhớ cũng ở trong nhóm này), và
+`lamp-cloud.service` đặt `LAMP_MEMORY_FORGET_SOCKET` trỏ tới đúng socket đó. Socket
+chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, nên
+khi công tắc đó còn tắt thì không có gì thay đổi với người dùng; khi nó bật, xóa
+một người trong app cũng xóa những gì bộ nhớ giữ về họ.

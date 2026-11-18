@@ -144,6 +144,14 @@ fn grants_ok(grants: &[String]) -> Result<(), String> {
             Err(_) => return Err(format!("grants: {grant:?} is not a grant")),
         }
     }
+    // `net` never beside a private grant (Heron's P1 on #7590): no yes is
+    // kept for a pair no run may hold.
+    if let Some(private) = lamp_skills::task::private_beside_net(grants) {
+        return Err(format!(
+            "grants: net beside {private}: {}",
+            lamp_skills::task::NET_BESIDE_PRIVATE
+        ));
+    }
     Ok(())
 }
 
@@ -249,7 +257,34 @@ pub struct KeptYes {
     /// (`lamp_skills::service_write::fixed_write_of`) is minted its one
     /// grant, its service's `-write` ([`KeptYes::fixed_write_grant`]).
     pub write_agent: bool,
+    /// `LAMP_SERVICES_TO_AGENT=on` ([`SERVICES_TO_AGENT_ENVIRONMENT`]): a
+    /// live spoken ask lamp-tasks hands to the lamp's agent is minted the
+    /// linked service grants it names, and only those
+    /// ([`KeptYes::ask_grants`]).
+    pub services_to_agent: bool,
 }
+
+/// A live spoken ask of a linked service run on the lamp's agent (the
+/// owner's ruling, 17 Nov): `on` only, here and in lamp-voice and
+/// lamp-tasks.
+pub const SERVICES_TO_AGENT_ENVIRONMENT: &str = "LAMP_SERVICES_TO_AGENT";
+/// The skill name a live ask's run is minted as (`lamp_services::VOICE_ASK_SKILL`).
+pub const VOICE_ASK_SKILL: &str = "voice-ask";
+
+/// Whether [`SERVICES_TO_AGENT_ENVIRONMENT`] is on in this process.
+pub fn services_to_agent_on() -> bool {
+    std::env::var(SERVICES_TO_AGENT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a live ask's mint is told with [`SERVICES_TO_AGENT_ENVIRONMENT`]
+/// off.
+pub const ASKS_OFF: &str =
+    "a live ask's linked services are off on this lamp (LAMP_SERVICES_TO_AGENT is not on)";
+
+/// The most grants a live ask's run is minted: one service's read. A
+/// `-write` is never minted for an ask in this cut (Heron's P2 5 on
+/// #7509): writes come with their own gates later.
+pub const MOST_ASK_GRANTS: usize = 1;
 
 /// A made skill's fixed write run through the lamp's agent (the owner's
 /// ruling, 13 Nov): `on` only, here and in lamp-skills, lamp-tasks and
@@ -291,6 +326,46 @@ impl KeptYes {
 }
 
 impl crate::runs::SkillYes for KeptYes {
+    /// A live ask's grants (`{"mint": {"ask": [...]}}`): with the tasks'
+    /// switch and [`KeptYes::services_to_agent`] on, one to
+    /// [`MOST_ASK_GRANTS`] linked service read grants (`<code>-read`) of
+    /// one service, each once; never a `-write`. Nothing else is ever
+    /// minted for an ask: no body, light, camera or microphone. The voice
+    /// held the ask to the owner's own heard line before lamp-tasks, which
+    /// takes it from lamp-voice alone, asked for it.
+    fn ask_grants(&self, asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+        if !self.on {
+            return Err(OFF.into());
+        }
+        if !self.services_to_agent {
+            return Err(ASKS_OFF.into());
+        }
+        if asked.is_empty() || asked.len() > MOST_ASK_GRANTS {
+            return Err(format!(
+                "ask: 1 to {MOST_ASK_GRANTS} linked service read grants"
+            ));
+        }
+        let mut grants = BTreeSet::new();
+        let mut code = None;
+        for grant in asked {
+            match serde_json::from_value::<Grant>(Value::String(grant.clone())) {
+                Ok(Grant::Service(service)) if service.access != crate::protocol::Access::Read => {
+                    return Err(format!("ask: {grant} is not a read; an ask reads only"));
+                }
+                Ok(Grant::Service(service))
+                    if *code.get_or_insert(service.code) == service.code =>
+                {
+                    if !grants.insert(Grant::Service(service)) {
+                        return Err(format!("ask: {grant} is listed twice"));
+                    }
+                }
+                Ok(Grant::Service(_)) => return Err("ask: one service's grants only".into()),
+                _ => return Err(format!("ask: {grant:?} is not a linked service's grant")),
+            }
+        }
+        Ok(grants)
+    }
+
     fn grants(&self, skill: &str) -> Result<BTreeSet<Grant>, String> {
         if !self.on {
             return Err(OFF.into());
@@ -622,14 +697,22 @@ mod tests {
         lamp_voice::skill_task_yes::set_net_here(Some(false));
         assert!(record(json!(["camera", "net"]), &"a".repeat(64))["error"].is_string());
         lamp_voice::skill_task_yes::set_net_here(Some(true));
-        let booth = task_skill(&skills, "photo-booth", r#"["camera", "light", "net"]"#);
+        let booth = task_skill(&skills, "photo-booth", r#"["light", "speak", "net"]"#);
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
         assert_eq!(
             record(json!(["net", "net"]), &sha256)["error"],
             "grants: net is listed twice"
         );
+        // Never beside a private grant (Heron's P1 on #7590).
+        let refused = record(json!(["camera", "light", "net"]), &sha256);
+        assert!(
+            refused["error"]
+                .as_str()
+                .is_some_and(|why| why.contains(lamp_skills::task::NET_BESIDE_PRIVATE)),
+            "{refused}"
+        );
         assert_eq!(
-            record(json!(["camera", "light", "net"]), &sha256),
+            record(json!(["light", "speak", "net"]), &sha256),
             json!({"recorded": true})
         );
         let kept = KeptYes {
@@ -637,14 +720,15 @@ mod tests {
             skills: skills.clone(),
             on: true,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(
             kept.grants("photo-booth").unwrap(),
-            BTreeSet::from([Grant::Camera, Grant::Light])
+            BTreeSet::from([Grant::Light, Grant::Speak])
         );
         // A yes without `net` for a folder that declares it asks again.
         assert_eq!(
-            record(json!(["camera", "light"]), &sha256),
+            record(json!(["light", "speak"]), &sha256),
             json!({"recorded": true})
         );
         assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
@@ -707,11 +791,43 @@ mod tests {
             skills: skills.clone(),
             on: true,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(
             kept.grants("bitcoin-daily").unwrap(),
             BTreeSet::from([Grant::Speak])
         );
+        lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
+    /// Heron's P1 on #7590: no yes is kept for `net` beside a private
+    /// grant (the camera, the microphone, what the lamp says, its notes,
+    /// `look`, a service's read or write); each alone still is, and `net`
+    /// beside the lamp's voice, or `air`, too.
+    #[test]
+    fn no_yes_names_net_beside_a_private_grant() {
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let of = |grants: &[&str]| {
+            grants_ok(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
+        };
+        for private in ["camera", "microphone", "speech", "notes", "look"] {
+            assert_eq!(of(&[private]), Ok(()), "{private}");
+            for pair in [[private, "net"], ["net", private]] {
+                let why = of(&pair).unwrap_err();
+                assert!(
+                    why.contains(lamp_skills::task::NET_BESIDE_PRIVATE),
+                    "{pair:?}: {why}"
+                );
+            }
+        }
+        // A service's grant is never one of this part's own, with `net` or
+        // without it.
+        assert!(of(&["gmail-read", "net"]).is_err());
+        assert_eq!(of(&["speak", "net"]), Ok(()));
+        assert_eq!(of(&["light", "speak", "net"]), Ok(()));
+        // `air` may sit beside `net` (the first builder's ruling on #7590,
+        // 18 Nov 02:01); `look`, above, may not.
+        assert_eq!(of(&["air", "net"]), Ok(()));
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
@@ -797,6 +913,7 @@ mod tests {
             skills: skills.clone(),
             on: true,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
@@ -824,6 +941,7 @@ mod tests {
             skills: skills.clone(),
             on: false,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(off.grants("photo-booth").unwrap_err(), OFF);
         // A yes for fewer grants than the folder declares names none of them.
@@ -887,6 +1005,7 @@ mod tests {
             skills: skills.clone(),
             on,
             write_agent,
+            services_to_agent: false,
         };
         let gmail_write = Grant::Service(
             crate::protocol::ServiceGrant::of("gmail", crate::protocol::Access::Write).unwrap(),
@@ -938,6 +1057,7 @@ mod tests {
             skills: skills.clone(),
             on: true,
             write_agent: false,
+            services_to_agent: false,
         };
         assert_eq!(folder_of(&skills, "photo-booth"), booth);
         assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
@@ -1075,5 +1195,67 @@ mod tests {
         assert!(!from_voice(&format!("0::{VOICE}-not\n")));
         assert!(!from_voice(&format!("4:cpu:{VOICE}\n")));
         assert!(!peer_is_voice(None));
+    }
+
+    /// `LAMP_SERVICES_TO_AGENT` (the owner's ruling, 17 Nov): a live ask is
+    /// minted one service's linked read grant alone, only with the switch and
+    /// the tasks' switch on; anything else, none.
+    #[test]
+    fn a_live_ask_is_minted_one_services_grants_alone() {
+        use crate::runs::SkillYes as _;
+        let kept = |on: bool, services_to_agent: bool| KeptYes {
+            state: "/nowhere/state".into(),
+            skills: "/nowhere/skills".into(),
+            on,
+            write_agent: false,
+            services_to_agent,
+        };
+        let asked = |grants: &[&str]| grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>();
+        let read = Grant::Service(
+            crate::protocol::ServiceGrant::of("gmail", crate::protocol::Access::Read).unwrap(),
+        );
+        assert_eq!(
+            kept(true, true)
+                .ask_grants(&asked(&["gmail-read"]))
+                .unwrap(),
+            BTreeSet::from([read])
+        );
+        assert_eq!(
+            kept(true, false)
+                .ask_grants(&asked(&["gmail-read"]))
+                .unwrap_err(),
+            ASKS_OFF
+        );
+        assert_eq!(
+            kept(false, true)
+                .ask_grants(&asked(&["gmail-read"]))
+                .unwrap_err(),
+            OFF
+        );
+        for refused in [
+            asked(&[]),
+            asked(&["camera"]),
+            asked(&["light"]),
+            asked(&["gmail-read", "gmail-read"]),
+            asked(&["gmail-read", "calendar-read"]),
+            asked(&["gmail-read", "gmail-write", "calendar-read"]),
+            asked(&["nothing-read"]),
+            // Reads only (Heron's P2 5 on #7509): a write, alone or beside
+            // its read, is never minted for an ask.
+            asked(&["gmail-write"]),
+            asked(&["gmail-read", "gmail-write"]),
+            asked(&["google_calendar-write"]),
+        ] {
+            assert!(
+                kept(true, true).ask_grants(&refused).is_err(),
+                "{refused:?}"
+            );
+        }
+        // The names lamp-services and lamp-voice read are this part's.
+        assert_eq!(
+            SERVICES_TO_AGENT_ENVIRONMENT,
+            lamp_services::SERVICES_TO_AGENT_ENVIRONMENT
+        );
+        assert_eq!(VOICE_ASK_SKILL, lamp_services::VOICE_ASK_SKILL);
     }
 }

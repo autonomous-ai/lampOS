@@ -232,7 +232,14 @@ immutable `lampos-lamp-voice-<sequence>` release. Stable is a selection feed,
 not a new signature or sequence namespace. A lamp pointed at it still uses
 `--channel lamp-voice`. The product unit (`deploy/product/lamp-update.service`)
 and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
-from the first customer lamps on (26 Oct): a lamp in a home gets a build only
+from the first customer lamps on (26 Oct), and since #6256 (F2) through its
+CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
+stable build on the CDN"), so a lamp in China, which can't reach GitHub,
+updates too. There is no GitHub fallback: the updater reads one feed. No
+round switches its own unit, so a lamp installed before keeps the GitHub
+stable feed. `lamp-update install` still fetches the models it lacks from
+the URLs `deploy/product/models.json` compiles in (GitHub); a round takes
+them from the manifest, which the mirror points at the CDN. A lamp in a home gets a build only
 once it is promoted here, never each lamp-voice publish, and a lamp the image
 makes starts on the promoted build. Until a first promotion the feed is absent
 and such a lamp keeps the build it has. This tool does not install anything on
@@ -285,8 +292,10 @@ These tests do not establish a real stable promotion or lamp acceptance.
 After a promotion, the `mirror-cdn` job (`.github/scripts/lampos-mirror.py`)
 puts the same build on `https://cdn.autonomous.ai/lampos/stable/`. It is off
 until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
-in it never fails the promotion: the GitHub stable feed above stays the one
-lamps read until a lamp is pointed at the CDN one.
+in it never fails the promotion. A lamp installed or imaged with the product
+unit since #6256 (F2) reads this feed, so when the mirror fails such a lamp
+keeps the build it has until a later promotion is mirrored; a lamp installed
+before reads the GitHub stable feed above.
 
 The job builds `lamp-update` from its own commit and never runs an updater
 it downloads. It reads the stable envelope, refuses it unless its files
@@ -2342,7 +2351,10 @@ same link. A unit of lamp-update's own that starts through `update/current`
 lamp-update's own unit starts from, and that link is left as it is: no round
 moves it. Before this, such a unit was refused (`update/current is there,
 and no unit of this lamp starts through it`), so a lamp that took the
-region's build through a round refused every later build. A part new to the
+region's build through a round refused every later build. That unit's `lamp-update region`, from `update/current` at every boot, is
+also how install's sysstat drop-ins (#7254, [install.md](install.md),
+"sysstat's collection off") reach a lamp in a home: a round never writes
+install's side files itself. A part new to the
 lamp is installed afresh in the folder of its
 binary's SHA-256, as a switch installs a build, and its `current` link is
 made to name it. A part's template, socket or timer is added when its part

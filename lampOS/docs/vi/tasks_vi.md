@@ -259,6 +259,60 @@ tuyến thứ hai (`second_provider/tests/task_yes_in_code.rs`)
 `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
 `a_typed_yes_is_not_taken_in_code`. Chưa được phát thử trên đèn.
 
+### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, tắt trừ khi `LAMP_SERVICE_RECORDS_TASKS=on`)
+
+Cùng với `LAMP_SERVICE_RECORDS`, chỉ trên tuyến thứ hai, việc được giao trên
+tiếng "có" nghe được của chủ đèn được giữ trong bộ nhớ Days của họ thành một
+bản ghi liên kết, qua hộp chờ liên kết của voice
+([memory-days_vi.md](memory-days_vi.md)) (`lamp-voice`
+`service_records::task_rows`):
+
+- **Của ai.** Người có tiếng "có" đã bắt đầu việc, theo cách các dịch vụ
+  nhận ra chủ đèn (`services::owner_of`): `confirm_agent_task` của mô hình
+  truyền chủ đèn của câu đó, còn tiếng "có" đơn thuần nhận trong code
+  (#7027) truyền chủ đèn mà phạm vi của câu tìm ra. Không có người đã biết
+  (id `p-`) thì không giữ hay theo dõi gì. Chỉ việc do chính voice bắt đầu
+  mới được ghi: việc nó không giao, dù bus hay phần tasks cho thấy gì, đều
+  không cho ra gì. Bản mô tả kỹ năng là việc đèn tự làm, không bao giờ là
+  một dòng.
+- **Ghi gì.** Khóa `t-<store>-<task>`, dịch vụ `harness`, hành động `task`,
+  `source_kind` `task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`. Tóm tắt là việc như đã nhờ (`text` của việc), một
+  dòng tối đa 160 byte; câu trả lời của agent ở lại phần tasks
+  (`get_observation`) và không bao giờ được ghi.
+- **Khi nào.** `prepared` lúc giao; rồi, từ lần quan sát mới nhất của việc
+  (`get_task`), `done` (idle), `failed` (failed, hay lần giao không bao giờ
+  được gửi) hoặc `cancelled` (stopped), mỗi thay đổi một lần. Một câu hỏi
+  ngược lại (`needs-input`), việc đang chạy, hay lần giao chưa chắc thì
+  không ghi gì. Mọi dòng của một việc mang thời điểm giao làm
+  `deed_unix_ms`, nên lần quên sau đó cũng thắng kết quả đến muộn trong
+  memory.
+- **Có giới hạn.** Theo dõi tối đa 16 việc, việc cũ nhất bị bỏ trước, mỗi
+  việc trong 12 giờ sau khi giao; mỗi việc một `get_task` mỗi 10 giây, tối
+  đa 1,5 giây mỗi lần, trên luồng riêng (`linked-task-rows`), không bao giờ
+  trên một lượt. Bản đồ chỉ nằm trong bộ nhớ: việc xong sau khi voice khởi
+  động lại giữ dòng `prepared`.
+- **Quên.** Quên tất cả (của người đó hay của mọi người), hay quên về một
+  điều khớp với tóm tắt, cũng bỏ theo dõi việc ở đây, trước khi gửi lần
+  quên; không đụng tới gì trong phần tasks.
+- **Tắt.** Một trong hai công tắc tắt thì không giữ, theo dõi hay hỏi gì.
+  Tuyến Live chưa có móc này.
+- **Quay về bản cũ.** Tắt công tắc, hoặc chạy voice cũ: các dòng đã ghi ở
+  lại tới khi bị quên, và memory cũ từ chối các trường liên kết, hộp chờ bỏ
+  chúng.
+
+Kiểm thử: trong `service_records::task_rows` là
+`the_yes_person_is_mapped`, `no_known_person_keeps_nothing`,
+`an_unknown_or_forged_task_is_dropped`,
+`the_summary_is_at_most_160_bytes`,
+`an_outcome_is_written_once_with_the_hand_over_deed`,
+`outcomes_from_the_task`, `a_forget_lets_their_tasks_go`,
+`a_forget_about_lets_only_the_matching_tasks_go`,
+`followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
+`off_nothing_is_kept_or_followed`; và trong `agent_tasks` là
+`a_hand_over_on_the_owners_yes_is_their_task_row` cùng tiếng "có" nhận
+trong code. Chưa được phát thử trên đèn.
+
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
@@ -1183,6 +1237,52 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Một yêu cầu nói trực tiếp trên socket tạo kỹ năng (`voice_ask`, tắt trừ khi bật)
+
+Quyết định của chủ đèn ngày 17/11: một lần đọc dịch vụ đã liên kết, và một
+yêu cầu mà mô hình của tuyến thứ hai không làm được, đi tới tác tử mặc định
+của đèn (Hermes hoặc OpenClaw, ~17:55), không bao giờ cố định là Hermes.
+Socket tạo kỹ năng nhận thêm một loại dòng từ lamp-voice,
+`{"op":"voice_ask","ask","grants","within_ms"}` (`lamp_tasks::voice_ask`),
+được trả lời như một lần tạo (`started`, rồi `answer` hoặc một lời từ chối),
+với một chỗ riêng bên cạnh lần tạo. Tác tử được chọn ở mỗi yêu cầu như một
+lần tạo với `"one_path":true` (`skill_make::MakeGateway`,
+`HarnessRunner::make_agent`), không có trường nào trên dòng:
+
+- **Hermes** chạy nó như dưới đây.
+- **Một tác tử gateway (OpenClaw)** nhận một yêu cầu khó thành một lượt tạo
+  (`MakeTurn`, `harness new openclaw` trong một thư mục `make-<run id>` mới
+  chỉ có `rules.md`; không token, không gì trong môi trường từ lamp-tasks).
+  Đó không phải là cô lập: lượt chạy trong chính Gateway của chủ đèn, với
+  workspace, bộ nhớ và các phiên của chủ đèn (nó giữ bản ghi của lượt), cùng
+  các công cụ, kênh nhắn tin và mạng của Gateway. Nó chỉ được giữ ở mức trả
+  lời bằng quy tắc của nó (`voice_ask::ANSWER_ONLY`, P2 của Heron trên
+  #7509): không gửi, mua, đổi, xoá hay đăng gì, không chạy gì làm việc đó,
+  không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Quy tắc của
+  Hermes giữ "làm điều họ yêu cầu": home mới của nó không có kênh nào và
+  không có bộ nhớ nào của chủ đèn. Câu trả lời mang `"owner_alone":true`
+  (`voice_ask::OWNER_ALONE`, P2 của AppOnly trên #7509): lamp-voice chỉ nói
+  nó khi chủ đèn được thấy một mình. Câu trả lời là `answer.md`, nếu không có
+  thì câu trả lời chat cuối của tác tử khi Harness không cắt nó
+  (`voice_ask::run_answer`), giữ trong 120 s tính từ lúc yêu cầu bắt đầu.
+  Một lần đọc trên OpenClaw bị từ chối `no_services` trước khi cấp token.
+- **Harness chưa xem** mà mặc định của đèn (`runtime::default_engine_of`,
+  đặt cùng các engine của đèn, bất kể `LAMP_SKILL_DEFAULT_AGENT`) không phải
+  Hermes: một lựa chọn Hermes bị từ chối `not_ready`. Lựa chọn thất bại là
+  `run_failed`.
+
+Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on`, trên
+Hermes bằng runner của lần tạo (mạng như `LAMP_MAKE_AGENT_NET` nói); với một
+quyền `<code>-read` của một dịch vụ (chỉ đọc: `-write` hay quyền thứ hai bị
+từ chối `bad_request`) chỉ với `LAMP_SERVICES_TO_AGENT=on` và
+`LAMP_AGENT_SERVICES=on`, tách khỏi mạng, trên một token lamp-control cấp
+cho đúng quyền đó, cấu hình home mới có `mcp_servers.lamp-services`. Trên
+Hermes, lời người nói nằm trong tệp quy tắc (không bao giờ trong đối số),
+câu trả lời đọc từ `answer.md`, gộp khoảng trắng và tối đa 3.000 byte, thư
+mục bị xoá và token kết thúc dù lượt chạy kết thúc thế nào, tối đa 120 s.
+Tắt thì dòng bị từ chối `off` và các lần tạo như trước
+([services_vi.md](services_vi.md)).
+
 ### Một lần tạo bằng giọng nói trên OpenClaw, qua đường chạy chung (`LAMP_MAKE_AGENT_ONE_PATH`, bật, #7245)
 
 Trên lamp-c0a4 (bản build 13333, OpenClaw là mặc định, 16/11 11:46) một
@@ -1385,7 +1485,7 @@ năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
 
 Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11). `LAMP_UPLOAD_TO_AGENT` bật
 trong sản phẩm từ 13/11 (phán quyết của chủ: luồng tải lên đi qua agent);
-`LAMP_TASK_NET` trong sản phẩm vẫn tắt cho tới khi qua các bước kiểm tra; khi bật, nó nằm trong lamp-tasks, lamp-skills và manage helper,
+`LAMP_TASK_NET` cũng bật trong sản phẩm (#7200), nằm trong lamp-tasks, lamp-skills và manage helper,
 lamp-control, lamp-voice và lamp-cloud, và lần chạy được cấp `net` với lời đồng ý bằng giọng
 nói của chủ tới được web công khai trên cổng 80 và 443, bị giữ như mọi lần chạy
 (quyết định của người xây dựng đầu tiên trên #7200: không bao giờ tới mạng của
@@ -1410,6 +1510,40 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
   lối ra, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
   trước khi có token.
+- **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
+  P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
+  - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi
+    của dịch vụ (`*-read`, `*-write`), `camera`, `microphone`, `speech`,
+    `notes` hay `look` (có ai ở đó không, tức nhà có trống không: quyết định
+    của người xây dựng đầu tiên trên #7590, 18/11 02:01)
+    (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`). `air`
+    không thuộc số đó: nó được đi cùng `net`, và lời đồng ý khi đó nói rõ
+    ("…, so its air readings can go to the internet",
+    `skill_task_yes::AIR_BESIDE_NET`).
+    Cặp đó bị từ chối khi nạp (`grants_of` của lamp-skills), khi tải lên
+    (`upload_agent::files` và phần kiểm tra `skill.toml` đã giữ, nói rõ
+    bằng lời), trong lời đồng ý của lamp-control (`grants_ok`) và trong lần
+    giao của lamp-tasks (`HandOver::check`, `bad_request`, không tạo token).
+    Kỹ năng cần cả hai thì là hai kỹ năng.
+  - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
+    thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó cạnh socket
+    lối ra của lần chạy, trong thư mục riêng 0700 của nó,
+    `/run/lampos-tasks/egress/<egress name>.folder` (0600, tạo mới cùng
+    socket bởi `Grant::open_for`, xoá cùng socket), nơi không lần chạy nào
+    thấy hay ghi được (P3 của Heron tại `2533a4f02b`; `egress::OWN_SKILL_FILE`), và script namespace chỉ đưa thư mục đó vào
+    trong `/var/lib/lampOS/skills` và `skills-dev`
+    (`hermes_install::OWN_SKILL_LINES`); script không có dòng đó
+    (`egress::NS_OWN_SKILL_LINE`) thì không nhận lần chạy `net` (`no_net`).
+    Trong thư mục làm việc của lamp-tasks, nó chỉ thấy thư mục lần chạy của
+    chính nó, `lamp/make-<run id>`, trên một tmpfs rỗng phủ phần còn lại,
+    nên không đọc và gửi đi được gì lần chạy khác để lại ở đó (P2 của Heron
+    tại `2533a4f02b`).
+  - Không có giới hạn byte cho lưu lượng của lần chạy `net` ngoài 16 đường
+    ống, 60 s nhàn rỗi và hạn chót của lần chạy.
+  - Câu hỏi DNS của lần chạy `net` đi tới resolver của đèn, thường là router
+    trong nhà.
+  - Lời đồng ý cho `net` chỉ được rút lại bằng cách gỡ kỹ năng; lần chạy đang
+    diễn ra vẫn giữ lối ra tới khi kết thúc.
 - **Lối ra của lần chạy có `net`** (`crate::egress`, ghi chú thiết kế trên
   #7200, câu trả lời của Heron): mọi lần chạy đều bị giữ, có `net` hay không.
   Lần chạy có `net` đi qua `skill_make::net_runner(home)`: runner bị giữ

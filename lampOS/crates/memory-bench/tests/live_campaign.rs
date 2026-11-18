@@ -21,7 +21,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -297,10 +297,10 @@ impl Chat {
         let done = stop.clone();
         let seen = counts.clone();
         let worker = thread::spawn(move || {
-            // Two fake-service months may run at once on a loaded debug host;
-            // the server outlives them so a slow run is not cut off midway.
-            let until = Instant::now() + Duration::from_secs(900);
-            while !done.load(Ordering::Relaxed) && Instant::now() < until {
+            // Two fake-service months may run at once on a loaded debug host.
+            // No clock of its own: it serves until its test drops it, so a
+            // slow run is not cut off midway.
+            while !done.load(Ordering::Relaxed) {
                 let (mut stream, _) = match listener.accept() {
                     Ok(s) => s,
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -366,12 +366,15 @@ impl Speech {
         let endpoint = format!("ws://{}/v1/listen", listener.local_addr().unwrap());
         let stop = Arc::new(AtomicBool::new(false));
         let done = stop.clone();
+        // No clock of its own: it waits until its test drops it. Whether it
+        // was contacted is the test's own check (`create_speech`'s calls).
         let worker = thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
-            runtime.block_on(async {let listener=tokio::net::TcpListener::from_std(listener).unwrap();let until=Instant::now()+Duration::from_secs(120);let socket=loop {if done.load(Ordering::Relaxed){return;}assert!(Instant::now()<until,"speech fixture was not contacted");if let Ok(accepted)=tokio::time::timeout(Duration::from_millis(100),listener.accept()).await{break accepted.unwrap().0;}};let mut socket=accept_async(socket).await.unwrap();let mut received=0;while let Ok(Some(Ok(frame)))=tokio::time::timeout(Duration::from_secs(5),socket.next()).await {match frame {Message::Binary(b)=>received+=b.len(),Message::Text(text)=>{let v:Value=serde_json::from_str(&text).unwrap();match v["type"].as_str(){Some("Finalize")=>{assert_eq!(received,1280);let v=json!({"type":"Results","channel_index":[0,1],"start":0.0,"duration":0.04,"is_final":true,"from_finalize":true,"channel":{"alternatives":[{"transcript":"offline observed words"}]},"metadata":{"request_id":"fixture-speech","model_uuid":"fixture-uuid","model_info":{"name":"general","arch":"nova-3","version":"fixture-v1"}}});socket.send(Message::text(v.to_string())).await.unwrap();},Some("CloseStream")=>{socket.send(Message::text(json!({"type":"Metadata","request_id":"fixture-speech","duration":0.04,"channels":1}).to_string())).await.unwrap();socket.close(None).await.unwrap();return;},_=>{}}},_=>{}}}panic!("fake speech did not finish");});
+            runtime.block_on(async {let listener=tokio::net::TcpListener::from_std(listener).unwrap();let socket=loop {if done.load(Ordering::Relaxed){return;}
+if let Ok(accepted)=tokio::time::timeout(Duration::from_millis(100),listener.accept()).await{break accepted.unwrap().0;}};let mut socket=accept_async(socket).await.unwrap();let mut received=0;while let Ok(Some(Ok(frame)))=tokio::time::timeout(Duration::from_secs(5),socket.next()).await {match frame {Message::Binary(b)=>received+=b.len(),Message::Text(text)=>{let v:Value=serde_json::from_str(&text).unwrap();match v["type"].as_str(){Some("Finalize")=>{assert_eq!(received,1280);let v=json!({"type":"Results","channel_index":[0,1],"start":0.0,"duration":0.04,"is_final":true,"from_finalize":true,"channel":{"alternatives":[{"transcript":"offline observed words"}]},"metadata":{"request_id":"fixture-speech","model_uuid":"fixture-uuid","model_info":{"name":"general","arch":"nova-3","version":"fixture-v1"}}});socket.send(Message::text(v.to_string())).await.unwrap();},Some("CloseStream")=>{socket.send(Message::text(json!({"type":"Metadata","request_id":"fixture-speech","duration":0.04,"channels":1}).to_string())).await.unwrap();socket.close(None).await.unwrap();return;},_=>{}}},_=>{}}}panic!("fake speech did not finish");});
         });
         Self {
             endpoint,
@@ -388,6 +391,16 @@ impl Drop for Speech {
             result.unwrap();
         }
     }
+}
+// A month under a loaded parallel run can take minutes before its first
+// speech call. The fake speech server ends when its test drops it, never on
+// a clock of its own, so a slow but correct run is not failed by the fixture.
+#[test]
+#[ignore = "125 s: run by hand after touching the fixture's lifetime"]
+fn speech_fixture_waits_for_its_test_not_a_clock() {
+    let speech = Speech::start();
+    thread::sleep(Duration::from_secs(125));
+    drop(speech);
 }
 fn prepare_audio(dir: &Path) -> String {
     fs::DirBuilder::new().mode(0o700).create(dir).unwrap();

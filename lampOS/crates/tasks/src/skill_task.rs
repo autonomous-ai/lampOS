@@ -242,7 +242,7 @@ pub const SERVICE_GRANTS: &[&str] = &[
     "notion",
 ];
 /// The switch for the task grant [`NET_GRANT`] (`on` exactly; off unless
-/// set, in no product unit yet): with it, a run whose grants name `net` reaches
+/// set; on in the product units that read it, #7200): with it, a run whose grants name `net` reaches
 /// the public web on ports 80 and 443, held as every run ([`NET_ENV`]
 /// `run`) and given its own egress socket, started by the make's runner
 /// ([`crate::skill_make::net_runner`], [`crate::egress`]); without it,
@@ -252,6 +252,37 @@ pub const NET_SWITCH: &str = "LAMP_TASK_NET";
 /// The task grant that gives the run the public web: never lamp-control's own,
 /// so never in a one-run token; checked by the owner's yes as any grant.
 pub const NET_GRANT: &str = "net";
+/// The grants that reach what is the person's own: a linked service's
+/// read or write (`*-read`, `*-write`), the camera, the microphone, what
+/// the lamp says, its notes, and `look` (whether someone is there, so
+/// whether the house is empty: the first builder's ruling on #7590, 18 Nov
+/// 02:01). A run granted [`NET_GRANT`] holds none of them (Heron's P1 on
+/// #7590): private data, untrusted text and a way out never share one run.
+/// `air` is not one: its readings show who is there only coarsely and
+/// slowly, and may go out (the yes says so). A skill that needs both is two skills. Checked here ([`HandOver::check`]), at load by lamp-skills and
+/// the upload, and by lamp-control's yes.
+pub const PRIVATE_GRANTS: [&str; 5] = ["camera", "microphone", "speech", "notes", "look"];
+/// Said when a skill's grants name [`NET_GRANT`] beside one of
+/// [`PRIVATE_GRANTS`] or a service's.
+pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes, or know whether someone is there: make it two skills";
+
+/// Whether `grant` is one a run granted [`NET_GRANT`] never holds:
+/// [`PRIVATE_GRANTS`], or any service's read or write.
+pub fn private_grant(grant: &str) -> bool {
+    PRIVATE_GRANTS.contains(&grant) || grant.ends_with("-read") || grant.ends_with("-write")
+}
+
+/// The first of `grants` that may not sit beside [`NET_GRANT`] there
+/// ([`private_grant`]), when `grants` names it; `None` otherwise.
+pub fn private_beside_net<S: AsRef<str>>(grants: &[S]) -> Option<&str> {
+    if !grants.iter().any(|grant| grant.as_ref() == NET_GRANT) {
+        return None;
+    }
+    grants
+        .iter()
+        .map(AsRef::as_ref)
+        .find(|grant| private_grant(grant))
+}
 /// An agent skill's `run` (`lamp_voice::upload_agent::INSTRUCTIONS`,
 /// `LAMP_UPLOAD_TO_AGENT`): a file added in the app, kept whole, which
 /// Hermes follows rather than runs.
@@ -392,6 +423,9 @@ impl HandOver {
             if !name_ok(grant) || !known || !seen.insert(grant) {
                 return Err("a grant is unknown, written twice or `skills`");
             }
+        }
+        if private_beside_net(&self.grants).is_some() {
+            return Err(NET_BESIDE_PRIVATE);
         }
         Ok(())
     }
@@ -598,6 +632,13 @@ pub trait Tokens {
     fn net_agreed(&self, _skill: &str, _sha256: &str, _grants: &[String]) -> bool {
         false
     }
+    /// A token for a live spoken ask's run `run` (`crate::voice_ask`,
+    /// `LAMP_SERVICES_TO_AGENT`): lamp-control mints exactly the linked
+    /// service `grants` asked, under its switch, or refuses. None by
+    /// default.
+    fn mint_ask(&self, _grants: &[String], _run: &str) -> Result<Minted, String> {
+        Err("no live ask's token on this lamp".into())
+    }
 }
 
 /// No lamp-control token: every run is refused.
@@ -654,18 +695,46 @@ impl ControlTokens {
 const MOST_ANSWER_BYTES: u64 = 64 * 1024;
 
 impl Tokens for ControlTokens {
+    fn mint_ask(&self, grants: &[String], run: &str) -> Result<Minted, String> {
+        self.mint_asked(
+            &json!({"mint": {
+                "ask": grants,
+                "run": run,
+                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+            }}),
+            run,
+        )
+    }
+
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
-        let asked = json!({"mint": {
-            "skill": skill,
-            "run": run,
-            "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
-        }});
+        self.mint_asked(
+            &json!({"mint": {
+                "skill": skill,
+                "run": run,
+                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+            }}),
+            run,
+        )
+    }
+
+    fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
+        self.net_agreed_asked(skill, sha256, grants)
+    }
+
+    fn end(&self, run: &str) {
+        self.end_asked(run);
+    }
+}
+
+impl ControlTokens {
+    /// One mint `asked` for run `run`: the token and the grants it names.
+    fn mint_asked(&self, asked: &Value, run: &str) -> Result<Minted, String> {
         // Once asked, a token may be live though its answer was lost: end
         // the run on any failure (an end is safe twice, or for no run).
-        let answer = match self.ask(&asked) {
+        let answer = match self.ask(asked) {
             Ok(answer) => answer,
             Err(why) => {
-                self.end(run);
+                self.end_asked(run);
                 return Err(why);
             }
         };
@@ -688,7 +757,7 @@ impl Tokens for ControlTokens {
                 grants,
             }),
             _ => {
-                self.end(run);
+                self.end_asked(run);
                 Err("lamp-control's token answer is not one this lamp-tasks reads".into())
             }
         }
@@ -700,7 +769,7 @@ impl Tokens for ControlTokens {
     /// folder lamp-control hashed itself and the grants it declares, and a
     /// skill has one yes, so an agreed check for the line's SHA-256 and
     /// grants is the owner's yes to `net` for the folder as it is.
-    fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
+    fn net_agreed_asked(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
         grants.iter().any(|grant| grant == NET_GRANT)
             && self
                 .ask(
@@ -709,7 +778,7 @@ impl Tokens for ControlTokens {
                 .is_ok_and(|answer| answer["agreed"] == true)
     }
 
-    fn end(&self, run: &str) {
+    fn end_asked(&self, run: &str) {
         if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
             // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
             eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
@@ -2501,7 +2570,8 @@ pub const ONE_PATH_EGRESS_LINES: [&str; 3] = [
 /// its id ([`ONE_PATH_EGRESS_LINES`]) and its data takes a make's home
 /// ([`crate::skill_make::ONE_PATH_HOME_LINE`], Hermes's alone), and the
 /// namespace shows a `skill-<run id>` egress socket
-/// ([`crate::egress::NS_LINE`], [`crate::egress::NS_SKILL_LINE`]) and that
+/// ([`crate::egress::NS_LINE`], [`crate::egress::NS_SKILL_LINE`]), shows
+/// it only its own skill's folder ([`crate::egress::NS_OWN_SKILL_LINE`]) and that
 /// home with the lasting one hidden
 /// ([`crate::skill_make::ONE_PATH_NS_MAKE_LINES`]).
 pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
@@ -2511,6 +2581,7 @@ pub fn takes_net_runs(wrapper: &str, script: &str) -> bool {
         && wrapper.contains(crate::skill_make::ONE_PATH_HOME_LINE)
         && script.contains(crate::egress::NS_LINE)
         && script.contains(crate::egress::NS_SKILL_LINE)
+        && script.contains(crate::egress::NS_OWN_SKILL_LINE)
         && script.contains(crate::skill_make::ONE_PATH_NS_MAKE_LINES)
 }
 
@@ -2656,7 +2727,7 @@ impl HarnessRunner {
         }
         let socket = format!("{RUN_FOLDER_PREFIX}{}", run.run);
         let served = grant
-            .open(&socket, until)
+            .open_for(&socket, until, &run.folder)
             .map_err(|error| format!("the run's way out was not made: {}", error.kind()))?;
         eprintln!(
             "[lamp-tasks] skill task {}: granted net: its egress socket {socket}.sock made for the lamp's default agent ({name})",
@@ -3620,8 +3691,10 @@ impl Runner for HarnessRunner {
         let cancel = AtomicBool::new(false);
         // A voice make's turn gets its whole deadline from the hand-over
         // (#7245, lamp-c0a4 17:53: Harness's hand-over took 40 of 90 s and
-        // OpenClaw had no time left to write). A skill's run is unchanged.
-        let deadline = if self.makes {
+        // OpenClaw had no time left to write). A skill's run is unchanged,
+        // and so is a live spoken ask's (`crate::voice_ask`): the person
+        // waits on it, so it is held to its deadline from its start.
+        let deadline = if self.makes && run.skill != crate::voice_ask::SKILL {
             run.deadline
         } else {
             run.deadline.saturating_sub(began.elapsed())
@@ -3768,18 +3841,23 @@ impl Runner for HarnessRunner {
                 // A make's answer is its folder's `answer.md`, read before
                 // its guard removes the folder (#7245), or, with none, its
                 // chat answer when that is a make's answer: a `cannot:` line
-                // or a skill's files (`make_answer`, #7427).
+                // or a skill's files (`make_answer`, #7427); a live spoken
+                // ask's (`crate::voice_ask`), any chat answer Harness didn't
+                // cut, held to a make's answer's bound (`voice_ask::run_answer`).
                 // Failing closed: a gateway agent's run whose launcher
                 // never claimed its start, or whose fence never said it
                 // started the script, never ran the skill's script.
                 let ended = if self.makes {
+                    let chat = answer
+                        .as_ref()
+                        .map(|(text, truncated)| (text.as_str(), *truncated));
+                    let taken = if run.skill == crate::voice_ask::SKILL {
+                        crate::voice_ask::run_answer(&started.folder, chat)
+                    } else {
+                        crate::skill_make::make_answer(&started.folder, chat)
+                    };
                     if ended.is_ok()
-                        && let Some((text, from)) = crate::skill_make::make_answer(
-                            &started.folder,
-                            answer
-                                .as_ref()
-                                .map(|(text, truncated)| (text.as_str(), *truncated)),
-                        )
+                        && let Some((text, from)) = taken
                     {
                         if from == crate::skill_make::AnswerFrom::Chat {
                             eprintln!(
@@ -5446,14 +5524,14 @@ mod tests {
             |asked| json!({"agreed": asked["task_yes_check"]["sha256"] == SHA}),
             2,
         );
-        let grants = vec!["camera".to_owned(), NET_GRANT.to_owned()];
+        let grants = vec!["light".to_owned(), NET_GRANT.to_owned()];
         assert!(tokens.net_agreed("photo-booth", SHA, &grants));
         assert!(!tokens.net_agreed("photo-booth", &"0".repeat(64), &grants));
         // No `net` in the grants: never asked, never agreed.
-        assert!(!tokens.net_agreed("photo-booth", SHA, &["camera".to_owned()]));
+        assert!(!tokens.net_agreed("photo-booth", SHA, &["light".to_owned()]));
         assert_eq!(
             served.join().unwrap()[0],
-            json!({"task_yes_check": {"name": "photo-booth", "sha256": SHA, "grants": ["camera", "net"]}})
+            json!({"task_yes_check": {"name": "photo-booth", "sha256": SHA, "grants": ["light", "net"]}})
         );
     }
 
@@ -7450,12 +7528,18 @@ mod tests {
             ONE_PATH_EGRESS_LINES[2]
         )));
         let ns = format!(
-            "{}\n{}\n{}",
+            "{}\n{}\n{}\n{}",
             crate::egress::NS_LINE,
             crate::egress::NS_SKILL_LINE,
+            crate::egress::NS_OWN_SKILL_LINE,
             crate::skill_make::ONE_PATH_NS_MAKE_LINES
         );
         assert!(takes_net_runs(ONE_PATH_HERMES, &ns));
+        // A script that would show a net run every skill's folder: refused.
+        assert!(!takes_net_runs(
+            ONE_PATH_HERMES,
+            &ns.replace(crate::egress::NS_OWN_SKILL_LINE, "")
+        ));
         assert!(!takes_net_runs(ONE_PATH_CLAUDE, &ns));
         assert!(!takes_net_runs(
             ONE_PATH_HERMES,
@@ -7463,19 +7547,85 @@ mod tests {
         ));
     }
 
+    /// Heron's P1 on #7590: a hand-over granted `net` beside a private
+    /// grant (a service's read or write, the camera, the microphone, what
+    /// the lamp says, its notes, `look`) is refused, nothing minted or run;
+    /// each of them alone still passes, and `net` beside the lamp's voice,
+    /// or `air`, too.
+    #[test]
+    fn a_hand_over_never_holds_net_beside_a_private_grant() {
+        let parse = |grants: Value| {
+            HandOver::parse_with(&line(|value| value["grants"] = grants), skills(), true)
+        };
+        for private in [
+            "gmail-read",
+            "gmail-write",
+            "google_calendar-read",
+            "camera",
+            "microphone",
+            "speech",
+            "notes",
+            // Whether someone is there (the first builder's ruling on
+            // #7590, 18 Nov 02:01).
+            "look",
+        ] {
+            assert!(private_grant(private), "{private}");
+            assert!(parse(json!([private])).is_ok(), "{private}");
+            for pair in [
+                json!([private, NET_GRANT]),
+                json!([NET_GRANT, "light", private]),
+            ] {
+                let (code, why) = parse(pair.clone()).unwrap_err();
+                assert_eq!(
+                    (code, why.as_str()),
+                    ("bad_request", NET_BESIDE_PRIVATE),
+                    "{pair}"
+                );
+            }
+        }
+        assert!(parse(json!(["speak", NET_GRANT])).is_ok());
+        assert!(parse(json!(["light", "speak", "body", NET_GRANT])).is_ok());
+        assert!(!private_grant("speak") && !private_grant(NET_GRANT) && !private_grant("air"));
+        // `air` stays allowed beside `net` (the same ruling): its yes says
+        // the readings can go to the internet.
+        assert!(parse(json!(["air", NET_GRANT])).is_ok());
+        // lamp-tasks refuses it before any token is asked for.
+        let tokens = FakeTokens {
+            net_yes: true,
+            ..FakeTokens::default()
+        };
+        let work = tempfile::tempdir().unwrap();
+        let (held, open) = (where_runner(), where_runner());
+        let agent = Agent {
+            net: Some(&open),
+            held: None,
+            work: Some(work.path()),
+            services: false,
+            keys: None,
+        };
+        let pair = line(|value| value["grants"] = json!(["camera", NET_GRANT]));
+        let told = answer_agent(&pair, true, skills(), &tokens, &held, &agent);
+        assert_eq!(told["error"], "bad_request", "{told}");
+        assert!(tokens.minted.borrow().is_empty());
+        assert!(open.started.borrow().is_empty() && held.started.borrow().is_empty());
+    }
+
     /// LAMP_TASK_NET: a run granted `net` goes through the make's net
     /// runner, held as every run with its own egress socket; one with no
     /// `net` goes through the skill's. With the switch off, `net` is no
     /// grant and the line is refused. The token never names `net`, so a yes
-    /// for camera and light mints for a line of camera, light and net.
+    /// for light and speak mints for a line of light, speak and net.
     #[test]
     fn the_net_grant_is_held_with_its_way_out_and_no_grant_has_none() {
         assert!(net_on(Some("on")) && !net_on(Some("yes")) && !net_on(None));
         let work = tempfile::tempdir().unwrap();
-        let with_net = line(|value| value["grants"] = json!(["camera", "light", NET_GRANT]));
+        let with_net = line(|value| value["grants"] = json!(["light", "speak", NET_GRANT]));
         // lamp-control's yes doesn't name `net`: refused, nothing run, the
         // token ended.
-        let no_net_yes = FakeTokens::default();
+        let no_net_yes = FakeTokens {
+            yes: Some(vec!["light".into(), "speak".into()]),
+            ..FakeTokens::default()
+        };
         let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
             net: Some(&open),
@@ -7490,6 +7640,7 @@ mod tests {
         assert_eq!(no_net_yes.ended.borrow().len(), 1);
         assert!(no_net_yes.live.borrow().is_empty());
         let tokens = FakeTokens {
+            yes: Some(vec!["light".into(), "speak".into()]),
             net_yes: true,
             ..FakeTokens::default()
         };
@@ -7506,7 +7657,8 @@ mod tests {
         assert_eq!(open.started.borrow().len(), 1);
         assert!(held.started.borrow().is_empty());
         // No `net`: held, though the switch is on.
-        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &held, &agent);
+        let no_net = line(|value| value["grants"] = json!(["light", "speak"]));
+        let told = answer_agent(&no_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
         assert_eq!(
             (held.started.borrow().len(), open.started.borrow().len()),
@@ -7578,9 +7730,12 @@ mod tests {
         let ns = dir.path().join("hermes-ns");
         let ns_with = |line: &str| std::fs::write(&ns, format!("{NS_HOME_LINE}{line}\n")).unwrap();
         let script = format!(
-            "env > {seen}.env; if [ -S \"{egress}/$LAMP_NS_EGRESS.sock\" ]; then echo there > {seen}.sock; fi",
+            "env > {seen}.env; if [ -S \"{egress}/$LAMP_NS_EGRESS.sock\" ]; then echo there > {seen}.sock; fi; \
+             cat \"{egress}/$LAMP_NS_EGRESS{own}\" > {seen}.own 2>/dev/null || rm -f {seen}.own; \
+             ls -A \"${{HOME%/home}}\" > {seen}.ls 2>/dev/null",
             seen = seen.display(),
-            egress = egress.display()
+            egress = egress.display(),
+            own = crate::egress::OWN_SKILL_FILE,
         );
         let stand_in = |runner: &mut crate::skill_make::MakeHermes| {
             runner.hermes.program = PathBuf::from("/bin/sh");
@@ -7611,10 +7766,16 @@ mod tests {
         let reset = || {
             let _ = std::fs::remove_file(seen.with_extension("env"));
             let _ = std::fs::remove_file(seen.with_extension("sock"));
+            let _ = std::fs::remove_file(seen.with_extension("own"));
         };
         let with_net = line(|value| value["grants"] = json!(["light", NET_GRANT]));
         // No yes naming `net`: refused, nothing run, no socket ever made.
-        ns_with(crate::egress::NS_LINE);
+        let ns_net = format!(
+            "{}\n{}",
+            crate::egress::NS_LINE,
+            crate::egress::NS_OWN_SKILL_LINE
+        );
+        ns_with(&ns_net);
         let no_yes = FakeTokens {
             yes: Some(vec!["light".into()]),
             ..FakeTokens::default()
@@ -7639,8 +7800,29 @@ mod tests {
             .expect("named its egress");
         assert!(crate::egress::plain_name(name), "{name}");
         assert!(seen.with_extension("sock").exists(), "there while it ran");
+        // Its own skill's folder named beside its socket while it ran,
+        // in lamp-tasks' private folder (Heron's P3 on #7590 and at
+        // 2533a4f02b): the namespace shows that one alone. Never in the
+        // run's own folder under the work folder, which other runs see.
+        assert_eq!(
+            std::fs::read_to_string(seen.with_extension("own")).unwrap(),
+            format!("{SKILLS}/photo-booth\n")
+        );
+        assert_eq!(
+            std::fs::read_to_string(seen.with_extension("ls")).unwrap(),
+            "home\n"
+        );
         assert_eq!(sockets(), 0, "gone after");
         assert_eq!(std::fs::read_dir(&work).unwrap().count(), 0);
+        // A namespace script that would show it every skill's folder:
+        // refused, nothing run.
+        reset();
+        ns_with(crate::egress::NS_LINE);
+        let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
+        assert_eq!(told["error"], NO_NET, "{told}");
+        assert_eq!(told["message"], crate::egress::NO_EGRESS);
+        assert!(!ran());
+        assert_eq!(sockets(), 0);
         // A namespace script with no egress line: refused, nothing run.
         reset();
         ns_with("");
@@ -7650,7 +7832,8 @@ mod tests {
         assert!(!ran());
         assert_eq!(sockets(), 0);
         // A run without `net` (an agent skill's, through the held make
-        // runner): held, no egress, no variable, nothing made.
+        // runner): held, no egress, no variable, nothing made, no folder
+        // named.
         reset();
         let agent_line = line(|value| {
             value["run"] = json!(AGENT_INSTRUCTIONS);
@@ -7662,6 +7845,7 @@ mod tests {
         assert!(env.lines().any(|line| line == "LAMP_NS_NET=run"), "{env}");
         assert!(!env.contains("LAMP_NS_EGRESS"), "{env}");
         assert!(!seen.with_extension("sock").exists());
+        assert!(!seen.with_extension("own").exists());
         assert_eq!(sockets(), 0);
     }
 

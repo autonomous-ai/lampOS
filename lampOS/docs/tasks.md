@@ -3805,6 +3805,59 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A live spoken ask on the make socket (`voice_ask`, off unless set)
+
+The owner's rulings of 17 Nov: a linked service's live read, and an ask the
+second route's model can't do, go to the lamp's agent, the lamp's default
+(Hermes or OpenClaw, ~17:55), never pinned to Hermes. The make socket takes
+a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
+"within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
+(`started`, then `answer` or a refusal), with its own one place beside a
+make's. The agent is picked at each ask as a make with `"one_path":true`
+picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no
+line field: the lamp's Hermes takes it as below; a gateway agent
+(OpenClaw) takes a hard ask as one make turn (`MakeTurn`, `harness new
+openclaw` in a fresh `make-<run id>` folder with only `rules.md`; no token
+and nothing in its environment from lamp-tasks). That is not isolation:
+the turn runs in the owner's own Gateway, with the owner's workspace,
+memory and sessions (it keeps the turn's transcript), and the Gateway's
+tools, messaging channels and network. It is held to an answer by its
+rules alone (`voice_ask::ANSWER_ONLY`, Heron's P2 on #7509): send, buy,
+change, delete or post nothing, run nothing that does, use no messaging
+channel, and say what would be needed instead. Hermes's rules keep "do
+what they asked": its fresh home has no channel and none of the owner's
+memory. Its answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
+AppOnly's P2 on #7509): lamp-voice says it only while the owner is seen
+alone, as a full read's. Its answer is `answer.md`, else the agent's final chat
+answer when Harness didn't cut it (`voice_ask::run_answer`), held to 120 s
+from the ask's start (a make's turn gets its whole deadline from the
+hand-over; an ask's doesn't). A read on OpenClaw is refused `no_services`
+before any mint (its gateway keeps the network and has no per-run
+lamp-services MCP server or token yet; [services.md](services.md)). A
+Hermes pick while lamp-tasks' read of the lamp's default
+(`runtime::default_engine_of`: `lamp_default`, set with the lamp's engines
+whatever `LAMP_SKILL_DEFAULT_AGENT` says) names another agent is refused
+`not_ready`. A
+failed pick (a default agent that takes no run) is `run_failed`. With no
+grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`, on Hermes on
+the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
+lamp's local ports included until the net runner lands; lamp-voice sends it
+only for the owner's own line); with one service's `<code>-read` grant (a
+read only: a `-write` or a second grant is refused `bad_request`, and
+lamp-control never mints one for an ask) only with `LAMP_SERVICES_TO_AGENT=on` and
+`LAMP_AGENT_SERVICES=on`, held off the network, on a token lamp-control
+mints for exactly that grant (`{"mint":{"ask":[...]}}`), its fresh home's
+config with `mcp_servers.lamp-services`. On Hermes, either way a fresh folder and home
+of its own, the person's words in its rules file (never its arguments), its
+answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
+the folder removed and the token ended however it ends, at most 120 s.
+On a lamp whose makes take the one run path (`LAMP_MAKE_AGENT_ONE_PATH`),
+an ask with a grant has no held-off runner and is refused `not_held_off`,
+and the voice says its fixed failure line: it fails closed.
+Off, the line is refused `off` and makes are as before
+([services.md](services.md), "Reads through the lamp's agent";
+[switches.md](switches.md)).
+
 ### A voice make on OpenClaw, through the one run path (`LAMP_MAKE_AGENT_ONE_PATH`, on, #7245)
 
 On lamp-c0a4 (build 13333, OpenClaw the default, 16 Nov 11:46) a make
@@ -4004,8 +4057,8 @@ lamp-tasks, the hand-over socket also takes a made skill's fixed write
 
 The first builder's yes at 19:44 (12 Nov). `LAMP_UPLOAD_TO_AGENT` is on in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
-agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET`, off in
-the product until its checks, goes in the six units below once on, so a run granted `net` with the
+agent; docs/skills.md, "Run by the lamp's agent"); `LAMP_TASK_NET` is on in
+the product too (#7200), in the six units below, so a run granted `net` with the
 owner's spoken yes reaches the public web on ports 80 and 443, held like
 every run (the first builder's decision on #7200: never the lamp's
 networks or its local ports; the home router's public address isn't
@@ -4038,6 +4091,38 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and a skill has one yes, so an agreed check is the owner's yes to `net`
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
+- **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
+  #7590, the first builder's 23:22 calls):
+  - `net` is never granted beside a private grant: a service's read or
+    write (`*-read`, `*-write`), `camera`, `microphone`, `speech`, `notes`
+    or `look` (whether someone is there, so whether the house is empty: the
+    first builder's ruling on #7590, 18 Nov 02:01) (`skill_task::PRIVATE_GRANTS`,
+    `skill_task_yes::private_grant`). `air` is not one: it may sit beside
+    `net`, and the yes then says so ("…, so its air readings can go to the
+    internet", `skill_task_yes::AIR_BESIDE_NET`).
+    The pair is refused at load (lamp-skills' `grants_of`), at an upload
+    (`upload_agent::files` and its kept `skill.toml`'s check, said plainly:
+    "it reaches the internet and also reads your Gmail, and one skill can't
+    do both: make it two skills"), in lamp-control's yes (`grants_ok`) and
+    in lamp-tasks' hand-over (`HandOver::check`, `bad_request`, nothing
+    minted). A skill that needs both is two skills.
+  - A `net` run sees only its own skill's folder, never another skill's:
+    lamp-tasks names it beside the run's egress socket in its private 0700
+    folder, `/run/lampos-tasks/egress/<egress name>.folder` (0600, made new
+    with the socket by `Grant::open_for`, removed with it), which no run can
+    see or write (Heron's P3 at `2533a4f02b`; `egress::OWN_SKILL_FILE`), and the namespace script stages that folder
+    alone of `/var/lib/lampOS/skills` and `skills-dev`
+    (`hermes_install::OWN_SKILL_LINES`); a script without that line
+    (`egress::NS_OWN_SKILL_LINE`) gets no `net` run (`no_net`). Of lamp-tasks'
+    work folder it sees only its own run's folder, `lamp/make-<run id>`,
+    over an empty tmpfs on the rest, so nothing another run left there can
+    be read and sent (Heron's P2 at `2533a4f02b`).
+  - There is no byte bound on a `net` run's traffic beyond its 16 pipes, 60 s
+    idle and the run's deadline.
+  - A `net` run's DNS questions go to the lamp's resolver, usually the home
+    router.
+  - The yes to `net` is taken back only by removing the skill; a run already
+    going keeps its way out to its end.
 - **A skill made by voice or in the app that needs the internet**
   (lamp-voice with `LAMP_TASK_NET`, `LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`
   and `LAMP_UPLOAD_TO_AGENT` on, `make_no_cannot::net_by_agent`): the
@@ -6073,6 +6158,59 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     the declined task's note still stood beside them (since #6582 the no
     clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
+
+### Kept in the person's memory (linked records, slice 3, off unless `LAMP_SERVICE_RECORDS_TASKS=on`)
+
+Beside `LAMP_SERVICE_RECORDS`, on the second route only, work handed over
+on the lamp owner's heard yes is kept in their Days memory as one linked
+record, through the voice's linked outbox
+([memory-days.md](memory-days.md#the-voices-linked-outbox-slice-2-under-lamp_service_records))
+(`lamp-voice` `service_records::task_rows`):
+
+- **Whose.** The person whose yes started it, as the services find the
+  lamp's owner (`services::owner_of`): the model's `confirm_agent_task`
+  passes the line's owner, and a plain yes taken in code (#7027) the
+  owner the line's scope found. With no known person (`p-` id), nothing is
+  kept or followed. Only a task the voice itself started is ever written:
+  one it did not hand over, whatever the bus or the tasks part shows, gives
+  nothing. A skill's brief is the lamp's own make, never a row.
+- **What.** Key `t-<store>-<task>`, service `harness`, action `task`,
+  `source_kind` `task`, `source_ref` `{service:"lamp-tasks",
+  id:"<store>:<task>"}`. The summary is the work as asked (the task's
+  `text`), one line of at most 160 bytes; the agent's answer stays in the
+  tasks part (`get_observation`) and is never written.
+- **When.** `prepared` at the hand-over; then, from the task's newest
+  observation (`get_task`), `done` (idle), `failed` (failed, or a
+  hand-over never sent) or `cancelled` (stopped), each change once. A
+  question back (`needs-input`), work going on, or an unsure hand-over
+  writes nothing. Every row of a task carries its hand-over time as
+  `deed_unix_ms`, so a forget after it wins over a late outcome in the
+  memory too.
+- **Bounded.** At most 16 tasks are followed, the oldest let go first, each
+  for 12 h after its hand-over; one `get_task` a task every 10 s, at most
+  1.5 s each, on a thread of its own (`linked-task-rows`), never on a turn.
+  The map is in memory only: a task that settles after the voice restarts
+  keeps its `prepared` row.
+- **Forgets.** Forget everything (the person's or everyone's), or a forget
+  about a thing whose summary matches, lets the task go here too, before
+  the forget is sent; nothing in the tasks part is touched.
+- **Off.** Either switch off, nothing is kept, followed or asked. The Live
+  route has no such hook.
+- **Rollback.** Turn the switch off, or run an older voice: rows already
+  written stay until forgotten, and an older memory refuses the linked
+  fields, which the outbox lets go.
+
+Tests: `service_records::task_rows`'s
+`the_yes_person_is_mapped`, `no_known_person_keeps_nothing`,
+`an_unknown_or_forged_task_is_dropped`,
+`the_summary_is_at_most_160_bytes`,
+`an_outcome_is_written_once_with_the_hand_over_deed`,
+`outcomes_from_the_task`, `a_forget_lets_their_tasks_go`,
+`a_forget_about_lets_only_the_matching_tasks_go`,
+`followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
+`off_nothing_is_kept_or_followed`; and `agent_tasks`'s
+`a_hand_over_on_the_owners_yes_is_their_task_row` and the yes taken in
+code. Not yet played on a lamp.
 
 ### One yes for a read-back said in words (#5169; on in the product for a yes to a words-only read-back, #6547 A)
 

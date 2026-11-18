@@ -1611,10 +1611,11 @@ pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// task dropped and the note it gets, or nothing.
 pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// A heard line's whole plain yes to a task this voice prepared and read
-/// back (`crate::agent_tasks::yes_taken`, #7027): with its request and
-/// words, the task started in code and the note it gets, or nothing.
-/// Blocking: it asks the tasks part.
-pub type TaskYes = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
+/// back (`crate::agent_tasks::yes_taken`, #7027): with its request, words
+/// and the lamp's owner who said it (`services::owner_of`, for the task's
+/// linked record), the task started in code and the note it gets, or
+/// nothing. Blocking: it asks the tasks part.
+pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
 /// [`TaskNote`] with the request's own words too: a new ask while a task
 /// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
 pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
@@ -1670,6 +1671,10 @@ pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// Whether a call, by its request and name, is held as not said to the
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
+/// Whether a call of a spoken request, by its request, name and arguments,
+/// starts a made skill's said start on a line nothing shows was said to
+/// the lamp ([`Engine::holding_said_starts`]).
+pub type SaidHold = Arc<dyn Fn(u64, &str, &Value) -> bool + Send + Sync>;
 /// Whether a call of this name goes to the skills, whose answer alone can
 /// ask for a look ([`Engine::looking_for_skills`]).
 pub type SkillCall = Arc<dyn Fn(&str) -> bool + Send + Sync>;
@@ -2029,6 +2034,9 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Said starts held as not said to the lamp
+    /// ([`Engine::holding_said_starts`]).
+    said_hold: Option<SaidHold>,
     /// Calls that wait for the Policy's decision ([`Engine::holding_for_the_policy`]).
     policy: Option<PolicyGate>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
@@ -4947,6 +4955,7 @@ impl Engine {
                 doing: None,
                 did: None,
                 hold: None,
+                said_hold: None,
                 policy: None,
                 words_heard: None,
                 look_by_call: false,
@@ -6933,6 +6942,18 @@ impl Engine {
     pub fn holding_calls(mut self, hold: CallHold) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.hold = Some(hold);
+        }
+        self
+    }
+
+    /// A call of a heard line that `hold` says starts a made skill's said
+    /// start where nothing shows the line was said to the lamp is held as
+    /// [`Self::holding_calls`] holds one: not run, and the model is told it
+    /// was not done (#7448, with `LAMP_MADE_SKILL_SAID` on; the first
+    /// builder at 20:55 on 17 Nov). Before any turn only.
+    pub fn holding_said_starts(mut self, hold: SaidHold) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.said_hold = Some(hold);
         }
         self
     }
@@ -10439,6 +10460,9 @@ async fn spoken(
         // 45 s of conversation).
         // Its own exchange is covered however late the line is written.
         crate::thread::close_now(Some(request));
+        // An ask with the lamp's agent is stopped too: its answer is never
+        // told, and is cancelled if it already waits (Heron's P2 4 on #7509).
+        crate::agent_asks::forget();
         // A reminder's ring this line cut is held, not rung once more.
         let _ = shared.emit(ProviderOutput::StopAnswered { request }).await;
         say_fixed(
@@ -10680,6 +10704,9 @@ async fn spoken(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
             );
+            // An offer of seen activity given in the cut words goes with
+            // them, held to being played whole in this request (#6543).
+            crate::seen_yes::answered_in_place(carried.request, request);
             put_in_flight(
                 &shared,
                 Carried {
@@ -11089,7 +11116,8 @@ async fn spoken(
                 && crate::services::plain_yes(&text) =>
         {
             let (yes, words) = (yes.clone(), text.clone());
-            tokio::task::spawn_blocking(move || yes(request, &words))
+            let person = crate::services::owner_of(scope.as_ref());
+            tokio::task::spawn_blocking(move || yes(request, &words, person.as_deref()))
                 .await
                 .ok()
                 .flatten()
@@ -11397,6 +11425,7 @@ async fn answered_if_declined(
         carried.request
     );
     crate::services::answered_in_place(request);
+    crate::seen_yes::answered_in_place(carried.request, request);
     unsay_carried(shared, request, &carried);
     let owner = carried.memory_write_owner.clone();
     put_in_flight(
@@ -14438,6 +14467,9 @@ fn keep_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, S
 /// [`keep_asker`]).
 type HeldAsker = (u64, String);
 
+/// [`not_theirs`]'s reason for a line no one is known on.
+const NO_ONE_KNOWN: &str = "not the same person: no one known on the line";
+
 /// Why a yes is not the held call's person's, as the journal says it, or
 /// none when it is: no known person on the line (none admitted, a gap, a
 /// cold face cache), the same person in a later session, or another
@@ -14447,7 +14479,7 @@ type HeldAsker = (u64, String);
 fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str> {
     match line {
         Some(line) if line == held => None,
-        None => Some("not the same person: no one known on the line"),
+        None => Some(NO_ONE_KNOWN),
         Some((_, person)) if *person == held.1 => {
             Some("not the same person: theirs, in a later session")
         }
@@ -14472,7 +14504,8 @@ fn late_or_not_theirs(
 
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
-    /// Nothing held, or dropped: nothing runs and nothing is told.
+    /// Nothing held, or dropped: nothing runs and nothing is told (but see
+    /// [`Taken::Unseen`] and [`Taken::Unknown`]).
     Nothing,
     /// Their yes runs exactly this call, with a carried keep's heard line
     /// ([`HeldForget::line`]), and whether it is a one-face line's named
@@ -14482,6 +14515,11 @@ enum Taken {
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
     Unseen(String),
+    /// A one-face forget's plain yes in time on a line no one is known on
+    /// (no face, an unknown face, a carried line): dropped, it is kept, and
+    /// the model is told the yes did not count and that they may say it
+    /// facing the lamp ([`crate::remember::unknown_yes_told`], #7454).
+    Unknown(String),
     /// A held keep's answer that was neither a yes nor a no
     /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
     /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
@@ -14650,7 +14688,13 @@ fn take_held_forget(
                     "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): {why}; it is kept",
                     held.request
                 );
-                Taken::Nothing
+                // A yes from no one known is told, as an unseen one is: the
+                // model must not say it is forgotten (#7454).
+                if why == NO_ONE_KNOWN {
+                    Taken::Unknown(held.call.name)
+                } else {
+                    Taken::Nothing
+                }
             }
             None => {
                 eprintln!(
@@ -16177,6 +16221,7 @@ async fn answer(
         }
         Taken::Runs(call, line, one_face) => (Some((call, line, one_face)), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
+        Taken::Unknown(name) => (None, Some(crate::remember::unknown_yes_told(&name))),
         Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
     };
     let (mut held_save_runs, held_save_dropped, face_to_ask) =
@@ -18786,6 +18831,11 @@ async fn answer(
                         .hold
                         .as_ref()
                         .is_some_and(|hold| hold(request, &call.name))
+                        || heard
+                            && shared
+                                .said_hold
+                                .as_ref()
+                                .is_some_and(|hold| hold(request, &call.name, &call.args))
                 })
                 .collect();
             // The Policy's decisions about a spoken turn's calls (#800,

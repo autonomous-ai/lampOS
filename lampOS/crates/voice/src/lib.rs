@@ -45,6 +45,7 @@ pub mod action_claim;
 pub mod activity;
 pub mod addressed;
 pub mod admission;
+pub mod agent_asks;
 pub mod agent_tasks;
 pub mod air_told;
 pub mod app_make;
@@ -144,6 +145,7 @@ pub(crate) mod open_at_start;
 pub mod options;
 pub mod others_answer;
 // Used by the Linux audio workers, and by tests anywhere (#4332).
+pub mod devices_tools;
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 pub(crate) mod peer_stop;
 #[cfg(target_os = "linux")]
@@ -236,6 +238,7 @@ pub mod tool_turns;
 pub mod tools;
 pub mod transport;
 mod turn_taking;
+pub mod turn_time_out;
 pub mod turn_times;
 pub mod unfinished_words;
 pub mod upload_agent;

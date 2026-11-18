@@ -2444,6 +2444,11 @@ pub fn serve(
             crate::make_skill_agent::set_tasks_dir(place.directory.clone());
         }
     }
+    // A live ask handed to the lamp's agent (`LAMP_SERVICES_TO_AGENT`,
+    // `LAMP_HARD_ASKS_TO_AGENT`) goes through this worker's tasks part.
+    if let Some(place) = &files.tools.tasks {
+        crate::agent_asks::set_tasks_dir(place.directory.clone());
+    }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
         report_own_key(
             files.bus_root.as_deref(),
@@ -2843,6 +2848,8 @@ pub fn serve(
     face_cache.went_cold(Instant::now());
     let scoped_settings = tools.clone();
     let skill_settings = tools.clone();
+    // Which calls start a said start, for their hold (#7448).
+    let said_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
     // recall runs here, so this worker reads the switch itself.
@@ -4180,9 +4187,11 @@ pub fn serve(
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
         }));
-        engine = engine.taking_a_task_yes(Arc::new(move |request, words: &str| {
-            crate::agent_tasks::yes_taken(&yes_place, request, words)
-        }));
+        engine = engine.taking_a_task_yes(Arc::new(
+            move |request, words: &str, person: Option<&str>| {
+                crate::agent_tasks::yes_taken(&yes_place, request, words, person)
+            },
+        ));
     }
     if let Some(place) = named_agent {
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {
@@ -4864,6 +4873,22 @@ pub fn serve(
                 heeding
                     .lock()
                     .is_ok_and(|heeding| heeding.holds_call(request, name))
+            }));
+        }
+        // A made skill's said start, in a line let out only as the
+        // conversation going on, needs a face seen speaking it or one in
+        // view (`LAMP_MADE_SKILL_SAID`, #7448). The catalogs are read only
+        // for such a line.
+        if crate::made_skill::said_on() {
+            eprintln!(
+                "lamp-voice second: a made skill's said start needs the lamp's name, a face seen speaking it, or a conversation going on with a face in view (LAMP_MADE_SKILL_SAID, #7448)"
+            );
+            let heeding = heeding.clone();
+            engine = engine.holding_said_starts(Arc::new(move |request, name, args| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.holds_said_start(request))
+                    && crate::tools::starts_said(&said_settings, name, args)
             }));
         }
         // In a quiet room, a conversation going on holds only for the one the
@@ -6074,6 +6099,12 @@ fn made_running(
         eprintln!(
             "lamp-voice second: request {request}: its turn was cut while make_skill ran: the made skill's line is said through the say service"
         );
+        // No model round saw the make's answer, so its wait is an app
+        // make's: the line after the say-back must answer it (#7245).
+        // A make with code is said back word for word in place of its cut
+        // code line, so the yes after it is heard whole is forced; one that
+        // also sends keeps its cut write line.
+        let line = crate::skill_write_yes::said_by_the_say_service(request, &line).unwrap_or(line);
         let saying = std::thread::Builder::new()
             .name("lamp-voice-made-line".into())
             .spawn(move || {
@@ -7422,6 +7453,10 @@ pub(crate) struct Heeding {
     /// declines it.
     decline_silent: bool,
     before_let_out: Option<BeforeLetOut>,
+    /// The newest line let out with nothing to show it was said to the lamp
+    /// and no face seen speaking it ([`unseen_line`]): a said start in it
+    /// waits on a face in view ([`Self::holds_said_start`], #7448).
+    going_on_unseen: Option<u64>,
 }
 
 /// What a line let out changes of the conversation going on, as it was
@@ -8471,6 +8506,7 @@ impl Heeding {
             played: std::collections::VecDeque::new(),
             decline_silent: false,
             before_let_out: None,
+            going_on_unseen: None,
         }
     }
 
@@ -11910,6 +11946,7 @@ impl Heeding {
         // `LAMP_UNTIED_GOING_ON` (#3882): let out only as the conversation
         // going on, with no tie to the lamp.
         let untied = alone && played && !tied;
+        self.going_on_unseen = unseen_line(attention, request, played, !seen.speakers.is_empty());
         self.untied_line = untied.then_some(request);
         // `LAMP_DECLINE_SILENT`: as things stand before this line is let
         // out, for its decline.
@@ -12126,6 +12163,31 @@ impl Heeding {
             }
             None => None,
         }
+    }
+
+    /// Whether a made skill's said start called in `request` is held
+    /// (#7448, `LAMP_MADE_SKILL_SAID`; the first builder at 20:55 on 17 Nov:
+    /// "a made skill's said start needs one of three things: the lamp's name
+    /// in the line; a face in view seen speaking it; a conversation going on
+    /// with that face in view"). A line let out by its name, its words
+    /// calling the lamp, a face turned to it, or as a reply to its news has
+    /// its own sign; one let out only as the conversation going on (an
+    /// answer to its question too: lamp-9adf, 18 Nov, request 10), or as a
+    /// short word, a short sound said close
+    /// to it, or a question about its work ([`unseen_line`]; the first
+    /// builder at 00:53 on 18 Nov), starts one only when a face was seen
+    /// speaking it, or one is in the eyes' newest look as the call comes.
+    /// With no eyes, or the camera closed, no face is in view. On lamp-9adf
+    /// (17 Nov, #7448's row, request 18) "Ugh, I am so busy today, nothing
+    /// but meetings.", said with nobody in view about 35 s after a said
+    /// line, turned the busy light on. The model may still answer it in words.
+    pub(crate) fn holds_said_start(&self, request: u64) -> bool {
+        self.going_on_unseen == Some(request)
+            && self
+                .bus
+                .as_ref()
+                .and_then(|(bus, _)| crate::bus_out::faces_in_view(bus))
+                .is_none_or(|faces| faces == 0)
     }
 
     /// Whether a call is held in `request`: one that sets something to come
@@ -12377,6 +12439,29 @@ fn others_may_talk(seen: &Seen, caller_faces: &crate::speaking_faces::Speakers) 
                 .iter()
                 .any(|face| !caller_faces.contains(face));
     seen.busy || seen.other_voice || another_face
+}
+
+/// The request whose made skill's said start waits on a face in view
+/// ([`Heeding::holds_said_start`], #7448): let out with no face seen speaking
+/// it, either only as the conversation going on (no name, no words calling
+/// the lamp, no face turned to it, not said close to it), an answer to its
+/// question among them
+/// ([`crate::attention::Attention::played_as_going_on_to_its_question`]), or
+/// as a short
+/// word, a short sound said close to it, or a question about its work with
+/// no call of its own ([`crate::attention::Attention::played_on_no_call`]).
+fn unseen_line(
+    attention: &crate::attention::Attention,
+    request: u64,
+    played: bool,
+    seen_speaking: bool,
+) -> Option<u64> {
+    (played
+        && !seen_speaking
+        && (attention.played_only_as_going_on()
+            || attention.played_as_going_on_to_its_question()
+            || attention.played_on_no_call()))
+    .then_some(request)
 }
 
 /// Whether the eyes saw a face speaking a line that is not the caller's: two
@@ -30178,6 +30263,255 @@ mod tests {
             Some(crate::attention::NOT_SPOKEN_TO)
         );
         assert_eq!(judged(Some(Did::Spoke(at(0))), "What time is it?"), None);
+    }
+
+    /// #7448 (the first builder at 20:55 on 17 Nov): a made skill's said
+    /// start needs the lamp's name in the line, a face seen speaking it, or a
+    /// conversation going on with a face in view. Request 18 of the row on
+    /// lamp-9adf, "Ugh, I am so busy today, nothing but meetings.", let out
+    /// only as the conversation going on with nobody in view, is held; the
+    /// named line, the line a face is seen speaking, and the line going on
+    /// with a face in view are not.
+    #[test]
+    fn a_said_start_is_held_on_a_line_only_going_on_with_no_face() {
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        let signs = || super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let face = |speaking: bool| Face {
+            pitch: None,
+            looking: None,
+            id: "f1".into(),
+            xmin: 0.3,
+            ymin: 0.2,
+            xmax: 0.6,
+            ymax: 0.7,
+            confidence: 1.0,
+            yaw: None,
+            facing: Some(false),
+            speaking: speaking.then_some(Speaking {
+                state: SpeakingState::Yes,
+                score: 0.9,
+                from: None,
+            }),
+            follows: None,
+        };
+        let busy = "Ugh, I am so busy today, nothing but meetings.";
+        let start = (Instant::now(), monotonic_us());
+        let line = (start.1 + 1_000_000, start.1 + 2_500_000);
+        let judged = |heeding: &mut Heeding, request: u64, heard: &str| {
+            heeding.as_the_only_voice(false, true, false);
+            heeding.judge(request, line, heard, signs())
+        };
+        // Request 18: let out, but its said start is held; another
+        // request's is not.
+        let mut heeding = Heeding::new(false, false, None, None);
+        assert_eq!(judged(&mut heeding, 18, busy), None, "let out");
+        assert_eq!(
+            heeding.conversation_note_for(18),
+            Some(super::CONVERSATION_ALONE),
+            "only as the conversation going on"
+        );
+        assert!(heeding.holds_said_start(18), "no name, no face");
+        assert!(!heeding.holds_said_start(17), "another request");
+        // The name in the line.
+        let mut heeding = Heeding::new(false, false, None, None);
+        assert_eq!(judged(&mut heeding, 19, "Lamp, I'm busy."), None);
+        assert!(!heeding.holds_said_start(19), "named");
+        // A face seen speaking it, not turned to the lamp.
+        let mut heeding = Heeding::new(false, false, None, None);
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        heeding.seeing_speaking_faces(eyes.clone(), None);
+        let speaks = Faces {
+            faces: vec![face(true)],
+        };
+        for look in 0..4u64 {
+            eyes.look(
+                start.0 + Duration::from_millis(1_200 + look * 400),
+                Some((("b", look + 1), &speaks)),
+            );
+        }
+        assert_eq!(judged(&mut heeding, 20, busy), None);
+        assert!(!heeding.holds_said_start(20), "a face seen speaking it");
+        // Going on with a face in the eyes' newest look as the call comes.
+        let root = std::path::PathBuf::from(format!("/tmp/lss-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut faces = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let mut heeding = Heeding::new(false, false, Some(&root), None);
+        assert_eq!(judged(&mut heeding, 21, busy), None);
+        assert!(heeding.holds_said_start(21), "nobody in view yet");
+        faces
+            .publish_json(
+                monotonic_us(),
+                &Faces {
+                    faces: vec![face(false)],
+                },
+            )
+            .unwrap();
+        assert!(!heeding.holds_said_start(21), "a face in view");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf (18 Nov 07:37, #7448's head), request 10: "Honestly, I'm so
+    /// busy this week, it never stops.", with nobody in view, 33 s after the
+    /// lamp answered "Lamp, I am busy." with a question, was let out as the
+    /// conversation going on and started `busy-red-light-2`. An answer to the
+    /// lamp's question is the conversation going on: with no face in view
+    /// its said start is held; with one in the eyes' newest look it starts.
+    #[test]
+    fn a_said_start_is_held_on_an_answer_to_the_lamps_question_with_no_face() {
+        use lamp_msgs::{Face, Faces};
+        let line = "Honestly, I'm so busy this week, it never stops.";
+        let start = monotonic_us();
+        let said = (start + 1_000_000, start + 3_000_000);
+        for room in [
+            crate::room_told::Room::Quiet,
+            crate::room_told::Room::Unknown,
+        ] {
+            let signs = super::Signs {
+                room,
+                going_on: true,
+                lamp_asked: true,
+                turned: None,
+                names: Vec::new(),
+                near: false,
+                continues_from: None,
+                soft_lead_us: 0,
+            };
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            assert_eq!(heeding.judge(10, said, line, signs), None, "let out");
+            assert!(
+                !heeding.attention.played_only_as_going_on(),
+                "an answer to its question"
+            );
+            assert!(heeding.holds_said_start(10), "{room:?}: no name, no face");
+        }
+        // A face in the eyes' newest look as the call comes: it starts.
+        let root = std::path::PathBuf::from(format!("/tmp/lsq-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut faces = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let mut heeding = Heeding::new(false, false, Some(&root), None);
+        heeding.as_the_only_voice(false, true, false);
+        let signs = super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked: true,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        assert_eq!(heeding.judge(10, said, line, signs), None);
+        assert!(heeding.holds_said_start(10), "nobody in view yet");
+        faces
+            .publish_json(
+                monotonic_us(),
+                &Faces {
+                    faces: vec![Face {
+                        pitch: None,
+                        looking: None,
+                        id: "f1".into(),
+                        xmin: 0.3,
+                        ymin: 0.2,
+                        xmax: 0.6,
+                        ymax: 0.7,
+                        confidence: 1.0,
+                        yaw: None,
+                        facing: Some(false),
+                        speaking: None,
+                        follows: None,
+                    }],
+                },
+            )
+            .unwrap();
+        assert!(!heeding.holds_said_start(10), "a face in view");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7448 (the first builder at 00:53 on 18 Nov): a short skill name let
+    /// out as a short word, or as a short sound said close to the lamp, with
+    /// no name and no face seen speaking it, is talk only: its said start is
+    /// held as one going on unseen is. With the name in it, it starts.
+    #[test]
+    fn a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name() {
+        use crate::attention::{Attention, SOUND_A_WORD, SOUND_NEAR, Verdict};
+        let sound = |heard: &str, near: bool| {
+            let mut attention = Attention::default();
+            attention.check_sounds(true);
+            attention.began_at(7, 1, 100_000_000);
+            attention.ended_as_sound(7);
+            attention.set_near(near);
+            attention.heard(heard);
+            let verdict =
+                attention.first_output_busy(7, crate::room_told::Room::Quiet, false, false, None);
+            (attention, verdict)
+        };
+        let held = |attention: &Attention, seen_speaking: bool| {
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.going_on_unseen = unseen_line(attention, 7, true, seen_speaking);
+            heeding.holds_said_start(7)
+        };
+        let (word, verdict) = sound("Done.", false);
+        assert_eq!(verdict, Some(Verdict::Play(SOUND_A_WORD)));
+        assert!(held(&word, false), "a short word, no name, no face");
+        assert!(!held(&word, true), "a face seen speaking it");
+        let (near, verdict) = sound("Focus.", true);
+        assert_eq!(verdict, Some(Verdict::Play(SOUND_NEAR)));
+        assert!(held(&near, false), "said close, no name, no face");
+        let (named, verdict) = sound("Lamp, focus.", true);
+        assert!(matches!(verdict, Some(Verdict::Play(_))));
+        assert!(!held(&named, false), "named");
+    }
+
+    /// #7448 (the first builder at 00:53 on 18 Nov): of the lines a lamp's
+    /// own work lets out, a question about its work with no name and no face
+    /// seen speaking it holds a said start; the first line after its own
+    /// news answers it, and keeps its start.
+    #[test]
+    fn a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news() {
+        use crate::second_provider::Did;
+        let signs = || super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let at = |seconds: u64| 1_000_000_000 + seconds * 1_000_000;
+        let line = (at(105), at(105) + 1_500_000);
+        let judged = |did: Did, heard: &str| {
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.lamp_did(did);
+            assert_eq!(heeding.judge(9, line, heard, signs()), None, "let out");
+            heeding
+        };
+        let asked = judged(Did::Worked(at(0)), "How is that task going?");
+        assert!(asked.attention.played_on_no_call());
+        assert!(asked.holds_said_start(9), "a question about its work");
+        let answered = judged(Did::Spoke(at(0)), "I'm busy.");
+        assert!(!answered.attention.played_on_no_call());
+        assert!(!answered.holds_said_start(9), "after its own news");
     }
 
     /// #1712, lamp-4ace's busy room: colleagues' talk just after a named

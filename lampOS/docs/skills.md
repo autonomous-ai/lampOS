@@ -71,7 +71,19 @@ publishes them, coming with #6543 phases 2 and 3. A skill that names one in
 said by `lamp-seen` only with `LAMP_SEEN_MORE_DOINGS=on`) is a topic of its
 own: a skill naming it shows the `seen_more` use, private and apart from
 `seen`, so a skill given `humans/doing` never receives it. No skill reads it
-yet.
+yet. **The owner's seen_more yes** (#6543): a skill that names it receives
+nothing from it until the owner says yes to that skill in the app
+(`skills.seen_more`, [cloud.md](cloud.md)), kept by name in `--state-dir`'s
+`seen_more` ("The manage helper", below). Without the yes, a core skill's
+too, no trigger on it holds, and no `[[while]]` or `sooner` reads it: it
+reads as a topic that has said nothing yet, so `unknown = "holds"` holds
+on it. The journal says `skill:NAME: humans/doing_more not given to it: the
+owner hasn't said yes to its seen_more` once for each such skill, again
+only after a yes. The yeses are read at the start and again with the off
+file, within 2 s; a yes taken back lets go at once of what the skill held
+on the topic (its `[[while]]` clocks begin again, a run held until such a
+trigger ends is ended). No shipped skill has the yes (test
+`humans_doing_more_reaches_a_skill_only_with_the_owners_seen_more_yes`).
 `humans/doing`'s three timers are always said, counted from the desk
 arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` holds for someone the
@@ -1698,9 +1710,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
-  lamp). With `LAMP_TASK_NET=on` (off in the product until its checks; once on, in lamp-tasks, lamp-skills
+  lamp). With `LAMP_TASK_NET=on` (on in the product, #7200: in lamp-tasks, lamp-skills
   and its manage helper, lamp-control, lamp-voice and lamp-cloud's skills page) one more, `net`
-  ("reaches the internet"): the run, held like every run, reaches the
+  ("reaches the public internet"): the run, held like every run, reaches the
   public web on ports 80 and 443 through its own egress socket (a proxy
   and DNS inside the run, every address checked by lamp-tasks: never the
   lamp's own networks (the router's home address among them) or the
@@ -2251,7 +2263,8 @@ it does not know).
   number; a link or a file of such a name is left as it is) and says so.
 - **`remove`** renames an installable skill's folder aside, so it is gone
   at once for the program, then deletes it. First it takes the owner's
-  yes to the skill's camera out of `--state-dir`'s `camera` (below).
+  yes to the skill's camera out of `--state-dir`'s `camera` (below), and
+  its seen_more out of `seen_more`.
   The app's skills page removes a skill the same way, through the manage
   helper below.
 - **`asked`** is the manage helper ("The manage helper", below): one
@@ -2408,7 +2421,7 @@ for it.
   desktop lamp only (the virtual lamp's own manage socket, `lamp-sim`): where lamp-control keeps
   a pushed package for the helper (`/var/lib/lampos-control/push`) and where a pushed skill is
   kept (`/var/lib/lampOS/skills-dev`); with neither, those are the paths, and no unit passes
-  them (a test checks every file under `deploy/`). `off`, `on` and `camera` are written beside
+  them (a test checks every file under `deploy/`). `off`, `on`, `camera` and `seen_more` are written beside
   and moved over, the file beside only ever made new and never through a
   link (`O_CREAT | O_EXCL | O_NOFOLLOW`; a link there is refused, its
   target untouched), and read never through a link (the reviewer's P2 on
@@ -2525,6 +2538,21 @@ for it.
     `from_store`) is refused, "a skill called NAME is already on this lamp,
     and it wasn't added from the Skills Store: remove it first to add this
     one", its folder and yes as they were (the Reviewer-lead's P2 on #4875).
+  - `{"seen_more": NAME}` and `{"seen_more_off": NAME}`, a string: the
+    owner's yes to the skill hearing `humans/doing_more` (tiredness, desk
+    work and celebrating, #6543, `package::seen_more`), given or taken back
+    in the app (`skills.seen_more`), kept as the camera's is: under the
+    folder's lock, in `--state-dir`'s `seen_more`, one name a line, beside
+    `camera`; the name need not be on the lamp yet. It answers `NAME may
+    know when you looked tired, worked or celebrated` or `NAME may not know
+    …`. The running program reads it at the start and again with the off
+    file (`Engine::reread_seen_more`), and a skill that names the topic
+    without its yes, core or not, receives nothing from it (above,
+    "The owner's seen_more yes"). A remove takes it back, and so does any
+    install not from the Store under that name; a Store package never needs
+    it to install. Test:
+    `the_owners_seen_more_yes_is_kept_across_a_restart_and_taken_back_by_a_remove`
+    (`tests/it/package.rs`).
     Any
     other install that puts a skill in place under a name with a yes (by
     hand, `lamp-skills install` of a folder or a package, whose
@@ -4297,8 +4325,30 @@ gone ([switches.md](switches.md)). What happens:
     `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
     agree before it sends anything. I couldn't tell you just now what it
     sends, so it sends nothing yet." (no word to repeat, no "yes"; test
-    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). While the
-    make is under way, or its line is still to be said
+    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). A skill
+    with code of its own whose say-back is said so waits as an app's make
+    with code does (`skill_write_yes::said_by_the_say_service`, #7245): no
+    model round saw the make's answer, so the person's next line after the
+    say-back said whole is forced to answer the wait
+    (`skill_write_yes::approve_force`); on c0a4 (17 Nov 19:43) a 116 s
+    OpenClaw make outlived its turn and the "yes" after its say-back called
+    nothing (test
+    `a_voice_makes_yes_after_its_say_back_through_the_say_service_is_forced`).
+    Its line there is its say-back word for word, "I made fruit notes. The
+    lamp's model wrote its code, and that code may use … It waits for you
+    to agree before it runs any code." (a task for the lamp's agent: "I can
+    have the lamp's agent do …" and its own say-back), never the cut turn's
+    "ask me for it again", and the say service tells the model to say it
+    word for word as an app's make's (`app_make::say_note`): on c0a4 (17
+    Nov 22:39) that cut line went as a note in the person's words, was said
+    in 136 chars, the say-back was never heard whole, and the "yes" after it
+    was told to hear it again, so nothing was forced or kept (tests
+    `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
+    `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes,
+    a code make that also sends included, keep `made_skill::cut_write_line`:
+    only the cut code line (`made_skill::cut_code_line`) is replaced.
+    While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
     say may wait up to an hour, and the question is not held that long:
@@ -6251,7 +6301,7 @@ The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
 the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
 the product since 13 Nov (the owner's ruling: the upload flow goes via the
 agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
-`lamp-skills-manage@`; with `LAMP_TASK_NET` on (off in the product until its checks), a file
+`lamp-skills-manage@`; with `LAMP_TASK_NET` on (on in the product, #7200), a file
 that reaches the internet is granted `net` (the public web on 80 and 443
 alone), asked the owner's spoken yes at its first run. With lamp-update's
 one run path on (`LAMP_SKILL_DEFAULT_AGENT`, on in the product) a run
@@ -6284,9 +6334,17 @@ bytes, as above):
   selfie) and `net` (an `http://` or `https://` link, a webhook, or a web
   API, URL or endpoint the file says to fetch, call, post, send, get or
   the like: a bare "API" or "URL" is not enough), never
-  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (off
-  in the product until its checks); off, such a file is refused ("it reaches the internet, which a skill's
-  task can't on this lamp").
+  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (on
+  in the product, #7200); off, such a file is refused ("it reaches the internet, which a skill's
+  task can't on this lamp"). `net` never sits beside the camera, the
+  microphone, what the lamp says, its notes, `look` (whether someone is
+  there; the first builder's ruling on #7590) or a linked service's grant
+  (Heron's P1 on #7590): such a file is refused, nothing kept ("it reaches
+  the internet and also uses the camera, and one skill can't do both: make
+  it two skills"), as is a kept `skill.toml` naming the pair; docs/tasks.md,
+  "What a `net` run never holds, and its bounds". `air` may sit beside
+  `net`, and the say-back then adds "so its air readings can go to the
+  internet".
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
   agent end to end), as a voice-made service skill's `do.task` carries
@@ -6534,8 +6592,8 @@ function with no trigger), and `lamp-cloud`'s
 
 #### A start said to the lamp (`LAMP_MADE_SKILL_SAID=on`, off)
 
-Off unless `LAMP_MADE_SKILL_SAID=on`, and in no product unit (#6526, the
-first builder's design). A skill made here, by voice or in the app
+Off unless `LAMP_MADE_SKILL_SAID=on`; on in the product, in lamp-voice and
+lamp-skills' manage helper (#6526, the first builder's design). A skill made here, by voice or in the app
 (`made_skill::keep_asked`), may start on a request said to the lamp, never
 on room talk: "when I'm working or in a meeting, I tell the lamp I'm busy,
 and it turns red". `lamp-voice` reads it (and gives the exact `on` to its
@@ -6570,15 +6628,81 @@ made skill is refused at install.
    with `keep = true`, the person's light, as Light scenes' are: set by
    lamp-skills as the call runs and never given back. `SKILL.md` keeps the
    model's name and is marked `made: here` and its maker, with the
-   description "Use it WHEN, a request said to you, never talk in the
-   room: it turns the light COLOUR.", the `when` line first, so a short
-   `use_skill` line keeps it. A name a skill on the lamp has gets the
-   first free one, as a written skill's.
+   description "Use it WHEN, said to you, never talk in the room you only
+   overhear; their telling you so is the ask, even a plain statement with
+   nothing asked: it turns the light COLOUR." (`made_skill::SAID_TO_YOU`
+   after the `when` line), the `when` line first, so a short `use_skill`
+   line keeps it. A name a skill on the lamp has gets the first free one,
+   as a written skill's.
 3. **Offered to the voice** as a `use_skill` choice ([tools.md](tools.md),
    `LAMP_USE_SKILL=on`) by that line: the voice's model picks it on a
    request it already hears after the name, the same way it picks the
    product skills. No new listening, no transcript kept, no phrase matched
-   on room sound.
+   on room sound. A telling is the ask: on lamp-9adf (17 Nov, #7448's row)
+   "Lamp, I'm busy." and "Lamp, I am in a meeting now." got no call 4 times
+   in 4 under the first description ("a request said to you, never talk in
+   the room"), answered in words ("I'll keep quiet and let you work.", once
+   "turning red now" with nothing called), the model reading a statement
+   as no ask. So while a said start is among the skills offered
+   (`made_skill::is_said`, its description's `SAID_TO_YOU`), with the
+   switch on, `use_skill`'s description ends "A skill whose line says
+   'said to you' is called when what someone tells you is what its line
+   says, even a plain statement with nothing asked."
+   (`use_skill::SAID_CALLED`), and the skills' lines end, within their
+   4,096 bytes, "A line that says 'said to you' is a skill the person
+   made to act when they tell you something: when what they tell you is
+   what that line says, even a plain statement of how they are or what
+   they are doing, with nothing asked, call use_skill for it before you
+   answer; that is how they asked for it. Only that call does what its
+   line says: never answer it in words alone, and never say it is done
+   without the call." (`use_skill::SAID_TOLD`), on both routes. The model
+   judges the match; no word of the person's line is matched in code.
+   Off, or with no said start offered, the function and the lines are as
+   before, byte for byte. A said start made before this keeps its first
+   description and is not told so: make it again. The action-claim check
+   (`LAMP_ACTION_CLAIM_CHECKED`, [second-voice.md](second-voice.md)) does
+   not hold such words ("turning red now" after a lead-in, "I'll keep
+   quiet"): its runs are the light's, volume's and Schedule's own, and
+   widening them is not part of this.
+
+   **Only on a line said to the lamp** (#7448; the first builder at 20:55
+   on 17 Nov). A said start needs one of three: the lamp's name in the
+   line; a face in view seen speaking it; or a conversation going on with
+   a face in view. On lamp-9adf (17 Nov, #7448's row, request 18) "Ugh, I
+   am so busy today, nothing but meetings.", said with nobody in view
+   about 35 s after a said line, was let out only as the conversation
+   going on and turned the busy light on. So, on the second route, a line
+   let out only as the conversation going on (no name, no words calling
+   the lamp, no face turned to it, not said close to it;
+   `Attention::played_only_as_going_on`), an answer to the lamp's question
+   among them (`Attention::played_as_going_on_to_its_question`; lamp-9adf,
+   18 Nov at 07:37, request 10: "Honestly, I'm so busy this week, it never
+   stops.", with nobody in view, after the lamp's question, turned the busy
+   light on), with no face seen speaking it (`Heeding::going_on_unseen`) starts no said start unless a
+   face is in the eyes' newest look as the call comes
+   (`Heeding::holds_said_start`, `bus_out::faces_in_view`; no eyes, or the
+   camera closed, is no face). So too a line let out as a short word said
+   to the lamp, a short sound said close to it, or a question about its
+   own work, with no call of its own (no name, no tap, no words calling
+   it; `Attention::played_on_no_call`, `worker::unseen_line`; the first
+   builder at 00:53 on 18 Nov): none shows it was said to the lamp, so a
+   short skill name said near it is talk only. The first line after the
+   lamp's own news answers it, and keeps its start. A call of such a skill, itself or through
+   `use_skill` (`tools::starts_said`, by its card's `SAID_TO_YOU`; never a
+   question about a skill), is then held as a call the rule holds
+   (`Engine::holding_said_starts`): not run, and the model is told it was
+   not done (`policy_holds::HELD`); it may still answer in words. A line
+   let out for its own sign (its name, a face turned to the lamp, a reply
+   to its news) is not held, so "Lamp,
+   I'm busy." from across the room still starts it. Structural only: no
+   word of the line is matched. With the switch off nothing is installed
+   and nothing changes. Tests:
+   `a_said_start_is_held_on_a_line_only_going_on_with_no_face`,
+   `a_said_start_is_held_on_an_answer_to_the_lamps_question_with_no_face`,
+   `a_said_start_is_held_on_a_short_word_or_a_sound_said_close_with_no_name`,
+   `a_said_start_is_held_on_a_question_about_its_work_and_kept_after_its_news`,
+   `a_held_said_start_is_not_run_and_the_model_is_told_so`,
+   `a_said_start_is_found_by_its_card_itself_or_through_use_skill`.
 4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
    you're busy, I'll turn red." (" at level N" before the stop when a
    level was asked), and it goes on at once, as a made skill does, with
@@ -6604,6 +6728,7 @@ Tests: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as_before
 `a_said_start_is_offered_through_use_skill_with_its_when_line` and
 `nothing_starts_a_said_start_without_a_request_to_the_lamp`;
 `make_skill_local::tests::a_said_start_is_told_to_the_maker_only_with_its_switch`;
+`use_skill::tests::a_said_start_is_told_as_called_on_a_plain_statement_only_with_its_switch`;
 and lamp-skills'
 `made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
 (the real checker packs it; the helper refuses it with the switch off; on,

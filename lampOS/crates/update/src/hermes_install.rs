@@ -251,6 +251,48 @@ pub const MODEL_SOCKET: &str = "/run/lampos-tasks/model.sock";
 pub const EGRESS_ENV: &str = "LAMP_NS_EGRESS";
 /// lamp-tasks' egress sockets' folder (`lamp_tasks::egress::EGRESS_DIR`).
 pub const EGRESS_DIR: &str = "/run/lampos-tasks/egress";
+
+/// The lines [`NS`] runs, with [`TASKS_SWITCH`] on, before it stages the
+/// work folder and the skills: a run granted `net` ([`NET_ENV`] `run` and
+/// [`EGRESS_ENV`] set) sees only its own run's folder of the work folder,
+/// `<work>/lamp/make-<run id>` (`Z`), over an empty tmpfs on the rest, so
+/// nothing another run left there can be read and sent (Heron's P2 at
+/// `2533a4f02b`); and only its own skill's folder of [`SKILLS`] and
+/// [`PUSHED`], never another skill's (Heron's P3 on #7590, made required
+/// by the first builder). lamp-tasks names that folder, one line, beside the run's
+/// egress socket in its private folder, [`EGRESS_DIR`]`/<name>.folder`
+/// (`lamp_tasks::egress::OWN_SKILL_FILE`, 0600, made with the socket and
+/// removed with it), which no run can see or write (Heron's P3 at
+/// `2533a4f02b`); read here before `/run` is hidden. A file that is missing, a link, or names anything but
+/// one plain folder directly in [`SKILLS`] or [`PUSHED`] ends the run
+/// before anything of it runs. `K` (or `P`) is then that folder alone and
+/// the other emptied, so the staging, moving back and read-only remount
+/// that follow show that folder alone, under an otherwise empty read-only
+/// `/var/lib`.
+macro_rules! own_skill_lines {
+    () => {
+        "Z=\n\
+         if [ \"${LAMP_NS_NET-}\" = run ] && [ -n \"${LAMP_NS_EGRESS-}\" ]; then\n\
+         \x20 case $LAMP_NS_EGRESS in skill-?*|make-?*) ;; *) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
+         \x20 case $LAMP_NS_EGRESS in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) fail \"LAMP_NS_EGRESS is not a run's folder\" ;; esac\n\
+         \x20 [ -n \"$W\" ] || fail \"a run granted net has no work folder\"\n\
+         \x20 Z=$W/lamp/make-${LAMP_NS_EGRESS#*-}\n\
+         \x20 [ -d \"$Z\" ] && [ ! -L \"$Z\" ] && [ ! -L \"$W/lamp\" ] || fail \"a run granted net has no folder of its own\"\n\
+         \x20 O=/run/lampos-tasks/egress/$LAMP_NS_EGRESS.folder N=\n\
+         \x20 [ -f \"$O\" ] && [ ! -L \"$O\" ] && [ ! -L \"${O%/*}\" ] && read -r N < \"$O\" || fail \"a run granted net names no skill folder of its own\"\n\
+         \x20 case ${N##*/} in ''|*[!abcdefghijklmnopqrstuvwxyz0123456789_-]*) fail \"a run granted net names no plain skill folder\" ;; esac\n\
+         \x20 case $N in\n\
+         \x20 \"$K/${N##*/}\") K=$N P= ;;\n\
+         \x20 \"$P/${N##*/}\") P=$N K= ;;\n\
+         \x20 *) fail \"a run granted net names a folder that is not one of the lamp's skills\" ;;\n\
+         \x20 esac\n\
+         \x20 [ -d \"$N\" ] && [ ! -L \"$N\" ] || fail \"no skill folder at $N\"\n\
+         \x20 unset O N\n\
+         fi\n"
+    };
+}
+/// [`own_skill_lines`]'s text.
+pub const OWN_SKILL_LINES: &str = own_skill_lines!();
 /// What [`NS`] starts inside a skill run's network namespace, in the
 /// background before Hermes, as the caller's own ids in a nested user
 /// namespace of its own: lamp-tasks' `net-relay`, listening on
@@ -744,8 +786,10 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// namespace has only `lo`. And it shows [`PUSHED`] read-only, staged and
 /// moved back as the skills are (skipped when the folder is not there),
 /// so a pushed skill's script is there for its run; Hermes started any
-/// other way (Harness's panes) never sees it.
-const TASKS_EDITS: [(&str, &str); 7] = [
+/// other way (Harness's panes) never sees it. A run granted `net` sees
+/// only its own skill's folder of the skills and those pushed
+/// ([`OWN_SKILL_LINES`]).
+const TASKS_EDITS: [(&str, &str); 9] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
@@ -756,7 +800,9 @@ const TASKS_EDITS: [(&str, &str); 7] = [
          # With LAMP_NS_EGRESS=make-<run> or skill-<run> too (a run granted net), it shows that run's egress socket alone,\n\
          # read-only, opens port 53 in the run's own network, names 127.0.0.1 in resolv.conf and starts the relay with a web\n\
          # proxy on 127.0.0.1:3128 and DNS on 127.0.0.1:53 through it: lamp-tasks lets out only the public web on 80 and 443.\n\
-         # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
+         # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n\
+         # A run granted net sees only its own skill's folder of those and the skills, named beside its egress socket,\n\
+         # and only its own run's folder of the work folder, over an empty tmpfs.\n",
     ),
     (
         " S=/tmp/.lampos-ns\n",
@@ -819,6 +865,18 @@ const TASKS_EDITS: [(&str, &str); 7] = [
             "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
             "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] && [ ! -L \"${p%/.install.lock}\" ] || continue\n    s=$(stat -c %d:%i \"$p\") && mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    [ ! -L \"$X/i/${p#\"$H/.hermes/installs/\"}\" ] && [ \"$(stat -c %d:%i \"$X/i/${p#\"$H/.hermes/installs/\"}\")\" = \"$s\" ] || { umount -n \"$X/i/${p#\"$H/.hermes/installs/\"}\"; fail \"Hermes install lock not shown\"; }\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ ! -L \"$p\" ] && [ ! -L \"${p%/pm-runtime}\" ] && [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && s=$(stat -c %d:%i \"$p/.prepare.lock\") && mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n    [ ! -L \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" ] && [ \"$(stat -c %d:%i \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\")\" = \"$s\" ] || { umount -n \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\"; fail \"Hermes runtime lock not shown\"; }\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed} r=${p#\"$H/.hermes/installs/\"}\n    [ ! -L \"$g\" ] && [ ! -L \"${g%/*}\" ] && [ ! -L \"$H/.hermes/installs/${r%%/*}\" ] && { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && s=$(stat -c %d:%i \"$g/.leases\") && mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n    [ ! -L \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" ] && [ \"$(stat -c %d:%i \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\")\" = \"$s\" ] || { umount -n \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\"; fail \"Hermes leases not shown\"; }\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X k p g r s\n"
         ),
+    ),
+    (
+        "if [ -d \"$W\" ]; then mount --bind \"$W\" \"$S/w\" || fail \"no $W\"; else W=; fi\n",
+        concat!(
+            own_skill_lines!(),
+            "if [ -d \"$W\" ]; then mount --bind \"${Z:-$W}\" \"$S/w\" || fail \"no $W\"; else W=; fi\n"
+        ),
+    ),
+    (
+        "if [ -n \"$W\" ]; then mkdir -p \"$W\" && mount --move \"$S/w\" \"$W\" || fail \"$W not shown\"; fi\n",
+        "if [ -n \"$W\" ] && [ -n \"$Z\" ]; then mkdir -p \"$W\" && mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W\" && mkdir -p \"$Z\" && mount --move \"$S/w\" \"$Z\" || fail \"$Z not shown\"\n\
+         elif [ -n \"$W\" ]; then mkdir -p \"$W\" && mount --move \"$S/w\" \"$W\" || fail \"$W not shown\"; fi\n",
     ),
 ];
 

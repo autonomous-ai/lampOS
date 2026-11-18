@@ -1352,6 +1352,13 @@ fn serve(
             if engine.reread_off() {
                 eprintln!("lamp-skills: the skills turned off read again: the app changed them");
             }
+            // The owner's seen_more yeses (#6543), written by the same helper.
+            if let Some(ends) = engine.reread_seen_more() {
+                eprintln!("lamp-skills: the seen_more yeses read again: the app changed them");
+                for run in ends {
+                    handle(run, &mut runs, &mut out, &runner);
+                }
+            }
             // Potential file I/O stays outside the authority lock. A stalled
             // scan cannot keep old leases alive: authorization checks its age.
             let mut scan = audio.lock().unwrap().scan();

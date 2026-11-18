@@ -155,7 +155,46 @@ pub const NET_ENVIRONMENT: &str = "LAMP_TASK_NET";
 /// The task grant that keeps the run on the lamp's network (with
 /// [`NET_ENVIRONMENT`] on): never one of lamp-control's own, so it is never
 /// in a one-run token; lamp-tasks reads it from the hand-over.
-pub const NET: (&str, &str) = ("net", "reaches the internet");
+pub const NET: (&str, &str) = ("net", "reaches the public internet");
+
+/// The grants that reach what is the person's own, which a run granted
+/// [`NET`] never holds beside it (Heron's P1 on #7590): private data,
+/// untrusted text and a way out never share one run. `look` is one (whether
+/// someone is there, so whether the house is empty: the first builder's
+/// ruling on #7590, 18 Nov 02:01); `air` is not, and its yes says its
+/// readings can go out ([`AIR_BESIDE_NET`]). With any service's read or
+/// write ([`private_grant`]). lamp-tasks keeps the same list
+/// (`lamp_tasks::skill_task::PRIVATE_GRANTS`, held equal by a test).
+pub const PRIVATE_GRANTS: [&str; 5] = ["camera", "microphone", "speech", "notes", "look"];
+
+/// Said after the grants when `air` sits beside [`NET`] ([`uses_said`]):
+/// `air` may (it is no private grant), and its readings can leave the lamp,
+/// so the yes says so (the first builder's ruling on #7590, 18 Nov 02:01).
+pub const AIR_BESIDE_NET: &str = "so its air readings can go to the internet";
+
+/// Said when a skill's grants name [`NET`] beside a private one
+/// (`lamp_tasks::skill_task::NET_BESIDE_PRIVATE`, held equal by a test).
+pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes, or know whether someone is there: make it two skills";
+
+/// Whether `grant` is one a run granted [`NET`] never holds:
+/// [`PRIVATE_GRANTS`], or any service's read or write.
+pub fn private_grant(grant: &str) -> bool {
+    PRIVATE_GRANTS.contains(&grant) || grant.ends_with("-read") || grant.ends_with("-write")
+}
+
+/// The first of `grants` that may not sit beside [`NET`] there
+/// ([`private_grant`]), when `grants` names it; `None` otherwise. So the
+/// yes's words ([`uses_said`]) never say a private grant and the internet
+/// together: no skill that holds both loads.
+pub fn private_beside_net<S: AsRef<str>>(grants: &[S]) -> Option<&str> {
+    if !grants.iter().any(|grant| grant.as_ref() == NET.0) {
+        return None;
+    }
+    grants
+        .iter()
+        .map(AsRef::as_ref)
+        .find(|grant| private_grant(grant))
+}
 
 thread_local! {
     /// The network grant's switch as a test of this thread sets it (other
@@ -198,7 +237,8 @@ pub fn grant_named(name: &str) -> Option<&'static str> {
 
 /// What the script uses, every grant in plain words: "it uses the camera
 /// and changes the light". A grant not in [`GRANTS`] is said by its name,
-/// never left out (the manage helper gives only known ones).
+/// never left out (the manage helper gives only known ones). With `air`
+/// beside [`NET`], it ends with [`AIR_BESIDE_NET`].
 pub fn uses_said(grants: &[String]) -> String {
     let words: Vec<String> = grants
         .iter()
@@ -209,10 +249,16 @@ pub fn uses_said(grants: &[String]) -> String {
                 .unwrap_or_else(|| format!("uses {grant}"))
         })
         .collect();
-    match words.as_slice() {
+    let said = match words.as_slice() {
         [] => "it uses none of the lamp's parts".to_owned(),
         [one] => format!("it {one}"),
         [rest @ .., last] => format!("it {} and {last}", rest.join(", ")),
+    };
+    let names = |name: &str| grants.iter().any(|grant| grant == name);
+    if names("air") && names(NET.0) {
+        format!("{said}, {AIR_BESIDE_NET}")
+    } else {
+        said
     }
 }
 
@@ -1123,6 +1169,36 @@ mod tests {
         assert!(GRANTS.iter().all(|(_, words)| !words.is_empty()));
         assert!(grant_words(NEVER).is_none());
         assert_eq!(grant_named("camera"), Some("camera"));
+    }
+
+    /// The first builder's ruling on #7590 (18 Nov 02:01): `look` is never
+    /// beside `net`; `air` may be, and its yes says the readings can go to
+    /// the internet. `air` alone, or `net` without it, says nothing of it.
+    #[test]
+    fn air_beside_net_says_its_readings_can_go_out_and_look_never_sits_there() {
+        set_net_here(Some(true));
+        let of = |grants: &[&str]| grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>();
+        assert_eq!(private_beside_net(&of(&["air", "net"])), None);
+        assert_eq!(
+            uses_said(&of(&["air", "net"])),
+            "it reads the air sensor and reaches the public internet, so its air readings can \
+             go to the internet"
+        );
+        assert_eq!(
+            uses_said(&of(&["net", "speak", "air"])),
+            "it reaches the public internet, speaks and plays sounds and reads the air sensor, \
+             so its air readings can go to the internet"
+        );
+        assert_eq!(uses_said(&of(&["air"])), "it reads the air sensor");
+        assert!(!uses_said(&of(&["speak", "net"])).contains(AIR_BESIDE_NET));
+        assert!(private_grant("look") && !private_grant("air"));
+        assert_eq!(private_beside_net(&of(&["look", "net"])), Some("look"));
+        assert_eq!(
+            private_beside_net(&of(&["net", "light", "look"])),
+            Some("look")
+        );
+        assert_eq!(private_beside_net(&of(&["look"])), None);
+        set_net_here(None);
     }
 
     /// LAMP_AGENT_SERVICES: a connector skill's service grants are said

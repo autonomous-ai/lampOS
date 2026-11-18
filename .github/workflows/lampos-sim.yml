@@ -178,6 +178,14 @@ jobs:
           cargo test --locked -p lamp-voice --lib peer_stop::
           cargo test --locked -p lamp-voice --lib process::ring_startup_tests::
           cargo test --locked -p lamp-voice --lib transport::tests::a_receive_from_a_peer_that_has_gone
+      # The chunk test is ignored on a Mac (its worker ended early once on this runner, reason unknown). This
+      # step runs it anyway, and never blocks: a failure prints why the worker ended (the test's join), so a
+      # runner fault can be told from a fault in the speaker loop. Read it, then decide; C5b follow-up.
+      - name: lamp-voice's speaker chunk test, ignored on a Mac (reads only)
+        continue-on-error: true
+        working-directory: lampOS
+        run: |
+          cargo test --locked -p lamp-voice --lib speaker_chunk_tests:: -- --ignored --nocapture
       - name: lamp-sim's tests
         working-directory: lampOS
         run: |
@@ -207,15 +215,21 @@ jobs:
       # first attempt's run 4 made: lamp-sim --controls (the bus and lamp-controls' no-slide state), then
       # `directed-fixture` with the silent microphone and `bus:speaker1`, the real privacy gate
       # (`LAMP_PRIVACY_CONTROLS=no-slide`) and the software mute's record. It passes on `listening_ready` AND exit 0.
-      # Run 4 reached `listening_ready` and then ended on a reference fault (F1), which is not yet fixed, so this step
-      # is `continue-on-error` until C5b ends it: it must not turn the job red, and it prints what the fault was
-      # (the journal's `reference_fault` row with every timestamp turned into an age before the fault) so the fix is
-      # chosen from the ages. Cleanup (F3): only the pids this step started; the sim's children (lamp-controls) outlive
+      # Run 4 reached `listening_ready` and then ended on a reference fault (F1: on a macOS runner the speaker's
+      # 2 ms sleep came back after ~10 ms, so one block a pass could not keep its queue, #7443); a software queue is
+      # now written two blocks ahead and up to two a pass (#7434), and the start works. With F4 (#7486: the bus's
+      # clock id on a Mac is `kern.bootsessionuuid`, one read for the bus and Controls) the privacy gate judges the
+      # Controls state by CLOCK_MONOTONIC, not the wall clock a slow runner outran. 18 Nov (#7657 made it block): it
+      # still ends "privacy switch unreadable: physical privacy closed or lost freshness" on a slow runner, after
+      # `listening_ready`, because lamp-controls' loop didn't run for 134 ms, past the privacy reading's 50 ms
+      # (lamp-voice at 1069d04a6 and train 1034, 11:4x). So it doesn't block again until a runner's stall can't end it.
+      # If it fails it prints what the fault was (the journal's `reference_fault` row with every timestamp turned into an age before
+      # the fault). Cleanup (F3): only the pids this step started; the sim's children (lamp-controls) outlive
       # `kill` by about a second and still write, so wait for the sim, poll up to 5 s for its sockets to go, and retry
       # the `rm -rf`; the step's exit is the voice's result, never the `rm`'s.
       - name: lamp-voice starts on a Mac with no host sound and the no-slide gate
+        continue-on-error: true # until a runner's stall can't end the privacy reading (#7657, 18 Nov)
         working-directory: lampOS
-        continue-on-error: true
         run: |
           cargo build --locked -p lamp-voice -p lamp-controls
           # Under $HOME/.lampsim, as the whole-lamp step puts its folder: lamp-body refuses a lock folder under /tmp
