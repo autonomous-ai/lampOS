@@ -7,6 +7,8 @@ fn key() -> YesKey {
         version: "1.2.0".into(),
         sha256: "ab".repeat(32),
         grants: vec!["speak".into(), "hear".into()],
+        net: true,
+        logs: false,
     }
 }
 
@@ -26,7 +28,9 @@ fn the_request_is_one_line_with_exactly_the_key() {
         "sorted"
     );
     assert_eq!(value.as_object().unwrap().len(), 1);
-    assert_eq!(take.as_object().unwrap().len(), 5);
+    assert_eq!(take["net"], true);
+    assert_eq!(take["logs"], false);
+    assert_eq!(take.as_object().unwrap().len(), 7);
 }
 
 #[test]

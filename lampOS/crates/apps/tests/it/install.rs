@@ -23,6 +23,7 @@ fn package(name: &str, version: &str, grants: &[&str], net: bool) -> AppPackage 
             version: version.into(),
             min_build: 100,
             net,
+            logs: false,
             grants: grants.iter().map(|g| (*g).to_owned()).collect(),
             entry: "app.main".into(),
         },
@@ -47,6 +48,8 @@ fn key(op: Op, package: &AppPackage, bytes: &[u8], new_grants: &[&str]) -> YesKe
         version: package.app.version.clone(),
         sha256: sha256_hex(bytes),
         grants: new_grants.iter().map(|g| (*g).to_owned()).collect(),
+        net: package.app.net,
+        logs: package.app.logs,
     }
 }
 
@@ -711,4 +714,92 @@ fn a_remove_in_the_gap_stops_the_install_from_laying_code() {
     assert!(error.contains("being changed"), "{error}");
     assert!(!rig.layout.code.join("x/current").exists());
     assert!(rig.fx.calls.is_empty());
+}
+
+/// An update's key says `net` and `logs` only when the update newly turns
+/// them on (the FB's condition on #7415): one that only turns the network
+/// on is not covered by a yes that names no new grants.
+#[test]
+fn an_update_that_only_turns_net_on_needs_a_yes_that_says_so() {
+    let mut rig = rig();
+    let old = package("x", "1.0.0", &["speak"], false);
+    put(&mut rig, &old, "a", Op::Install, &["speak"]).unwrap();
+    rig.fx.calls.clear();
+    let newer = package("x", "1.1.0", &["speak"], true);
+    // The old kind of yes: no new grants, net false. Refused, nothing laid.
+    let bytes = bytes_of("b");
+    let mut plain = FakeYes::granting(vec![YesKey {
+        version: "1.1.0".into(),
+        ..key(Op::Update, &old, &bytes, &[])
+    }]);
+    assert!(
+        install(
+            &rig.layout,
+            &mut rig.fx,
+            &mut rig.skills,
+            &mut plain,
+            &StubReader::new(newer.clone()),
+            &bytes,
+            Some(200)
+        )
+        .is_err()
+    );
+    assert_eq!(installed_record(&rig.layout, "x").unwrap().version, "1.0.0");
+    assert!(rig.fx.calls.is_empty());
+    // The yes that says net takes it; and a later update that keeps net on
+    // asks no net again.
+    let mut yes = FakeYes::granting(vec![key(Op::Update, &newer, &bytes, &[])]);
+    install(
+        &rig.layout,
+        &mut rig.fx,
+        &mut rig.skills,
+        &mut yes,
+        &StubReader::new(newer.clone()),
+        &bytes,
+        Some(200),
+    )
+    .unwrap();
+    assert!(installed_record(&rig.layout, "x").unwrap().net);
+    let newest = package("x", "1.2.0", &["speak"], true);
+    let bytes = bytes_of("c");
+    let mut again = FakeYes::granting(vec![YesKey {
+        net: false,
+        ..key(Op::Update, &newest, &bytes, &[])
+    }]);
+    install(
+        &rig.layout,
+        &mut rig.fx,
+        &mut rig.skills,
+        &mut again,
+        &StubReader::new(newest),
+        &bytes,
+        Some(200),
+    )
+    .unwrap();
+}
+
+#[test]
+fn logs_are_asked_like_net() {
+    let mut rig = rig();
+    let mut pkg = package("x", "1.0.0", &["speak"], false);
+    pkg.app.logs = true;
+    let bytes = bytes_of("a");
+    let mut wrong = FakeYes::granting(vec![YesKey {
+        logs: false,
+        ..key(Op::Install, &pkg, &bytes, &["speak"])
+    }]);
+    assert!(
+        install(
+            &rig.layout,
+            &mut rig.fx,
+            &mut rig.skills,
+            &mut wrong,
+            &StubReader::new(pkg.clone()),
+            &bytes,
+            Some(200)
+        )
+        .is_err()
+    );
+    assert!(put(&mut rig, &pkg, "a", Op::Install, &["speak"]).is_ok());
+    assert!(installed_record(&rig.layout, "x").unwrap().logs);
 }

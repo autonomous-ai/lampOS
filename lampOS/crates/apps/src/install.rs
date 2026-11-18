@@ -46,6 +46,9 @@ pub struct Record {
     pub version: String,
     pub grants: Vec<String>,
     pub net: bool,
+    /// Absent in a record an earlier build wrote: no logs.
+    #[serde(default)]
+    pub logs: bool,
     pub sha256: String,
 }
 
@@ -175,6 +178,7 @@ fn lay_and_start(
         version: package.app.version.clone(),
         grants: sorted(&package.app.grants),
         net: package.app.net,
+        logs: package.app.logs,
         sha256: sha.to_owned(),
     };
     lay(&app_dir, package, &record, sha)?;
@@ -243,6 +247,11 @@ pub fn install(
                 .filter(|grant| !have.grants.contains(grant))
                 .collect(),
         },
+        // `net` and `logs` are manifest booleans outside the grants but as
+        // much a permission: an install says them as the manifest does, an
+        // update only what it newly turns on (the FB's condition, #7415).
+        net: package.app.net && before.as_ref().is_none_or(|have| !have.net),
+        logs: package.app.logs && before.as_ref().is_none_or(|have| !have.logs),
     };
     // The yes is used up under the lock, so a busy lamp does not spend it,
     // and nothing is written before it.
