@@ -1558,6 +1558,88 @@ pub(super) const LINES: &[Line] = &[
         "没关系，你可以稍后重新设置。只要让我重新设置就行。",
         "괜찮아요. 나중에 다시 설정하실 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
     ]),
+    // "Who you are" ended with the name only (`skill::NAME_ONLY`, #5139):
+    // without a line here a Vietnamese walk handed it to the model as an
+    // English quote, and it was said in English (#7718 item 8).
+    ("Thanks. I'll remember your name, and things for you, once I've seen your face.", [
+        "Cảm ơn bạn. Khi đã thấy mặt bạn, mình sẽ nhớ tên bạn và những điều cần nhớ giúp bạn.",
+        "ありがとうございます。お顔を見られたら、お名前とあなたのためのことを覚えますね。",
+        "谢谢。等我看到你的脸，就会记住你的名字，还有要帮你记的事。",
+        "고마워요. 얼굴을 보고 나면 이름이랑 챙겨 드릴 일들을 기억해 둘게요.",
+    ]),
+    // The face asked for once more after the walk (`skill::FACE_AGAIN`).
+    ("One more thing: may I remember your face now, so I can remember things for you?", [
+        "Còn một việc nữa: giờ mình nhớ khuôn mặt bạn được không, để mình nhớ mọi thứ giúp bạn?",
+        "もう一つだけ。あなたのためにいろいろ覚えられるように、今お顔を覚えてもいいですか？",
+        "还有一件事：现在我可以记住你的脸吗？这样我就能帮你记事情了。",
+        "하나 더요. 기억할 일들을 챙겨 드릴 수 있게, 지금 얼굴을 기억해도 될까요?",
+    ]),
+    ("That's fine.", [
+        "Không sao đâu.",
+        "大丈夫ですよ。",
+        "没关系。",
+        "괜찮아요.",
+    ]),
+    // The app's onboarding pages' lines (lamp-cloud's `onboarding_page`,
+    // #6353), asked as notes by the skill `onboarding-app` and said in the
+    // owner's language through this table (`crate::say::PAGE_SKILL`, #7718
+    // item 8). A `{colour}` is one of [`COLOURS`], said in the language; a
+    // `{name}` is the skill's own title, as given. "Next" is the app's
+    // button, kept as written.
+    ("{colour} it is! That's your first skill. Tap Next in the app.", [
+        "Đèn đã sang màu {colour} rồi! Đó là kỹ năng đầu tiên của bạn. Bấm Next trong app nhé.",
+        "{colour}になりました！これが最初のスキルです。アプリで「Next」をタップしてください。",
+        "变成{colour}了！这是你的第一个技能。在 App 里点 Next 吧。",
+        "{colour}으로 바꿨어요! 첫 번째 스킬이에요. 앱에서 Next를 눌러 주세요.",
+    ]),
+    ("That's your first skill. Tap Next in the app.", [
+        "Đó là kỹ năng đầu tiên của bạn. Bấm Next trong app nhé.",
+        "これが最初のスキルです。アプリで「Next」をタップしてください。",
+        "这是你的第一个技能。在 App 里点 Next 吧。",
+        "첫 번째 스킬이에요. 앱에서 Next를 눌러 주세요.",
+    ]),
+    ("Want to try a skill? Say turn blue.", [
+        "Bạn muốn thử một kỹ năng không? Hãy nói: đổi sang màu xanh dương.",
+        "スキルを試してみますか？「青にして」と言ってみてください。",
+        "想试试技能吗？说“变成蓝色”。",
+        "스킬을 한번 써 볼까요? “파란색으로 바꿔 줘”라고 말해 보세요.",
+    ]),
+    ("{name} is on! Add more skills if you like, or tap Next to make your own.", [
+        "{name} đã bật rồi! Bạn có thể thêm kỹ năng nữa, hoặc bấm Next để tự tạo kỹ năng của mình.",
+        "{name}をオンにしました！よければスキルをもっと追加するか、「Next」をタップして自分のスキルを作りましょう。",
+        "{name}已开启！你可以再添加一些技能，或者点 Next 来创建你自己的技能。",
+        "{name} 스킬을 켰어요! 원하시면 스킬을 더 추가하거나, Next를 눌러 직접 만들어 보세요.",
+    ]),
+    ("{name} is on too.", [
+        "{name} cũng bật rồi nhé.",
+        "{name}もオンにしました。",
+        "{name}也开启了。",
+        "{name} 스킬도 켰어요.",
+    ]),
+    ("You're a skill master now! Keep exploring, just say Hey Lamp anytime. Have fun!", [
+        "Giờ bạn là bậc thầy kỹ năng rồi! Cứ khám phá tiếp nhé, lúc nào cần thì nói Hey Lamp. Chúc bạn vui!",
+        "これでスキルマスターですね！どんどん試してみてください。いつでも Hey Lamp と呼んでね。楽しんでください！",
+        "你现在是技能大师了！继续探索吧，随时说 Hey Lamp 就行。玩得开心！",
+        "이제 스킬 마스터예요! 계속 둘러보세요. 언제든 Hey Lamp라고 불러 주세요. 즐거운 시간 보내세요!",
+    ]),
+];
+
+/// The light's colours as the app's Try line names them (lamp-cloud's
+/// `onboarding_page::COLOUR_NAMES`), in vi, ja, zh and ko: a `{colour}`
+/// slot is said in the language. Every Korean one ends in 색, so the line's
+/// 으로 fits each.
+#[rustfmt::skip]
+const COLOURS: &[Line] = &[
+    ("Yellow", ["vàng", "黄色", "黄色", "노란색"]),
+    ("Red", ["đỏ", "赤", "红色", "빨간색"]),
+    ("Green", ["xanh lá", "緑", "绿色", "초록색"]),
+    ("Blue", ["xanh dương", "青", "蓝色", "파란색"]),
+    ("Cyan", ["xanh ngọc", "シアン", "青色", "청록색"]),
+    ("Purple", ["tím", "紫", "紫色", "보라색"]),
+    ("Orange", ["cam", "オレンジ", "橙色", "주황색"]),
+    ("Pink", ["hồng", "ピンク", "粉色", "분홍색"]),
+    ("White", ["trắng", "白", "白色", "흰색"]),
+    ("Warm white", ["trắng ấm", "電球色", "暖白色", "따뜻한 흰색"]),
 ];
 
 fn column(language: Language) -> usize {
@@ -1582,6 +1664,14 @@ fn line_in(quoted: &str, language: Language) -> Option<String> {
             .strip_prefix(before)?
             .strip_suffix(after)
             .filter(|_| quoted.len() >= before.len() + after.len())?;
+        // A colour is said in the language; a name stays as it was given.
+        let filled = match slot {
+            "colour" => COLOURS
+                .iter()
+                .find(|(english, _)| *english == filled)
+                .map_or(filled, |(_, said)| said[column(language)]),
+            _ => filled,
+        };
         Some(said.replace(&format!("{{{slot}}}"), filled))
     })
 }
@@ -1970,11 +2060,114 @@ mod tests {
                 super::super::skill::LAST_LATER,
                 super::super::skill::PREFERENCES_DONE_HARNESS,
                 super::super::skill::PREFERENCES_DONE_TRIES_HARNESS,
+                // #7718 item 8: these were said in English in a Vietnamese walk.
+                super::super::skill::NAME_ONLY,
+                super::super::skill::FACE_ASK,
+                super::super::skill::FACE_AGAIN,
             ]
             .map(str::to_owned),
         );
         assert!(notes.len() > 60, "{}", notes.len());
         notes
+    }
+
+    /// lamp-cloud's `onboarding_page::COLOUR_NAMES`, as its Try line says
+    /// them: written out here so this test also runs against a table that
+    /// lacks them.
+    const PAGE_COLOURS: [&str; 10] = [
+        "Yellow",
+        "Red",
+        "Green",
+        "Blue",
+        "Cyan",
+        "Purple",
+        "Orange",
+        "Pink",
+        "White",
+        "Warm white",
+    ];
+
+    /// The app's page lines as lamp-cloud asks them for an owner who does
+    /// not speak English (its `say_request`): a note of the fixed form
+    /// around the line, each colour of the Try line, and a skill's title.
+    fn page_notes() -> Vec<(String, String)> {
+        let lines = PAGE_COLOURS
+            .iter()
+            .map(|colour| format!("{colour} it is! That's your first skill. Tap Next in the app."))
+            .chain(
+                [
+                    "That's your first skill. Tap Next in the app.",
+                    "Want to try a skill? Say turn blue.",
+                    "Comfort break is on! Add more skills if you like, or tap Next to make your own.",
+                    "Comfort break is on too.",
+                    "You're a skill master now! Keep exploring, just say Hey Lamp anytime. Have fun!",
+                ]
+                .map(str::to_owned),
+            );
+        lines
+            .map(|line| {
+                let note = format!("(Say only this, nothing before or after it: \"{line}\")");
+                (line, note)
+            })
+            .collect()
+    }
+
+    /// #7718 item 8: with `language=vi` (and ja, zh, ko) no page line comes
+    /// out as an English sentence: the Try, Add and Done lines are said in
+    /// the language, the colour too; only the skill's title and the app's
+    /// "Next" button stay as written. The note stays of the fixed form.
+    #[test]
+    fn the_app_pages_lines_have_no_english_sentence_in_any_language() {
+        for (line, note) in page_notes() {
+            assert_eq!(said(note.clone(), None), note, "English is as asked");
+            for language in ALL {
+                let told = said(note.clone(), Some(language));
+                let words = super::super::fixed_words(&told).unwrap_or_else(|| panic!("{told}"));
+                for sentence in line
+                    .split_inclusive(['.', '!', '?'])
+                    .map(str::trim)
+                    .filter(|sentence| sentence.contains(' '))
+                {
+                    let sentence = sentence.trim_start_matches("Comfort break ");
+                    assert!(!words.contains(sentence), "{language:?}: {words}");
+                }
+                for colour in PAGE_COLOURS {
+                    if line.starts_with(&format!("{colour} it is")) {
+                        assert!(!words.contains(colour), "{language:?}: {words}");
+                    }
+                }
+                if line.starts_with("Comfort break") {
+                    assert!(words.contains("Comfort break"), "{words}");
+                }
+            }
+        }
+        let blue = said(
+            "(Say only this, nothing before or after it: \"Blue it is! That's your first skill. Tap Next in the app.\")".into(),
+            Some(Language::Vietnamese),
+        );
+        assert_eq!(
+            super::super::fixed_words(&blue),
+            Some(
+                "Đèn đã sang màu xanh dương rồi! Đó là kỹ năng đầu tiên của bạn. Bấm Next trong app nhé."
+            )
+        );
+    }
+
+    /// #7718 item 8: the name-only line is the walk's own line in the
+    /// owner's language, never an English quote left for the model.
+    #[test]
+    fn the_name_only_line_is_said_in_each_language() {
+        let note = super::super::skill::NAME_ONLY.to_owned();
+        let told = said(note.clone(), Some(Language::Vietnamese));
+        assert_eq!(
+            super::super::fixed_words(&told),
+            Some(
+                "Cảm ơn bạn. Khi đã thấy mặt bạn, mình sẽ nhớ tên bạn và những điều cần nhớ giúp bạn."
+            )
+        );
+        for language in ALL {
+            assert_ne!(said(note.clone(), Some(language)), note, "{language:?}");
+        }
     }
 
     /// Each quoted line of a note that is a sentence, not a step's name.

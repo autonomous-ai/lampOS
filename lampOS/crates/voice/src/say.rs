@@ -995,6 +995,18 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             _ => return Err(ONE_OF.into()),
         }
     };
+    // An app page's note (#7718 item 8): lamp-cloud asks it, for an owner
+    // not speaking English, as the walk's fixed form around the English
+    // line. Its quoted line is said in the owner's language from the walk's
+    // own table, as the walk's lines are, so the model never repeats the
+    // English. The size is checked after.
+    let words = match words {
+        Words::Note(note) if skill == PAGE_SKILL => Words::Note(crate::onboarding::page_note_in(
+            note,
+            crate::language::at_start(),
+        )),
+        words => words,
+    };
     if let Words::Note(said) | Words::Text(said) = &words
         && (said.trim().is_empty()
             || said.len() > MOST_WORDS_BYTES

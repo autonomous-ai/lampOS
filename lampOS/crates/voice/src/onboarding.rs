@@ -1395,6 +1395,14 @@ pub fn fixed_words(note: &str) -> Option<&str> {
     (fixed && !words.trim().is_empty()).then_some(words)
 }
 
+/// A note of the app's onboarding pages (`crate::say::PAGE_SKILL`, #7718
+/// item 8) as said in `language`: each quoted line in the walk's table
+/// ([`in_language`]) in the language, the instruction as it is. English,
+/// or a line not in the table, is the note as asked.
+pub(crate) fn page_note_in(note: String, language: Option<crate::language::Language>) -> String {
+    in_language::said(note, language)
+}
+
 /// What marks one of the walk's own lines ([`own_line`]).
 const OWN_MARK: &str = "(The lamp says this itself.) ";
 
@@ -8802,13 +8810,26 @@ mod tests {
             lines.last().and_then(|line| own_words(line)),
             fixed_words(&face_ask)
         );
-        // No face kept: the name-only line, which has no Vietnamese line.
+        // No face kept: the name-only line, the walk's own in Vietnamese
+        // since #7718 item 8 (it was an English quote left to the model,
+        // which said it in English on lamp-0c89 on 18 Nov).
         lines.extend(walk(&mut room, FACE_SAVE_WAIT_US + S));
-        let name_only = lines
-            .iter()
-            .find(|line| line.contains("I'll remember your name"))
-            .expect("the name-only line");
-        assert_eq!(own_words(name_only), None, "{name_only}");
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains("I'll remember your name")),
+            "{lines:?}"
+        );
+        let name_only = in_language::said(
+            skill::NAME_ONLY.to_owned(),
+            Some(crate::language::Language::Vietnamese),
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| own_words(line) == fixed_words(&name_only)),
+            "{lines:?}"
+        );
         // Every own line is said in Vietnamese, none in English.
         for line in &lines {
             if let Some(words) = own_words(line) {

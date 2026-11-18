@@ -27,8 +27,10 @@
 //! - **done:** [`DONE`], once.
 //!
 //! Each line goes to the voice's say socket: as written (`exact`, no chat)
-//! for an English owner; as a note in the person's language otherwise,
-//! these lines having no translation (`crate::say` in lamp-voice: said only
+//! for an English owner; as a note otherwise, whose quoted line lamp-voice
+//! says in the person's language from the walk's table (#7718 item 8:
+//! `onboarding/in_language.rs`; a line changed here needs its row there)
+//! (`crate::say` in lamp-voice: said only
 //! once nobody is talking and the lamp's own line has ended; as the page's
 //! answer, with no say's 15 s quiet after the last turn, #7718). Behind
 //! `onboarding.done`'s switch (`LAMP_APP_ONBOARDING_DONE`), with
@@ -740,7 +742,7 @@ mod tests {
     }
 
     /// #6353: an English owner's line goes as written, no chat; any other
-    /// owner's as a note, these lines having no translation.
+    /// owner's as a note, its line said in their language by lamp-voice.
     #[test]
     fn the_line_is_exact_for_english_else_a_note() {
         let asked = say_request(DONE, true);

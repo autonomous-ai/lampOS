@@ -385,9 +385,9 @@ the lamp's words, so the face question's yes still runs the setup save
 (`Thread::names_window`): unlike a skill's exact line (#5777), it goes
 through the provider, whose words reach the thread as any answer's. It is
 marked once said in the owner's language (`in_language`); a fixed line with
-no line in that language (the name-only line and the longer closings in
-Vietnamese, for one) stays a note for the model to say in it, never an own
-line in English. An "Ask exactly this" note (`who_you_are`'s ask
+no line in that language stays a note for the model to say in it, never an
+own line in English (the name-only line was one until #7718 item 8: on
+lamp-0c89 on 18 Nov the model said it in English). An "Ask exactly this" note (`who_you_are`'s ask
 and its read-back, preferences, the room sounds and faces asks, the face
 question asked again) tells the model how to take the answer, so it stays
 the model's. Tests:
@@ -974,7 +974,19 @@ and `ko` (`crates/voice/src/onboarding/in_language.rs`).
 said in the language, from the voice's own table (`LINES`): the skill's
 lines in `skills/onboarding/skill.toml` and the code's own
 (`PREFERENCES_HELLO`, `PREFERENCES_DONE`, `FACE_EXPRESSIONS_YES`/`_NO`,
-`LATER`, `LAST_LATER`, and the closings with `harness_line::SENTENCE`). A line is translated as the walk hands it out (its
+`LATER`, `LAST_LATER`, the closings with `harness_line::SENTENCE`, and since
+#7718 item 8 `NAME_ONLY`, `FACE_ASK` and `FACE_AGAIN`'s lines).
+
+**The app's pages' lines** (#7718 item 8) use the same table: lamp-cloud
+asks them, for an owner not speaking English, as the walk's fixed form
+around the English line ([cloud.md](cloud.md), "The app's onboarding
+pages"), and the voice says the quoted line in the owner's language as it
+reads the ask (`say::PAGE_SKILL`, `onboarding::page_note_in`), so the model
+never repeats the English. Try's colour is said in the language (`COLOURS`,
+the ten names lamp-cloud's `COLOUR_NAMES` gives); a skill's title on Add
+stays as given, and "Next", the app's button, stays as written. Tests:
+`in_language::tests::the_app_pages_lines_have_no_english_sentence_in_any_language`,
+`in_language::tests::the_name_only_line_is_said_in_each_language`. A line is translated as the walk hands it out (its
 `tick` and its invitations), so the walk itself still keeps and compares
 the English notes. A `{location}` or `{name}` filled in stays as it was
 given (the privacy switch's location is the hardware profile's words). The

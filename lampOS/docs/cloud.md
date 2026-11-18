@@ -2902,8 +2902,11 @@ says `onboarding_page_supported: true` then, and `onboarding_page_version:
 - **The line.** Every line is in `crate::onboarding_page`, one constant
   each. Handed to the voice's say socket (`LAMP_SAY_SOCKET`, else
   `/run/lampos-say/say.sock`), skill `onboarding-app`, let go after 30 s:
-  as written (`exact`, no chat) for an English owner; as a note said in the
-  person's language otherwise, these lines having no translation. Only
+  as written (`exact`, no chat) for an English owner; as a note otherwise,
+  the walk's fixed form around the English line, which lamp-voice says in
+  the person's language from the walk's own table (#7718 item 8,
+  [onboarding.md](onboarding.md), "The owner's language"). A line changed
+  here needs its row there, or it is said in English. Only
   once the lamp's own speech is over and nobody is heard (the say
   service's gates), never waited for here. The voice takes `onboarding-app`'s
   lines as the page's answer: no say's 15 s quiet after the last turn and
