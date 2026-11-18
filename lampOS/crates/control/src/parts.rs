@@ -1209,13 +1209,14 @@ impl Lamp {
                 result = attempt(&plain);
             }
             let (how, why) = result;
-            forget_say(&says, &client, number);
-            if how == "finished" {
-                take();
-                if let Some(said) = &said {
-                    count_said(said, &client, |counts| counts.spoken += 1);
-                }
-            }
+            end_say(
+                &says,
+                said.as_ref(),
+                &client,
+                number,
+                how == "finished",
+                take,
+            );
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -1224,6 +1225,28 @@ impl Lamp {
         });
         Ok(json!({"to": "voice"}))
     }
+}
+
+/// Say `number` of `client` is answered: spoken whole (`finished`), it is
+/// counted taken (`take`) and spoken first, and only then leaves the says
+/// still waiting ([`forget_say`]), so a run's settled end, which reads the
+/// counts once none of its says waits (`Shared::end_run_settled`), never
+/// reads them before a say spoken whole is counted (#6071).
+fn end_say(
+    says: &Says,
+    said: Option<&SaidCounts>,
+    client: &str,
+    number: u64,
+    finished: bool,
+    take: impl Fn(),
+) {
+    if finished {
+        take();
+        if let Some(said) = said {
+            count_said(said, client, |counts| counts.spoken += 1);
+        }
+    }
+    forget_say(says, client, number);
 }
 
 /// Counts a say of `client` into its entry, only while it is there
@@ -2549,6 +2572,43 @@ mod tests {
         count_said(&lamp.said, "c_run", |counts| counts.spoken += 1);
         assert!(!lamp.said.lock().unwrap().contains_key("c_run"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a say spoken whole is counted while it still waits, never
+    /// after it leaves the says waiting: a settled end that finds none
+    /// waiting reads a count already made. Seen at the count itself.
+    #[test]
+    fn a_say_spoken_whole_is_counted_before_it_stops_waiting() {
+        let says = Says::default();
+        says.lock()
+            .unwrap()
+            .entry("c_run".to_owned())
+            .or_default()
+            .insert(7, None);
+        let said = SaidCounts::default();
+        said.lock()
+            .unwrap()
+            .insert("c_run".to_owned(), crate::session::Said::default());
+        let waiting = |says: &Says| {
+            says.lock()
+                .unwrap()
+                .get("c_run")
+                .is_some_and(|asked| asked.contains_key(&7))
+        };
+        let seen = std::cell::Cell::new(None);
+        end_say(&says, Some(&said), "c_run", 7, true, || {
+            seen.set(Some(waiting(&says)));
+            count_said(&said, "c_run", |counts| counts.asked += 1);
+        });
+        assert_eq!(seen.get(), Some(true), "counted while it still waited");
+        assert!(!waiting(&says), "then it stopped waiting");
+        assert_eq!(
+            said.lock().unwrap()["c_run"],
+            crate::session::Said {
+                asked: 1,
+                spoken: 1
+            }
+        );
     }
 
     /// #6071: a say the voice can't be reached for, or refuses, is never
