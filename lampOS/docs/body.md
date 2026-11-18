@@ -1378,9 +1378,13 @@ With `LAMP_BODY_ENERGY=on` (off unless exactly `on`; on in the product, set on B
 energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
 (`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
 keeps the last level, not 1. A new level is taken once the lamp is settled: no gesture playing or
-waiting, the pose still, the stand up or down. A shift at rest found playing does not keep it waiting:
-it is eased to rest over 0.7 s (`EASE_OUT`, as a hand's yield eases a gesture), and no shift begins
-while a level waits, so the level is taken within 5 s of the send. A gesture asked of it (a skill, a
+waiting, no head joint faster than the new level lets it go (a glance or talk moving the head slower
+does not hold it), the stand up or down. A shift at rest found playing does not keep it waiting: it is
+eased to rest as a hand's yield eases a gesture (`easing_out`), but no joint faster than the clip's own
+pace or than it was moving, the ease stretched past 0.7 s as needed (`settle`'s 54-count sag about
+2.5 s, `look_up` about 1.3 s), so it only slows. A shift or an idle-priority gesture waiting (Expression's
+`lively`) is dropped, and no shift begins while a level waits, so the level is taken within 5 s of the
+send, energy_in's 1 s read included. A gesture asked of it (a skill, a
 nod while talking, a turn to a voice) is never cut for a level; the level waits for its end (#7749).
 Off, the body never reads it and runs at level 1. Level 1 is today exactly:
 the limits and the stand pace the unit gives (`Limits::at(1)` returns them unchanged, a test pins it
