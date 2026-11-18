@@ -5863,7 +5863,13 @@ after a take-over, but now for every turn:
   lamp-74ff, 18 Nov: the owner, head down talking at his phone just after
   an answer, was answered): the speaker is each look's one face read
   speaking or, none read speaking, its only face in view whose mouth was
-  not read still, turned to the lamp or not, and the line's pose is the
+  not read still, turned to the lamp or not (that lone face only while no
+  other voice is in the conversation: a print under
+  `same_voice::DIFFERENT_BELOW` against the conversation's, or a line of it
+  that showed another person, `Heeding::another_person`, skips it, journaled
+  `the lone face's pose skipped: another voice`; the Reviewer-lead's HOLD
+  on #7726: an off-camera follow-up is not held by the pose of someone
+  head down in view), and the line's pose is the
   median `pitch` and the most-read `looking` over its looks, so one level
   look among many down is still down
   (`SpeakingFaces::speaker_pose_between`); the eyes' lost marks (pitch 90
