@@ -1246,6 +1246,15 @@ pub fn other_skill_named(heard: &str, skill: &str, installed: &[String]) -> Opti
             if let Some(other) = other
                 && other.len() > own_most
             {
+                // Said as the name is, without a word said before it that
+                // the spelling distance lets in ("my page title backup").
+                let mut other: &[String] = other;
+                while other.len() > 1
+                    && BEFORE_A_NAME.contains(&other[0].as_str())
+                    && another(&other[1..])
+                {
+                    other = &other[1..];
+                }
                 return Some(other.join(" "));
             }
             // The words right before "skill", back to a word that comes
