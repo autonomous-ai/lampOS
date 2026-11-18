@@ -94,10 +94,11 @@ pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 /// is dropped and the note is said as before.
 pub const DESK_TIME_ENVIRONMENT: &str = "LAMP_DESK_TIME";
 
-/// Where a note says the current sitting ([`DESK_TIME_ENVIRONMENT`]): a
-/// core wellbeing nudge's plain `say` (Sip of water, Stretch break, Rest
-/// your eyes). Filled only for a skill that may read `room/activity`, from
-/// its newest value that lasts; dropped otherwise (`sitting_told`).
+/// Where a note says the current sitting ([`DESK_TIME_ENVIRONMENT`]): any
+/// plain `say` that holds it. A skill opts in by writing it in its note, no
+/// list of skills here; it is filled only for a core skill that may read
+/// `room/activity`, from its newest value that lasts, and dropped otherwise
+/// (`sitting_now`, `sitting_told`).
 pub const SITTING_SLOT: &str = "{sitting}";
 
 /// Topics no skill may read, whatever it lists (#7267): an agent's steps
