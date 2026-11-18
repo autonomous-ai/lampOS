@@ -975,8 +975,15 @@ the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
 elbow holds 3 short at 24 and is left as it is.
 
 - A gesture, a lean, a hold, a cut by the anti-tip rule or a sit-down
-  writes another goal; while it does, the count pauses. It resets only
-  when the joint is at its goal or unloaded.
+  writes another goal; while it does, the count pauses. A step at its goal
+  or unloaded (load 150 or under) pauses it too; it resets only after 50
+  such steps in a row, 1 s (`STAND_EASE_SETTLED`, #7281): a joint that has
+  truly settled. lamp-52e6 (14083) held its shoulder 52 short at 220 on
+  every 10 s line, but read 176, 144 and 64 just after moves; when one such
+  step zeroed the count, a lamp that leant and gestured every 10 to 25 s
+  was never eased and heated. The same rule counts the 60 s after an ease
+  below: a stray dip doesn't save an ease that leaves it loaded, and a
+  load that settles keeps the ease.
 - Never above the measured stand (the eased goal lies between where the
   joint holds and the goal), and never more than 80 counts under it
   (`STAND_EASE_FLOOR`): a joint held farther short is a hand pushing it
@@ -1004,7 +1011,9 @@ more arms' journals. Shown by tests only
 `a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal`,
 `a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`,
 `a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more`,
-`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`); not yet on a lamp.
+`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`,
+`a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased`,
+`a_standing_elbow_whose_load_settles_for_2_s_starts_its_count_again`); not yet on a lamp.
 
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 

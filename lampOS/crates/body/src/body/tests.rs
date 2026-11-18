@@ -1964,15 +1964,23 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
 /// otherwise as `set` makes it: the arm goals and positions of the last
 /// step it was fully stood up.
 fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]) {
-    elbow_standing_for(Duration::from_secs(75), load, Duration::from_secs(75), set)
+    elbow_standing_for(
+        Duration::from_secs(75),
+        load,
+        Duration::from_secs(75),
+        &[],
+        set,
+    )
 }
 
 /// As [`elbow_standing`], standing for `ends`, the elbow reading `load`
-/// until `loaded` only.
+/// until `loaded` only, and speaking (so leaning, `LEAN`) in `speaks`
+/// (seconds, from and until).
 fn elbow_standing_for(
     ends: Duration,
     load: u16,
     loaded: Duration,
+    speaks: &'static [(u64, u64)],
     set: impl FnOnce(&mut Lamp),
 ) -> ([u16; 2], [u16; 2]) {
     let (mut lamp, mut clock) = folded(ends);
@@ -1980,9 +1988,23 @@ fn elbow_standing_for(
     lamp.overload_clears = 1;
     lamp.strains = vec![(Duration::ZERO, loaded, 2, load)];
     set(&mut lamp);
-    // Listened to throughout: awake, and at energy level 1 no lean moves
+    // Listened to otherwise: awake, and at energy level 1 no lean moves
     // the arm off its stand goal.
-    let news = || Some((Mood::Listening, 100));
+    let time = clock.time.clone();
+    let news = move || {
+        let at = time.get().as_secs();
+        Some(
+            if speaks
+                .iter()
+                .any(|(from, until)| (*from..*until).contains(&at))
+            {
+                (Mood::Speaking, 100)
+            } else {
+                (Mood::Listening, 100)
+            },
+        )
+    };
+    let mut leant = false;
     let mut last = None;
     let report = run_standing(
         &mut lamp,
@@ -1993,12 +2015,16 @@ fn elbow_standing_for(
         news,
         |glimpse| {
             if glimpse.stand == 1.0 {
+                // The shoulder is never eased here: stood, a goal this far
+                // under its stand is a lean.
+                leant |= glimpse.arm_goals[0] <= 2_650 - 40;
                 last = Some((glimpse.arm_goals, glimpse.arm_positions));
             }
         },
     );
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
     assert!(report.stood && report.retreats.is_empty(), "{report:?}");
+    assert_eq!(leant, !speaks.is_empty());
     last.unwrap()
 }
 
@@ -2025,6 +2051,7 @@ fn a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases
         Duration::from_secs(200),
         172,
         Duration::from_secs(200),
+        &[],
         |lamp| lamp.short = Some((2, 40.0)),
     );
     assert_eq!(goals, [2_650, 2_600], "at {at:?}");
@@ -2038,9 +2065,58 @@ fn a_standing_elbow_whose_load_drops_after_its_ease_keeps_it() {
         Duration::from_secs(200),
         190,
         Duration::from_secs(80),
+        &[],
         |lamp| lamp.short = Some((2, 45.0)),
     );
     assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-52e6 on 14083 (#7281): its shoulder held 52 short at 220 on every
+/// 10 s line but read 176, 144 and 64 right after moves, and leant and
+/// gestured every 10 to 25 s; it was never eased and heated. Here the elbow
+/// holds 50 short at 220 with one 140 read every 30 s and a lean between
+/// each: a dip pauses the count as a lean does, so it is eased, and once
+/// its load drops (at 100 s) the ease is kept.
+#[test]
+fn a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased() {
+    let ms = Duration::from_millis;
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(130),
+        220,
+        Duration::from_secs(100),
+        &[(12, 16), (42, 46), (72, 76)],
+        |lamp| {
+            lamp.short = Some((2, 50.0));
+            // Ahead of the steady load, which `Lamp::strains` finds after.
+            for at in [30_000, 60_000, 90_000] {
+                lamp.strains.insert(0, (ms(at), ms(at + 30), 2, 140));
+            }
+        },
+    );
+    assert!(at[1] <= 2_600 - STAND_EASE_SHORT, "at {at:?}");
+    assert_eq!(goals, [2_650, at[1] + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// A joint that truly settles, its load under `STAND_EASE_LOAD` for 2 s
+/// (past `STAND_EASE_SETTLED`), starts the count again: 50 short at 220
+/// with that settle at 40 s, it is not eased by 90 s, though it was short
+/// and loaded for more than `STAND_EASE_STEPS` in all.
+#[test]
+fn a_standing_elbow_whose_load_settles_for_2_s_starts_its_count_again() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(90),
+        220,
+        Duration::from_secs(90),
+        &[],
+        |lamp| {
+            lamp.short = Some((2, 50.0));
+            lamp.strains.insert(
+                0,
+                (Duration::from_secs(40), Duration::from_secs(42), 2, 140),
+            );
+        },
+    );
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
 }
 
 /// lamp-52e6 on the same build: 3 short at a load of 24. Nothing changes.
