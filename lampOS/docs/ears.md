@@ -329,3 +329,16 @@ or the records unless the person asks, and the voice never reads them (it never
 answers a cough as if spoken to). `crates/ears/tests/body_sounds_stay_home.rs`
 fails if a part that leaves the lamp or lasts names the topic or the type.
 
+**The kit that measures the bars** is `lamp-ears-body-kit`, a development
+binary (`crates/ears/src/bin/body_kit.rs`, `body_kit.rs`). The steps for the
+run are in [body-sounds-kit.md](body-sounds-kit.md). `take` records the
+person's clips into a private folder on the lamp, from `mic1/audio`. It
+scores each patch of each clip with this frontend and model, and writes the
+scores beside the clip. `office` logs an hour's body scores from
+`ears/classes`, with no sound. `suggest` picks each class's lowest bar over
+every other sound's peak, so the 60 others give no false hit. It prints the
+recall and precision there, and the alarms an hour that `Detector` would give
+over the office log. Only a class with recall of at least 0.9 and under one
+alarm an hour is printed as `Some` in `BARS`. `delete` zero-fills the clips,
+then removes the kit's files and the folder.
+

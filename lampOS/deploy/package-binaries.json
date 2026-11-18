@@ -19,6 +19,6 @@
     "lamp-policy-fit", "lamp-policy-judges", "lamp-sound-fixtures", "lamp-tasks-harness-fixture",
     "lamp-voice-eval", "lamp-memory-bench", "lamp-memory-fixture", "lamp-records-fixture",
     "lamp-policy-replay", "lamp-station", "lamp-seems-measure", "lamp-sim",
-    "lamp-memory-tiers-arm"
+    "lamp-memory-tiers-arm", "lamp-ears-body-kit"
   ]
 }

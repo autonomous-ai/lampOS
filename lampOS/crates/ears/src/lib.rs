@@ -5,6 +5,7 @@
 use lamp_msgs::{EARS_SILENCE_DB, RoomSound, SuddenSound};
 use std::collections::VecDeque;
 
+pub mod body_kit;
 pub mod body_sounds;
 pub mod classes;
 pub mod pcm;
