@@ -82,6 +82,8 @@ test('SIGTERM ends a code run the same way, and a wrong code says the lamp\'s wo
   const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
   t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
   const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port), '--camera'], env: { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }, fake, home });
+  // The camera line is the banner's second write: on a loaded machine it can come after the URL's chunk.
+  for (let i = 0; i < 100 && !/CAMERA ON/.test(real.out.text); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
   assert.match(real.out.text, /CAMERA ON: anyone on your network who has this link can see or hear the room/);
   real.child.kill('SIGTERM');
   assert.equal(await real.ended, 0);
