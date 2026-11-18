@@ -11182,13 +11182,22 @@ async fn spoken(
     // "Lamp ơi"), or as the coordinator reads a line of the name alone
     // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
     // alone, or no words at all.
+    // Its words past the name: only a plain yes, a few words, confirms a
+    // made skill's remove (`skill_write_yes::PLAIN_YES_MOST`, #6960).
+    let name_only = called
+        || text.trim().is_empty()
+        || name_alone(&text)
+        || crate::attention::only_the_name(&text);
     crate::skill_write_yes::line_heard(
         request,
-        called
-            || text.trim().is_empty()
-            || name_alone(&text)
-            || crate::attention::only_the_name(&text),
+        name_only,
+        crate::skill_write_yes::line_words(&text, net::key_terms::NAME),
     );
+    // A remove on the line right after one that found nothing is asked
+    // only when this line names the skill (`made_remove::line_heard`).
+    if !name_only {
+        crate::made_remove::line_heard(request, &text);
+    }
     let called = called.then(|| {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and the model is told so"
@@ -18458,6 +18467,13 @@ async fn answer(
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
             }
+            // A round that calls anything but a wait's answer: no made
+            // skill's remove is confirmed in this request (#6960), told
+            // before any of its calls runs.
+            crate::skill_write_yes::round_called(
+                request,
+                calls.iter().map(|call| (call.name.as_str(), &call.args)),
+            );
             // The photo face's answer called: no yes is held for it after.
             if calls
                 .iter()

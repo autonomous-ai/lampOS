@@ -119,6 +119,15 @@ pub struct Waiting {
     /// end, in monotonic µs ([`played_until`]): where the carry of a yes
     /// counts from (`LAMP_SKILL_YES_CARRY`, #7148, [`asked_until`]).
     pub played: VecDeque<(u64, u64)>,
+    /// A remove's (#6960) answer line ([`line_heard`]): the first later
+    /// line that was more than the lamp's name, its request and how many
+    /// words it had past the name. Only that line may confirm the remove
+    /// ([`not_a_plain_yes`]); a later one drops the wait.
+    pub answer_line: Option<(u64, usize)>,
+    /// Later requests whose rounds called anything but a wait's answer
+    /// ([`round_called`]), at most [`SAID_KEPT`]: no remove is confirmed in
+    /// one.
+    pub other_calls: Vec<u64>,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -257,6 +266,8 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             name_only: Vec::new(),
             newest_line: 0,
             played: VecDeque::new(),
+            answer_line: None,
+            other_calls: Vec::new(),
         });
     });
     if remove {
@@ -806,19 +817,105 @@ fn name_only_line(waiting: &Waiting, request: u64) -> bool {
 /// ([`approve_forced_now`]), the note gives no approve_id
 /// ([`waiting_note`]), and the wait goes on for the next line. State, not
 /// words: the route already judged the line a call.
-pub fn line_heard(request: u64, name_only: bool) {
-    kept::waiting(|waiting| {
-        let Some(waiting) = waiting.as_mut().filter(|waiting| request > waiting.request) else {
+///
+/// `words`: how many words the line had past the lamp's name
+/// ([`line_words`]). A remove's (#6960) first such line that is more than
+/// the name is its answer line ([`Waiting::answer_line`]); a later one
+/// drops the remove, nothing removed: only the very next line can confirm
+/// it (lamp-9adf, 18 Nov, stock 14083: a make two lines after "Remove
+/// daily stretch reminder?" was taken as its yes).
+pub fn line_heard(request: u64, name_only: bool, words: usize) {
+    kept::waiting(|kept| {
+        let Some(waiting) = kept.as_mut().filter(|waiting| request > waiting.request) else {
             return;
         };
         waiting.newest_line = waiting.newest_line.max(request);
-        if name_only && !waiting.name_only.contains(&request) {
-            if waiting.name_only.len() == SAID_KEPT {
-                waiting.name_only.remove(0);
+        if name_only {
+            if !waiting.name_only.contains(&request) {
+                if waiting.name_only.len() == SAID_KEPT {
+                    waiting.name_only.remove(0);
+                }
+                waiting.name_only.push(request);
             }
-            waiting.name_only.push(request);
+            return;
+        }
+        if !waiting.asks.remove {
+            return;
+        }
+        match waiting.answer_line {
+            None => waiting.answer_line = Some((request, words)),
+            Some((line, _)) if request > line => {
+                eprintln!(
+                    "lamp-voice: request {request}: a remove's question was not confirmed on the line right after it: dropped, nothing removed (#6960)"
+                );
+                *kept = None;
+            }
+            Some(_) => {}
         }
     });
+}
+
+/// The most words, past the lamp's name, a line may have and still confirm
+/// a made skill's remove (#6960): a plain yes ("yes", "go ahead", "yes,
+/// remove it"). A longer line carries more than the yes ("Yes, and make me
+/// a skill that …", "sure, play some music"), so it never removes. A bound
+/// on the line's length, never a list of words.
+pub const PLAIN_YES_MOST: usize = 3;
+
+/// How many words `line` has, past the lamp's name `name`: each run of
+/// letters or digits between spaces, the name itself not counted ("Lamp,
+/// yes." is one).
+pub fn line_words(line: &str, name: &str) -> usize {
+    line.split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|word| !word.is_empty() && !word.eq_ignore_ascii_case(name))
+        .count()
+}
+
+/// A round of `request` calls `calls` (each its function's name and
+/// arguments), before any runs. While a made skill's remove waits (#6960),
+/// a round that calls anything but a wait's answer (`make_skill` with an
+/// [`APPROVE_ID`] alone of its asks) marks the request: no remove is
+/// confirmed in it ([`not_a_plain_yes`]), whatever the model answered.
+/// The line carried another ask, by the call it made, never by its words.
+pub fn round_called<'a>(request: u64, calls: impl IntoIterator<Item = (&'a str, &'a Value)>) {
+    let other = calls
+        .into_iter()
+        .any(|(name, args)| name != crate::made_skill::MAKE || !args[APPROVE_ID].is_string());
+    if !other {
+        return;
+    }
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| waiting.asks.remove && request > waiting.request)
+        else {
+            return;
+        };
+        if !waiting.other_calls.contains(&request) {
+            if waiting.other_calls.len() == SAID_KEPT {
+                waiting.other_calls.remove(0);
+            }
+            waiting.other_calls.push(request);
+        }
+    });
+}
+
+/// Why the yes in `request` to the remove `waiting` (#6960) is no plain
+/// yes to its question, in code: not on its answer line (the first line
+/// after the question, [`line_heard`]), a line longer than
+/// [`PLAIN_YES_MOST`] words, or a request whose rounds called anything
+/// else ([`round_called`]). None when it is one. The model's own reading
+/// of the line (its `answer` and `named`) is taken before this, and this
+/// only ever turns a yes into nothing removed.
+fn not_a_plain_yes(waiting: &Waiting, request: u64) -> Option<&'static str> {
+    match waiting.answer_line {
+        Some((line, _)) if line != request => Some("not the line right after the question"),
+        None => Some("not the line right after the question"),
+        Some((_, words)) if words > PLAIN_YES_MOST => Some("longer than a plain yes"),
+        _ if waiting.other_calls.contains(&request) => Some("its turn called something else"),
+        _ => None,
+    }
 }
 
 /// Whether [`approve_force`] forces a request at `now`.
@@ -884,6 +981,17 @@ pub fn remove_left_next(spoken: &str) -> String {
         "Nothing was removed: their line was a new ask, not an answer to the lamp's question. \
          Say first, in a few words, in the conversation's language, that you left {spoken} as \
          it is; then do what they asked in that line, as for any line."
+    )
+}
+/// What the model is told when a yes to a remove was no plain yes on the
+/// line right after its question ([`not_a_plain_yes`]): nothing removed,
+/// the skill left as it is, said first, and anything else the line asked
+/// done as for any line.
+pub fn remove_not_plain_next(spoken: &str) -> String {
+    format!(
+        "Nothing was removed: only a plain yes, right after the lamp's question, removes a \
+         skill. Say first, in a few words, in the conversation's language, that you left \
+         {spoken} as it is; then do anything else they asked in that line, as for any line."
     )
 }
 /// What the model is told when the line after a say-back was a new ask
@@ -957,7 +1065,24 @@ pub fn answered(
                     if named.eq_ignore_ascii_case(NAMED_NONE)
                         || crate::made_remove::same_name(named, &skill) =>
                 {
-                    return None;
+                    // A remove's yes, held in code to a plain yes on the
+                    // line right after its question (lamp-9adf, 18 Nov,
+                    // stock 14083: "Lamp, also make one that plays a soft
+                    // chime …" was the model's yes, and daily stretch
+                    // reminder was lost): else it is left as it is. A plain
+                    // yes, or any other wait's, is taken by [`approve`].
+                    let why = remove
+                        .then(|| not_a_plain_yes(waiting, request))
+                        .flatten()?;
+                    *kept = None;
+                    eprintln!(
+                        "lamp-voice: request {request}: a yes to removing {skill} not taken: {why}: nothing removed, the wait dropped (#6960)"
+                    );
+                    return Some(json!({
+                        "approved": false,
+                        "left": skill,
+                        "next": remove_not_plain_next(&spoken)
+                    }));
                 }
                 Some(named) => {
                     other = Some(named.to_owned());
@@ -995,6 +1120,9 @@ pub fn answered(
         }
         if answer == "unclear" && !waiting.unclear {
             waiting.unclear = true;
+            // A remove's question is asked again: the line after that is
+            // its answer line now.
+            waiting.answer_line = None;
             eprintln!(
                 "lamp-voice: request {request}: the answer to {skill}'s say-back was unclear: nothing kept, asked once more"
             );
@@ -2085,6 +2213,81 @@ mod tests {
         );
     }
 
+    /// The first builder's strict rule (18 Nov): a remove's yes counts only
+    /// as a plain yes on the line right after its question, in code. The
+    /// words past the lamp's name are counted, never read; an unclear
+    /// answer asks again, and the line after that is the answer line; a
+    /// second line that is more than the name drops the wait.
+    #[test]
+    fn a_removes_yes_counts_only_as_a_plain_yes_on_the_next_line() {
+        assert_eq!(line_words("Lamp, yes.", "Lamp"), 1);
+        assert_eq!(line_words("Yes, remove it.", "Lamp"), 3);
+        assert_eq!(line_words("Sure, play some music.", "Lamp"), 4);
+        assert_eq!(line_words(" ... ", "Lamp"), 0);
+        let rain = || Asks {
+            skill: "rain-joke".into(),
+            sha256: "b".repeat(64),
+            writes: Vec::new(),
+            say_back: "Remove rain joke?".into(),
+            grants: None,
+            code: false,
+            remove: true,
+        };
+        clear_for_test();
+        let now = Instant::now();
+        // An unclear answer on the next line, then a plain yes on the line
+        // after the question asked again: taken.
+        let id = wait_for_yes(rain(), 1, now);
+        lamp_said(1, "Remove rain joke?");
+        line_heard(2, false, 2);
+        assert!(answered(&id, 2, Some("unclear"), Some(NAMED_NONE)).is_some());
+        line_heard(3, true, 0);
+        line_heard(4, false, 1);
+        assert_eq!(answered(&id, 4, Some("yes"), Some(NAMED_NONE)), None);
+        // Four words: left, the wait dropped.
+        let id = wait_for_yes(rain(), 5, now);
+        line_heard(6, false, 4);
+        let told = answered(&id, 6, Some("yes"), Some(NAMED_NONE)).unwrap();
+        assert_eq!(told["left"], "rain-joke", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("left rain joke as it is"), "{next}");
+        assert!(!waits(&id));
+        // A round of that line that calls a play beside the answer: left.
+        let id = wait_for_yes(rain(), 7, now);
+        line_heard(8, false, 2);
+        let answer = json!({ APPROVE_ID: id });
+        let play = json!({"query": "music"});
+        round_called(8, [(crate::made_skill::MAKE, &answer)]);
+        assert!(waits(&id), "the answer alone marks nothing");
+        round_called(
+            8,
+            [(crate::made_skill::MAKE, &answer), ("play_music", &play)],
+        );
+        let told = answered(&id, 8, Some("yes"), Some(NAMED_NONE)).unwrap();
+        assert_eq!(told["left"], "rain-joke", "{told}");
+        // A second line drops it; a yes in no line heard is no yes.
+        let id = wait_for_yes(rain(), 9, now);
+        line_heard(10, false, 5);
+        line_heard(11, false, 1);
+        assert!(!waits(&id));
+        let id = wait_for_yes(rain(), 12, now);
+        assert!(answered(&id, 13, Some("yes"), Some(NAMED_NONE)).is_some());
+        assert!(!waits(&id));
+        // Another wait's (a task's) yes is never held to it.
+        let id = wait_for_yes(
+            Asks {
+                remove: false,
+                grants: Some(vec!["camera".into()]),
+                ..rain()
+            },
+            14,
+            now,
+        );
+        line_heard(15, false, 9);
+        assert_eq!(answered(&id, 15, Some("yes"), Some(NAMED_NONE)), None);
+        clear_for_test();
+    }
+
     /// #7561's row on lamp-9adf (17 Nov 23:4x): "Remove rain joke?", then
     /// "Yes, remove rain joke." was answered `new_ask` and the wait was
     /// dropped. A line naming the very skill asked about answers it: the
@@ -2107,6 +2310,7 @@ mod tests {
         let now = Instant::now();
         let id = wait_for_yes(rain(), 1, now);
         lamp_said(1, "Remove rain joke?");
+        line_heard(2, false, 3);
         let note = waiting_note(2, now).unwrap();
         assert!(note.contains("named \"rain joke\""), "{note}");
         assert!(note.contains("never new_ask"), "{note}");
