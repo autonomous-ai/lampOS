@@ -458,6 +458,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
         ],
     ),
+    // What it says when a live figure could not be looked up
+    // (`LAMP_LIVE_FACT_CHECKED`, #7605).
+    (
+        crate::live_fact::COULD_NOT_LINE,
+        [
+            "Xin lỗi, giờ mình chưa tra được thông tin đó.",
+            "ごめんね、今それを調べられなかった。",
+            "抱歉，我现在没能查到这个。",
+            "미안해요, 지금은 그걸 찾아보지 못했어요.",
+        ],
+    ),
     // What it says in place of a reply claiming a made skill not on is on
     // (`LAMP_MADE_NOT_ON_TOLD`, #7270), its yes still taken, then too late.
     (
