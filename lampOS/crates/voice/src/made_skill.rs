@@ -4674,7 +4674,17 @@ pub const SCRIPT_SDK: &str = "import asyncio; from lampos import Lamp; async def
 thread_local! {
     /// [`PYTHON`] as a test of this thread sets it.
     static PYTHON_HERE: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+    /// [`PARSE_WITHIN`] for a test of this thread that set its own Python.
+    static PARSE_WITHIN_HERE: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) };
 }
+
+/// How long a test's own Python ([`set_python_here`]) is waited for: a test
+/// that expects a real parse result must not race [`PARSE_WITHIN`] on a
+/// loaded runner, where Python's start alone can pass 2 s (#7585). The
+/// bound itself is tested only by a slow Python's case, with its own short
+/// one.
+#[cfg(test)]
+const TEST_PARSE_WITHIN: Duration = Duration::from_secs(10);
 
 /// The Python [`scripts_parse`] parses with: [`PYTHON`], or a test's.
 fn python() -> PathBuf {
@@ -4685,9 +4695,21 @@ fn python() -> PathBuf {
     PathBuf::from(PYTHON)
 }
 
-/// [`python`] for this test's thread alone.
+/// How long [`scripts_parse`] waits for one script's parse:
+/// [`PARSE_WITHIN`], or [`TEST_PARSE_WITHIN`] once a test set its Python.
+fn parse_within() -> Duration {
+    #[cfg(test)]
+    if let Some(within) = PARSE_WITHIN_HERE.with(std::cell::Cell::get) {
+        return within;
+    }
+    PARSE_WITHIN
+}
+
+/// [`python`] for this test's thread alone, waited for [`TEST_PARSE_WITHIN`]
+/// while it is set.
 #[cfg(test)]
 pub(crate) fn set_python_here(python: Option<PathBuf>) {
+    PARSE_WITHIN_HERE.with(|here| here.set(python.as_ref().map(|_| TEST_PARSE_WITHIN)));
     PYTHON_HERE.with(|here| *here.borrow_mut() = python);
 }
 
@@ -4802,11 +4824,12 @@ fn parsed(python: &Path, text: &str, within: Duration) -> Parse {
 /// script as it is: the person's yes still stands before it runs.
 fn scripts_parse(scripts: &[(String, String)]) -> Result<(), Refused> {
     let python = python();
+    let within = parse_within();
     for (path, text) in scripts
         .iter()
         .filter(|(path, _)| path.ends_with(RUNNABLE_ENDING))
     {
-        match parsed(&python, text, PARSE_WITHIN) {
+        match parsed(&python, text, within) {
             Parse::Parses => {}
             Parse::Unchecked(why) => {
                 eprintln!("lamp-voice: a made skill's {path} was not parsed: {why}");
@@ -16099,7 +16122,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         let dir = scratch("made-code-parse-bounds");
         let missing = dir.join("no-python");
         assert!(matches!(
-            parsed(&missing, "x = 1\n", PARSE_WITHIN),
+            parsed(&missing, "x = 1\n", TEST_PARSE_WITHIN),
             Parse::Unchecked(_)
         ));
         let slow = dir.join("slow-python");
@@ -16125,15 +16148,15 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         .unwrap();
         fs::set_permissions(&broken, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(matches!(
-            parsed(&broken, "x = 1\n", PARSE_WITHIN),
+            parsed(&broken, "x = 1\n", TEST_PARSE_WITHIN),
             Parse::Unchecked(_)
         ));
         if let Some(python) = a_python_here() {
             assert!(matches!(
-                parsed(&python, MAIN_PY, PARSE_WITHIN),
+                parsed(&python, MAIN_PY, TEST_PARSE_WITHIN),
                 Parse::Parses
             ));
-            match parsed(&python, FOR_PY, PARSE_WITHIN) {
+            match parsed(&python, FOR_PY, TEST_PARSE_WITHIN) {
                 Parse::Not { line, error } => {
                     assert_eq!(line, Some(3));
                     assert!(error.starts_with("SyntaxError"), "{error}");
@@ -16145,7 +16168,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             let mark = dir.join("ran");
             let writes = format!("open({:?}, 'w').write('ran')\n", mark.display().to_string());
             assert!(matches!(
-                parsed(&python, &writes, PARSE_WITHIN),
+                parsed(&python, &writes, TEST_PARSE_WITHIN),
                 Parse::Parses
             ));
             assert!(!mark.exists());
