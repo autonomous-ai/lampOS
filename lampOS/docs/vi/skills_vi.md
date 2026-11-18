@@ -2380,28 +2380,39 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   know, not to answer: in this conversation with them, newest first, the
   lamp turned water reminder off (just now); made daily stretch reminder (4
   minutes ago). When their line means a skill of theirs without saying its
-  name, it means the newest of these that fits what they ask, as if they
-  had said that name: to turn it off, turn it on or remove it, call
-  make_skill with turn_off, turn_on or remove and that name; to use or run
-  it, call it as for any skill, by its own function, by use_skill with that
-  name, or by make_skill with run and that name, never a second make of
-  it. Never list their skills for it. ... When their line means a skill
-  of theirs and none of these fits, ask which skill they mean. A line about
-  anything else, the light, music or a timer, is answered as it is: no
-  question about skills, and no skill turned on for it.)", tối đa 3 kỹ
-  năng, mỗi kỹ năng theo việc làm sau cùng với nó. Khi có hơn một kỹ năng
-  được tạo trong cuộc trò chuyện, ghi chú thêm "ask once which they mean,
-  naming them (A or B), and call nothing" cho câu chỉ một kỹ năng đã tạo mà
-  không nói là cái nào. Ghi chú nằm trong các ghi chú mỗi lượt, không bao
-  giờ trong mô tả của `make_skill`, nên mô tả giữ nguyên số byte. Một lần
-  tắt/bật mà tên không khớp kỹ năng nào và đưa ra `candidates` thì đặt
-  những kỹ năng đã tạo hoặc tắt/bật trong cuộc trò chuyện này lên đầu, mỗi
-  cái đánh dấu `in_this_conversation` ("made just now", "turned off 2
-  minutes ago"), và bảo mô hình chọn cái mới nhất phù hợp (và hỏi cái nào
-  khi hơn một kỹ năng đã tạo đều phù hợp); khi không có gì được tạo hay
-  tắt/bật trong cuộc trò chuyện, mô hình được bảo "None of theirs was made,
-  turned off or turned on in this conversation: ... ask which skill they
-  mean and call nothing; never choose one for them."
+  name, judge which of these fits what they ask. If only one fits, it
+  means that one, as if they had said its name: act on it and never ask.
+  To turn it off, turn it on or remove it, call make_skill with turn_off,
+  turn_on or remove and that name; to use or run it, call it as for any
+  skill, by its own function, by use_skill with that name, or by make_skill
+  with run and that name, never a second make of it. Never list their
+  skills for it. If more than one fits and their line doesn't say which,
+  ask once, short, naming only those that fit so one word answers it, as in
+  "The water one or the stretch one?", and call nothing. If none fits, say
+  plainly, in a few words, that they have no skill like that, and ask
+  nothing: never which one they mean. A line about anything else, the
+  light, music or a timer, is answered as it is: no question about skills,
+  and no skill turned on for it.)", tối đa 3 kỹ năng, mỗi kỹ năng theo việc
+  làm sau cùng với nó. Câu "more than one" (`just_made::ASK_WHICH`) chỉ
+  được nói khi ghi chú nêu tên hơn một kỹ năng; câu "none"
+  (`just_made::NONE_FITS`) thì luôn có. Đây là phán quyết của người xây
+  dựng đầu tiên trên #7715 (23:14, "keep the one question, worded to be
+  quick"): chỉ một ứng viên thì làm luôn, không bao giờ hỏi; nhiều ứng viên
+  thì hỏi một lần, nêu tên, để một từ là trả lời được; không có ứng viên
+  nào thì nói thẳng, không bao giờ hỏi "cái nào". Mô hình tự phán đoán cái
+  nào phù hợp: không có danh sách từ. Ghi chú nằm trong các ghi chú mỗi
+  lượt, không bao giờ trong mô tả của `make_skill`, nên mô tả giữ nguyên số
+  byte. Một lần tắt/bật mà tên không khớp kỹ năng nào và đưa ra
+  `candidates` thì đặt những kỹ năng đã tạo hoặc tắt/bật trong cuộc trò
+  chuyện này lên đầu, mỗi cái đánh dấu `in_this_conversation` ("made just
+  now", "turned off 2 minutes ago"), và bảo mô hình rằng khi câu nói chỉ
+  một trong số đó mà không nêu tên, cái phù hợp được gọi lại bằng tên của
+  nó, không bao giờ hỏi; thêm `ASK_WHICH` khi hơn một cái được đánh dấu; và
+  `NONE_FITS`. Khi không có gì được tạo hay tắt/bật trong cuộc trò chuyện,
+  mô hình được bảo "None of theirs was made, turned off or turned on in
+  this conversation: when their line means one made or changed just now
+  without saying its name, they have none like that: say so plainly, in a
+  few words, ask nothing and call nothing; never choose one for them."
   (`just_made::candidates`). Bản thân việc tắt/bật vẫn như trước: chỉ của
   chủ đèn, câu trả lời của chính nó, không cần "có". Ghi chú không thêm
   cổng nào của riêng nó: `turn_on` của mô hình cho kỹ năng nó nêu tên chạy
@@ -2428,6 +2439,9 @@ thành gỡ. Sau đó, trong code (`made_turn::asked`):
   `turn_it_back_on_right_after_means_the_one_just_turned_off`,
   `two_makes_in_the_conversation_ask_which_naming_both`,
   `no_make_in_the_conversation_asks_and_never_guesses`,
+  `more_than_one_fitting_is_asked_once_naming_them_for_a_one_word_answer`,
+  `one_candidate_is_acted_on_never_asked`,
+  `none_fitting_says_no_skill_like_that_never_which`,
   `another_persons_make_doesnt_count`,
   `a_make_is_told_for_ten_minutes_after_it_never_carried_on_by_lines`,
   `a_failed_make_keeps_nothing_and_the_switch_off_tells_nothing`,

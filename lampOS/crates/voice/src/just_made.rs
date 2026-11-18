@@ -21,17 +21,21 @@
 //!   own function, `use_skill` with its name or `make_skill` `run` (as
 //!   `made_turn::off_note` says, #7562), never a second make. Which one
 //!   a line means is the model's to judge, never a list of words (the
-//!   owner's ruling, 13 Nov): the note says the newest that fits, and to
-//!   ask which, naming them, when more than one was made in this
-//!   conversation; a line about anything else is answered as it is. In the
-//!   per-turn notes, never in `make_skill`'s description, which stays
-//!   within its bytes.
+//!   owner's ruling, 13 Nov), told as one quick question at most (the
+//!   first builder's ruling on #7715, 23:14): the one that fits is acted
+//!   on, never asked; more than one that fits is asked once, naming them so
+//!   one word answers it ("The water one or the stretch one?",
+//!   [`ASK_WHICH`]); none that fits is said plainly, that they have no skill
+//!   like that, never a question ([`NONE_FITS`]). A line about anything
+//!   else is answered as it is. In the per-turn notes, never in
+//!   `make_skill`'s description, which stays within its bytes.
 //! - **Candidates, this conversation's first.** A turn whose name found none
 //!   offers theirs (`made_turn::CANDIDATES`); those made or turned in this
 //!   conversation come first, each marked [`IN_THIS_CONVERSATION`], and the
-//!   model is told so ([`candidates`]). With none made or turned in this
-//!   conversation, it is told that too, and to ask which they mean rather
-//!   than pick one: a line that means one made just now never gets a guess.
+//!   model is told so ([`candidates`]), with the same one, several and
+//!   none. With none made or turned in this conversation, it is told that
+//!   too: a line that means one made just now has none like that, said
+//!   plainly, never a guess and never a question.
 //!
 //! No file, no round trip: a few names in this process's memory, and the
 //! made skills' index read only to leave out one no longer kept (a skill
@@ -226,30 +230,24 @@ fn newest(events: &[Event]) -> Vec<&Event> {
     newest
 }
 
-/// The skills made in the conversation, newest first, each once.
-fn made(events: &[Event]) -> Vec<String> {
-    let mut made: Vec<String> = Vec::new();
-    for event in events.iter().rev().filter(|event| event.done == Done::Made) {
-        if !made.contains(&event.name) {
-            made.push(event.name.clone());
-        }
-    }
-    made
-}
+/// What the model is told when more than one of the skills it was told
+/// could be the one a line means: one quick question, naming them so one
+/// word answers it (the first builder's ruling on #7715, 23:14: "keep the
+/// one question, worded to be quick").
+pub const ASK_WHICH: &str = "If more than one fits and their line doesn't say which, ask once, \
+     short, naming only those that fit so one word answers it, as in \"The water one or the \
+     stretch one?\", and call nothing.";
 
-/// What the model is told to do when more than one skill was made in the
-/// conversation (`made`, newest first).
-fn ask_which(made: &[String]) -> String {
-    format!(
-        "More than one skill was made in this conversation: when their line means one made in \
-         it without saying which, ask once which they mean, naming them ({}), and call nothing.",
-        crate::made_remove::said_or(&made[..made.len().min(SAID_MOST)])
-    )
-}
+/// What the model is told when none of the skills it was told fits the
+/// line: no such skill, said plainly, never a question (the same ruling).
+pub const NONE_FITS: &str = "If none fits, say plainly, in a few words, that they have no skill \
+     like that, and ask nothing: never which one they mean.";
 
 /// The note a heard line of the person's is told at `now` of what the lamp
 /// made and turned in their conversation (`events`, oldest first): none
-/// when nothing was.
+/// when nothing was. Which of these a line means is the model's to judge:
+/// one that fits is acted on, more than one asked once ([`ASK_WHICH`],
+/// only when it names more than one), none said plainly ([`NONE_FITS`]).
 pub fn note(events: &[Event], now: Instant) -> Option<String> {
     let newest = newest(events);
     if newest.is_empty() {
@@ -260,31 +258,31 @@ pub fn note(events: &[Event], now: Instant) -> Option<String> {
         .take(SAID_MOST)
         .map(|event| format!("{} ({})", what(event), ago(event.at, now)))
         .collect();
-    let made = made(events);
-    let which = if made.len() > 1 {
-        format!(" {}", ask_which(&made))
+    let which = if newest.len() > 1 {
+        format!(" {ASK_WHICH}")
     } else {
         String::new()
     };
     Some(format!(
         "(For you to know, not to answer: in this conversation with them, newest first, the \
-         lamp {}. When their line means a skill of theirs without saying its name, it means the \
-         newest of these that fits what they ask, as if they had said that name: to turn it \
-         off, turn it on or remove it, call make_skill with turn_off, turn_on or remove and \
-         that name; to use or run it, call it as for any skill, by its own function, by \
-         use_skill with that name, or by make_skill with run and that name, never a second make \
-         of it. Never list their skills for it.{which} When their line means a \
-         skill of theirs and none of these fits, ask which skill they mean. A line about \
-         anything else, the light, music or a timer, is answered as it is: no question about \
-         skills, and no skill turned on for it.)",
+         lamp {}. When their line means a skill of theirs without saying its name, judge which \
+         of these fits what they ask. If only one fits, it means that one, as if they had said \
+         its name: act on it and never ask. To turn it off, turn it on or remove it, call \
+         make_skill with turn_off, turn_on or remove and that name; to use or run it, call it as \
+         for any skill, by its own function, by use_skill with that name, or by make_skill with \
+         run and that name, never a second make of it. Never list their skills for it.{which} \
+         {NONE_FITS} A line about anything else, the light, music or a timer, is answered as it \
+         is: no question about skills, and no skill turned on for it.)",
         done.join("; ")
     ))
 }
 
 /// A turn's answer `told` with its candidates (`made_turn::CANDIDATES`),
 /// those made or turned in the conversation (`events`, oldest first)
-/// first, each marked [`IN_THIS_CONVERSATION`], and the model told so; with
-/// nothing made or turned in it, told to ask rather than pick one. Any
+/// first, each marked [`IN_THIS_CONVERSATION`], and the model told so: one
+/// that fits is called, more than one marked asked once ([`ASK_WHICH`]),
+/// none said plainly ([`NONE_FITS`]); with nothing made or turned in it,
+/// told they have none like that, never a question and never a pick. Any
 /// other answer as it is.
 pub fn candidates(mut told: Value, events: &[Event], now: Instant) -> Value {
     let Some(offered) = told.get_mut(CANDIDATES).and_then(Value::as_array_mut) else {
@@ -311,25 +309,26 @@ pub fn candidates(mut told: Value, events: &[Event], now: Instant) -> Value {
             first.push(candidate);
         }
     }
-    let marked = !first.is_empty();
+    let marked = first.len();
     first.append(offered);
     *offered = first;
-    let added = if marked {
-        let made = made(events);
-        let which = if made.len() > 1 {
-            format!(" {}", ask_which(&made))
+    let added = if marked > 0 {
+        let which = if marked > 1 {
+            format!(" {ASK_WHICH}")
         } else {
             String::new()
         };
         format!(
             " Those with {IN_THIS_CONVERSATION} were made or turned off or on in this \
-             conversation, newest first: when their line means one of those without saying its \
-             name, choose the newest that fits.{which}"
+             conversation, newest first. When their line means one of those without saying its \
+             name: if only one fits, it is that one: call again with its name and never ask.\
+             {which} {NONE_FITS}"
         )
     } else if newest.is_empty() {
         " None of theirs was made, turned off or turned on in this conversation: when their \
-         line means one made or changed just now without saying its name, ask which skill they \
-         mean and call nothing; never choose one for them."
+         line means one made or changed just now without saying its name, they have none like \
+         that: say so plainly, in a few words, ask nothing and call nothing; never choose one \
+         for them."
             .to_owned()
     } else {
         String::new()
@@ -562,7 +561,7 @@ mod tests {
         );
         assert!(
             told.contains(
-                "to turn it off, turn it on or remove it, call make_skill with turn_off, turn_on \
+                "To turn it off, turn it on or remove it, call make_skill with turn_off, turn_on \
                  or remove and that name"
             ),
             "{told}"
@@ -576,11 +575,14 @@ mod tests {
             "{told}"
         );
         assert!(told.contains("Never list their skills"), "{told}");
-        // "It" about the light is no skill's: never a question about skills.
+        // One told: acted on, never asked; none fitting is said plainly.
         assert!(
-            told.contains("When their line means a skill of theirs and none of these fits"),
+            told.contains("If only one fits, it means that one") && told.contains("never ask"),
             "{told}"
         );
+        assert!(!told.contains(ASK_WHICH), "{told}");
+        assert!(told.contains(NONE_FITS), "{told}");
+        // "It" about the light is no skill's: never a question about skills.
         assert!(
             told.contains(
                 "A line about anything else, the light, music or a timer, is answered as it is"
@@ -653,7 +655,11 @@ mod tests {
                 .all(|one| one.get(IN_THIS_CONVERSATION).is_none())
         );
         let next = answer["next"].as_str().unwrap();
-        assert!(next.contains("choose the newest that fits"), "{next}");
+        assert!(
+            next.contains("if only one fits, it is that one: call again with its name"),
+            "{next}"
+        );
+        assert!(!next.contains(ASK_WHICH), "{next}");
         // Its name turns it on.
         let mut helper = Vec::new();
         let answer = made_turn::asked(
@@ -675,9 +681,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Two makes in the conversation: the note names both and asks which,
-    /// naming both, when a line means one made without saying which; a
-    /// turn's candidates say the same.
+    /// Two makes in the conversation: the note names both and, when both
+    /// fit, asks once, naming them so one word answers it; a turn's
+    /// candidates say the same.
     #[test]
     fn two_makes_in_the_conversation_ask_which_naming_both() {
         let now = Instant::now();
@@ -695,8 +701,9 @@ mod tests {
             ),
             "{told}"
         );
+        assert!(told.contains(ASK_WHICH), "{told}");
         assert!(
-            told.contains("ask once which they mean, naming them (daily stretch reminder or water reminder), and call nothing"),
+            told.contains("\"The water one or the stretch one?\""),
             "{told}"
         );
         let answer = json!({
@@ -720,15 +727,14 @@ mod tests {
             ["daily stretch reminder", "water reminder", "coffee time"]
         );
         let next = answer["next"].as_str().unwrap();
-        assert!(
-            next.contains("naming them (daily stretch reminder or water reminder)"),
-            "{next}"
-        );
+        assert!(next.contains(ASK_WHICH), "{next}");
+        assert!(next.contains(NONE_FITS), "{next}");
     }
 
     /// No make in the conversation: nothing is told, and a turn that finds
-    /// none by the name is told to ask which they mean, never to pick one
-    /// (the newest of theirs is never a guess at "the one you just made").
+    /// none by the name is told they have none like that, said plainly,
+    /// never a question and never a pick (the newest of theirs is never a
+    /// guess at "the one you just made").
     #[test]
     fn no_make_in_the_conversation_asks_and_never_guesses() {
         let (root, keeping) = keeping("just-made-none");
@@ -754,11 +760,150 @@ mod tests {
             "{next}"
         );
         assert!(
-            next.contains("ask which skill they mean and call nothing"),
+            next.contains(
+                "they have none like that: say so plainly, in a few words, ask nothing and call \
+                 nothing"
+            ),
             "{next}"
         );
         assert!(next.contains("never choose one for them"), "{next}");
+        assert!(!next.contains("ask which"), "{next}");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The candidates of a turn whose name found none: water reminder,
+    /// daily stretch reminder and coffee time, as `made_turn` offers them.
+    fn offered_three() -> Value {
+        json!({
+            "error": crate::made_remove::NO_MADE,
+            CANDIDATES: [
+                {"name": "coffee time"},
+                {"name": "water reminder"},
+                {"name": "daily stretch reminder"}
+            ],
+            "next": "No skill they made or added has that name."
+        })
+    }
+
+    /// The first builder's ruling on #7715, 23:14 (a): more than one that
+    /// fits is asked once, naming them so one word answers it. A make of
+    /// water reminder and a turn off of daily stretch reminder (one made,
+    /// two told) are both named, and the question is told once, in the note
+    /// and in a turn's candidates.
+    #[test]
+    fn more_than_one_fitting_is_asked_once_naming_them_for_a_one_word_answer() {
+        let now = Instant::now();
+        kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
+        let off =
+            json!({ TURN_OFF: "daily-stretch-reminder", "off": true, "next": "Say it is off." });
+        let _ = kept_from_turn(off, Some(OWNER), now + Duration::from_secs(30));
+        let told = heard(OWNER, now + Duration::from_secs(40)).unwrap();
+        assert!(
+            told.contains(
+                "the lamp turned daily stretch reminder off (just now); made water reminder (just \
+                 now)"
+            ),
+            "{told}"
+        );
+        assert_eq!(told.matches(ASK_WHICH).count(), 1, "{told}");
+        assert!(ASK_WHICH.contains("ask once"), "{ASK_WHICH}");
+        assert!(
+            ASK_WHICH.contains("naming only those that fit so one word answers it"),
+            "{ASK_WHICH}"
+        );
+        assert!(
+            ASK_WHICH.contains("\"The water one or the stretch one?\""),
+            "{ASK_WHICH}"
+        );
+        assert!(ASK_WHICH.contains("call nothing"), "{ASK_WHICH}");
+        // Still one that fits is acted on, and none said plainly.
+        assert!(told.contains("If only one fits"), "{told}");
+        assert!(told.contains(NONE_FITS), "{told}");
+        let answer = kept_from_turn(offered_three(), Some(OWNER), now + Duration::from_secs(41));
+        let marked = answer[CANDIDATES]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|one| one.get(IN_THIS_CONVERSATION).is_some())
+            .count();
+        assert_eq!(marked, 2, "{answer}");
+        let next = answer["next"].as_str().unwrap();
+        assert_eq!(next.matches(ASK_WHICH).count(), 1, "{next}");
+        assert!(next.contains(NONE_FITS), "{next}");
+    }
+
+    /// The same ruling (b): with only one candidate, it isn't asked: that
+    /// one is acted on. One make told: the note says to act on the one that
+    /// fits and never ask, with no question; a turn's candidates with that
+    /// one marked say to call it with its name, never ask.
+    #[test]
+    fn one_candidate_is_acted_on_never_asked() {
+        let now = Instant::now();
+        kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
+        let told = heard(OWNER, now + Duration::from_secs(5)).unwrap();
+        assert!(
+            told.contains(
+                "If only one fits, it means that one, as if they had said its name: act on it and \
+                 never ask."
+            ),
+            "{told}"
+        );
+        assert!(!told.contains(ASK_WHICH), "{told}");
+        assert!(!told.contains("ask once"), "{told}");
+        assert!(!told.contains("ask which"), "{told}");
+        let answer = kept_from_turn(offered_three(), Some(OWNER), now + Duration::from_secs(6));
+        let offered = answer[CANDIDATES].as_array().unwrap();
+        assert_eq!(offered[0]["name"], "water reminder", "{answer}");
+        assert!(
+            offered[1..]
+                .iter()
+                .all(|one| one.get(IN_THIS_CONVERSATION).is_none())
+        );
+        let next = answer["next"].as_str().unwrap();
+        assert!(
+            next.contains(
+                "if only one fits, it is that one: call again with its name and never ask."
+            ),
+            "{next}"
+        );
+        assert!(!next.contains(ASK_WHICH), "{next}");
+        assert!(!next.contains("ask which"), "{next}");
+    }
+
+    /// The same ruling (c): if none fits, the lamp says it has no skill like
+    /// that, never "which". The note and a turn's marked candidates tell it
+    /// plainly, asking nothing; with nothing made or turned in the
+    /// conversation, a turn's candidates say they have none like that.
+    #[test]
+    fn none_fitting_says_no_skill_like_that_never_which() {
+        assert!(
+            NONE_FITS.contains("say plainly, in a few words, that they have no skill like that"),
+            "{NONE_FITS}"
+        );
+        assert!(NONE_FITS.contains("ask nothing"), "{NONE_FITS}");
+        let now = Instant::now();
+        // Nothing made or turned: no note, and a turn's candidates say
+        // they have none like that, no question.
+        assert_eq!(heard(OWNER, now), None);
+        let answer = kept_from_turn(offered_three(), Some(OWNER), now);
+        let next = answer["next"].as_str().unwrap();
+        assert!(
+            next.contains("they have none like that: say so plainly"),
+            "{next}"
+        );
+        assert!(next.contains("ask nothing and call nothing"), "{next}");
+        assert!(!next.contains("ask which"), "{next}");
+        assert!(!next.contains(ASK_WHICH), "{next}");
+        // One made: the note and the marked candidates say none fitting
+        // is said plainly.
+        kept_from_make(&made_told("water-reminder"), Some(OWNER), now);
+        let told = heard(OWNER, now + Duration::from_secs(5)).unwrap();
+        assert!(told.contains(NONE_FITS), "{told}");
+        assert!(!told.contains("ask which"), "{told}");
+        let answer = kept_from_turn(offered_three(), Some(OWNER), now + Duration::from_secs(6));
+        let next = answer["next"].as_str().unwrap();
+        assert!(next.contains(NONE_FITS), "{next}");
+        assert!(!next.contains("ask which"), "{next}");
     }
 
     /// Another person's make never counts for the owner: kept for them
