@@ -3524,7 +3524,11 @@ cả hai người viết.
     một phút vẫn được chạy tiếp (`long_make::to_agent`, `long_make::cut`),
     nên đi qua cùng cổng, không bao giờ được bật hay nói qua dịch vụ say mà
     không có cổng (P2 của El trên #7774); phản ứng nhanh của DeepSeek giữ
-    đường lượt bị cắt cũ. Mỗi lần một: khi một lần đang chạy tiếp (dấu của
+    đường lượt bị cắt cũ. Dấu `making` của nó được ghi ngay lúc cắt, bởi
+    một chốt mà lượt đang chờ giữ (`long_make::CutAtDrop`), không chỉ khi
+    lần tạo kết thúc, nên tắt mic, ngủ hay worker khởi động lại ở giữa thì
+    nó được báo là chưa xong, không bao giờ bị mất mà chưa báo (P3 của
+    Heron trên #7774). Mỗi lần một: khi một lần đang chạy tiếp (dấu của
     nó trong `long-make.json` cạnh `made.json` ghi `making`), yêu cầu tạo
     mới được trả lời "I'm still making your <name> skill." (tên bản nháp
     của DeepSeek, hoặc "your skill"), không tạo gì. Tin của mỗi lần tạo có
@@ -3546,15 +3550,19 @@ cả hai người viết.
     `task_news::quiet_for_news`), không trong giờ yên lặng
     (`run_write_yes::quiet_hours_now`), có người ở đèn; phòng không bận,
     không nợ câu nào. Hôm nay họ không quay lại thì chờ lần sau, bao lâu
-    cũng được. Mỗi tin được đưa ra nhiều nhất ba lần
+    cũng được. Khi vẫn đang chờ một câu đồng ý (phần đọc lại của một lần
+    báo trước, hoặc của một lần tạo nhanh, `skill_write_yes::awaited`) hay
+    câu hỏi trùng vẫn đang chờ lựa chọn (`made_clash::awaited`), báo lúc đó
+    sẽ thay chỗ lần chờ ấy và làm skill của nó kẹt ở trạng thái tắt, nên
+    worker không nói gì, giữ dấu và trả lại lượt đưa ra, và tin được báo ở
+    dịp sau (P2 của Heron trên #7774). Mỗi tin được đưa ra nhiều nhất ba lần
     (`long_make::MOST_OFFERS`, cách nhau ít nhất hai phút, đếm trong
     `long-make-offers.json` nên khởi động lại không đếm lại từ đầu); sau đó để lại
     cho `ready_untold` trong danh sách của app và câu "Skill của tôi xong
     chưa?", skill vẫn tắt. Worker xử lý ghi chú của lượt đó
     (`long_make::told_here`): một câu, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), không đọc lại
-    và không hỏi đồng ý, có code riêng hay không (first builder, 18/11
-    18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
+    Say 'remove it' to undo." (`long_make::ready_on_line`), không hỏi đồng
+    ý (first builder, 18/11 18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
     câu của lần tạo xong. Skill có code khi đèn không chạy code của skill
     (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
     bao giờ nói là bật. Skill có code vẫn cần câu đồng ý như lần tạo xong
@@ -3595,7 +3603,12 @@ cả hai người viết.
     không tạo được được nói là lỗi của agent. Skill đã xong mà bị xóa trong
     app trước khi báo (đã xong, hoặc không bật được) thì dấu của nó được bỏ
     lặng lẽ, không bao giờ nói
-    "couldn't finish".
+    "couldn't finish". Giới hạn đã biết: sau khi worker khởi động lại, lượt
+    chạy của lần tạo trong lamp-tasks không bị dừng, và có thể tiếp tục tới
+    `long_make::WRITE_WITHIN` (300 giây) chờ câu trả lời, rồi câu trả lời
+    đó bị bỏ; trong lúc đó lamp-tasks từ chối lần tạo mới với `busy`, nên
+    yêu cầu lại ngay sau "I couldn't finish" có thể không được cho tới khi
+    nó kết thúc.
   - **"Skill của tôi xong chưa?"** Danh sách skill của người dùng trong
     `make_skill` (`made: true`, mô tả của nó nêu câu hỏi này) mang
     `long_make`: `still_making` với `minutes_so_far`, `made`,

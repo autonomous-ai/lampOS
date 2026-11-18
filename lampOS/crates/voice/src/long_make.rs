@@ -18,12 +18,16 @@
 //! - **Done:** the same checks and repairs as any agent make. A finished
 //!   long make is kept but stays off, `ready_untold` on its `made.json`
 //!   entry (what the app reads of made skills), until its person has heard
-//!   one line, [`ready_on_line`] with its undo, never read back and no yes
-//!   asked (the first builder, 18 Nov 18:41), as the lamp's own turn ([`Tells`]):
-//!   their face seen alone (or the private room, as a read-back is held),
-//!   not mid-conversation, never in the quiet hours, never to an empty room
-//!   ([`may_tell`]), offered at most [`MOST_OFFERS`] times, then left to
-//!   `ready_untold` in the app's list, still off. Only once
+//!   its telling, as the lamp's own turn ([`Tells`]): one line,
+//!   [`ready_on_line`] with its undo and no yes asked (the first builder, 18
+//!   Nov 18:41), or, for code that keeps its yes, its read-back (below).
+//!   Told only with their face seen alone (or the private room, as a
+//!   read-back is held), not mid-conversation, never in the quiet hours,
+//!   never to an empty room ([`may_tell`]), and never while a yes or a
+//!   clash's choice is still awaited (Heron's P2 on #7774: it would take
+//!   that wait's place); then it says nothing, its offer given back, and is
+//!   told at a later chance ([`told`]). Offered at most [`MOST_OFFERS`]
+//!   times, then left to `ready_untold` in the app's list, still off. Only once
 //!   that turn was played through ([`heard_through`], [`heard`]) does it go
 //!   on as a finished make does; cut, it stays off and is told again. Not
 //!   put on then, its person is told why ([`not_on_line`]). One with code of
@@ -344,6 +348,9 @@ fn write_all(directory: &Path, marks: &[State]) {
 
 /// As the second route's worker starts: a make marked `making` was cut by
 /// the restart, and its person is told so once ([`not_finished_line`]).
+/// A known limit: its run in lamp-tasks isn't stopped, and may go on up to
+/// [`WRITE_WITHIN`] for an answer thrown away, lamp-tasks refusing a new
+/// make `busy` until then (`docs/skills.md`).
 pub fn after_start(directory: &Path, now_ms: u64) {
     crate::made_skill::index_locked(directory, || after_start_in(directory, now_ms));
 }
@@ -445,6 +452,43 @@ pub fn cut(request: u64, now_ms: u64) -> bool {
         .iter()
         .any(|(of, phase)| *of == request && matches!(phase, Phase::Running { agent: true, .. }));
     agent && let_go(request, now_ms)
+}
+
+/// Held by the voice turn waiting on `request`'s make: dropped before
+/// [`Self::answered`], the turn was cut, and the make is let run on at
+/// once ([`cut`]), its `making` mark written then, not only when it ends;
+/// so a mute, sleep or worker restart before it ends tells it as not
+/// finished ([`after_start`]), never loses it untold. A make not handed to
+/// the agent yet goes as before (its end checks the cut again).
+pub struct CutAtDrop {
+    request: u64,
+    waiting: bool,
+}
+
+impl CutAtDrop {
+    /// The turn waits on `request`'s make.
+    pub fn new(request: u64) -> Self {
+        Self {
+            request,
+            waiting: true,
+        }
+    }
+
+    /// The turn took the make's answer: no cut.
+    pub fn answered(mut self) {
+        self.waiting = false;
+    }
+}
+
+impl Drop for CutAtDrop {
+    fn drop(&mut self) {
+        if self.waiting && cut(self.request, crate::app_make::now_unix_ms()) {
+            eprintln!(
+                "lamp-voice: request {}: a long make's turn was cut before its minute: it runs on, marked making",
+                self.request
+            );
+        }
+    }
 }
 
 /// The voice turn waiting on `request`'s make lets it run on, at `now_ms`:
@@ -622,7 +666,8 @@ pub fn status(directory: &Path, now_ms: u64, names: bool) -> Value {
 
 /// What the model is told to do with [`status`].
 pub const STATUS_NEXT: &str = "If they asked whether a skill they asked for is ready, answer \
-     truthfully from long_make: made and ready (it is told in a moment and goes on then), still \
+     truthfully from long_make: made and ready (it is told in a moment and goes on then, or, if \
+     it needs their yes, is read back for it), still \
      being made (for how long so far), made but not on (they're told why in a moment), or not \
      made.";
 
@@ -664,6 +709,23 @@ fn offer_counted(directory: &Path, key: &str, marked: &[String]) -> u32 {
         write_offers(directory, &offers);
         times
     })
+}
+
+/// The offer of the telling `key` in `directory` given back, not said
+/// ([`told`] while a yes or a clash's choice is awaited): it counts as
+/// never offered.
+fn offer_given_back(directory: &Path, key: &str) {
+    crate::made_skill::index_locked(directory, || {
+        let mut offers = offers(directory);
+        let Some(times) = offers.get_mut(key) else {
+            return;
+        };
+        *times = times.saturating_sub(1);
+        if *times == 0 {
+            offers.remove(key);
+        }
+        write_offers(directory, &offers);
+    });
 }
 
 /// `offers` kept as [`OFFERS_FILE`] in `directory`, written whole and moved
@@ -853,8 +915,9 @@ fn ready_on_with(name: &str, also: &str) -> String {
 /// go on with no yes (`LAMP_MADE_CODE_ON_AT_ONCE`,
 /// [`crate::made_skill::code_goes_on_at_once`], by the path a yes puts it
 /// on by, `make_skill_local::code_on_at_once`), exactly as a finished make
-/// does. One that sends, or with the camera, the microphone or hearing,
-/// keeps its yes (Twelve's P2 on #7774): never put on here.
+/// does. One that keeps its yes (Twelve's P2 on #7774: every skill with
+/// code while `LAMP_MADE_CODE_ON_AT_ONCE` is off; one that sends, or with
+/// the camera, the microphone or hearing, always) is never put on here.
 fn goes_on_once_heard(
     keeping: &crate::made_skill::Keeping,
     made: &crate::made_skill::Made,
@@ -870,13 +933,17 @@ fn goes_on_once_heard(
 /// on: a long make's telling ([`Tells::next`]), the model given what to
 /// say; nothing goes on and nothing is cleared here, only once the turn was
 /// heard whole ([`heard`]). Its gate holds the owner seen alone
-/// ([`may_tell`]). Ready: one line, [`ready_on_line`], never read back and
-/// no yes asked, code of its own or not (the first builder, 18 Nov 18:41),
-/// with the link ask for a service not linked yet (`linked`, as a finished
-/// make is told). With code while this lamp runs none, or clashing with a
-/// skill on the lamp, it isn't said on: off and why, or the clash's
-/// question asked ([`crate::made_clash::asked`]) as a finished make's is.
-/// Not made, or not put on: its line. Any other text as it is.
+/// ([`may_tell`]). Ready: one line, [`ready_on_line`], no yes asked (the
+/// first builder, 18 Nov 18:41), with the link ask for a service not
+/// linked yet (`linked`, as a finished make is told). With code that keeps
+/// its yes ([`goes_on_once_heard`]), read back as an app make's is and its
+/// yes awaited, never said on. With code while this lamp runs none, or
+/// clashing with a skill on the lamp, it isn't said on: off and why, or the
+/// clash's question asked ([`crate::made_clash::asked`]) as a finished
+/// make's is. Not made, or not put on: its line. While a yes or a clash's
+/// choice is still awaited (Heron's P2 on #7774), nothing: a telling would
+/// replace that wait, so it says nothing, its mark kept and its offer given
+/// back, to be told at a later chance. Any other text as it is.
 pub fn told(
     keeping: &crate::made_skill::Keeping,
     request: u64,
@@ -895,6 +962,19 @@ pub fn told(
         // Told already, or another's: nothing more to say.
         return "(Nobody has spoken. Say nothing, and call nothing.)".to_owned();
     };
+    // A yes still awaited (an earlier telling's say-back, or a quick
+    // make's) or a clash's choice still asked: a telling now would take its
+    // place, the skill it waits for stranded off (Heron's P2 on #7774). It
+    // says nothing, its mark kept and its offer given back, and is told at
+    // a later chance; a silent turn is never heard through, so nothing is
+    // taken.
+    if crate::skill_write_yes::awaited(now) || crate::made_clash::awaited(now) {
+        eprintln!(
+            "lamp-voice: request {request}: a long make's news waits: a yes or a clash's choice is still awaited"
+        );
+        offer_given_back(directory, asked);
+        return "(Nobody has spoken. Say nothing, and call nothing.)".to_owned();
+    }
     match state {
         State::Made { sha256, .. } => {
             let Some(made) = crate::made_skill::kept_by_sha256(directory, &sha256) else {
