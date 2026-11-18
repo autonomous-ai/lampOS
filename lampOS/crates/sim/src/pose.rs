@@ -247,7 +247,27 @@ mod tests {
             (from.0 - 130.0).abs() < 6.0 && (from.1 - 94.8).abs() < 6.0,
             "{from:?}"
         );
-        // The head's pitch and yaw signs are the model's (a CAD guess until a photo of
-        // a lamp checks them): no direction is asserted for them here.
+        // The yaw's sign is the model's (a CAD guess until a photo of a lamp checks it):
+        // no direction is asserted for it here. The pitch's is pinned by the next test.
+    }
+
+    #[test]
+    fn more_pitch_counts_look_further_down() {
+        // lamp-52e6 folded: only the head's pitch moved, and the head met the base at
+        // 2,010 counts going down and rose free to 1,474 going up (docs/body.md, 14 Oct):
+        // more counts is head down. So the camera's axis (the world's up component of
+        // the camera's forward) falls as the pitch's counts grow, by the degrees of the counts.
+        let model = Model::shipped();
+        let b = camera_in_head();
+        let elevation = |pitch: f64| {
+            let mut now = STAND;
+            now[4] = pitch;
+            let forward = mat_mul(&model.head(now), &b);
+            forward[1][2].clamp(-1.0, 1.0).asin().to_degrees()
+        };
+        let (up, level, down) = (elevation(1474.0), elevation(STAND[4]), elevation(2010.0));
+        assert!(up > level && level > down, "{up} {level} {down}");
+        let turn = (2010.0 - STAND[4]) * 360.0 / COUNTS_A_TURN;
+        assert!((level - down - turn).abs() < 3.0, "{level} {down} {turn}");
     }
 }
