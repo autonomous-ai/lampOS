@@ -465,6 +465,10 @@ struct Inner {
     /// The pane to be removed for good, and why (a sign-out): done at the
     /// next [`OneSession::tend`], which has Harness to close it with.
     drop_due: Option<String>,
+    /// The due removal's close is `--now`: its session may still be
+    /// working (a turn cancelled, cut at its deadline or unanswered), and
+    /// Harness refuses a plain close then (#7245).
+    drop_now: bool,
     /// A removal under way ([`OneSession::drop_pane_as`]): the pane taken,
     /// its close, its OpenClaw session's delete and its token's removal
     /// not all done yet.
@@ -1090,12 +1094,15 @@ impl OneSession {
             && let Some(file) = &self.kept_token
             && let Some(kind) = engine_named(&engine)
         {
-            if let Err(code) = harness.close_kept(&name_for(kind), file, false) {
+            let now = std::mem::take(&mut self.lock().drop_now);
+            if let Err(code) = harness.close_kept(&name_for(kind), file, now) {
                 eprintln!(
                     "tasks: one session: the kept session {} not closed: {code}; tried again next",
                     short(&agent)
                 );
-                self.lock().drop_due = Some(why.to_owned());
+                let mut inner = self.lock();
+                inner.drop_due = Some(why.to_owned());
+                inner.drop_now |= now;
                 return;
             }
             self.kept_closed(&agent, kind);
@@ -1348,6 +1355,7 @@ impl OneSession {
         if inner.held_spoken && inner.holder.as_deref() == Some(id) && inner.closing_for.is_none() {
             inner.closing_for = Some(id.to_owned());
             inner.drop_due = Some(format!("{id}'s turn ended unanswered"));
+            inner.drop_now = true;
             eprintln!("tasks: one session: {id}'s turn ended unanswered; the pane is closed next");
         }
     }
@@ -2707,7 +2715,19 @@ impl Turn<'_> {
                 let closed = harness
                     .close_kept(&name, &token, true)
                     .map(|()| Closed::Closed);
-                self.one.kept_closed(agent, EngineKind::Openclaw);
+                match &closed {
+                    Ok(_) => self.one.kept_closed(agent, EngineKind::Openclaw),
+                    // Not closed (Harness busy, or no answer): the record
+                    // and the conversation are kept, and the close `--now`
+                    // is tried again at the next look as a due removal
+                    // (First's and El's P2 on #7737), so the next make
+                    // never resumes a session still working.
+                    Err(_) => {
+                        let mut inner = self.one.lock();
+                        inner.drop_due = Some(format!("{}'s turn was cancelled", self.id));
+                        inner.drop_now = true;
+                    }
+                }
                 closed
             }
             None => {
