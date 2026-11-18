@@ -129,6 +129,9 @@ pub trait Lamp {
     fn devices(&mut self, _now_ms: u64, _connected: bool) -> crate::devices::Polled {
         crate::devices::Polled::default()
     }
+    /// A desk or Hydrate ask the client would not take (its queue was full):
+    /// answered `busy` at once.
+    fn devices_unsent(&mut self, _req_id: &str) {}
     /// One `devices.*` kind from the cloud: whether the bridge took it
     /// (always `false` when off, so the kind is refused as any unknown one).
     fn devices_down(&mut self, _kind: &str, _data: &Value, _now_ms: u64) -> bool {

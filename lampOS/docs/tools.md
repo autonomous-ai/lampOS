@@ -586,6 +586,30 @@ yours."; no answer, "I couldn't reach the desk." or "I'm not online right
 now, so I can't reach your devices." The Hydrate never speaks unasked: these
 functions answer a question and the sips (`devices/event`) are not told.
 
+
+### `desk_stop`, the stop (#7470 S3a)
+
+Beside the two reads, with `LAMP_DEVICES=on`: `desk_stop`, no argument, which
+sends `Stop` to the desk at once. It needs no yes, no presence and no
+person's own words: stopping a desk grants nothing. The desk is the one in
+flight, else the first desk of the kept list (so a stop is one round trip, the
+list read only when none is kept); it is told within 3 s: "Okay, I've told the
+desk to stop.", or "I can't stop that desk.", or, when the cloud did not say,
+"I couldn't reach the desk, so I'm not sure it stopped." (`ok` is that the
+stop was handed to the desk). It is the model's way to stop; the fast ways,
+in code, are below.
+
+**The touch guard.** A move in flight arms a guard (`arm_guard`, S3b calls it
+when a move's command goes; nothing in S3a does): it listens to `controls/touch`
+BEFORE the move goes, and any contact with the lamp (its head, its button),
+from Controls, enabled, valid and later than the arming, sends `Stop` on
+`devices/ask` straight away, once, and ends the guard; it also ends at its
+time (60 s) or when another stop was sent. Timed in a test on a real bus from
+the touch on the bus to the `Stop` on the bus: under 100 ms (the guard looks
+every 20 ms); lamp-cloud then sends it up (`stop` goes first, past every cap,
+tested under 100 ms to the send); the cloud's and the desk's own legs are
+measured only on a real desk (the row on lamp-0c89).
+
 ## `reports_stop`, a system function
 
 With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,

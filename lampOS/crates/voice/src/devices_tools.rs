@@ -20,8 +20,8 @@
 //! never made up.
 use lamp_gemini::Tool;
 use lamp_msgs::{
-    DeviceAnswer, DeviceAsk, DeviceRow, DeviceState, DeviceStatus, DeviceType, DevicesAnswer,
-    DevicesAsk, NoAnswer,
+    DeviceAnswer, DeviceAsk, DeviceCommand, DeviceRow, DeviceState, DeviceStatus, DeviceType,
+    DevicesAnswer, DevicesAsk, NoAnswer,
 };
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
@@ -34,6 +34,13 @@ pub const FLAG: &str = "--devices";
 pub const DESK: &str = "desk_height";
 /// How much the person has drunk today.
 pub const WATER: &str = "water_today";
+/// Stops the desk (#7470 S3a): no argument, no yes, from anyone.
+pub const STOP: &str = "desk_stop";
+/// How long a stop waits for the cloud's word on it.
+pub const STOP_WITHIN: Duration = Duration::from_secs(3);
+/// How long a guard watches for a touch after a move: a desk goes a few
+/// centimetres a second over at most 72 cm.
+pub const GUARD_FOR: Duration = Duration::from_secs(60);
 /// How long a whole call waits for the cloud, every round together (the
 /// list, then the state): the cloud usually answers in about a second, and
 /// `lamp-cloud` itself gives it 8 s, so the person is never made to wait
@@ -82,12 +89,27 @@ pub fn read_of(name: &str) -> Option<Read> {
 }
 
 pub fn is_tool(name: &str) -> bool {
-    read_of(name).is_some()
+    read_of(name).is_some() || is_stop_tool(name)
 }
 
-/// The two functions, asked about only when the person asks.
+pub fn is_stop_tool(name: &str) -> bool {
+    name == STOP
+}
+
+/// The functions: the reads, asked about only when the person asks, and
+/// the stop.
 pub fn tools() -> Vec<Tool> {
     vec![
+        Tool {
+            name: STOP.into(),
+            description: "Call this AT ONCE when the person says stop, or asks you to stop \
+                          the standing desk, while it is moving. It needs no yes and no \
+                          reason; say what it gives you as \"say\", in a few words, in their \
+                          language. It only stops the desk."
+                .into(),
+            parameters: None,
+            silent: false,
+        },
         Tool {
             name: DESK.into(),
             description: "Call this only when the person asks how high their standing desk is. \
@@ -369,6 +391,165 @@ fn volume(ml: u32) -> String {
         };
         format!("{litres} {}", if tenths == 10 { "litre" } else { "litres" })
     }
+}
+
+/// What the person hears of a stop.
+pub const STOPPED: &str = "Okay, I've told the desk to stop.";
+pub const STOP_REFUSED: &str = "I can't stop that desk.";
+pub const STOP_NOT_SURE: &str = "I couldn't reach the desk, so I'm not sure it stopped.";
+
+/// A desk move in flight: the desk, and until when a touch stops it. Set
+/// after a move's `ok` (S3b), cleared by a stop.
+#[derive(Clone, Debug)]
+pub struct Moving {
+    pub device_id: String,
+    pub until: Instant,
+}
+
+static MOVING: std::sync::Mutex<Option<Moving>> = std::sync::Mutex::new(None);
+
+/// The move in flight, if any and not past its time.
+pub fn moving_now() -> Option<Moving> {
+    MOVING
+        .lock()
+        .ok()
+        .and_then(|moving| moving.clone())
+        .filter(|moving| Instant::now() < moving.until)
+}
+
+fn set_moving(moving: Option<Moving>) {
+    if let Ok(mut kept) = MOVING.lock() {
+        *kept = moving;
+    }
+}
+
+/// A stop: no yes, no presence, from anyone, asked at once. The desk is the
+/// one in flight, else the list's first desk (the kept list: no round trip).
+/// Told as it was sent, with the cloud's word if it comes within `within`:
+/// `ok` is that the stop was handed to the desk, any other end is "not sure".
+pub fn run_stop(link: &mut impl Link, cache: &mut Cache, within: Duration) -> (Value, bool) {
+    let deadline = Instant::now() + within;
+    let left = || deadline.saturating_duration_since(Instant::now());
+    let device_id = match moving_now() {
+        Some(moving) => moving.device_id,
+        None => {
+            let rows: Vec<DeviceRow> = match cache.fresh(Instant::now()) {
+                Some(rows) => rows.to_vec(),
+                None => match list(link, left()) {
+                    Ok(rows) => {
+                        cache.rows = Some((Instant::now(), rows.clone()));
+                        rows
+                    }
+                    Err(told) => return (told, false),
+                },
+            };
+            match rows.iter().find(|row| row.device_type == DeviceType::Desk) {
+                Some(desk) => desk.device_id.clone(),
+                None => return (json!({"ok": true, "say": NO_DESK}), true),
+            }
+        }
+    };
+    // Whatever comes of the answer, a desk told to stop is no move in flight.
+    set_moving(None);
+    let ask = DevicesAsk {
+        req_id: req_id(),
+        ask: DeviceAsk::Command {
+            device_id: device_id.clone(),
+            command: DeviceCommand::Stop,
+        },
+    };
+    let id = ask.req_id.clone();
+    let answers = link.ask(vec![ask], left());
+    match answers.into_iter().find(|answer| answer.req_id == id) {
+        Some(DevicesAnswer {
+            answer: DeviceAnswer::Command { status, .. },
+            ..
+        }) => match status {
+            DeviceStatus::Ok => (json!({"ok": true, "say": STOPPED}), true),
+            DeviceStatus::Refused => (json!({"error": STOP_REFUSED}), false),
+            DeviceStatus::Error => (json!({"error": STOP_NOT_SURE}), false),
+        },
+        Some(DevicesAnswer {
+            answer: DeviceAnswer::None {
+                why: NoAnswer::Away,
+            },
+            ..
+        }) => (json!({"error": AWAY}), false),
+        _ => (json!({"error": STOP_NOT_SURE}), false),
+    }
+}
+
+/// Arms the touch guard on the lamp's own bus for a move of `device_id` that
+/// is in flight until `until`: a touch of the lamp stops the desk (S3b calls
+/// this when a move's command goes).
+pub fn arm_guard(device_id: String, until: Instant) {
+    if let Ok(bus) = lamp_bus::Bus::from_environment() {
+        let _ = arm_guard_on(&bus, device_id, until);
+    }
+}
+
+/// [`arm_guard`] on `bus`: the touches are listened for and the stop's
+/// publisher made BEFORE this returns, so a touch right after is never
+/// missed; the watching is a thread of its own, joined by tests. A touch
+/// event (any contact, any source: the lamp's head, its button) from
+/// Controls, enabled, fresh and valid, sends `Stop` at once, once, and ends
+/// the guard. None if the bus cannot be listened to: then the move must not go.
+pub fn arm_guard_on(
+    bus: &lamp_bus::Bus,
+    device_id: String,
+    until: Instant,
+) -> Option<std::thread::JoinHandle<()>> {
+    let mut touches = bus
+        .subscribe_typed(
+            lamp_msgs::TouchEvent::TOPIC,
+            SOURCE,
+            lamp_msgs::TouchEvent::TYPE,
+        )
+        .ok()?;
+    let mut out = bus
+        .publisher_declared(DevicesAsk::TOPIC, &DevicesAsk::declaration(), SOURCE)
+        .ok()?;
+    let armed_us = lamp_ipc::monotonic_us();
+    set_moving(Some(Moving {
+        device_id: device_id.clone(),
+        until,
+    }));
+    Some(std::thread::spawn(move || {
+        while Instant::now() < until {
+            // Stopped by a spoken or model stop: the guard is no more.
+            if moving_now().is_none_or(|moving| moving.device_id != device_id) {
+                return;
+            }
+            let Ok(Some(message)) = touches.recv(Duration::from_millis(20)) else {
+                continue;
+            };
+            let Ok(event) = message.parse::<lamp_msgs::TouchEvent>() else {
+                continue;
+            };
+            if message.expired
+                || message.header.source != "controls"
+                || !event.enabled
+                || event.check().is_err()
+                || event.observed_us < armed_us
+            {
+                continue;
+            }
+            let stop = DevicesAsk {
+                req_id: req_id(),
+                ask: DeviceAsk::Command {
+                    device_id: device_id.clone(),
+                    command: DeviceCommand::Stop,
+                },
+            };
+            set_moving(None);
+            if out.publish_json(lamp_ipc::monotonic_us(), &stop).is_err() {
+                eprintln!("lamp-voice devices: a touch could not stop the desk on the bus");
+            } else {
+                eprintln!("lamp-voice devices: a touch stopped the desk");
+            }
+            return;
+        }
+    }))
 }
 
 #[cfg(test)]
