@@ -2955,10 +2955,22 @@ pub fn asks_lifted(text: &str) -> String {
     };
     let mut expected = table.clone();
     let mut moved = None;
-    for (_, value) in expected.iter_mut() {
-        if let Some(found) = value.as_table_mut().and_then(|inner| inner.remove("asks")) {
-            moved = Some(found);
-            break;
+    // Under a table, or under one step of an array of tables (`[[do]]`: a
+    // model that writes its asks last puts them in the last step).
+    'found: for (_, value) in expected.iter_mut() {
+        let tables: Vec<&mut toml::Table> = match value {
+            toml::Value::Table(inner) => vec![inner],
+            toml::Value::Array(items) => items
+                .iter_mut()
+                .filter_map(toml::Value::as_table_mut)
+                .collect(),
+            _ => Vec::new(),
+        };
+        for inner in tables {
+            if let Some(found) = inner.remove("asks") {
+                moved = Some(found);
+                break 'found;
+            }
         }
     }
     let Some(moved) = moved else {
@@ -15282,6 +15294,20 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(asks_lifted(&both), both);
         let none = UNDER.replace("asks = [\"send my test note\"]\n", "");
         assert_eq!(asks_lifted(&none), none);
+        // Written last, under the last `[[do]]` step (gentle-robin's read).
+        let last = "kind = \"installable\"\nversion = \"1.0.0\"\n[[do]]\nsay = { text = \"hi\" }\n\
+            asks = [\"send my note\"]\n";
+        let lifted_last = asks_lifted(last);
+        assert!(
+            lifted_last.starts_with("asks = [\"send my note\"]\n"),
+            "{lifted_last}"
+        );
+        assert!(top(&lifted_last)["do"][0].get("asks").is_none());
+        let string = UNDER.replace(
+            "asks = [\"send my test note\"]",
+            "asks = \"send my test note\"",
+        );
+        assert_eq!(asks_lifted(&string), string, "not a list: as it came");
         // Off: byte for byte.
         set_asks_here(Some(false));
         assert_eq!(asks_lifted(UNDER), UNDER);

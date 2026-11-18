@@ -391,7 +391,9 @@ const NOTES_RULES: &str = " To keep something for later (\"write it down\", \"ke
      reads it back (\"I'll keep three facts about apples, and read them to you when you say \
      'apple file'\"), never a file the person can open. The SDK above has \
      lamp.notes.set and lamp.notes.get, so a skill that writes something down and reads it \
-     back can be made.";
+     back can be made. A request to write or save it to a file, even \"a file I can open\", is \
+     made this way with a note, never answered cannot: the lamp has no screen, and its note is \
+     how the person keeps it.";
 
 /// With [`NOTES_RULES`] and [`made_skill::asks_on`] alone: a skill started
 /// by the person's own words is no hearing of the room (lamp-c0a4, 18 Nov
@@ -3671,6 +3673,9 @@ pub(crate) mod tests {
             // its transcript saying "the SDK has no notes call" and taking
             // "when I say fruit notes" for hearing the room.
             "The SDK above has lamp.notes.set and lamp.notes.get",
+            // lamp-c0a4, 18 Nov 10:04: OpenClaw answered `cannot: ...
+            // writing to a file you can open` for "a file I can open".
+            "made this way with a note, never answered cannot",
         ] {
             assert!(on.contains(part), "{part}: {on}");
         }
