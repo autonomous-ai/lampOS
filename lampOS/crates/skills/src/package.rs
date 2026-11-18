@@ -3235,11 +3235,17 @@ pub fn task_asks(
     let Some(step) = skill.task_step() else {
         return Ok(none);
     };
-    if let Some(why) = crate::task::origin_refuses(&folder, pushed) {
+    // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
+    // its brief is the lamp's own, checked byte for byte as it loaded.
+    if !skill.via_agent
+        && let Some(why) = crate::task::origin_refuses(&folder, pushed)
+    {
         return Err(why);
     }
     let sha256 = crate::task::folder_sha256(&folder)?;
-    let from = if pushed {
+    let from = if skill.via_agent {
+        crate::core_agent::FROM.to_owned()
+    } else if pushed {
         // "your computer NAME", or "your computer" when no name came with
         // the push: never "your computer a computer", which no read-back
         // says word for word, so no first yes was taken (#6715).

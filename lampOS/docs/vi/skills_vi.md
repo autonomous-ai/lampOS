@@ -3629,6 +3629,70 @@ từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng gi
 được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
 lời đồng ý của lần đầu.
 
+### Câu nói của một kỹ năng lõi qua agent của đèn (`LAMP_CORE_VIA_AGENT`, thử nghiệm, tắt)
+
+Dạng ở giữa của một lần tạo bằng giọng nói, cho các kỹ năng lõi nói một câu
+do model viết mỗi lần kích hoạt: lamp-skills giữ nguyên trigger, các guard
+`[[while]]`, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`, `wait`,
+`[budget]`, `[rest]` và `[stop]`, và chỉ câu nói của lần kích hoạt thành một
+`do.task` cho agent của đèn (Hermes hoặc OpenClaw, qua lamp-tasks). Tắt trừ khi
+`LAMP_CORE_VIA_AGENT=on`, trong lamp-skills và manage helper của nó; không unit
+nào đặt (phán quyết của first builder, 19/11 05:42: sau một công tắc mới, tắt).
+Khi tắt, không gì bên dưới được đọc: các kỹ năng nạp và chạy y hệt từng byte như
+trước. `lamp_skills::core_agent`.
+
+- **Những kỹ năng nào** (`core_agent::PILOTS`): Sip of water và Stretch break.
+  Một phản ứng nhanh, hay một kỹ năng mà lần kích hoạt chỉ là ánh sáng, một âm
+  thanh cố định hay một cử động, không bao giờ qua agent.
+- **Biến thể** (`agent.toml` cạnh `skill.toml`, và `scripts/agent.py`): nó chỉ
+  thay `grants`, `[[do]]` và `[[present.do]]` (`core_agent::overlaid`), nên
+  trigger và guard không bao giờ bị chép lại. Nó chỉ được đọc khi đúng y của bản
+  thử nghiệm: `grants = []`; một `task = { task, run = "scripts/agent.py" }`, là
+  ý định rõ ràng của chính kỹ năng từ `SKILL.md` ("One short, friendly line
+  suggesting a sip of water; no lecture, nothing about health."), không bao giờ
+  đoán lời một người; mọi bước khác là của `skill.toml`, đúng từng chữ (câu say
+  của nó là phương án dự phòng); và script của nó là brief của đèn đúng từng byte
+  (`core_agent::script`, một chuỗi Python thuần, như brief `make_no_cannot` của
+  một lần tạo bằng giọng nói): cái gì kích hoạt nó, đèn nói gì bây giờ, "Answer
+  with that one line alone, … If nothing fitting comes to mind, answer -.". Khác
+  đi thì kỹ năng nạp như cũ, với một dòng nhật ký nêu lý do. Đây là kỹ năng lõi
+  duy nhất được mang `do.task`; nó không bị `task::origin_refuses` giữ, vì brief
+  của nó được biên dịch vào lamp-skills. Cái gật đầu của chủ đèn cho thư mục của
+  nó (phần đọc lại nói "Its script comes from the lamp itself, and it uses none
+  of the lamp's parts."), token một lần chạy của lamp-control, 20 lần chạy một
+  ngày cho mỗi kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Chưa
+  có trong bản cài của sản phẩm: trên đèn, hai tệp được chép cạnh kỹ năng.
+- **Mỗi lần kích hoạt**: `do.task` của nó được giao cho lamp-tasks trên luồng
+  riêng, như mọi task, và câu say của lần kích hoạt chờ câu của nó trên luồng
+  riêng của lần chạy, không bao giờ trên vòng lặp của trigger.
+- **Phương án dự phòng, không bao giờ trễ hay im lặng** (05:42 của first
+  builder): câu của agent có trong `core_agent::FALLBACK_WITHIN` (10 giây) từ
+  lần kích hoạt thì được nói thay câu say, như lời chính xác ở độ ưu tiên của
+  câu say, với cái nhìn, ánh sáng và cử động mà câu say mang theo. Nếu không,
+  câu say của chính kỹ năng được nói ngay, đúng như khi tắt công tắc: quá 10
+  giây; agent không chạy, ngoại tuyến, không liên lạc được, bị từ chối, hoặc
+  đang chờ cái gật đầu của chủ đèn (lần kích hoạt đầu hỏi điều đó như mọi
+  task); hoặc câu trả lời là `-`, rỗng, hay dài hơn một câu ngắn (hai câu, 200 ký
+  tự, `core_agent::heard`). Câu đến sau đó bị bỏ, không bao giờ nói trễ, và một
+  lần chạy thất bại không tự nói gì (không câu thất bại, không lời từ chối):
+  không bao giờ nói sai.
+- **Một lần kích hoạt tốn gì.** Một lần chạy agent mất vài chục giây
+  (lamp-tasks đo 75 giây trên Hermes, `MEASURED_RUN_SECS`), nên với quy tắc 10
+  giây câu của agent chỉ được nghe khi lần chạy nhanh, và đa số lần kích hoạt
+  nói câu dự phòng; mỗi lần vẫn tốn một trong 20 lần chạy một ngày của kỹ năng,
+  và lần chạy tiếp tục trong lamp-tasks sau khi câu dự phòng đã nói. Lời nhắc
+  đến chậm nhất 10 giây sau lần kích hoạt, không bao giờ hơn.
+- **Các ca của nó** (`lamp-skills test`): một ca không có agent, nên lần chạy
+  của một lần kích hoạt là lần chạy khi agent không chạy, câu say của chính nó
+  ngay; `tests/` của mỗi kỹ năng đều qua khi bật như khi tắt, phần giao không
+  phải một lệnh gọi của ca. Kiểm thử: `core_agent::tests` (các toml đã phân tích
+  giống nhau trừ câu nói, mỗi lần kích hoạt giao task cho agent, tắt thì không
+  gì đổi, dự phòng khi chậm quá 10 giây, không chạy, `-` và rỗng) và
+  `a_core_skills_line_with_its_agent_down_says_its_own_at_once`.
+- **Nhật ký**: `its line through the lamp's agent: said its agent's line (N
+  characters)` hoặc `… said its own line at once: WHY`, không bao giờ là lời của
+  agent.
+
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 
 Kỹ năng tạo tại đây, bằng giọng nói hay trong ứng dụng, là của chính người

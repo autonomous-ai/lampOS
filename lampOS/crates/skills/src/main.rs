@@ -1313,6 +1313,7 @@ fn serve(
             state: options.state.clone(),
             socket: options.tasks_socket.clone(),
             say: sockets.say.clone(),
+            via_agent: HashSet::new(),
         }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
@@ -1611,6 +1612,11 @@ fn serve(
                         )?;
                         Some((skill.name.clone(), (folder, skill.grants.clone())))
                     })
+                    .collect();
+                runner.tasks.borrow_mut().via_agent = skills
+                    .iter()
+                    .filter(|skill| skill.via_agent)
+                    .map(|skill| skill.name.clone())
                     .collect();
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
@@ -2122,13 +2128,16 @@ struct Runner {
 /// grants, as of the last load; and the program's `--state-dir`, where the
 /// runs' ledger is (the owner's yes is lamp-control's), lamp-tasks'
 /// socket, and the voice's say service, which asks for a missing yes aloud
-/// (#6071's V2).
+/// (#6071's V2). `via_agent`: the core skills whose line goes through the
+/// lamp's agent (`LAMP_CORE_VIA_AGENT`, [`lamp_skills::core_agent`]), whose
+/// say waits for their task's line.
 #[derive(Default)]
 struct Tasks {
     of: HashMap<String, (PathBuf, Vec<String>)>,
     state: Option<PathBuf>,
     socket: Option<PathBuf>,
     say: PathBuf,
+    via_agent: HashSet<String>,
 }
 
 /// `addon/proposal`, written for the add-ons, and what they proposed lately.
@@ -2829,11 +2838,24 @@ fn start(
         .into_iter()
         .partition(|call| matches!(call, Call::Task(_)));
     let handed = !tasks.is_empty();
+    // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
+    // its say waits for its task's line on the run's own thread, at most
+    // `core_agent::FALLBACK_WITHIN`, then says it or its own at once.
+    let (line_to, line_from) = if handed
+        && runner.tasks.borrow().via_agent.contains(&skill)
+        && calls.iter().any(lamp_skills::core_agent::is_line)
+    {
+        let (to, from) = mpsc::channel();
+        (Some(to), Some(from))
+    } else {
+        (None, None)
+    };
     for call in tasks {
         let Call::Task(step) = call else { continue };
         let room = task_room(&skill, &step, runner);
-        hand_task(&skill, *step, &runner.tasks.borrow(), room);
+        hand_task(&skill, *step, &runner.tasks.borrow(), room, line_to.clone());
     }
+    drop(line_to);
     if handed && calls.is_empty() {
         let _ = made.send(());
         let _ = runner.finished.send(SkillEvent {
@@ -2932,6 +2954,18 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
+        // The agent's line, or the skill's own at once (`LAMP_CORE_VIA_AGENT`).
+        let calls = match line_from {
+            Some(from) => {
+                let said = lamp_skills::core_agent::awaited(
+                    from,
+                    lamp_skills::core_agent::FALLBACK_WITHIN,
+                );
+                eprintln!("lamp-skills: skill:{skill}: {}", said.journal());
+                lamp_skills::core_agent::with_line(calls, &said)
+            }
+            None => calls,
+        };
         // A light relative to the person's, or never brighter than it, is
         // made from the light shown as the run began (#1672, #3691); with
         // that light off, or not known for a relative one, nothing is shown,
@@ -5886,7 +5920,13 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// one fixed line behind the same gate, and one refused `busy` waits its
 /// turn in the lamp's one line ([`lamp_skills::task_sure::LAMP`]), on this
 /// thread; off, as before.
-fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
+fn hand_task(
+    skill: &str,
+    step: lamp_skills::task::TaskStep,
+    tasks: &Tasks,
+    mut room: LampRoom,
+    line: Option<mpsc::Sender<lamp_skills::core_agent::Heard>>,
+) {
     // This run's own: a run now asked by voice, never a trigger's after it.
     // Its quiet lifted and its not-ready line only with
     // `LAMP_TOLD_WHEN_ASKED` (#7180), as before; its failure answered in
@@ -5995,6 +6035,25 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
             dropped.words()
         });
         eprintln!("lamp-skills: skill:{skill}: {said}");
+        // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
+        // its line, or nothing, goes to the fire's say, which says its own
+        // at once without one; nothing of a failed run is said here, and a
+        // line after the say's wait is dropped, never said late.
+        if let Some(line) = line {
+            let heard = lamp_skills::core_agent::heard(found.take());
+            let _ = (refused.take(), not_ready.take(), tried.failed());
+            let what = match &heard {
+                lamp_skills::core_agent::Heard::Line(_) => "its agent's line",
+                lamp_skills::core_agent::Heard::Nothing(why) => why,
+            };
+            match line.send(heard) {
+                Ok(()) => eprintln!("lamp-skills: skill:{skill}: do.task: {what}, to its say"),
+                Err(_) => eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: {what} came after its own line was said: dropped"
+                ),
+            }
+            return;
+        }
         // A refusal the person must hear (a run granted the internet the
         // lamp's agent can't be given, #7200): said in plain words, behind
         // the same gate as a told answer, never the journal's words.
@@ -8751,6 +8810,7 @@ mod tests {
             state: Some(root.path().to_owned()),
             socket: None,
             say: root.path().join("say.sock"),
+            via_agent: HashSet::new(),
         };
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
@@ -8802,6 +8862,108 @@ mod tests {
         assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
     }
 
+    /// `LAMP_CORE_VIA_AGENT`: a core skill's fire whose agent is down (its
+    /// tasks off here, no lamp-tasks) says its own line at once, well
+    /// inside the 10 s, and the fire's caller, the trigger's loop, is never
+    /// held while its say waits for the agent's line.
+    #[test]
+    fn a_core_skills_line_with_its_agent_down_says_its_own_at_once() {
+        // The switch is read from this process's environment here.
+        if lamp_skills::task::on() {
+            return;
+        }
+        let root = tempfile::Builder::new()
+            .prefix("core-agent-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(root.path().join("bus")).unwrap();
+        let mut out = bus
+            .publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")
+            .unwrap();
+        let say = UnixListener::bind(root.path().join("say.sock")).unwrap();
+        let (asked, ask) = mpsc::channel();
+        std::thread::spawn(move || {
+            let (stream, _) = say.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream).read_line(&mut line).unwrap();
+            let _ = asked.send((Instant::now(), line));
+        });
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
+        let skill = "sip-of-water";
+        let runner = Runner {
+            sockets: nowhere(root.path(), Permissions::default()),
+            finished,
+            bus,
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            unplug: RefCell::default(),
+            made: RefCell::default(),
+            lively: RefCell::default(),
+            energy: Cell::new(1),
+            tasks: RefCell::new(Tasks {
+                of: HashMap::from([(skill.to_owned(), (root.path().join(skill), Vec::new()))]),
+                state: None,
+                socket: None,
+                say: root.path().join("say.sock"),
+                via_agent: HashSet::from([skill.to_owned()]),
+            }),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            runs: RefCell::default(),
+            permissions: RefCell::new(HashMap::from([(
+                skill.into(),
+                Permissions {
+                    body: true,
+                    speak: true,
+                    light: true,
+                    ..Permissions::default()
+                },
+            )])),
+            looks: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+            proposals: None,
+        };
+        let note = "They have sat at the desk for about half an hour. Suggest a sip of water.";
+        let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
+            task: lamp_skills::core_agent::PILOTS[0].task.into(),
+            run: lamp_skills::core_agent::RUN.into(),
+            quiet: None,
+        }));
+        let fired = Instant::now();
+        let _made = start(
+            skill.into(),
+            vec![task, Call::Gaze { face: None }, Call::Say(note.into())],
+            None,
+            &mut HashSet::new(),
+            &mut out,
+            &runner,
+        );
+        assert!(
+            fired.elapsed() < Duration::from_millis(500),
+            "the fire is never held"
+        );
+        let (at, line) = ask.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(
+            at.duration_since(fired) < lamp_skills::core_agent::FALLBACK_WITHIN / 2,
+            "its own line at once: {:?}",
+            at.duration_since(fired)
+        );
+        let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(asked["note"], note, "{asked}");
+        assert_eq!(asked["skill"], skill);
+    }
+
     /// A run that is only a `do.task` the lamp would not hand over makes
     /// nothing and says "not made:", never "goes on on its own"; a run with
     /// another call is made as it is, its task held to the hand-over.
@@ -8826,6 +8988,7 @@ mod tests {
             state: Some(root.path().to_owned()),
             socket: None,
             say: root.path().join("say.sock"),
+            via_agent: HashSet::new(),
         };
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {

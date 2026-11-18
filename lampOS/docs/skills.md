@@ -2192,6 +2192,72 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
   news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
 
+### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, a pilot, off)
+
+The middle form of a voice make, for the core skills that say a
+model-worded line at each fire: lamp-skills keeps the trigger, the
+`[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`,
+`wait`, `[budget]`, `[rest]` and `[stop]` exactly, and only the fire's line
+becomes a `do.task` for the lamp's agent (Hermes or OpenClaw, through
+lamp-tasks). Off unless `LAMP_CORE_VIA_AGENT=on`, in lamp-skills and its
+manage helper; set in no unit (the first builder's ruling, 19 Nov 05:42:
+behind a new switch, off). Off, nothing below is read: the skills load and
+run byte for byte as before. `lamp_skills::core_agent`.
+
+- **Which skills** (`core_agent::PILOTS`): Sip of water and Stretch break.
+  A quick reaction, or a skill whose fire is only light, a fixed sound or a
+  move, never goes through the agent.
+- **The variant** (`agent.toml` beside `skill.toml`, and
+  `scripts/agent.py`): it stands in for `grants`, `[[do]]` and
+  `[[present.do]]` alone (`core_agent::overlaid`), so the trigger and the
+  guards are never copied. It is read only while it is exactly the pilot's:
+  `grants = []`; one `task = { task, run = "scripts/agent.py" }`, the
+  skill's own plain intent from its `SKILL.md` ("One short, friendly line
+  suggesting a sip of water; no lecture, nothing about health."), never a
+  guess at a person's words; every other step `skill.toml`'s own, word for
+  word (its say is the fallback); and its script the lamp's brief byte for
+  byte (`core_agent::script`, one plain Python string, as a voice make's
+  `make_no_cannot` brief): what fired it, what the lamp says now, "Answer
+  with that one line alone, … If nothing fitting comes to mind, answer -.".
+  Anything else and the skill loads as it is, with one journal line why.
+  This is the one core skill that may carry a `do.task`; it is not held to
+  `task::origin_refuses`, since its brief is compiled into lamp-skills.
+  The owner's yes to its folder (its read-back says "Its script comes from
+  the lamp itself, and it uses none of the lamp's parts."), lamp-control's
+  one-run token, the day's 20 runs a skill and one run at a time hold as for
+  every `do.task`. Not yet in the product's install: on a lamp the two files
+  are copied beside the skill.
+- **Each fire**: its `do.task` is handed to lamp-tasks on its own thread, as
+  every task is, and the fire's say waits for its line on the run's own
+  thread, never the trigger's loop.
+- **The fallback, never late or silent** (the first builder's 05:42):
+  the agent's line said within `core_agent::FALLBACK_WITHIN` (10 s) of the
+  fire, it is said in the say's place as exact words at the say's priority,
+  with the look, the light and the move the say brings. Otherwise the
+  skill's own say is said at once, exactly as with the switch off: past
+  10 s; the agent down, offline, not reached, refused, or waiting for the
+  owner's yes (its first fire asks for it as any task does); or an answer
+  of `-`, nothing, or more than one short line (two sentences, 200
+  characters, `core_agent::heard`). A line that comes after is dropped,
+  never said late, and a failed run says nothing of its own (no failed
+  line, no refusal): never something wrong.
+- **What a fire costs.** An agent run takes tens of seconds (lamp-tasks
+  measured 75 s on Hermes, `MEASURED_RUN_SECS`), so under the 10 s rule
+  the agent's line is heard only when its run is quick, and most fires say
+  the fallback; each fire still spends one of the skill's 20 runs a day,
+  and its run goes on in lamp-tasks after the fallback is said. The nudge
+  comes at most 10 s after its fire, never more.
+- **Its cases** (`lamp-skills test`): a case has no agent, so a fire's run
+  is the run with the agent down, its own say at once; each skill's own
+  `tests/` pass with the switch on as with it off, its hand-over not one of
+  the case's calls. Tests: `core_agent::tests` (the parsed tomls the same
+  but for the line, each fire hands the agent its task, off changes
+  nothing, the fallback slow past 10 s, down, `-` and empty) and
+  `a_core_skills_line_with_its_agent_down_says_its_own_at_once`.
+- **Journal**: `its line through the lamp's agent: said its agent's line
+  (N characters)` or `… said its own line at once: WHY`, never the agent's
+  words.
+
 ### Core and installable skills
 
 The owner, 19 Oct 2026, 07:1x to 07:2x: "think in terms of skills all the
