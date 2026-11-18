@@ -171,6 +171,8 @@ fits a 20 ms tick.
 - `python3 query.py map.npz SHOULDER ELBOW PITCH [--shrink COUNTS]` gives each joint's safe range at a pose (the others held);
   `--export out.json` writes the map for a page or a test. A grid is an overview (above): keep `--shrink` at 48 counts or more,
   past the 40 counts the 3D grid overshot the exact march at the standing pose.
+- `node examples/twin/try.js --real --keyring DIR --reach-map examples/twin/reach-map-4ace.json --reach-shrink 48` (from `sdk/js`) puts the same
+  guard on the page of a real lamp: the page only, the body's own limits unchanged; the first map is the one in use.
 - The try-it page's guard (`sdk/js/examples/twin/reach-guard.js`, `server.js --reach-map reach-map-4ace.json`) checks the
   page's own goals against such a file before sending them. The page only; the body's limits are unchanged.
 - The map is lamp-4ace's geometry and home, with V1's estimated masses, until each lamp's own are measured.

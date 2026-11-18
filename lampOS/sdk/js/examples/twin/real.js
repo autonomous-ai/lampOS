@@ -25,7 +25,7 @@ import { portFree } from './virtual-lamp.js';
 
 export const CLIENT_NAME = 'try-controller';
 const ONE_WORD = new Set(['--real', '--camera', '--microphone', '--no-open', '--local']);
-const WITH_VALUE = new Set(['--host', '--port', '--keyring', '--twin-port', '--glb', '--lan-address']);
+const WITH_VALUE = new Set(['--host', '--port', '--keyring', '--twin-port', '--glb', '--lan-address', '--reach-map', '--reach-shrink']);
 
 // The arguments of a real run. `--code` and `--pin` are refused with the way to give them; anything else unknown is too.
 export function parseReal(args) {
@@ -97,12 +97,20 @@ export async function pairOrOpen(options, env = process.env, ask = promptHidden)
 }
 
 // Runs the twin on that keyring and says its URL; the page is on the network like try.js's.
+// The arguments the twin's server.js is started with for a real run. `--reach-map` (one map, or several separated by commas) and
+// `--reach-shrink` go through as given: the page then checks every goal for the arm and the head against the map (the page only).
+export function twinArguments(options, port) {
+  const localOnly = options.flags.has('local');
+  return [fileURLToPath(new URL('server.js', import.meta.url)), '--real', ...(localOnly ? [] : ['--lan']), '--port', port,
+    ...(options.glb ? ['--glb', options.glb] : []), ...(!localOnly && options['lan-address'] ? ['--lan-address', options['lan-address']] : []),
+    ...(options['reach-map'] ? ['--reach-map', options['reach-map']] : []), ...(options['reach-shrink'] ? ['--reach-shrink', options['reach-shrink']] : []),
+    ...(options.flags.has('camera') ? ['--camera'] : []), ...(options.flags.has('microphone') ? ['--microphone'] : [])];
+}
+
 export async function startReal(options, folderOrKeyringPath) {
   const twinPort = options['twin-port'] ?? String((await portFree(8737)) ? 8737 : 0);
   const localOnly = options.flags.has('local');
-  const args = [fileURLToPath(new URL('server.js', import.meta.url)), '--real', ...(localOnly ? [] : ['--lan']), '--port', twinPort === '0' ? String(await freePort()) : twinPort,
-    ...(options.glb ? ['--glb', options.glb] : []), ...(!localOnly && options['lan-address'] ? ['--lan-address', options['lan-address']] : []),
-    ...(options.flags.has('camera') ? ['--camera'] : []), ...(options.flags.has('microphone') ? ['--microphone'] : [])];
+  const args = twinArguments(options, twinPort === '0' ? String(await freePort()) : twinPort);
   const { LAMP_TRY_CODE: _code, LAMP_TRY_PIN: _pin, ...clean } = process.env;
   // Its own process group: a terminal's Ctrl-C reaches this program alone, which then asks the twin to end (SIGTERM) and waits.
   const twin = spawn(process.execPath, args, { env: { ...clean, LAMP_TRY_KEYRING: folderOrKeyringPath }, stdio: ['ignore', 'pipe', 'inherit'], detached: true });
