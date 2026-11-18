@@ -11534,6 +11534,9 @@ async fn spoken(
         || crate::attention::only_the_name(&text);
     crate::skill_write_yes::line_heard(request, name_only, &text);
     crate::made_clash::line_heard(request, name_only, &text);
+    // Only the first line after an offer in place of a make may answer it
+    // (`make_core_offer::line_heard`, #7747).
+    crate::make_core_offer::line_heard(request, name_only);
     // A remove on the line right after one that found nothing is asked
     // only when this line names the skill (`made_remove::line_heard`).
     if !name_only {
