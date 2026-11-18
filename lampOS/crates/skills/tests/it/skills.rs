@@ -16922,3 +16922,396 @@ fn music_sway_follows_the_energy_level_and_level_one_is_as_written() {
         "{why}"
     );
 }
+
+/// A cough-fit skill (#7686): `count` with `extra` keys on its trigger, or
+/// without `count` when `count` is empty.
+fn coughs(dir: &Path, name: &str, count: &str, extra: &str) -> PathBuf {
+    skill_with(
+        dir,
+        name,
+        &format!(
+            r#"
+[trigger]
+topic = "ears/body"
+field = "class"
+equals = "cough"
+when = "appears"
+{count}
+{extra}
+[ask]
+policy = "nudge"
+[[do]]
+body = {{ gesture = "nod" }}
+[permissions]
+topics = ["ears/body"]
+body = true
+"#
+        ),
+    )
+}
+
+const FIT: &str = r#"count = { at_least = 4, within = "3m" }"#;
+
+/// Body sounds at these seconds, each of this class, and the seconds `skill`
+/// ran at.
+fn sound_runs(skill: &Path, sounds: &[(u64, &str)]) -> Vec<u64> {
+    let payloads: Vec<(u64, String)> = sounds
+        .iter()
+        .map(|(at, class)| {
+            (
+                *at,
+                format!(
+                    r#"{{"class":"{class}","score":0.9,"at_us":{}}}"#,
+                    at * 1_000_000
+                ),
+            )
+        })
+        .collect();
+    let messages: Vec<(u64, &str, &str)> = payloads
+        .iter()
+        .map(|(at, payload)| (*at, "ears/body", payload.as_str()))
+        .collect();
+    runs_at(skill, &messages)
+        .into_iter()
+        .map(|(at, _)| at)
+        .collect()
+}
+
+/// #7686 phase 1: a count fires at the Nth matching event within its
+/// while, never at N−1, and other events between them break nothing.
+#[test]
+fn a_count_fires_at_its_nth_event_within_the_while_and_never_at_one_fewer() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = coughs(dir.path(), "cough-fit", FIT, "");
+    let cough = |at| (at, "cough");
+    assert_eq!(
+        sound_runs(&skill, &[cough(0), cough(30), cough(60), cough(90)]),
+        [90],
+        "the fourth cough in 3 minutes"
+    );
+    assert!(
+        sound_runs(&skill, &[cough(0), cough(30), cough(60)]).is_empty(),
+        "three coughs are not four"
+    );
+    // Sneezes are not coughs: they neither count nor break the fit.
+    let mixed = [
+        cough(0),
+        (10, "sneeze"),
+        cough(20),
+        (25, "sneeze"),
+        (30, "sneeze"),
+        cough(40),
+        (45, "sneeze"),
+        cough(50),
+    ];
+    assert_eq!(sound_runs(&skill, &mixed), [50]);
+    assert!(
+        sound_runs(
+            &skill,
+            &[(0, "sneeze"), (5, "sneeze"), (10, "sneeze"), (15, "sneeze")]
+        )
+        .is_empty(),
+        "four sneezes are no cough fit"
+    );
+}
+
+/// #7686 phase 1: the while slides. Coughs further apart than it can hold
+/// four never fit, however many; the fourth just inside it does.
+#[test]
+fn a_count_of_events_spaced_wider_than_its_while_never_fires() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = coughs(dir.path(), "cough-fit", FIT, "");
+    // A cough every 61 s: any four span 183 s, past the 180.
+    let sparse: Vec<(u64, &str)> = (0..30).map(|at| (at * 61, "cough")).collect();
+    assert!(sound_runs(&skill, &sparse).is_empty());
+    // Every 60 s: four span 180 s, just inside the while.
+    let close: Vec<(u64, &str)> = (0..4).map(|at| (at * 60, "cough")).collect();
+    assert_eq!(sound_runs(&skill, &close), [180]);
+    // A slow start, then a fit: only the last four, inside 3 minutes.
+    let late = [
+        (0, "cough"),
+        (200, "cough"),
+        (400, "cough"),
+        (410, "cough"),
+        (420, "cough"),
+    ];
+    assert!(sound_runs(&skill, &late).is_empty());
+    let mut fit = late.to_vec();
+    fit.push((430, "cough"));
+    assert_eq!(sound_runs(&skill, &fit), [430]);
+}
+
+/// #7686 phase 1: one fit, one run. Once it fires its coughs are let go, so
+/// the next fit needs four new ones; coughing on in between is no second.
+#[test]
+fn a_count_begins_again_after_it_fires_so_a_second_fit_needs_n_new_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = coughs(dir.path(), "cough-fit", FIT, "");
+    let every_ten: Vec<(u64, &str)> = (0..12).map(|at| (at * 10, "cough")).collect();
+    // Fits at the 4th, 8th and 12th coughs: 30, 70 and 110 s.
+    assert_eq!(sound_runs(&skill, &every_ten), [30, 70, 110]);
+    // Three more after a fit are not a second one.
+    let three_more: Vec<(u64, &str)> = (0..7).map(|at| (at * 10, "cough")).collect();
+    assert_eq!(sound_runs(&skill, &three_more), [30]);
+    // Its cooldown still holds the second fit back, which is then spent.
+    let cooled = coughs(dir.path(), "cooled-fit", FIT, "cooldown = \"10m\"");
+    assert_eq!(sound_runs(&cooled, &every_ten), [30]);
+}
+
+/// #7686 phase 1: what `count` takes is checked at load, with why.
+#[test]
+fn a_count_is_bounded_and_only_on_an_event_trigger() {
+    let dir = tempfile::tempdir().unwrap();
+    let refused = |name: &str, count: &str, extra: &str| {
+        load(&coughs(dir.path(), name, count, extra)).unwrap_err()
+    };
+    for (name, count, why) in [
+        (
+            "one",
+            r#"count = { at_least = 1, within = "3m" }"#,
+            "count.at_least is 2 to 60",
+        ),
+        (
+            "many",
+            r#"count = { at_least = 61, within = "3m" }"#,
+            "count.at_least is 2 to 60",
+        ),
+        (
+            "long",
+            r#"count = { at_least = 4, within = "2h" }"#,
+            "count.within is 1s to 1h",
+        ),
+        (
+            "none",
+            r#"count = { at_least = 4, within = "0s" }"#,
+            "count.within is 1s to 1h",
+        ),
+        ("bare", r#"count = { at_least = 4 }"#, "within"),
+        (
+            "other",
+            r#"count = { at_least = 4, within = "3m", every = "1m" }"#,
+            "every",
+        ),
+    ] {
+        let error = refused(name, count, "");
+        assert!(error.contains(why), "{name}: {error}");
+    }
+    for (name, extra, why) in [
+        ("held", "for = \"10s\"", "not with each, rise, for, gap"),
+        ("gapped", "gap = \"10s\"", "not with each, rise, for, gap"),
+        (
+            "away",
+            "absent_for = \"1m\"",
+            "not with each, rise, for, gap",
+        ),
+    ] {
+        let error = refused(name, FIT, extra);
+        assert!(error.contains(why), "{name}: {error}");
+    }
+    let present = skill_with(
+        dir.path(),
+        "present",
+        &format!(
+            "[trigger]\ntopic = \"ears/body\"\nfield = \"class\"\nequals = \"cough\"\n{FIT}\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n\
+             [permissions]\ntopics = [\"ears/body\"]\nbody = true\n"
+        ),
+    );
+    assert!(
+        load(&present)
+            .unwrap_err()
+            .contains("count goes with when = \"appears\""),
+        "a present trigger"
+    );
+    // A face and the clock are states said again and again, never events.
+    let face = skill_with(
+        dir.path(),
+        "face",
+        &format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n{FIT}\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"
+        ),
+    );
+    assert!(
+        load(&face)
+            .unwrap_err()
+            .contains("count is of an event topic"),
+        "a face trigger"
+    );
+    let rising = skill_with(
+        dir.path(),
+        "rising",
+        &format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"pm2_5\"\nwhen = \"appears\"\n\
+             rise = {{ by = 100, within = \"1m\" }}\n{FIT}\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"
+        ),
+    );
+    assert!(load(&rising).unwrap_err().contains("not with each, rise"));
+    // The bounds themselves load.
+    for (name, count) in [
+        ("two", r#"count = { at_least = 2, within = "1s" }"#),
+        ("sixty", r#"count = { at_least = 60, within = "1h" }"#),
+    ] {
+        load(&coughs(dir.path(), name, count, "")).unwrap();
+    }
+}
+
+/// #7686 phase 1: a trigger without `count` is as it was. On the same
+/// sounds an `appears` cough trigger fires at a cough after something that
+/// was not one, never counting.
+#[test]
+fn a_trigger_without_a_count_holds_as_before() {
+    let dir = tempfile::tempdir().unwrap();
+    let plain = coughs(dir.path(), "each-cough", "", "");
+    let sounds = [
+        (0, "cough"),
+        (30, "cough"),
+        (40, "sneeze"),
+        (50, "cough"),
+        (60, "cough"),
+        (70, "cough"),
+    ];
+    assert_eq!(sound_runs(&plain, &sounds), [0, 50]);
+    let counted = coughs(dir.path(), "cough-fit", FIT, "");
+    assert_eq!(sound_runs(&counted, &sounds), [60]);
+}
+
+/// A body sound of `class` at `at` seconds, as `ears/body` says it.
+fn cough_message(at: u64, class: &str) -> String {
+    format!(
+        r#"{{"class":"{class}","score":0.9,"at_us":{}}}"#,
+        at * 1_000_000
+    )
+}
+
+/// #7686, the reviewer's P2 on #7756: the Policy's answer to a count's ask
+/// finds the fit its chance took, though a sneeze or one more cough came
+/// between the ask and the answer.
+#[test]
+fn a_counts_late_answer_keeps_the_fit_its_chance_took() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = coughs(dir.path(), "cough-fit", FIT, "");
+    for between in ["sneeze", "cough"] {
+        let mut engine = Engine::new(vec![load(&skill).unwrap()], false).asking_the_policy();
+        let mut asked = Vec::new();
+        for at in [0, 30, 60, 90] {
+            asked.extend(engine.observe(
+                "ears/body",
+                at * 1_000_000,
+                cough_message(at, "cough").as_bytes(),
+                None,
+            ));
+        }
+        let run = asked.pop().expect("asked at the fourth cough");
+        assert!(run.ask.is_some());
+        assert!(asked.is_empty(), "{asked:?}");
+        let more = engine.observe(
+            "ears/body",
+            91_000_000,
+            cough_message(91, between).as_bytes(),
+            None,
+        );
+        assert!(more.is_empty(), "{between}: {more:?}");
+        assert!(
+            engine.still(&run, 92_000_000).is_some(),
+            "a {between} between the ask and the answer"
+        );
+    }
+}
+
+/// #7686, the reviewer's P3 on #7756: the counted coughs begin again at a
+/// reload, and outside the trigger's `during`.
+#[test]
+fn a_count_begins_again_at_a_reload_and_outside_its_during() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = coughs(dir.path(), "cough-fit", FIT, "");
+    let mut engine = Engine::new(vec![load(&skill).unwrap()], true);
+    let cough = |engine: &mut Engine, at: u64| {
+        engine
+            .observe(
+                "ears/body",
+                at * 1_000_000,
+                cough_message(at, "cough").as_bytes(),
+                None,
+            )
+            .into_iter()
+            .filter(|run| !run.calls.is_empty())
+            .count()
+    };
+    for at in [0, 10, 20] {
+        assert_eq!(cough(&mut engine, at), 0, "at {at} s");
+    }
+    engine.replace(vec![load(&skill).unwrap()]);
+    for at in [30, 40, 50] {
+        assert_eq!(
+            cough(&mut engine, at),
+            0,
+            "three since the reload, at {at} s"
+        );
+    }
+    assert_eq!(cough(&mut engine, 60), 1, "the fourth since the reload");
+
+    const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
+    let timed = skill_with(
+        dir.path(),
+        "morning-fit",
+        &format!(
+            "[trigger]\ntopic = \"ears/body\"\nfield = \"class\"\nequals = \"cough\"\n\
+             when = \"appears\"\n{FIT}\nduring = {{ from = \"06:00\", to = \"06:10\" }}\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n\
+             [permissions]\ntopics = [\"ears/body\", \"clock/local\"]\nbody = true\n"
+        ),
+    );
+    let mut engine = Engine::new(vec![load(&timed).unwrap()], true);
+    engine.clock(0, 0, MORNING);
+    for at in [0, 10, 20] {
+        assert_eq!(cough(&mut engine, at), 0, "at {at} s");
+    }
+    // 07:00, outside its while: the cough there lets the three go.
+    engine.clock(0, 30_000_000, MORNING + 3_600_000);
+    assert_eq!(cough(&mut engine, 30), 0, "outside the window");
+    engine.clock(0, 40_000_000, MORNING + 60_000);
+    for at in [40, 50, 60] {
+        assert_eq!(cough(&mut engine, at), 0, "three back inside, at {at} s");
+    }
+    assert_eq!(cough(&mut engine, 70), 1, "the fourth back inside");
+}
+
+/// #7686, the reviewer's P3 on #7756: `count` is refused with `each`,
+/// `sooner`, `rearm` and on `clock/local`, each with why.
+#[test]
+fn a_count_is_refused_with_each_sooner_rearm_and_on_the_clock() {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, extra) in [
+        ("listed", "each = \"sounds\"\nkey = \"class\""),
+        (
+            "sooner",
+            "sooner = { topic = \"ears/body\", field = \"score\", above = 0, for = \"1m\" }",
+        ),
+        ("rearmed", "rearm = \"leaves\""),
+        ("lined", "rearm = { below = 1, for = \"10s\" }"),
+    ] {
+        let error = load(&coughs(dir.path(), name, FIT, extra)).unwrap_err();
+        assert!(
+            error.contains("not with each, rise, for, gap, absent_for, sooner or rearm"),
+            "{name}: {error}"
+        );
+    }
+    let clock = skill_with(
+        dir.path(),
+        "clock",
+        &format!(
+            "[trigger]\ntopic = \"clock/local\"\nfield = \"hour\"\nequals = 7\n\
+             when = \"appears\"\n{FIT}\n\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n\
+             [permissions]\ntopics = [\"clock/local\"]\nbody = true\n"
+        ),
+    );
+    assert!(
+        load(&clock)
+            .unwrap_err()
+            .contains("count is of an event topic, a message each event: not clock/local"),
+        "a clock trigger"
+    );
+}

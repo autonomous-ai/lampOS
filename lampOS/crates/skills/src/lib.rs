@@ -773,6 +773,8 @@ struct TriggerFile {
     wait: Option<String>,
     /// The field rose at least this much within this while (#1684).
     rise: Option<RiseFile>,
+    /// At least this many matching messages within this while (#7686).
+    count: Option<CountFile>,
     /// After a night the lamp rested, a chance waits for another skill's
     /// daily trigger to be judged first (#1672): its greeting comes first.
     yields_to: Option<YieldFile>,
@@ -789,6 +791,14 @@ struct TriggerFile {
     /// `[budget]` group (#5620): while it is still to come, their due
     /// chances wait for it.
     stands_in_for_group: Option<bool>,
+}
+
+/// `count = { at_least = 4, within = "3m" }` (#7686).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CountFile {
+    at_least: u64,
+    within: String,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -2993,6 +3003,9 @@ pub struct Trigger {
     pub unless_heard: bool,
     /// It holds only while its field rose this much within a while (#1684).
     pub rise: Option<Rise>,
+    /// It holds only while this many of its topic's messages that pass its
+    /// test came within a while (#7686).
+    pub count: Option<EventCount>,
     /// The skill and its daily trigger this one's chance waits for, after a
     /// night the lamp rested (#1672): `yields_to`.
     pub yields_to: Option<(String, String)>,
@@ -3072,6 +3085,61 @@ impl Readings {
             self.kept.pop_front();
         }
         self.risen
+    }
+}
+
+/// A trigger's `count` (#7686): it holds while at least `at_least` of its
+/// topic's messages that pass its test came within the `within_us` before
+/// the newest message, the newest among them when it passes. The while
+/// slides: each message is counted from its own time. Once the trigger's
+/// chance is taken, those messages are let go, so the next fit needs
+/// `at_least` new ones: one fit, one run.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EventCount {
+    pub at_least: usize,
+    pub within_us: u64,
+}
+
+/// The fewest messages a `count` takes: one message is no pattern.
+pub const COUNT_LEAST: u64 = 2;
+/// The most messages a `count` takes, and so the most a trigger keeps.
+pub const COUNT_MOST: u64 = 60;
+/// The longest while a `count` takes.
+pub const COUNT_MOST_WITHIN_US: u64 = HOUR_US;
+
+/// The times of the matching messages a `count` holds by, in memory only:
+/// never written, and begun again at a start or a reload. At most
+/// `at_least` are kept: an older one can't change whether the newest
+/// `at_least` came within the while.
+#[derive(Debug, Default)]
+struct Counts {
+    kept: std::collections::VecDeque<u64>,
+    /// Whether the count held at the newest message, for an answer that
+    /// comes later.
+    fit: bool,
+}
+
+impl Counts {
+    /// Whether, with the message at `now_us` (counted when it `matched`),
+    /// at least `count.at_least` matching messages came within its while.
+    fn see(&mut self, now_us: u64, matched: bool, count: &EventCount) -> bool {
+        let from = now_us.saturating_sub(count.within_us);
+        while self.kept.front().is_some_and(|at| *at < from) {
+            self.kept.pop_front();
+        }
+        if matched {
+            self.kept.push_back(now_us);
+            if self.kept.len() > count.at_least {
+                self.kept.pop_front();
+            }
+        }
+        self.fit = self.kept.len() >= count.at_least;
+        self.fit
+    }
+
+    /// The chance was taken: the fit's messages are let go.
+    fn spend(&mut self) {
+        self.kept.clear();
     }
 }
 
@@ -3919,6 +3987,53 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             })
         }
     };
+    // A count of events (#7686): a message each, as `ears/body` tells a
+    // sound once, counted over the whole topic and judged at each message.
+    // What times a state's hold (`for`, `gap`, `absent_for`, `sooner`),
+    // compares its readings (`rise`) or waits for it to end (`rearm`) means
+    // nothing for one; a face and the clock are states, said again and
+    // again, never events.
+    let count = match file.count {
+        None => None,
+        Some(count) => {
+            if when != When::Appears {
+                return Err("count goes with when = \"appears\": one run for each fit".into());
+            }
+            if file.topic == Faces::TOPIC || file.topic == LOCAL_CLOCK_TOPIC {
+                return Err(format!(
+                    "count is of an event topic, a message each event: not {}",
+                    file.topic
+                ));
+            }
+            if each.is_some()
+                || rise.is_some()
+                || file.lasting.is_some()
+                || file.gap.is_some()
+                || file.absent_for.is_some()
+                || file.sooner.is_some()
+                || rearm_given
+            {
+                return Err(
+                    "count goes with a field test on the whole topic: not with each, rise, \
+                     for, gap, absent_for, sooner or rearm"
+                        .into(),
+                );
+            }
+            if !(COUNT_LEAST..=COUNT_MOST).contains(&count.at_least) {
+                return Err(format!(
+                    "count.at_least is {COUNT_LEAST} to {COUNT_MOST}: one event is no pattern"
+                ));
+            }
+            let within_us = duration_us(&count.within)?;
+            if !(1_000_000..=COUNT_MOST_WITHIN_US).contains(&within_us) {
+                return Err("count.within is 1s to 1h".into());
+            }
+            Some(EventCount {
+                at_least: count.at_least as usize,
+                within_us,
+            })
+        }
+    };
     let mut test = match file.present {
         None => match (&rise, &file.field, file.above) {
             (Some(_), Some(field), None) => {
@@ -4000,6 +4115,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         lively: file.lively,
         wait_us,
         rise,
+        count,
         during,
         days,
         once_per_day: file.once_per_day,
@@ -6681,6 +6797,9 @@ struct Watch {
     /// With `rise`: the readings it compares with, since the start or the
     /// last reload.
     readings: Readings,
+    /// With `count`: the matching messages it counts, since the start or
+    /// the last reload (#7686).
+    counts: Counts,
     /// `when = "changes"`: the last eligible selected values and whether
     /// the trigger and its while conditions have remained eligible.
     changes: Changes,
@@ -8478,6 +8597,7 @@ impl Engine {
         for ((name, index), watch) in &mut self.watches {
             watch.items = None;
             watch.readings = Readings::default();
+            watch.counts = Counts::default();
             let unchanged = old
                 .iter()
                 .find(|skill| &skill.name == name)
@@ -8874,13 +8994,17 @@ impl Engine {
             return None;
         }
         // A rise holds as it did at its newest reading, the one the answer
-        // is to: nothing newer came to compare.
+        // is to: nothing newer came to compare. A count's own run holds by
+        // the fit its chance took and let go (#7686): a message between the
+        // ask and the answer, a sneeze or one more cough, takes nothing from
+        // it. Another trigger's count holds as its newest message had it.
+        let own = run.from.as_ref().map(|(index, _)| *index);
         let rose = |index: usize, trigger: &Trigger| {
-            trigger.rise.is_none()
-                || self
-                    .watches
-                    .get(&(skill.name.clone(), index))
-                    .is_some_and(|watch| watch.readings.risen)
+            let watch = self.watches.get(&(skill.name.clone(), index));
+            (trigger.rise.is_none() || watch.is_some_and(|watch| watch.readings.risen))
+                && (trigger.count.is_none()
+                    || own == Some(index)
+                    || watch.is_some_and(|watch| watch.counts.fit))
         };
         let holds = |index: usize, trigger: &Trigger, item: Option<&String>| {
             if trigger.once_per_day && self.daily_faulted {
@@ -8900,7 +9024,11 @@ impl Engine {
                                 item_name(at(item, key)).as_ref() == Some(name)
                                     && trigger.test.holds(item)
                             }),
-                        _ => trigger.test.holds(value) && chooses(skill, value),
+                        // A count holds as it did at its newest message (#7686).
+                        _ => {
+                            (trigger.count.is_some() || trigger.test.holds(value))
+                                && chooses(skill, value)
+                        }
                     }
                 })
         };
@@ -9321,6 +9449,13 @@ impl Engine {
                     rose = watch.readings.rose(reading, now_us, rise);
                 }
                 watch.unknown_us = None;
+                // A count holds by the matching messages within its while,
+                // whatever this one is: a sneeze between coughs breaks no
+                // fit of coughs (#7686).
+                let counted = trigger
+                    .count
+                    .as_ref()
+                    .map(|count| watch.counts.see(now_us, trigger.test.holds(&value), count));
                 if let Some(line) = rearm_line {
                     if !line.test.holds(&value) {
                         watch.past_line_us = None;
@@ -9328,7 +9463,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                let holds = trigger.test.holds(&value) && followed;
+                let holds = counted.unwrap_or_else(|| trigger.test.holds(&value)) && followed;
                 // A hold taken back from before a restart is confirmed by
                 // its topic's next message, or dropped (`holds`).
                 let restored = std::mem::take(&mut watch.restored);
@@ -10216,6 +10351,8 @@ impl Engine {
                     // run holding anything, the program lets it pass.
                     watch.open = skill.holds_until_ends();
                 }
+                // Its chance is taken: the next fit needs new messages.
+                watch.counts.spend();
                 let run = decide(
                     skill,
                     skill

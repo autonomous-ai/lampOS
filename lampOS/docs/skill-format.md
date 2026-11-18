@@ -160,6 +160,13 @@ Keys of a trigger:
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
   `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
+- `count = { at_least, within }`: with `when = "appears"` on an event
+  topic, it holds while at least `at_least` (2 to 60) messages passing the
+  field test came within the last `within` (1 s to 1 h). One fit is one
+  run: the counted messages are let go when its chance is taken, and a
+  Policy answer finds the fit that chance took. Not with `each`, `rise`,
+  `for`, `gap`, `absent_for`, `sooner` or `rearm`. Kept in memory only
+  (#7686, [skills.md](skills.md)).
 - `lively = true`: its `cooldown` and `rearm` follow the energy level
   (`LAMP_BODY_ENERGY`, [skills.md](skills.md)); level 1 as written.
 - `during` (a window), `days` (with `during`: `["mon", "fri"]`,
