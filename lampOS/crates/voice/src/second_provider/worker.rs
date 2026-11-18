@@ -3091,6 +3091,15 @@ pub fn serve(
         }
         crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
     }
+    // A photo from the owner's app (`LAMP_ATTACHMENTS`, #7659): listened
+    // for on the bus, and given to the owner's next line; the owner kept
+    // fresh, off any reply's path, to know whose line it is.
+    if crate::attachments::on()
+        && let Some(root) = files.bus_root.as_deref()
+    {
+        crate::attachments::start(root);
+        crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+    }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     // Whether anything tracks it: set where the one-face rule takes the flag.

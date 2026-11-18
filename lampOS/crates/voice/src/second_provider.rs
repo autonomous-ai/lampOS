@@ -16920,6 +16920,19 @@ async fn answer(
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
     let reminder = matches!(asked, Asker::Reminder { .. });
+    // A photo the owner sent from the app (`LAMP_ATTACHMENTS`, #7659): a
+    // spoken line with no look's picture carries it once, as a look's
+    // picture goes, when it is theirs ([`crate::attachments::carried`]).
+    let (picture, attached) = match picture {
+        Some(jpeg) => (Some(jpeg), false),
+        None if heard => {
+            let photo =
+                crate::attachments::carried(request, scope.as_ref(), shared.services.sees());
+            let attached = photo.is_some();
+            (photo, attached)
+        }
+        None => (None, false),
+    };
     // Whether the line names the lamp, known without the model: the name
     // in its words, its name detector's note, or a wake by name before it
     // (#7346: after the first usage-limit line, only such a line hears it).
@@ -17291,6 +17304,8 @@ async fn answer(
                 && rename_note.is_none()
                 && read_back_named.is_none()
                 && skill_named.is_none()
+                // Begun without the app's photo, which round 1 now carries.
+                && !attached
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -17303,7 +17318,12 @@ async fn answer(
     // The heard words, kept for a hand-over made in code when an agent
     // they name is still given no `start_agent_task` (#6547 cause 3).
     let named_words = named_agent.is_some().then(|| said.clone());
+    // The words alone, should the chat refuse the app's photo.
+    let attached_words = attached.then(|| said.clone());
     let question = match picture {
+        Some(jpeg) if attached => {
+            Message::user_seeing(format!("{said}{}", crate::attachments::NOTE), &jpeg)
+        }
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
     };
@@ -18468,7 +18488,12 @@ async fn answer(
                         eprintln!(
                             "lamp-voice second: request {request} the chat refused the look's picture ({status}); asked again without it"
                         );
-                        messages[asked_at] = Message::user(crate::speak_up::NO_LOOK_NOTE);
+                        // The app's photo refused: the person's words
+                        // alone, never the look's note.
+                        messages[asked_at] = match &attached_words {
+                            Some(words) => Message::user(words.clone()),
+                            None => Message::user(crate::speak_up::NO_LOOK_NOTE),
+                        };
                         seeing = false;
                         refused = true;
                         break;
