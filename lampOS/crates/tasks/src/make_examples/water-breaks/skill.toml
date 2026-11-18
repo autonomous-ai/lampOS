@@ -1,0 +1,14 @@
+asks = ["start my water breaks"]
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+actions = ["repeat_reminder"]
+
+[ask]
+policy = "nudge"
+
+# One repeating reminder in the lamp's schedule: said every 30 minutes,
+# whoever is at the lamp, until the person cancels it by voice.
+[[do]]
+remind = { every = "30m", words = "Time for a glass of water." }

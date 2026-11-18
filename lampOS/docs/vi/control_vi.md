@@ -12,7 +12,9 @@ cập cho nhà phát triển trong ứng dụng.
 Khi `LAMP_CONTROL` không bật mà `LAMP_SKILL_TASKS=on`, `lamp-control` vẫn
 chạy nhưng không có cửa: không lắng nghe TCP, không TLS, không ghép đôi. Nó
 chỉ phục vụ phía chủ đèn (`--admin-socket`: lời đồng ý của voice, việc cấp
-token của lamp-tasks) và socket cho skill run. Cả hai đều tắt thì nó báo vậy
+token của lamp-tasks, và `{"notes_forget_skills": true}` → `{"forgot": N}`:
+xoá ghi chú của mọi kỹ năng tự tạo khi chủ đèn nói "quên hết", #7245) và
+socket cho skill run. Cả hai đều tắt thì nó báo vậy
 và thoát với mã 0.
 
 ## Bốn quyết định

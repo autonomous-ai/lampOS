@@ -10252,6 +10252,41 @@ fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
         .collect()
 }
 
+/// #7245: with V1's tools switched off (`LAMP_OPENCLAW_V1_TOOLS=off`), a
+/// gateway make's words name no check, as before V1's tools.
+#[test]
+fn a_gateway_make_without_v1s_tools_is_given_no_check() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER"},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let mut gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    assert!(gateway.checked, "on unless off");
+    gateway.checked = false;
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    let news = calls_of_verb(&rig, "new");
+    let task = news[0]["args"][9].as_str().unwrap();
+    assert!(task.contains("rules.md"), "{task}");
+    assert!(
+        !task.contains("lamp-skills"),
+        "no check without V1's tools: {task}"
+    );
+}
+
 /// #7245 (lamp-c0a4, 16 Nov 17:53: Harness's hand-over took 40 of 90 s): a
 /// gateway make's turn gets its whole deadline from the hand-over, so a slow
 /// `harness new` still leaves the agent its time to answer.
@@ -10332,9 +10367,14 @@ fn a_one_path_make_on_a_gateway_default_is_one_harness_new_then_closed_and_gone(
         task.contains("rules.md") && task.contains("answer.md"),
         "{task}"
     );
+    // V1's tools on (LAMP_OPENCLAW_V1_TOOLS unset, the product's): the
+    // guide's check, run from the make's folder.
     assert!(
-        !task.contains("lamp-skills"),
-        "no check on a gateway: {task}"
+        task.contains(&format!(
+            "cd {} && /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME",
+            folder.display()
+        )),
+        "the check on a gateway with V1's tools: {task}"
     );
     let closes = calls_of_verb(&rig, "close");
     assert_eq!(closes.len(), 1, "closed once");
@@ -10785,7 +10825,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         ),
         Ok(Some("needs-input".into()))
     );
-    assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, false), Ok(()));
+    // #7245: a turn cancelled or at its deadline closes it `--now`.
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, true), Ok(()));
     let calls = rig.calls();
     let path = token.to_str().unwrap();
     for call in &calls {
@@ -10814,9 +10856,17 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let held = last_reply["args"].as_array().unwrap();
     let at = held.iter().position(|arg| arg == "--timeout").unwrap();
     assert_eq!(held[at + 1], "60s");
-    let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
-    assert_eq!(close[0], "close");
-    assert!(!close.contains(&json!("--forget")), "not built yet");
+    let closes: Vec<Vec<Value>> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "close")
+        .map(|call| call["args"].as_array().unwrap().clone())
+        .collect();
+    assert_eq!(closes.len(), 2, "{closes:?}");
+    assert!(!closes[0].contains(&json!("--now")), "{:?}", closes[0]);
+    assert!(closes[1].contains(&json!("--now")), "{:?}", closes[1]);
+    for close in &closes {
+        assert!(!close.contains(&json!("--forget")), "not built yet");
+    }
     // No `capabilities` verb: `ensure --help` naming the token flag says yes.
     rig.plan(json!({
         "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},

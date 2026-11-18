@@ -62,16 +62,18 @@ sau:
      (coming to the desk is room/presence)" và `body = { gesture }`: system
      prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). Vì vậy chữ riêng của bản hướng dẫn tối
-     đa 680 byte, bản hướng dẫn dài nhất là 2.680 byte với yêu cầu 2.000
-     byte (`MOST_BRIEF_BYTES`; 1.160 với 480, trước đó là 1.340) và các dòng
+     đa 960 byte, bản hướng dẫn dài nhất là 2.960 byte với yêu cầu 2.000
+     byte (`MOST_BRIEF_BYTES`; 1.160 với 480, 1.440 khi bản hướng dẫn nêu
+     bước remind và `every` của nó ở #7245, trước đó là 1.340) và các dòng
      kiểm tra của một lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là
      560), đủ chỗ cho nghĩa của cả sáu trigger. Bản hướng dẫn chỉ đi tới
      một bên tạo: chat riêng của đèn, hoặc lượt tạo của agent của đèn, mà
      rules của nó (system prompt và bản hướng dẫn) được lamp-tasks nhận tới
      48 KiB (`lamp_tasks::skill_make::MOST_RULES_BYTES`; một test giữ lần
-     sửa dài nhất cùng system prompt dài nhất trong giới hạn đó). Nó không
-     còn bị giữ trong 2.000 byte của phần tasks: từ 3/11 không bản hướng
-     dẫn nào được gửi tới đó.
+     sửa dài nhất cùng system prompt dài nhất trong giới hạn đó); lời của
+     một lượt tạo qua gateway chỉ nêu file rules và không bao giờ chép yêu
+     cầu vào. Nó không còn bị giữ trong giới hạn của phần tasks (3.000 byte
+     từ #7245): từ 3/11 không bản hướng dẫn nào được gửi tới đó.
 3. **Mô hình của đèn viết.** Bản hướng dẫn được gửi tới chat của tuyến thứ
    hai (`llm_*`, relay hoặc DeepSeek riêng của người dùng), không có hàm,
    dạng stream, trên luồng và runtime riêng, tối đa 30 giây
@@ -507,7 +509,7 @@ sau:
      thuộc loại khác thì quay lại để sửa (`made_skill::WRITE_NOT_FIXED`).
      System prompt liệt kê các loại và khoá của chúng
      (`make_skill_local::write_rules`); brief thêm "Or one write, as
-     above." (hoặc "Or a read/write as above."), vẫn trong 2.680
+     above." (hoặc "Or a read/write as above."), vẫn trong 2.960
      byte.
    - **Lời của nó là lời của chính yêu cầu**
      (`made_skill::write_from_request`, tại `keep_asked`, nay nhận yêu
@@ -698,7 +700,7 @@ sau:
      (`make_skill_local::code_rules`) nói dạng, các giới hạn và các quyền,
      rằng mã chỉ tới được đèn qua SDK của đèn với đúng các quyền đó và không
      có mạng nào khác, và rằng đèn đọc lại rồi chờ lời đồng ý; brief thêm
-     "Or code, as above." (vẫn trong 2.680 byte), và một câu trả lời có thể
+     "Or code, as above." (vẫn trong 2.960 byte), và một câu trả lời có thể
      dài tới 37 KiB. Nó nêu đúng các lời gọi thật của SDK
      (`made_skill::SCRIPT_SDK`, #6749 E): `import asyncio`,
      `from lampos import Lamp`, `lamp = await Lamp.local()` trong
@@ -708,6 +710,30 @@ sau:
      `asyncio.run(main())`; không có module nào khác của đèn (trên
      lamp-9adf, 13/11, mô hình đã viết `from lamp import light` và
      `light.set_light(…, for="59s")`).
+     Khi `LAMP_MADE_NOTES=on` (#7245) nó còn nêu
+     `lamp.notes.set(key, value)` và `lamp.notes.get(key)` (quyền `notes`,
+     `made_skill::SCRIPT_NOTES_SDK`): một ghi chú nhỏ giữ trong kho notes
+     của lamp-control dưới client riêng của kỹ năng
+     (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
+     là một tệp người dùng mở được. Lời nhắc nói rõ SDK có hai lệnh đó, nên
+     kỹ năng như vậy làm được, và khi `LAMP_MADE_SKILL_ASKS` cũng bật, một
+     kỹ năng khởi động bằng chính lời người dùng nói là khởi động bằng
+     `asks` của nó, không phải nghe trong phòng (`NOTES_ASKS_RULES`; trên
+     lamp-c0a4, 18/11, OpenClaw đã từ chối "when I say fruit notes ..." với
+     lý do "SDK không có lệnh ghi chú"). Một câu nói tự nhận đã ghi tệp hay ghi
+     chú mà mã không gọi `lamp.notes.set` bị từ chối để sửa lại
+     (`made_skill::CLAIMS_A_FILE`), cũng như một câu nói hay lời của task hứa
+     một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc
+     lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
+     "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
+     xóa ghi chú của mọi kỹ năng tự tạo. Một quyền ghi chú viết dưới tên
+     khác (`note`, hoặc `notes` hay `note` rồi `-`, `_` hoặc `:` và một từ, hoa
+     hay thường, như `notes-write`; danh sách trên một hay nhiều dòng, có thể
+     kèm chú thích) được viết lại thành `notes` trên một dòng trước khi kiểm
+     tra
+     (`made_skill::notes_granted`; c0a4, 18/11: OpenClaw xin
+     `notes-write`); không quyền nào khác bị đổi tên hay thêm vào. Khi tắt,
+     giữ nguyên từng byte như trước.
    - **Được mời cho giọng nói** (#6749 B): khi bật công tắc, mô tả của
      hàm `make_skill` (`make_skill_local::CODE_TOLD`) nói rằng một kỹ năng
      tự tạo có thể mang script Python riêng, chạy bởi task của nó khi người
@@ -1031,22 +1057,35 @@ sau:
    [skills.md](../skills.md), `do.remind`): `{ at = "HH:MM", words = "..." }`
    đặt một lời nhắc qua `set_reminder` của phần actions (lần `HH:MM` địa
    phương kế tiếp), hoặc `{ in = D, words = "..." }` đặt một hẹn giờ qua
-   `set_timer` (D tính từ lần chạy, từ `1m` đến `24h`), cùng lời gọi giọng nói
+   `set_timer` (D tính từ lần chạy, từ `1m` đến `24h`), hoặc `{ every = D,
+   words = "..." }` đặt một lời nhắc lặp qua `repeat_reminder` với
+   `every = "interval"` (#7245: D là số phút tròn, từ `15m` đến `24h`, theo
+   `MIN_EVERY_MINUTES` và `MAX_EVERY_MINUTES` của lịch; nói mỗi D cho đến khi
+   huỷ bằng giọng nói; cần `LAMP_SCHEDULE_EVERY=on` trong `lamp-actions` và
+   `lamp-schedule`), cùng lời gọi giọng nói
    dùng khi có người hỏi, với `LAMP_SCHEDULE_TOOLS=on` trong `lamp-actions`.
    Cần tên hàm đó trong `[permissions] actions`, kiểm tra lúc nạp và lại lúc
    gọi. `words` là chữ cố định của kỹ năng, không bao giờ do mô hình viết lúc
    chạy, cùng giới hạn của câu nói trong kỹ năng tự tạo: tối đa 120 ký tự, một
    hoặc hai câu, không địa chỉ web, không dấu ngoặc kép, ngoặc nhọn hay dấu
    backtick, không ký tự điều khiển hay định dạng; sai thì kỹ năng bị từ chối
-   lúc nạp. Chỉ trong kỹ năng do trigger khởi động, không có `tool`. Phép lịch
+   lúc nạp. Chỉ trong kỹ năng do trigger hoặc chính lời của nó (`asks`) khởi động, không
+   có `tool`; tên hàm cần là `set_reminder`, `set_timer` hoặc `repeat_reminder`. Phép lịch
    sự: một kỹ năng đặt tối đa 3 cái trong 24 giờ bất kỳ (`remind::MOST_A_DAY`),
    và không bao giờ chồng: trước khi đặt nó đọc `list_reminders`, và cùng lời
    đã đặt mà chưa nói thì không đặt mới; danh sách không đọc trọn được thì không
    đặt gì. Đọc lại là của lịch: journal ghi `set, due HH:MM` chỉ khi câu trả
    lời là `committed`, không bao giờ ghi lời nhắc. Lời gọi không nêu người gọi,
    nên lời nhắc là của phòng: nói với ai đang ở bên đèn khi đến giờ. Nó không
-   đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Kỹ năng tự tạo chưa tạo
-   được bước này; phần nói lại của nó đến sau.
+   đọc bộ nhớ và không ghi gì ngoài mục trong lịch. Agent tạo kỹ năng (#7245)
+   chỉ được dạy `every` của bước này trong `guide.md`, `format.md` và ví dụ
+   `water-breaks`; `in` hay `at` một lần vẫn là của Schedule, không bao giờ
+   dạy như một kỹ năng, và brief của giọng nói chỉ nêu `every` khi bật
+   `LAMP_MAKE_AGENT_GUIDE` (`made_skill::remind_told`), nên lần tạo của
+   DeepSeek giữ brief như hôm nay. Hướng dẫn dạy một lời nhắc tự phát các
+   chốt chặn của sip-of-water (`[[while]]` voice/state không speaking và đang
+   resting, room/activity không head_down, một lần mỗi lần ngồi), như các ví
+   dụ `break-timer` và `water-while-here`.
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
@@ -3121,10 +3160,22 @@ cả hai người viết.
   một thư mục tạo mới (đường chạy chung của #7133), đọc lại `answer.md`,
   không tạo token và không mở lần chạy skill-start nào, và xoá phiên cùng
   thư mục dù lần tạo kết thúc thế nào ([tasks_vi.md](tasks_vi.md), "Một lần
-  tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). OpenClaw chỉ
-  chạy được skill-start, nên lần chạy của nó bỏ `lamp-skills pack` của
-  hướng dẫn; kiểm tra và sửa của giọng nói vẫn như cũ. Một `cannot:` được
-  chuyển nguyên văn tới phương án dự phòng của #7234. Nhật ký ghi "the
+  tạo bằng giọng nói trên OpenClaw, qua đường chạy chung"). Khi quyền
+  công cụ của V1 bật (`LAMP_OPENCLAW_V1_TOOLS`, bật trong sản phẩm), OpenClaw có
+  toàn quyền exec như V1 (trên gateway, security full, ask off, elevated),
+  nên lần chạy của nó có bước kiểm tra `lamp-skills pack` của hướng dẫn như lần
+  tạo của Hermes (`skill_make::gateway_checked_prompt`); khi công tắc đó
+  `off`, OpenClaw chỉ chạy được skill-start, nên lần chạy của nó bỏ bước
+  kiểm tra (`gateway_guide`). Dù thế nào, kiểm tra và sửa của giọng nói
+  vẫn như cũ. Một `cannot:` đầu
+  tiên không nêu giới hạn thật nào của đèn (`made_skill::real_limit`) được
+  hỏi lại một lần, trích lại lý do cùng những gì một kỹ năng làm được
+  (`make_skill_local::cannot_asked_again`, `CANNOT_AGAIN_CAN`), chỉ khi
+  còn ít nhất 40 giây thời gian của agent (`CANNOT_AGAIN_LEAST`), lượt đó
+  không quá phần còn lại; lý do không bao giờ được ghi nhật ký (#7245: mô
+  hình rẻ của OpenClaw trả lời `cannot:` 4 trên 5 lần tạo trên lamp-c0a4,
+  18/11). Một `cannot:` thứ hai được chuyển nguyên văn tới phương án dự
+  phòng của #7234. Nhật ký ghi "the
   lamp's agent is OpenClaw: handed over on the one run path". Trên đèn
   hoàn toàn không có agent (không có target `lamp`; #7375), lần tạo
   DeepSeek giữ được vẫn là kết quả và các lời từ chối của chính brief giữ
@@ -3176,6 +3227,40 @@ cả hai người viết.
   (người nhận của chính họ khi ghi) không bao giờ nằm trong luật: mỗi địa
   chỉ là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu
   trả lời của agent trước khi kiểm tra.
+- **Màn trình diễn ánh sáng trong kỹ năng tự tạo (#7245, khi bật
+  `LAMP_MADE_SKILL_ASKS`).** Luật tạo kỹ năng cho mô hình biết một kỹ năng
+  chỉ khởi động bằng `asks` của nó có thể phát một màn trình diễn ánh sáng
+  (`make_skill_local::SHOWS_RULES`): một bước `[[do]]` `show = "NAME"`,
+  `light = true`, và thêm một khối có rào tên
+  ```` ```shows/NAME.toml ```` gồm 2 đến 30 khung `[[light]]` (mức 1 đến 5,
+  mỗi khung 2 s đến 20 s, tổng tối đa một phút); các màu nối tiếp hay lặp
+  lại được viết ra từng khung. Nháy hay chớp trong kỹ năng như vậy là một
+  màn trình diễn màu đó xen kẽ mức 5 và mức 1, mỗi khung 2 s, phần chớp
+  nhanh hơn được nói là bị bỏ ra (`BLINK_SHOWS`); ở chỗ khác, và khi tắt
+  công tắc, vẫn là `BLINK` như trước, từng byte. Giọng nói nhận tối đa
+  `made_skill::MOST_SHOWS` (2) khối show, mỗi khối tối đa
+  `MOST_SHOW_BYTES` (4 KiB) văn bản thuần tên `shows/NAME.toml`, mỗi tệp
+  được một bước phát và tệp của mỗi bước đều có, tối đa 30 khung
+  (`shows_held`, bị từ chối để sửa với `SHOWS_NOT_HELD`); nó ghi chúng vào
+  thư mục kỹ năng cạnh `skill.toml`, nên `lamp-skills pack` đọc từng khung
+  bằng kiểm tra show của chính nó và SHA-256 của gói bao gồm chúng, và
+  helper quản lý kiểm tra lại khi bật kỹ năng (`put_on_scripts`).
+  lamp-skills phát show trong kỹ năng chỉ do lời của nó khởi động (không
+  trigger), như kỹ năng do tool khởi động. Khi tắt công tắc, một khối
+  `shows/` là tệp mà kỹ năng tự tạo không được có, như trước. Thư mục tạo
+  kỹ năng của agent gateway (OpenClaw, `put_for_gateway`) còn có
+  `format.md`, toàn bộ `docs/skill-format.md` của bản build này
+  (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, toàn bộ tài liệu SDK
+  Python của đèn (`skill_make::SDK`, `sdk/python/README.md`, để code của
+  kỹ năng dùng được mọi hàm), và `examples/`, bảy kỹ năng hoàn chỉnh
+  (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu nói
+  theo `asks`, cử chỉ và câu nói khi ngồi lâu, tung đồng xu bằng code, câu
+  nói lặp mỗi 30 phút khi có người, hẹn giờ nghỉ bằng `remind`, nhắc uống
+  nước mỗi 30 phút bằng `remind every`, và script dẫn ba nhịp thở bằng đèn
+  và giọng nói), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
+  nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
+  ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
+  của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
 - **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
   nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần
@@ -3192,12 +3277,16 @@ cả hai người viết.
   draft/NAME` (đúng `pack` mà giọng nói dùng để giữ một kỹ năng tự tạo;
   `/opt` hiện trong namespace của lần tạo, và gói được ghi vào `/tmp` riêng
   của lần chạy), sửa theo lời của kiểm tra tối đa hai lần, rồi ghi
-  `answer.md` như luật nói. Mỗi câu trả lời có 90 giây
-  (`make_skill_agent::GUIDED_WRITE_WITHIN`), bằng khi không có hướng dẫn
-  (`WRITE_WITHIN`), trong 120 giây của agent. Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
+  `answer.md` như luật nói. Mỗi câu trả lời có 10 phút
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`, #7245, quyết định của builder
+  đầu tiên trên #6811; 90 giây khi không có hướng dẫn, `WRITE_WITHIN`),
+  trong 10 phút 30 giây của agent (`MAKE_WITHIN`, hơn của lamp-tasks 30
+  giây, `TASKS_MARGIN`). Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
   bị từ chối được gửi lại kèm lời của kiểm tra (`REPAIR_MARK`) tối đa thêm
   2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thêm một câu trả
-  lời vẫn vừa 120 giây, và câu vẫn bị từ chối được nói là không tạo được,
+  lời vẫn vừa thời gian của agent (nên với hướng dẫn, mà một lần chạy đã
+  viết nháp, kiểm tra và sửa hai lần, lần sửa của giọng nói hiếm khi bắt
+  đầu), và câu vẫn bị từ chối được nói là không tạo được,
   như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
   `process::second_route_worker_environment` chuyển cho), và với MAKE IT
@@ -3220,12 +3309,12 @@ cả hai người viết.
     lamp-tasks báo lần chạy của lần giao đầu tiên đã bắt đầu (không bao giờ
     sau một lượt bị cắt, và bỏ qua nếu không nói được trong 15 giây), rồi
     im lặng cho đến khi đèn nói lại kỹ năng hoặc nói không tạo được. Với
-    hướng dẫn, một câu trả lời có thể mất tới 90 giây, cộng tối đa 5 giây
-    chờ thêm của lamp-tasks, và phần của agent tới 120 giây khi có một lần
-    sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả lời 90
-    giây vẫn kết thúc trong 120 giây, tức là chỉ sau một câu trả lời đến
-    trong 30 giây: sau một câu trả lời từ 60 giây trở lên thì không còn lần
-    sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
+    hướng dẫn, một câu trả lời có thể mất tới 10 phút, cộng tối đa 5 giây
+    chờ thêm của lamp-tasks, và phần của agent tới 10 phút 30 giây khi có
+    một lần sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả
+    lời 10 phút vẫn kết thúc trong 10 phút 30 giây, tức là chỉ sau một câu
+    trả lời đến trong 30 giây: sau một câu trả lời quá 30 giây thì không
+    còn lần sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
     đó giữ nguyên; cả hai lần sửa chỉ xảy ra khi câu trả lời đầu và lần sửa
     đầu cộng lại không quá 30 giây. Những lần sửa thường vừa là của chính
     hướng dẫn, bên trong lần chạy.
@@ -3235,25 +3324,32 @@ cả hai người viết.
   giao (`NotWritten::NoMakeRun`). Thất bại của một câu trả lời của DeepSeek
   vẫn giữ nguyên và được nói rõ ràng. Nhật ký ghi "can't be run in a skill
   run's namespace here".
-- **Agent im lặng.** lamp-tasks giết cả nhóm tiến trình của lần chạy khi
-  hết 90 giây. Giọng nói chờ chừng đó và thêm một chút (tối đa 5 giây), rồi
-  thất bại vẫn giữ nguyên.
-- **Giới hạn.** Mỗi câu trả lời của agent trong 90 giây
-  (`make_skill_agent::WRITE_WITHIN`, trong mức tối đa 120 giây của
-  lamp-tasks, `lamp_tasks::skill_make::MOST_WITHIN`). Trước đây là 45 giây:
+- **Agent im lặng.** lamp-tasks kết thúc lần chạy khi hết `within_ms` của
+  dòng: 10 phút khi có hướng dẫn (bật trong sản phẩm), 90 giây khi không;
+  với Hermes, cả nhóm tiến trình của lần chạy bị giết. Giọng nói chờ chừng
+  đó và thêm một chút (tối đa 5 giây; trên đường chạy chung, nơi
+  lamp-tasks tính từ lúc giao, tới gấp đôi thời gian của lần chạy cộng
+  phần chờ thêm đó, `Agent::read_within`), rồi thất bại vẫn giữ nguyên.
+- **Giới hạn.** Mỗi câu trả lời của agent trong 10 phút khi có hướng dẫn
+  (`make_skill_agent::GUIDED_WRITE_WITHIN`) và 90 giây khi không
+  (`make_skill_agent::WRITE_WITHIN`), trong mức tối đa 10 phút của
+  lamp-tasks (`lamp_tasks::skill_make::MOST_WITHIN`, #7245; trước là 120
+  giây). Mức 90 giây trước đây là 45 giây:
   trên lamp-9adf, 14/11 (bản 12958), một lần tạo có code hết giờ ở 45 giây
   2 trên 2, trong khi riêng `hermes chat -q "Say OK."` đã mất khoảng 24,5
   giây trên Orange Pi đó, khoảng 13 giây trước khi phiên của Hermes bắt
   đầu, và một lần tạo gmail không có script mất 30 giây trên một đèn khác;
   90 giây chừa khoảng một phút cho việc tạo sau khi Hermes đã chạy. Một lần
-  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 120 giây của agent
-  (`make_skill_agent::MAKE_WITHIN`, không đổi), nên chỉ có lần sửa sau một
-  câu trả lời đầu trong vòng 30 giây.
-  Agent không trả lời trong 90 giây, lỗi, hay không có câu trả lời đầu: kỹ
+  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 10 phút 30 giây của
+  agent (`make_skill_agent::MAKE_WITHIN`, #7245; trước là 120 giây), nên
+  khi không có hướng dẫn các lần sửa có chỗ.
+  Agent không trả lời trong thời gian của nó (10 phút khi có hướng dẫn, 90
+  giây khi không), lỗi, hay không có câu trả lời đầu: kỹ
   năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
   của DeepSeek, vốn không được sửa (khi đèn có agent DeepSeek không được sửa
   lần nào), nên đây không phải thất bại sau 3 lần sửa như hôm nay. Một lần
-  tạo có thể kéo dài tới 240 giây, và tuyến thứ hai chờ câu của lần tạo theo
+  tạo có thể kéo dài tới 12 phút 30 giây (120 giây của DeepSeek và 10 phút
+  30 giây của agent), và tuyến thứ hai chờ câu của lần tạo theo
   đúng mức đó (`make_skill_local::longest_make`).
 - **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
   lamp-tasks báo lần chạy tạo đầu tiên của agent bắt đầu (nó báo ngay khi
@@ -3283,9 +3379,10 @@ cả hai người viết.
   long-wait line is said". Không câu nào lặp lại. Qua dịch vụ nói (không có
   lượt giọng nói nào chờ lần tạo) chỉ nói câu chờ, không bao giờ nói câu chờ
   lâu: không có lượt thì không có dáng suy nghĩ để giữ. Một lần tạo hết giờ
-  (`make_skill_agent::MAKE_WITHIN`, 120 giây) nói câu chờ lâu ở khoảng 90
-  giây và câu báo thất bại ở khoảng 120 giây: hai câu cách nhau khoảng 30
-  giây, đúng như thiết kế, không phải lỗi. Từ lúc nói xong câu chờ
+  (`make_skill_agent::MAKE_WITHIN`, 10 phút 30 giây từ #7245) nói câu chờ
+  lâu ở khoảng 90 giây và câu báo thất bại ở cuối; giữa hai câu chỉ có dáng
+  suy nghĩ (nhả lượt sau câu chờ lâu là của #7774, một cách duy nhất, không
+  thêm ở đây). Từ lúc nói xong câu chờ
   tới khi có kết quả, đèn hiện dáng suy nghĩ: âm thanh của mỗi câu chờ gửi
   xong là lượt sinh của nó kết thúc (`GenerationComplete`, rồi
   `MakeWaiting`), nên phần phát dừng lại, vòng đèn và thân đèn chuyển sang
@@ -3732,7 +3829,7 @@ chối khi cài.
    không `[trigger]` và không `[ask]`. Mô hình được biết kỹ năng chưa thể
    nghe những gì nói trong phòng, và bản brief ghi "one [trigger] as listed
    or [said] as above" ở chỗ vốn nêu sự có mặt ở bàn (lời nhắc hệ thống cũng
-   nêu điều đó), nên brief dài nhất vẫn trong 2.680 byte. Bất cứ gì khác
+   nêu điều đó), nên brief dài nhất vẫn trong 2.960 byte. Bất cứ gì khác
    cạnh `[said]` bị từ chối kèm các dòng cho một lần sửa
    (`made_skill::said_asked`), và người dùng nghe "I couldn't make that
    one." nếu đã hết lượt sửa.
@@ -3877,7 +3974,7 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    phòng "other than a request told to the lamp (a [said] start) or the
    words the person names to start it (asks), both below", và brief nói
    "one [trigger] listed, [said]/asks as above", viết ngắn để brief dài
-   nhất với mọi switch bật vẫn trong 2.680 byte.
+   nhất với mọi switch bật vẫn trong 2.960 byte.
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
@@ -3889,6 +3986,14 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    tối đa 8 (`made_skill::MOST_ADDED_ASKS`, các trigger phrase của nó, mục
    7), giữ cùng hình dạng; không có tool, hoặc khi công tắc tắt, chúng bị
    từ chối. Bước dọn giữ nguyên chúng.
+   Model tạo kỹ năng được cho xem đúng dạng (`asks = ["apple file"]` là
+   dòng đầu tiên của file, rồi `kind`, `version`, rồi `[permissions]`). Một
+   `asks` nó vẫn viết dưới một bảng (trên lamp-c0a4, 18/11, OpenClaw viết
+   nó sau `[permissions]` và `lamp-skills` từ chối kỹ năng vì "unknown
+   field") được nhấc lên dòng đầu tiên của file trước bước kiểm tra
+   (`made_skill::asks_lifted`, một dòng journal), chỉ khi phần đầu chưa có
+   và kỹ năng vẫn đọc như cũ với asks ở đầu; nếu không thì trả lại nguyên
+   như cũ.
 3. **Không bao giờ là của kỹ năng khác** (`made_skill::asks_taken`, lúc
    tạo, sau khi tên đã trống): một cụm trùng với ask của kỹ năng khác, hoặc
    chứa tên hay function của kỹ năng khác (đã cài, đẩy lên hoặc trong file

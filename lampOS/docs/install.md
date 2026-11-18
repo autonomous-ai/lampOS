@@ -2549,7 +2549,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      glob, no argument pattern), in OpenClaw's exec approvals (its state
      database, not `openclaw.json`): with OpenClaw's stock
      `tools.exec.mode: "ask"`, a headless turn's exec is denied otherwise,
-     since nobody can answer the approval. The work folder
+     since nobody can answer the approval. Since #7245, lamp-tasks writes
+     V1's `tools.exec` (`security: "full"`, `ask: "off"`) unless
+     `LAMP_OPENCLAW_V1_TOOLS=off` (docs/tasks.md, "OpenClaw's settings on
+     the lamp"). The entry stays for a lamp with that switch off. The work folder
      (`/var/lib/lampos-tasks/harnesses/lamp-tasks`) stays writable to the
      gateway and every OpenClaw agent, so nothing in it is allowlisted;
      an earlier build's glob there
@@ -2596,7 +2599,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the gateway active; only then does it go false.
      Off, the wrapper and `openclaw-ns` are as before #6685, byte for
      byte. lamp-update never writes OpenClaw's shared
-     `openclaw.json` for a skill's run and never changes `tools.exec`: its
+     `openclaw.json` for a skill's run and never changes `tools.exec` (lamp-tasks does, #7245): its
      one write of that file is the install's own `gateway` block (the
      gateway's token, above), with any switch.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
