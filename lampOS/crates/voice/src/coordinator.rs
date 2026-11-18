@@ -14145,16 +14145,26 @@ fn conversation_with_gate_inner(
             )?;
             last_publish = monotonic_us();
         }
-        // A long make's news (#6811): "ready" with its read-back, or that
-        // it wasn't finished, said only to its person at the lamp, as the
-        // lamp's own turn: their face seen, no conversation going on (15 s
-        // with nothing said by or to the lamp), never in the quiet hours,
-        // never to an empty room; else it waits, for days if need be
-        // (`crate::long_make::may_tell`).
+        // A long make's news (#6811): "ready and on" in one line, or that
+        // it wasn't finished or put on, said only to its person at the
+        // lamp, as the lamp's own turn: their face seen alone (the line
+        // names the skill), no conversation going on (15 s with nothing said
+        // by or to the lamp), never in the quiet hours, never to an empty
+        // room; else it waits, for days if need be
+        // (`crate::long_make::may_tell`). News is looked for first, so the
+        // faces are read only when there is some.
+        let long_make_now = (std::time::Instant::now(), crate::app_make::now_unix_ms());
         if let Some(tells) = long_makes.as_mut()
             && !reminder_waiting
+            && tells.has_news(long_make_now.0, long_make_now.1)
+            && !room.busy()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
             && crate::long_make::may_tell(
-                crate::long_make::owner_seen_now(),
+                crate::services::owner_sees_alone_now(),
                 crate::task_news::quiet_for_news(
                     false,
                     clock,
@@ -14173,15 +14183,8 @@ fn conversation_with_gate_inner(
                     .as_ref()
                     .is_some_and(|presence| presence.present(clock)),
             )
-            && !room.busy()
-            && reply.is_none()
-            && provider_queue.is_empty()
-            && !admission.owns_stream()
-            && !submission_draining
-            && snapshot.listening_ready(now())
             && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
-            && let Some(note) =
-                tells.next(std::time::Instant::now(), crate::app_make::now_unix_ms())
+            && let Some(note) = tells.next(long_make_now.0, long_make_now.1)
         {
             eprintln!("lamp-voice: telling a long make's news to its person at the lamp (#6811)");
             snapshot = commit_written_turn(

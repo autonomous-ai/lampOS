@@ -9369,31 +9369,35 @@ pub fn drop_gone(keeping: &Keeping) {
 /// package with it unless another entry names it (`crate::made_clash`'s
 /// cancel, or a clash never answered): never told as made and off.
 pub fn forget_unput(directory: &Path, sha256: &str) {
-    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
-        .into_iter()
-        .partition(|entry| entry["sha256"] == sha256 && entry["on"] != true);
-    if gone.is_empty() {
-        return;
-    }
-    if let Err(error) = write_index(directory, &entries) {
-        eprintln!("lamp-voice: a made skill not put on wasn't dropped from the index: {error}");
-        return;
-    }
-    drop_packages(directory, gone, &entries);
+    index_locked(directory, || {
+        let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+            .into_iter()
+            .partition(|entry| entry["sha256"] == sha256 && entry["on"] != true);
+        if gone.is_empty() {
+            return;
+        }
+        if let Err(error) = write_index(directory, &entries) {
+            eprintln!("lamp-voice: a made skill not put on wasn't dropped from the index: {error}");
+            return;
+        }
+        drop_packages(directory, gone, &entries);
+    })
 }
 
 /// Drop from the index every kept skill called `name` but the one from
 /// `from`, their packages with them.
 fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
-    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
-        .into_iter()
-        .partition(|entry| entry["name"] == name && entry["from"] != from);
-    if gone.is_empty() {
-        return Ok(());
-    }
-    write_index(directory, &entries)?;
-    drop_packages(directory, gone, &entries);
-    Ok(())
+    index_locked(directory, || {
+        let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+            .into_iter()
+            .partition(|entry| entry["name"] == name && entry["from"] != from);
+        if gone.is_empty() {
+            return Ok(());
+        }
+        write_index(directory, &entries)?;
+        drop_packages(directory, gone, &entries);
+        Ok(())
+    })
 }
 
 /// The packages of the index entries `gone`, each unless one of `entries`,
@@ -10361,18 +10365,21 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
         Ok(does),
         true,
     )?;
-    let mut entries = index(&keeping.directory);
-    for entry in &mut entries {
-        if entry["sha256"] == made.sha256.as_str() {
-            entry["agent"] = json!(true);
-            entry["grants"] = json!(grants);
-            // Its keys' names, for the app (`LAMP_SKILL_SECRETS`).
-            if crate::upload_agent::secrets_on() {
-                entry["secrets"] = json!(crate::upload_agent::secrets_of_toml(&files.toml));
+    index_locked(&keeping.directory, || {
+        let mut entries = index(&keeping.directory);
+        for entry in &mut entries {
+            if entry["sha256"] == made.sha256.as_str() {
+                entry["agent"] = json!(true);
+                entry["grants"] = json!(grants);
+                // Its keys' names, for the app (`LAMP_SKILL_SECRETS`).
+                if crate::upload_agent::secrets_on() {
+                    entry["secrets"] = json!(crate::upload_agent::secrets_of_toml(&files.toml));
+                }
             }
         }
-    }
-    write_index(&keeping.directory, &entries).map_err(unkept)?;
+        write_index(&keeping.directory, &entries)
+    })
+    .map_err(unkept)?;
     Ok(made)
 }
 
@@ -10435,14 +10442,17 @@ pub fn keep_agent_asked(
         Ok(does),
         true,
     )?;
-    let mut entries = index(&keeping.directory);
-    for entry in &mut entries {
-        if entry["sha256"] == made.sha256.as_str() {
-            entry["agent"] = json!(true);
-            entry["grants"] = json!(grants);
+    index_locked(&keeping.directory, || {
+        let mut entries = index(&keeping.directory);
+        for entry in &mut entries {
+            if entry["sha256"] == made.sha256.as_str() {
+                entry["agent"] = json!(true);
+                entry["grants"] = json!(grants);
+            }
         }
-    }
-    write_index(&keeping.directory, &entries).map_err(unkept)?;
+        write_index(&keeping.directory, &entries)
+    })
+    .map_err(unkept)?;
     Ok(made)
 }
 
@@ -10900,9 +10910,22 @@ pub fn kept_by_sha256(directory: &Path, sha256: &str) -> Option<Made> {
         .and_then(|entry| made_of(directory, &entry))
 }
 
+/// Whether the kept skill `sha256` is on the lamp, as its index entry says
+/// (`crate::long_make`).
+pub fn is_on(directory: &Path, sha256: &str) -> bool {
+    index(directory)
+        .iter()
+        .any(|entry| entry["sha256"] == sha256 && entry["on"] == true)
+}
+
 /// The kept skill `sha256`'s index entry given `key` as `value`, or `key`
 /// taken off with none (`crate::long_make::READY_UNTOLD`).
 pub fn mark(directory: &Path, sha256: &str, key: &str, value: Option<Value>) {
+    index_locked(directory, || mark_in(directory, sha256, key, value));
+}
+
+/// [`mark`], its index lock held.
+fn mark_in(directory: &Path, sha256: &str, key: &str, value: Option<Value>) {
     let mut entries = index(directory);
     let mut found = false;
     for entry in &mut entries {
@@ -11101,6 +11124,19 @@ fn remember_with(
     directory: &Path,
     from: &str,
     made: &Made,
+    added: (bool, Option<&str>),
+    toml_sha256: &str,
+) -> io::Result<()> {
+    index_locked(directory, || {
+        remember_in(directory, from, made, added, toml_sha256)
+    })
+}
+
+/// [`remember_with`], its index lock held.
+fn remember_in(
+    directory: &Path,
+    from: &str,
+    made: &Made,
     (added, made_with): (bool, Option<&str>),
     toml_sha256: &str,
 ) -> io::Result<()> {
@@ -11179,6 +11215,11 @@ pub fn writes_in(toml: &str) -> Vec<Value> {
 
 /// Keep the writes of the kept skill `sha256` beside it in the index.
 fn note_writes(directory: &Path, sha256: &str, writes: &[Value]) -> io::Result<()> {
+    index_locked(directory, || note_writes_in(directory, sha256, writes))
+}
+
+/// [`note_writes`], its index lock held.
+fn note_writes_in(directory: &Path, sha256: &str, writes: &[Value]) -> io::Result<()> {
     let mut entries = index(directory);
     for entry in &mut entries {
         if entry["sha256"] == sha256 {
@@ -11191,6 +11232,11 @@ fn note_writes(directory: &Path, sha256: &str, writes: &[Value]) -> io::Result<(
 /// What the made skill `sha256` starts on and uses, kept as `"clash"`
 /// beside it (`crate::made_clash::signature`).
 fn note_clash(directory: &Path, sha256: &str, signature: Value) -> io::Result<()> {
+    index_locked(directory, || note_clash_in(directory, sha256, signature))
+}
+
+/// [`note_clash`], its index lock held.
+fn note_clash_in(directory: &Path, sha256: &str, signature: Value) -> io::Result<()> {
     let mut entries = index(directory);
     for entry in &mut entries {
         if entry["sha256"] == sha256 {
@@ -11205,6 +11251,11 @@ fn note_clash(directory: &Path, sha256: &str, signature: Value) -> io::Result<()
 /// while it is kept and not on. With the switch off, or no asks, the
 /// index is untouched.
 fn note_asks(directory: &Path, sha256: &str, toml: &str) -> io::Result<()> {
+    index_locked(directory, || note_asks_in(directory, sha256, toml))
+}
+
+/// [`note_asks`], its index lock held.
+fn note_asks_in(directory: &Path, sha256: &str, toml: &str) -> io::Result<()> {
     if !asks_on() {
         return Ok(());
     }
@@ -11244,6 +11295,53 @@ pub(crate) fn write_entries(directory: &Path, entries: &[Value]) -> io::Result<(
     write_index(directory, entries)
 }
 
+/// The lock beside the index that [`index_locked`] holds.
+const INDEX_LOCK: &str = ".made.lock";
+
+std::thread_local! {
+    /// How deep this thread is in [`index_locked`].
+    static INDEX_HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// This thread's hold in [`index_locked`], let go when dropped.
+struct IndexHeld {
+    _lock: Option<fs::File>,
+}
+
+impl Drop for IndexHeld {
+    fn drop(&mut self) {
+        INDEX_HELD.with(|held| held.set(held.get().saturating_sub(1)));
+    }
+}
+
+/// `edit`, a read and write of the index in `directory`, done holding the
+/// index's lock ([`INDEX_LOCK`] beside it, an advisory `flock`, which
+/// holds threads and processes alike): the coordinator
+/// (`crate::long_make::heard`) and the second route's worker both write
+/// it, and neither loses the other's write (El's P3 on #7774). Nested on
+/// one thread, the lock held already is kept. With no lock to be had (no
+/// folder yet), done as before.
+pub(crate) fn index_locked<T>(directory: &Path, edit: impl FnOnce() -> T) -> T {
+    let nested = INDEX_HELD.with(|held| {
+        held.set(held.get() + 1);
+        held.get() > 1
+    });
+    let _held = IndexHeld {
+        _lock: (!nested)
+            .then(|| {
+                fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .write(true)
+                    .open(directory.join(INDEX_LOCK))
+                    .and_then(|file| file.lock().map(|()| file))
+                    .ok()
+            })
+            .flatten(),
+    };
+    edit()
+}
+
 /// The index written whole beside it and moved over it.
 fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
     let new = directory.join(format!(".{INDEX}.new"));
@@ -11260,6 +11358,11 @@ fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
 /// a made skill goes on with no spoken yes (the owner, 10 Nov: the app's
 /// MAKE IT and the voice ask are the ask, #5977). Whether one was marked.
 pub fn goes_on(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<bool> {
+    index_locked(directory, || goes_on_in(directory, sha256, now_unix_ms))
+}
+
+/// [`goes_on`], its index lock held.
+fn goes_on_in(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<bool> {
     let mut entries = index(directory);
     let mut found = false;
     for entry in &mut entries {
@@ -11309,6 +11412,11 @@ fn not_on(directory: &Path, sha256: &str, why: &str) {
 /// The check's words are only of the refusal they came with: none, and
 /// any kept before is dropped.
 fn not_on_said(directory: &Path, sha256: &str, why: &str, said: Option<&str>) {
+    index_locked(directory, || not_on_said_in(directory, sha256, why, said));
+}
+
+/// [`not_on_said`], its index lock held.
+fn not_on_said_in(directory: &Path, sha256: &str, why: &str, said: Option<&str>) {
     let said = said.and_then(check_said);
     let mut entries = index(directory);
     let mut found = false;
@@ -11523,6 +11631,13 @@ pub const CODE_BY_VOICE: &str = "a skill that runs its own code goes on only onc
 /// asked, `code_asked_at_unix_ms`, so the voice's second route takes its
 /// yes once that say-back is said ([`code_asked_in`]).
 pub fn code_asked(directory: &Path, sha256: &str, now_unix_ms: u64) {
+    index_locked(directory, || {
+        code_asked_locked(directory, sha256, now_unix_ms)
+    });
+}
+
+/// [`code_asked`], its index lock held.
+fn code_asked_locked(directory: &Path, sha256: &str, now_unix_ms: u64) {
     let mut entries = index(directory);
     let mut found = false;
     for entry in &mut entries {
@@ -11728,17 +11843,20 @@ pub fn put_on_within(
         // No answer in time: the helper may still put it on.
         None => refused(NOT_SAID_IN_TIME.into()),
         Some(true) => {
-            let mut entries = index(directory);
-            for entry in &mut entries {
-                if entry["sha256"] == sha256 {
-                    entry["on"] = json!(true);
-                    if let Some(entry) = entry.as_object_mut() {
-                        entry.remove("not_on");
-                        entry.remove("check_said");
+            let written = index_locked(directory, || {
+                let mut entries = index(directory);
+                for entry in &mut entries {
+                    if entry["sha256"] == sha256 {
+                        entry["on"] = json!(true);
+                        if let Some(entry) = entry.as_object_mut() {
+                            entry.remove("not_on");
+                            entry.remove("check_said");
+                        }
                     }
                 }
-            }
-            if let Err(error) = write_index(directory, &entries) {
+                write_index(directory, &entries)
+            });
+            if let Err(error) = written {
                 eprintln!("lamp-voice: a made skill is on, but not marked so: {error}");
             }
             eprintln!("lamp-voice: a made skill is on the lamp: {name}, sha256 {sha256}");
