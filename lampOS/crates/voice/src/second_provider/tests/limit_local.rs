@@ -97,9 +97,14 @@ async fn engine_going_on(
             .unwrap()
             .is_none()
             || (on
-                && ["Brighter.", LIMIT_TIMER_DONE, LIMIT_REMINDER_DUE, last_piece]
-                    .iter()
-                    .any(|line| engine.shared.fixed_clips.kept(line).is_none()))
+                && [
+                    "Brighter.",
+                    LIMIT_TIMER_DONE,
+                    LIMIT_REMINDER_DUE,
+                    last_piece,
+                ]
+                .iter()
+                .any(|line| engine.shared.fixed_clips.kept(line).is_none()))
         {
             tokio::task::yield_now().await;
         }
@@ -422,7 +427,11 @@ async fn at_the_limit_the_time_is_said_from_its_pieces() {
         );
     }
     assert!(names(&ran).is_empty(), "no function for the time");
-    assert_eq!(script.asked.lock().unwrap().len(), 2, "no chat at the limit");
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "no chat at the limit"
+    );
 }
 
 /// The time's pieces: the hour with its lead, the minutes as a clock is
@@ -486,10 +495,7 @@ async fn at_the_known_limit_a_due_timer_or_reminder_is_rung_with_its_own_line() 
         refused.contains(&format!("audio:{}", DOWN_LINE_LIMIT.len())),
         "{refused:?}"
     );
-    for (request, timer, line) in [
-        (2, true, LIMIT_TIMER_DONE),
-        (3, false, LIMIT_REMINDER_DUE),
-    ] {
+    for (request, timer, line) in [(2, true, LIMIT_TIMER_DONE), (3, false, LIMIT_REMINDER_DUE)] {
         engine.submit(due(request, timer));
         let rung = turn(&mut engine).await;
         assert!(rung.contains(&format!("audio:{}", line.len())), "{rung:?}");
