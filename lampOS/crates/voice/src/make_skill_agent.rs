@@ -372,6 +372,15 @@ pub fn not_made_try(why: &str) -> &'static str {
 /// (`lamp_tasks::skill_make`, one at a time).
 const BUSY_CODE: &str = "busy";
 
+/// How a make refused [`BUSY_CODE`] is said ([`Agent::write`]).
+fn busy_why() -> String {
+    format!("lamp-tasks didn't make it ({BUSY_CODE})")
+}
+
+/// How often a person's make asks again for the slot an old skill's remake
+/// holds ([`Agent::write`]).
+const BUSY_AGAIN: Duration = Duration::from_millis(500);
+
 impl Agent {
     /// The agent for a voice make, with the switch on and a tasks part;
     /// none otherwise.
@@ -543,7 +552,30 @@ impl Agent {
     /// make run, within [`Agent::within`]. With `waiting`,
     /// [`WAITING_LINE`] is said once lamp-tasks says the run starts, never
     /// when it was refused at once.
+    ///
+    /// The person goes first (#7765): refused `busy` while an old skill is
+    /// remade here (`crate::made_remake`), the remake is asked to stand
+    /// down and this make waits for the slot, asking again every
+    /// [`BUSY_AGAIN`] within [`Agent::within`], never told busy for it.
     pub fn write(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
+        let began = std::time::Instant::now();
+        loop {
+            let written = self.write_once(system, brief, waiting);
+            let busy = matches!(&written, Err(NotWritten::Failed(why)) if *why == busy_why());
+            if busy && began.elapsed() < self.within && crate::made_remake::stand_down() {
+                eprintln!(
+                    "lamp-voice: a skill made here: an old skill's remake holds the make: it \
+                     stands down, this make waits its turn"
+                );
+                std::thread::sleep(BUSY_AGAIN);
+                continue;
+            }
+            return written;
+        }
+    }
+
+    /// One [`Agent::write`] to lamp-tasks' make socket.
+    fn write_once(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
         let mut stream = UnixStream::connect(self.tasks.join(MAKE_SOCKET_NAME))
             .map_err(|_| NotWritten::NoMakeRun)?;
         // lamp-tasks ends the run at `within`; its answer comes just after.

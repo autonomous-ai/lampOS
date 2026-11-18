@@ -7637,3 +7637,116 @@ line no longer cuts `wellbeing_nudges` or `set_pose` to its name alone.
   `use_skill`'s section. Whether the model calls `use_skill` for each
   question (`calls=use_skill:1`, not `calls=none`, the rows on build 10883
   for Light scenes and Light show) is a played row's on a lamp.
+
+## Old skills remade in the middle form
+
+With `LAMP_REMAKE_OLD_SKILLS` on (exactly `on`, in no unit; the first
+builder's yes on #6811, 18 Nov 16:40; remade without asking, the first
+builder 18:23; the middle form, his 19:50 ruling), a skill DeepSeek made
+before the route, which isn't a quick reaction, is made again in the middle
+form a new make judged no quick reaction takes: the trigger the lamp's own
+model picks, one task for the lamp's agent whose words are the skill's own
+request, and sip-of-water's guards, so it holds back while the person talks
+(`made_remake`). A quick reaction is left alone, never remade. The lamp
+writes it: the agent is never asked to write it, and lamp-tasks' make slot
+is never taken.
+
+- **What it touches** (`made_remake::chosen`). A kept made skill on the
+  lamp whose `made_with` (in `made.json`, else the card's `made_with:`
+  line) is missing or `deepseek`, made here by voice or in the app (`from`
+  is `local:` or `written:`), and not a quick reaction
+  (`made_skill::quick_reaction`, the route's own test). Never one added
+  from a file (`upload:`, `added`), a Store or core skill (a folder of that
+  name not marked `made: here`), or one changed since it was made: its
+  folder must hold the very package made (`.package.json`) and, with no code
+  of its own, the very `skill.toml` (`toml_sha256`).
+- **Remade without asking** (the first builder, 18 Nov 18:23, in place of
+  16:40's one ask). No offer is ever given and no yes is waited for: with
+  the switch on, the pass queues each one that qualifies on its own
+  (`remake.json`'s `queue`), never one the person put back or one out of
+  tries. The person's own "remake my old skills" comes back as
+  `make_skill`'s `remake_old` `asked`, the model's judgment of their words,
+  the owner's alone, heard (`services::owner_hears`): it queues them now,
+  one put back or out of tries too, and the pass begins within its caps.
+- **Cheap on every line** (#7765). A guest's line reads nothing here, and
+  an owner's reads only `remake.json`. The scan of the made skills' folders
+  is in the pass's look a minute, not on a line, and with nothing new to
+  queue the made index's time and size are kept, so it runs again only once
+  the index changed: on 31 made skills (a laptop's debug test) the scan took
+  about 4.4 ms and a look with nothing changed about 0.3 ms.
+- **Remade one at a time** (`made_remake::step`, a look a minute in the
+  second route's worker): only while idle (no line heard for 10 minutes),
+  never in the made skills' quiet hours (`made_skill::MANNERS_QUIET`,
+  22:00 to 08:00; a zone that can't be read counts as quiet), at most 5
+  begun a day, and never once the relay's day is 80% used. No reader of
+  that level (#7738) is here yet: `When::relay_day_mostly_used` is a marked
+  seam that says no. Each remake makes the skill's own `made.json`
+  `description`, the lamp's code-written words, its one task
+  (`make_skill_local::remade_as_task`), through the very path a new make
+  judged no quick reaction takes (`make_skill_local::agent_task`,
+  `make_no_cannot::skill_text`): one call to the lamp's own model for its
+  name, grants and trigger, one `do.task` of those words run by the lamp's
+  agent script, sip-of-water's three `[[while]]` guards
+  (`made_skill::template_guards`), no say and no other step a model wrote,
+  the same checks and repairs. No reaction judgement, no DeepSeek draft and
+  no waiting line. It needs an agent on the lamp to do its task (as
+  lamp-tasks' targets name it), but the agent is never asked to write it. It is kept under the same name. While it runs, that thread
+  reads as `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on
+  (`made_skill::reactions_on`), so the guards are written and said, even
+  with that switch off.
+- **Replaced only once it passes.** The new one is kept (the same checks a
+  new make passes) and put on through the manage helper. Its only code is
+  the lamp's own agent script (`Uses::agent_task`), so it goes on with no
+  yes recorded: its task runs only once the person agrees, asked when it
+  first fires (lamp-skills' `task_yes`, kept by lamp-control). One with any
+  other code, which waits for a spoken yes, is not put on. Then its on/off
+  state is kept (turned off again if it was in lamp-skills' `off` file).
+  Its card says `made_with: hermes` or `openclaw` (the agent that does its
+  task) after `made_by`, whenever this switch is on, even with
+  `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off; its entry records `made_with` and
+  `remade_from` (the old package's SHA-256), with the old entry under `old`
+  beside `replaced_at_ms`.
+- **The person goes first** (#7765). A remake never takes lamp-tasks' one
+  make slot (the middle form is written by the lamp), so it never holds up
+  a person's make. A person's make refused `busy` for another make while a
+  remake runs still asks the remake to stand down
+  (`made_remake::stand_down`) and waits for the slot, asking again every
+  0.5 s within its own time; the remake keeps nothing, the old skill stays,
+  and it is tried again another day, not counted as a try.
+- **A failed remake** leaves the old skill exactly as it was; the new one,
+  if kept, is dropped. The journal says "a made skill's remake: not kept:"
+  and a short reason of the lamp's own, never a word of the skill. It is
+  tried at most once more, on another day.
+- **Undo for 7 days.** `make_skill`'s `put_back`, the name as heard ("put my
+  old water skill back"), matched to the remade skills' names in code, puts
+  the old package back on, on or off as it was, and deletes the new one.
+  One put back is never queued on its own again, only on the person's ask.
+  After 7 days the old package is deleted and `old` dropped.
+- **One line, once, after the fact.** When the day's remakes are done, the
+  owner's next heard line with nothing else waiting is told first, once, in
+  the lamp's language (Vietnamese on a Vietnamese lamp, else the
+  conversation's), the real count and one real name: "I updated 3 of your
+  skills so they wait while you talk; each asks you once before it first
+  runs. Say 'put my old water skill back' to undo." (one skill: "I updated
+  your water skill so it waits while you talk; it asks you once before it
+  first runs. ..."). It is marked told before the note.
+
+Off (unset, or anything but `on`), `make_skill`'s parameters, the heard
+line's notes and every answer are as before, and no pass starts.
+`lamp-voice` passes the exact `on` to its `provider` and `second` workers.
+
+Tests (`made_remake::tests`): `only_a_deepseek_presence_skill_is_picked`,
+`no_offer_is_ever_given_and_qualifying_skills_are_queued_on_their_own`,
+`one_at_a_time_five_a_day_idle_only_never_at_night`,
+`a_remake_replaces_it_under_its_name_with_made_with_and_off_kept`,
+`a_failed_remake_keeps_the_old_skill_untouched_and_tries_once_more_another_day`,
+`only_the_lamps_own_task_script_goes_on_any_other_code_is_never_put_on`,
+`put_back_within_a_week_restores_it_and_after_a_week_the_old_is_deleted`,
+`with_the_switch_off_nothing_happens`,
+`the_one_line_after_is_told_once_in_the_owners_language`,
+`nothing_to_queue_is_kept_until_the_index_changes`,
+`a_persons_make_during_a_remake_makes_it_stand_down` and
+`a_persons_make_waits_for_the_slot_a_remake_holds`, with a fake
+middle-form make, helper and clock; and
+`make_skill_local::tests::an_old_skill_is_remade_as_its_trigger_and_one_task_with_the_guards`,
+through a stub model.

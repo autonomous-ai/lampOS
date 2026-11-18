@@ -4858,3 +4858,100 @@ Kiểm thử (`crates/skills/src/lib.rs`):
 `a_note_says_one_number_from_the_reading_that_fired_it`.
 
 Mô tả đầy đủ ở [skills.md](../skills.md), "A number from the reading in a note".
+
+## Kỹ năng cũ được làm lại ở dạng giữa
+
+Khi bật `LAMP_REMAKE_OLD_SKILLS` (đúng `on`, không unit nào đặt; first
+builder đồng ý trên #6811, 18/11 16:40; làm lại không cần hỏi, first
+builder 18:23; dạng giữa, phán quyết 19:50 của anh), một kỹ năng DeepSeek
+làm trước khi có route, không phải phản ứng nhanh, được làm lại ở dạng giữa
+mà một lần làm mới bị phán không phải phản ứng nhanh nhận: trigger do mô
+hình của chính đèn chọn, một task cho agent của đèn với lời là chính yêu cầu
+của kỹ năng, và guard của sip-of-water, để nó nhường khi người đang nói
+(`made_remake`). Phản ứng nhanh được để nguyên, không làm lại. Đèn tự viết
+nó: agent không bao giờ được nhờ viết, và chỗ làm kỹ năng của lamp-tasks
+không bao giờ bị chiếm.
+
+- **Đụng tới gì** (`made_remake::chosen`). Một kỹ năng tự làm đang giữ và
+  đang trên đèn, có `made_with` (trong `made.json`, nếu không thì dòng
+  `made_with:` của thẻ) thiếu hoặc là `deepseek`, làm tại đây bằng giọng nói
+  hoặc trong app (`from` bắt đầu bằng `local:` hoặc `written:`), và không
+  phải phản ứng nhanh (`made_skill::quick_reaction`, phép thử của route).
+  Không bao giờ đụng kỹ năng thêm từ tệp (`upload:`, `added`), kỹ năng Store
+  hay lõi (thư mục cùng tên không ghi `made: here`), hay kỹ năng đã đổi từ
+  khi làm: thư mục phải giữ đúng gói đã làm (`.package.json`) và, nếu không
+  có code riêng, đúng `skill.toml` (`toml_sha256`).
+- **Làm lại không cần hỏi** (first builder, 18/11 18:23, thay cho câu hỏi
+  một lần lúc 16:40). Không bao giờ có lời mời và không chờ câu đồng ý nào:
+  khi bật công tắc, lượt chạy tự xếp hàng từng kỹ năng đủ điều kiện
+  (`queue` trong `remake.json`), không bao giờ xếp kỹ năng người đã đặt lại
+  hay đã hết lượt thử. Câu tự yêu cầu của người ("remake my old skills") về
+  qua `remake_old` là `asked` của `make_skill`, do mô hình phán đoán, chỉ
+  của chủ, nói thành tiếng (`services::owner_hears`): xếp hàng ngay, kể cả
+  kỹ năng đã đặt lại hay hết lượt thử, và lượt chạy bắt đầu trong giới hạn.
+- **Rẻ trên mỗi câu** (#7765). Câu của khách không đọc gì ở đây, câu của chủ
+  chỉ đọc `remake.json`. Việc quét thư mục nằm trong lần xem mỗi phút của
+  lượt chạy, không ở mỗi câu, và khi không có gì mới để xếp hàng, thời gian
+  và kích thước của chỉ mục được giữ, nên chỉ quét lại khi chỉ mục đổi: với
+  31 kỹ năng (kiểm thử debug trên laptop), quét mất khoảng 4,4 ms, một lần
+  xem không đổi gì khoảng 0,3 ms.
+- **Người đi trước** (#7765). Lần làm lại không bao giờ chiếm chỗ làm kỹ
+  năng duy nhất của lamp-tasks (dạng giữa do đèn viết), nên không bao giờ
+  giữ chân lần làm của người. Lần làm của người bị từ chối `busy` vì một lần
+  làm khác trong khi đang làm lại thì vẫn yêu cầu lần làm lại nhường
+  (`made_remake::stand_down`) và chờ chỗ, hỏi lại mỗi 0,5 giây trong thời
+  gian của nó; lần làm lại không giữ gì, kỹ năng cũ giữ nguyên, và được thử
+  lại vào ngày khác, không tính là một lần thử.
+- **Làm lại từng cái một** (`made_remake::step`, mỗi phút một lần trong
+  worker của route thứ hai): chỉ khi rảnh (10 phút không nghe câu nào),
+  không trong giờ yên lặng của kỹ năng tự làm (`made_skill::MANNERS_QUIET`,
+  22:00 tới 08:00; múi giờ không đọc được thì coi là yên lặng), tối đa 5
+  lần bắt đầu mỗi ngày, và không khi ngày của relay đã dùng 80%. Chưa có bộ
+  đọc mức đó (#7738): `When::relay_day_mostly_used` là chỗ nối được đánh dấu,
+  luôn trả lời không. Mỗi lần làm lại lấy `description` trong `made.json`
+  của chính kỹ năng (lời do code của đèn viết) làm task duy nhất của nó
+  (`make_skill_local::remade_as_task`), qua đúng đường một lần làm mới bị
+  phán không phải phản ứng nhanh đi (`make_skill_local::agent_task`,
+  `make_no_cannot::skill_text`): một lần hỏi mô hình của chính đèn để có
+  tên, quyền và trigger, một `do.task` của lời đó chạy bằng script agent của
+  đèn, ba guard `[[while]]` của sip-of-water (`made_skill::template_guards`),
+  không có câu nói và không bước nào khác do mô hình viết, cùng kiểm tra và
+  sửa. Không phán phản ứng nhanh, không bản nháp DeepSeek, không có câu chờ.
+  Cần một agent trên đèn để làm task (như target của lamp-tasks nêu), nhưng
+  agent không bao giờ được nhờ viết nó. Giữ dưới cùng tên. Khi chạy, luồng
+  đó được coi như `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` bật
+  (`made_skill::reactions_on`), nên guard được viết và nói ra, kể cả khi
+  công tắc đó tắt.
+- **Chỉ thay khi đã qua.** Bản mới được giữ (cùng các kiểm tra như một lần
+  làm mới) và bật qua helper quản lý. Code duy nhất của nó là script agent
+  của chính đèn (`Uses::agent_task`), nên nó được bật mà không ghi câu đồng
+  ý nào: task của nó chỉ chạy khi người đồng ý, được hỏi lúc nó chạy lần đầu
+  (`task_yes` của lamp-skills, lamp-control giữ). Bản có code nào khác, cần
+  câu đồng ý nói ra, thì không được bật. Rồi trạng thái bật/tắt được giữ.
+  Thẻ của nó ghi `made_with: hermes` hoặc `openclaw` (agent làm task) sau
+  `made_by` mỗi khi công tắc này bật, kể cả khi
+  `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` tắt; mục của nó ghi
+  `made_with` và `remade_from` (SHA-256
+  của gói cũ), với mục cũ nằm dưới `old` cùng `replaced_at_ms`.
+- **Làm lại thất bại** thì kỹ năng cũ giữ nguyên; bản mới, nếu đã giữ, bị bỏ.
+  Nhật ký ghi "a made skill's remake: not kept:" và một lý do ngắn của đèn,
+  không có chữ nào của kỹ năng. Thử lại tối đa một lần nữa, vào ngày khác.
+- **Hoàn tác trong 7 ngày.** `put_back` của `make_skill`, tên như nghe được
+  ("put my old water skill back"), khớp bằng code với tên các kỹ năng đã làm
+  lại, bật lại gói cũ, bật hay tắt như trước, và xoá bản mới. Sau 7 ngày gói
+  cũ bị xoá và `old` bị bỏ. Kỹ năng đã đặt lại không bao giờ tự xếp hàng
+  lại, chỉ khi người yêu cầu.
+- **Một câu, một lần, sau khi xong.** Khi xong các lần làm lại trong ngày,
+  câu nghe được tiếp theo của chủ khi không có gì khác đang chờ được báo
+  trước, một lần, bằng ngôn ngữ của đèn (tiếng Việt trên đèn tiếng Việt,
+  nếu không thì ngôn ngữ của cuộc trò chuyện), với số thật và một tên thật:
+  "I updated 3 of your skills so they wait while you talk; each asks you
+  once before it first runs. Say 'put my old water skill back' to undo."
+  (một kỹ năng: "I updated your water skill so it waits while you talk; it
+  asks you once before it first runs. ..."). Được đánh dấu đã báo trước khi ghi chú.
+
+Khi tắt (chưa đặt, hoặc khác `on`), tham số của `make_skill`, ghi chú của
+câu nghe được và mọi câu trả lời như trước, và không có lượt nào chạy.
+`lamp-voice` chuyển đúng `on` cho worker `provider` và `second`.
+
+Mô tả đầy đủ ở [skills.md](../skills.md), "Old skills remade in the middle form".
