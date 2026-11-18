@@ -4224,6 +4224,27 @@ pub fn serve(
             crate::did_history::ENVIRONMENT
         );
     }
+    // A line that is a whole trigger of a running app is taken by that app
+    // (#7415 piece 6, LAMP_APP_TRIGGERS, off).
+    if crate::app_triggers::on() {
+        match files
+            .bus_root
+            .as_deref()
+            .and_then(crate::app_triggers::line_taker)
+        {
+            Some(take) => {
+                eprintln!(
+                    "lamp-voice second: a final line that is a running app's trigger is told to it and ends there when it takes it ({})",
+                    crate::app_triggers::ENVIRONMENT
+                );
+                engine = engine.taking_app_lines(take);
+            }
+            None => eprintln!(
+                "lamp-voice second: there is no bus to tell an app its trigger on, so none is ({})",
+                crate::app_triggers::ENVIRONMENT
+            ),
+        }
+    }
     if let Some(place) = named_agent {
         engine = engine.catching_named_agents(Arc::new(move |words: &str| {
             crate::agent_tasks::named_for_work(&place, words)

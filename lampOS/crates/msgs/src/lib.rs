@@ -58,6 +58,8 @@ mod shutdown;
 pub use shutdown::*;
 mod ears;
 pub use ears::*;
+mod app_triggers;
+pub use app_triggers::*;
 mod body_sound;
 pub use body_sound::*;
 mod lamp_did;
@@ -2655,6 +2657,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(sound_class_topics())
         .chain(body_sound_topics())
         .chain(lamp_did_topics())
+        .chain(app_trigger_topics())
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(reports_topics())

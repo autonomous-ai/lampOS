@@ -59,6 +59,13 @@ pub(super) struct HeldRenames {
     ran: Option<(u64, String)>,
 }
 
+impl HeldRenames {
+    /// Whether a rename waits for its yes now.
+    pub(super) fn is_held(&self) -> bool {
+        self.held.is_some()
+    }
+}
+
 /// Whom a rename is held for, or whose yes runs one: the line's session and
 /// known person, its own ([`forget_asker`]) or theirs only by their face
 /// alone in view with no other voice heard
