@@ -67,6 +67,11 @@ pub struct FaceSwitches {
     /// only because the eyes' known file named a face is kept only for a
     /// face the eyes know ([`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`], #7704).
     pub face_save_known_only: bool,
+    /// A question whether the lamp knows them ("Do you remember my
+    /// face?") is no ask to remember them, and a face already known by the
+    /// name asked for is told so with no look and no save
+    /// ([`FACE_QUESTION_NOT_ASK_ENVIRONMENT`]).
+    pub face_question: bool,
 }
 
 /// A refused face request tells the model the face record as it stands
@@ -144,6 +149,26 @@ pub const FACE_SAVE_KNOWN_ONLY_ENVIRONMENT: &str = "LAMP_FACE_SAVE_KNOWN_ONLY";
 /// Whether [`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`] is exactly `on`.
 pub fn face_save_known_only_on() -> bool {
     std::env::var(FACE_SAVE_KNOWN_ONLY_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
+/// A question whether the lamp knows or remembers them ("Do you remember
+/// me?", "Did you remember my face?", "Do you know my face?") is no ask to
+/// remember them (lamp-74ff, 19 Nov: two such questions, right after the
+/// face was kept, called `remember_my_face`, and the name checks answered
+/// that the lamp could not take the look). The model is told so in the
+/// tool's description ([`QUESTION_NOT_ASK`]); its call still stands, never
+/// judged by words here. A call for the face in view under the name the
+/// eyes already know it by, a fresh real match, is told so
+/// ([`already_known`]), with no look and nothing saved. `on` only, off
+/// unless set.
+pub const FACE_QUESTION_NOT_ASK_ENVIRONMENT: &str = "LAMP_FACE_QUESTION_NOT_ASK";
+
+/// Whether [`FACE_QUESTION_NOT_ASK_ENVIRONMENT`] is exactly `on`.
+pub fn face_question_not_ask_on() -> bool {
+    std::env::var(FACE_QUESTION_NOT_ASK_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on")
@@ -917,6 +942,14 @@ pub(crate) fn refused_here(told: &Value) -> bool {
         ]
         .contains(&error)
     })
+}
+
+/// Whether a tool answer was given here, the eyes not asked: a refusal
+/// ([`refused_here`]), or, with `LAMP_FACE_QUESTION_NOT_ASK`, a face already
+/// known by that name (`already_known`). The voice's log then never says
+/// the eyes answered.
+pub(crate) fn answered_here(told: &Value) -> bool {
+    refused_here(told) || (told.get("already_known").is_some() && told.get("remembered").is_none())
 }
 
 /// Whether a tool answer is the first setup save's refusal for want of the
@@ -1962,6 +1995,140 @@ pub fn asks_to_remember(said: &str) -> bool {
         })
 }
 
+/// With `LAMP_FACE_QUESTION_NOT_ASK`: the second worker's faces, read for
+/// the one near face's track ([`reused_name`]); `None` until it starts, or
+/// without the bus.
+static TRACKS: std::sync::Mutex<Option<std::sync::Arc<crate::speaking_faces::SpeakingFaces>>> =
+    std::sync::Mutex::new(None);
+
+/// The name confirmed this session (said back and agreed, or spelled, in a
+/// save's checks) and the one near face (`boot/f3`) in view as it was
+/// ([`note_confirmed`]). Memory only; a forget clears it.
+static CONFIRMED: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
+
+/// Gives [`reused_name`] the second worker's faces (`None`: no reuse).
+pub fn sees_tracks_with(eyes: Option<std::sync::Arc<crate::speaking_faces::SpeakingFaces>>) {
+    if let Ok(mut tracks) = TRACKS.lock() {
+        *tracks = eyes;
+    }
+}
+
+/// The one near face in view now, by the second worker's faces.
+fn one_near_face_now() -> Option<(std::sync::Arc<crate::speaking_faces::SpeakingFaces>, String)> {
+    let eyes = TRACKS.lock().ok()?.clone()?;
+    let face = eyes.one_near_face(std::time::Instant::now())?;
+    Some((eyes, face))
+}
+
+/// Keeps `name` as confirmed this session, with the one near face in view
+/// now; with none, or two, nothing is kept and an older confirmation goes.
+fn note_confirmed(name: &str) {
+    if let Ok(mut confirmed) = CONFIRMED.lock() {
+        *confirmed = one_near_face_now().map(|(_, face)| (name.to_owned(), face));
+    }
+}
+
+/// Forgets the name confirmed this session ([`note_confirmed`]).
+fn forget_confirmed() {
+    if let Ok(mut confirmed) = CONFIRMED.lock() {
+        *confirmed = None;
+    }
+}
+
+/// With `LAMP_FACE_QUESTION_NOT_ASK`: whether `name` may stand as heard
+/// though not said again (lamp-74ff, 19 Nov: saves right after the name
+/// was confirmed were refused as not heard). All must hold: it is the name
+/// confirmed this session ([`note_confirmed`]: said back and agreed, or
+/// spelled), folded alike; exactly one near face is in view now
+/// ([`crate::speaking_faces::SpeakingFaces::one_near_face`]); and it is the
+/// same track as the one near face when it was confirmed, the same passing
+/// id or one followed from it. A held or carried name is never one. The
+/// save then goes to the eyes' own checks as any other: a name kept for
+/// another face is theirs to refuse ([`NOT_LIKE_THEM`]).
+pub(crate) fn reused_name(name: &str) -> bool {
+    let Some((then_name, then_face)) = CONFIRMED
+        .lock()
+        .ok()
+        .and_then(|confirmed| confirmed.clone())
+    else {
+        return false;
+    };
+    let asked = folded_words(name);
+    if asked.is_empty() || folded_words(&then_name) != asked {
+        return false;
+    }
+    one_near_face_now()
+        .is_some_and(|(eyes, now)| eyes.same_track(&then_face, &now, std::time::Instant::now()))
+}
+
+/// What the model is told of a [`REMEMBER`] call for the face in view under
+/// the name the eyes already know it by ([`already_known`]), or answered by
+/// the eyes `already` (their prints kept in place, no new person).
+pub(crate) const ALREADY_KNOWN_NOTE: &str = "You already know this face by that name. Tell them in a few words that you already know their face, with their name, like \"I already know your face, Ana.\" Never say you'll know them now or that you just remembered them, don't mention noticing their visits, and don't say anything failed.";
+
+/// Where the voice reads whether the eyes mark a name kept by a hold, not
+/// a match: the held mark beside the known file ([`held_mark_of`]), written
+/// by the eyes with their own `LAMP_FACE_STICKY=on` (#7933). `on` only.
+/// Without it a held name (`LAMP_FACE_KNOWN_HOLD`'s 4 s renew) can't be
+/// told from a match, so [`already_known`] is never taken from the known
+/// file and every save goes to the eyes, which match afresh.
+pub const FACE_STICKY_ENVIRONMENT: &str = "LAMP_FACE_STICKY";
+
+#[cfg(test)]
+thread_local! {
+    /// Tests: the held marks taken as written ([`held_marks_on`]).
+    static TEST_HELD_MARKS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`FACE_STICKY_ENVIRONMENT`] is exactly `on`.
+fn held_marks_on() -> bool {
+    #[cfg(test)]
+    if TEST_HELD_MARKS.with(std::cell::Cell::get) {
+        return true;
+    }
+    std::env::var(FACE_STICKY_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The eyes' held mark beside the known file `known`: `-held` (#7933's
+/// `who::known_held_of`).
+fn held_mark_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-held");
+    PathBuf::from(beside)
+}
+
+/// Whether the eyes' held mark beside `known` was written within [`FRESH`],
+/// as the known file is.
+fn held_mark_fresh(known: &Path) -> bool {
+    std::fs::metadata(held_mark_of(known))
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|written| SystemTime::now().duration_since(written).ok())
+        .is_some_and(|age| age < FRESH)
+}
+
+/// With [`FaceSwitches::face_question`]: the known name of the face in view
+/// when it is `name`, folded alike (case, accents, spaces;
+/// [`folded_words`]), and only as a fresh real match (the owner, 20 Nov
+/// 02:18): the known file within [`FRESH`] ([`known_now`]), the eyes
+/// marking held names ([`held_marks_on`]) and no fresh held mark beside it.
+/// `None` for a face known by another name, an unknown face, none, a held
+/// name, or eyes whose held names can't be told: the save then goes to
+/// the eyes, which answer `already` or `not_like_them` from a fresh look.
+pub(crate) fn already_known(socket: &Path, name: &str) -> Option<String> {
+    already_known_marked(socket, name, held_marks_on())
+}
+
+/// [`already_known`] with the held marks read or not (`marks`).
+fn already_known_marked(socket: &Path, name: &str, marks: bool) -> Option<String> {
+    let asked = folded_words(name);
+    let known = known_file_of(socket);
+    if !marks || asked.is_empty() || held_mark_fresh(&known) {
+        return None;
+    }
+    known_now(&known).filter(|known| folded_words(known) == asked)
+}
+
 /// Where the second route reads whether a known face giving another name
 /// must call [`REMEMBER`], so the lamp asks before renaming them (`on`
 /// only; [`gives_another_name`], #5485).
@@ -2078,6 +2245,13 @@ pub const DEADLINE: Duration = Duration::from_secs(6);
 pub(crate) const FRESH: Duration = Duration::from_secs(3);
 const MOST_NAME_BYTES: usize = 120;
 
+/// With [`FaceSwitches::face_question`], at the end of [`REMEMBER`]'s
+/// description, checked or not: a question whether the lamp knows them is
+/// no ask. The model's call is never judged by its words here.
+const QUESTION_NOT_ASK: &str = " A question of whether you know or remember them (\"Do you remember me?\", \
+     \"Did you remember my face?\", \"Do you know my face?\") is not an ask: answer it from who you see now, \
+     and never call this for it.";
+
 /// The two functions the model is told of when the eyes remember faces.
 /// With names checked, remembering takes `replace`, for a face known by
 /// another name.
@@ -2097,6 +2271,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         name_learn_fix: false,
         face_no_ask: false,
         face_save_known_only: false,
+        face_question: false,
     })
 }
 
@@ -2120,7 +2295,12 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
                  tell them why in a few words. Never call it for someone who did not ask, or with a name \
                  given for somebody else."
             }
-            .into(),
+            .to_owned()
+                + if switches.face_question {
+                    QUESTION_NOT_ASK
+                } else {
+                    ""
+                },
             parameters: Some(if checked {
                 json!({
                     "type": "object",
@@ -2222,6 +2402,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             name_learn_fix: false,
             face_no_ask: false,
             face_save_known_only: false,
+            face_question: false,
         },
         None,
         None,
@@ -2385,6 +2566,23 @@ fn run_scoped_into(
 ) -> (Value, bool) {
     if call.name != REMEMBER || !switches.remember_speaker {
         return run_for_with(socket, call, switches, person, line, None, replaced);
+    }
+    // With `LAMP_FACE_QUESTION_NOT_ASK`, before the speaker's own checks:
+    // a face known by this name, only when the line's own speaking face is
+    // that known face ([`said_by_known_face`]). The confirmed name is never
+    // reused here: this route keeps a face only on the speaker's own words
+    // ([`reused_name`] is `run_switched`'s).
+    if switches.face_question
+        && said_by_known_face(line)
+        && let Some(name) = call
+            .args
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        && let Some(told) = face_question_first(socket, call, switches, name)
+    {
+        return record_told(socket, call, told, switches, person, line);
     }
     let mut told = run_speaker(socket, call, switches, line, request, lease, replaced);
     if switches.face_no_ask && !switches.at_setup {
@@ -2550,7 +2748,8 @@ fn run_speaker(
             if switches.face_no_ask && switches.visits && !switches.at_setup {
                 told = no_ask_visits(socket, told);
             }
-            (told, true)
+            // With `LAMP_FACE_QUESTION_NOT_ASK`, known already (lamp-74ff).
+            (told_already(told, &answer, switches, replace), true)
         }
         None => (
             json!({"error": "I could not finish remembering that face. I have not confirmed that it was saved."}),
@@ -2751,6 +2950,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             name_learn_fix: false,
             face_no_ask: false,
             face_save_known_only: false,
+            face_question: false,
         },
         said,
         None,
@@ -2773,6 +2973,69 @@ fn run_at_setup(socket: &Path, call: &ToolCall, said: &Said) -> (Value, bool) {
         None,
         &mut None,
     )
+}
+
+/// With `LAMP_FACE_QUESTION_NOT_ASK`, before any name check, on either
+/// save route ([`run_switched`], and the speaker-bound [`run_speaker`]'s
+/// caller, only for the line's own speaking face): the face in view already
+/// known by this name, a fresh real match ([`already_known`]), needs no
+/// look and no save, whatever the line says (lamp-74ff, 19 Nov: "Did you
+/// remember my face then?" right after the face was kept was answered that
+/// the lamp couldn't take the look). Whether a line asks or only wonders is
+/// the model's call, told in the description ([`QUESTION_NOT_ASK`]), never
+/// judged here. `None` goes on as before. Never a rename, nor the setup
+/// walk's first save.
+fn face_question_first(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    name: &str,
+) -> Option<(Value, bool)> {
+    let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    if !switches.face_question || call.name != REMEMBER || replacing || switches.at_setup {
+        return None;
+    }
+    let known = already_known(socket, name)?;
+    eprintln!(
+        "lamp-voice: remember_my_face for the face in view under the name it is known by: nothing sent (LAMP_FACE_QUESTION_NOT_ASK)"
+    );
+    Some((
+        json!({"already_known": known, "note": ALREADY_KNOWN_NOTE}),
+        true,
+    ))
+}
+
+/// The speaker-bound save's line was said by the face the eyes' known file
+/// names: its own speaking face ([`crate::remember_speaker::Proof`]) is the
+/// known face read with it, as [`run_speaker`]'s own check. An off-camera
+/// voice giving the in-view person's name is not.
+fn said_by_known_face(line: Option<&crate::speaking_faces::LineSeen>) -> bool {
+    line.is_some_and(|line| {
+        line.enrollment
+            .as_ref()
+            .zip(line.known.as_ref())
+            .is_some_and(|(proof, (_, face))| *face == proof.face)
+    })
+}
+
+/// With `LAMP_FACE_QUESTION_NOT_ASK`: a face the eyes already kept under
+/// this name, matched as theirs (their `already`), is said to be known
+/// already, never as a first save, and the visits line said at the first
+/// save is not said again (lamp-74ff). Never on a rename.
+fn told_already(told: Value, answer: &Value, switches: FaceSwitches, replacing: bool) -> Value {
+    if switches.face_question
+        && !replacing
+        && answer.get("already").and_then(Value::as_bool) == Some(true)
+        && let Some(kept) = told["remembered"].as_str().map(str::to_owned)
+    {
+        return json!({
+            "ok": true,
+            "remembered": kept,
+            "already_known": kept,
+            "note": ALREADY_KNOWN_NOTE,
+        });
+    }
+    told
 }
 
 fn run_switched(
@@ -2802,6 +3065,9 @@ fn run_switched(
     // With `LAMP_NAME_LEARN_FIX` (#7331), two letters too once the lamp
     // asked for a spelling.
     let replacing = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    if let Some(told) = face_question_first(socket, call, switches, name) {
+        return told;
+    }
     let spelled_rename = checked && switches.name_learn_fix && replacing && spelling_asked(said);
     // Right after the lamp said a spelled name back by its letters
     // ([`spelled_back`]), a line may correct it ([`corrects_spelled_back`]).
@@ -2845,6 +3111,24 @@ fn run_switched(
     // Not while the eyes' known file names a face at the lamp: a known
     // face's "Call me Jay." still goes to the eyes' "known as" and the
     // rename's own yes, as above (Heron's and Migrate's HOLDs on #7800).
+    // With `LAMP_FACE_QUESTION_NOT_ASK`, a name confirmed here (said back
+    // and agreed, or spelled) is kept for this session with the one near
+    // face in view, before any refusal, for a later save of that face
+    // ([`reused_name`]); a forget lets it go. Only with `LAMP_FACE_NO_ASK`
+    // on too: without it this route has no speaking proof, so the reuse is
+    // dark and the save goes as today (#8010 deferred, Friday's P3 on
+    // #8026).
+    let reuses = switches.face_question && switches.face_no_ask && checked && !switches.at_setup;
+    if reuses && call.name == FORGET {
+        forget_confirmed();
+    }
+    if reuses
+        && call.name == REMEMBER
+        && !replacing
+        && (said_back_and_agreed(name, said) || spelled_by_them(name, &said.this) || corrected)
+    {
+        note_confirmed(name);
+    }
     let lamp_before = said.before.last().map(|(_, lamp)| lamp.as_str());
     let new_face = checked && call.name == REMEMBER && !replacing && !setup && !corrected;
     if new_face && switches.face_no_ask && known_now(&known_file_of(socket)).is_none() {
@@ -2889,7 +3173,8 @@ fn run_switched(
     } else {
         name_heard(&heard_name, &heard_said)
     } || (setup && said_back_and_agreed(&heard_name, &heard_said))
-        || corrected;
+        || corrected
+        || (reuses && call.name == REMEMBER && !replacing && reused_name(name));
     let name = if checked && call.name == REMEMBER && !heard {
         // Only after the lamp asked them to spell, and as many spelled runs
         // as the model's name has words: "L O R E N, and I'm at I B M" is
@@ -3015,7 +3300,8 @@ fn run_switched(
             if switches.face_no_ask && switches.visits && !setup {
                 told = no_ask_visits(socket, told);
             }
-            (told, true)
+            // With `LAMP_FACE_QUESTION_NOT_ASK`, known already (lamp-74ff).
+            (told_already(told, &answer, switches, replacing), true)
         }
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),
@@ -4734,6 +5020,7 @@ mod tests {
                 name_learn_fix: false,
                 face_no_ask: false,
                 face_save_known_only: false,
+                face_question: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -5820,6 +6107,7 @@ mod tests {
             name_learn_fix: false,
             face_no_ask: false,
             face_save_known_only: false,
+            face_question: false,
         };
         let (told, _) = run_switched(
             &socket,
@@ -6692,6 +6980,699 @@ mod tests {
             vec![json!({"remember": "Jay", "one_face": true, "replace": false})]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// `LAMP_FACE_QUESTION_NOT_ASK` (lamp-74ff, 19 Nov): the face in view
+    /// already known by the name asked for, a fresh real match, is told so
+    /// ([`already_known`]) whatever the line says, with nothing sent to the
+    /// eyes and no refusal. The line's words are never judged: an unknown
+    /// face's call, a face known by another name, a rename, and the switch
+    /// off go as before.
+    #[test]
+    fn with_face_question_a_known_face_sends_nothing_and_any_other_call_goes_as_before() {
+        // The eyes mark held names (`LAMP_FACE_STICKY`), none held here.
+        TEST_HELD_MARKS.with(|marks| marks.set(true));
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let switches = |face_question: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question,
+            ..FaceSwitches::default()
+        };
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        // Runs one save against eyes answering `answers`, with `known` in
+        // the known file: what the model is told and what the eyes got.
+        let run = |on: bool, known: Option<&str>, args: Value, this: &str, answers: Vec<Value>| {
+            let (socket, sent) = eyes(answers);
+            if let Some(known) = known {
+                std::fs::write(known_file_of(&socket), format!("{known}\n")).unwrap();
+            }
+            let (told, _) = run_switched(
+                &socket,
+                &call(args),
+                switches(on),
+                &Said::now(this),
+                None,
+                &mut None,
+            );
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            (told, sent)
+        };
+        // Known as Ana, asked again as Ana (any case and spacing), with a
+        // question or a plain ask: told so, nothing sent.
+        for (name, this) in [
+            ("Ana", "Okay. Did you remember my face then?"),
+            ("ana", "Do you remember my face?"),
+            (" ANA ", "Remember my face."),
+            ("Ana", "Do you know who I am? I'd like you to keep my face."),
+            ("Ana", "Nhớ mặt mình nhé."),
+        ] {
+            let (told, sent) = run(true, Some("Ana"), json!({"name": name}), this, vec![]);
+            assert_eq!(told["already_known"], "Ana", "{told}");
+            assert_eq!(told["note"], ALREADY_KNOWN_NOTE, "{told}");
+            assert!(told.get("error").is_none(), "{told}");
+            assert!(answered_here(&told) && !refused_here(&told));
+            assert!(sent.is_empty(), "{sent:?}");
+        }
+        assert!(ALREADY_KNOWN_NOTE.contains("already know"));
+        // Nobody known, or another face: the call goes on as it does with
+        // the switch off, whatever the line says. No words decide it.
+        for known in [None, Some("Walter")] {
+            for this in [
+                "Okay. Did you remember my face then?",
+                "Do you remember my face?",
+                "Do you know who I am? I'd like you to keep my face.",
+            ] {
+                let on = run(true, known, json!({"name": "Ana"}), this, vec![]);
+                let off = run(false, known, json!({"name": "Ana"}), this, vec![]);
+                assert_eq!(on, off, "{this}");
+                assert!(on.0.get("already_known").is_none(), "{this}");
+            }
+        }
+        // A face known by another name, and a rename, go as today.
+        let known_as = || vec![json!({"error": "known_as", "known_as": "Walter"})];
+        for (known, args, this, answers) in [
+            (
+                Some("Walter"),
+                json!({"name": "Jay"}),
+                "Call me Jay.",
+                known_as(),
+            ),
+            (
+                Some("Ana"),
+                json!({"name": "Ana", "replace": true}),
+                "Do you remember my face?",
+                vec![],
+            ),
+            (
+                Some("Walter"),
+                json!({"name": "Walter", "replace": true}),
+                "Remember my face.",
+                vec![],
+            ),
+        ] {
+            let on = run(true, known, args.clone(), this, answers.clone());
+            let off = run(false, known, args, this, answers);
+            assert_eq!(on, off, "{this}");
+            assert!(on.0.get("already_known").is_none(), "{this}");
+        }
+        // Off: today's answers, the lamp-74ff refusals.
+        let (told, _) = run(
+            false,
+            Some("Ana"),
+            json!({"name": "Ana"}),
+            "Okay. Did you remember my face then?",
+            vec![],
+        );
+        assert!(refused_here(&told), "{told}");
+        assert!(told.get("already_known").is_none(), "{told}");
+        let (told, _) = run(
+            false,
+            None,
+            json!({"name": "Ana"}),
+            "Do you remember my face?",
+            vec![],
+        );
+        assert!(refused_here(&told), "{told}");
+        // The setup walk's first save is untouched.
+        let setup = |face_question: bool| FaceSwitches {
+            at_setup: true,
+            ..switches(face_question)
+        };
+        let (socket, _) = eyes(vec![]);
+        std::fs::write(known_file_of(&socket), "Ana\n").unwrap();
+        let said = Said::now("Do you remember my face?");
+        let save = call(json!({"name": "Ana"}));
+        assert_eq!(
+            run_switched(&socket, &save, setup(true), &said, None, &mut None),
+            run_switched(&socket, &save, setup(false), &said, None, &mut None)
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// The tests that read or write the confirmed name and the faces read
+    /// for it ([`CONFIRMED`], [`TRACKS`]), one at a time.
+    static FACE_QUESTION_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// One look of the eyes now, each face `(id, height, follows)`.
+    fn look_now(
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        seq: u64,
+        faces: &[(&str, f32, Option<&str>)],
+    ) {
+        let faces = lamp_msgs::Faces {
+            faces: faces
+                .iter()
+                .map(|(id, height, follows)| lamp_msgs::Face {
+                    pitch: None,
+                    looking: None,
+                    id: (*id).to_owned(),
+                    xmin: 0.2,
+                    ymin: 0.2,
+                    xmax: 0.4,
+                    ymax: 0.2 + height,
+                    confidence: 1.0,
+                    yaw: None,
+                    facing: None,
+                    speaking: None,
+                    follows: follows.map(str::to_owned),
+                })
+                .collect(),
+        };
+        eyes.look(std::time::Instant::now(), Some((("b", seq), &faces)));
+    }
+
+    /// `LAMP_FACE_QUESTION_NOT_ASK` (lamp-74ff, 19 Nov: saves right after
+    /// the name was confirmed were refused as not heard): a name confirmed
+    /// this session (spelled here) stands as heard for a later save only
+    /// while one near face is in view and it is the same track, the same
+    /// id or one followed from it; then it goes to the eyes' own checks. A
+    /// new id, two near faces, a forget, or the switch off ask again. Only
+    /// with `LAMP_FACE_NO_ASK` on too: off, this route has no speaking
+    /// proof and the name is never reused, the same near face or not. With
+    /// it on, a new face with nobody known keeps nothing before any name
+    /// check, so here the eyes' known file names Ana (no held marks told,
+    /// so no already-known answer): the save goes to the eyes.
+    #[test]
+    fn with_face_question_a_confirmed_name_is_reused_only_for_the_same_one_near_face() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        TEST_HELD_MARKS.with(|marks| marks.set(false));
+        let switches = |face_question: bool, face_no_ask: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question,
+            face_no_ask,
+            ..FaceSwitches::default()
+        };
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ana"}),
+        };
+        let forget = ToolCall {
+            id: "1".into(),
+            name: FORGET.into(),
+            args: json!({"name": "Ana"}),
+        };
+        let eyes_now = std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        sees_tracks_with(Some(eyes_now.clone()));
+        let mut seq = 0;
+        let mut look = |faces: &[(&str, f32, Option<&str>)]| {
+            seq += 1;
+            look_now(&eyes_now, seq, faces);
+        };
+        // The eyes' known file names Ana with `LAMP_FACE_NO_ASK` on.
+        let at_lamp = |no_ask: bool, answers: Vec<Value>| {
+            let (socket, sent) = eyes(answers);
+            if no_ask {
+                std::fs::write(known_file_of(&socket), "Ana\n").unwrap();
+            }
+            (socket, sent)
+        };
+        // Confirmed by spelling, with f1 the one near face (a small far
+        // face beside it is no second near one), and kept: off, no face
+        // leave yet, so refused; on, the known face's save goes to the
+        // eyes.
+        let confirm = |on: bool, no_ask: bool| {
+            let answers = if no_ask {
+                vec![json!({"remembered": "Ana", "replaced": []})]
+            } else {
+                vec![]
+            };
+            let (socket, sent) = at_lamp(no_ask, answers);
+            let (told, _) = run_switched(
+                &socket,
+                &save,
+                switches(on, no_ask),
+                &Said::now("A N A."),
+                None,
+                &mut None,
+            );
+            let sent = sent.join().unwrap();
+            if no_ask {
+                assert_eq!(sent.len(), 1, "{told}");
+            } else {
+                assert_eq!(told["error"], ASK_FACE_FIRST, "{told}");
+                assert!(sent.is_empty());
+            }
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+        };
+        // A later "Remember my face." with no name in it, against eyes
+        // answering `answers`.
+        let again = |on: bool, no_ask: bool, answers: Vec<Value>| {
+            let (socket, sent) = at_lamp(no_ask, answers);
+            let (told, _) = run_switched(
+                &socket,
+                &save,
+                switches(on, no_ask),
+                &Said::now("Remember my face."),
+                None,
+                &mut None,
+            );
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            (told, sent)
+        };
+        let kept = || vec![json!({"remembered": "Ana", "replaced": []})];
+        let asked = vec![json!({"remember": "Ana", "one_face": true, "replace": false})];
+        // Not asked again: refused here, nothing sent, nothing kept.
+        let unkept = |(told, sent): (Value, Vec<Value>)| {
+            assert!(told.get("remembered").is_none(), "{told}");
+            assert!(told.get("error").is_some(), "{told}");
+            assert!(sent.is_empty(), "{sent:?}");
+        };
+        // With `LAMP_FACE_NO_ASK` off: never reused, even confirmed with
+        // the same one near face in view (the route has no speaking proof).
+        look(&[("f1", 0.3, None), ("f2", 0.05, None)]);
+        confirm(true, false);
+        look(&[("f1", 0.3, None)]);
+        let (told, sent) = again(true, false, vec![]);
+        assert_eq!(told["error"], NOT_HEARD, "{told}");
+        assert!(sent.is_empty());
+        forget_confirmed();
+        // With it on: the same track saves through the eyes' checks.
+        look(&[("f1", 0.3, None), ("f2", 0.05, None)]);
+        confirm(true, true);
+        look(&[("f1", 0.3, None)]);
+        let (told, sent) = again(true, true, kept());
+        assert_eq!(told["remembered"], "Ana", "{told}");
+        assert_eq!(sent, asked);
+        // A face the eyes said follows f1: the same track.
+        look(&[("f3", 0.3, Some("f1"))]);
+        let (told, sent) = again(true, true, kept());
+        assert_eq!(told["remembered"], "Ana", "{told}");
+        assert_eq!(sent, asked);
+        // The eyes refuse another person's name for this face: no save.
+        let (told, sent) = again(true, true, vec![json!({"error": "not_like_them"})]);
+        assert_eq!(told, json!({"error": NOT_LIKE_THEM}), "{told}");
+        assert_eq!(sent, asked);
+        // Two near faces: asked again, nothing sent.
+        look(&[("f3", 0.3, None), ("f4", 0.2, None)]);
+        unkept(again(true, true, vec![]));
+        // A new id since: asked again.
+        look(&[("f5", 0.3, None)]);
+        unkept(again(true, true, vec![]));
+        // Confirmed again with f5, then forgotten: asked again.
+        confirm(true, true);
+        let (told, _) = again(true, true, kept());
+        assert_eq!(told["remembered"], "Ana", "{told}");
+        let (socket, _) = eyes(vec![json!({"forgot": true})]);
+        let _ = run_switched(
+            &socket,
+            &forget,
+            switches(true, true),
+            &Said::now("Forget my face."),
+            None,
+            &mut None,
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+        unkept(again(true, true, vec![]));
+        // The question switch off: as today, never reused.
+        confirm(false, false);
+        let (told, sent) = again(false, false, vec![]);
+        assert_eq!(told["error"], NOT_HEARD, "{told}");
+        assert!(sent.is_empty());
+        forget_confirmed();
+        sees_tracks_with(None);
+    }
+
+    /// `LAMP_FACE_QUESTION_NOT_ASK`: the eyes' `already` (a face kept again
+    /// under its own name, matched as theirs) is told as known already,
+    /// with no visits line; off, as a first save.
+    #[test]
+    fn with_face_question_a_face_the_eyes_knew_already_is_told_so() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ana"}),
+        };
+        let run = |face_question: bool| {
+            let (socket, sent) = eyes(vec![json!({
+                "remembered": "Ana", "replaced": [], "already": true, "visits": true
+            })]);
+            let (told, _) = run_switched(
+                &socket,
+                &save,
+                FaceSwitches {
+                    checked: true,
+                    name_learn_fix: true,
+                    face_question,
+                    ..FaceSwitches::default()
+                },
+                &Said::now("Remember my face, my name is Ana."),
+                None,
+                &mut None,
+            );
+            assert_eq!(sent.join().unwrap().len(), 1);
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            told
+        };
+        let on = run(true);
+        assert_eq!(on["already_known"], "Ana", "{on}");
+        assert_eq!(on["remembered"], "Ana", "{on}");
+        assert_eq!(on["note"], ALREADY_KNOWN_NOTE, "{on}");
+        assert!(on.get("also_say").is_none(), "{on}");
+        assert!(!on.to_string().contains(VISITS_LINE), "{on}");
+        assert!(!answered_here(&on));
+        assert!(ALREADY_KNOWN_NOTE.contains("I already know your face"));
+        let off = run(false);
+        assert!(off.get("already_known").is_none(), "{off}");
+        assert!(
+            off["also_say"]
+                .as_str()
+                .is_some_and(|line| line.contains(VISITS_LINE)),
+            "{off}"
+        );
+    }
+
+    /// With `LAMP_FACE_NO_ASK` on too (#8010 turns it on, with
+    /// `LAMP_REMEMBER_SPEAKER`): the already-known answer still comes first,
+    /// on the route with no speaking proof, and on the speaker-bound one
+    /// only for the line's own speaking face (an off-camera voice giving
+    /// the in-view person's name is never told "I already know your
+    /// face"); a confirmed name reused for the same one near
+    /// face keeps nothing on the route with no speaking proof (nothing
+    /// sent, the no-asks answer); and the speaker-bound route never reuses
+    /// it (no proof: as before).
+    #[test]
+    fn with_face_question_and_no_ask_nothing_is_kept_without_speaking_proof() {
+        // The eyes mark held names (`LAMP_FACE_STICKY`), none held here.
+        TEST_HELD_MARKS.with(|marks| marks.set(true));
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let no_ask = |remember_speaker: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_no_ask: true,
+            remember_speaker,
+            face_question: true,
+            ..FaceSwitches::default()
+        };
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ana"}),
+        };
+        let switched = |known: Option<&str>, this: &str| {
+            let (socket, sent) = eyes(vec![]);
+            if let Some(known) = known {
+                std::fs::write(known_file_of(&socket), format!("{known}\n")).unwrap();
+            }
+            let (told, _) = run_switched(
+                &socket,
+                &save,
+                no_ask(false),
+                &Said::now(this),
+                None,
+                &mut None,
+            );
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            (told, sent)
+        };
+        // Known as Ana: told so, nothing sent.
+        let (told, sent) = switched(Some("Ana"), "Do you remember my face?");
+        assert_eq!(told["already_known"], "Ana", "{told}");
+        assert!(sent.is_empty());
+        // Nobody known: the call goes on as with the switch off.
+        let (told, sent) = switched(None, "Did you remember my face?");
+        assert!(told.get("already_known").is_none(), "{told}");
+        assert!(told.get("remembered").is_none(), "{told}");
+        assert!(sent.is_empty());
+        // Ana confirmed with f1, f1 still the one near face: kept nothing,
+        // nothing asked, nothing sent.
+        let eyes_now = std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        sees_tracks_with(Some(eyes_now.clone()));
+        look_now(&eyes_now, 1, &[("f1", 0.3, None)]);
+        if let Ok(mut confirmed) = CONFIRMED.lock() {
+            *confirmed = Some(("Ana".into(), "b/f1".into()));
+        }
+        assert!(reused_name("Ana"));
+        let (told, sent) = switched(None, "Remember my face.");
+        assert!(
+            [NOT_KEPT_NO_ASK, CANT_KEEP_NO_ASK].contains(&told["error"].as_str().unwrap_or("")),
+            "{told}"
+        );
+        assert!(sent.is_empty(), "{sent:?}");
+        // The speaker-bound route: known as Ana (face eyes/f1) is told so
+        // first only when the line's own speaking face is eyes/f1. An
+        // off-camera voice (no face seen saying it), another face saying
+        // it, or no line read, goes on as before: refused with no speaking
+        // proof, nothing sent, the confirmed name not reused.
+        let speaker = |known: Option<&str>, said_by: Option<Option<&str>>| {
+            let (socket, sent) = eyes(vec![]);
+            if let Some(known) = known {
+                std::fs::write(known_file_of(&socket), format!("{known}\n")).unwrap();
+            }
+            let line = said_by.map(|face| {
+                let now = lamp_ipc::monotonic_us();
+                crate::speaking_faces::LineSeen {
+                    request: 7_901_001,
+                    known: known.map(|known| (known.to_owned(), "eyes/f1".to_owned())),
+                    enrollment: face.map(|face| {
+                        crate::remember_speaker::Proof::heard(
+                            face.to_owned(),
+                            now - 1_000_000,
+                            now,
+                            "Do you remember me? It's Ana.",
+                            crate::remember_speaker::generation(),
+                        )
+                        .unwrap()
+                    }),
+                    ..Default::default()
+                }
+            });
+            let told = run_scoped(
+                &socket,
+                &save,
+                no_ask(true),
+                None,
+                line.as_ref(),
+                7_901_001,
+                None,
+            );
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            (told, sent)
+        };
+        let (told, sent) = speaker(Some("Ana"), Some(Some("eyes/f1")));
+        assert_eq!(told.0["already_known"], "Ana", "{}", told.0);
+        assert!(sent.is_empty());
+        for said_by in [None, Some(None), Some(Some("eyes/f2"))] {
+            let (told, sent) = speaker(Some("Ana"), said_by);
+            assert!(
+                told.0.get("already_known").is_none(),
+                "{said_by:?} {}",
+                told.0
+            );
+            assert!(told.0.get("remembered").is_none(), "{said_by:?} {}", told.0);
+            assert!(sent.is_empty(), "{said_by:?} {sent:?}");
+        }
+        let (told, sent) = speaker(None, Some(Some("eyes/f1")));
+        assert!(told.0.get("already_known").is_none(), "{}", told.0);
+        assert!(told.0.get("remembered").is_none(), "{}", told.0);
+        assert!(sent.is_empty());
+        forget_confirmed();
+        sees_tracks_with(None);
+        // The eyes' `already`: known already, never on a rename.
+        let answer = json!({"remembered": "Ana", "replaced": [], "already": true});
+        let told = json!({"ok": true, "remembered": "Ana"});
+        assert_eq!(
+            told_already(told.clone(), &answer, no_ask(true), false)["already_known"],
+            "Ana"
+        );
+        assert_eq!(
+            told_already(told.clone(), &answer, no_ask(true), true),
+            told
+        );
+        let off = FaceSwitches {
+            face_question: false,
+            ..no_ask(true)
+        };
+        assert_eq!(told_already(told.clone(), &answer, off, false), told);
+    }
+
+    /// The owner, 20 Nov 02:18: "I already know your face" only on a fresh
+    /// real match. A name the eyes hold (their fresh held mark), or eyes
+    /// whose held names can't be told (no `LAMP_FACE_STICKY`), never
+    /// short-circuit: "Remember me as Ana." from a face held as Ana goes to
+    /// the eyes, whose fresh look answers `not_like_them` or `already`.
+    #[test]
+    fn with_face_question_a_held_name_goes_to_the_eyes() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ana"}),
+        };
+        let switches = FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question: true,
+            ..FaceSwitches::default()
+        };
+        let asked = vec![json!({"remember": "Ana", "one_face": true, "replace": false})];
+        let run = |marks: bool, held: bool, answers: Vec<Value>| {
+            TEST_HELD_MARKS.with(|on| on.set(marks));
+            let (socket, sent) = eyes(answers);
+            let known = known_file_of(&socket);
+            std::fs::write(&known, "Ana\n").unwrap();
+            if held {
+                std::fs::write(held_mark_of(&known), b"").unwrap();
+            }
+            let (told, _) = run_switched(
+                &socket,
+                &save,
+                switches,
+                &Said::now("Remember me as Ana."),
+                None,
+                &mut None,
+            );
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            TEST_HELD_MARKS.with(|on| on.set(false));
+            (told, sent)
+        };
+        // Held as Ana, another face: the eyes refuse, nothing said known.
+        let (told, sent) = run(true, true, vec![json!({"error": "not_like_them"})]);
+        assert_eq!(told, json!({"error": NOT_LIKE_THEM}), "{told}");
+        assert_eq!(sent, asked);
+        // Held marks not read: to the eyes too; their fresh match says so.
+        let already = json!({"remembered": "Ana", "replaced": [], "already": true});
+        let (told, sent) = run(false, false, vec![already]);
+        assert_eq!(told["already_known"], "Ana", "{told}");
+        assert_eq!(told["remembered"], "Ana", "{told}");
+        assert_eq!(sent, asked);
+        // Marks read, none held: the fresh match short-circuits.
+        let (told, sent) = run(true, false, vec![]);
+        assert_eq!(told["already_known"], "Ana", "{told}");
+        assert!(told.get("remembered").is_none(), "{told}");
+        assert!(sent.is_empty(), "{sent:?}");
+    }
+
+    /// The owner, 20 Nov: the rename path keeps working with
+    /// `LAMP_FACE_QUESTION_NOT_ASK`. A known Ana's "Call me Jay." reaches
+    /// the eyes and their `known_as` asks the rename; the yes with
+    /// `replace` keeps Jay, an `already` from the eyes on it is no "known
+    /// already", and a confirmed name is never reused for a rename: each
+    /// as with the switch off.
+    #[test]
+    fn with_face_question_a_rename_runs_as_today() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let switches = |face_question: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question,
+            ..FaceSwitches::default()
+        };
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        let run = |on: bool, args: Value, said: &Said, answers: Vec<Value>| {
+            let (socket, sent) = eyes(answers);
+            std::fs::write(known_file_of(&socket), "Ana\n").unwrap();
+            let (told, _) = run_switched(&socket, &call(args), switches(on), said, None, &mut None);
+            let sent = sent.join().unwrap();
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            (told, sent)
+        };
+        // "Call me Jay." from the face known as Ana: the eyes ask.
+        let asked = Said::now("Call me Jay.");
+        let known_as = || vec![json!({"error": "known_as", "known_as": "Ana"})];
+        let on = run(true, json!({"name": "Jay"}), &asked, known_as());
+        assert_eq!(on, run(false, json!({"name": "Jay"}), &asked, known_as()));
+        assert_eq!(
+            rename_asked(&on.0),
+            Some(Some("Ana".to_owned())),
+            "{}",
+            on.0
+        );
+        assert_eq!(
+            on.1,
+            vec![json!({"remember": "Jay", "one_face": true, "replace": false})]
+        );
+        // Their yes to "Shall I call you Jay?": kept as Jay in place of Ana.
+        let yes = Said {
+            this: "Yes, call me Jay.".into(),
+            before: vec![("Call me Jay.".into(), "Shall I call you Jay?".into())],
+        };
+        let renamed = || vec![json!({"remembered": "Jay", "replaced": ["Ana"], "already": false})];
+        let args = json!({"name": "Jay", "replace": true});
+        let on = run(true, args.clone(), &yes, renamed());
+        assert_eq!(on, run(false, args.clone(), &yes, renamed()));
+        assert_eq!(on.0["remembered"], "Jay", "{}", on.0);
+        assert!(on.0.get("already_known").is_none(), "{}", on.0);
+        assert_eq!(
+            on.1,
+            vec![json!({"remember": "Jay", "one_face": true, "replace": true})]
+        );
+        // An `already` on a rename is no "known already".
+        let marked = || vec![json!({"remembered": "Jay", "replaced": ["Ana"], "already": true})];
+        let (told, _) = run(true, args.clone(), &yes, marked());
+        assert!(told.get("already_known").is_none(), "{told}");
+        // A rename with no yes to the new name is refused as today, even
+        // with Jay confirmed and the same one near face in view.
+        let eyes_now = std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        sees_tracks_with(Some(eyes_now.clone()));
+        look_now(&eyes_now, 1, &[("f1", 0.3, None)]);
+        if let Ok(mut confirmed) = CONFIRMED.lock() {
+            *confirmed = Some(("Jay".into(), "b/f1".into()));
+        }
+        let no_yes = Said::now("Remember my face.");
+        let on = run(true, args.clone(), &no_yes, vec![]);
+        assert_eq!(on, run(false, args, &no_yes, vec![]));
+        assert!(refused_here(&on.0), "{}", on.0);
+        assert!(on.1.is_empty());
+        forget_confirmed();
+        sees_tracks_with(None);
+    }
+
+    /// The description says a question whether the lamp knows them is no
+    /// ask, checked or not, only with the switch.
+    #[test]
+    fn with_face_question_the_description_says_a_question_is_no_ask() {
+        for checked in [false, true] {
+            let described = |face_question: bool| {
+                tools_for(FaceSwitches {
+                    checked,
+                    face_question,
+                    ..FaceSwitches::default()
+                })
+                .into_iter()
+                .find(|tool| tool.name == REMEMBER)
+                .unwrap()
+                .description
+            };
+            let (on, off) = (described(true), described(false));
+            assert!(on.ends_with(QUESTION_NOT_ASK), "{on}");
+            assert!(on.contains("\"Do you remember me?\""), "{on}");
+            assert!(!off.contains("Do you remember me"), "{off}");
+            assert_eq!(on, format!("{off}{QUESTION_NOT_ASK}"));
+        }
     }
 
     /// `LAMP_FACE_NO_ASK` with a face the eyes' known file names at the

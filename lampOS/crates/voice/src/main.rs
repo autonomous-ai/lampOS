@@ -790,10 +790,10 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::cut_in::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said]]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said] | --face]
         // probe-tools PROVIDER_CONFIG SECOND_CONFIG --doubt [--wording new|old|off] [--times N]
         [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
-            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said]], or --doubt [--wording new|old|off] [--times 1 to 20], or --held-yes [--wording new|old] [--times 1 to 20]");
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said] | --face], or --doubt [--wording new|old|off] [--times 1 to 20], or --held-yes [--wording new|old] [--times 1 to 20]");
             // probe-tools PROVIDER_CONFIG SECOND_CONFIG --held-yes [--wording new|old] [--times N]
             if rest.first().is_some_and(|first| first == "--held-yes") {
                 use lamp_voice::second_provider::probe::held_yes::Wording;
@@ -826,6 +826,19 @@ fn run() -> Result<()> {
                 }
                 tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
                     lamp_voice::second_provider::probe::doubt::run(Path::new(provider_config), Path::new(second_config), runs, &wordings),
+                )?;
+                return Ok(());
+            }
+            if let [first @ .., last] = rest
+                && last == "--face"
+            {
+                let runs = match first {
+                    [] => 1,
+                    [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                    _ => return Err(usage().into()),
+                };
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::face_question::run(Path::new(provider_config), Path::new(second_config), runs),
                 )?;
                 return Ok(());
             }

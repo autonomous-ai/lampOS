@@ -4019,6 +4019,31 @@ pub fn serve(
     } else {
         None
     };
+    // A name confirmed this session reused for the same near face's save
+    // (`LAMP_FACE_QUESTION_NOT_ASK`, lamp-74ff 19 Nov): the faces read
+    // above, or a reader of its own.
+    let _track_reader = if crate::known_faces::face_question_not_ask_on() {
+        let mut reader = None;
+        let eyes = enrollment_eyes
+            .clone()
+            .or_else(|| wordless_eyes.clone())
+            .or_else(|| {
+                files.bus_root.as_deref().and_then(|root| {
+                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                    reader = Some(crate::speaking_faces::read_from(eyes.clone(), root)?);
+                    Some(eyes)
+                })
+            });
+        if eyes.is_none() {
+            eprintln!(
+                "lamp-voice second: a confirmed name is not reused for a face save: no faces to read (LAMP_FACE_QUESTION_NOT_ASK)"
+            );
+        }
+        crate::known_faces::sees_tracks_with(eyes);
+        reader
+    } else {
+        None
+    };
     engine = engine.asking_wordless_only_seen_speaking(wordless_eyes);
     engine = engine.remembering_speaker(remember_speaker, enrollment_eyes);
     if let (Some(early), Some(search)) = (early, search) {
