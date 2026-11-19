@@ -2108,8 +2108,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   to news (`answer_outcome`). **Otherwise it is news**
   (`service_read::tell_news`): a trigger's run, a line ready later, or one
   the voice didn't say as the answer (`not said in the asking conversation
-  (<why>), so as news: …`) waits behind a told answer's gate (below: the
-  owner alone, the lamp's one read turn) and is said once, the next time
+  (<why>), so as news: …`) waits behind a read's gate (the owner alone,
+  the lamp's one read turn; a found answer has none since #7894, below) and is said once, the next time
   the owner is seen within 30 minutes (`NEWS_WAIT`), else dropped
   (`skipped: <why>`); at quiet hours it is dropped at once (`skipped:
   quiet hours`), never held through them. A run now asked by voice whose
@@ -2123,7 +2123,7 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   lamp-9adf (18 Nov, 00:11) "Lamp, use my bitcoin price skill." had its
   agent's answer kept and then held unsaid by quiet hours. The answer in
   the asking conversation (`answers`) is the failure line's alone; what
-  the agent found still goes behind a read's gate, with the quiet lifted.
+  the agent found is said at once with no read's gate (#7894, below).
   Before, the line waited up to
   an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
   "Fig facts is running now." was followed by nothing. Lines:
@@ -6002,16 +6002,21 @@ keyed run, a `net` run off the one run path), from what the agent was asked
 to write to its own folder's `answer.md` (a run Harness's runner starts
 with no Harness keeps none, so it is never told its answer is said; a
 fixed write's never tells), and
-`lamp-skills` says it to the owner as a `do.read`'s lines are said
-(`service_read::tell`): behind the same gate (the owner's known face alone
-in view and steady 5 s, no voice for a minute, not private or paused, not
-in the lamp's quiet hours or the skill's own `[quiet]`, as a `do.read`'s
-(`task::TaskStep::quiet`), waited for up to 60 minutes, then skipped
-unsaid), in the
-lamp's one read turn, one sentence a line as exact words (never a turn for
-the model, so what a mail says is never an instruction), the gate judged
-again before each, someone coming stopping it with "I'll tell you the rest
-later." The sentences are `task::told`'s: markdown's marks left out, each
+`lamp-skills` says it to the owner as soon as the run ended
+(`service_read::tell`, #7894), one sentence a line as exact words, in
+order (never a turn for the model, so what a mail says is never an
+instruction), with no read's gate: no owner alone or steady, no voice for
+a minute, no quiet hours or `[quiet]`, no 60-minute wait then skipped
+(on lamp-52e6, 19 Nov 09:52, a mail check's answer waited "not alone"
+and "a voice heard" while the person who asked was at the lamp). A line
+is held only while the lamp can't speak (`service_read::held`: the
+privacy switch or the microphones off, asleep, or paused), and said the
+moment it can, the next line held again if it closed between; and while
+another skill's read says its lines (the lamp's one read turn, taken
+with no minute's gap after a read), never between them. It gives that
+turn back as it ends, so a scheduled read still waits its minute after
+it; a scheduled `do.read` keeps its whole gate (docs/services.md). The
+sentences are `task::told`'s: markdown's marks left out, each
 at most the say service's 900 bytes, all of them at most about 400
 characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person
 answers in a sentence or two) and 10 sentences, cut at the last sentence
@@ -6031,15 +6036,17 @@ only how many were said (`do.task: what its agent found: told N`), and
 before it how much of the agent's answer lamp-tasks' answer carried, its
 length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
-begins, a read's or a told answer's, is said with its reason
-(`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
-answer held in quiet hours leaves a line (#7180), and on `skills/tasks` as
-`held` with the same reason, then `told` or `dropped` once it ends
-(`service_read::held_news`, `answer_news`; #7873, for lamp-peek); each change of that reason
+begins, a read's or a failed run's news, is said with its reason
+(`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so a
+line held in quiet hours leaves one (#7180), and a found answer held says
+`private`, `paused` or `another read under way` once a line; either is on
+`skills/tasks` as `held` with the same reason, then `told` or `dropped`
+once it ends (`service_read::held_news`, `answer_news`; #7873, for
+lamp-peek); each change of that reason
 while it waits is said once more, at most one a second
 (`service_read::SAY_WHY_EVERY`), never each look, so a wait that holds on
 shows which condition held (lamp-9adf, 17 Nov). Its end is said as before
-(`told N`, or `skipped: quiet hours` after the hour); while it waits it is
+(`told N`; news `skipped: <why>`); while it waits it is
 kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
 said at the next start (`what its agent found: dropped unsaid, lamp-skills
@@ -6061,7 +6068,9 @@ skill's own `[quiet]` are lifted for it until five minutes after it was
 ready (`told_when_asked::quiet_holds`), so a wait for the owner never
 speaks at one in the morning unasked. Every other part of the gate stays:
 the owner in view and alone, no voice for a minute, not private or
-paused, the lamp's one read turn, and the night's volume. The journal says
+paused, the lamp's one read turn, and the night's volume. Since #7894 the
+lift matters only to a failed run's news: what the agent found has no
+quiet hours to lift. The journal says
 which: `what its agent found: told in quiet hours too, its owner asked by
 voice N s before (LAMP_TOLD_WHEN_ASKED)`, or `its quiet holds, ready N s
 after its owner's ask, past five minutes`. The same switch lets the voice

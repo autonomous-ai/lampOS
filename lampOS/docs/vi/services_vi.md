@@ -2085,7 +2085,12 @@ của chính nó liên tục 5 s, và thời gian chờ vẫn tính trong cùng 
 khi đến hạn, nên một lượt đọc xếp hàng sau lượt khác sẽ bỏ qua ngày đó khi hết
 giờ ("skipped: another read under way"), không bao giờ bắt đầu một giờ mới.
 Nếu không có quy tắc này, hai lượt đọc của hai kỹ năng cùng chờ ở cổng (Morning
-agenda và Morning mail khi có khách) sẽ nói xen kẽ từng dòng của nhau. Mỗi kỹ năng đọc một lần
+agenda và Morning mail khi có khách) sẽ nói xen kẽ từng dòng của nhau. Câu trả lời cần nói của tác vụ của kỹ
+năng (điều agent tìm thấy, `service_read::tell`) không phải lượt đọc và
+không có cổng này (#7894, [skills_vi.md](skills_vi.md)): nó được nói ngay
+khi lượt chạy kết thúc, chỉ bị giữ khi đèn riêng tư hoặc tạm dừng, và chỉ
+chờ lượt khi một lượt đọc đang nói, không chờ khoảng một phút; nó trả lượt
+khi kết thúc, nên lượt đọc theo lịch vẫn chờ một phút sau nó. Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
 quên và có thể cho phép đọc lại trong ngày đó). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
 phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
