@@ -3702,7 +3702,9 @@ gateway nào chạy (như lúc cài lần đầu) thì không có lock nào đ�
 nên chạy trong `openclaw-ns` riêng như trước. `GATEWAY_WAITS`,
 `NO_GATEWAY`, `NODE_NOT_READY` và `gateway_not_there` giờ nằm ở
 `lamp_checked_replace` (lamp-tasks vẫn xuất lại chúng trong
-`openclaw_config`), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
+`openclaw_config`, lamp-update xuất lại `NODE_NOT_READY` trong
+`openclaw_install`, và một test ghim `NO_GATEWAY` vào dòng không có gateway
+của wrapper), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
 chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra mới được thử lại, văn
 bản bị OpenClaw từ chối thì không.
 
