@@ -6612,9 +6612,11 @@ the same code for both writers.
   chat -q "Say OK."` alone takes about 24.5 s on that Orange Pi, about 13 s
   of it before Hermes's own session starts, and a gmail make with no
   script took 30 s on another lamp; 90 s leaves about a minute for the
-  work once Hermes is up. A repair is begun only while one more answer
-  fits the agent's 10 minutes 30 s (`make_skill_agent::MAKE_WITHIN`,
-  #7245; 120 s before), so without the guide repairs have room.
+  work once Hermes is up. A repair is begun only while at least 2
+  minutes of the agent's 10 minutes 30 s are left
+  (`make_skill_local::REPAIR_AT_LEAST` within `make_skill_agent::MAKE_WITHIN`,
+  #7874; before, only while one more whole answer fitted, so a guided make
+  past 30 s got none), and its write is bounded by what is left.
   No answer from it in its time (10 minutes with the guide, 90 s
   without), an error, or its first answer not given: the
   make is not made, and what is said is DeepSeek's one answer's failure,
