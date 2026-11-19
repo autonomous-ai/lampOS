@@ -381,6 +381,25 @@ fn own_line(current: &Reply, lamp_began: Option<u64>) -> bool {
             || lamp_began == Some(current.owner.turn()))
 }
 
+/// What the voice tells of a reply whose first audio is queued
+/// (`LAMP_DID_VOICE`): the line it began itself in `line` (the setup walk's
+/// or the update's, kept with its turn), or news it tells with no person's
+/// words, no skill's say and no reminder in it. None for anything else.
+fn did_voice_moment(
+    current: &Reply,
+    line: Option<(u64, crate::did_voice::Moment)>,
+) -> Option<crate::did_voice::Moment> {
+    if current.input_sequence != 0 || current.say.is_some() || current.reminder.is_some() {
+        return None;
+    }
+    if let Some((turn, moment)) = line
+        && turn == current.owner.turn()
+    {
+        return Some(moment);
+    }
+    (!current.news.is_empty()).then_some(crate::did_voice::Moment::TaskNews)
+}
+
 /// A line the lamp started on its own, sounding ([`Reply::reached_speaker`])
 /// in a room busy as it began (`busy`, `LAMP_OWN_LINE_OVER_TALK`): talk over
 /// it is the room's. The duplex mask doesn't yield to it, and a candidate
@@ -6546,6 +6565,9 @@ fn conversation_with_gate_inner(
     // The newest turn the lamp began itself with no ticket or news on it:
     // a line of the setup walk.
     let mut lamp_began: Option<u64> = None;
+    // What the line the lamp began itself is, for `lamp/did`
+    // (`LAMP_DID_VOICE`, #7757): told at its first audio queued, never before.
+    let mut did_voice_line: Option<(u64, crate::did_voice::Moment)> = None;
     // The eyes' faces, for the person an own line is for (#2287's
     // follow-up): read every 100 ms off the audio path, only with either
     // switch; passing ids and booleans, nothing kept past 30 s.
@@ -8840,6 +8862,11 @@ fn conversation_with_gate_inner(
                                 json!({"kind":"provider_first_audio","turn":request,"at_us":monotonic_us()}),
                             )?;
                             current.had_audio = true;
+                            // A line the lamp began itself (no skill's say, no
+                            // reminder) is told as its first audio is queued.
+                            if let Some(moment) = did_voice_moment(current, did_voice_line) {
+                                crate::did_voice::told(moment);
+                            }
                             // It answers: a wake by name it followed is kept.
                             if let Some(controls) = controls.as_mut() {
                                 controls.answer_began();
@@ -12880,6 +12907,7 @@ fn conversation_with_gate_inner(
             )?;
             last_publish = monotonic_us();
             lamp_began = reply.as_ref().map(|current| current.owner.turn());
+            did_voice_line = lamp_began.map(|turn| (turn, crate::did_voice::Moment::UpdateLine));
             give_way.said();
             record(trace, json!({"kind":"update_give_way_said","at_us":clock}))?;
         }
@@ -13573,6 +13601,7 @@ fn conversation_with_gate_inner(
                 )?;
                 last_publish = monotonic_us();
                 lamp_began = reply.as_ref().map(|current| current.owner.turn());
+                did_voice_line = lamp_began.zip(walk.line_moment());
                 // "Where you sit"'s intro is reported as an invitation is,
                 // so it is kept as said only when it was heard; so is an owed
                 // line, said again when none of it played.
@@ -18184,6 +18213,7 @@ mod tests {
     }
 
     mod call_wait;
+    mod did_voice_line;
     mod duplex;
     mod early_end;
     mod endpoint_session;
