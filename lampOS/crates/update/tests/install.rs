@@ -2864,6 +2864,47 @@ fn the_product_tells_once_that_a_skills_read_service_is_not_linked() {
     );
 }
 
+/// The faces three on together (#7876, the first builder's ruling; each
+/// alone leaves a gap): `LAMP_FACE_NO_ASK` and `LAMP_REMEMBER_SPEAKER` once
+/// in lamp-voice and lamp-eyes, the two units whose parts read them, and
+/// `LAMP_FACE_LEARN_LATER` once in lamp-voice alone (its walk's way back),
+/// and no other product unit names any of them.
+#[test]
+fn the_product_keeps_a_face_seen_saying_its_name_with_nothing_asked() {
+    assert_eq!(
+        lamp_voice::known_faces::FACE_NO_ASK_ENVIRONMENT,
+        "LAMP_FACE_NO_ASK"
+    );
+    assert_eq!(
+        lamp_voice::remember_speaker::ENVIRONMENT,
+        "LAMP_REMEMBER_SPEAKER"
+    );
+    let both = ["lamp-voice.service", "lamp-eyes.service"];
+    for (name, readers) in [
+        ("LAMP_FACE_NO_ASK", &both[..]),
+        ("LAMP_REMEMBER_SPEAKER", &both[..]),
+        ("LAMP_FACE_LEARN_LATER", &both[..1]),
+    ] {
+        let switch = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let service = section(text, "Service");
+            let on = service.iter().filter(|line| **line == switch).count();
+            let mentioned = text
+                .lines()
+                .filter(|line| line.contains(&format!("{name}=")))
+                .count();
+            assert_eq!(on, usize::from(readers.contains(unit)), "{unit} {name}");
+            assert_eq!(mentioned, on, "{unit} names {name}");
+        }
+        for reader in readers {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == reader),
+                "{reader} is not a product unit"
+            );
+        }
+    }
+}
+
 /// An uploaded skill's keys go in through the app and reach only its run
 /// (#6686, the first builder's ruling, 12 Nov 19:44 on #6059):
 /// `LAMP_SKILL_SECRETS=on` in the four units that read it, each once, and

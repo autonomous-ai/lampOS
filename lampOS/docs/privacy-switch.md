@@ -698,5 +698,5 @@ physical facts separately. No lamp or acoustic result is asserted here.
 ## Faces kept with nothing asked
 
 This switch closes the microphones and the camera; it does not decide whose face is kept. A face kept with nothing
-asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric, and at the lamp is kept only with the speaker's own "I'm X"
+asked (`LAMP_FACE_NO_ASK=on`, off unless set, on in the product) is biometric, and at the lamp is kept only with the speaker's own "I'm X"
 proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing asked").

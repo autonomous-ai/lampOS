@@ -277,6 +277,13 @@ Environment=LAMP_NAMES_RENAME_ASKED=on
 Environment=LAMP_NAMES_RENAME_YES=on
 # LAMP_NAME_LEARN_FIX: its why and rules are its row in docs/switches.md (#7331).
 Environment=LAMP_NAME_LEARN_FIX=on
+# The faces three, on together (#7876; the first builder's DEFAULT-ON on #7814): a face is kept only when it was seen
+# saying its own name, with nothing asked (LAMP_FACE_NO_ASK, LAMP_REMEMBER_SPEAKER), and a lamp that knows nobody asks
+# "What should I call you?" once (LAMP_FACE_LEARN_LATER). Each alone leaves a gap; lamp-eyes.service sets the first
+# two too. Their why and rules are their rows in docs/switches.md.
+Environment=LAMP_FACE_NO_ASK=on
+Environment=LAMP_REMEMBER_SPEAKER=on
+Environment=LAMP_FACE_LEARN_LATER=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on

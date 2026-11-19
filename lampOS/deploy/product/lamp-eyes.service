@@ -59,6 +59,11 @@ Environment=LAMP_FACE_KNOWN_HOLD=on
 # with the hold above a new id beside the held one's said on humans/faces/tracked as following it (#4885, #5081):
 # the memory owner's call (C65). The name moves to the new id only by a print read as theirs (who::Held::printed).
 Environment=LAMP_FACE_REFOUND=on
+# A face kept only when it was seen saying its own name, with nothing asked, and a photo's one face kept at once
+# (#7876, the faces three; the first builder's DEFAULT-ON on #7814); lamp-voice.service sets both, with
+# LAMP_FACE_LEARN_LATER. Their why and rules are their rows in docs/switches.md.
+Environment=LAMP_FACE_NO_ASK=on
+Environment=LAMP_REMEMBER_SPEAKER=on
 # The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames
 # (about 21 of 25 a second at 640x480, lamp-75c9 10 Nov) at /run/lampos-eyes/frames.sock instead of the eyes' two a
 # second. The socket takes only lamp-control.service, and a stream's end stops its writer at once. Off for any
