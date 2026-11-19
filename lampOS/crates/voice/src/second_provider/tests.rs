@@ -10008,6 +10008,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 rename_yes: false,
                 name_learn_fix: false,
                 face_no_ask: false,
+                face_save_known_only: false,
             },
         ))
         .chain(crate::photo_faces::tools())

@@ -922,6 +922,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 );
                 serde_json::json!({"error": "not_like_them"})
             }
+            // Asked to keep only a face it knows (#7704): the voice asks
+            // the face question.
+            Err(who::Refused::NotKnown) => {
+                eprintln!(
+                    "lamp-eyes: did not remember a face: asked for a known face only, it is known as nobody"
+                );
+                serde_json::json!({"error": "not_known"})
+            }
             Err(who::Refused::NotAName) => serde_json::json!({"error": "not_a_name"}),
             Err(who::Refused::Store(error)) => {
                 eprintln!("lamp-eyes: could not remember a face: {error}");
@@ -1956,6 +1964,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         name,
                         replace,
                         apart,
+                        known_only,
                     }) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!(
@@ -1965,6 +1974,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
                             taking.one_face = Some(replace);
                             taking.apart = apart;
+                            taking.known_only = known_only;
                             who.taking = Some((taking, stream));
                             continue;
                         }
@@ -3490,6 +3500,7 @@ mod tests {
             name: "Kesh".into(),
             replace: false,
             apart: false,
+            known_only: false,
         };
         for ask in [&plain, &one] {
             assert_eq!(speaker_refusal(ask, true), Some("speaker_required"));

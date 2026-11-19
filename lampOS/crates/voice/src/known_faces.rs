@@ -63,6 +63,10 @@ pub struct FaceSwitches {
     /// setup and at setup's first save, only on speaking-face proof
     /// ([`FACE_NO_ASK_ENVIRONMENT`]).
     pub face_no_ask: bool,
+    /// With names checked, a new face's save sent past the face question
+    /// only because the eyes' known file named a face is kept only for a
+    /// face the eyes know ([`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`], #7704).
+    pub face_save_known_only: bool,
 }
 
 /// A refused face request tells the model the face record as it stands
@@ -124,6 +128,25 @@ pub const FACE_NO_ASK_ENVIRONMENT: &str = "LAMP_FACE_NO_ASK";
 /// Whether [`FACE_NO_ASK_ENVIRONMENT`] is exactly `on`.
 pub fn face_no_ask_on() -> bool {
     std::env::var(FACE_NO_ASK_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With `LAMP_NAME_LEARN_FIX`, a new face's save skips the face question
+/// while the eyes' known file names a face at the lamp (#7653), and that
+/// file can still name someone for up to its 3 s after a stranger steps in
+/// (#7704). With this switch that save asks the eyes to keep it only for a
+/// face they know (`"known_only":true`); their `not_known` is told as the
+/// face question ([`ASK_FACE_FIRST`]), nothing kept. Not with
+/// `LAMP_FACE_NO_ASK`, which asks nothing. Voice and eyes ship together:
+/// an older eyes build refuses the field. Only with names checked; `on`
+/// only, off unless set.
+pub const FACE_SAVE_KNOWN_ONLY_ENVIRONMENT: &str = "LAMP_FACE_SAVE_KNOWN_ONLY";
+
+/// Whether [`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`] is exactly `on`.
+pub fn face_save_known_only_on() -> bool {
+    std::env::var(FACE_SAVE_KNOWN_ONLY_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
 }
 
 /// The exchanges before the turn in hand that a name may have been said
@@ -2073,6 +2096,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         rename_yes: false,
         name_learn_fix: false,
         face_no_ask: false,
+        face_save_known_only: false,
     })
 }
 
@@ -2197,6 +2221,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         },
         None,
         None,
@@ -2725,6 +2750,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         },
         said,
         None,
@@ -4694,6 +4720,7 @@ mod tests {
                 rename_yes: false,
                 name_learn_fix: false,
                 face_no_ask: false,
+                face_save_known_only: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -5779,6 +5806,7 @@ mod tests {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         };
         let (told, _) = run_switched(
             &socket,

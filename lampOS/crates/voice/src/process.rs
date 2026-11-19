@@ -3061,6 +3061,9 @@ fn second_route_worker_environment(
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
         // A new face past setup kept with nothing asked (the first builder 18:50).
         crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
+        // A new face's save past the face question on a known file kept
+        // only for a face the eyes know (#7704).
+        crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT,
         // The model's decline of the walk's name ask (#7876).
         crate::onboarding::learn_later::ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
@@ -3385,6 +3388,7 @@ mod tests {
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
             crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
+            crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT,
             crate::onboarding::learn_later::ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
@@ -4559,6 +4563,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
                     || name == crate::known_faces::FACE_NO_ASK_ENVIRONMENT
+                    || name == crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT
                     || name == crate::onboarding::learn_later::ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
@@ -4680,6 +4685,7 @@ mod tests {
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FACE_LEARN_LATER=on",
                     "LAMP_FACE_NO_ASK=on",
+                    "LAMP_FACE_SAVE_KNOWN_ONLY=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
