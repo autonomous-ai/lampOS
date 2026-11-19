@@ -2124,8 +2124,18 @@ words or files, nor a made skill's SHA-256.
 - **A no** deletes the days with everything else, and asks the manage
   helper (`{"forget_counts": {}}`, root's, which owns both files) to
   delete `lamp-skills`' `runs.json` and the voice's `counts.json`, each
-  under its writers' lock; asked again every 10 s until it says done
-  (`reports/state.json` keeps that it is owed). Runs counted in a running
+  under its writers' lock. It is asked at once and, while not done,
+  again after 20 s, 40 s, 80 s and so on, doubling up to 10 minutes
+  (`FORGET_MOST`) between asks, until it says done
+  (`reports/state.json` keeps that it is owed; a restart asks at once).
+  `lamp-cloud` asks one at a time and waits at most 5 s for each answer,
+  so it holds at most one of the manage socket's four connections, and
+  none between asks (#7967: asked every 10 s, the socket filled and the
+  voice's skill runs were dropped). Once the helper can answer done (its
+  locks bounded, #7907), the counts are forgotten within 10 minutes.
+  Tests: `reports::tests::a_forget_not_done_is_asked_again_later_each_time`,
+  `reports::tests::the_forget_holds_one_manage_connection_at_most_and_none_between_asks`.
+  Runs counted in a running
   part's memory and not yet written (at most a minute's) begin the next
   file. Nothing is sent without a yes, and a yes again begins the count
   anew from its first reading.

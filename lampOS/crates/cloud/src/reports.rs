@@ -171,6 +171,11 @@ pub const ERROR_HOLDS: Duration = Duration::from_secs(60);
 pub const ERROR_AGAIN: Duration = Duration::from_secs(60 * 60);
 /// How often the exit notes are looked at.
 pub const NOTES_EVERY: Duration = Duration::from_secs(10);
+/// After a no, the parts' skill counts are asked deleted at once; each ask
+/// not done doubles the wait for the next, from [`NOTES_EVERY`] to at most
+/// this (#7967: asked every 10 s, the manage socket filled). So once the
+/// helper can answer done, the counts are forgotten within this.
+pub const FORGET_MOST: Duration = Duration::from_secs(10 * 60);
 /// How long a send waits while the voice is in a turn.
 pub const VOICE_WAIT: Duration = Duration::from_secs(60);
 /// The most crash reports in an hour and in a day, across every unit.
@@ -2044,6 +2049,10 @@ pub struct Timing {
     pub next_health: Instant,
     pub next_notes: Instant,
     pub next_state: Instant,
+    /// The parts' skill counts asked deleted next, and the wait after
+    /// that ask if it is not done ([`FORGET_MOST`]).
+    pub next_forget: Instant,
+    pub forget_wait: Duration,
     /// A health waiting on the voice's turn, since.
     pub waiting_since: Option<Instant>,
 }
@@ -2055,6 +2064,8 @@ impl Timing {
             next_health: now + FIRST_HEALTH,
             next_notes: now,
             next_state: now,
+            next_forget: now,
+            forget_wait: NOTES_EVERY,
             waiting_since: None,
         }
     }
@@ -2089,17 +2100,23 @@ pub fn step(
         put |= stopped;
         timing.next_state = now;
     }
-    if now >= timing.next_notes {
-        timing.next_notes = now + NOTES_EVERY;
-        // After a no, the parts' skill counts deleted: asked again each
-        // round until done.
-        if shared.with(|reports| reports.kept.forget_skill_counts) && sources.forget_skill_counts()
-        {
+    // After a no, the parts' skill counts deleted: asked again until done,
+    // each wait twice the last up to [`FORGET_MOST`]. One ask at a time:
+    // `step` waits for its answer (`crate::skills::ASK_TIMEOUT`, 5 s).
+    if now >= timing.next_forget && shared.with(|reports| reports.kept.forget_skill_counts) {
+        if sources.forget_skill_counts() {
             shared.with(|reports| {
                 reports.kept.forget_skill_counts = false;
                 reports.keep();
             });
+            timing.forget_wait = NOTES_EVERY;
+        } else {
+            timing.forget_wait = (timing.forget_wait * 2).min(FORGET_MOST);
         }
+        timing.next_forget = now + timing.forget_wait;
+    }
+    if now >= timing.next_notes {
+        timing.next_notes = now + NOTES_EVERY;
         put |= shared.with(|reports| {
             let mut put = false;
             for note in reports.new_notes() {
@@ -4033,6 +4050,7 @@ pub(crate) mod tests {
         // The cap, pinned: never more than 10 minutes between two asks.
         let gaps: Vec<u64> = helper.asked.windows(2).map(|two| two[1] - two[0]).collect();
         assert_eq!(gaps.iter().max(), Some(&600));
+        assert_eq!(FORGET_MOST, Duration::from_secs(600));
     }
 
     /// #7967: `lamp-cloud` holds at most one of the manage socket's

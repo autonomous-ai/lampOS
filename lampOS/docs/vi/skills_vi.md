@@ -5060,10 +5060,18 @@ giờ có tên, lời hay tệp của một kỹ năng.
   `made_counts::forget` với `.counts.lock`), chờ cả hai khóa tổng cộng tối đa
   4 giây (`ASKED_LOCK_WAIT`, dưới 5 giây chờ của `lamp-cloud`), quá thì từ
   chối (`WouldBlock`) và không xóa gì, không bao giờ chờ đến khi systemd giết
-  trình quản lý; hỏi lại mỗi 10 giây cho đến khi xong. Số đếm còn
-  trong bộ nhớ chưa ghi (tối đa một phút) bắt đầu tệp mới. Kiểm thử:
-  `package::tests::forget_counts_deletes_both_counts`,
-  `package::tests::forget_counts_answers_while_the_daily_journal_is_open`.
+  trình quản lý. `lamp-cloud` hỏi ngay, rồi khi chưa xong thì hỏi lại sau 20
+  giây, 40 giây, 80 giây…, gấp đôi mỗi lần, cách nhau tối đa 10 phút
+  (`FORGET_MOST`), cho đến khi xong; khởi động lại thì hỏi ngay. Mỗi lần chỉ
+  một yêu cầu, chờ trả lời tối đa 5 giây, nên `lamp-cloud` giữ tối đa một
+  trong bốn kết nối của socket quản lý, và không giữ kết nối nào giữa hai lần
+  hỏi (#7967: hỏi mỗi 10 giây làm đầy socket, lệnh chạy kỹ năng của giọng nói
+  bị rơi). Khi trình quản lý trả lời được "xong", số đếm được xóa trong vòng
+  10 phút. Số đếm còn trong bộ nhớ chưa ghi (tối đa một phút) bắt đầu tệp
+  mới. Kiểm thử: `package::tests::forget_counts_deletes_both_counts`,
+  `package::tests::forget_counts_answers_while_the_daily_journal_is_open`,
+  `reports::tests::a_forget_not_done_is_asked_again_later_each_time`,
+  `reports::tests::the_forget_holds_one_manage_connection_at_most_and_none_between_asks`.
 
 
 ## Thêm kỹ năng từ một tệp (`LAMP_SKILL_UPLOAD=on`, bật trong sản phẩm)
