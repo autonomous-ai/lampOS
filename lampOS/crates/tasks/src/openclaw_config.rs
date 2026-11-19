@@ -796,6 +796,13 @@ mod tests {
     /// live one: refused, `write` fails with OpenClaw's words and the old
     /// file stays byte for byte with nothing left beside it; taken, the new
     /// text is in place. With no wrapper there it is written as before.
+    /// The check joins the running gateway's namespaces, as the wrapper's
+    /// every other call does (#7268's ROW FAIL on lamp-52e6: run with
+    /// `LAMP_OPENCLAW_GATEWAY=on`, the wrapper gave it namespaces of its
+    /// own and OpenClaw 2026.11.2 refused with `GatewayLockNamespaceError`
+    /// whatever the text): never that switch, OpenClaw's own environment.
+    /// With no gateway running the wrapper fails closed, and so does the
+    /// write.
     #[test]
     fn a_text_openclaws_own_validate_refuses_never_lands() {
         let dir = tempfile::tempdir().unwrap();
@@ -803,22 +810,28 @@ mod tests {
         fs::create_dir_all(&state).unwrap();
         let path = state.join(CONFIG_FILE);
         fs::write(&path, INSTALLED).unwrap();
-        // A stand-in wrapper: its `config validate` keeps a copy of the
-        // file it was pointed at and answers with the verdict file's
-        // status.
+        // A stand-in wrapper, as lamp-update's: `LAMP_OPENCLAW_GATEWAY`
+        // set gives the call namespaces of its own, which OpenClaw refuses
+        // while its gateway runs; unset, the call joins the gateway's
+        // (`running` there) or fails closed with none. Joined, its `config
+        // validate` keeps a copy of the file it was pointed at and answers
+        // with the verdict file's status.
         let verdict = dir.path().join("verdict");
         let checked = dir.path().join("checked");
+        let running = dir.path().join("running");
         let wrapper = dir.path().join("openclaw");
         fs::write(
             &wrapper,
             format!(
-                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] && [ \"$LAMP_OPENCLAW_GATEWAY\" = on ] && [ \"$OPENCLAW_CONFIG_PATH\" != {live} ] || exit 2\ncp \"$OPENCLAW_CONFIG_PATH\" {checked}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] && [ \"$OPENCLAW_CONFIG_PATH\" != {live} ] && [ \"$HOME\" = /var/lib/lampos-openclaw ] && [ \"$OPENCLAW_STATE_DIR\" = /var/lib/lampos-openclaw/state ] || exit 2\n[ -z \"${{LAMP_OPENCLAW_GATEWAY+set}}\" ] || {{ echo 'GatewayLockNamespaceError: cannot verify Gateway ownership from this namespace'; exit 1; }}\n[ -e {running} ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\ncp \"$OPENCLAW_CONFIG_PATH\" {checked}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
                 live = path.display(),
+                running = running.display(),
                 checked = checked.display(),
                 verdict = verdict.display()
             ),
         )
         .unwrap();
+        fs::write(&running, "").unwrap();
         fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
         let write = |validator: &Path| {
             write_checked(&state, 7741, Path::new(WORKSPACE), true, true, validator)
@@ -839,6 +852,12 @@ mod tests {
         assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
 
         fs::write(&path, INSTALLED).unwrap();
+        fs::remove_file(&running).unwrap();
+        let error = write(&wrapper).unwrap_err().to_string();
+        assert!(error.contains("is not running"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
         assert!(write(&dir.path().join("none")).unwrap());
         assert_eq!(fs::read_to_string(&path).unwrap(), given);
     }
