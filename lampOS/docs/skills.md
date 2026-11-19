@@ -1766,14 +1766,22 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
 
 - **The step.** `task = { task, run }`, alone in its `[[do]]` table (no
   `on`, `after` or `if_choice`), one a skill, in an installable skill only.
-  `task` is 1 to 500 bytes of words; a new skill takes only one plain
-  sentence of at most 120 characters, the bound the voice reads back whole
-  for the owner's yes (`Skill::made_refuses`, #7874). It is one bound for
-  every skill, however it comes: `lamp-skills pack`, an install (a Store
-  skill too) and the app's push all refuse a longer one, and the refusal its
-  author sees says "a task's words: one plain sentence of at most 120
-  characters, read back whole to the owner for their yes". A skill already on
-  a lamp still loads. `run` a plain file inside the skill's
+  `task` is the task in full, the words its run is handed: 1 to 4,000
+  bytes; a new skill's may be long, plain and at most 1,000 characters, a
+  cap that only stops garbage (`made_skill::MOST_TASK_CHARS`; V2's call on
+  #7874: a task's length never blocks making a skill). An optional
+  `summary = "..."` beside it is the one line the lamp reads back for the
+  owner's yes: plain, at most 120 characters
+  (`made_skill::MOST_TASK_SAID_CHARS`). Without one, the lamp reads back
+  the task's first sentence, and a first sentence longer than 120
+  characters is cut at a word's end with "…" (`made_skill::task_said`).
+  The full words stay in the skill and are used for the run. The bounds
+  are one for every skill, however it comes (`Skill::made_refuses`):
+  `lamp-skills pack`, an install (a Store skill too) and the app's push all
+  refuse a longer task or summary, and the refusal its author sees says "a
+  task's words: plain, at most 1000 characters; its summary, if given: one
+  plain line of at most 120 characters, read back to the owner for their
+  yes". A skill already on a lamp still loads. `run` a plain file inside the skill's
   own `scripts/` (relative, at most four parts, no `..`, no hidden part, no
   link anywhere on it). Its `[permissions]` do not hold it: its reach is its
   `grants`.
@@ -3775,7 +3783,8 @@ gone ([switches.md](switches.md)). What happens:
      (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); exactly one
      `[[do]]` step that is a `task` alone, `task = { task = "take a photo",
      run = "scripts/main.py" }` (#6305's `do.task`), its words plain and at
-     most 120 characters, its `run` a `.py` file it wrote; and a top-level
+     most 1,000 characters, an optional `summary` of at most 120 read back
+     for the yes, its `run` a `.py` file it wrote; and a top-level
      `grants = [...]` of #6305's grants (`made_skill::GRANTS`, the names of
      `skill_task_yes::GRANTS`:
      `body`, `light`, `speak`, `look`, `hear`, `sound`, `air`, `device`,
@@ -4043,8 +4052,10 @@ gone ([switches.md](switches.md)). What happens:
    every check a load makes, its permissions among them, and the package
    read back as an install reads one. A skill that does more than it
    declares is refused there, and so is a `do.task` whose words are empty,
-   longer than 120 characters or not plain (control or format characters),
-   the voice's own rule (`made_skill::task_words_plain`, #7874). When it fails, the voice's journal has the
+   longer than 1,000 characters or not plain (control or format characters),
+   or whose `summary` is not one plain line of at most 120 characters, the
+   voice's own rules (`made_skill::task_words_plain`, `task_summary_plain`,
+   #7874). When it fails, the voice's journal has the
    check's exit code and its first line, without the skill's own words:
    anything in quotes, the skill's name and its folder are left out, and
    the line is at most 200 characters (`made_skill::check_reason`; #2813's
@@ -5964,7 +5975,8 @@ ruling; a send alone only `-write`; `made_skill::service_grant`, the codes
 back ("reading your gmail", "sending with your gmail, each send only on
 your yes"); the lamp's own trigger;
 exactly one `[[do]]` step `task = { task = "...", run = "scripts/main.py" }`,
-its words (at most 120 characters) saying plainly what to read and tell,
+its words in full (at most 1,000 characters, with an optional `summary` of
+at most 120 read back for the yes) saying plainly what to read and tell,
 or what to send and to whom; and a `scripts/main.py` that only prints a
 line. The brief says " Or a task, as above." in place of the read, write
 and code lines (`made_skill::brief_for`). Such a make is checked, said back
@@ -6266,18 +6278,19 @@ the same code for both writers.
   `make_skill_local::longest_make`) for a name, the fewest grants, and
   either one `[trigger]` of the lamp's own or the words the person will
   say to ask for it (`asks:`); it writes nothing else. The skill's one
-  task is the person's request in their own words, plain, at most 120
+  task is the person's request in their own words, plain, at most 1,000
   characters (`make_no_cannot::task_words`). A longer request is never cut
   short (lamp-9adf, 19 Nov: the evening rate lost "more than half a
   percent since the day before"): the same call's brief asks for a `task:`
-  line, one plain sentence of at most 120 characters, kept only when every
-  number (in words or digits), time word, name, comparison and percent in
-  the request survives in it (`make_no_cannot::task_kept`); else the model
-  is asked again once, told what it left out, then the make is refused as
-  too long (below), on a trigger or only asked for alike. By
+  line, plain, at most 1,000 characters (`made_skill::MOST_TASK_CHARS`),
+  kept only when every number (in words or digits), time word, name,
+  comparison and percent in the request survives in it
+  (`make_no_cannot::task_kept`); else the model is asked again once, told
+  what it left out, then the make is refused as too long (below), on a
+  trigger or only asked for alike. By
   voice, the request is the voice model's tool argument rather than the
-  line heard; the read-back bounds this, because the owner agrees to
-  exactly the words said back. Its
+  line heard; the owner agrees to its read-back, the request's first
+  sentence, cut at 120 characters with "…" (`made_skill::task_said`). Its
   grants are checked against the ones there are (`make_no_cannot::covered`):
   `light` or `speak` (`make_no_cannot::FALLBACK_GRANTS`); `net` with
   `LAMP_TASK_NET=on`, asked for or on a trigger (the owner's ruling of 17
@@ -6549,7 +6562,8 @@ the same code for both writers.
   version of V1's `skills/skill-creator/SKILL.md`, Apache-2.0, its first
   line naming that origin and license; V1's evals, benchmarks and viewer
   left out; #7874: its "How a made skill runs" says the run model, the
-  `task` words' rule of one plain sentence of at most 120 characters, a
+  `task` words in full with a one-line `summary` of at most 120 characters
+  read back for the yes, a
   linked-service skill and a `net` skill). The run is told to read the guide first, the rules winning
   where they differ: take the intent from the person's words alone (what
   the lamp does, when, and what the form can't do, left out), draft the
