@@ -5312,6 +5312,51 @@ mod tests {
         assert_eq!(take_health_line(&mut json!({"quoted": []})), None);
     }
 
+    /// The first builder's P3 on #7900: a health read's exchange keeps only
+    /// [`crate::thread::PRIVATE_SAID`] for the lamp's words, those said
+    /// before the read answered and after it, so no value reaches the
+    /// thread's file, a later turn or the running summary.
+    #[test]
+    fn a_health_reads_exchange_keeps_only_private_said() {
+        use lamp_services::health::Spoken;
+        let _one = HEALTH_READS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let request = 7_900_010;
+        let now = Instant::now();
+        let before = "Looking at Apple Health, 47,911 so far.";
+        let after = "Apple Health, as of 7:30 am: 47,912 steps so far today.";
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp(request, before, now);
+        let (folder, _) = health_folder("private", health_answer());
+        let (told, answered) = health_read(
+            &folder,
+            &health_call(),
+            request,
+            (Some("the-owner"), true),
+            Spoken::English,
+        );
+        assert!(answered && told.get(HEALTH_SAY).is_some(), "{told}");
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.lamp(request, after, now);
+        let recent = thread.recent(now, crate::thread::REMEMBERED_FOR, 64);
+        drop(thread);
+        let told_again = format!("{recent:?}");
+        assert!(
+            !told_again.contains("47,91"),
+            "a health read's words kept: {told_again}"
+        );
+        assert!(
+            recent
+                .iter()
+                .any(|exchange| exchange.lamp == crate::thread::PRIVATE_SAID),
+            "{told_again}"
+        );
+        crate::remember::health_facts_let_go();
+    }
+
     /// The owner's read is kept in their own memory as a dated fact with
     /// memory's own marked request (`health_fact::REMEMBER_OP`, never a
     /// plain `remember` with the conversation's exchanges as its sources),

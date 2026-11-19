@@ -229,6 +229,18 @@ fn main() -> ExitCode {
         services
     });
     say(&format!("serving {}", run.display()));
+    // The daily maintain: Apple Health's kept days past the 14 dropped from
+    // the file even when the phone stopped pushing and nobody reads it
+    // (the first builder's P3 on #7900); once at start, then each day.
+    if apple_health {
+        let maintained = services.clone();
+        std::thread::spawn(move || {
+            loop {
+                maintained.maintain(lamp_services::now_secs());
+                std::thread::sleep(serve::MAINTAIN_EVERY);
+            }
+        });
+    }
     let admin_services = services.clone();
     std::thread::spawn(move || serve::serve(admin, admin_services, serve::Door::Admin));
     serve::serve(calls, services, serve::Door::Tools);

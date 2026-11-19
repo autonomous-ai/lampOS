@@ -3085,7 +3085,9 @@ Checked strictly, first by `lamp-cloud` and again by `lamp-services`
 - `days`: 1 to 14 (`DAYS_MOST`), each `date` (`YYYY-MM-DD`, a real day)
   once; kept oldest first. A day before the 14 ending today (in `tz`) is
   dropped, not refused, at each push, and dropped from the file at each
-  read too (`health::prune`), so no day is kept past 14. Every other day field is optional, and `null` is
+  read and at lamp-services' daily maintain too (`health::prune`,
+  `Services::maintain`, once at start then every 24 h, so a lamp whose
+  phone stopped pushing keeps no old days), so no day is kept past 14. Every other day field is optional, and `null` is
   the same as absent: `steps` 0 to 200,000, `active_kcal` 0 to 20,000,
   `resting_hr` 20 to 250, `sleep_min` 0 to 1,440 (the night that ended on
   `date`), `sleep_start` and `sleep_end` `HH:MM` (00:00 to 23:59), all whole
@@ -3263,10 +3265,12 @@ removed by:
   `/run/lampos-memory/forget.sock`, set in `lamp-cloud.service`), which
   forgets every person's kept Apple Health facts, by their mark.
   Disconnecting removes what Lamp kept from Apple Health; what you talked
-  about stays in your conversations until you ask Lamp to forget it. If memory doesn't answer
-  or refuses, the result is `failure`, "Apple Health was unlinked, but what
-  Lamp remembered from it could not be removed just now; try again"
-  (`HEALTH_FACTS_KEPT`). With no socket given, nothing is asked.
+  about stays in your conversations until you ask Lamp to forget it.
+  A thing the person asks Lamp to remember about their health after a read is theirs like anything else they told it, and goes with "forget that", not with Disconnect.
+  If memory doesn't answer or refuses, the unlink is still done and the
+  forget owed: lamp-cloud retries it in the background, kept across a
+  restart, until memory takes it (cloud.md, "Apple Health's summaries").
+  With no socket given, nothing is asked.
 - A reset: the reset plan wipes `/var/lib/lampos-memory` and
   `/var/lib/lampos-services` whole.
 

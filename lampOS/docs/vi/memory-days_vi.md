@@ -1918,10 +1918,12 @@ người đều bị quên, từng mục, không chọn lọc, cùng những gì
 `{"ok":true,"removed":N}`. Không lượt trao đổi nào bị xoá (không lượt nào gắn
 với một mục) và đêm không bị đánh dấu: ngắt kết nối sẽ xoá những gì Lamp giữ từ
 Apple Health; những gì bạn đã trò chuyện vẫn ở trong các cuộc trò chuyện của
-bạn cho tới khi bạn bảo Lamp quên chúng. lamp-cloud gửi nó khi app gỡ liên kết Apple Health (`health.summary`
+bạn cho tới khi bạn bảo Lamp quên chúng. Điều người dùng nhờ Lamp nhớ về sức khoẻ của họ sau một lần đọc là của họ như mọi điều khác họ đã kể, và mất đi với "quên điều đó", không phải với Ngắt kết nối. Lệnh quên bộ nhớ
+không nhận lúc gỡ được lamp-cloud thử lại cho tới khi nhận. lamp-cloud gửi nó khi app gỡ liên kết Apple Health (`health.summary`
 `null`, `connector.remove.apple_health`, lần xóa khi đăng xuất), qua
 `services::forget_health_facts` (xem [services_vi.md](services_vi.md), «Apple
 Health»). Test: `forget_apple_health_takes_the_marked_facts_and_nothing_else`,
+`forget_person_takes_their_marked_apple_health_facts`,
 `an_apple_health_fact_is_replaced_by_the_same_days_next_read`,
 `an_apple_health_fact_is_gone_after_fourteen_days`,
 `apple_health_facts_are_not_counted_in_the_kept_lists_room`,

@@ -296,7 +296,9 @@ socket is refused before the eyes forget anything.
   lamp-cloud send `{"op":"forget_apple_health"}` on the narrow socket,
   which removes all of them, by their mark. Disconnecting removes what
   Lamp kept from Apple Health; what you talked about stays in your
-  conversations until you ask Lamp to forget it. The owner's own "forget
+  conversations until you ask Lamp to forget it. A thing the person asks Lamp to remember about their health after a read is theirs like anything else they told it, and goes with "forget that", not with Disconnect. A forget
+  memory doesn't take at the unlink is retried by lamp-cloud until it does
+  (cloud.md). The owner's own "forget
   everything" takes them with the rest of their scope.
 
 ### The owner's face and typed name (#7501, `LAMP_OWNER_LINK`)
@@ -506,6 +508,7 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   Lamp to forget it. The narrow socket lets it through (the app's unlink
   of Apple Health). Tests (`days_protocol::tests`):
   `forget_apple_health_takes_the_marked_facts_and_nothing_else`,
+  `forget_person_takes_their_marked_apple_health_facts`,
   `an_apple_health_fact_is_replaced_by_the_same_days_next_read`,
   `an_apple_health_fact_is_gone_after_fourteen_days`,
   `apple_health_facts_are_not_counted_in_the_kept_lists_room`.

@@ -317,7 +317,8 @@ pub fn checked(kind: &str, code: &str, connector: &Value) -> Result<(), String> 
 /// narrow socket `memory` with `{"op": "forget_apple_health"}` (#7900): the
 /// app's unlink, a remove and a sign-out take them with the summary. No
 /// socket given (a dev lamp), nothing is asked. An error when memory
-/// doesn't answer or refuses, so the app is told and may ask again; a
+/// doesn't answer or refuses: the unlink then owes it ([`forget_or_owe`])
+/// and [`forget_health_until_taken`] asks again until memory takes it; a
 /// retry removes nothing twice.
 pub fn forget_health_facts(memory: Option<&Path>) -> Result<(), String> {
     let Some(socket) = memory else {
@@ -335,8 +336,139 @@ pub fn forget_health_facts(memory: Option<&Path>) -> Result<(), String> {
 }
 
 /// What the app is told when Apple Health's summary went but what Lamp
-/// remembered of it could not be removed just now.
+/// remembered of it could not be removed and could not be owed either
+/// ([`ForgetOwed::owe`] never fails, so only [`forget_health_facts`] says it).
 pub const HEALTH_FACTS_KEPT: &str = "Apple Health was unlinked, but what Lamp remembered from it could not be removed just now; try again";
+
+/// The file under lamp-cloud's state folder that says a forget of Apple
+/// Health's kept facts is owed, so a restart still tries it.
+pub const FORGET_OWED_FILE: &str = "apple-health-forget.json";
+/// The first wait before an owed forget is tried again.
+pub const FORGET_FIRST: Duration = Duration::from_secs(5);
+/// The longest wait between tries: each failure doubles it, up to this.
+pub const FORGET_MOST: Duration = Duration::from_secs(300);
+
+/// A forget of Apple Health's kept facts that memory didn't take when the
+/// person unlinked (#7900): kept in [`FORGET_OWED_FILE`] when there is a
+/// state folder and tried again by [`forget_health_until_taken`] until
+/// memory takes it, so a Disconnect always finishes without a second tap.
+#[derive(Debug, Default)]
+pub struct ForgetOwed {
+    file: Option<PathBuf>,
+    /// 0 when nothing is owed; otherwise bumped by each new owe, so a
+    /// forget that began before a newer owe doesn't pay it.
+    owed: Mutex<u64>,
+    wake: tokio::sync::Notify,
+}
+
+impl ForgetOwed {
+    /// Kept in `file` when given: a forget owed before a restart is owed again.
+    pub fn open(file: Option<PathBuf>) -> Self {
+        let owed = u64::from(file.as_deref().is_some_and(Path::exists));
+        Self {
+            file,
+            owed: Mutex::new(owed),
+            wake: tokio::sync::Notify::new(),
+        }
+    }
+
+    /// The owe now, 0 when nothing is owed.
+    pub fn owed(&self) -> u64 {
+        self.owed.lock().map_or(0, |owed| *owed)
+    }
+
+    /// A forget memory didn't take: owed, kept on disk when it can be (in
+    /// memory otherwise, until a restart), and the retry woken.
+    pub fn owe(&self) {
+        if let Ok(mut owed) = self.owed.lock() {
+            *owed = owed.wrapping_add(1).max(1);
+        }
+        if let Some(file) = &self.file {
+            let _ = write_owed(file);
+        }
+        self.wake.notify_one();
+    }
+
+    /// Memory took a forget asked when the owe was `seen`: paid unless a
+    /// newer owe came meanwhile.
+    pub fn paid(&self, seen: u64) {
+        let Ok(mut owed) = self.owed.lock() else {
+            return;
+        };
+        if *owed == seen {
+            *owed = 0;
+            if let Some(file) = &self.file {
+                let _ = std::fs::remove_file(file);
+            }
+        }
+    }
+}
+
+/// The owed mark, mode 0600, written whole: it holds no value, only when.
+fn write_owed(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let temporary = path.with_extension("tmp");
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)?;
+    file.write_all(
+        json!({"since_s": crate::signed_out::now_s()})
+            .to_string()
+            .as_bytes(),
+    )?;
+    file.sync_all()?;
+    std::fs::rename(&temporary, path)
+}
+
+/// [`forget_health_facts`], and when memory doesn't take it, owed in
+/// `owed` for [`forget_health_until_taken`]: the unlink is done either way.
+/// A forget taken now pays any older owe too, as it removes them all.
+pub fn forget_or_owe(memory: Option<&Path>, owed: &ForgetOwed) {
+    let seen = owed.owed();
+    match forget_health_facts(memory) {
+        Ok(()) if seen != 0 => owed.paid(seen),
+        Ok(()) => {}
+        Err(_) => owed.owe(),
+    }
+}
+
+/// Tries an owed forget again (`services.forget_owed`) until memory takes
+/// it: at once at start when one was kept, then after [`FORGET_FIRST`],
+/// doubling to [`FORGET_MOST`]; woken at once by a new owe. Never returns.
+pub async fn forget_health_until_taken(services: Arc<Services>, say: &mut impl FnMut(&str)) {
+    let owed = services.forget_owed.clone();
+    let mut wait = FORGET_FIRST;
+    loop {
+        let seen = owed.owed();
+        if seen == 0 {
+            owed.wake.notified().await;
+            wait = FORGET_FIRST;
+            continue;
+        }
+        let memory = services.memory.clone();
+        let taken = tokio::task::spawn_blocking(move || forget_health_facts(memory.as_deref()))
+            .await
+            .unwrap_or_else(|_| Err(HEALTH_FACTS_KEPT.to_owned()));
+        if taken.is_ok() {
+            owed.paid(seen);
+            say("apple health: the owed forget was taken by memory");
+            wait = FORGET_FIRST;
+            continue;
+        }
+        say(&format!(
+            "apple health: memory did not take the owed forget, tried again in {}s",
+            wait.as_secs()
+        ));
+        tokio::select! {
+            () = tokio::time::sleep(wait) => {}
+            () = owed.wake.notified() => {}
+        }
+        wait = (wait * 2).min(FORGET_MOST);
+    }
+}
 
 /// The admin socket: `line` out, one JSON line back within `wait`. An
 /// `"ok": true` reply as it is; `"ok": false` its plain `error`.
@@ -377,6 +509,9 @@ pub struct Services {
     /// Apple Health's unlink removes what the voice kept of it there too
     /// ([`forget_health_facts`]).
     pub memory: Option<PathBuf>,
+    /// A forget memory didn't take, tried again in the background
+    /// ([`forget_health_until_taken`]).
+    pub forget_owed: Arc<ForgetOwed>,
 }
 
 impl std::fmt::Debug for Services {
@@ -406,6 +541,7 @@ impl Services {
             done: Arc::default(),
             health,
             memory: None,
+            forget_owed: Arc::default(),
         })
     }
 
@@ -421,6 +557,20 @@ impl Services {
         services
     }
 
+    /// [`Self::with_memory`], an owed forget kept in `owed` across restarts.
+    pub fn with_forget_owed(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+        memory: Option<PathBuf>,
+        owed: Option<PathBuf>,
+    ) -> Arc<Self> {
+        let mut services = Self::with_memory(socket, fetch, health, memory);
+        Arc::get_mut(&mut services).expect("just made").forget_owed =
+            Arc::new(ForgetOwed::open(owed));
+        services
+    }
+
     /// The product's: [`ADMIN_SOCKET`] and the backend, with the switch;
     /// none without it, or without the account's base or the lamp's key.
     pub fn product(account: &Account, key: &str) -> Option<Arc<Self>> {
@@ -433,11 +583,14 @@ impl Services {
             .ok()
             .map(PathBuf::from)
             .filter(|path| path.is_absolute());
-        Some(Self::with_memory(
+        let owed = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| PathBuf::from(dir).join(FORGET_OWED_FILE));
+        Some(Self::with_forget_owed(
             ADMIN_SOCKET,
             Arc::new(backend),
             health,
             memory,
+            owed,
         ))
     }
 
@@ -461,12 +614,13 @@ impl Services {
         let code = code.to_owned();
         let fetch = self.fetch.clone();
         let memory = self.memory.clone();
+        let owed = self.forget_owed.clone();
         self.spawn(kind, move |socket, kind| match asked {
             Asked::Set => set(&*fetch, socket, kind, &code),
             Asked::Remove => {
                 ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
                 if code == lamp_services::health::CODE {
-                    forget_health_facts(memory.as_deref())?;
+                    forget_or_owe(memory.as_deref(), &owed);
                 }
                 Ok(Some(json!({"connector": code})))
             }
@@ -484,9 +638,10 @@ impl Services {
         let code = lamp_services::health::CODE;
         if data.is_null() {
             let memory = self.memory.clone();
+            let owed = self.forget_owed.clone();
             return self.spawn(HEALTH_KIND, move |socket, _| {
                 ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
-                forget_health_facts(memory.as_deref())?;
+                forget_or_owe(memory.as_deref(), &owed);
                 Ok(Some(json!({"connector": code, "cleared": true})))
             });
         }
@@ -562,10 +717,12 @@ impl Services {
     }
 
     /// Every token wiped: the lamp left its account. What the voice kept
-    /// of Apple Health goes with its summary ([`forget_health_facts`]).
+    /// of Apple Health goes with its summary ([`forget_or_owe`]): memory
+    /// not answering owes it to [`forget_health_until_taken`].
     pub fn wipe(&self) -> Result<(), String> {
         ask(&self.socket, &json!({"op": "wipe"}), ADMIN_WAIT)?;
-        forget_health_facts(self.memory.as_deref())
+        forget_or_owe(self.memory.as_deref(), &self.forget_owed);
+        Ok(())
     }
 
     /// Results handed to the broker and lost with the connection before it
@@ -795,7 +952,7 @@ pub mod tests {
             .map(|line| serde_json::from_str(line.trim()).unwrap())
             .collect();
         assert_eq!(asked, vec![json!({"op": "forget_apple_health"}); 3]);
-        // Memory gone: the app is told, and may ask again.
+        // Memory gone: the unlink is done all the same, the forget owed.
         let gone = Services::with_memory(
             admin.socket(),
             fetch(),
@@ -805,9 +962,138 @@ pub mod tests {
         gone.start_health(&Value::Null).unwrap();
         assert_eq!(
             results(&gone, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        assert_ne!(gone.forget_owed.owed(), 0);
+        assert_eq!(
+            forget_health_facts(Some(&memory.dir.path().join("none.sock"))),
             Err(HEALTH_FACTS_KEPT.to_owned())
         );
         assert_eq!(forget_health_facts(None), Ok(()));
+    }
+
+    /// A fake memory at `path`, from now on: each line kept, `reply` sent.
+    fn listen_at(path: &Path, reply: &'static str) -> Arc<Mutex<Vec<String>>> {
+        let listener = UnixListener::bind(path).unwrap();
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let kept = lines.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                let _ = BufReader::new(&stream).read_line(&mut line);
+                kept.lock().unwrap().push(line);
+                let _ = stream.write_all(format!("{reply}\n").as_bytes());
+            }
+        });
+        lines
+    }
+
+    /// #7900: memory down at the Disconnect, then up: the facts are gone
+    /// with no second tap, the forget owed on disk meanwhile and retried in
+    /// the background; a restart with the owe kept tries it at once.
+    #[test]
+    fn a_disconnect_memory_missed_is_retried_until_memory_takes_it() {
+        let admin = admin(r#"{"ok":true}"#);
+        let state = tempfile::tempdir().unwrap();
+        let owed_file = state.path().join(FORGET_OWED_FILE);
+        let memory_socket = state.path().join("memory.sock");
+        let make = || {
+            Services::with_forget_owed(
+                admin.socket(),
+                Arc::new(FakeFetch {
+                    answer: Err("never fetched".into()),
+                    asked: Mutex::default(),
+                }),
+                true,
+                Some(memory_socket.clone()),
+                Some(owed_file.clone()),
+            )
+        };
+        let services = make();
+        services.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        assert!(owed_file.exists(), "owed on disk");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let said = Arc::new(Mutex::new(Vec::<String>::new()));
+        let wait_for = |lines: Arc<Mutex<Vec<String>>>, owed: Arc<ForgetOwed>| async move {
+            for _ in 0..1500 {
+                if !lines.lock().unwrap().is_empty() && owed.owed() == 0 {
+                    return lines.lock().unwrap().clone();
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            panic!("never forgotten");
+        };
+        let kept = said.clone();
+        let asked = services.clone();
+        let memory = runtime.block_on(async {
+            let retrying = async move {
+                let mut say = |line: &str| kept.lock().unwrap().push(line.to_owned());
+                forget_health_until_taken(asked, &mut say).await;
+            };
+            let checked = async {
+                // Memory still down: tried, not taken, still owed.
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                assert_ne!(services.forget_owed.owed(), 0);
+                let lines = listen_at(&memory_socket, r#"{"ok":true,"removed":3}"#);
+                wait_for(lines, services.forget_owed.clone()).await
+            };
+            tokio::select! {
+                () = retrying => unreachable!(),
+                lines = checked => lines,
+            }
+        });
+        assert_eq!(
+            serde_json::from_str::<Value>(memory[0].trim()).unwrap(),
+            json!({"op": "forget_apple_health"})
+        );
+        assert!(!owed_file.exists(), "paid");
+        assert!(
+            said.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line.contains("taken"))
+        );
+
+        // A restart with the owe kept: tried at once, with no new unlink.
+        write_owed(&owed_file).unwrap();
+        let _ = std::fs::remove_file(&memory_socket);
+        let lines = listen_at(&memory_socket, r#"{"ok":true,"removed":0}"#);
+        let restarted = make();
+        assert_ne!(restarted.forget_owed.owed(), 0);
+        let asked = restarted.clone();
+        let mut quiet = |_: &str| {};
+        let memory = runtime.block_on(async {
+            tokio::select! {
+                () = forget_health_until_taken(asked, &mut quiet) => unreachable!(),
+                lines = wait_for(lines, restarted.forget_owed.clone()) => lines,
+            }
+        });
+        assert_eq!(memory.len(), 1);
+        assert!(!owed_file.exists());
+    }
+
+    /// An owe newer than the forget under way isn't paid by it, and the
+    /// backoff stays within its bounds.
+    #[test]
+    fn a_newer_owe_is_not_paid_by_an_older_forget() {
+        let owed = ForgetOwed::open(None);
+        assert_eq!(owed.owed(), 0);
+        owed.owe();
+        let seen = owed.owed();
+        owed.owe();
+        owed.paid(seen);
+        assert_ne!(owed.owed(), 0);
+        owed.paid(owed.owed());
+        assert_eq!(owed.owed(), 0);
+        assert!(FORGET_FIRST < FORGET_MOST && FORGET_MOST <= Duration::from_secs(600));
     }
 
     /// Apple Health's summary: checked here, a refusal at once and by its

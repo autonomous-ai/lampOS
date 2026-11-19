@@ -2187,24 +2187,58 @@ pub(crate) mod tests {
             week,
             "over the last 7 days: about 7,855 steps a day; slept about 7 h 7 m a night; resting heart rate around 58 bpm; 2 workouts"
         );
-        for what in ["sleep", "steps", "heart", "workouts", "week"] {
-            for args in [json!({}), json!({"days": 14})] {
-                let Some((said, _)) = line(what, args) else {
-                    continue;
-                };
-                for never in [
-                    "running",
-                    "cycling",
-                    "06:55",
-                    "23:48",
-                    "06:40",
-                    "2026-11-1",
-                    "km",
+        // The never-list over measured and in-bed nights, and every kind
+        // of argument: none, a span, a day by its date and a word.
+        let mut in_bed = week_kept();
+        for day in &mut in_bed.summary.days {
+            if day.sleep_min.is_some() {
+                day.sleep_kind = Some(SLEEP_IN_BED.to_owned());
+            }
+        }
+        let mut said_in_bed = None;
+        for kept in [week_kept(), in_bed] {
+            for what in ["sleep", "steps", "heart", "workouts", "week"] {
+                for args in [
+                    json!({}),
+                    json!({"days": 14}),
+                    json!({"date": "2026-11-16"}),
+                    json!({"date": "2026-11-18"}),
+                    json!({"date": "yesterday"}),
                 ] {
-                    assert!(!said.contains(never), "{what}: {said}");
+                    let Ok(told) = read(what, args.clone(), Some(&kept), NOW) else {
+                        continue;
+                    };
+                    let Some((said, _)) = model_line(what, &args, &told, NOW) else {
+                        continue;
+                    };
+                    for never in [
+                        "running",
+                        "cycling",
+                        "swimming",
+                        "06:55",
+                        "23:48",
+                        "06:40",
+                        "17:10",
+                        "2026-11-1",
+                        "km",
+                        "20.25",
+                        "kcal",
+                    ] {
+                        assert!(!said.contains(never), "{what} {args}: {said}");
+                    }
+                    if what == "sleep" && kept.summary.days[4].sleep_kind.is_some() {
+                        assert!(!said.contains("slept"), "{args}: {said}");
+                        said_in_bed = Some(said);
+                    }
                 }
             }
         }
+        assert!(
+            said_in_bed
+                .as_deref()
+                .is_some_and(|said| said.contains("in bed")),
+            "{said_in_bed:?}"
+        );
         // An error, a stale summary or nothing found gives the model nothing.
         assert_eq!(
             model_line("steps", &json!({}), &json!({"error": NO_DATA}), NOW),

@@ -416,12 +416,20 @@ pub struct Services<H, M> {
     /// voice. Off, none is kept and the service is never listed or read; a
     /// summary kept while it was on still goes with a remove or a wipe.
     pub apple_health: bool,
+    /// Held over a local service's file from its read to its write: a
+    /// prune (at a read or the daily maintain) never writes back days a
+    /// remove, a wipe or a newer summary replaced meanwhile.
+    local_write: Mutex<()>,
 }
 
 /// What a made skill's or a skill run's read of a local service (Apple
-/// Health) is told, after its name: only the owner at the lamp hears it,
-/// their known face seen saying the line (the voice's gate).
+/// Health) is told, after its name: only the voice reads it, to whoever
+/// the voice takes as the owner (in the private room, anyone speaking at
+/// the lamp; the voice's `health_owner_turn`).
 pub const LOCAL_OWNER_ONLY: &str = "is read only to its owner at the lamp, never by a skill";
+
+/// How often lamp-services' daily maintain runs ([`Services::maintain`]).
+pub const MAINTAIN_EVERY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
 /// What a write to a local service (Apple Health) is told, after its name.
 pub const LOCAL_NEVER_WRITTEN: &str = "is read only: the lamp never writes to it";
@@ -539,6 +547,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             skill_secrets: None,
             run_calls: None,
             apple_health: false,
+            local_write: Mutex::new(()),
         }
     }
 
@@ -546,6 +555,41 @@ impl<H: Http, M: Mail> Services<H, M> {
     pub fn with_apple_health(mut self, on: bool) -> Self {
         self.apple_health = on;
         self
+    }
+
+    /// A local service's kept data, its days past the 14 kept dropped from
+    /// the file too, not only left unread (the first builder's P3s on
+    /// #7900): at each read and at the daily maintain ([`Self::maintain`]).
+    fn kept_local_pruned(&self, code: &str, now: i64) -> Option<health::Kept> {
+        let _held = self
+            .local_write
+            .lock()
+            .unwrap_or_else(|held| held.into_inner());
+        let mut kept = self
+            .store
+            .load_local(code)
+            .and_then(|record| health::Kept::from_record(&record))?;
+        if health::prune(&mut kept.summary, now) {
+            let record = health::Kept::record(&kept.summary, kept.stored_at);
+            if let Err(error) = self.store.keep_local(code, &record) {
+                eprintln!(
+                    "lamp-services: {code}: its older days could not be dropped: {}",
+                    error.kind()
+                );
+            }
+        }
+        Some(kept)
+    }
+
+    /// The daily maintain: every local service's kept days past the 14
+    /// dropped, so a lamp whose phone stopped pushing keeps no old days on
+    /// disk. Its switch off, nothing is read here (a remove or a wipe
+    /// still takes the file).
+    pub fn maintain(&self, now: i64) {
+        if self.local_off(health::CODE) {
+            return;
+        }
+        let _ = self.kept_local_pruned(health::CODE, now);
     }
 
     /// Whether `code` is a local service whose switch is off here: then it
@@ -1060,6 +1104,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                 ),
             },
             Admin::Wipe => {
+                let _held = self
+                    .local_write
+                    .lock()
+                    .unwrap_or_else(|held| held.into_inner());
                 self.desk.forget(None);
                 // A sign-out, an unpairing or a reset: no skill's write
                 // goes until a service is linked again, even if the wipe
@@ -1074,6 +1122,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                 }
             }
             Admin::Remove(code) => {
+                let _held = self
+                    .local_write
+                    .lock()
+                    .unwrap_or_else(|held| held.into_inner());
                 self.desk.forget(Some(&code));
                 // Unlinking takes back every yes to a skill's write to it.
                 if skill_writes::Approvals::new(&self.store.0)
@@ -1104,6 +1156,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                     Err(why) => return (refused(&why), format!("{code} not kept: {why}")),
                 };
                 let days = summary.days.len();
+                let _held = self
+                    .local_write
+                    .lock()
+                    .unwrap_or_else(|held| held.into_inner());
                 match self
                     .store
                     .keep_local(&code, &health::Kept::record(&summary, now))
@@ -1224,6 +1280,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                 // Apple Health's kept summary too (the first builder's P3
                 // on #7900). Never offered to a model, never a skill's.
                 health::FORGET_CALL if asker == Asker::Owner => {
+                    let _held = self
+                        .local_write
+                        .lock()
+                        .unwrap_or_else(|held| held.into_inner());
                     match self.store.remove(health::CODE) {
                         Ok(()) => {
                             eprintln!(
@@ -2108,8 +2168,8 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     /// A read of a local service (Apple Health), from its kept file alone:
-    /// the voice's only (said to the owner's known face seen saying the
-    /// line), never a made skill's or a skill's run,
+    /// the voice's only (said to whoever the voice takes as the owner, its
+    /// `health_owner_turn`), never a made skill's or a skill's run,
     /// and with its switch off it is a service the lamp can't link.
     fn local_read(
         &self,
@@ -2125,24 +2185,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             return Err((Stage::Link, format!("{} {LOCAL_OWNER_ONLY}", service.name)));
         }
         let now = crate::now_secs();
-        let mut kept = self
-            .store
-            .load_local(service.code)
-            .and_then(|record| health::Kept::from_record(&record));
-        // Days past the 14 kept are dropped from the file at each read too,
-        // not only left unread (the first builder's P3 on #7900).
-        if let Some(kept) = kept.as_mut()
-            && health::prune(&mut kept.summary, now)
-        {
-            let record = health::Kept::record(&kept.summary, kept.stored_at);
-            if let Err(error) = self.store.keep_local(service.code, &record) {
-                eprintln!(
-                    "lamp-services: {}: its older days could not be dropped: {}",
-                    service.code,
-                    error.kind()
-                );
-            }
-        }
+        let kept = self.kept_local_pruned(service.code, now);
         reads::local_read(service.code, args, kept.as_ref(), now).map_err(|why| {
             let stage = if why == health::NO_DATA {
                 Stage::Link
@@ -3377,6 +3420,45 @@ mod tests {
     /// The owner's "forget everything" removes the kept summary through the
     /// voice's own call, never a skill's; a read drops days past the 14
     /// kept from the file (the first builder's P3s on #7900).
+    /// The daily maintain drops Apple Health's days past the 14 with no
+    /// push and no read; its switch off, the file is left to a remove.
+    #[test]
+    fn the_daily_maintain_prunes_apple_health_with_no_push_or_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("s/apple_health.json");
+        let now = crate::now_secs();
+        let today = jiff::Timestamp::from_second(now)
+            .unwrap()
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .date();
+        let old = today.checked_sub(jiff::Span::new().days(20)).unwrap();
+        let summary: health::Summary = serde_json::from_value(json!({
+            "as_of": jiff::Timestamp::from_second(now).unwrap().to_string(), "tz": "UTC",
+            "days": [{"date": old.to_string(), "steps": 1}, {"date": today.to_string(), "steps": 2}]
+        }))
+        .unwrap();
+        let off = services(dir.path(), "[]", true);
+        off.store
+            .keep_local(health::CODE, &health::Kept::record(&summary, now))
+            .unwrap();
+        off.maintain(now);
+        assert!(
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .contains(&old.to_string())
+        );
+        let on = services(dir.path(), "[]", true).with_apple_health(true);
+        on.maintain(now);
+        let kept = std::fs::read_to_string(&file).unwrap();
+        assert!(!kept.contains(&old.to_string()), "{kept}");
+        assert!(kept.contains(&today.to_string()), "{kept}");
+        assert_eq!(fs_mode(&file), 0o600);
+        // Nothing kept: the maintain writes nothing.
+        std::fs::remove_file(&file).unwrap();
+        on.maintain(now);
+        assert!(!file.exists());
+    }
+
     #[test]
     fn apple_health_is_forgotten_and_pruned() {
         let dir = tempfile::tempdir().unwrap();

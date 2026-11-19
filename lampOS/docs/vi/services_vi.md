@@ -3140,7 +3140,10 @@ với `owner.place`):
 - `days`: 1 tới 14 ngày (`DAYS_MOST`), mỗi `date` (`YYYY-MM-DD`, một ngày có
   thật) một lần; được giữ theo thứ tự cũ trước. Một ngày trước 14 ngày kết
   thúc hôm nay (theo `tz`) bị bỏ đi, không bị từ chối, ở mỗi lần đẩy, và
-  cũng bị bỏ khỏi file ở mỗi lần đọc (`health::prune`), nên không ngày nào
+  cũng bị bỏ khỏi file ở mỗi lần đọc và ở lần bảo trì hằng ngày của
+  lamp-services (`health::prune`, `Services::maintain`, một lần lúc khởi
+  động rồi mỗi 24 giờ, nên đèn có điện thoại đã ngừng đẩy cũng không giữ
+  ngày cũ), nên không ngày nào
   được giữ quá 14 ngày. Mọi trường khác của ngày đều
   không bắt buộc, và `null` như không có: `steps` 0 tới 200,000,
   `active_kcal` 0 tới 20,000, `resting_hr` 20 tới 250, `sleep_min` 0 tới
@@ -3306,9 +3309,13 @@ kết (`health.summary` `null`, `connector.remove.apple_health`, lần xoá khi
 dấu của mọi người, trả `{"ok":true,"removed":N}`
 ([memory-days_vi.md](memory-days_vi.md)). Ngắt kết nối sẽ xoá những gì Lamp
 giữ từ Apple Health; những gì bạn đã trò chuyện vẫn ở trong các cuộc trò
-chuyện của bạn cho tới khi bạn bảo Lamp quên chúng. Không có trả lời hay bị từ chối
-thì kết quả là `failure` "Apple Health was unlinked, but what Lamp
-remembered from it could not be removed just now; try again". Lần đặt lại
+chuyện của bạn cho tới khi bạn bảo Lamp quên chúng. Điều người dùng nhờ Lamp nhớ về sức khoẻ của họ sau một lần đọc là của họ như mọi điều khác họ đã kể, và mất đi với "quên điều đó", không phải với Ngắt kết nối. Bộ nhớ không
+trả lời hay từ chối thì việc gỡ liên kết vẫn `success`: lệnh quên được ghi nợ
+trong `$STATE_DIRECTORY/apple-health-forget.json` (0600, chỉ thời điểm, không
+giá trị), và `services::forget_health_until_taken` của lamp-cloud hỏi lại ở nền
+cho tới khi bộ nhớ nhận, ngay sau khi khởi động lại, rồi sau 5 giây, gấp đôi
+tới tối đa 5 phút, và được đánh thức ngay khi có lần gỡ mới; không cần chạm lần
+hai. Lần đặt lại
 xoá `/var/lib/lampos-memory` và `/var/lib/lampos-services`.
 
 **Riêng tư.** Không giá trị sức khoẻ nào nằm trong một dòng journal, lỗi

@@ -1972,6 +1972,38 @@ mod tests {
         );
     }
 
+    /// The first builder's P3 on #7900: the app's removal of a person
+    /// (`forget_person`) takes their marked Apple Health facts with the
+    /// rest of theirs, and leaves another person's marked fact alone.
+    #[test]
+    fn forget_person_takes_their_marked_apple_health_facts() {
+        let (_scratch, mut store) = Scratch::new("forget-person-apple-health");
+        let (ann, bob) = ("p-0123456789abcdef", "p-fedcba9876543210");
+        for person in [ann, bob] {
+            let kept = health_keep(&mut store, person, NOW, "8,421 steps so far today");
+            assert_eq!(kept["ok"], true, "{kept}");
+        }
+        let coffee = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":NOW+1,"text":"takes her coffee black"}),
+            NOW + 1,
+        );
+        assert_eq!(coffee["ok"], true, "{coffee}");
+        let done = health_send(
+            &mut store,
+            json!({"op":"forget_person","person":ann}),
+            NOW + 2,
+        );
+        assert_eq!(done["ok"], true, "{done}");
+        assert_eq!(done["removed"], 2, "the fact and her own line: {done}");
+        assert!(health_kept(&mut store, ann, NOW + 2).is_empty());
+        // Only Bob's marked fact is left for the app's unlink to take.
+        assert_eq!(
+            health_send(&mut store, json!({"op":"forget_apple_health"}), NOW + 2),
+            json!({"ok":true,"removed":1})
+        );
+    }
+
     /// #7900: one Apple Health fact a person a local day, the next read's
     /// replacing it; another day's stays beside it, and another person's.
     #[test]

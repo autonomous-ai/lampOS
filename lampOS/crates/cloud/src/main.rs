@@ -263,6 +263,9 @@ fn main() -> ExitCode {
     let wiping = services
         .clone()
         .zip(login.as_ref().map(|login| login.watch()));
+    // Apple Health's kept facts that memory didn't take at an unlink, tried
+    // again until it does (#7900), kept across restarts.
+    let forgetting = services.clone();
     let alerts_bus = bus.clone();
     // The energy kept with the character words, said for the body (#6893).
     let energy_bus = bus.clone();
@@ -528,6 +531,16 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_forgets = |line: &str| say(line);
+        let forgetting = async move {
+            match forgetting {
+                Some(services) => {
+                    lamp_cloud::services::forget_health_until_taken(services, &mut said_forgets)
+                        .await
+                }
+                None => std::future::pending().await,
+            }
+        };
         let mut said_hermes = |line: &str| say(line);
         let forwarding = async move {
             lamp_cloud::hermes_llm::run(
@@ -542,6 +555,7 @@ fn main() -> ExitCode {
             () = forwarding => {}
             () = alerting => {}
             () = wiping => {}
+            () = forgetting => {}
             () = pinging => {}
             () = staying => {}
             () = looks => {}
