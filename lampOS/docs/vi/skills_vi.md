@@ -3506,8 +3506,19 @@ cả hai người viết.
   của mô hình giọng nói trong `request` của `make_skill`, chỉ dùng khi
   không nghe được câu nào của họ (tạo từ app hoặc câu gõ); lần đánh giá và
   lần gọi thêm cũng hỏi theo chính lời đó. Câu dài hơn sức chứa của task
-  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) bị từ chối,
-  nói rõ, không bao giờ bị cắt. Nó chạy bằng `scripts/agent.py`, lời dặn
+  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) không bao giờ
+  bị từ chối vì độ dài hay bị cắt: task của nó là câu do mô hình tự viết
+  trong lần gọi thêm (`task:`), chỉ được giữ khi mọi con số, giờ giấc và
+  tên trong câu đều còn (`make_no_cannot::task_kept`, #7904; quyết định
+  của người xây dựng đầu tiên trên #7819), và lời dặn trích chính câu đó.
+  Task của đường internet
+  (`make_skill_local::net_made`, `LAMP_TASK_NET`) và của `cannot:` do mô
+  hình nói (`make_skill_local::no_cannot`, `LAMP_MAKE_NO_CANNOT`) cũng vậy:
+  cùng câu của chính họ, cùng lời được kiểm cho câu quá dài, trên trigger
+  cũng như khi chỉ gọi bằng lời (việc làm thêm của Twelve trên #7819,
+  02:41;
+  `make_in_gives_the_internets_task_the_own_make_line_and_words_one_too_long`
+  chạy chính `make_in`). Nó chạy bằng `scripts/agent.py`, lời dặn
   nêu điều đã kích hoạt và trích nguyên câu ("A skill the person made has
   fired (when someone comes back to the desk after it was empty for 5
   minutes). When they made it, they said: «Lamp, make a skill that tells

@@ -3416,6 +3416,20 @@ fn made_and_journaled_by(
     let own_line = OWN_LINE
         .with(std::cell::RefCell::take)
         .unwrap_or_else(|| heard.map(str::to_owned));
+    // The judge and every task for the lamp's agent made here (the middle
+    // form, the internet's and the model's cannot) take the person's own
+    // make line whole (the first builder, 19:50 and 02:09 on #7819;
+    // Twelve's follow-up at 02:41): their own line alone (`own_line`, the
+    // thread's `heard_in_own_line`), never the newest words heard nor the
+    // voice model's paraphrase in `request`; the request's words only when
+    // no line of theirs was heard: a make from the app or a typed line. The
+    // agent reads it inside the run-time brief
+    // ([`crate::make_no_cannot::script`]).
+    let own_words = own_line
+        .as_deref()
+        .map(str::trim)
+        .filter(|line| line.chars().any(char::is_alphanumeric))
+        .unwrap_or(request);
     let judge_ask = |question: &str| judged(Arc::clone(&chat), question.to_owned());
     let given = GIVEN.with(std::cell::RefCell::take);
     let asked = made_skill::Asked {
@@ -3587,7 +3601,7 @@ fn made_and_journaled_by(
         let made = net_made(
             made,
             &needs_net,
-            request,
+            own_words,
             &chat,
             began,
             &kept,
@@ -3596,7 +3610,7 @@ fn made_and_journaled_by(
         let made = no_cannot(
             made,
             &models_cannot,
-            request,
+            own_words,
             &chat,
             began,
             &kept,
@@ -3669,18 +3683,7 @@ fn made_and_journaled_by(
     // the internet's line or what can't be read keeps its own route. With
     // no agent on the lamp (`missing`), told so; an agent not known, no
     // judgement: DeepSeek's as before.
-    // The judge and the middle form's task take the person's own make line
-    // whole (the first builder, 19:50 and 02:09 on #7819): their own line
-    // alone (`own_line`, the thread's `heard_in_own_line`), never the newest
-    // words heard nor the voice model's paraphrase in `request`; the
-    // request's words only when no line of theirs was heard: a make from
-    // the app or a typed line. The agent reads it inside the run-time
-    // brief ([`crate::make_no_cannot::script`]).
-    let own_words = own_line
-        .as_deref()
-        .map(str::trim)
-        .filter(|line| line.chars().any(char::is_alphanumeric))
-        .unwrap_or(request);
+    // The judge and the middle form's task take `own_words` above.
     let routed = made_skill::reactions_on() && (engine.is_some() || missing);
     let judged_none = routed && reaction_judged(Arc::clone(&chat), own_words) != Some(true);
     let first = (!judged_none).then(first_ask);
@@ -3716,20 +3719,13 @@ fn made_and_journaled_by(
                 "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
                  one task of the request; no DeepSeek draft kept"
             );
-            // A line longer than a task holds is refused, said plainly,
-            // never cut unheard (the first builder, 02:09 on #7819).
-            let made = if crate::make_no_cannot::task_cut(own_words) {
-                eprintln!("lamp-voice: a skill made here: the line is longer than a task holds");
-                Err(crate::make_no_cannot::too_long())
-            } else {
-                agent_task(
-                    own_words,
-                    &chat,
-                    began,
-                    &agent_kept,
-                    (from, keeping, asked.named),
-                )
-            };
+            let made = agent_task(
+                own_words,
+                &chat,
+                began,
+                &agent_kept,
+                (from, keeping, asked.named),
+            );
             let line = kept_line(&made, false, began.elapsed().as_millis());
             return (plain_unless_cannot(made, false), line);
         }
@@ -3864,7 +3860,7 @@ fn made_and_journaled_by(
     let made = net_made(
         made,
         &needs_net,
-        request,
+        own_words,
         &chat,
         began,
         &kept,
@@ -3873,7 +3869,7 @@ fn made_and_journaled_by(
     let made = no_cannot(
         made,
         &models_cannot,
-        request,
+        own_words,
         &chat,
         began,
         &kept,
@@ -3933,11 +3929,13 @@ fn stays_deepseeks(
 /// one that keeps people and their services safe is said with the lamp's
 /// own plain reason ([`crate::make_no_cannot::kept_refusal`]), any other as
 /// the model wrote it. The agent's ([`crate::make_no_cannot::AGENTS_CANNOT`])
-/// is never said. Off, or any other make, `made` as it is.
+/// is never said. Its task's `words` are the person's own make line, as
+/// the middle form's (Twelve's follow-up on #7819, 02:41). Off, or any
+/// other make, `made` as it is.
 fn no_cannot(
     made: Result<Made, Refused>,
     models_cannot: &std::cell::Cell<bool>,
-    request: &str,
+    words: &str,
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
@@ -3979,7 +3977,7 @@ fn no_cannot(
          ({})",
         crate::make_no_cannot::ENVIRONMENT
     );
-    let made = agent_task(request, chat, began, kept, (from, keeping, named));
+    let made = agent_task(words, chat, began, kept, (from, keeping, named));
     models_cannot.set(false);
     made
 }
@@ -3991,12 +3989,13 @@ fn no_cannot(
 /// `LAMP_MAKE_NO_CANNOT`: asked for by its words, an agent skill granted
 /// `net` that reads back and waits for the yes at its first ask; on a
 /// trigger, a made task for the agent on it, granted `net` (the owner's
-/// ruling, 17 Nov), said back and waiting for the spoken yes. Any other
-/// make, `made` as it is.
+/// ruling, 17 Nov), said back and waiting for the spoken yes. Its task's
+/// `words` are the person's own make line, as the middle form's (Twelve's
+/// follow-up on #7819, 02:41). Any other make, `made` as it is.
 fn net_made(
     made: Result<Made, Refused>,
     needs_net: &std::cell::Cell<bool>,
-    request: &str,
+    words: &str,
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
@@ -4010,7 +4009,7 @@ fn net_made(
          lamp's agent ({})",
         crate::skill_task_yes::NET_ENVIRONMENT
     );
-    agent_task(request, chat, began, kept, (from, keeping, named))
+    agent_task(words, chat, began, kept, (from, keeping, named))
 }
 
 /// The make of `request` as one task for the lamp's agent
@@ -4018,7 +4017,12 @@ fn net_made(
 /// asked of the lamp's own model in one more call (`chat`, begun only while
 /// one round still fits [`longest_make`]), kept through the make's own
 /// checks (`kept`), or only asked for, kept from `from` in `keeping` as an
-/// agent skill ([`made_skill::keep_agent_asked`]).
+/// agent skill ([`made_skill::keep_agent_asked`]). A `request` longer than
+/// a task holds ([`crate::make_no_cannot::task_cut`]) is never refused for
+/// its length nor cut: its task is the model's own sentence, kept only when
+/// every condition survives ([`crate::make_no_cannot::task_kept`], #7904),
+/// on a trigger as when only asked for (the first builder's call on #7819,
+/// after #7904).
 fn agent_task(
     request: &str,
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
@@ -11532,6 +11536,80 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// Twelve's follow-up on #7819 (02:41): the internet's route, driven
+    /// through [`make_in`] itself, makes its task of the person's own make
+    /// line, the one held for the voice's request (`heard_in_own_line`, set
+    /// by `make_in` as [`OwnLine`]), never the voice model's paraphrase in
+    /// `request`; one longer than a task holds
+    /// ([`crate::make_no_cannot::task_cut`]) is never refused for its
+    /// length nor cut: its task is the model's own sentence, checked to keep
+    /// every condition (`make_no_cannot::task_kept`, #7904).
+    #[test]
+    fn make_in_gives_the_internets_task_the_own_make_line_and_words_one_too_long() {
+        net_make_here(Some(true));
+        const PARAPHRASE: &str = "check the bitcoin price online when the user asks";
+        let own = format!("Lamp, {BITCOIN}.");
+        let (root, keeping) = keeping("net-own-line");
+        let helper = manage_helper(&keeping.manage);
+        let (url, served) = service_sent(vec![
+            (200, "internet: the Bitcoin price".to_owned()),
+            (200, BITCOIN_ASKED.to_owned()),
+        ]);
+        const MADE_IN: u64 = 7_819_241;
+        crate::thread::THREAD.lock().unwrap().line_of(MADE_IN, &own);
+        let told = make_in(MADE_IN, PARAPHRASE, &keeping, chat_at(url), NOW);
+        assert_eq!(served.join().unwrap().len(), 2, "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        let next = told["next"].as_str().unwrap();
+        let words = crate::make_no_cannot::task_words(&own);
+        assert_eq!(words, format!("Lamp, {BITCOIN}"));
+        assert!(next.contains(&format!("“{words}”")), "{next}");
+        assert!(!told.to_string().contains(PARAPHRASE), "{told}");
+        // Longer than a task holds: the one more call is asked for its task
+        // in its own words, and that sentence, keeping what the line names,
+        // is the task; never refused for its length, never cut.
+        let long = format!("{own} {}", "And then tell me the weather too. ".repeat(4));
+        assert!(crate::make_no_cannot::task_cut(&long));
+        const LONG_TASK: &str = "Check the Bitcoin price and the weather on the web and tell me, when I say bitcoin price";
+        // A second helper on the same socket: the first one's file goes.
+        let _ = std::fs::remove_file(&keeping.manage);
+        let helper = manage_helper(&keeping.manage);
+        let (url, served) = service_sent(vec![
+            (200, "internet: the Bitcoin price".to_owned()),
+            (
+                200,
+                format!(
+                    "name: bitcoin-weather\ngrants: net, speak\nasks: bitcoin weather\ntask: \
+                     {LONG_TASK}"
+                ),
+            ),
+        ]);
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .line_of(MADE_IN + 1, &long);
+        let told = make_in(
+            MADE_IN + 1,
+            "check the bitcoin price and the weather online when asked",
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "{told}");
+        assert!(
+            sent[1].contains("The request is too long to read back whole"),
+            "{}",
+            sent[1]
+        );
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "bitcoin-weather", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains(&format!("“{LONG_TASK}”")), "{next}");
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The same make when DeepSeek's answer isn't kept and the lamp's agent
     /// (Hermes, told the same rules) answers `internet:`: made the same
     /// way, the agent's line never said.
@@ -12367,8 +12445,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// paraphrase in `request` nor the newest words heard (a later line, or
     /// another person's); the agent reads it at each run inside the lamp's
     /// brief, which names what fired it and quotes the line. With no line of
-    /// theirs, the request's words. One longer than a task holds is refused,
-    /// never cut.
+    /// theirs, the request's words. One longer than a task holds is never
+    /// refused for its length nor cut: its task is the model's own sentence,
+    /// checked to keep every condition (#7904).
     #[test]
     fn with_the_switch_the_middle_forms_task_is_the_own_make_line_in_a_run_brief() {
         made_skill::set_reactions_here(Some(true));
@@ -12444,13 +12523,35 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 brief
             )]));
         }
-        // Longer than a task holds: refused plainly, nothing kept, no
-        // second call.
-        let long = format!("{BACK} {}", "And then tell me the weather too. ".repeat(4));
+        // Longer than a task holds (a 300-character ask): never refused for
+        // its length, never cut. It goes to #7904's checked path: the one
+        // more call is asked for the task in its own words (`task:`), kept
+        // only when every number, time and name survives
+        // (`make_no_cannot::task_kept`), and the run's brief quotes that
+        // sentence (the first builder's call on #7819, after #7904).
+        let long = format!(
+            "{BACK} Read me the top three headlines about science and space, then the weather \
+             for Hanoi, and keep each of them short and calm, never more than two sentences each, \
+             and please skip anything about sports, celebrities or gossip of any kind at all."
+        );
+        assert!(long.chars().count() >= 300, "{}", long.chars().count());
         assert!(crate::make_no_cannot::task_cut(&long));
-        let entries = made_skill::entries(&keeping.directory).len();
+        const LONG_TASK: &str = "Tell the news on return: top three science and space \
+                                 headlines, then Hanoi weather, each at most two calm sentences";
+        assert!(LONG_TASK.chars().count() <= made_skill::MOST_TASK_CHARS);
         let tasks = agent_answering(vec![]);
-        let (url, served) = service_sent(vec![judgement(false)]);
+        let name = "desk-news-long";
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (
+                200,
+                trigger_answer(name, "net, speak", "room/presence", back).replacen(
+                    "\n```",
+                    &format!("\ntask: {LONG_TASK}\n```"),
+                    1,
+                ),
+            ),
+        ]);
         let _own = OwnLine::set(Some(long.clone()));
         let told = make_with_by(
             0,
@@ -12462,9 +12563,26 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             || None,
             Some(&tasks.agent()),
         );
-        assert_eq!(served.join().unwrap().len(), 1, "{told}");
-        assert!(told.get("made").is_none(), "{told}");
-        assert_eq!(made_skill::entries(&keeping.directory).len(), entries);
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(
+            sent[1].contains("The request is too long to read back whole"),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], name, "{told}");
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        let table: toml::Table = toml::from_str(&kept).unwrap();
+        assert_eq!(
+            table["do"][0]["task"]["task"].as_str(),
+            Some(LONG_TASK),
+            "{kept}"
+        );
+        let brief = std::fs::read_to_string(&script).unwrap();
+        assert!(
+            brief.contains(&format!("they said: «{LONG_TASK}». Do now what it is for")),
+            "{brief}"
+        );
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
