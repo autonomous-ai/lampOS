@@ -747,8 +747,10 @@ fn walk_agents(
         cut_hermes_config,
         yaml_keys,
         steps,
-        &mut |_| Ok(()),
-        &mut |_| {},
+        CutCheck {
+            check: &mut |_| Ok(()),
+            say: &mut |_| {},
+        },
     )?);
     removed += usize::from(kept.cut(
         OPENCLAW_STATE,
@@ -756,8 +758,7 @@ fn walk_agents(
         cut_openclaw_config,
         json_keys,
         steps,
-        check,
-        say,
+        CutCheck { check, say },
     )?);
     for shell in [".bashrc", ".profile"] {
         removed += usize::from(kept.cut(
@@ -766,8 +767,10 @@ fn walk_agents(
             |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
             |_| Vec::new(),
             steps,
-            &mut |_| Ok(()),
-            &mut |_| {},
+            CutCheck {
+                check: &mut |_| Ok(()),
+                say: &mut |_| {},
+            },
         )?);
     }
     Ok(removed)
@@ -859,6 +862,13 @@ fn json_keys(text: &[u8]) -> Vec<String> {
     }
 }
 
+/// What a kept file's cut is checked by before it lands, and what it says
+/// when the check does not take it (#7868, [`Kept::cut`]).
+struct CutCheck<'a> {
+    check: &'a mut dyn FnMut(&Path) -> Result<(), String>,
+    say: &'a mut dyn FnMut(&str),
+}
+
 /// The kept settings files' cut, acted on or only listed.
 struct Kept<'a> {
     root: &'a Path,
@@ -878,7 +888,8 @@ impl Kept<'_> {
     /// (refused, past its time, not started), nothing is left beside it,
     /// the old file is removed too, as a file `cut` can't read is, so no
     /// person's key outlives the reset, `say` gets why (never a value),
-    /// and the reset goes on. A missing folder or file is nothing to do. `keys` names the top-level keys for the step listed, never their
+    /// and the reset goes on. A missing folder or file is nothing to do.
+    /// `keys` names the top-level keys for the step listed, never their
     /// values.
     fn cut(
         &self,
@@ -887,8 +898,7 @@ impl Kept<'_> {
         cut: fn(&[u8]) -> Option<Vec<u8>>,
         keys: fn(&[u8]) -> Vec<String>,
         steps: &mut Vec<AgentStep>,
-        check: &mut dyn FnMut(&Path) -> Result<(), String>,
-        say: &mut dyn FnMut(&str),
+        CutCheck { check, say }: CutCheck<'_>,
     ) -> io::Result<bool> {
         use std::io::Read;
         use std::os::fd::AsFd;
