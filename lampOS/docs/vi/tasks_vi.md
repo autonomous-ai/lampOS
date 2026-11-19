@@ -3708,6 +3708,11 @@ có giá trị nào của file. Quá lần chờ cuối thì không
 ghi cho tới lần lamp-tasks khởi động sau, dòng nhật ký nói lần từ chối cuối; văn bản bị OpenClaw từ chối thì
 không bao giờ thử lại. Việc ghi chạy trên một thread riêng, nên lamp-tasks
 khởi động không bao giờ phải chờ nó.
+Phần thay file có kiểm tra và lần kiểm tra có giới hạn thời gian nằm ở
+`crates/checked-replace` (`lamp_checked_replace`, #7868), và hai chỗ ghi
+`openclaw.json` còn lại cũng đi qua đó: bản cài của lamp-update (khối
+`gateway`, docs/install.md) và lần reset của lamp-setup (cắt còn
+`gateway`, docs/setup.md).
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
