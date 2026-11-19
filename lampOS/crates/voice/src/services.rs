@@ -1731,15 +1731,24 @@ pub fn brief(told: &mut Value) {
 
 /// The key of a health read's answer that carries the fixed words Lamp says
 /// itself (`lamp_services::health::said`): the second route says them
-/// verbatim and gives the chat model none of them
-/// (`second_provider`'s round, [`take_health_line`]).
+/// verbatim, and the chat model is given the short line of what was read
+/// in their place ([`HEALTH_FOR_MODEL`], [`take_health_line`]).
 pub const HEALTH_SAY: &str = "lamp_says_exactly";
-/// What a health read's spoken line is kept as in the thread, the session
-/// records and the model's history: never its values (the first builder's
-/// P2 on #7900).
-pub const HEALTH_SHOWN: &str = "[an Apple Health read]";
-/// What the chat model is told of a health read in place of its answer.
-pub const HEALTH_TOLD: &str = "Lamp has said this Apple Health answer aloud itself, in fixed words. Don't repeat it, add to it, or guess any health value.";
+/// The key of a health read's answer that carries the one short line of
+/// what was read (`lamp_services::health::model_line`: no workout name or
+/// time, no raw days) for the chat model. Lamp's voice uses the owner's
+/// health summary to talk with whoever asks at the lamp, through its voice
+/// services, and remembers it for the owner: the owner's choice in linking
+/// it (the product owner's answer through the lead, the first builder's
+/// c7003138011 on #7900).
+pub const HEALTH_FOR_MODEL: &str = "what_was_read";
+/// What the chat model is told of a health read, beside [`HEALTH_FOR_MODEL`].
+pub const HEALTH_TOLD: &str = "Lamp has said this Apple Health answer aloud itself, in fixed words: don't repeat it now. what_was_read is what it read, for you to use in this talk (for example, to go easy after a short night). Never guess any other health value.";
+/// What the chat model is told of a health read that found nothing to give.
+pub const HEALTH_TOLD_NOTHING: &str = "Lamp has said this Apple Health answer aloud itself, in fixed words. Don't repeat it, add to it, or guess any health value.";
+/// How long the last health read is told beside the next lines
+/// ([`health_note_for`]): a conversation's while, in this process alone.
+pub const HEALTH_NOTE_FOR: std::time::Duration = std::time::Duration::from_secs(5 * 60);
 
 /// Whether `args` name Apple Health as their `service`, by its code or its
 /// name as lamp-services takes either (`apple_health`, "Apple Health").
@@ -1772,54 +1781,93 @@ fn health_spoken() -> lamp_services::health::Spoken {
     }
 }
 
-/// Whether a health read may be said: the line heard (`heard`), and the
-/// eyes saw the owner's known face (`owner`, the face kept at setup,
-/// `known_faces::owner_now`) saying it (`seen`, [`seen_saying_owner`]).
-/// The private room counts for nothing here, and with no face enrolled
-/// nobody is the owner (the first builder's P1 on #7900): health is more
-/// sensitive than mail or a calendar.
-pub(crate) fn health_heard_from_owner(
-    heard: bool,
-    owner: Option<&str>,
-    seen: impl FnOnce(&str) -> bool,
-) -> bool {
-    heard && owner.is_some_and(seen)
+/// The one place that decides whose Apple Health turn request `request` is
+/// (`lease`, its memory scope): the owner's memory id, or `None` when the
+/// line is not taken as the owner's. As every linked service's read
+/// ([`owner_of`]): in the private room (`LAMP_PRIVATE_ROOM`, on in the
+/// product) whoever speaks at the lamp is answered as the owner, with no
+/// face check; the owner chose that in linking Apple Health (the product
+/// owner's answer through the lead, the first builder's c7003138011 on
+/// #7900, which lifted the known-face gate of P1). Everything of Apple
+/// Health in the voice asks this alone: the read ([`health_read`]), the
+/// owner's kept fact (`remember::keep_health_fact`) and the line told
+/// beside the next lines ([`health_note_for`]).
+pub(crate) fn health_owner_turn(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    owner_of(lease)
 }
 
-/// An Apple Health read ([`is_health_read`]), the voice's own gate before
-/// any other: said only when the owner's known face is seen saying the line
-/// ([`health_heard_from_owner`]); anyone else, or a lamp with no face
-/// enrolled, hears [`lamp_services::health::not_yours`] and nothing is
-/// asked of lamp-services. On the second route (`second_route`) the answer
-/// is the fixed words `lamp_services::health::said` builds, under
-/// [`HEALTH_SAY`], said verbatim with no chat model; the Live route, whose
-/// model speaks every answer, reads nothing. No service record is kept.
+/// The last Apple Health read for the model: whose, its short line and
+/// when. In this process alone, never on disk; let go after
+/// [`HEALTH_NOTE_FOR`], at the owner's "forget everything" and when a read
+/// finds no data (unlinked).
+static HEALTH_HEARD: std::sync::Mutex<Option<(String, String, Instant)>> =
+    std::sync::Mutex::new(None);
+
+/// Keep `line` as `owner`'s last read ([`HEALTH_HEARD`]); `None` lets it go.
+fn health_heard(read: Option<(&str, &str)>) {
+    if read.is_none() {
+        crate::remember::health_facts_let_go();
+    }
+    if let Ok(mut heard) = HEALTH_HEARD.lock() {
+        *heard = read.map(|(owner, line)| (owner.to_owned(), line.to_owned(), Instant::now()));
+    }
+}
+
+/// What the model is told beside request `request`'s words of the last
+/// Apple Health read, within [`HEALTH_NOTE_FOR`], when the line is taken
+/// as the same owner's ([`health_owner_turn`]): so Lamp can go on using it
+/// in the talk.
+pub fn health_note_for(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<String> {
+    let (owner, line) = {
+        let heard = HEALTH_HEARD.lock().ok()?;
+        let (owner, line, at) = heard.as_ref()?;
+        if at.elapsed() > HEALTH_NOTE_FOR {
+            return None;
+        }
+        (owner.clone(), line.clone())
+    };
+    (health_owner_turn(lease)? == owner).then(|| {
+        eprintln!(
+            "lamp-voice: request {request}: the line is told what Apple Health read a moment ago"
+        );
+        format!(
+            "(What Lamp read from the owner's Apple Health a moment ago: {line}. Use it to talk with them if it helps; never guess any other health value.)"
+        )
+    })
+}
+
+/// An Apple Health read ([`is_health_read`]) in `owner`'s turn (from
+/// [`health_owner_turn`]; `None`, a line not taken as the owner's, is told
+/// [`OWNER_ONLY`] as any linked service's read is, and nothing is asked of
+/// lamp-services). On the second route (`second_route`) the answer is the
+/// fixed words `lamp_services::health::said` builds, under [`HEALTH_SAY`],
+/// said verbatim; the model is given one short line of what was read
+/// ([`HEALTH_FOR_MODEL`]), told again beside the next lines a while
+/// ([`health_note_for`]), and the line is kept in the owner's own memory as
+/// a dated fact (`remember::keep_health_fact`). The Live route, whose model
+/// would speak the whole answer, reads nothing. No service record is kept.
 fn health_read(
     folder: &Path,
     call: &ToolCall,
     request: u64,
-    (seen_owner, second_route): (bool, bool),
+    (owner, second_route): (Option<&str>, bool),
     spoken: lamp_services::health::Spoken,
 ) -> (Value, bool) {
     use lamp_services::health;
-    let told = |line: &str| {
-        if second_route {
-            json!({"ok": true, HEALTH_SAY: line})
-        } else {
-            json!({ "error": line })
-        }
-    };
-    if !seen_owner {
+    let Some(owner) = owner else {
         eprintln!(
-            "lamp-voice: request {request}: an Apple Health read: the owner's known face was not seen saying the line; the plain line, nothing read"
+            "lamp-voice: request {request}: an Apple Health read on a line not the owner's: nothing read"
         );
-        return (told(health::not_yours(spoken)), true);
-    }
+        return (json!({ "error": OWNER_ONLY }), true);
+    };
     if !second_route {
         eprintln!(
-            "lamp-voice: request {request}: an Apple Health read on the Live route: nothing read, its model would say the values"
+            "lamp-voice: request {request}: an Apple Health read on the Live route: nothing read, its model would say the whole answer"
         );
-        return (told(health::not_on_this_voice(spoken)), true);
+        return (json!({ "error": health::not_on_this_voice(spoken) }), true);
     }
     let (answer, answered) = ask(folder, call, DEADLINE);
     let what = call.args.get("what").and_then(Value::as_str).unwrap_or("");
@@ -1827,22 +1875,45 @@ fn health_read(
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs() as i64);
     let line = health::said(what, &call.args, &answer, now, spoken);
+    let for_model = health::model_line(what, &call.args, &answer, now);
     eprintln!(
-        "lamp-voice: request {request}: an Apple Health read for the owner's known face seen saying it: said in fixed words, no model given a value"
+        "lamp-voice: request {request}: an Apple Health read: said in fixed words; {}",
+        if for_model.is_some() {
+            "the model is given one short line of it, kept in the owner's memory"
+        } else {
+            "nothing found, the model is given no value"
+        }
     );
     read_answered(request);
     if let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.private_for(request);
     }
-    (told(&line), answered)
+    let mut told = json!({"ok": true, HEALTH_SAY: line});
+    match &for_model {
+        Some((short, date)) => {
+            told[HEALTH_FOR_MODEL] = json!(short);
+            health_heard(Some((owner, short)));
+            crate::remember::keep_health_fact(owner, &lamp_msgs::health_fact::text(date, short));
+        }
+        None if answer.get("error").and_then(Value::as_str) == Some(health::NO_DATA) => {
+            health_heard(None);
+        }
+        None => {}
+    }
+    (told, answered)
 }
 
 /// A health read's fixed words ([`HEALTH_SAY`]) taken out of `told`, which
-/// is left as what the chat model is told ([`HEALTH_TOLD`]): `None` for
-/// any other answer.
+/// is left as what the chat model is told: [`HEALTH_TOLD`] with the short
+/// line of what was read ([`HEALTH_FOR_MODEL`]), or [`HEALTH_TOLD_NOTHING`]
+/// when it found none. `None` for any other answer.
 pub fn take_health_line(told: &mut Value) -> Option<String> {
     let line = told.get(HEALTH_SAY)?.as_str()?.to_owned();
-    *told = json!({"ok": true, "said": HEALTH_SHOWN, "note": HEALTH_TOLD});
+    *told = match told.get(HEALTH_FOR_MODEL).and_then(Value::as_str) {
+        Some(read) => json!({"ok": true, "said_aloud": true, "note": HEALTH_TOLD,
+            HEALTH_FOR_MODEL: read}),
+        None => json!({"ok": true, "said_aloud": true, "note": HEALTH_TOLD_NOTHING}),
+    };
     Some(line)
 }
 
@@ -1899,6 +1970,7 @@ pub(crate) fn health_forget_if(
         args: json!({}),
     };
     let (answer, answered) = ask(folder, &call, DEADLINE);
+    health_heard(None);
     if answered && answer["forgotten"] == true {
         eprintln!("lamp-voice: Apple Health's summary removed with everything about the owner");
         told.0["apple_health"] = json!("forgotten too");
@@ -2369,19 +2441,15 @@ pub fn run(
     // The second route's attempt id, never anyone else's to read (#5853).
     let (call, attempt) = take_attempt(call);
     let call = &call;
-    // An Apple Health read: its own gate, before any other, whatever the
-    // private room says ([`health_read`]).
+    // An Apple Health read: answered for the owner's line as every linked
+    // service's read, in the lamp's fixed words ([`health_read`]).
     if is_health_read(call) {
-        let owner =
-            crate::known_faces::owner_now().map(|face| crate::known_faces::memory_person(&face));
-        let seen = health_heard_from_owner(heard, owner.as_deref(), |owner| {
-            seen_saying_owner(request, owner).0
-        });
+        let owner = health_owner_turn(lease);
         return health_read(
             folder,
             call,
             request,
-            (seen, judge().is_some()),
+            (owner.as_deref(), judge().is_some()),
             health_spoken(),
         );
     }
@@ -5025,81 +5093,96 @@ mod tests {
         }
     }
 
-    /// The first builder's P1 on #7900: an Apple Health read is said only
-    /// when the owner's known face is seen saying the line, private room or
-    /// not; no face enrolled is nobody's, never "the-owner".
+    fn health_answer() -> Value {
+        json!({"source": "Apple Health", "as_of": "2026-11-18T07:30:00+07:00",
+            "tz": "Asia/Ho_Chi_Minh", "quoted": [{"date": "2026-11-18", "steps": 8421}]})
+    }
+
+    /// #7900, the first builder's c7003138011 (the product owner through
+    /// the lead): no face check. In the private room the owner's question
+    /// and a second person's are both answered, as any linked service's
+    /// read; outside it a line not the owner's is told [`OWNER_ONLY`] and
+    /// lamp-services is never asked.
     #[test]
-    fn a_health_read_is_said_only_to_the_owners_known_face_seen_saying_it() {
-        assert!(health_heard_from_owner(true, Some("p-ann"), |_| true));
-        assert!(!health_heard_from_owner(true, Some("p-ann"), |_| false));
-        assert!(!health_heard_from_owner(false, Some("p-ann"), |_| true));
-        assert!(!health_heard_from_owner(true, None, |_| true));
+    fn a_health_read_is_answered_for_whoever_asks_in_the_private_room() {
         assert!(is_health_read(&health_call()));
         assert!(!is_health_read(&ToolCall {
             id: "g".into(),
             name: READ.into(),
             args: json!({"service": "gmail", "what": "recent"}),
         }));
-        // The private room on, no face enrolled, a heard line: the plain
-        // line, and lamp-services is never asked.
-        let (folder, asked) = health_folder("nobody", json!({"quoted": [{"steps": 8421}]}));
-        crate::person::set_private_room_for_test(Some(true));
-        crate::known_faces::owner_for_test(Some(None));
+        let (folder, asked) = health_folder("anyone", health_answer());
         crate::services::judging_voices(std::sync::Arc::new(|_| None));
-        let (told, answered) = run(&folder, &health_call(), 7_900_001, true, None);
-        crate::person::set_private_room_for_test(None);
-        crate::known_faces::owner_for_test(None);
-        assert!(answered);
-        let english = lamp_services::health::not_yours(lamp_services::health::Spoken::English);
-        let vietnamese =
-            lamp_services::health::not_yours(lamp_services::health::Spoken::Vietnamese);
-        assert!(
-            told[HEALTH_SAY] == english || told[HEALTH_SAY] == vietnamese,
-            "{told}"
-        );
-        assert!(!told.to_string().contains("8421"));
-        assert!(asked.lock().unwrap().is_empty(), "never asked");
-        // The owner's face known but not seen saying it (the eyes off in a
-        // test): the same.
         crate::person::set_private_room_for_test(Some(true));
-        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
-        let (told, _) = run(&folder, &health_call(), 7_900_002, true, None);
+        // The owner, then a second person: no face known to either.
+        let owner = run(&folder, &health_call(), 7_900_001, true, None);
+        let guest = run(&folder, &health_call(), 7_900_002, true, None);
+        crate::person::set_private_room_for_test(Some(false));
+        let outside = run(&folder, &health_call(), 7_900_003, true, None);
         crate::person::set_private_room_for_test(None);
-        crate::known_faces::owner_for_test(None);
-        assert!(told[HEALTH_SAY].is_string() && !told.to_string().contains("8421"));
-        assert!(asked.lock().unwrap().is_empty(), "never asked");
+        for (told, answered) in [&owner, &guest] {
+            assert!(answered);
+            assert!(
+                told[HEALTH_SAY].as_str().unwrap().contains("8,421 steps"),
+                "{told}"
+            );
+            assert!(
+                told[HEALTH_FOR_MODEL]
+                    .as_str()
+                    .unwrap()
+                    .contains("8,421 steps"),
+                "{told}"
+            );
+        }
+        assert_eq!(asked.lock().unwrap().len(), 2);
+        assert_eq!(outside.0["error"], OWNER_ONLY);
     }
 
-    /// Seen: lamp-services is asked, and the answer is the lamp's fixed
-    /// words under [`HEALTH_SAY`] on the second route; the Live route reads
-    /// nothing. [`take_health_line`] leaves the model no value.
+    /// The read is the lamp's fixed words under [`HEALTH_SAY`]; the model
+    /// is given the short line of it ([`take_health_line`]), told again
+    /// beside the owner's next lines ([`health_note_for`]); the Live route
+    /// reads nothing.
     #[test]
-    fn the_owners_seen_read_is_the_lamps_fixed_words() {
+    fn the_read_is_fixed_words_and_the_model_gets_the_short_line() {
         use lamp_services::health::Spoken;
-        let answer = json!({"source": "Apple Health", "as_of": "2026-11-18T07:30:00+07:00",
-            "tz": "Asia/Ho_Chi_Minh", "quoted": [{"date": "2026-11-18", "steps": 8421}]});
-        let (folder, asked) = health_folder("seen", answer);
+        let (folder, asked) = health_folder("seen", health_answer());
         let (mut told, answered) = health_read(
             &folder,
             &health_call(),
-            7_900_003,
-            (true, true),
+            7_900_004,
+            (Some("the-owner"), true),
             Spoken::English,
         );
         assert!(answered);
         let line = told[HEALTH_SAY].as_str().unwrap().to_owned();
         assert!(line.starts_with("Apple Health, as of "), "{line}");
-        assert!(line.contains("8,421 steps"), "{line}");
         assert_eq!(asked.lock().unwrap().len(), 1);
-        assert_eq!(take_health_line(&mut told), Some(line));
-        assert!(!told.to_string().contains("8"), "{told}");
-        assert_eq!(told["said"], HEALTH_SHOWN);
+        assert_eq!(take_health_line(&mut told), Some(line.clone()));
+        assert!(told.get(HEALTH_SAY).is_none(), "{told}");
+        assert!(!told.to_string().contains(&line), "{told}");
+        assert!(
+            told[HEALTH_FOR_MODEL]
+                .as_str()
+                .unwrap()
+                .contains("8,421 steps"),
+            "{told}"
+        );
+        assert_eq!(told["note"], HEALTH_TOLD);
+        // The owner's next line (the private room's, with no owner kept in
+        // a test: "the-owner") is told it; a line not the owner's isn't.
+        crate::person::set_private_room_for_test(Some(true));
+        let note = health_note_for(7_900_005, None);
+        crate::person::set_private_room_for_test(Some(false));
+        let not_theirs = health_note_for(7_900_006, None);
+        crate::person::set_private_room_for_test(None);
+        assert!(note.as_deref().unwrap().contains("8,421 steps"), "{note:?}");
+        assert_eq!(not_theirs, None);
         // Live: nothing asked, no value.
         let (told, _) = health_read(
             &folder,
             &health_call(),
-            7_900_004,
-            (true, false),
+            7_900_007,
+            (Some("p-0123456789abcdef"), false),
             Spoken::Vietnamese,
         );
         assert_eq!(
@@ -5109,6 +5192,28 @@ mod tests {
         assert_eq!(asked.lock().unwrap().len(), 1);
         // Any other answer carries no line.
         assert_eq!(take_health_line(&mut json!({"quoted": []})), None);
+    }
+
+    /// The owner's read is kept in their own memory as a dated fact,
+    /// `remember` of `lamp_msgs::health_fact::text` in their scope, once;
+    /// "the-owner" (no face or name kept) and any other text keep nothing.
+    #[test]
+    fn the_owners_read_is_kept_once_as_a_dated_fact_of_theirs() {
+        let fact = lamp_msgs::health_fact::text("2026-11-18", "8,421 steps so far today");
+        let call = crate::remember::health_fact_job("p-00000000000079a0", &fact).unwrap();
+        assert_eq!(call.name, crate::remember::REMEMBER);
+        assert_eq!(call.args, json!({"text": fact}));
+        assert_eq!(
+            crate::remember::health_fact_job("p-00000000000079a0", &fact),
+            None
+        );
+        assert_eq!(crate::remember::health_fact_job("the-owner", &fact), None);
+        assert_eq!(
+            crate::remember::health_fact_job("p-00000000000079a1", "takes coffee black"),
+            None
+        );
+        crate::remember::health_facts_let_go();
+        assert!(crate::remember::health_fact_job("p-00000000000079a0", &fact).is_some());
     }
 
     /// The first builder's P2 on #7900: with others maybe here a read's

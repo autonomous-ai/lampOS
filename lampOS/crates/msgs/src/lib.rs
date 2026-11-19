@@ -127,6 +127,10 @@ pub use speaker_state::*;
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
 
+/// The owner's kept Apple Health facts: their wording and memory's removal
+/// of them (#7900).
+pub mod health_fact;
+
 /// The owner's approximate place from the app, rounded, and its file
 /// (#4333, `docs/owner-place.md`).
 pub mod owner_place;

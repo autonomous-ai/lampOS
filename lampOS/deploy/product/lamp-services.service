@@ -71,7 +71,8 @@ Environment=LAMP_SKILL_SECRETS=on
 # create_event only.
 Environment=LAMP_CALENDAR_EDITS=on
 # The phone app's Apple Health daily summaries (docs/services.md "Apple Health"): kept here with no token,
-# said only to the owner's known face seen saying the line, never a skill's read; the same line in
+# read for whoever asks at the lamp in the private room (no face check, the owner's choice), in fixed
+# words, its short line given to the voice's model and remembered for the owner; never a skill's read; the same line in
 # lamp-cloud.service. On in the product by the owner's decision (19 Nov); a drop-in setting
 # LAMP_APPLE_HEALTH=off turns it off.
 Environment=LAMP_APPLE_HEALTH=on

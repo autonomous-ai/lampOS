@@ -312,6 +312,32 @@ pub fn checked(kind: &str, code: &str, connector: &Value) -> Result<(), String> 
     Ok(())
 }
 
+/// What Lamp's voice kept in memory of Apple Health reads (each a dated
+/// thing of the owner's, `lamp_msgs::health_fact`), removed on memory's
+/// narrow socket `memory` with `{"op": "forget_apple_health"}` (#7900): the
+/// app's unlink, a remove and a sign-out take them with the summary. No
+/// socket given (a dev lamp), nothing is asked. An error when memory
+/// doesn't answer or refuses, so the app is told and may ask again; a
+/// retry removes nothing twice.
+pub fn forget_health_facts(memory: Option<&Path>) -> Result<(), String> {
+    let Some(socket) = memory else {
+        return Ok(());
+    };
+    let answer = crate::photos::exchange(
+        socket,
+        &json!({"op": lamp_msgs::health_fact::FORGET_OP}),
+        crate::faces::DEADLINE,
+    );
+    match answer {
+        Some(answer) if answer["ok"] == true => Ok(()),
+        _ => Err(HEALTH_FACTS_KEPT.to_owned()),
+    }
+}
+
+/// What the app is told when Apple Health's summary went but what Lamp
+/// remembered of it could not be removed just now.
+pub const HEALTH_FACTS_KEPT: &str = "Apple Health was unlinked, but what Lamp remembered from it could not be removed just now; try again";
+
 /// The admin socket: `line` out, one JSON line back within `wait`. An
 /// `"ok": true` reply as it is; `"ok": false` its plain `error`.
 pub fn ask(socket: &Path, line: &Value, wait: Duration) -> Result<Value, String> {
@@ -347,6 +373,10 @@ pub struct Services {
     done: Arc<Mutex<Vec<Outcome>>>,
     /// `LAMP_APPLE_HEALTH=on`: [`HEALTH_KIND`]'s summaries are taken.
     pub health: bool,
+    /// Memory's narrow socket (`LAMP_MEMORY_FORGET_SOCKET`), when given:
+    /// Apple Health's unlink removes what the voice kept of it there too
+    /// ([`forget_health_facts`]).
+    pub memory: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for Services {
@@ -375,7 +405,20 @@ impl Services {
             under_way: Arc::default(),
             done: Arc::default(),
             health,
+            memory: None,
         })
+    }
+
+    /// [`Self::with_health`], with memory's narrow socket ([`Self::memory`]).
+    pub fn with_memory(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+        memory: Option<PathBuf>,
+    ) -> Arc<Self> {
+        let mut services = Self::with_health(socket, fetch, health);
+        Arc::get_mut(&mut services).expect("just made").memory = memory;
+        services
     }
 
     /// The product's: [`ADMIN_SOCKET`] and the backend, with the switch;
@@ -386,7 +429,16 @@ impl Services {
         }
         let backend = Backend::of(account, key)?;
         let health = std::env::var(HEALTH_ENVIRONMENT).ok().as_deref() == Some("on");
-        Some(Self::with_health(ADMIN_SOCKET, Arc::new(backend), health))
+        let memory = std::env::var(crate::faces::MEMORY_ENVIRONMENT)
+            .ok()
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute());
+        Some(Self::with_memory(
+            ADMIN_SOCKET,
+            Arc::new(backend),
+            health,
+            memory,
+        ))
     }
 
     /// Whether `lamp-services` is here to ask: `can` names [`CAN`] and
@@ -408,10 +460,16 @@ impl Services {
         }
         let code = code.to_owned();
         let fetch = self.fetch.clone();
+        let memory = self.memory.clone();
         self.spawn(kind, move |socket, kind| match asked {
             Asked::Set => set(&*fetch, socket, kind, &code),
-            Asked::Remove => ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
-                .map(|_| Some(json!({"connector": code}))),
+            Asked::Remove => {
+                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
+                if code == lamp_services::health::CODE {
+                    forget_health_facts(memory.as_deref())?;
+                }
+                Ok(Some(json!({"connector": code})))
+            }
         })
     }
 
@@ -425,9 +483,11 @@ impl Services {
     pub fn start_health(&self, data: &Value) -> Result<(), String> {
         let code = lamp_services::health::CODE;
         if data.is_null() {
+            let memory = self.memory.clone();
             return self.spawn(HEALTH_KIND, move |socket, _| {
-                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
-                    .map(|_| Some(json!({"connector": code, "cleared": true})))
+                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
+                forget_health_facts(memory.as_deref())?;
+                Ok(Some(json!({"connector": code, "cleared": true})))
             });
         }
         if !self.health {
@@ -501,9 +561,11 @@ impl Services {
         Ok(json!({ "connected": connected }))
     }
 
-    /// Every token wiped: the lamp left its account.
+    /// Every token wiped: the lamp left its account. What the voice kept
+    /// of Apple Health goes with its summary ([`forget_health_facts`]).
     pub fn wipe(&self) -> Result<(), String> {
-        ask(&self.socket, &json!({"op": "wipe"}), ADMIN_WAIT).map(|_| ())
+        ask(&self.socket, &json!({"op": "wipe"}), ADMIN_WAIT)?;
+        forget_health_facts(self.memory.as_deref())
     }
 
     /// Results handed to the broker and lost with the connection before it
@@ -695,6 +757,57 @@ pub mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         all
+    }
+
+    /// #7900: Apple Health's disconnect, its remove and a sign-out's wipe
+    /// take what the voice kept of it in memory too, on memory's narrow
+    /// socket; memory not answering is told to the app as not done.
+    #[test]
+    fn unlinking_apple_health_removes_the_kept_facts_in_memory_too() {
+        let memory = admin(r#"{"ok":true,"removed":2}"#);
+        let admin = admin(r#"{"ok":true}"#);
+        let fetch = || -> Arc<dyn Fetch> {
+            Arc::new(FakeFetch {
+                answer: Err("never fetched".into()),
+                asked: Mutex::default(),
+            })
+        };
+        let services = Services::with_memory(admin.socket(), fetch(), true, Some(memory.socket()));
+        services.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        services.start("connector.remove.apple_health").unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health"})))
+        );
+        assert_eq!(services.wipe(), Ok(()));
+        // Another service's remove leaves memory alone.
+        services.start("connector.remove.gmail").unwrap();
+        assert!(results(&services, 1)[0].result.is_ok());
+        let asked: Vec<Value> = memory
+            .lines
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line.trim()).unwrap())
+            .collect();
+        assert_eq!(asked, vec![json!({"op": "forget_apple_health"}); 3]);
+        // Memory gone: the app is told, and may ask again.
+        let gone = Services::with_memory(
+            admin.socket(),
+            fetch(),
+            true,
+            Some(memory.dir.path().join("none.sock")),
+        );
+        gone.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&gone, 1)[0].result,
+            Err(HEALTH_FACTS_KEPT.to_owned())
+        );
+        assert_eq!(forget_health_facts(None), Ok(()));
     }
 
     /// Apple Health's summary: checked here, a refusal at once and by its

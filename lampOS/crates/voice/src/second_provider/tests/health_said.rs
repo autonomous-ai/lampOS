@@ -1,15 +1,18 @@
-//! An Apple Health read on the second route (the first builder's P2s on
-//! #7900): the lamp's fixed words (`services::HEALTH_SAY`) are said as they
-//! are, the chat model is told only that they were said, and the thread and
-//! session records keep [`crate::services::HEALTH_SHOWN`], never a value.
+//! An Apple Health read on the second route (#7900): the lamp's fixed words
+//! (`services::HEALTH_SAY`) are said as they are and shown as they are, and
+//! the chat model is told the short line of what was read
+//! (`services::HEALTH_FOR_MODEL`), never the fixed words with a workout's
+//! name or time.
 use super::*;
 
 const LINE: &str = "Apple Health, as of 7:30 am: you slept 6 hours and 52 minutes last night.";
+const SHORT: &str = "slept 6 h 52 m last night";
 const ROUND_TWO: &str = "And the light is warmer.";
 
 fn health_told(name: &str) -> Value {
     match name {
-        crate::services::READ => json!({"ok": true, crate::services::HEALTH_SAY: LINE}),
+        crate::services::READ => json!({"ok": true, crate::services::HEALTH_SAY: LINE,
+            crate::services::HEALTH_FOR_MODEL: SHORT}),
         _ => json!({"ok": true}),
     }
 }
@@ -66,9 +69,8 @@ fn health_turn(names: &[&str]) -> (Vec<String>, Vec<Vec<Message>>, Vec<String>) 
     (labels, asked, spoken)
 }
 
-/// A read alone: its fixed words go to the voice as they are, the
-/// transcript says only [`crate::services::HEALTH_SHOWN`], and no round 2
-/// is asked, so no model ever sees a value.
+/// A read alone: its fixed words go to the voice and the transcript as they
+/// are, and no round 2 is asked, so the model adds nothing to them.
 #[test]
 fn a_health_read_is_said_in_fixed_words_with_no_model_round() {
     let (labels, asked, spoken) = health_turn(&[crate::services::READ]);
@@ -78,27 +80,23 @@ fn a_health_read_is_said_in_fixed_words_with_no_model_round() {
         .filter_map(|label| label.strip_prefix("said:"))
         .map(str::trim)
         .collect();
-    assert_eq!(said, vec![crate::services::HEALTH_SHOWN], "{labels:?}");
-    assert!(
-        !labels.iter().any(|label| label.contains("6 hours")),
-        "{labels:?}"
-    );
+    assert_eq!(said, vec![LINE], "{labels:?}");
     assert_eq!(asked.len(), 1, "no round 2: {asked:?}");
     assert_eq!(labels.last().map(String::as_str), Some("complete"));
 }
 
-/// Beside another call, round 2 is asked for the rest, and is told only
-/// that the health answer was said, never its words.
+/// Beside another call, round 2 is asked for the rest, and is told the
+/// short line of what was read, never the fixed words themselves.
 #[test]
-fn beside_another_call_round_two_is_never_told_the_values() {
+fn beside_another_call_round_two_is_told_the_short_line() {
     let (labels, asked, spoken) = health_turn(&[crate::services::READ, "set_light"]);
     assert_eq!(spoken.first().map(String::as_str), Some(LINE), "{labels:?}");
     assert_eq!(asked.len(), 2, "{labels:?}");
     let second = format!("{:?}", asked[1]);
     assert!(!second.contains("6 hours"), "{second}");
-    assert!(second.contains("[an Apple Health read]"), "{second}");
+    assert!(second.contains(SHORT), "{second}");
     assert!(
-        !labels.iter().any(|label| label.contains("6 hours")),
-        "{labels:?}"
+        second.contains(crate::services::HEALTH_FOR_MODEL),
+        "{second}"
     );
 }

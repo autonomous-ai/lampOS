@@ -327,9 +327,12 @@ pub const SERVICES: &[Service] = &[
     },
     // The phone app's daily Apple Health summaries (`health.summary` in
     // lamp-cloud, `crate::health`): no sign-in and no host, kept on the
-    // lamp and read from there alone, then read aloud through Lamp's voice
-    // services in fixed words (`health::said`). Listed and read only with
-    // `LAMP_APPLE_HEALTH=on`; never written.
+    // lamp and read from there alone, for whoever asks at the lamp in the
+    // private room (no face check: the owner's choice in linking it),
+    // said in fixed words (`health::said`). Lamp's voice uses the health
+    // summary to talk with you, through its voice services, and remembers
+    // it for you (`health::model_line`, `lamp_msgs::health_fact`). Listed
+    // and read only with `LAMP_APPLE_HEALTH=on`; never written.
     Service {
         code: "apple_health",
         name: "Apple Health",

@@ -181,12 +181,12 @@ fn main() -> ExitCode {
         say("skill runs' calls kept: the last 64 across all runs, no content, for the voice alone");
     }
     // Apple Health's summaries from the app (LAMP_APPLE_HEALTH): kept here
-    // with no token, listed, and said only to the owner's known face seen
-    // saying the line (the voice's gate).
+    // with no token, listed, and read for the owner's line as any linked
+    // service (the voice's `health_owner_turn`).
     let apple_health = on(std::env::var(health::ENVIRONMENT).ok().as_deref());
     if apple_health {
         say(
-            "Apple Health on: the app's summaries kept, said only to the owner's known face seen saying the line",
+            "Apple Health on: the app's summaries kept, read for the owner's line as any linked service",
         );
     }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)

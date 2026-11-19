@@ -344,7 +344,7 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 | `notion` | Notion | `mcp.notion.com` | như Slack | như Slack |
-| `apple_health` | Apple Health (với `LAMP_APPLE_HEALTH=on`) | không có: cục bộ, không token, không lấy gì từ mạng; câu trả lời được đọc thành tiếng qua các dịch vụ giọng nói của Lamp | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, từ bản tóm tắt đã giữ ("Apple Health", bên dưới) | không có |
+| `apple_health` | Apple Health (với `LAMP_APPLE_HEALTH=on`) | không có: cục bộ, không token, không lấy gì từ mạng; câu trả lời được đọc thành tiếng bằng lời cố định qua các dịch vụ giọng nói của Lamp, mô hình chat chỉ nhận một dòng ngắn bằng tiếng Anh, và dòng đó được giữ trong bộ nhớ của chủ đèn | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, từ bản tóm tắt đã giữ ("Apple Health", bên dưới) | không có |
 
 Calendar không có lần đọc `calendars`: liên kết của nó chỉ giữ
 `calendar.events` (#5385), và Google chỉ liệt kê lịch với scope calendar hoặc
@@ -3097,15 +3097,16 @@ trạng thái của nó) hay một `Debug`.
 
 Ứng dụng trên điện thoại đọc HealthKit và đẩy các bản tóm tắt hằng ngày
 lên đèn; giọng nói trả lời "tối qua tôi ngủ thế nào", "hôm nay bao nhiêu
-bước" hay "các lần chạy tuần này" từ đó qua `service_read`, chỉ khi mắt
-của đèn thấy chính khuôn mặt đã biết của chủ đèn nói câu đó ("Ai được
-nghe", bên dưới), một cổng riêng, chặt hơn cổng của mọi lần đọc khác.
+bước" hay "các lần chạy tuần này" từ đó qua `service_read`, cho chủ đèn,
+như lần đọc của mọi dịch vụ đã liên kết ("Ai được nghe", bên dưới).
 Không có đăng nhập, không token và không host: dòng catalog `apple_health`
 là `local` (`catalog.rs`), và `lamp-services` không bao giờ lấy nó từ
-mạng. Bản thân câu trả lời được đọc thành tiếng qua các dịch vụ giọng nói
-của Lamp: đèn tự dựng đúng từng chữ và dịch vụ chuyển văn bản thành giọng
-nói (ElevenLabs trong sản phẩm) đọc chúng; không mô hình chat nào nhận một
-giá trị ("Những gì được nói", bên dưới). Các quy tắc nằm ở một chỗ,
+mạng. **Giọng nói của Lamp dùng bản tóm tắt sức khỏe của bạn để trò chuyện
+với bạn, qua các dịch vụ giọng nói của nó, và ghi nhớ nó giúp bạn.** Đèn tự
+dựng đúng từng chữ của câu trả lời và dịch vụ chuyển văn bản thành giọng
+nói (ElevenLabs trong sản phẩm) đọc chúng; mô hình chat chỉ nhận một dòng
+ngắn bằng tiếng Anh ("Những gì được nói", bên dưới), và dòng đó được giữ
+trong bộ nhớ của chính chủ đèn ("Bộ nhớ", bên dưới). Các quy tắc nằm ở một chỗ,
 `crates/services/src/health.rs`, do `lamp-cloud`, `lamp-services` và giọng
 nói cùng đọc.
 
@@ -3166,7 +3167,9 @@ giữ trọn, thay bản trước ("Token được giữ ở đâu", ở trên):
 tắc bật không bao giờ tồn tại lâu hơn nó (quy tắc của `owner.place.clear`).
 `connector.remove.apple_health` của ứng dụng làm cùng việc;
 `connector.set.apple_health` bị từ chối. Lần xoá khi đăng xuất và lần đặt
-lại nhà máy lấy đi file cùng các token. `services.list` và
+lại nhà máy lấy đi file cùng các token. Mỗi lần gỡ của ứng dụng (`null`,
+`connector.remove.apple_health`, lần xoá khi đăng xuất) cũng xoá những gì
+Lamp đã ghi nhớ từ Apple Health ("Bộ nhớ", bên dưới). `services.list` và
 `services_connected` liệt kê `apple_health`, không tài khoản, không bao giờ
 hết hạn, khi có bản tóm tắt được giữ và công tắc bật.
 
@@ -3204,24 +3207,17 @@ mô tả sẽ vượt 1,024 byte khi mọi dịch vụ được nêu tên, nên 
 by service: …" được nói trên mô tả riêng của `what`; khi tắt công tắc, mô tả
 và `what` như trước, và `tools.json` không có gì trong số này.
 
-**Ai được nghe** (P1 của first builder trên #7900). Một lần đọc chỉ được
-nói khi mắt thấy **khuôn mặt đã biết của chủ đèn** (khuôn mặt giữ lúc cài
-đặt, `known_faces::owner_now`) nói câu đó (`seen_saying_owner` của
-`LAMP_EYES_SPEAKING`, không bao giờ một khuôn mặt chỉ được giọng nói xác
-nhận, và không khuôn mặt nào khác được thấy nói trong câu), bất kể
-`LAMP_PRIVATE_ROOM` nói gì: sức khoẻ nhạy cảm hơn thư hay lịch, nên luật
-"ai nói cũng là chủ đèn" của căn phòng riêng không bao gồm nó, và một đèn
-chưa ghi nhận khuôn mặt nào thì không có chủ để nói cho (không có dự phòng
-"the-owner"). Bất kỳ ai khác, một câu không được nghe tại đèn, hay khi chưa
-có khuôn mặt nào được ghi nhận, đều chỉ nghe một câu đơn giản, "I keep
-health details for the person they belong to." ("Mình chỉ nói thông tin
-sức khỏe với đúng người sở hữu chúng."), và không gì được đọc: giọng nói
-không bao giờ hỏi `lamp-services` (`lamp_voice::services::health_read`,
-trước mọi cổng khác của một lần đọc, kể cả lần chuyển cho tác tử). Trên
-tuyến Live, nơi mô hình nói mọi câu trả lời, một lần đọc là "I can't read
-Apple Health on this voice." và không gì được đọc. Có nên để căn phòng
-riêng bao gồm sức khoẻ hay không là việc của lead hỏi chủ đèn; cho tới lúc
-đó cổng này giữ nguyên.
+**Ai được nghe** (quyết định của chủ sản phẩm qua lead, comment
+c7003138011 của first builder trên #7900). Không có kiểm tra khuôn mặt
+nào: điều kiện duy nhất là `lamp_voice::services::health_owner_turn(lease)`
+= `owner_of(lease)`, như lần đọc của mọi dịch vụ đã liên kết. Trong căn
+phòng riêng (`LAMP_PRIVATE_ROOM`, bật trong sản phẩm) ai nói tại đèn cũng
+được trả lời như chủ đèn, nên **bất kỳ ai ở cạnh đèn hỏi đều có thể nghe
+thông tin sức khỏe của chủ đèn; chủ đèn chọn điều đó khi biết rõ, bằng việc
+liên kết Apple Health.** Ngoài căn phòng riêng, một câu không phải của chủ
+đèn nhận `OWNER_ONLY`, và `lamp-services` không được hỏi. Trên tuyến Live,
+nơi mô hình nói mọi câu trả lời, một lần đọc là "I can't read Apple Health
+on this voice." và không gì được đọc.
 
 Lần đọc của một kỹ năng tự tạo bị từ chối ngay ở cửa
 (`spoken::not_readable`, "read only to its owner at the lamp, never by a
@@ -3234,15 +3230,20 @@ never writes to it"), và máy chủ MCP của tác tử không bao giờ liệt
 (`mcp_server::granted` bỏ qua dịch vụ cục bộ dù quyền nói gì).
 
 **Những gì được nói** (P2 của first builder trên #7900). Trên tuyến thứ
-hai, giọng nói không đưa mô hình chat giá trị nào: `lamp_services::health::said`
-dựng đúng từng chữ của câu trả lời từ câu trả lời của lần đọc, bằng tiếng
-Anh hoặc, với chủ đèn nói tiếng Việt (`LAMP_LANGUAGE_FILE`), tiếng Việt, và
-kết quả của lần đọc chỉ mang những chữ đó (`lamp_says_exactly`). Lượt đó
-nói chúng y nguyên (`Queue::push_shown_as`, không tag hay sửa chữ) rồi kết
-thúc ở đó, không có lượt thứ hai; khi đi cùng lời gọi khác, lượt kế chỉ
-được báo "Lamp has said this Apple Health answer aloud itself, in fixed
-words. Don't repeat it, add to it, or guess any health value." Lời cho mỗi
-lần đọc:
+hai, `lamp_services::health::said` dựng đúng từng chữ của câu trả lời từ
+câu trả lời của lần đọc, bằng tiếng Anh hoặc, với chủ đèn nói tiếng Việt
+(`LAMP_LANGUAGE_FILE`), tiếng Việt, và kết quả của lần đọc mang những chữ
+đó (`lamp_says_exactly`). Lượt đó nói chúng y nguyên (`Queue::push_verbatim`,
+không tag hay sửa chữ) và hiện chúng đúng như vậy; một lượt chỉ có lần đọc
+sức khỏe kết thúc ở đó, không có lượt thứ hai. Mô hình chat chỉ nhận một
+dòng ngắn bằng tiếng Anh (`lamp_services::health::model_line`, khóa
+`what_was_read`, ghi chú `HEALTH_TOLD`), ví dụ "slept 6 h 52 m last night"
+hay "8,421 steps so far today": không bao giờ tên hay loại buổi tập hay giờ
+của nó, không giờ đồng hồ, không danh sách thô các ngày; không có dòng nào
+cho lỗi, dữ liệu cũ hay không có gì. Khi đi cùng lời gọi khác, lượt 2 được
+báo dòng ngắn đó. Dòng được báo lại cạnh các câu tiếp theo của chủ đèn
+trong 5 phút (`services::health_note_for`, chỉ trong tiến trình, bị xoá khi
+"quên mọi thứ" và khi một lần đọc không thấy dữ liệu). Lời cho mỗi lần đọc:
 
 - `sleep`: "Theo Apple Health lúc 7 giờ 30, đêm qua bạn ngủ 6 tiếng 52
   phút, từ 23 giờ 48 đến 6 giờ 40." ("… bạn nằm trên giường …" cho một đêm
@@ -3274,18 +3275,36 @@ Giờ "tính tới" được nói theo múi giờ của chủ đèn: "lúc 7 gi�
 giờ 10 hôm qua". Những chữ này do dịch vụ chuyển văn bản thành giọng nói
 đọc, nên các giá trị có rời đèn tới dịch vụ đó, được đọc thành tiếng qua
 các dịch vụ giọng nói của Lamp; mô hình chat (DeepSeek trong sản phẩm)
-không bao giờ thấy chúng.
+chỉ thấy dòng ngắn ở trên.
+
+**Bộ nhớ.** Dòng ngắn đó được giữ trong bộ nhớ của chính chủ đèn như một
+điều được giữ có ngày, qua đường `remember` thường trong phạm vi người của
+chủ đèn (`remember::keep_health_fact`, chỉ với bộ nhớ Days, chỉ cho một id
+người `p-`, mỗi lần chạy một lần cho mỗi lời). Lời là "From Apple Health,
+read on YYYY-MM-DD: <dòng>." (`lamp_msgs::health_fact`). Nó được xoá khi:
+chủ đèn nói "quên mọi thứ" (phạm vi bộ nhớ của họ được làm rỗng, cùng
+`apple_health.json` qua `apple_health_forget`, bên dưới); ứng dụng gỡ liên
+kết (`health.summary` `null`, `connector.remove.apple_health`, lần xoá khi
+đăng xuất): `lamp-cloud` (`services::forget_health_facts`) gửi
+`{"op":"forget_apple_health"}` trên socket hẹp của bộ nhớ
+(`LAMP_MEMORY_FORGET_SOCKET`), và bộ nhớ quên mọi mục đã giữ của mọi người
+bắt đầu bằng phần đầu đó, trả `{"ok":true,"removed":N}`
+([memory-days_vi.md](memory-days_vi.md)); không có trả lời hay bị từ chối
+thì kết quả là `failure` "Apple Health was unlinked, but what Lamp
+remembered from it could not be removed just now; try again". Lần đặt lại
+xoá `/var/lib/lampos-memory` và `/var/lib/lampos-services`.
 
 **Riêng tư.** Không giá trị sức khoẻ nào nằm trong một dòng journal, lỗi
 của câu trả lời hay một `Debug` (`Debug` của `Summary` chỉ cho số ngày):
 `lamp-services` ghi "health.summary stored, N days", `lamp-cloud` ghi kind
 và trạng thái, và dòng của một lần đọc là "the voice's service_read of
-apple_health steps: found 1"; giọng nói ghi khuôn mặt chủ đèn có được
-thấy hay không và rằng lời là lời cố định, không bao giờ chính lời đó. Câu
-đèn nói được giữ là "[an Apple Health read]" trong thread, lịch sử của
-lượt sau và bản ghi lời của các phiên
-(`/var/lib/lampOS/voice/sessions/*/metadata/events-*.jsonl`), không bao giờ
-là lời của nó (`services::HEALTH_SHOWN`). Không bản ghi dịch vụ
+apple_health steps: found 1"; giọng nói ghi rằng lời là lời cố định, không
+bao giờ chính lời đó. Câu đèn nói được hiện đúng như vậy trong bản ghi lời
+và bản ghi của các phiên
+(`/var/lib/lampOS/voice/sessions/*/metadata/events-*.jsonl`); thread giữ
+cuộc trao đổi là `PRIVATE_SAID` như mọi lần đọc dịch vụ. Không đường tải
+lên nào của thiết bị (nhật ký hỗ trợ) mang bản ghi phiên giọng nói, file
+thread hay bộ nhớ. Không bản ghi dịch vụ
 (`LAMP_SERVICE_RECORDS`) nào được giữ cho một lần đọc Apple Health, dù trả
 lời, lỗi hay bị từ chối, nên không bản ghi nào còn lại sau khi ngắt kết
 nối. Một lần đọc rút gọn (`services::brief`, khi người khác có thể đang
@@ -3745,19 +3764,30 @@ chương trình (không giữ, liệt kê, đọc hay đưa ra gì, lệnh ngắ
 được nhận); một ngày quá 14 ngày bị bỏ ở lần đẩy và khỏi file ở lần đọc;
 lời gọi `apple_health_forget` của giọng nói xoá file, của kỹ năng hay lượt
 chạy bị từ chối; lời cố định của mỗi lần đọc bằng tiếng Anh và tiếng Việt
-(`health::tests::each_read_is_said_in_fixed_words`); `mcp_server::granted`
-không bao giờ liệt kê nó. Giọng nói (`services::tests`,
+(`health::tests::each_read_is_said_in_fixed_words`); dòng của mô hình ngắn,
+không tên buổi tập, giờ hay danh sách thô các ngày
+(`health::tests::the_models_line_is_short_with_no_workout_names_times_or_raw_days`);
+`mcp_server::granted` không bao giờ liệt kê nó. Giọng nói (`services::tests`,
 `service_records::tests`, `second_provider::tests::health_said`,
-`made_skill::tests`): một lần đọc chỉ được nói cho khuôn mặt đã biết của
-chủ đèn được thấy nói câu đó, khi căn phòng riêng bật và chưa ghi nhận
-khuôn mặt thì nghe câu đơn giản và `lamp-services` không bao giờ được hỏi;
-lời cố định của lần đọc được thấy, mô hình không được báo chữ nào và không
-có lượt 2, khi đi cùng lời gọi khác thì lượt 2 chỉ được báo là đã nói; bản
-ghi lời là "[an Apple Health read]"; `week` bị cắt ở lần đọc rút gọn; không
-bản ghi dịch vụ; câu "quên mọi thứ" của chủ đèn hỏi `apple_health_forget`,
-của người khác thì không; và Apple Health không có trong danh sách quyền
-nào (các test catalog của `lamp-control` và `lamp-tasks` bỏ qua dịch vụ cục
-bộ).
+`made_skill::tests`): trong căn phòng riêng một lần đọc được trả lời cho bất
+kỳ ai hỏi
+(`services::tests::a_health_read_is_answered_for_whoever_asks_in_the_private_room`);
+lời là lời cố định và mô hình nhận dòng ngắn
+(`the_read_is_fixed_words_and_the_model_gets_the_short_line`); lần đọc của
+chủ đèn được giữ một lần như một điều có ngày của họ
+(`the_owners_read_is_kept_once_as_a_dated_fact_of_theirs`); một lượt chỉ có
+lần đọc sức khỏe không có lượt 2
+(`health_said::a_health_read_is_said_in_fixed_words_with_no_model_round`),
+khi đi cùng lời gọi khác thì lượt 2 được báo dòng ngắn
+(`beside_another_call_round_two_is_told_the_short_line`); `week` bị cắt ở
+lần đọc rút gọn; không bản ghi dịch vụ; câu "quên mọi thứ" của chủ đèn hỏi
+`apple_health_forget`, của người khác thì không; và Apple Health không có
+trong danh sách quyền nào (các test catalog của `lamp-control` và
+`lamp-tasks` bỏ qua dịch vụ cục bộ). Bộ nhớ:
+`forget_apple_health_takes_every_kept_health_fact_and_nothing_else`,
+`the_narrow_check_lets_through_one_forget_person_and_nothing_else`;
+`lamp-cloud`: `unlinking_apple_health_removes_the_kept_facts_in_memory_too`;
+`lamp-msgs`: `a_kept_fact_is_found_by_its_start_alone`.
 
 `cargo test -p lamp-services`: kho chỉ root (0700/0600) và được ghi trọn, một
 code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật nào trong một

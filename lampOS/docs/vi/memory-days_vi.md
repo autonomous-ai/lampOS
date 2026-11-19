@@ -1898,6 +1898,16 @@ Unit product mở sẵn socket hẹp của bộ nhớ (A8, #6852): `lamp-memory.
 chạy với `--forget-socket /run/lampos-memory/forget.sock --forget-group lampos`
 (`lampos` là nhóm của lamp-cloud, và user của bộ nhớ cũng ở trong nhóm này), và
 `lamp-cloud.service` đặt `LAMP_MEMORY_FORGET_SOCKET` trỏ tới đúng socket đó. Socket
-chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, nên
-khi công tắc đó còn tắt thì không có gì thay đổi với người dùng; khi nó bật, xóa
-một người trong app cũng xóa những gì bộ nhớ giữ về họ.
+chỉ nhận `forget_person`, và thêm đúng một dòng một khóa
+`{"op":"forget_apple_health"}`. lamp-cloud chỉ hỏi `forget_person` khi
+`LAMP_FACES_PAGE=on`, nên khi công tắc đó còn tắt thì không có gì thay đổi với
+người dùng; khi nó bật, xóa một người trong app cũng xóa những gì bộ nhớ giữ về họ.
+
+`{"op":"forget_apple_health"}` (Days): mọi mục đã giữ của mọi người có lời bắt
+đầu bằng «From Apple Health, read on » (`lamp_msgs::health_fact`) đều bị quên,
+từng mục, không chọn lọc; trả `{"ok":true,"removed":N}`. Không mục nào khác bị
+động tới. lamp-cloud gửi nó khi app gỡ liên kết Apple Health (`health.summary`
+`null`, `connector.remove.apple_health`, lần xóa khi đăng xuất), qua
+`services::forget_health_facts` (xem [services_vi.md](services_vi.md), «Apple
+Health»). Test: `forget_apple_health_takes_every_kept_health_fact_and_nothing_else`,
+`the_narrow_check_lets_through_one_forget_person_and_nothing_else`.

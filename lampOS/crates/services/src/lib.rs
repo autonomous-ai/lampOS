@@ -20,7 +20,7 @@
 //! kept here too, and `lamp-tasks.service` may ask for a run's
 //! ([`skill_secrets`]). With `LAMP_APPLE_HEALTH=on`, the phone app's
 //! Apple Health summaries are kept here too, with no token, and read by
-//! the voice only to the owner's known face seen saying the line ([`health`]).
+//! the voice for the owner's line as any linked service ([`health`]).
 pub mod catalog;
 pub mod health;
 pub mod mail;

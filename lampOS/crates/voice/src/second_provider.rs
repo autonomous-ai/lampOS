@@ -11877,6 +11877,9 @@ async fn spoken(
         ))
         .chain(records)
         .chain(read_ids)
+        // The owner's last Apple Health read, beside their own line alone
+        // (`services::health_note_for`, #7900): no wait.
+        .chain(crate::services::health_note_for(request, scope.as_ref()))
         .chain(remembered)
         .chain(named)
         .chain(wake)
@@ -20577,13 +20580,11 @@ async fn answer(
                     return Err(Stop::Gone);
                 }
                 // An Apple Health read: its fixed words, built on the lamp,
-                // are said now as they are, and the model is told only that
-                // they were said (`services::take_health_line`; the first
-                // builder's P2 on #7900): no value reaches it, now or later.
+                // are said now as they are, and the model is told the short
+                // line of what was read in their place
+                // (`services::take_health_line`, #7900).
                 if let Some(line) = crate::services::take_health_line(&mut answer.told) {
-                    queue
-                        .push_shown_as(line, crate::services::HEALTH_SHOWN)
-                        .await?;
+                    queue.push_verbatim(line).await?;
                     health_said += 1;
                 }
                 // A skill turned off, its function asked for on a heard line
@@ -20989,7 +20990,9 @@ async fn answer(
                 continue;
             }
             // Every call an Apple Health read, said in fixed words: the turn
-            // ends with them, no round 2, so no model words follow a value.
+            // ends with them, no round 2, so the model never says them again
+            // or adds to them in that turn; it has the short line of what
+            // was read for the next (`services::health_note_for`).
             if health_said > 0 && health_said == calls.len() {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: {health_said} Apple Health read(s) said in the lamp's fixed words; no round 2"
@@ -21226,13 +21229,8 @@ async fn answer(
             // After a piece not said, this one is said with it, in order
             // (#4338): its own speech, already started, is let go. The two
             // go to the voice as the lamp's words, without the speech tags
-            // (`LAMP_SECOND_SPEECH_TAGS`) the pieces were given apart. Never
-            // with a health read's piece, whose words are not its text
-            // (`Queue::push_shown_as`): its own speech is kept.
-            let (piece, mut packets) = match carried
-                .take()
-                .filter(|_| answering && own != crate::services::HEALTH_SHOWN)
-            {
+            // (`LAMP_SECOND_SPEECH_TAGS`) the pieces were given apart.
+            let (piece, mut packets) = match carried.take().filter(|_| answering) {
                 Some(unsaid) => {
                     let joined = format!("{unsaid} {own}");
                     eprintln!(
@@ -21258,9 +21256,7 @@ async fn answer(
                     // Not started twice, and none of it played: kept for the
                     // next piece (#4338). The announcement is never carried.
                     Err(error) if services::unsaid(&error) && !played => {
-                        // A health read's piece is shown as its placeholder
-                        // alone, which is never said (`push_shown_as`).
-                        if answering && piece != crate::services::HEALTH_SHOWN {
+                        if answering {
                             eprintln!(
                                 "lamp-voice second: request {request}: a piece of the answer could not be started twice; it is said with the next piece"
                             );
@@ -21782,11 +21778,10 @@ impl Queue<'_> {
 
     /// Words the lamp built itself (`spoken`, a health read's fixed words,
     /// `services::HEALTH_SAY`), said verbatim by the speech service with no
-    /// tags, rewrites or model, and kept everywhere else (the thread, the
-    /// session records' transcript, a later turn's history) as `shown`
-    /// alone (`services::HEALTH_SHOWN`), never its values. Never said again
+    /// tags, rewrites or model, and shown as they are. Never said again
     /// after a cut ([`Shared::wrote_piece`] not told), as a clip is not.
-    async fn push_shown_as(&mut self, spoken: String, shown: &str) -> Result<(), Stop> {
+    async fn push_verbatim(&mut self, spoken: String) -> Result<(), Stop> {
+        let shown = spoken.clone();
         self.announce().await?;
         if !self.started {
             eprintln!(
@@ -21802,14 +21797,14 @@ impl Queue<'_> {
                 *said = (self.request, String::new());
             }
             said.1.push(' ');
-            said.1.push_str(shown);
+            said.1.push_str(&shown);
         }
         let turn = net::Turn {
             request: self.request,
             heard_at: self.heard_at,
         };
         let packets = start_speech(self.shared, self.speech, spoken, turn);
-        self.send(shown.to_owned(), packets, false).await
+        self.send(shown, packets, false).await
     }
 
     /// A fixed line (`line`) said from its clip rendered ahead, as the

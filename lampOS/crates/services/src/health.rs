@@ -6,12 +6,18 @@
 //! (`store::Store::keep_local`, `/var/lib/lampos-services/apple_health.json`,
 //! root's, 0600) until a remove, a sign-out or a reset wipes it.
 //!
-//! The owner reads it with `service_read` (`reads::local_read`), answered
-//! from the kept file alone, and only when the eyes see the owner's own
-//! known face saying the line (`lamp_voice::services::health_read`): the
-//! voice says the answer in the fixed words [`said`] builds here, in English
-//! or Vietnamese, and no chat model is given a value. Those words are read
-//! aloud through Lamp's voice services (its speech service renders them).
+//! It is read with `service_read` (`reads::local_read`), answered from the
+//! kept file alone, for the owner's line as any linked service's read
+//! (`lamp_voice::services::health_read`): in the private room, on in the
+//! product, that is whoever asks at the lamp, with no face check, so anyone
+//! at the lamp who asks can hear the owner's health; the owner chooses that
+//! knowingly in linking it (#7900). The voice says the answer in the fixed
+//! words [`said`] builds here, in English or Vietnamese, and its chat model
+//! is given one short line of what was read ([`model_line`]: no workout
+//! name or time, no raw days) to talk with them, which Lamp also remembers
+//! for the owner (`lamp_msgs::health_fact`). Lamp's voice uses the health
+//! summary to talk with you, through its voice services, and remembers it
+//! for you.
 //! Each answer carries the summary's `as_of`; a summary older than
 //! [`STALE_AFTER_S`] gives no values, only that it is out of date. Nothing
 //! here invents a value: a day or a field the phone did not send is said to
@@ -881,16 +887,6 @@ impl Spoken {
     }
 }
 
-/// What the voice says, in place of any read, when the line is not the
-/// owner's known face seen saying it, or no face is enrolled: nothing of
-/// the summary is read (the first builder's P1 on #7900).
-pub fn not_yours(spoken: Spoken) -> &'static str {
-    spoken.pick(
-        "I keep health details for the person they belong to.",
-        "Mình chỉ nói thông tin sức khỏe với đúng người sở hữu chúng.",
-    )
-}
-
 /// What the voice says of a health read on a route that can't say fixed
 /// words without a model (the Live route): nothing is read.
 pub fn not_on_this_voice(spoken: Spoken) -> &'static str {
@@ -1365,6 +1361,115 @@ pub fn said(what: &str, args: &Value, told: &Value, now: i64, spoken: Spoken) ->
     }
 }
 
+/// `minutes` short, for the model: `6 h 52 m`, `45 m`, `7 h`.
+fn short_duration(minutes: u64) -> String {
+    match (minutes / 60, minutes % 60) {
+        (0, m) => format!("{m} m"),
+        (h, 0) => format!("{h} h"),
+        (h, m) => format!("{h} h {m} m"),
+    }
+}
+
+/// One short English line of what a health read found, for the chat model
+/// in the owner's own turn and for their own memory (the first builder's
+/// yes of 19 Nov, 14:37, on #7900): "slept 6 h 52 m last night", "4,210
+/// steps so far today", a week's averages. Never a workout's name, kind or
+/// time (only how many), never a day's raw list, never a clock time: each
+/// value relative to the read's own day, which is given beside it (the
+/// summary's local `YYYY-MM-DD`). `None` for an error, a stale summary or
+/// an answer with nothing in it: nothing then reaches the model or memory.
+pub fn model_line(what: &str, args: &Value, told: &Value, now: i64) -> Option<(String, String)> {
+    if told.get("error").is_some() || told["stale"] == true {
+        return None;
+    }
+    let as_of = told["as_of"].as_str()?;
+    let zone = zone_of(told["tz"].as_str().unwrap_or_default(), as_of);
+    let today = jiff::Timestamp::from_second(now)
+        .ok()?
+        .to_zoned(zone)
+        .date();
+    let items = told["quoted"].as_array()?;
+    let first = items.first()?;
+    let english = Spoken::English;
+    let n = |value: &Value| value.as_u64().map(|n| number(n, english));
+    let line = match what {
+        "sleep" => {
+            let in_bed = first.get("in_bed_min").is_some();
+            let minutes = first["asleep_min"]
+                .as_u64()
+                .or(first["in_bed_min"].as_u64())?;
+            let night = spoken_night(first["date"].as_str().unwrap_or_default(), today, english);
+            let length = short_duration(minutes);
+            if in_bed {
+                format!("in bed {length} {night} (time in bed, not measured sleep)")
+            } else {
+                format!("slept {length} {night}")
+            }
+        }
+        "steps" if first.get("steps_total").is_some() => {
+            let (total, average, asked) = (
+                n(&first["steps_total"])?,
+                n(&first["steps_daily_average"])?,
+                first["days_asked"].as_u64()?,
+            );
+            format!("{total} steps over the last {asked} days, about {average} a day")
+        }
+        "steps" => {
+            let steps = n(&first["steps"])?;
+            let date = first["date"].as_str().unwrap_or_default();
+            if date_of(date) == Some(today) {
+                format!("{steps} steps so far today")
+            } else {
+                format!("{steps} steps {}", spoken_day(date, today, english))
+            }
+        }
+        "heart" => {
+            let bpm = n(&first["resting_heart_rate_bpm"])?;
+            let day = spoken_day(first["date"].as_str().unwrap_or_default(), today, english);
+            format!("resting heart rate {bpm} bpm {day}")
+        }
+        "workouts" => {
+            let found = told["workouts_found"]
+                .as_u64()
+                .unwrap_or(items.len() as u64);
+            match asked_days(args).ok().flatten() {
+                Some(days) => format!(
+                    "{found} workout{} in the last {days} days",
+                    if found == 1 { "" } else { "s" }
+                ),
+                None => format!(
+                    "latest workout {}",
+                    spoken_day(first["date"].as_str().unwrap_or_default(), today, english)
+                ),
+            }
+        }
+        "week" => {
+            let week = &told["week"];
+            let mut parts = Vec::new();
+            if let Some(average) = n(&week["steps_daily_average"]) {
+                parts.push(format!("about {average} steps a day"));
+            }
+            if let Some(asleep) = week["asleep_nightly_average_min"].as_u64() {
+                parts.push(format!("slept about {} a night", short_duration(asleep)));
+            }
+            if let Some(in_bed) = week["in_bed_nightly_average_min"].as_u64() {
+                parts.push(format!("about {} in bed a night", short_duration(in_bed)));
+            }
+            if let Some(bpm) = n(&week["resting_heart_rate_average_bpm"]) {
+                parts.push(format!("resting heart rate around {bpm} bpm"));
+            }
+            let workouts = week["workouts"].as_u64().unwrap_or(0);
+            parts.push(format!(
+                "{workouts} workout{}",
+                if workouts == 1 { "" } else { "s" }
+            ));
+            format!("over the last 7 days: {}", parts.join("; "))
+        }
+        _ => return None,
+    };
+    Some((line, today.to_string()))
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -1572,12 +1677,7 @@ pub(crate) mod tests {
     /// The plain lines say no value.
     #[test]
     fn the_plain_lines_say_nothing_of_the_summary() {
-        assert_eq!(
-            not_yours(Spoken::English),
-            "I keep health details for the person they belong to."
-        );
         for line in [
-            not_yours(Spoken::Vietnamese),
             not_on_this_voice(Spoken::English),
             not_on_this_voice(Spoken::Vietnamese),
         ] {
@@ -2045,5 +2145,76 @@ pub(crate) mod tests {
                 }
             }
         }
+    }
+    /// The model's line for the owner's own turn and memory (the first
+    /// builder's 14:37 yes on #7900): short, relative to the read's day,
+    /// never a workout's name or time, never a clock or a raw list of days.
+    #[test]
+    fn the_models_line_is_short_with_no_workout_names_times_or_raw_days() {
+        let kept = week_kept();
+        let kept = Some(&kept);
+        let line = |what: &str, args: Value| {
+            let told = read(what, args.clone(), kept, NOW).unwrap();
+            model_line(what, &args, &told, NOW)
+        };
+        let today = "2026-11-18".to_owned();
+        assert_eq!(
+            line("sleep", json!({})),
+            Some(("slept 6 h 52 m last night".to_owned(), today.clone()))
+        );
+        assert_eq!(
+            line("steps", json!({})),
+            Some(("8,421 steps so far today".to_owned(), today.clone()))
+        );
+        assert_eq!(
+            line("steps", json!({"days": 7})).unwrap().0,
+            "31,421 steps over the last 7 days, about 7,855 a day"
+        );
+        assert_eq!(
+            line("heart", json!({})).unwrap().0,
+            "resting heart rate 57 bpm yesterday"
+        );
+        assert_eq!(
+            line("workouts", json!({})).unwrap().0,
+            "latest workout today"
+        );
+        assert_eq!(
+            line("workouts", json!({"days": 3})).unwrap().0,
+            "2 workouts in the last 3 days"
+        );
+        let week = line("week", json!({})).unwrap().0;
+        assert_eq!(
+            week,
+            "over the last 7 days: about 7,855 steps a day; slept about 7 h 7 m a night; resting heart rate around 58 bpm; 2 workouts"
+        );
+        for what in ["sleep", "steps", "heart", "workouts", "week"] {
+            for args in [json!({}), json!({"days": 14})] {
+                let Some((said, _)) = line(what, args) else {
+                    continue;
+                };
+                for never in [
+                    "running",
+                    "cycling",
+                    "06:55",
+                    "23:48",
+                    "06:40",
+                    "2026-11-1",
+                    "km",
+                ] {
+                    assert!(!said.contains(never), "{what}: {said}");
+                }
+            }
+        }
+        // An error, a stale summary or nothing found gives the model nothing.
+        assert_eq!(
+            model_line("steps", &json!({}), &json!({"error": NO_DATA}), NOW),
+            None
+        );
+        assert_eq!(
+            model_line("steps", &json!({}), &json!({"stale": true}), NOW),
+            None
+        );
+        let none = read("sleep", json!({"date": "yesterday"}), kept, NOW).unwrap();
+        assert_eq!(model_line("sleep", &json!({}), &none, NOW), None);
     }
 }

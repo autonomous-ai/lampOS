@@ -384,6 +384,9 @@ enum Extra {
         person: Who,
         about: Vec<Vec<String>>,
     },
+    /// Every person's kept Apple Health facts (`lamp_msgs::health_fact`),
+    /// on the app's unlink (`Days::forget_apple_health`).
+    ForgetAppleHealth {},
     /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
     /// known person's mail contact saved, new or replacing the address
     /// kept for that name (`Days::service_contact_put`).
@@ -1311,6 +1314,9 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
                 json!({"ok":true,"removed":forgot.removed,"records":forgot.records,"addresses":forgot.addresses})
             }
         }
+        Extra::ForgetAppleHealth {} => {
+            json!({"ok":true,"removed":store.forget_apple_health()?})
+        }
         Extra::ExchangesForget { person, about } => {
             json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
         }
@@ -1378,6 +1384,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts",
             "service_contacts_forget",
             "exchanges_forget",
+            lamp_msgs::health_fact::FORGET_OP,
         ];
         const OLD: &[&str] = &[
             "append",
@@ -1857,6 +1864,51 @@ mod tests {
         let of = |id: &Value| facts.iter().find(|fact| fact["id"] == *id).unwrap();
         assert_eq!(of(&dated["id"])["on"], "2026-10-16");
         assert!(of(&plain["id"]).get("on").is_none(), "{note}");
+    }
+
+    /// #7900: the app's unlink of Apple Health removes every person's kept
+    /// Apple Health facts and nothing else they keep.
+    #[test]
+    fn forget_apple_health_takes_every_kept_health_fact_and_nothing_else() {
+        let (_scratch, mut store) = Scratch::new("forget-apple-health");
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let (ann, bob) = ("p-0123456789abcdef", "p-fedcba9876543210");
+        let fact = lamp_msgs::health_fact::text("2026-11-19", "slept 6 h 52 m last night");
+        for (person, text) in [
+            (ann, fact.as_str()),
+            (ann, "takes her coffee black"),
+            (bob, fact.as_str()),
+        ] {
+            let kept = send(
+                &mut store,
+                json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":text}),
+            );
+            assert_eq!(kept["ok"], true, "{kept}");
+        }
+        let gone = send(&mut store, json!({"op":"forget_apple_health"}));
+        assert_eq!(gone, json!({"ok":true,"removed":2}));
+        let ann_kept = send(
+            &mut store,
+            json!({"op":"kept","person":ann,"max_bytes":2000}),
+        );
+        let texts: Vec<&str> = ann_kept["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["text"].as_str().unwrap())
+            .collect();
+        assert_eq!(texts, ["takes her coffee black"]);
+        let bob_kept = send(
+            &mut store,
+            json!({"op":"kept","person":bob,"max_bytes":2000}),
+        );
+        assert_eq!(bob_kept["entries"], json!([]));
+        assert_eq!(
+            send(&mut store, json!({"op":"forget_apple_health"})),
+            json!({"ok":true,"removed":0})
+        );
     }
 
     /// #3613 on the wire: `forget` with `selective:true` takes an unlinked

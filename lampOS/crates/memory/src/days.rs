@@ -1386,6 +1386,33 @@ impl Days {
         Ok(removed)
     }
 
+    /// Every person's kept Apple Health facts (`lamp_msgs::health_fact`,
+    /// found by their start), each forgotten as a `forget {id}` without the
+    /// selective rule forgets a kept thing: what was made from it goes with
+    /// it. The app's unlink of Apple Health (#7900, the first builder's
+    /// condition 3). Marked for the night first for each person reached.
+    /// How many entries went.
+    pub fn forget_apple_health(&mut self) -> Result<u64> {
+        let found: Vec<(String, u64)> = {
+            let mut statement = self.db.prepare(
+                "SELECT person,id FROM entries WHERE kind='kept' AND substr(text,1,length(?1))=?1 ORDER BY person,id",
+            )?;
+            statement
+                .query_map(params![lamp_msgs::health_fact::PREFIX], |r| {
+                    Ok((r.get(0)?, r.get(1)?))
+                })?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        let mut removed = 0;
+        for (person, id) in found {
+            let Some(person) = Person::new(&person) else {
+                continue;
+            };
+            removed += self.forget_linked(&person, id, false)?;
+        }
+        Ok(removed)
+    }
+
     fn forget_here(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
         let Some(record) = self.record(person, id)? else {
             return Ok(0);
