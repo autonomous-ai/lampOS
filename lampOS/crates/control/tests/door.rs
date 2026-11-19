@@ -286,10 +286,69 @@ async fn another_path_or_an_oversized_frame_is_refused() {
     let _welcome = next(&mut socket).await;
     let huge = "x".repeat(server::FRAME_MAX + 1);
     let _ = socket.send(Message::text(huge)).await;
+    assert_closed_too_big(&mut socket).await;
+    // Past even a pose's frame: closed by the WebSocket itself.
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut socket).await;
+    let _ = socket
+        .send(Message::text("x".repeat(server::POSE_FRAME_MAX + 1)))
+        .await;
     let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
         .await
         .expect("closed in time");
     assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// A frame over 64 KiB that is not a taken pose: told `bad_request`, then
+/// closed.
+async fn assert_closed_too_big(socket: &mut Socket) {
+    match tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("answered in time")
+    {
+        Some(Ok(Message::Text(text))) => {
+            let told: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(told["error"]["code"], "bad_request", "{told}");
+            assert_eq!(told["error"]["why"], server::FRAME_TOO_BIG);
+        }
+        other => panic!("{other:?}"),
+    }
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// Only a `pose` from a computer that said hello may pass 64 KiB on the
+/// lamp's own network (Heron's P2 on #7972): a large pose is answered (in
+/// the door's words), a large other op closes the connection, and so does a
+/// large pose before hello.
+#[tokio::test]
+async fn only_a_pose_after_hello_may_be_larger_than_64_kib() {
+    let lamp = lamp("pose-frame").await;
+    let jpeg = "A".repeat(150 * 1024);
+    let pose = json!({"id": 9, "op": "pose", "jpeg": jpeg}).to_string();
+    assert!(pose.len() > server::FRAME_MAX && pose.len() < server::POSE_FRAME_MAX);
+    // Before hello: closed.
+    let mut stranger = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut stranger).await;
+    stranger.send(Message::text(pose.clone())).await.unwrap();
+    assert_closed_too_big(&mut stranger).await;
+    // After hello: answered (here unrouted), and the connection stays.
+    let mut socket = paired(&lamp, json!(["camera"]), 41).await;
+    socket.send(Message::text(pose)).await.unwrap();
+    let answer = next(&mut socket).await;
+    assert_eq!(answer["re"], 9, "{answer}");
+    let still = send(
+        &mut socket,
+        json!({"id": 10, "op": "get", "state": ["lamp"]}),
+    )
+    .await;
+    assert_eq!(still["re"], 10, "{still}");
+    // Another op as large: told and closed.
+    let notes = json!({"id": 11, "op": "notes.set", "key": "k", "value": "x".repeat(80 * 1024)});
+    socket.send(Message::text(notes.to_string())).await.unwrap();
+    assert_closed_too_big(&mut socket).await;
 }
 
 /// A computer paired with `grants` and said hello, as the SDK would.

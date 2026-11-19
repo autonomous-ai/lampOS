@@ -34,6 +34,10 @@ const USAGE: &str = "usage: lamp-npu serve [--socket PATH] [--state DIR] [--bus-
 const TICK: Duration = Duration::from_secs(10);
 /// How often the installed apps are looked at for one that uses `pose`.
 const APPS_EVERY: Duration = Duration::from_secs(60);
+/// How often the watchdog looks at the NPU's run under way.
+const WATCH_EVERY: Duration = Duration::from_secs(1);
+/// The exit status when the NPU's run hung (`EX_SOFTWARE`).
+const HUNG_EXIT: i32 = 70;
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -169,11 +173,30 @@ fn serve_command(args: &[String]) -> Result<(), String> {
         loop {
             let now = Instant::now();
             ticking.tick(now);
+            // A newer model the Store offers, at most each 6 h.
+            ticking.refresh(now);
             if apps_at.is_none_or(|at| now >= at + APPS_EVERY) {
                 apps_at = Some(now);
                 serve::apps_tick(&ticking, &apps_root, now);
             }
             std::thread::sleep(TICK);
+        }
+    });
+    // The watchdog: a run of the NPU past its deadline has hung, holding
+    // the net's lock and every ask behind it, and only a new process lets
+    // the driver go. It exits, and systemd (`Restart=on-failure`) starts
+    // the service again.
+    let watched = service.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(WATCH_EVERY);
+            if let Some(taken) = watched.hung(Instant::now()) {
+                eprintln!(
+                    "[lamp-npu] the NPU's run has taken {} ms, past its deadline: exiting for a restart",
+                    taken.as_millis()
+                );
+                std::process::exit(HUNG_EXIT);
+            }
         }
     });
     serve::serve(

@@ -32,6 +32,16 @@ decision on the model's delivery, with the first builder's four rules of 16:55.
   `voice/privacy` lease says the microphone is not permitted or the switch is
   muted, or the bus can't be read, and drops an answer if that changed during
   the run.
+- **Bounded pictures.** A JPEG is at most 150 KiB (the same bound as
+  lamp-control's `pose`) and at most 1280 pixels on a side, the camera's
+  largest size (1280x720): a larger one is refused `bad_request` from its
+  header, before it is decoded ("jpeg: WxH is too big: at most 1280 pixels
+  on each side"). It is decoded and cropped before the NPU's lock is taken,
+  so a slow picture never holds the others' runs.
+- **A hung NPU restarts the service.** A run (about 3 ms) that takes more
+  than 5 s (`RUN_DEADLINE`) has hung: a watchdog thread, looking each
+  second, ends the process (status 70) and systemd starts it again
+  (`Restart=on-failure`), since a hung run holds every ask behind it.
 - **Nothing is kept of a picture.** The JPEG and the keypoints live only for
   the ask; the journal says the model's loads, fetches and failures, never a
   picture or a pose.
@@ -48,6 +58,11 @@ answered (`crates/npu/src/serve.rs`).
   "width","height","model","ms":{"decode","npu","post","total"}}`, or
   `{"ok":false,"code","why","retry_ms"?}`, `code` one of `private`, `rate`,
   `busy`, `preparing`, `unavailable`, `bad_request`.
+- Past 8 askers at once, one is answered `busy` (`retry_ms` 100) before its
+  line is read, then its line is read and dropped, so it reads the answer
+  rather than a closed socket; lamp-control reads that answer even when its
+  own write was cut short. An asker has one 5 s deadline for its whole line,
+  however slowly its bytes come.
 - `{"op":"status"}` → the ops it answers, its board, and for `pose` the
   model's state (`absent`, `preparing`, `ready`, `unavailable` with why),
   whether it is loaded, and the kept model's id, head and licence.
@@ -59,7 +74,12 @@ lamp's own shell, through the same socket.
 
 A model is a network binary graph (`.nb`) converted for the NPU with its
 normalisation baked in, so it takes one RGB frame of bytes, `n, h, w, 3` or
-`n, 3, h, w`, and gives its raw outputs. A region of the picture is scaled
+`n, 3, h, w`, read from the input's shape (the converter's layout tag,
+`nchw` on MoveNet's `[1, 192, 192, 3]`, is a label and not trusted), and
+gives its raw outputs. Each output is read through its own quantisation:
+none, affine per tensor (`(q - zero) * scale`) or dynamic fixed point
+(`q / 2^fl`, int8 or int16); a model with any other (per-channel affine,
+say) is refused at its load. A region of the picture is scaled
 into the model's frame, bilinear and black past the picture's edges, as
 OpenCV's `warpAffine` makes it, and the keypoints are mapped back
 (`crates/npu/src/image.rs`). A client's first frame is the whole picture,
@@ -72,24 +92,29 @@ model is let go. A head reads the outputs (`crates/npu/src/head.rs`, the
 
 - `movenet`: MoveNet SinglePose (Lightning, 192x192; Thunder, 256x256),
   Apache-2.0, the model the lamp ships (the owner, 19 Nov). Converted for the
-  NPU (`movenet_lightning_pcq.nb`, int8 per channel, 192x192 RGB bytes fed as
-  they are), it stops before MoveNet's own decode and gives four maps on a
-  48x48 grid, channels last: the person's centre (1), the keypoints' heat
-  (17), their offsets in the cell (34) and their distance from the centre
-  (34). The decode is MoveNet's own, on the CPU: the centre is the centre
-  map's highest cell weighed by its distance from the grid's middle; each
-  keypoint is the most heat near where the centre's regression puts it,
-  weighed down by distance, plus its offset; its score is its heat. The
+  NPU with int16 dynamic fixed point outputs (`movenet_lightning_i16.nb`,
+  192x192 RGB bytes fed as they are, interleaved), it stops before MoveNet's
+  own decode and gives four maps on a 48x48 grid, channels last: the
+  person's centre (1), the keypoints' heat (17), their offsets in the cell
+  (34) and their distance from the centre (34), each `q / 2^fl` (fl 15, 15,
+  10 and 8). The int8 conversion before it was too sensitive to be used: a
+  one-level change of one pixel moved a keypoint up to 11.9 px, against
+  0.5 px for int16 (lamp-0c89, 19 Nov). The decode is MoveNet's own, as its
+  float graph does it, on the CPU: the person is the centre map's highest
+  cell times the centre weight `1 / (distance from the grid's middle +
+  1.8)`, so of two people the one nearer the middle wins; each keypoint is
+  the most heat divided by (its distance from where the centre's regression
+  puts it + 1.8), plus its offset; its score is its heat. The
   person's score is the keypoints' mean. The next frame is cropped around
   the person, as the MoveNet tutorial does: a square on the hips' middle,
   1.9 times the torso or 1.2 times the body seen, whichever is wider; the
   whole picture when the shoulders or hips are not seen (score 0.2 or less)
-  or the square would be wider than the picture. Checked against the
-  reference decode the conversion was measured with (`mn.py`, within 0.0002
-  of the float model): its keypoints from the NPU's int8 maps of two frames,
-  its next crops of two frames and its crops of a made picture
-  (`crates/npu/tests/fixtures/movenet/`, made by `make.py` there; no model,
-  no picture of a person).
+  or the square would be wider than the picture. Checked against MoveNet's
+  own decode (`make.py`'s, within 0.0002 of the float model's output on 13
+  frames): its keypoints from the NPU's int8 maps of two frames, the same
+  maps as int16 fixed point, its next crops of two frames and its crops of a
+  made picture (`crates/npu/tests/fixtures/movenet/`, made by `make.py`
+  there; no model, no picture of a person).
 - `yolov8-pose`: YOLOv8-pose cut before its decode, as the reference
   conversion cuts it (box 64 / class 1 / keypoints 51 at strides 8, 16 and
   32): the most confident anchor is the person. Kept for comparison only: its
@@ -145,6 +170,23 @@ with when it is tried again: 30 s, doubled each time up to 30 minutes. What
 is kept is checked again, signature and SHA-256, at every load; a file
 changed on the disk is removed, never run, and fetched again after the wait.
 
+A model the NPU refuses at its load (`vip_create_network`, or an output
+this build can't read) is removed and marked by its SHA-256
+(`/var/lib/lampos-npu/models/pose.refused`, kept across restarts). Each try
+after it reads only the Store's manifest and signature (a few KiB, nothing
+written): while the Store still offers that SHA-256 it stays `unavailable`,
+"the NPU refused model …", and the wait keeps doubling; a model of another
+SHA-256 is fetched whole.
+
+**Updates.** A kept model is checked against the Store's every 6 hours
+(`REFRESH_EVERY`, from the service's 10 s tick; the first check once a model
+is kept, 6 hours after one was just fetched): the manifest and signature
+alone, and when they name another model (another SHA-256, a re-conversion
+or a new version) its file is fetched and checked as above, then swapped in
+under the NPU's lock. The loaded model is let go and the next ask loads the
+new one, so a lamp that keeps v1 gets v2 without a reset. A model the NPU
+refused is never taken again.
+
 `lamp-npu pack --key-file KEY --model FILE --id ID --head HEAD --licence SPDX
 --out DIR` makes the three files on the Store's side, signed as
 `lamp-skills pack --key-file` signs a package.
@@ -166,13 +208,22 @@ the service's state, `/var/lib/lampos-npu` (setup.md).
 `deploy/product/lamp-npu.service`: installed and enabled on every lamp, as
 `lampos` in `lampos-parts.slice`, under the keeper, its state in
 `/var/lib/lampos-npu` (0700) and its socket in `/run/lampos-npu` (0700),
-`/dev/vipcore` its only device (`DevicePolicy=closed`). With `LAMP_NPU`
+`/dev/vipcore` its only device (`DevicePolicy=closed`). The device is the
+`video` group's, 0660, by the image's udev rule
+(`robots/lamp/rootfs/etc/udev/rules.d/99-lamp-device.rules`), and the unit
+adds `SupplementaryGroups=video`, so `lampos` opens it. An update reloads
+udev's rules but triggers nothing, so the rule applies from the next boot.
+**Not yet run as the product unit**: the lamp-0c89 runs were as the normal
+user, from a temporary folder. With `LAMP_NPU`
 unset, `serve` idles and touches nothing: no socket, no file, no NPU, no
 network. A drop-in setting `LAMP_NPU=on` here and in `lamp-control.service`,
 and the Store's `--models-url` and `--models-host`, turns it on.
 
 ## Measured
 
-See the pull request for #7415's first run on lamp-0c89. Unit tests cover the
+See the pull request for #7415's first run on lamp-0c89. With the int16
+model on lamp-0c89 (19 Nov): the NPU 6.0 ms a run, the whole path p50
+14.9 ms, a one-pixel change moving keypoints 0.5 px (int8: 11.9 px), and
+6.7 px mean from YOLOv8n-pose on the same frames. Unit tests cover the
 fetch's checks with a fake Store, the service's rules with a fake NPU and its
 own clock, both heads, the picture's fit and the VIPLite struct's layout.

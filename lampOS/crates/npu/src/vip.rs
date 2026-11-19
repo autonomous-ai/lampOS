@@ -34,6 +34,7 @@ const PROP_DATA_FORMAT: u32 = 3;
 const PROP_FIXED_POINT_POS: u32 = 4;
 const PROP_SCALE: u32 = 5;
 const PROP_ZERO_POINT: u32 = 6;
+const QUANT_NONE: i32 = 0;
 const QUANT_DFP: i32 = 1;
 const QUANT_AFFINE: i32 = 2;
 const FLUSH: u32 = 1;
@@ -214,6 +215,7 @@ impl VipNet {
             return Err(format!("a buffer of {n} dimensions"));
         }
         let format = Format::from_vip(data_format).ok_or(format!("buffer format {data_format}"))?;
+        known_quant(quant_format)?;
         let mut quant_data = QuantData {
             affine: Affine {
                 scale: 1.0,
@@ -367,8 +369,26 @@ impl VipNet {
     }
 }
 
+/// A buffer's quantisation this build reads: none, dynamic fixed point or
+/// affine per tensor. Per-channel affine (3) or anything newer, read as
+/// plain numbers, would be wrong without a word, so its model is refused
+/// (Heron's P3 on #7972).
+fn known_quant(code: i32) -> Result<(), String> {
+    match code {
+        QUANT_NONE | QUANT_DFP | QUANT_AFFINE => Ok(()),
+        other => Err(format!(
+            "buffer quantisation {other} is not one this lamp reads (none, dynamic fixed point or affine per tensor)"
+        )),
+    }
+}
+
 /// The frame a model's input takes, from its shape (outermost first): one
 /// RGB frame of bytes, `n, h, w, 3` or `n, 3, h, w`.
+///
+/// The converter's metadata tags MoveNet's input `nchw` while its shape is
+/// `[1, 192, 192, 3]`: the tag is a label only and not trusted. The shape
+/// is what is read, so that one is interleaved (HWC), which a planar run
+/// against float MoveNet confirmed on lamp-0c89 (Heron's P2 2 on #7972).
 pub fn frame_shape(dims: &[usize], format: Format) -> Result<Input, String> {
     if format != Format::U8 {
         return Err(format!(
@@ -529,6 +549,15 @@ mod tests {
         );
         assert!(frame_shape(&[1, 192, 192, 3], Format::F32).is_err());
         assert!(frame_shape(&[1, 192, 192, 1], Format::U8).is_err());
+    }
+
+    #[test]
+    fn an_unknown_quantisation_refuses_the_model() {
+        for known in [QUANT_NONE, QUANT_DFP, QUANT_AFFINE] {
+            assert_eq!(known_quant(known), Ok(()));
+        }
+        assert!(known_quant(3).unwrap_err().contains("quantisation 3"));
+        assert!(known_quant(-1).is_err());
     }
 
     #[test]

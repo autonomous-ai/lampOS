@@ -5,7 +5,8 @@
 //! that held the lease.
 //!
 //! Frames are capped at [`FRAME_MAX`] (the Reviewer-lead's note on #3715:
-//! `parse` itself has no cap). A connection says nothing within
+//! `parse` itself has no cap), but a `pose` on the local door or an app's,
+//! at [`POSE_FRAME_MAX`]. A connection says nothing within
 //! [`HELLO_WITHIN`] of its welcome, or goes quiet for [`QUIET_MAX`], and it
 //! is closed.
 //!
@@ -39,9 +40,49 @@ use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, SetGrantsRefused, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
-/// The largest frame a client may send: room for a `pose` JPEG
+/// The largest frame a client may send, but a `pose` on a door that takes
+/// one ([`POSE_FRAME_MAX`]).
+pub const FRAME_MAX: usize = 64 * 1024;
+/// The largest `pose` frame: room for its JPEG
 /// (`protocol::POSE_JPEG_MAX_CHARS`, 200 KiB of base64) and its request.
-pub const FRAME_MAX: usize = 256 * 1024;
+/// Only from a computer that said hello on the lamp's own network, or an
+/// app on the lamp: the remote door, the local agent's and the run sockets
+/// take [`FRAME_MAX`] whole, and any other frame over [`FRAME_MAX`] closes
+/// the connection (Heron's P2 on #7972: every op on every door was raised
+/// to 256 KiB).
+pub const POSE_FRAME_MAX: usize = 256 * 1024;
+
+/// The largest frame a door's WebSocket reads: [`POSE_FRAME_MAX`] on a
+/// door that takes a `pose`, else [`FRAME_MAX`].
+pub fn transport_max(takes_pose: bool) -> usize {
+    if takes_pose {
+        POSE_FRAME_MAX
+    } else {
+        FRAME_MAX
+    }
+}
+
+/// Whether a text frame of `len` bytes is taken: any up to [`FRAME_MAX`];
+/// past it, only a `pose` from a computer that said hello, on a door that
+/// takes one, up to [`POSE_FRAME_MAX`].
+pub fn frame_taken(len: usize, takes_pose: bool, said_hello: bool, text: &str) -> bool {
+    if len <= FRAME_MAX {
+        return true;
+    }
+    if !(takes_pose && said_hello && len <= POSE_FRAME_MAX) {
+        return false;
+    }
+    #[derive(serde::Deserialize)]
+    struct Named<'a> {
+        #[serde(borrow)]
+        op: Option<&'a str>,
+    }
+    serde_json::from_str::<Named>(text).is_ok_and(|named| named.op == Some("pose"))
+}
+
+/// What a frame over [`FRAME_MAX`] that is not a `pose` is told before
+/// its connection closes.
+pub const FRAME_TOO_BIG: &str = "frame over 64 KiB: only a pose may be larger (to 256 KiB), on the lamp's own network after hello";
 /// What the close frame says when the app was removed.
 pub const CLOSED_REMOVED: &str = "this app was removed";
 /// What the close frame says when the owner revoked the computer.
@@ -1231,9 +1272,11 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             let within = shared.limits.lock().expect("limits").handshake;
             let opened = tokio::time::timeout(within, async {
                 let stream = tls.accept(stream).await.ok()?;
+                // The remote door never takes a pose (local only): 64 KiB.
+                let most = transport_max(!remote);
                 let config = WebSocketConfig::default()
-                    .max_message_size(Some(FRAME_MAX))
-                    .max_frame_size(Some(FRAME_MAX));
+                    .max_message_size(Some(most))
+                    .max_frame_size(Some(most));
                 tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config))
                     .await
                     .ok()
@@ -1475,9 +1518,10 @@ pub async fn serve_app_as(
         let (shared, held) = (shared.clone(), held.clone());
         tokio::spawn(async move {
             let within = shared.limits.lock().expect("limits").handshake;
+            // An app on the lamp may ask a pose.
             let config = WebSocketConfig::default()
-                .max_message_size(Some(FRAME_MAX))
-                .max_frame_size(Some(FRAME_MAX));
+                .max_message_size(Some(POSE_FRAME_MAX))
+                .max_frame_size(Some(POSE_FRAME_MAX));
             let opened = tokio::time::timeout(
                 within,
                 tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
@@ -1545,6 +1589,10 @@ async fn connection<S>(
     if remote {
         session.set_remote();
     }
+    // The doors that take a pose's larger frame: the lamp's own network's,
+    // and an app's on the lamp; never the remote door, the local agent's or
+    // a run's.
+    let takes_pose = !remote && local.is_none() && !run;
     shared.open.lock().expect("open").insert(
         id,
         Open {
@@ -1602,6 +1650,20 @@ async fn connection<S>(
                         }
                         _ => break,
                     };
+                    // Over 64 KiB: a pose alone, said after hello, on a door
+                    // that takes one; anything else is told and closed, as
+                    // the WebSocket's own cap would close it.
+                    if !frame_taken(text.len(), takes_pose, session.client().is_some(), text.as_str()) {
+                        let refused = crate::protocol::refused(
+                            None,
+                            &crate::protocol::Error::new(
+                                crate::protocol::ErrorCode::BadRequest,
+                                FRAME_TOO_BIG,
+                            ),
+                        );
+                        let _ = socket.send(Message::text(refused.to_string())).await;
+                        break;
+                    }
                     // The ops only an app has, answered before the door parses
                     // a frame, once it has said hello.
                     if let Some(name) = session.app_name().map(str::to_owned)
@@ -2467,6 +2529,35 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 64 KiB for every frame on every door, but a `pose` said after hello
+    /// on a door that takes one, to 256 KiB; the remote door reads 64 KiB
+    /// at most (Heron's P2 on #7972).
+    #[test]
+    fn only_a_pose_after_hello_on_a_local_door_passes_64_kib() {
+        assert_eq!(transport_max(false), 64 * 1024);
+        assert_eq!(transport_max(true), 256 * 1024);
+        let pose = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(100 * 1024)}).to_string();
+        let other =
+            json!({"id": 1, "op": "notes.set", "key": "k", "value": "A".repeat(100 * 1024)})
+                .to_string();
+        let small = json!({"id": 1, "op": "get", "state": ["lamp"]}).to_string();
+        // Any small frame, anywhere.
+        for (door, hello) in [(false, false), (false, true), (true, false), (true, true)] {
+            assert!(frame_taken(small.len(), door, hello, &small));
+        }
+        assert!(frame_taken(pose.len(), true, true, &pose));
+        // The remote door (and the agent's and a run's).
+        assert!(!frame_taken(pose.len(), false, true, &pose));
+        // Before hello.
+        assert!(!frame_taken(pose.len(), true, false, &pose));
+        // Another op.
+        assert!(!frame_taken(other.len(), true, true, &other));
+        // A pose past its own cap.
+        let huge = json!({"op": "pose", "jpeg": "A".repeat(POSE_FRAME_MAX)}).to_string();
+        assert!(!frame_taken(huge.len(), true, true, &huge));
+        assert!(!frame_taken(FRAME_MAX + 1, true, true, "not json"));
+    }
 
     /// A door whose journal lines go to the list it gives back, and one
     /// connection on it, hello'd as `c_1` with the body grant, subscribed

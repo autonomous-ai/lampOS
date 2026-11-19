@@ -20,6 +20,10 @@ SUBSYSTEM=="video4linux", ATTRS{idVendor}=="01da", ATTRS{idProduct}=="5875", ATT
 # stuck after a mute without a reboot (USBDEVFS_RESET, lampOS #2126).
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="01da", ATTR{idProduct}=="5875", GROUP="video", MODE="0664"
 
+# The A733's NPU, /dev/vipcore: read and written by `video`, so lampOS's
+# lamp-npu (user lampos, SupplementaryGroups=video) opens it (lampOS #7972).
+KERNEL=="vipcore", GROUP="video", MODE="0660"
+
 # Servo driver: QinHeng CH340 -> /dev/device-servo
 SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", SYMLINK+="device-servo"
 

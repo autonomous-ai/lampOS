@@ -9,8 +9,8 @@
 //!   G x G grid (48 for Lightning), channels last, in this order: the
 //!   person's centre (1), the keypoints' heat (17), their offsets in the
 //!   cell (34, `y, x` each) and their distance from the centre (34). They
-//!   are read as the model's own decode reads them (`mn.py`, the reference
-//!   the conversion was checked with); the person's score is the
+//!   are read as the model's own float graph decodes them (checked against
+//!   its output, `tests/fixtures/movenet/make.py`); the person's score is the
 //!   keypoints' mean. The next frame is cropped around the person found
 //!   ([`PoseHead::next`], the MoveNet tutorial's crop).
 //! - `yolov8-pose`: YOLOv8-pose cut before its decode, as `npu/convert.sh`
@@ -131,13 +131,16 @@ impl PoseHead for MoveNet {
         let distance = |y: f32, x: f32, cy: f32, cx: f32| {
             ((y - cy) * (y - cy) + (x - cx) * (x - cx)).sqrt() + MOVENET_EPS
         };
-        // The person: the centre map weighed down by distance from the
-        // frame's middle. The first of equals, as the reference's argmax.
+        // The person: the centre map times MoveNet's centre weight,
+        // `1 / (distance from the frame's middle + 1.8)`, as the float
+        // graph's own decode does it, so of two people the one nearer the
+        // middle wins (Heron's P2 1 on #7972). The first of equals, as the
+        // reference's argmax.
         let middle = g as f32 / 2.0;
         let mut best = (f32::MIN, 0);
         for i in 0..cells {
             let (y, x) = ((i / g) as f32, (i % g) as f32);
-            let weighed = centre.at(i) * distance(y, x, middle, middle);
+            let weighed = centre.at(i) / distance(y, x, middle, middle);
             if weighed > best.0 {
                 best = (weighed, i);
             }
@@ -353,7 +356,7 @@ mod tests {
     }
 
     /// The NPU's int8 maps of two frames (the converter's simulation of
-    /// the lamp's model) and the keypoints the reference decode (`mn.py`)
+    /// the lamp's model) and the keypoints MoveNet's own decode
     /// reads from them, by `tests/fixtures/movenet/make.py`.
     #[test]
     fn movenet_reads_the_npus_maps_as_the_reference_does() {
@@ -387,6 +390,53 @@ mod tests {
                     (ours.y / 192.0 - y).abs() < 1e-4
                         && (ours.x / 192.0 - x).abs() < 1e-4
                         && (ours.score - score).abs() < 1e-4,
+                    "keypoint {k}: {ours:?}, the reference {y} {x} {score}"
+                );
+            }
+        }
+    }
+
+    /// The same two frames' maps as the int16 MoveNet gives them: dynamic
+    /// fixed point, fl 15, 15, 10 and 8 (its `nbg_meta.json`), made from
+    /// the int8 maps' values. The decode reads them through their
+    /// quantisation to the same keypoints.
+    #[test]
+    fn movenet_reads_int16_fixed_point_maps() {
+        let runs: Vec<Heads> =
+            serde_json::from_str(include_str!("../tests/fixtures/movenet/heads.json")).unwrap();
+        for run in runs {
+            let outputs: Vec<Tensor> = run
+                .maps
+                .iter()
+                .zip([15, 15, 10, 8])
+                .map(|(m, pos)| {
+                    let mut q = vec![i32::from(m.fill); 48 * 48 * m.channels];
+                    for pair in m.at.chunks(2) {
+                        q[pair[0] as usize] = pair[1];
+                    }
+                    let data = q
+                        .iter()
+                        .flat_map(|&q| {
+                            let real = (q - m.zero) as f32 * m.scale;
+                            let fixed = (real * 2f32.powi(pos)).round();
+                            (fixed.clamp(-32768.0, 32767.0) as i16).to_le_bytes()
+                        })
+                        .collect();
+                    Tensor {
+                        dims: vec![1, 48, 48, m.channels],
+                        format: Format::I16,
+                        quant: Quant::Dfp { pos },
+                        data,
+                    }
+                })
+                .collect();
+            let found = MoveNet.decode(&outputs, SQUARE).unwrap();
+            for (k, [y, x, score]) in run.keypoints.iter().enumerate() {
+                let ours = found.keypoints[k];
+                assert!(
+                    (ours.y / 192.0 - y).abs() < 2e-3
+                        && (ours.x / 192.0 - x).abs() < 2e-3
+                        && (ours.score - score).abs() < 1e-3,
                     "keypoint {k}: {ours:?}, the reference {y} {x} {score}"
                 );
             }
@@ -460,6 +510,31 @@ mod tests {
         assert!((nose.score - 0.4).abs() < 1e-6);
         assert!((found.keypoints[5].x - 48.0).abs() < 1e-3);
         assert!((found.score - (0.4 + 16.0 * 0.8) / 17.0).abs() < 1e-6);
+    }
+
+    /// Two people: a fainter centre in the middle and a stronger one far
+    /// off it. MoveNet's weight, `1 / (distance + 1.8)`, takes the one in
+    /// the middle (0.6 / 1.8 against 0.9 / 21.8).
+    #[test]
+    fn movenet_takes_the_person_nearest_the_middle() {
+        let points = [(0.5, 0.5, 0.8); 17];
+        let mut maps = movenet_maps(&points, 48);
+        let mut centre = vec![0f32; 48 * 48];
+        centre[24 * 48 + 24] = 0.6;
+        centre[4 * 48 + 4] = 0.9;
+        maps[0] = Tensor::from_f32(vec![1, 48, 48, 1], &centre);
+        // The far person's own keypoints, all at its centre, hotter.
+        let mut heat: Vec<f32> = (0..maps[1].len()).map(|i| maps[1].at(i)).collect();
+        for k in 0..17 {
+            heat[(4 * 48 + 4) * 17 + k] = 0.95;
+        }
+        maps[1] = Tensor::from_f32(vec![1, 48, 48, 17], &heat);
+        let found = MoveNet.decode(&maps, SQUARE).unwrap();
+        let nose = found.keypoints[0];
+        assert!(
+            (nose.x - 96.0).abs() < 1e-3 && (nose.y - 96.0).abs() < 1e-3,
+            "{nose:?}"
+        );
     }
 
     #[test]

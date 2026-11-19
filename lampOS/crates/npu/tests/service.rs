@@ -571,3 +571,215 @@ fn a_clients_next_frame_is_cropped_around_its_person_until_it_goes_stale() {
     let after = rig.pose("c_1", t + Duration::from_millis(3300), OPEN);
     assert_eq!(left_shoulder(&after), whole);
 }
+
+/// A model the NPU refuses (`vip_create_network`) is marked by its
+/// SHA-256: after the wait only the Store's manifest is read, the file is
+/// never fetched or written again, and the wait grows. A model of another
+/// SHA-256 is fetched (Heron's P2 4 on #7972).
+#[test]
+fn a_model_the_npu_refused_is_never_fetched_again_but_a_new_one_is() {
+    let mut fake = fake_movenet();
+    fake.refuse = Some(LoadError::Failed("vip create network: -1".to_owned()));
+    let rig = Rig::new(fake, true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    assert_eq!(rig.shelf.asked(), 3);
+    let refused = rig.pose("c_1", t + Duration::from_secs(1), OPEN);
+    assert_eq!(refused["code"], "unavailable", "{refused}");
+    assert_eq!(refused["retry_ms"], 30_000);
+    // The model is gone; only its mark is kept.
+    let kept = rig.kept_files();
+    assert!(
+        kept.len() == 1 && kept[0].ends_with("pose.refused"),
+        "{kept:?}"
+    );
+    // After the wait: the manifest and its signature, never the file.
+    let later = t + Duration::from_secs(32);
+    assert_eq!(rig.pose("c_1", later, OPEN)["code"], "preparing");
+    rig.run_jobs();
+    assert_eq!(rig.shelf.asked(), 5);
+    let again = rig.pose("c_1", later + Duration::from_secs(1), OPEN);
+    assert_eq!(again["code"], "unavailable", "{again}");
+    assert!(
+        again["why"].as_str().unwrap().contains("refused"),
+        "{again}"
+    );
+    // The wait doubled: 60 s from the refusal (a fetch's wait runs on
+    // the real clock, here about `t`), not 30 s.
+    let soon = t + Duration::from_secs(50);
+    assert_eq!(rig.pose("c_1", soon, OPEN)["code"], "unavailable");
+    assert_eq!(rig.run_jobs(), 0);
+    // A re-converted model: fetched whole at the next try.
+    rig.shelve(&rig.key.clone(), b"a re-converted model", "movenet");
+    let next = t + Duration::from_secs(62);
+    assert_eq!(rig.pose("c_1", next, OPEN)["code"], "preparing");
+    rig.run_jobs();
+    assert_eq!(rig.shelf.asked(), 8);
+    assert!(
+        rig.kept_files()
+            .iter()
+            .any(|path| path.ends_with("pose.nb")),
+        "{:?}",
+        rig.kept_files()
+    );
+}
+
+/// A kept model is checked against the Store's every `refresh`: one of
+/// another SHA-256 is fetched and swapped in, the loaded one let go, and
+/// the next ask loads the new one; the same one costs only its manifest.
+#[test]
+fn a_newer_model_in_the_store_reaches_a_lamp_that_keeps_one() {
+    let rig = Rig::new(fake_movenet(), true);
+    let first = rig.shelve(&rig.key.clone(), b"model version one", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    assert_eq!(
+        rig.pose("c_1", t + Duration::from_secs(1), OPEN)["ok"],
+        true
+    );
+    assert_eq!(rig.fake.loads.load(std::sync::atomic::Ordering::SeqCst), 1);
+    // Just fetched: no check until a whole wait has passed.
+    assert!(!rig.service.refresh(t + Duration::from_secs(2)));
+    let day = t + Duration::from_secs(7 * 60 * 60);
+    // The Store still offers the same: its manifest read, nothing else.
+    assert!(rig.service.refresh(day));
+    assert!(!rig.service.refresh(day), "one check at a time");
+    rig.run_jobs();
+    assert_eq!(rig.shelf.asked(), 5);
+    // A re-converted model (another SHA-256): fetched and swapped in.
+    let second = rig.shelve(&rig.key.clone(), b"model version two", "movenet");
+    assert_ne!(first.sha256, second.sha256);
+    let later = day + Duration::from_secs(7 * 60 * 60);
+    assert!(rig.service.refresh(later));
+    rig.run_jobs();
+    assert_eq!(rig.shelf.asked(), 8);
+    let kept = std::fs::read(rig.state.path().join("models/pose/pose.nb")).unwrap();
+    assert_eq!(kept, b"model version two");
+    assert_eq!(
+        rig.pose("c_1", later + Duration::from_secs(1), OPEN)["ok"],
+        true
+    );
+    assert_eq!(rig.fake.loads.load(std::sync::atomic::Ordering::SeqCst), 2);
+    // No model kept, no source: nothing to check.
+    let none = Rig::new(fake_movenet(), false);
+    assert!(!none.service.refresh(t));
+}
+
+/// A run past its deadline reads as hung, for the watchdog; none under way
+/// never does (Heron's P2 6 on #7972).
+#[test]
+fn a_run_past_its_deadline_reads_as_hung() {
+    let mut fake = fake_movenet();
+    fake.delay = Duration::from_millis(600);
+    let rig = Rig::new(fake, true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    assert_eq!(
+        rig.service.hung(Instant::now() + Duration::from_secs(60)),
+        None
+    );
+    let service = rig.service.clone();
+    let line = json!({"op": "pose", "client": "c_1", "jpeg": STANDARD.encode(jpeg(64, 48))});
+    let asked = std::thread::spawn(move || {
+        serve::answer(
+            &service,
+            &line.to_string(),
+            t + Duration::from_secs(1),
+            &|| OPEN,
+        )
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    // The deadline is 5 s: under way, and hung only once past it.
+    assert_eq!(rig.service.hung(Instant::now()), None);
+    let past = rig
+        .service
+        .hung(Instant::now() + Duration::from_secs(5))
+        .expect("hung past the deadline");
+    assert!(past >= Duration::from_secs(5));
+    assert_eq!(asked.join().unwrap()["ok"], true);
+    assert_eq!(
+        rig.service.hung(Instant::now() + Duration::from_secs(60)),
+        None
+    );
+}
+
+/// A picture past the camera's 1280 on a side is refused from its header,
+/// in words that say the bound.
+#[test]
+fn a_picture_past_the_cameras_size_is_a_bad_request() {
+    let rig = Rig::new(fake_movenet(), true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    let line = json!({"op": "pose", "client": "c_1", "jpeg": STANDARD.encode(jpeg(1600, 16))});
+    let answer = serve::answer(
+        &rig.service,
+        &line.to_string(),
+        t + Duration::from_secs(1),
+        &|| OPEN,
+    );
+    assert_eq!(answer["code"], "bad_request", "{answer}");
+    assert!(
+        answer["why"].as_str().unwrap().contains("at most 1280"),
+        "{answer}"
+    );
+    assert_eq!(rig.fake.runs.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+/// The socket: past the askers it serves at once, one is answered `busy`
+/// with `retry_ms`, not closed unanswered; and an asker gets one deadline
+/// for its whole line, however slowly its bytes come (Heron's P3s on
+/// #7972).
+#[test]
+fn the_socket_says_busy_past_its_limit_and_holds_one_deadline_per_ask() {
+    use std::io::{BufRead, BufReader, Write as _};
+    use std::os::unix::net::{UnixListener, UnixStream};
+    let rig = Rig::new(fake_movenet(), false);
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("npu.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let service = rig.service.clone();
+    let wait = Duration::from_millis(400);
+    std::thread::spawn(move || {
+        serve::serve_within(listener, service, Arc::new(|| OPEN), wait);
+    });
+    // Eight that say nothing hold every place.
+    let held: Vec<UnixStream> = (0..serve::MOST_AT_ONCE)
+        .map(|_| UnixStream::connect(&socket).unwrap())
+        .collect();
+    std::thread::sleep(Duration::from_millis(50));
+    let mut ninth = UnixStream::connect(&socket).unwrap();
+    writeln!(ninth, r#"{{"op":"status"}}"#).unwrap();
+    let mut answer = String::new();
+    BufReader::new(&ninth).read_line(&mut answer).unwrap();
+    let answer: Value = serde_json::from_str(&answer).unwrap();
+    assert_eq!(answer["code"], "busy", "{answer}");
+    assert_eq!(answer["retry_ms"], 100);
+    drop(held);
+    // A slow asker, a byte each 100 ms: closed at its one deadline, never
+    // kept by each byte's own time.
+    std::thread::sleep(Duration::from_millis(100));
+    let started = Instant::now();
+    let mut slow = UnixStream::connect(&socket).unwrap();
+    let mut closed = false;
+    for byte in br#"{"op":"status"}"#.iter().chain(b"\n") {
+        if slow.write_all(&[*byte]).is_err() {
+            closed = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let mut answer = String::new();
+    let read = BufReader::new(&slow).read_line(&mut answer);
+    assert!(
+        closed || read.is_err() || answer.is_empty(),
+        "answered after {:?}: {answer}",
+        started.elapsed()
+    );
+}

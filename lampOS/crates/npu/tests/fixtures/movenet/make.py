@@ -1,11 +1,12 @@
-"""Makes lamp-npu's MoveNet fixtures from the reference decode (mn.py).
+"""Makes lamp-npu's MoveNet fixtures from MoveNet's own decode and mn.py's crops.
 
 usage: make.py MN_DIR SIM_DIR TFLITE OUT_DIR FRAME.jpg ...
 
-MN_DIR holds mn.py; SIM_DIR the converter's simulated int8 head dumps
+MN_DIR holds mn.py (its crop helpers; the decode is this file's own,
+below); SIM_DIR the converter's simulated int8 head dumps
 (iter_N_*.qnt.tensor); TFLITE the float MoveNet whose output is 17 x
 [y, x, score]. Writes heads.json (int8 maps of two runs, sparse, and the
-keypoints mn.decode reads from them), track.json (each frame's keypoints on
+keypoints `decode` below reads from them), track.json (each frame's keypoints on
 the whole frame and the crop mn.crop_region takes next) and crop.json
 (mn.crop_image of a made picture, sampled).
 """
@@ -34,17 +35,34 @@ def load(it):
         maps.append((q, *QUANT[key]))
     return maps
 
+def decode(heads):
+    """MoveNet's own decode, as its float graph does it: the person is the
+    centre map times the centre weight cw = 1 / (distance from the middle
+    + EPS), so the one nearest the middle wins among equals; each
+    keypoint is the heat divided by (its distance from where the centre's
+    regression puts it + EPS). Checked against the float model's own
+    output on 13 frames: within 2e-4 (mn.decode's centre / cw was off by
+    up to 0.03 on 6 of them)."""
+    cm, h, off, reg = [np.asarray(a, np.float32).reshape(G, G, -1) for a in heads]
+    cy, cx = divmod(int(np.argmax(cm[..., 0] * cw)), G)
+    r = reg[cy, cx].reshape(17, 2)
+    ry, rx = cy + r[:, 0], cx + r[:, 1]
+    d = np.sqrt((ys[..., None] - ry) ** 2 + (xs[..., None] - rx) ** 2) + EPS
+    ky, kx = np.divmod((h / d).reshape(-1, 17).argmax(0), G)
+    o = off[ky, kx].reshape(17, 17, 2)[np.arange(17), np.arange(17)]
+    return np.stack([(ky + o[:, 0]) / G, (kx + o[:, 1]) / G, h[ky, kx, np.arange(17)]], 1)
+
 def deq(maps):
     return [((q - z) * s).astype(np.float32) for q, s, z in maps]
 
 heads = []
 for it in [0, 5]:
     maps = load(it)
-    dense = mn.decode(deq(maps), cw, ys, xs, EPS)
+    dense = decode(deq(maps))
     # Keep what the decode reads: centre and heat whole, offset and regress
     # only at the cells read; the rest at their zero point (a real 0).
     cmap, heat, off, reg = deq(maps)
-    ci = int(np.argmax(cmap.reshape(G, G) / cw)); cy, cx = divmod(ci, G)
+    ci = int(np.argmax(cmap.reshape(G, G) * cw)); cy, cx = divmod(ci, G)
     keep_reg = {cy * G + cx}
     kept = [[q.copy(), s, z] for q, s, z in maps]
     # offset cells: the keypoints' argmax cells
@@ -59,7 +77,7 @@ for it in [0, 5]:
         mask = np.ones(G * G, bool); mask[list(keep)] = False
         q[mask] = z
         kept[n][0] = q.reshape(-1)
-    sparse = mn.decode(deq(kept), cw, ys, xs, EPS)
+    sparse = decode(deq(kept))
     assert np.abs(sparse - dense).max() == 0, "the sparse maps decode the same"
     entry = {"maps": [], "keypoints": dense.round(6).tolist()}
     for q, s, z in kept:
