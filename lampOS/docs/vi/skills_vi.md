@@ -4302,7 +4302,11 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    "please", "now", lời đề nghị đứng trước như "can you", từ xin chạy như
    "run") và từ đệm (`skill_named::FILLERS`: "um", "uh", "er", "erm",
    "hmm"). "Hey Lamp, daily brief", "Lamp, daily brief please", "Daily
-   brief." và "um, daily brief now" bắt đầu daily-brief; "tell me about
+   brief." và "um, daily brief now" bắt đầu daily-brief, "Daily briefs."
+   và "Lamp, daily briefs." cũng vậy: thêm một chữ "s" ở từ cuối cũng được
+   so khớp, cách viết đúng được ưu tiên trước (`skill_named::spelled_as`;
+   row của #7916 trên lamp-9adf, 19/11: speech to text trả "Um, daily
+   brief." về thành "Daily briefs."); "tell me about
    your daily brief idea" có từ khác nên là của model. Câu phủ định, câu
    hỏi, cụm hai kỹ năng cùng có, một phần của tên, hay khi đang giữ một
    lời đồng ý: không bắt đầu gì. Sau khi lời cuối của đèn hỏi điều gì đó
