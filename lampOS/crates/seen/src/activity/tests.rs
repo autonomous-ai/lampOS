@@ -633,3 +633,50 @@ fn an_answer_with_nothing_counted_names_nothing_off() {
         "burst answered: top using computer 0.40; counted none; server 447 ms a frame, at most 600; 8 of 8 frames, 56 bytes, 9000 ms in all"
     );
 }
+
+/// On a hot board (#7879) the next burst is four minutes after this one
+/// began, the frames within it still [`SPACING_US`] apart; back to ok, a
+/// minute again, counted from the same start.
+#[test]
+fn a_hot_board_spaces_the_next_burst_and_ok_brings_it_back() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Script::Answer(vec![Reply::Labels(vec![]); 8])]);
+    let mut activity = Activity::new(mock.endpoint(), pace());
+    activity.set_every_us(Pace::at(HeatLevel::Hot, true).burst_every_us);
+    assert!(activity.ready(0), "the first burst is due at once");
+    burst(&mut activity, 0, 8);
+    finish(&mut activity, 10 * S);
+    assert!(!activity.ready(EVERY_US));
+    assert!(!activity.ready(4 * EVERY_US - 1));
+    assert!(activity.ready(4 * EVERY_US));
+    activity.set_every_us(Pace::at(HeatLevel::Warm, true).burst_every_us);
+    assert!(!activity.ready(2 * EVERY_US - 1));
+    assert!(activity.ready(2 * EVERY_US));
+    activity.set_every_us(Pace::at(HeatLevel::Ok, true).burst_every_us);
+    assert!(activity.ready(EVERY_US));
+}
+
+/// A stop (the gate closing on a forget, the privacy, sleep) aborts a
+/// burst under way on a hot board as at ok.
+#[test]
+fn a_stop_still_aborts_the_burst_on_a_hot_board() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Script::Answer(vec![Reply::Labels(vec![(
+        "drinking", 0.9,
+    )])])]);
+    let mut activity = Activity::new(mock.endpoint(), pace());
+    activity.set_every_us(Pace::at(HeatLevel::Hot, true).burst_every_us);
+    burst(&mut activity, 0, 3);
+    mock.wait("a frame", |seen| !seen.frames.is_empty());
+    activity.stopped();
+    assert!(!activity.sending());
+    mock.wait("the socket closed", |seen| seen.closed == 1);
+    wait_wiped(&activity, 3);
+    assert_eq!(activity.counts().aborted, 1);
+    assert!(
+        !activity.ready(4 * EVERY_US - 1),
+        "the next burst in its turn"
+    );
+}

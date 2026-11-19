@@ -235,6 +235,9 @@ pub struct Activity {
     pace: Pace,
     running: Option<Running>,
     next_us: u64,
+    /// From one burst's start to the next's: [`EVERY_US`], or longer on a
+    /// warm or hot board ([`crate::heat::Pace`]).
+    every_us: u64,
     retreat: Retreat,
     last_failure: Option<Failure>,
     wiped: Arc<AtomicU64>,
@@ -254,12 +257,31 @@ impl Activity {
             pace,
             running: None,
             next_us: 0,
+            every_us: EVERY_US,
             retreat: Retreat::default(),
             last_failure: None,
             wiped: Arc::new(AtomicU64::new(0)),
             counts: Counts::default(),
             notes: Vec::new(),
         }
+    }
+
+    /// Space the bursts `every_us` apart, start to start
+    /// ([`crate::heat::Pace`]): the next one too, counted from the last
+    /// one's start. A burst under way finishes as it is.
+    pub fn set_every_us(&mut self, every_us: u64) {
+        if self.next_us > 0 {
+            self.next_us = self
+                .next_us
+                .saturating_sub(self.every_us)
+                .saturating_add(every_us);
+        }
+        self.every_us = every_us;
+    }
+
+    /// From one burst's start to the next's, now.
+    pub fn every_us(&self) -> u64 {
+        self.every_us
     }
 
     /// The journal's notes since the last call, oldest first.
@@ -371,7 +393,7 @@ impl Activity {
     }
 
     fn start(&mut self, now_us: u64) -> bool {
-        self.next_us = now_us.saturating_add(EVERY_US);
+        self.next_us = now_us.saturating_add(self.every_us);
         self.counts.bursts = self.counts.bursts.saturating_add(1);
         match Burst::start(self.endpoint.clone(), self.pace) {
             Ok(burst) => {

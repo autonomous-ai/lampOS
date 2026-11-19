@@ -401,7 +401,10 @@ impl Serve<'_> {
         if value.check().is_err() {
             return;
         }
-        let at_us = self.at_us();
+        // On the boot clock, as readers age a kept value
+        // (`lamp_bus::monotonic_us`), not since lamp-health started: one
+        // started more than its 15 s after boot would read as expired.
+        let at_us = lamp_bus::monotonic_us();
         if self.heat_out.publish(at_us, &value, self.say) {
             self.totals.heats += 1;
         } else {
