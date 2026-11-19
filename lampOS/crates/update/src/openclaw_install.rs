@@ -2140,6 +2140,15 @@ pub const ADD_AGAIN: Duration = if cfg!(test) {
     Duration::from_secs(3)
 };
 
+/// [`gateway_block`]'s waits for a gateway not there to check the block:
+/// `lamp_checked_replace::GATEWAY_WAITS`, a millisecond each in tests, as
+/// [`ADD_AGAIN`] is.
+const GATEWAY_WAITS: [Duration; 8] = if cfg!(test) {
+    [Duration::from_millis(1); 8]
+} else {
+    lamp_checked_replace::GATEWAY_WAITS
+};
+
 /// Whether the gateway's unit is active (`systemctl is-active`).
 fn gateway_active(run: &mut Runner) -> bool {
     run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_ok()
@@ -2508,8 +2517,30 @@ fn gateway_block_due(root: &Path) -> bool {
 /// Refused, `openclaw.json` stays byte for byte and nothing is restarted.
 /// One line, with no values of the config; still due, the next round asks
 /// again. No switch of its own: it only keeps what the install writes.
+///
+/// Its check joins a running gateway ([`validate_argv`]), and one just
+/// (re)started may not be there to join yet: only that refusal
+/// (`lamp_checked_replace::gateway_not_there`) is tried again, after each
+/// of [`GATEWAY_WAITS`] (lamp-tasks' schedule, #7268), each said in one
+/// line; past the last, it is refused as any refusal is.
 fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
-    match gateway_config(root, run, say) {
+    let mut waits = GATEWAY_WAITS.iter();
+    let written = loop {
+        match gateway_config(root, run, say) {
+            Err(why) if lamp_checked_replace::gateway_not_there(&why) => {
+                let Some(wait) = waits.next() else {
+                    break Err(why);
+                };
+                say(&format!(
+                    "{CONFIG}'s gateway block waits for OpenClaw's gateway to check it; tried again in {} s",
+                    wait.as_secs()
+                ));
+                std::thread::sleep(*wait);
+            }
+            done => break done,
+        }
+    };
+    match written {
         Ok(false) => {}
         Ok(true) => match run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
             Ok(_) => say(&format!(
