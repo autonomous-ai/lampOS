@@ -289,6 +289,24 @@ thấy thì không giữ gì, như trước, nên lời "có" về cách viết 
 ý ghi nhớ. Trước đây lamp giữ "They said: … renunculus" trong khi nói
 "ranunculus", và không hỏi.
 
+Với `LAMP_MEMORY_UNSURE_NOT_KEPT=on` (#7739; tắt nếu không đặt, chỉ đường thứ
+hai; bật trong bản sản phẩm), câu lamp không chắc đã nghe đúng thì không được
+giữ, và lamp không hỏi gì. Đây là quy tắc "không hỏi" của chủ sản phẩm ngày
+18/11: "An unsure line is simply not acted on, with no 'did you say…?'". Sự
+nghi ngờ đến từ chính mô hình, không từ danh sách từ nào phán xét lời người
+nói: lời của vòng trả lời nghi ngờ điều đã nghe, hoặc câu của mô hình có cách
+viết gần với một từ đã nghe. Một `remember` mà chính vòng của nó nghi ngờ thì
+không chạy, và mô hình được báo là không giữ gì, không hỏi gì (không "did you
+say …?", không bảo nói lại) và không bao giờ nói là đã giữ. Một lần giữ mà vòng
+ngay sau nghi ngờ thì bị quên theo id (cần `LAMP_MEMORY_DOUBT_UNDOES`) và không
+chờ lời "có" nào, nên không cần mắt, và một lời "có" sau đó không giữ gì. Lần
+giữ có từ viết gần từ đã nghe như trên thì không chạy và không hỏi gì, dù có
+hay không có `LAMP_MEMORY_ASK_NEAR_HEARD`. Mô tả của `remember` và ghi chú của
+`LAMP_KEEP_QUIETLY` nói rằng từ còn nghi ngờ thì không giữ và không hỏi. Câu
+trả lời của mô hình giữ nguyên, không thêm câu nào; lần giữ rõ ràng vẫn được
+giữ như trước. Câu hỏi "chắc chưa?" trước "forget everything" vẫn còn. Nhật ký
+chỉ ghi số đếm.
+
 Câu có gọi `remember` hay `forget` không vào nhật ký: nó bị đánh dấu ở ngoài
 (`remember::keep_out`) trước khi lệnh chạy. Với
 `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on` (chỉ đường thứ hai; tắt nếu không đặt),

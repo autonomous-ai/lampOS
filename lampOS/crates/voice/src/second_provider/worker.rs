@@ -4189,6 +4189,16 @@ pub fn serve(
         );
         engine = engine.asking_near_heard_words(on);
     }
+    // An unsure line is simply not kept, and nothing is asked
+    // (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739): in place of the near word's
+    // ask and the doubted keep's hold for a yes.
+    if crate::remember::doubted::unsure_not_kept_on() {
+        eprintln!(
+            "lamp-voice second: {} is on: a doubted keep is not kept, and nothing is asked",
+            crate::remember::doubted::UNSURE_ENVIRONMENT
+        );
+        engine = engine.not_keeping_unsure(true);
+    }
     if reads_back_by_words {
         engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
     }
