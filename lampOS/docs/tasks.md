@@ -2982,7 +2982,17 @@ The checked replace and the bounded check live in `crates/checked-replace`
 `openclaw.json` go through too: lamp-update's install (its `gateway`
 block, docs/install.md; a round that finds the block missing or
 different has Harness's one-shot write it again, #7868) and lamp-setup's
-reset (its cut to `gateway`, docs/setup.md).
+reset (its cut to `gateway`, docs/setup.md). Both check with
+`openclaw_install::validate_argv`: when `lamp-openclaw-gateway.service`
+has a `MainPID` (its gateway runs), through the wrapper, joined to the
+gateway's namespaces as lamp-tasks' check is; with no gateway running (as
+at a first install) there is no lock to clash with, so it runs in
+`openclaw-ns` of its own as before. `GATEWAY_WAITS`, `NO_GATEWAY`,
+`NODE_NOT_READY` and `gateway_not_there` now live in
+`lamp_checked_replace` (lamp-tasks re-exports them in `openclaw_config`),
+and lamp-update's one-shot uses the same schedule: only a refusal because
+the gateway was not there to check is tried again, never a refusal of the
+text.
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 

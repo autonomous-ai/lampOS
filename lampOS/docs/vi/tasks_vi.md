@@ -3401,7 +3401,12 @@ lamp-setup (cắt còn
 `lamp-openclaw-gateway.service` có `MainPID` (gateway đang chạy) thì chạy
 qua wrapper, nhập vào namespace của gateway như lamp-tasks; không có
 gateway nào chạy (như lúc cài lần đầu) thì không có lock nào để va chạm,
-nên chạy trong `openclaw-ns` riêng như trước.
+nên chạy trong `openclaw-ns` riêng như trước. `GATEWAY_WAITS`,
+`NO_GATEWAY`, `NODE_NOT_READY` và `gateway_not_there` giờ nằm ở
+`lamp_checked_replace` (lamp-tasks vẫn xuất lại chúng trong
+`openclaw_config`), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
+chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra mới được thử lại, văn
+bản bị OpenClaw từ chối thì không.
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 

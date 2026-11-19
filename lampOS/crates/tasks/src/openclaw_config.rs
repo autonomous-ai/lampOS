@@ -451,36 +451,8 @@ pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
     lamp_checked_replace::validate(&argv, &env, VALIDATE_WITHIN)
 }
 
-/// What lamp-update's wrapper says when it finds no running gateway to
-/// join, and fails closed.
-pub const NO_GATEWAY: &str = "is not running in its own namespaces";
-/// What it says joining a gateway just started whose namespace does not
-/// show Node yet (`lamp_update::openclaw_install::NODE_NOT_READY`).
-pub const NODE_NOT_READY: &str = "'node': No such file or directory";
-/// The waits before each new try of a write OpenClaw's gateway was not
-/// there to check ([`write_waiting`]), 5 min 15 s in all: lamp-tasks can
-/// start before the gateway, at a boot or an update that restarts both
-/// (#7268's HOLD), and a gateway takes 27-53 s to start on lamp-c0a4,
-/// about 3 min with a reinstall beside it.
-// ponytail: a fixed schedule; past it the write waits for lamp-tasks' next
-// start, as a refusal does.
-pub const GATEWAY_WAITS: [Duration; 8] = [
-    Duration::from_secs(5),
-    Duration::from_secs(10),
-    Duration::from_secs(20),
-    Duration::from_secs(40),
-    Duration::from_secs(60),
-    Duration::from_secs(60),
-    Duration::from_secs(60),
-    Duration::from_secs(60),
-];
-
-/// Whether a write was refused only because OpenClaw's gateway was not
-/// there to check it ([`NO_GATEWAY`], [`NODE_NOT_READY`]), not for its
-/// text.
-pub fn gateway_not_there(error: &str) -> bool {
-    error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
-}
+// Shared with lamp-update's one-shot (#7868), which can't take lamp-tasks.
+pub use lamp_checked_replace::{GATEWAY_WAITS, NO_GATEWAY, NODE_NOT_READY, gateway_not_there};
 
 /// What [`validate`] says of a check ended by a signal, OpenClaw's verdict
 /// never given: #7268's FINDING, a check racing the gateway's own start
