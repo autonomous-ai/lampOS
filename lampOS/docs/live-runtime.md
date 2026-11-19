@@ -184,7 +184,7 @@ systemd restarts it, one line per step with counts only, and each reopen
 journals the ms from the reopen to the clock's start. With the switch on
 the hold's two steps run before the coordinator's 1.5 s retention
 heartbeat: the recovery's `ClockNotStarted` gap moves the heartbeat's start
-to when it is read, as a ridden privacy gap's reopen does, once a hold,
+to when capture closed the microphone (its `closed_at_us`), as a ridden privacy gap's reopen does, once a hold,
 and the heartbeat still bounds everything else. The coordinator's check ends the
 voice only at the boot barrier, before the first certified start; anywhere
 else a frame failing only that check is dropped and counted as a gap's,

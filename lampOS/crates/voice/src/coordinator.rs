@@ -17531,10 +17531,17 @@ fn drain_capture_control(
                 json!({"kind":"echo_reference_reset","at_us":monotonic_us(),"details":event}),
             )?,
             WorkerEvent::CaptureGap { epoch: gone, .. } if *epoch == Some(gone) => {
-                if matches!(&event, WorkerEvent::CaptureGap { reason, .. }
-                    if reason == crate::unstarted_frames::CLOCK_NOT_STARTED)
+                // When the worker closed the microphone, on the same clock as
+                // its frames' reads, never this drain's own time: a late
+                // drain must not drop a frame read after the reopen.
+                if let WorkerEvent::CaptureGap {
+                    reason,
+                    closed_at_us,
+                    ..
+                } = &event
+                    && reason == crate::unstarted_frames::CLOCK_NOT_STARTED
                 {
-                    trace.clock_recovery_at_us = Some(monotonic_us());
+                    trace.clock_recovery_at_us = Some(*closed_at_us);
                 }
                 record(
                     trace,
@@ -19019,6 +19026,63 @@ mod tests {
             Some(1)
         );
         assert_eq!(epoch, Some(2));
+    }
+
+    /// Heron's P3 on #8011 (#7224): the heartbeat moves to when capture
+    /// closed the microphone for a clock that had not started, as its
+    /// `ClockNotStarted` gap says, not to when a late drain read it, so a
+    /// frame read after the close and before the drain is still taken.
+    #[test]
+    fn a_clock_recovery_moves_the_heartbeat_to_its_own_close_not_the_drain() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut capture) = pair(&dir, "capture");
+        let mut epoch = Some(3);
+        let mut trace = SessionState::default();
+        let closed_at_us = monotonic_us();
+        capture
+            .control
+            .send(WorkerEvent::CaptureGap {
+                epoch: 3,
+                reason: crate::unstarted_frames::CLOCK_NOT_STARTED.to_owned(),
+                closed_at_us,
+            })
+            .unwrap();
+        let read_at_us = closed_at_us + 1;
+        std::thread::sleep(Duration::from_millis(30));
+        assert_eq!(
+            drain_capture_control(
+                &mut parent.control,
+                &mut epoch,
+                NoiseSuppression::On,
+                &mut trace
+            )
+            .unwrap(),
+            Some(3)
+        );
+        let from_us = trace.clock_recovery_at_us.take().unwrap();
+        assert_eq!(from_us, closed_at_us);
+        let drained_at = monotonic_us();
+        assert!(drained_at > read_at_us + 20_000, "the drain came late");
+        let ride = crate::privacy_gap::GapRide::new(false);
+        assert!(ride.takes_frame(read_at_us, from_us, drained_at));
+        // Another gap's reason moves nothing.
+        capture
+            .control
+            .send(WorkerEvent::CaptureGap {
+                epoch: 4,
+                reason: "AuthorityExpired".to_owned(),
+                closed_at_us,
+            })
+            .unwrap();
+        let mut epoch = Some(4);
+        drain_capture_control(
+            &mut parent.control,
+            &mut epoch,
+            NoiseSuppression::On,
+            &mut trace,
+        )
+        .unwrap();
+        assert_eq!(trace.clock_recovery_at_us, None);
     }
 
     fn ready_link(revision: u64, session: u64) -> ProviderLink {
