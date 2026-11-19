@@ -2741,7 +2741,7 @@ fn run_call_with_scope(
                 crate::service_records::reminder_rows::after_call(
                     &call.name,
                     &call.args,
-                    Some(&caller),
+                    Some(&schedule_whose::record_caller(lease, &call.name, &caller)),
                     &told,
                     crate::service_records::unix_ms(),
                 );
