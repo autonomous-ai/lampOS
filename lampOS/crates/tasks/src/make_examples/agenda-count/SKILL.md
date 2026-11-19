@@ -1,6 +1,6 @@
 ---
 name: agenda-count
-description: When I ask how full my day is, the lamp's agent counts my calendar events left today.
+description: When I say count my day, the lamp's agent counts my calendar events left today.
 made: here
 ---
 

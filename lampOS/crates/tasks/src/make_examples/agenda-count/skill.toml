@@ -1,4 +1,4 @@
-asks = ["how full is my day"]
+asks = ["count my day"]
 kind = "installable"
 version = "1.0.0"
 grants = ["google_calendar-read"]
