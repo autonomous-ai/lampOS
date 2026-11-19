@@ -389,6 +389,45 @@ pub fn found(asked: &str, keeping: &Keeping) -> Found {
     }
 }
 
+/// Of the skills `names`, the one the words `asked` name, as [`found`]
+/// takes one of the person's own made skills alone: near by spelling
+/// ([`apart`], [`near`]), with `LAMP_MADE_SKILL_OFF_SAID` on never one
+/// whose numbers differ from those asked ([`same_numbers`]), a name inside
+/// another named as it is written being that other's part. None when none
+/// is near, or several are as near (`crate::make_no_asks::undo` by a
+/// name: Heron's P2 and Thirteen's HOLD on #7836).
+pub fn named_alone(asked: &str, names: &[String]) -> Option<String> {
+    let late = made_skill::off_said_on();
+    let numbered = |name: &str| !late || same_numbers(asked, name);
+    let theirs: Vec<(usize, &str, &str)> = names
+        .iter()
+        .map(|name| (apart(asked, name), name.as_str(), ""))
+        .filter(|(apart, name, _)| near(*apart, name) && numbered(name))
+        .collect();
+    let best = theirs.iter().map(|(apart, ..)| *apart).min()?;
+    let mut tied: Vec<(usize, &str, &str)> = theirs
+        .iter()
+        .filter(|(apart, ..)| *apart == best)
+        .copied()
+        .collect();
+    if !late {
+        hold_nearest(&theirs, &mut tied);
+    }
+    let whole: Vec<&str> = tied
+        .iter()
+        .filter(|(apart, ..)| *apart == 0)
+        .map(|(_, name, _)| *name)
+        .collect();
+    tied.retain(|(_, name, _)| !whole.iter().any(|long| inside(name, long)));
+    if late {
+        hold_nearest(&theirs, &mut tied);
+    }
+    match tied.as_slice() {
+        [(_, name, _)] => Some((*name).to_owned()),
+        _ => None,
+    }
+}
+
 /// Whether the numbers in `asked` and in the skill `name`, each as digits
 /// ([`words_of`]: "three" and "3" are both `3`), are the same, in order:
 /// "good morning three" and `good-morning-3`, never `good-morning-13` nor

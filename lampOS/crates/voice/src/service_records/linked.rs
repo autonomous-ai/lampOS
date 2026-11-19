@@ -23,8 +23,10 @@
 //! - **Off.** With `LAMP_SERVICE_RECORDS` off nothing is kept
 //!   ([`Put::Off`]). Each writer comes with its own switch: Harness task
 //!   rows (`LAMP_SERVICE_RECORDS_TASKS`, [`super::task_rows`]); reminder
-//!   rows (`LAMP_SERVICE_RECORDS_REMINDERS`, [`super::reminder_rows`]);
-//!   agent rows in a later slice (`_AGENT`).
+//!   rows (`LAMP_SERVICE_RECORDS_REMINDERS`, [`super::reminder_rows`]); a
+//!   paired computer's daily notes count (`LAMP_SERVICE_RECORDS_SDK`,
+//!   [`super::sdk_counts`]); agent rows (`LAMP_SERVICE_RECORDS_AGENT`,
+//!   [`super::agent_rows`]).
 use super::{Status, tidy};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -51,6 +53,8 @@ pub enum Kind {
     Task,
     Agent,
     Reminder,
+    /// A paired computer's daily notes count ([`super::sdk_counts`]).
+    Sdk,
 }
 
 impl Kind {
@@ -59,6 +63,7 @@ impl Kind {
             Self::Task => "task",
             Self::Agent => "agent",
             Self::Reminder => "reminder",
+            Self::Sdk => "sdk",
         }
     }
 }
@@ -292,6 +297,8 @@ pub fn unsent(person: Option<&str>) {
     });
     super::task_rows::forgot(person);
     super::reminder_rows::forgot(person);
+    super::agent_rows::forgot(person);
+    super::sdk_counts::forgot(person, super::unix_ms());
 }
 
 /// A forget about a thing of `person`'s is about to be sent, or was
@@ -300,6 +307,7 @@ pub fn unsent(person: Option<&str>) {
 pub fn unsent_about(person: &str, matches: impl Fn(&str) -> bool) {
     super::task_rows::forgot_about(person, &matches);
     super::reminder_rows::forgot_about(person, &matches);
+    super::agent_rows::forgot_about(person, &matches);
     kept::outbox(|outbox| {
         outbox.waiting.retain(|change| {
             change.person != person

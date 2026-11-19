@@ -598,6 +598,25 @@ or another voice, keeps it the room's. Risk, accepted by the lamp-memory
 owner: **a silent guest sitting by hears the person's thread on a carried
 line** (its exchanges and running summary, never their saved memory).
 
+**Their own covered face** (`LAMP_CONVERSATION_CARRIES_OWN_TRACK=on`, off by
+default, C63(b)): on lamp-06c1 on 18 Nov (request 111) the owner put a hand
+over their face mid-conversation. Their print fell under the eyes' hold's bar,
+so the eyes let the name go while the box kept its id, and the one face at the
+desk read as "another face in view": "What do you remember about my food?" was
+the room's. With this switch, a line no face was seen speaking is still carried
+in their conversation going on when **the only face in view is the same
+unbroken eyes track as the face last named as them, alone in view**
+(`SpeakingFaces::own_track_alone`): the pair the voice last read from the
+eyes' known file names them and was read within 45 s; from that naming through
+the line's end every look is of the same boot and counts no face but that
+track (an empty look is no other face), the track is seen at least every
+1.5 s (the eyes' own life of a passing id) and in a look of the line, and a
+lost id the eyes say a new one follows is that new one. It acts on both carry
+paths (a line of theirs, and a line admitted as the room's). A second face,
+another face alone, a gap over 1.5 s, or the eyes starting again keeps the
+line the room's; everything else of the carry stands. It is for the carry
+only: it names no face, moves no known file and runs no forget or yes.
+
 **The room's lines of the same conversation** (`LAMP_CONVERSATION_ROOM_LINES_TOLD=on`,
 #4339): a line still split off to the room's thread was unknown to the
 person's next turn (lamp-3e83, 30 Oct: a web search answered in the room's
@@ -2097,7 +2116,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     never "I didn't keep that" (Thirteen's P2 on #5701): on 10538 the yes after a done forget was answered
     with a `recall`, never a `forget`, so the call's check never saw it. A
     done keep or change then backs that turn's "Kept." as a held keep's
-    does; a done forget does not (tests:
+    does; a done forget does not. A yes on a one-face line
+    (`LAMP_PERSON_SCOPE_ONE_FACE`, "told and read as the room's, its keep
+    theirs") looks for the done write in the scope its keep goes to, that
+    person's, when the room's has none (`remember::done_for_yes_in`, for
+    both the note before round 1 and a `remember` or `forget` the model
+    calls on that yes, `heard::yes_alone`, so the call is never told
+    "Nothing was kept" beside a done-already note: Seventh's P2 on #5798):
+    on
+    build 10824 (9 Nov, S1 req 390-391) the scarf was kept as theirs and
+    its yes, read as the room's, found none, 5 times in 11. Their keep
+    admitted as theirs (seen speaking) is the same done write for them, so
+    their one-face yes after it is told too. Only a keep or
+    change of theirs, never their forget: it is a note, and a one-face line
+    still forgets and retires nothing. The yes's note opens the room's
+    session before it looks, and a room's session open keeps a person's
+    done keep or change, found by that person's lookups only; their forget,
+    and any done write once another person's session opens, still go
+    (lamp-06c1, 16 Nov, row R5 of #5798: `session_open person=everyone` let
+    the keep go first, and the yes was asked again) (tests:
+    `a_one_face_keep_outlives_the_room_note_its_yes_opens`,
+    `a_one_face_yes_is_told_its_one_face_keep_is_done_already`,
+    `a_one_face_yes_through_done_already_finds_its_keep`,
     `a_done_write_outlives_a_new_session_for_the_same_scope`,
     `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
     `a_done_write_two_turns_back_is_not_the_yes_last_turn`,

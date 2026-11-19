@@ -16,9 +16,9 @@ fn write(path: &Path, text: &str) {
 fn installed(layout: &Layout, name: &str) {
     write(&layout.code.join(name).join("1.0.0/src/app.py"), "x");
     symlink("1.0.0", layout.code.join(name).join("current")).unwrap();
-    write(&layout.private.join(name).join("notes.txt"), "data");
+    write(&layout.data_real(name).join("notes.txt"), "data");
     fs::create_dir_all(&layout.data).unwrap();
-    symlink(layout.private.join(name), layout.data.join(name)).unwrap();
+    symlink(layout.data_real(name), layout.data_link(name)).unwrap();
 }
 
 fn rig() -> (tempfile::TempDir, Layout) {
@@ -29,11 +29,8 @@ fn rig() -> (tempfile::TempDir, Layout) {
 
 fn gone(layout: &Layout, name: &str) {
     assert!(!layout.code.join(name).exists(), "code");
-    assert!(layout.data.join(name).symlink_metadata().is_err(), "link");
-    assert!(
-        layout.private.join(name).symlink_metadata().is_err(),
-        "data"
-    );
+    assert!(layout.data_link(name).symlink_metadata().is_err(), "link");
+    assert!(layout.data_real(name).symlink_metadata().is_err(), "data");
     for mark in [Mark::Installing, Mark::Removing, Mark::Stopped] {
         assert!(!has(&layout.state, name, mark), "{mark:?}");
     }
@@ -44,7 +41,7 @@ fn remove_runs_in_one_order_and_leaves_nothing() {
     let (_root, layout) = rig();
     installed(&layout, "x");
     set(&layout.state, "x", Mark::Stopped).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
     assert_eq!(
         remove(&layout, &mut fx, &mut skills, "x"),
         Ok(Removed::Done)
@@ -58,9 +55,71 @@ fn remove_runs_in_one_order_and_leaves_nothing() {
             "empty? lampapp-net@x.service",
             "/usr/bin/systemctl reset-failed -- lampapp@x.service",
             "/usr/bin/systemctl reset-failed -- lampapp-net@x.service",
+            "/usr/bin/systemctl clean --what=state -- lampapp@x.service",
+            "/usr/bin/systemctl clean --what=state -- lampapp-net@x.service",
+            "app_forget x",
         ]
     );
     assert_eq!(skills.removed, ["x"]);
+    gone(&layout, "x");
+}
+
+/// lamp-control keeps an app's settings, notes, clips and moves, and drops
+/// them on `app_forget`. It is said only once both unit variants have stopped
+/// and are empty (a running app could set them again), and a remove it does
+/// not answer is cut, not done.
+#[test]
+fn lamp_control_is_told_only_after_both_units_have_stopped() {
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    let mut fx = FakeEffects {
+        never_empty: true,
+        ..FakeEffects::cleaning(&layout)
+    };
+    let mut skills = FakeCompanions::default();
+    assert!(remove(&layout, &mut fx, &mut skills, "x").is_err());
+    assert!(
+        !fx.calls.iter().any(|call| call.starts_with("app_forget")),
+        "a unit still has a process: {:?}",
+        fx.calls
+    );
+    let mut fx = FakeEffects::cleaning(&layout);
+    remove(&layout, &mut fx, &mut skills, "x").unwrap();
+    let at = |what: &str| fx.calls.iter().position(|c| c.contains(what)).unwrap();
+    assert!(at("empty? lampapp@x") < at("app_forget x"));
+    assert!(at("empty? lampapp-net@x") < at("app_forget x"));
+    assert!(at("stop -- lampapp-net@x") < at("app_forget x"));
+    assert_eq!(
+        fx.calls
+            .iter()
+            .filter(|c| c.starts_with("app_forget"))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn a_forget_lamp_control_does_not_answer_leaves_the_remove_cut_and_the_next_one_finishes() {
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    let mut skills = FakeCompanions::default();
+    // The forget is the ninth call of a whole remove.
+    let mut fx = FakeEffects {
+        fail_at: Some(8),
+        ..FakeEffects::cleaning(&layout)
+    };
+    assert!(remove(&layout, &mut fx, &mut skills, "x").is_err());
+    assert_eq!(fx.calls.last().map(String::as_str), Some("app_forget x"));
+    assert!(layout.code.join("x").exists(), "the code stays");
+    assert!(has(&layout.state, "x", Mark::Removing), "the mark stays");
+    assert!(skills.removed.is_empty(), "no companion skill went yet");
+    // Asked again, with no second yes in the way, it is told once more and ends.
+    let mut fx = FakeEffects::cleaning(&layout);
+    assert_eq!(
+        remove(&layout, &mut fx, &mut skills, "x"),
+        Ok(Removed::Done)
+    );
+    assert!(fx.calls.iter().any(|c| c == "app_forget x"));
     gone(&layout, "x");
 }
 
@@ -70,15 +129,12 @@ fn the_removing_mark_is_written_before_anything_is_touched() {
     installed(&layout, "x");
     let mut fx = FakeEffects {
         fail_at: Some(0),
-        ..Default::default()
+        ..FakeEffects::cleaning(&layout)
     };
     let mut skills = FakeCompanions::default();
     assert!(remove(&layout, &mut fx, &mut skills, "x").is_err());
     assert!(has(&layout.state, "x", Mark::Removing));
-    assert!(
-        layout.private.join("x/notes.txt").exists(),
-        "data untouched"
-    );
+    assert!(layout.data_real("x/notes.txt").exists(), "data untouched");
     assert!(
         layout.code.join("x/1.0.0/src/app.py").exists(),
         "code untouched"
@@ -92,17 +148,17 @@ fn nothing_is_deleted_while_the_unit_still_has_a_process() {
     installed(&layout, "x");
     let mut fx = FakeEffects {
         never_empty: true,
-        ..Default::default()
+        ..FakeEffects::cleaning(&layout)
     };
     let mut skills = FakeCompanions::default();
     assert!(remove(&layout, &mut fx, &mut skills, "x").is_err());
-    assert!(layout.private.join("x/notes.txt").exists());
+    assert!(layout.data_real("x/notes.txt").exists());
     assert!(layout.code.join("x").exists());
     assert!(has(&layout.state, "x", Mark::Removing));
     // A slow stop that does empty in time still removes.
     let mut fx = FakeEffects {
         busy_polls: 3,
-        ..Default::default()
+        ..FakeEffects::cleaning(&layout)
     };
     assert_eq!(
         remove(&layout, &mut fx, &mut skills, "x"),
@@ -112,96 +168,9 @@ fn nothing_is_deleted_while_the_unit_still_has_a_process() {
 }
 
 #[test]
-fn a_link_and_a_hard_link_planted_in_the_data_folder_cost_nothing_outside() {
-    let (root, layout) = rig();
-    installed(&layout, "x");
-    let outside = root.path().join("outside");
-    fs::create_dir_all(outside.join("dir")).unwrap();
-    fs::write(outside.join("dir/keep.txt"), "keep").unwrap();
-    fs::write(outside.join("file.txt"), "keep").unwrap();
-    let data = layout.private.join("x");
-    symlink(outside.join("dir"), data.join("to-dir")).unwrap();
-    symlink(outside.join("file.txt"), data.join("to-file")).unwrap();
-    fs::hard_link(outside.join("file.txt"), data.join("hard")).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
-    assert_eq!(
-        remove(&layout, &mut fx, &mut skills, "x"),
-        Ok(Removed::Done)
-    );
-    assert_eq!(
-        fs::read_to_string(outside.join("dir/keep.txt")).unwrap(),
-        "keep"
-    );
-    assert_eq!(
-        fs::read_to_string(outside.join("file.txt")).unwrap(),
-        "keep"
-    );
-    gone(&layout, "x");
-}
-
-#[test]
-fn a_data_link_that_points_elsewhere_is_left_alone_with_its_target() {
-    let (root, layout) = rig();
-    installed(&layout, "x");
-    let elsewhere = root.path().join("elsewhere");
-    write(&elsewhere.join("precious"), "p");
-    fs::remove_file(layout.data.join("x")).unwrap();
-    symlink(&elsewhere, layout.data.join("x")).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
-    let error = remove(&layout, &mut fx, &mut skills, "x").unwrap_err();
-    assert!(
-        error.contains("elsewhere") || error.contains("points"),
-        "{error}"
-    );
-    assert!(elsewhere.join("precious").exists());
-    assert!(
-        layout.data.join("x").symlink_metadata().is_ok(),
-        "the link stays"
-    );
-    assert!(
-        layout.code.join("x").exists(),
-        "the code is left, the remove is unfinished"
-    );
-    assert!(has(&layout.state, "x", Mark::Removing));
-}
-
-#[test]
-fn a_real_folder_where_the_link_should_be_is_refused() {
-    let (_root, layout) = rig();
-    installed(&layout, "x");
-    fs::remove_file(layout.data.join("x")).unwrap();
-    write(&layout.data.join("x").join("f"), "f");
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
-    assert!(remove(&layout, &mut fx, &mut skills, "x").is_err());
-    assert!(layout.data.join("x/f").exists());
-}
-
-#[test]
-fn no_folder_and_no_link_is_clean_and_so_is_a_dangling_link() {
-    let (_root, layout) = rig();
-    write(&layout.code.join("a/1.0.0/src/app.py"), "x");
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
-    assert_eq!(
-        remove(&layout, &mut fx, &mut skills, "a"),
-        Ok(Removed::Done)
-    );
-    gone(&layout, "a");
-    // The data folder is made when the app first starts: a link whose folder
-    // is not there (or is gone) is cleaned, not an error.
-    write(&layout.code.join("b/1.0.0/src/app.py"), "x");
-    fs::create_dir_all(&layout.data).unwrap();
-    symlink(layout.private.join("b"), layout.data.join("b")).unwrap();
-    assert_eq!(
-        remove(&layout, &mut fx, &mut skills, "b"),
-        Ok(Removed::Done)
-    );
-    gone(&layout, "b");
-}
-
-#[test]
 fn an_app_that_is_not_there_is_a_clean_no_with_no_effect() {
     let (_root, layout) = rig();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
     assert_eq!(
         remove(&layout, &mut fx, &mut skills, "x"),
         Err(NOT_INSTALLED.to_owned())
@@ -214,7 +183,7 @@ fn an_app_that_is_not_there_is_a_clean_no_with_no_effect() {
 #[test]
 fn a_bad_name_is_refused_before_anything() {
     let (_root, layout) = rig();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
     for bad in ["", "../x", "X", "a/b", "9"] {
         assert!(
             remove(&layout, &mut fx, &mut skills, bad).is_err(),
@@ -232,7 +201,7 @@ fn a_code_folder_that_is_a_link_is_unlinked_not_followed() {
     fs::create_dir_all(&layout.code).unwrap();
     symlink(&target, layout.code.join("x")).unwrap();
     set(&layout.state, "x", Mark::Removing).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
     assert_eq!(
         remove(&layout, &mut fx, &mut skills, "x"),
         Ok(Removed::Done)
@@ -251,7 +220,7 @@ fn a_crash_at_any_step_then_a_retry_ends_clean() {
         set(&layout.state, "x", Mark::Stopped).unwrap();
         let mut fx = FakeEffects {
             fail_at: Some(at),
-            ..Default::default()
+            ..FakeEffects::cleaning(&layout)
         };
         let mut skills = FakeCompanions::default();
         let first = remove(&layout, &mut fx, &mut skills, "x");
@@ -260,7 +229,7 @@ fn a_crash_at_any_step_then_a_retry_ends_clean() {
             continue;
         }
         assert!(has(&layout.state, "x", Mark::Removing), "call {at}");
-        let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+        let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
         assert_eq!(
             remove(&layout, &mut fx, &mut skills, "x"),
             Ok(Removed::Done),
@@ -270,7 +239,7 @@ fn a_crash_at_any_step_then_a_retry_ends_clean() {
     }
     let (_root, layout) = rig();
     installed(&layout, "x");
-    let mut fx = FakeEffects::default();
+    let mut fx = FakeEffects::cleaning(&layout);
     let mut skills = FakeCompanions {
         fail: true,
         ..Default::default()
@@ -279,7 +248,12 @@ fn a_crash_at_any_step_then_a_retry_ends_clean() {
     assert!(has(&layout.state, "x", Mark::Removing));
     let mut skills = FakeCompanions::default();
     assert_eq!(
-        remove(&layout, &mut FakeEffects::default(), &mut skills, "x"),
+        remove(
+            &layout,
+            &mut FakeEffects::cleaning(&layout),
+            &mut skills,
+            "x"
+        ),
         Ok(Removed::Done)
     );
     gone(&layout, "x");
@@ -319,7 +293,7 @@ fn a_remove_of_an_app_whose_units_are_already_unloaded_runs_to_the_end() {
     let (_root, layout) = rig();
     installed(&layout, "x");
     set(&layout.state, "x", Mark::Stopped).unwrap();
-    let mut fx = FakeEffects::default();
+    let mut fx = FakeEffects::cleaning(&layout);
     for unit in ["lampapp@x.service", "lampapp-net@x.service"] {
         for verb in ["stop", "reset-failed"] {
             fx.exits
@@ -342,7 +316,7 @@ fn a_cut_remove_is_finished_by_the_next_start_up_sweep() {
     use lamp_apps::sweep::sweep;
     let (_root, layout) = rig();
     installed(&layout, "x");
-    let mut cut = FakeEffects::default();
+    let mut cut = FakeEffects::cleaning(&layout);
     cut.exits.push((
         "/usr/bin/systemctl reset-failed -- lampapp@x.service".into(),
         1,
@@ -354,9 +328,83 @@ fn a_cut_remove_is_finished_by_the_next_start_up_sweep() {
         layout.code.join("x/1.0.0").exists(),
         "the code is still there"
     );
-    let mut fx = FakeEffects::default();
+    let mut fx = FakeEffects::cleaning(&layout);
     let report = sweep(&layout, &mut fx, &mut skills);
     assert_eq!(report.resumed_removes, ["x"]);
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     gone(&layout, "x");
+}
+
+#[test]
+fn the_data_is_systemds_to_remove_and_the_helper_deletes_none_of_it() {
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    // systemd (the fake does not clean) leaves the data: the remove stops
+    // before the code goes, with its mark, and deletes nothing itself.
+    let mut fx = FakeEffects::default();
+    let mut skills = FakeCompanions::default();
+    let error = remove(&layout, &mut fx, &mut skills, "x").unwrap_err();
+    assert!(
+        error.contains("still there after systemctl clean"),
+        "{error}"
+    );
+    assert!(layout.data_real("x/notes.txt").exists());
+    assert!(layout.data_link("x").symlink_metadata().is_ok());
+    assert!(layout.code.join("x").exists());
+    assert!(has(&layout.state, "x", Mark::Removing));
+    assert!(skills.removed.is_empty());
+    // A retry once systemd has cleaned finishes.
+    assert_eq!(
+        remove(
+            &layout,
+            &mut FakeEffects::cleaning(&layout),
+            &mut skills,
+            "x"
+        ),
+        Ok(Removed::Done)
+    );
+    gone(&layout, "x");
+}
+
+#[test]
+fn the_clean_line_is_state_only_and_the_source_deletes_no_data() {
+    use lamp_apps::effects::{Verb, argv};
+    assert_eq!(
+        argv(Verb::Clean, "lampapp@x.service"),
+        [
+            "/usr/bin/systemctl",
+            "clean",
+            "--what=state",
+            "--",
+            "lampapp@x.service"
+        ]
+    );
+    // The remove names no data path to delete: it never calls remove_dir_all
+    // or remove_file on `data_real` or `data_link`.
+    let source =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/remove.rs")).unwrap();
+    assert!(!source.contains("remove_entry(&real)"));
+    assert!(!source.contains("data_real(name)).map_err"));
+}
+
+/// `systemctl clean` is systemd's to do; if it ran and the data is still
+/// there the remove stops at its mark and deletes nothing itself.
+#[test]
+fn data_that_survives_the_clean_stops_the_remove_and_is_not_deleted_by_it() {
+    let (_root, layout) = rig();
+    installed(&layout, "x");
+    // A fake whose `clean` removes nothing.
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let said = remove(&layout, &mut fx, &mut skills, "x").unwrap_err();
+    assert!(said.contains("still there after systemctl clean"), "{said}");
+    assert!(
+        layout.data_real("x").join("notes.txt").exists(),
+        "not deleted by the helper"
+    );
+    assert!(layout.code.join("x").exists());
+    assert!(has(&layout.state, "x", Mark::Removing));
+    assert!(
+        !fx.calls.iter().any(|c| c.starts_with("app_forget")),
+        "no forget before the data is gone"
+    );
 }

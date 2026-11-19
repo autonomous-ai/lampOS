@@ -348,6 +348,12 @@ pub struct SpeakingFaces {
 /// known file: a conversation's going on (`thread::GOING_ON_FOR`, 45 s).
 pub const NAMED_FOR: Duration = Duration::from_secs(45);
 
+/// The longest the face last named may go unseen and still be the same
+/// track ([`SpeakingFaces::own_track_alone`]): the eyes' own life of a
+/// passing id once its box is lost (`SAME_WITHIN_US`, 1.5 s, `lamp-eyes`
+/// bus_out.rs).
+pub const OWN_TRACK_GAP: Duration = Duration::from_millis(1500);
+
 impl SpeakingFaces {
     /// One read of the eyes' `humans/faces/tracked`: their frame, by its
     /// publisher's boot and sequence, counted only if it is new; `None` when
@@ -846,6 +852,54 @@ impl SpeakingFaces {
                         })
                     })
             })
+    }
+
+    /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b), lamp-06c1, 18 Nov): the
+    /// face [`Self::known_with_boot`] last named, within [`NAMED_FOR`] of
+    /// `to`, as a person `theirs` accepts, when it is the same unbroken track
+    /// from that naming through the line's end: in the eyes' own looks of the
+    /// same boot, never more than [`OWN_TRACK_GAP`] apart, with no look
+    /// counting a face but it (a look with nobody is no other face), and in
+    /// a look of the line (`from` to `to`). Its id as of `to`, a lost id the
+    /// eyes say a new one follows read as that new one ([`Looks::links_at`]).
+    /// A hand over the owner's face lets the eyes' name go (a print under
+    /// their hold's bar) while their box keeps its id: the face is still
+    /// theirs for the carry, and only for it. Never a name: the known file
+    /// and every other rule read the eyes' own word.
+    pub fn own_track_alone(
+        &self,
+        theirs: impl Fn(&str) -> bool,
+        from: Instant,
+        to: Instant,
+    ) -> Option<String> {
+        let (name, face, read) = self.named.lock().ok()?.clone()?;
+        if !theirs(&name) || to.saturating_duration_since(read) > NAMED_FOR {
+            return None;
+        }
+        let looks = self.looks.lock().ok()?;
+        let links = looks.links_at(to);
+        let track = one_face(face, &links);
+        let start = read.min(from);
+        let mut last_seen = start;
+        let mut in_line = false;
+        for look in looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= start && look.at <= to && !look.boot.is_empty())
+        {
+            let own = |id: &String| one_face(format!("{}/{id}", look.boot), &links) == track;
+            if !look.counted.iter().all(own) {
+                return None;
+            }
+            if look.tracked.iter().any(own) {
+                if look.at.saturating_duration_since(last_seen) > OWN_TRACK_GAP {
+                    return None;
+                }
+                last_seen = look.at;
+                in_line |= look.at >= from;
+            }
+        }
+        (in_line && to.saturating_duration_since(last_seen) <= OWN_TRACK_GAP).then_some(track)
     }
 
     /// Whether the eyes made any look of their own from `from` to `to`,
@@ -3481,6 +3535,133 @@ mod tests {
         assert_eq!(
             alone.line_counted(edge, to, (true, false), ids),
             alone.line_counted(edge, to, (false, false), ids)
+        );
+    }
+
+    /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b), lamp-06c1, 18 Nov):
+    /// the face last named as theirs, the eyes no longer naming it (a hand
+    /// over it), is still theirs for the carry while the same unbroken track
+    /// is the only face in view: from its naming through the line's end, in
+    /// a look at least every [`OWN_TRACK_GAP`], no look with another face. A
+    /// second face, another face alone, a gap, a naming of someone else or
+    /// one too old, and nobody named are not.
+    #[test]
+    fn own_track_alone_is_the_named_face_unbroken_and_alone() {
+        let face = |id: &str, follows: Option<&str>| Face {
+            pitch: None,
+            looking: None,
+            id: id.to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: Some(Speaking {
+                state: SpeakingState::No,
+                score: 0.9,
+                from: None,
+            }),
+            follows: follows.map(str::to_owned),
+        };
+        let t0 = Instant::now();
+        let at = |ms: u64| t0 + Duration::from_millis(ms);
+        let a = |name: &str| name == "A";
+        // Named A on `b/f1` at 0, then each look by `in_view` every 500 ms
+        // to 6 s; the line from 4 s to 6 s.
+        let seen = |in_view: &dyn Fn(u64) -> Vec<Face>| {
+            let eyes = SpeakingFaces::default();
+            *eyes.named.lock().unwrap() = Some(("A".to_owned(), "b/f1".to_owned(), at(0)));
+            for (seq, ms) in (0..=6000).step_by(500).enumerate() {
+                eyes.look(
+                    at(ms),
+                    Some((("b", seq as u64), &Faces { faces: in_view(ms) })),
+                );
+            }
+            eyes
+        };
+        let line = |eyes: &SpeakingFaces| eyes.own_track_alone(a, at(4000), at(6000));
+
+        let own = seen(&|_| vec![face("f1", None)]);
+        assert_eq!(line(&own), Some("b/f1".to_owned()), "their own track alone");
+        assert_eq!(
+            own.own_track_alone(|name| name == "B", at(4000), at(6000)),
+            None,
+            "named as someone else"
+        );
+        let two = seen(&|ms| {
+            let mut faces = vec![face("f1", None)];
+            if ms == 5000 {
+                faces.push(face("f2", None));
+            }
+            faces
+        });
+        assert_eq!(line(&two), None, "a second face in one look");
+        let before = seen(&|ms| {
+            let mut faces = vec![face("f1", None)];
+            if ms == 2000 {
+                faces.push(face("f2", None));
+            }
+            faces
+        });
+        assert_eq!(line(&before), None, "a second face since the naming");
+        let other = seen(&|ms| {
+            if ms < 3000 {
+                vec![face("f1", None)]
+            } else {
+                vec![face("f2", None)]
+            }
+        });
+        assert_eq!(line(&other), None, "another face alone, no follow");
+        let gap = seen(&|ms| {
+            if (1000..=3000).contains(&ms) {
+                vec![]
+            } else {
+                vec![face("f1", None)]
+            }
+        });
+        assert_eq!(line(&gap), None, "out of view over 1.5 s");
+        let blink = seen(&|ms| {
+            if ms == 3000 {
+                vec![]
+            } else {
+                vec![face("f1", None)]
+            }
+        });
+        assert_eq!(line(&blink), Some("b/f1".to_owned()), "one empty look");
+        // The eyes say a new id follows the lost one: the same track.
+        let followed = seen(&|ms| {
+            if ms < 3000 {
+                vec![face("f1", None)]
+            } else {
+                vec![face("f3", Some("f1"))]
+            }
+        });
+        assert_eq!(line(&followed), Some("b/f3".to_owned()), "followed");
+        let unnamed = seen(&|_| vec![face("f1", None)]);
+        *unnamed.named.lock().unwrap() = None;
+        assert_eq!(line(&unnamed), None, "nobody named");
+        let old = seen(&|_| vec![face("f1", None)]);
+        assert_eq!(
+            old.own_track_alone(a, at(4000), at(0) + NAMED_FOR + Duration::from_secs(1)),
+            None,
+            "named too long ago"
+        );
+        let restarted = seen(&|_| vec![face("f1", None)]);
+        restarted.look(
+            at(6200),
+            Some((
+                ("c", 0),
+                &Faces {
+                    faces: vec![face("f1", None)],
+                },
+            )),
+        );
+        assert_eq!(
+            restarted.own_track_alone(a, at(4000), at(6200)),
+            None,
+            "the eyes started again: their f1 is someone else"
         );
     }
 }

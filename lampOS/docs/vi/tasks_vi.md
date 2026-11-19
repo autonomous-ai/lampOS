@@ -315,6 +315,15 @@ trong code. Chưa được phát thử trên đèn.
 
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
+Một lần chạy của kỹ năng không phải là việc trong store, nên `tasks/status`
+không bao giờ liệt kê nó: với `serve --progress`, mỗi lần chạy được báo trên
+`skills/tasks` thay vào đó (#7873, [msgs.md](../msgs.md) `SkillTask`, cho
+lamp-peek), `started` kèm id lần chạy và engine nó bắt đầu trên đó
+(`skill_task::tell_run`, nơi `HarnessRunner` chọn engine, có hoặc không có
+Harness), rồi `ran` hoặc `failed` khi runner của nó kết thúc
+(`run_on_token`). Lần chạy của một lần tạo và của một yêu cầu bằng giọng nói
+không được báo.
+
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
 giao phần chậm hơn cho Hermes của chính đèn. lamp-skills gửi một dòng cho mỗi
 lần chạy, và được trả lời khi lần chạy kết thúc
@@ -3016,7 +3025,10 @@ là phần của một coder khác trong #6226; thiết kế:
   từ chối `mode` đi cùng một trong hai (exit 78, gateway chết), và lamp-tasks
   stable hôm nay, đích rollback, chèn `mode: "ask"` mà không bỏ gì khác, nên
   chỉ file có riêng `mode` mới qua được rollback (#7245, thấy trên
-  lamp-c0a4). Mục cho phép của launcher
+  lamp-c0a4). Một đèn cập nhật từ bản cũ có `security`/`ask` trong
+  `tools.exec`, dù có hay không có `mode` đi cùng (file khiến gateway exit
+  78), sẽ chỉ còn `mode` ở lần lamp-tasks khởi động kế tiếp, các khóa exec
+  riêng của người dùng (như `askFallback`) được giữ; file đã chỉ có `mode` thì không bị ghi lại (#7859). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 

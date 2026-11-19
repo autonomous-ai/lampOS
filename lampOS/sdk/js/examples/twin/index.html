@@ -25,11 +25,20 @@
   /* What the real body will do (reach.js): the lamp's reach as a band under the slider, amber past it, and the lamp's own word after a move. */
   .joint .track { position: relative; }
   .joint .band { position: absolute; top: 50%; height: 6px; margin-top: -3px; min-width: 3px; border-radius: 3px; background: #4caf50; opacity: .55; pointer-events: none; display: none; }
+  /* Above the stand the body takes nothing yet (an arm joint on a standing lamp): hatched, over the map's upper half. */
+  .joint .notyet { position: absolute; top: 50%; height: 14px; margin-top: -7px; border-radius: 3px; pointer-events: none; display: none; background: repeating-linear-gradient(45deg, rgba(150,150,150,.45) 0 4px, rgba(150,150,150,.12) 4px 8px); }
   .joint .servo-reach { color: var(--soft); font-size: 12px; min-height: 1.2em; }
   .joint.past .servo-reach { color: #c77700; font-weight: 600; }
   .joint.past input[type=range] { accent-color: #e08a00; }
   .joint .servo-reach.said { color: var(--accent); }
   .moving { color: var(--accent); }
+  /* STOP: always in view, on every layout, over everything; one press (or Esc) ends what the page sends. */
+  #stopbar { position: fixed; top: 8px; right: 8px; z-index: 1000; display: flex; gap: 8px; align-items: center; }
+  #stopbtn { background: #d9302c; color: #fff; border: 3px solid #fff; border-radius: 10px; font: 700 22px/1 system-ui, sans-serif; letter-spacing: .06em; padding: 14px 26px; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,.6); }
+  #stopbtn:focus-visible { outline: 3px solid #ffd54f; }
+  #stopsaid { display: none; max-width: 46ch; background: #7a1411; color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.3; box-shadow: 0 2px 12px rgba(0,0,0,.6); }
+  #stopsaid.on { display: block; }
+  #stopsaid button { margin-left: 8px; font-size: 13px; padding: 4px 10px; cursor: pointer; }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
   details label { display: grid; grid-template-columns: 70px 1fr 60px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
@@ -84,6 +93,7 @@
 </script>
 </head>
 <body>
+<div id="stopbar"><span id="stopsaid" role="alert" aria-live="assertive"><span id="stoptext"></span><button id="resumebtn" type="button" hidden>Resume sliders</button><button id="givebtn" type="button" hidden>Let go (arm eases back to the stand)</button></span><button id="stopbtn" type="button" aria-label="STOP: send nothing more to the lamp and hold the arm where it is (Esc); letting go is a second press">STOP</button></div>
 <div id="view"><div id="status">loading the lamp…</div></div>
 <aside id="side">
   <h1>Lamp twin</h1>
@@ -264,11 +274,17 @@ const showServoReach = (name) => {
   const past = bodyReach.pastReach(limit, asked[name]);
   row.row.classList.toggle('past', past);
   if (!row.saying) row.servoReach.textContent = bodyReach.reachText(limit, asked[name]);
-  row.band.style.display = limit ? 'block' : 'none';
-  if (limit) {
+  const own = bodyReach.reachOf(limit);
+  row.band.style.display = own ? 'block' : 'none';
+  row.notyet.style.display = limit?.pose ? 'block' : 'none';
+  if (own) {
     const at = (deg) => `${((Math.max(-180, Math.min(180, deg)) + 180) / 360) * 100}%`;
-    row.band.style.left = at(limit.min);
-    row.band.style.width = `calc(${at(limit.max)} - ${at(limit.min)})`;
+    row.band.style.left = at(own.min);
+    row.band.style.width = `calc(${at(own.max)} - ${at(own.min)})`;
+    if (limit.pose) {
+      row.notyet.style.left = at(limit.pose.max);
+      row.notyet.style.width = `calc(${at(180)} - ${at(limit.pose.max)})`;
+    }
   }
 };
 // The panel: one row per joint, from the base out.
@@ -279,7 +295,7 @@ for (const name of model.chain) {
   const row = document.createElement('div');
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
-    <div class="track"><div class="band"></div><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
+    <div class="track"><div class="band"></div><div class="notyet" title="not yet: the body takes no arm pose above its stand"></div><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
     <div class="reach"></div>
     <div class="load" title="load the body reads on this joint"><i></i></div>
     <div class="facts">servo ${joint.servo} · ${joint.bus}</div>
@@ -307,7 +323,7 @@ for (const name of model.chain) {
     send({ type: 'drag', joint: name, deg });
   });
   slider.addEventListener('change', () => { const deg = held(); asked[name] = deg; wanted[name] = body(name, deg); showServoReach(name); send({ type: 'drag', joint: name, deg, final: true }); });
-  rows[name] = { row, slider, band: row.querySelector('.band'), reach: row.querySelector('.reach'), servoReach: row.querySelector('.servo-reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
+  rows[name] = { row, slider, band: row.querySelector('.band'), notyet: row.querySelector('.notyet'), reach: row.querySelector('.reach'), servoReach: row.querySelector('.servo-reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -409,7 +425,20 @@ document.getElementById('copy').addEventListener('click', async () => {
 
 // The live link.
 let ws;
-const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+// STOP: once pressed, no drag leaves this page until Resume (the server holds the same line and says what it did).
+let stopped = false;
+const send = (message) => { if (stopped && message.type === 'drag') return; if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+const stopSaid = (text, resumable, holding) => { document.getElementById('stoptext').textContent = text; document.getElementById('stopsaid').classList.add('on'); document.getElementById('resumebtn').hidden = !resumable; document.getElementById('givebtn').hidden = !holding; };
+const pressStop = () => {
+  stopped = true;
+  stopSaid('STOP pressed: no more is sent from this page. Waiting for the lamp to be told…', false);
+  // Sent twice over the one socket if it is up; with the socket down it says so, so nobody thinks the lamp was told.
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stop_all' })); else stopSaid('STOP pressed but this page is not connected to the twin: close the page process (Ctrl-C) to stop it.', false);
+};
+document.getElementById('stopbtn').addEventListener('click', pressStop);
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') pressStop(); });
+document.getElementById('givebtn').addEventListener('click', () => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'give_back' })); stopSaid('Letting go…', false, false); });
+document.getElementById('resumebtn').addEventListener('click', () => { stopped = false; document.getElementById('stopsaid').classList.remove('on'); if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resume' })); });
 window.twinSend = send;
 // The try-it panel, when the server has one (--stim-dir): its buttons, its log. A first import can still be lost (a browser aborts
 // a request now and then, and then remembers that URL as failed), so it is tried again under another URL (a counter in the
@@ -508,6 +537,8 @@ function connect() {
   ws.onclose = () => { log('disconnected; retrying'); setTimeout(connect, 1000); };
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
+    if (data.type === 'stopped') { stopped = true; stopSaid(data.text, data.done === true, data.hold === true); log(data.text); }
+    if (data.type === 'resumed') { stopped = false; document.getElementById('stopsaid').classList.remove('on'); log(data.text); }
     if (data.type === 'said') {
       // A goal the reach map held is said under its slider too, for a few seconds.
       const held = /^reach map: (\w+) /.exec(data.text);
@@ -530,7 +561,7 @@ function connect() {
     }
     if (data.type === 'joint_done') {
       const row = rows[data.joint];
-      const words = row && bodyReach ? bodyReach.doneWords(data, data.joint) : '';
+      const words = row && bodyReach ? bodyReach.doneWords(data, data.joint, limits[data.joint]) : '';
       if (!words) return;
       row.saying = true;
       row.servoReach.textContent = words;

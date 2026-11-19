@@ -1,0 +1,31 @@
+# The Store apps' manage helper, one request (#7415, docs/apps.md): started by lamp-apps-manage.socket for each
+# connection, as root, the connection its standard input and output. `lamp-apps-manage asked` reads one line and
+# answers one line; every change but a list needs LAMP_STORE_APPS=on in this environment (a drop-in turns it on, #7415).
+# The owner's yes is asked of lamp-control's admin socket (a unix socket); the package is read from the staging
+# folder, never fetched here (PrivateNetwork). It makes no user and writes no unit. It writes no app's data: a remove asks systemd
+# (`systemctl clean --what=state`) to take the dynamic user's state and its link away, so no app's data path is writable here. Slice= the parts', which lamp-control reads.
+[Unit]
+Description=lampOS apps' manage helper (lamp-apps-manage asked)
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+User=root
+Group=root
+Slice=lampos-parts.slice
+ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage asked
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+SyslogIdentifier=lamp-apps-manage
+RuntimeMaxSec=60
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/lampOS/apps /var/lib/lampos-apps-state -/var/lib/lampOS/skills
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_FOWNER

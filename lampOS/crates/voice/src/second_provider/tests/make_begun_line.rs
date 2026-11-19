@@ -104,9 +104,9 @@ async fn a_copied_make_line_with_no_call_is_not_said_and_asked_again_with_make_s
     // The history carries the lamp's own line, with no call beside it.
     assert!(
         asked[0].iter().any(|message| message.role == "assistant"
-            && message
-                .words()
-                .is_some_and(|words| words.contains("about a minute"))),
+            && message.words().is_some_and(
+                |words| words.contains(crate::make_skill_agent::ONE_PATH_WAITING_LINE)
+            )),
         "{:?}",
         asked[0]
             .iter()
@@ -128,7 +128,7 @@ async fn a_copied_make_line_with_no_call_is_not_said_and_asked_again_with_make_s
     assert!(!asked[1].iter().skip(asked[0].len()).any(|message| {
         message
             .words()
-            .is_some_and(|words| words.contains("about a minute"))
+            .is_some_and(|words| words.contains(crate::make_skill_agent::ONE_PATH_WAITING_LINE))
     }));
 }
 
@@ -465,6 +465,38 @@ async fn a_bare_make_skill_call_has_the_lamps_opening_said_first_once() {
     assert_eq!(
         a_make_turn(7_554_704, plain(), fast, vec![no_stream_event, made()]).await,
         [opening, "said:Made cat joke.".into()]
+    );
+}
+
+/// #7679 (`LAMP_MAKE_QUEUE`): a bare make asked while another is under way
+/// waits its turn, so the lamp's "I'll make it now" is never said before
+/// it: the one line is the model's "I'll make the gold one next". Idle
+/// again, the opening is said as before.
+#[tokio::test]
+async fn a_bare_make_while_another_is_made_says_no_opening_only_its_next_line() {
+    let opening = format!("said:{}", crate::make_skill_agent::MAKE_OPENING);
+    let next = || vec![text("I'll make the gold one next."), Ok(ChatEvent::Done)];
+    let plain = || vec![Message::user("And another: check the gold price at six.")];
+    let fast = (false, false, Duration::ZERO);
+    crate::make_queue::clear_for_test();
+    assert!(matches!(
+        crate::make_queue::admit(
+            7_679_100,
+            crate::make_queue::Asker::default(),
+            "bitcoin price".into(),
+            Instant::now(),
+            Box::new(|| crate::tools::ToolAnswer::plain(json!({}))),
+        ),
+        crate::make_queue::Admitted::Run
+    ));
+    assert_eq!(
+        a_make_turn(7_679_101, plain(), fast, vec![a_bare_make(), next()]).await,
+        ["said:I'll make the gold one next."]
+    );
+    crate::make_queue::clear_for_test();
+    assert_eq!(
+        a_make_turn(7_679_102, plain(), fast, vec![a_bare_make(), next()]).await,
+        [opening, "said:I'll make the gold one next.".into()]
     );
 }
 

@@ -702,6 +702,7 @@ switched and off unless set. The task's number is the same one
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `skills/events` | event, no period, no lifespan | `lamp-skills` | People and the lamp's app: what each physical skill did and why ([skills.md](skills.md)); `lamp-peek`'s timeline, skill and stage only ([peek.md](peek.md)) |
+| `skills/tasks` | event, no period, no lifespan | `lamp-tasks` (with `--progress`), `lamp-skills` | `lamp-peek`'s Tasks and Timeline (#7873): each skill's `do.task` run, its engine and end, and its answer held for its gate, then told or dropped ([msgs.md](msgs.md) `SkillTask`, [peek.md](peek.md)) |
 
 The [`SkillEvent` message](msgs.md#the-skills-contract) says one stage of a
 run: triggered, asked, answered (with whether it was allowed) and done,
@@ -857,5 +858,11 @@ in 2 s, with fixed words and a clip's name as the reason. The ring tells (`LAMP_
 the four faces it shows on its own as each begins: the asleep face, the night's
 sleep face, the unplug picture and the physical-mute red breath, once each, from
 a thread of its own and at most one in 2 s, with a fixed sentence as the reason
-(the privacy one records only that the lamp was private). The voice's own
-actions are told in a small PR of their own.
+(the privacy one records only that the lamp was private). The voice tells
+(`LAMP_DID_VOICE=on`, source `voice`, a share of at most 20 of the 200) the
+lines it begins itself with nobody speaking to it and no skill asking: news of
+a task, a step of the first minutes with a new person (with the step's number in
+the walk's order) and the update line, once each as its first audio is queued,
+from a thread of its own and at most one in 2 s, `Spoke`, with a fixed sentence
+as the reason: no task's text, no agent's answer and no name. A skill's say, a
+reminder and an answer are not told by it (lamp-skills tells the says).

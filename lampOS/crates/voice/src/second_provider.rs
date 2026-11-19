@@ -62,6 +62,17 @@ use tokio::{
 };
 
 mod after_forget;
+
+/// Tests: the status a turn keeps of a `make_skill` call answered as queued
+/// (`LAMP_MAKE_QUEUE`, #7679), as `after_forget::status` keeps it.
+#[cfg(test)]
+pub(crate) fn queued_make_status_for_test() -> serde_json::Value {
+    after_forget::status(
+        crate::made_skill::MAKE,
+        &crate::make_queue::queued_told(1, "q1", "gold price"),
+    )
+}
+
 mod held_rename;
 pub mod limit_local;
 pub mod link;
@@ -1070,6 +1081,14 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// ([`Engine::carrying_skill_yes_from_question`], #7148). `on`, and nothing
 /// else; off, as before.
 pub const SKILL_YES_CARRY_ENVIRONMENT: &str = "LAMP_SKILL_YES_CARRY";
+
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a line no face was seen
+/// speaking is carried in the known person's conversation going on when the
+/// only face in view is the same unbroken eyes track as the face last named
+/// as them, alone in view, though the eyes no longer name it (a hand over
+/// their face mid-conversation; C63(b), lamp-06c1, 18 Nov;
+/// [`Engine::carrying_own_track`]). `on`, and nothing else; off, as before.
+pub const CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES_OWN_TRACK";
 
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line may save into
 /// the conversation's own scope: its `remember` runs as the carried person's
@@ -2307,6 +2326,10 @@ struct Shared {
     /// read-back with no save called ([`yes_save`]); the walk's file when
     /// unset.
     setup_open: Option<SetupOpen>,
+    /// A face kept with nothing asked (`LAMP_FACE_NO_ASK`, names checked,
+    /// [`Engine::keeping_faces_unasked`]): a yes at setup runs no save and
+    /// asks no face question ([`yes_save`]).
+    face_no_ask: bool,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -2349,6 +2372,10 @@ struct Shared {
     /// end of its say-back as played and read by the short-line rule
     /// (`LAMP_SKILL_YES_CARRY`, [`Engine::carrying_skill_yes_from_question`]).
     skill_yes_carry: bool,
+    /// With [`Self::carries`], the face last named as the person, the same
+    /// unbroken track alone in view, is theirs for the carry
+    /// (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`, [`Engine::carrying_own_track`]).
+    carries_own_track: bool,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -2541,6 +2568,30 @@ fn no_other_shown(
         Some(another) => eyes.looked_between(begun, finishing) && !another(),
         None => eyes.no_other_face_in_view(face, begun, finishing),
     }
+}
+
+/// [`Engine::carrying_own_track`] (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`,
+/// C63(b)): with the switch on, the face last named as `person`, when it is
+/// the same unbroken track alone in view through the line
+/// ([`crate::speaking_faces::SpeakingFaces::own_track_alone`]) and not
+/// already `own_face`, the face the eyes name as theirs now. None off.
+fn own_track_face(
+    shared: &Shared,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    person: &str,
+    own_face: Option<&str>,
+    begun: Instant,
+    finishing: Instant,
+) -> Option<String> {
+    if !shared.carries_own_track {
+        return None;
+    }
+    eyes.own_track_alone(
+        |name| crate::known_faces::memory_person(name) == person,
+        begun,
+        finishing,
+    )
+    .filter(|track| own_face != Some(track.as_str()))
 }
 
 /// A known person's line read for the carry (#4339): no face found saying
@@ -5151,6 +5202,7 @@ impl Engine {
                 cut_window: None,
                 said_window: None,
                 setup_open: None,
+                face_no_ask: false,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
@@ -5162,6 +5214,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 skill_yes_carry: false,
+                carries_own_track: false,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5474,6 +5527,23 @@ impl Engine {
         self
     }
 
+    /// With [`Self::carrying_conversations`], a line no face was seen
+    /// speaking is carried when the only face in view through it is the same
+    /// unbroken eyes track as the face last named as its person, though the
+    /// eyes no longer name it (`LAMP_CONVERSATION_CARRIES_OWN_TRACK=on`,
+    /// C63(b)): on lamp-06c1 (18 Nov, request 111) the owner's hand over
+    /// their face mid-conversation let the eyes' name go, the one face at
+    /// the desk read as another face, and "What do you remember about my
+    /// food?" was the room's ([`crate::speaking_faces::SpeakingFaces::own_track_alone`]).
+    /// A second face, another face alone, a gap over 1.5 s, or the eyes
+    /// starting again is the room's, and the rest of the carry stands. The
+    /// carry only: it names no face and moves no known file.
+    pub fn carrying_own_track(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.carries_own_track = on;
+        self
+    }
+
     /// With [`Self::carrying_conversations`], a carried line's `remember`
     /// and its journalled exchange go to the conversation's own scope, the
     /// carried person's (`LAMP_CONVERSATION_CARRIED_SAVES=on`,
@@ -5710,6 +5780,16 @@ impl Engine {
     pub fn holding_renames_for_yes(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.rename_yes = on;
+        self
+    }
+
+    /// With `LAMP_FACE_NO_ASK` and names checked, a yes at setup with no
+    /// save called runs none and asks no face question ([`yes_save`]): the
+    /// setup face is kept only on the speaker's own proof
+    /// (`known_faces::run_speaker`). Off, as before.
+    pub fn keeping_faces_unasked(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_no_ask = on;
         self
     }
 
@@ -9728,12 +9808,18 @@ async fn spoken(
                     .as_ref()
                     .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
                     .map(|(_, face)| face.as_str());
+                // `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b)).
+                let own_track = shared
+                    .scope_seen
+                    .then(|| own_track_face(&shared, eyes, &person, own_face, begun, finishing))
+                    .flatten();
+                let carry_face = own_track.as_deref().or(own_face);
                 let carried = shared.scope_seen
                     && unseen_carry(
                         &shared,
                         eyes,
                         &speakers,
-                        own_face,
+                        carry_face,
                         (begun, finishing),
                         &person,
                         || {
@@ -9746,12 +9832,17 @@ async fn spoken(
                     .is_some_and(|keep_only| carry_into(&shared, scope, &person, keep_only));
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
-                    carried_face = own_face.map(str::to_owned);
+                    carried_face = carry_face.map(str::to_owned);
                     eprintln!(
                         "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                         carried_as(&shared),
                         carried_told(scope)
                     );
+                    if own_track.is_some() {
+                        eprintln!(
+                            "lamp-voice second: request {request}: carried on their face as last named, the same unbroken track alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
+                        );
+                    }
                 }
                 // Their known face the one face through it, none seen
                 // speaking it, no other voice in the conversation, and not
@@ -9968,6 +10059,10 @@ async fn spoken(
             .as_ref()
             .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
             .map(|(_, face)| face.as_str());
+        // `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b)): their face as last
+        // named, the same unbroken track alone in view, as above.
+        let own_track = own_track_face(&shared, eyes, &person, face, begun, finishing);
+        let face = own_track.as_deref().or(face);
         if speakers.is_empty()
             && no_other_shown(&shared, eyes, face, begun, finishing)
             && eyes.face_seen_between(
@@ -9984,6 +10079,11 @@ async fn spoken(
                 carried_as(&shared),
                 carried_told(lease)
             );
+            if own_track.is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: carried on their face as last named, the same unbroken track alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
+                );
+            }
             if prepared.take().is_some() {
                 eprintln!(
                     "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the room's"
@@ -11786,6 +11886,10 @@ async fn spoken(
             scope.as_ref(),
             Instant::now(),
         ))
+        // Makes waiting their turn (`LAMP_MAKE_QUEUE`, #7679): their labels
+        // and ids, so "never mind the gold one" can drop one. None waiting
+        // (always, with the switch off), nothing.
+        .chain(crate::make_queue::note())
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
@@ -15602,6 +15706,14 @@ fn yes_save(
     if !heard {
         return None;
     }
+    // With `LAMP_FACE_NO_ASK` (the product owner's no-asks rule; the first
+    // builder's ruling on #7810): a yes is no proof that the face in view
+    // said the name, so it runs no save, and no face question is asked;
+    // the face is kept only on the speaker's own proof
+    // (`known_faces::run_speaker`), else the step ends with the name only.
+    if shared.face_no_ask {
+        return None;
+    }
     let said = said_window(shared);
     let (name, face) = match crate::known_faces::face_agreed_name(&said) {
         Some(name) => (name, true),
@@ -18437,10 +18549,15 @@ async fn answer(
                 };
                 // The round asked again for a reply that said a make line
                 // with no call is the turn's first words too: the same.
+                // Not while another make is under way or waits
+                // (`LAMP_MAKE_QUEUE`, #7679; never with it off): this one
+                // waits its turn, and its one line is "I'll make it next",
+                // never "I'll make it now" before it. One lock, no I/O.
                 if new_make
                     && (round == 1 || begun_again_at.is_some())
                     && !queue.started
                     && !text.chars().any(char::is_alphanumeric)
+                    && !crate::make_queue::busy()
                     && !std::mem::replace(&mut make_opened, true)
                 {
                     let english = crate::make_skill_agent::MAKE_OPENING;

@@ -8,7 +8,9 @@
 //! present only while the yes stands (Fourteen's design on #6543). It is a
 //! yes only when [`KEY`] is exactly `"yes"`; missing, unreadable, over
 //! `lamp_msgs::consent::MOST_BYTES` (4096), not JSON or anything else is
-//! no. It is read with `lamp_msgs::consent::read`, the same rule lamp-ears
+//! no. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, off unless set, in no
+//! unit) a missing file is a yes nobody gave and a kept `"no"` stays no. It
+//! is read with `lamp_msgs::consent::read_or`, the same rule lamp-ears
 //! keeps for `room-sounds.json`, and read again every [`READ_EVERY`], as
 //! lamp-ears asks its yes again every 2 s: once the file is gone, the gate
 //! closes at the next read.
@@ -115,6 +117,9 @@ pub trait Store {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct File {
     pub path: PathBuf,
+    /// What a missing file reads as (#7767): `LAMP_NOTICING_BY_DEFAULT`
+    /// ([`consent::noticing_by_default`]), read once when made.
+    pub by_default: bool,
 }
 
 impl File {
@@ -127,7 +132,13 @@ impl File {
     pub fn in_folder(folder: &Path) -> Self {
         Self {
             path: folder.join(FILE),
+            by_default: consent::noticing_by_default(),
         }
+    }
+
+    /// The same file, with a missing one read as `by_default`.
+    pub fn by_default(self, by_default: bool) -> Self {
+        Self { by_default, ..self }
     }
 
     /// Whether the file is gone (not there at all, as against there and
@@ -141,8 +152,13 @@ impl File {
 }
 
 impl Reader for File {
+    /// `lamp_msgs::consent`'s one rule ([`consent::read_or`], as
+    /// [`consent::allowed`] reads it): a kept `"no"` is no, a missing file
+    /// is [`File::by_default`]'s, a yes nobody gave
+    /// ([`consent::BY_DEFAULT`], with no time), and a file that can't be
+    /// read is no.
     fn read(&self) -> Kept {
-        consent::read(&self.path, KEY)
+        consent::read_or(&self.path, KEY, self.by_default)
     }
 }
 
@@ -294,10 +310,38 @@ mod tests {
         folder
     }
 
+    /// #7767: off, a missing file is no, as before; with
+    /// `LAMP_NOTICING_BY_DEFAULT` on it is a yes nobody gave, with no time; a
+    /// kept no and a file that can't be read stay no either way.
+    #[test]
+    fn a_missing_opt_in_is_the_default_only_with_the_switch() {
+        let folder = folder("default");
+        let latch = OptIn::default();
+        let off = File::in_folder(&folder).by_default(false);
+        let on = File::in_folder(&folder).by_default(true);
+        assert_eq!(off.read(), Kept::default(), "missing, off");
+        let kept = on.read();
+        assert!(latch.on(&kept), "missing, on");
+        assert_eq!(kept.by.as_deref(), Some(consent::BY_DEFAULT));
+        assert_eq!(kept.at_unix_s, None);
+        for text in [
+            consent::no_bytes(KEY, 9, consent::BY_VOICE),
+            b"not json".to_vec(),
+        ] {
+            std::fs::write(&on.path, &text).unwrap();
+            assert!(!latch.on(&on.read()), "{}", String::from_utf8_lossy(&text));
+            assert!(!latch.on(&off.read()), "{}", String::from_utf8_lossy(&text));
+        }
+        std::fs::remove_file(&on.path).unwrap();
+        std::fs::create_dir(&on.path).unwrap();
+        assert!(!latch.on(&on.read()), "unreadable");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
     #[test]
     fn off_unless_a_kept_yes() {
         let folder = folder("off");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         let latch = OptIn::default();
         assert!(!latch.on(&file.read()), "missing");
         assert!(file.gone());
@@ -362,7 +406,7 @@ mod tests {
     #[test]
     fn reading_never_writes_the_consent_folder() {
         let folder = folder("ro");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         std::fs::write(&file.path, consent::bytes(KEY, 7, consent::BY_APP)).unwrap();
         let before = std::fs::read(&file.path).unwrap();
         let mut latch = OptIn::default();
@@ -483,7 +527,7 @@ mod tests {
     #[test]
     fn a_record_left_after_the_yes_was_removed_turns_nothing_on() {
         let folder = folder("left");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         let record = Record::in_folder(&folder);
         record
             .set_said(Said::On {

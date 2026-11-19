@@ -58,6 +58,7 @@ pub mod body_motion;
 pub mod bus_out;
 pub mod did_history;
 pub mod did_ring;
+pub mod did_voice;
 pub mod watches;
 // A developer's computer reads the microphone off the bus (`--microphone-device bus:mic1`).
 #[cfg(unix)]
@@ -116,6 +117,7 @@ pub mod made_turn;
 pub mod make_core_offer;
 pub mod make_no_asks;
 pub mod make_no_cannot;
+pub mod make_queue;
 pub mod make_skill_agent;
 pub mod make_skill_local;
 pub mod marked;
@@ -193,6 +195,7 @@ pub mod ring_night;
 pub mod ring_requests;
 pub mod ring_sight;
 pub mod ring_unplug;
+pub mod ring_update;
 pub mod ring_wire;
 pub mod ring_worker;
 pub mod room_floor;

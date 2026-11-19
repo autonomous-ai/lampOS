@@ -2859,7 +2859,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   written and are always taken out: OpenClaw refuses `mode` beside either
   (exit 78, the gateway down), and today's stable lamp-tasks, the rollback
   target, inserts `mode: "ask"` and removes nothing else, so only a
-  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). The skill-start launcher's allow-list entry ("One exec approval",
+  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). A lamp
+  updated from an older build with `security`/`ask` in `tools.exec`, with or
+  without a `mode` beside them (the file the gateway exits 78 on), gets
+  `mode` alone at the next lamp-tasks start, a person's own exec keys (such as `askFallback`) kept; a
+  file with `mode` alone already is left unwritten (#7859). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 
@@ -2880,6 +2884,13 @@ stand-in is removed once a sandbox hook mode (openharness#4194) ships in the
 pinned Harness (docs/install.md, "Hermes on the lamp").
 
 ## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
+
+A skill's run is no task in the store, so `tasks/status` never lists it:
+with `serve --progress`, each one is said on `skills/tasks` instead (#7873,
+[msgs.md](msgs.md) `SkillTask`, for lamp-peek), `started` with its run id
+and the engine it began on (`skill_task::tell_run`, where `HarnessRunner`
+picks the engine, with Harness or without), then `ran` or `failed` when its
+runner ends (`run_on_token`). A make's and a voice ask's runs are not said.
 
 A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
 hands its slower part to the lamp's own Hermes. lamp-skills sends one line

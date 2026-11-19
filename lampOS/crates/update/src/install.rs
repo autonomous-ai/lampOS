@@ -55,6 +55,11 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lampos-parts.slice",
         include_str!("../../../deploy/product/lampos-parts.slice"),
     ),
+    // The Store apps' slice (#7415): every lampapp@ and lampapp-net@ below it.
+    (
+        "lampos-apps.slice",
+        include_str!("../../../deploy/product/lampos-apps.slice"),
+    ),
     (
         "lamp-voice.service",
         include_str!("../../../deploy/product/lamp-voice.service"),
@@ -267,6 +272,30 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
     // Setup's hotspot again when a set-up lamp's saved network is gone
     // (#3020); `LAMP_WIFI_RECOVERY=on` in the unit (#5758).
+    // The Store apps (#7415, docs/apps.md): the manage helper, root's, started by its socket for each
+    // connection (the socket enabled, the template never); the boot's start of the apps the owner has
+    // not stopped; and the two static app templates, started by name, never enabled. All do nothing
+    // while LAMP_STORE_APPS is off in their own environment.
+    (
+        "lamp-apps-manage.socket",
+        include_str!("../../../deploy/product/lamp-apps-manage.socket"),
+    ),
+    (
+        "lamp-apps-manage@.service",
+        include_str!("../../../deploy/product/lamp-apps-manage@.service"),
+    ),
+    (
+        "lamp-apps-start.service",
+        include_str!("../../../deploy/product/lamp-apps-start.service"),
+    ),
+    (
+        "lampapp@.service",
+        include_str!("../../../deploy/product/lampapp@.service"),
+    ),
+    (
+        "lampapp-net@.service",
+        include_str!("../../../deploy/product/lampapp-net@.service"),
+    ),
     (
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
@@ -292,6 +321,8 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-addons.service",
     "lamp-air-clock.service",
     "lamp-air.service",
+    "lamp-apps-manage@.service",
+    "lamp-apps-start.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",
@@ -689,6 +720,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "0192f1ca63da3391fcb14e072afef96244691c35edef6388c8cd91abc05a7b55", // #6543: the app's desk noticing mark, seen-activity-mark.json
     "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts
     "73d29d8ffa197507ad12bcf41037e12a2a9e5f25c9444a82243c1a07c6ff8666", // #6893: the energy beside the character words
     "622eb88154730d0ee596b9ef048e2120ce9eb67ee33393b1503a1a4d53cdf199", // #6543: lamp-seen's state folder and its opt-in, seen-activity.json
@@ -1278,6 +1310,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lampos-setup-done.path",
             "lamp-region.path",
             "lamp-skills-manage.socket",
+            "lamp-apps-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
             "lamp-eyes-camera.socket",
@@ -3760,6 +3793,8 @@ mod tests {
             name.ends_with(".service")
                 && *name != "lamp-update-back.service"
                 && *name != crate::apply::UNIT
+                // The apps' templates run python3 through the fixed launcher.
+                && !name.starts_with("lampapp")
         };
         for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
@@ -3768,12 +3803,13 @@ mod tests {
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
-        // helper (#2892), and lamp-update and its region one-shot (#6256);
+        // helper (#2892), the apps' manage helper and its boot start, and lamp-update
+        // and its region one-shot (#6256);
         // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(
             parts.len(),
-            services - 10,
+            services - 11,
             "every product service is a part"
         );
         for part in &parts {

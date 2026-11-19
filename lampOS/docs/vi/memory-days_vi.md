@@ -476,17 +476,21 @@ trường mới, và một lần ghi không nêu trường nào hoạt động n
 
   | Cột | Kiểu | Mặc định | Giới hạn |
   |---|---|---|---|
-  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder` | `'voice'` | một trong bốn |
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder`, `sdk` | `'voice'` | một trong năm |
   | `source_ref` | `TEXT NOT NULL`, một object JSON | `'{}'` | tối đa 512 byte |
   | `summary` | `TEXT NOT NULL` | `''` | tối đa 160 byte |
   | `deed_unix_ms` | `INTEGER`, null ở bản ghi cũ | null | thời điểm tính bằng ms |
 
   Cùng chỉ mục `service_records_kind(person, source_kind, changed_unix_ms)`.
+  Bảng đã mở ở lát 1 có `CHECK` của `source_kind` chưa có `sdk`; cùng giao
+  dịch đó dựng lại bảng một lần (`allow_sdk`: bảng mới từ `sql` đã lưu có
+  thêm `sdk`, chép mọi dòng, xóa bảng cũ, đổi tên bảng mới, tạo lại chỉ mục
+  và trigger), đếm số dòng trước và sau, lệch là lần mở thất bại.
 - **`service_record`** nhận thêm bốn trường tùy chọn: `source_kind`,
   `source_ref`, `summary` và `deed_unix_ms`. Không có trường nào (voice cũ)
   thì bản ghi là `voice`, như mọi bản ghi trước đây. Loại không biết bị từ
   chối `bad_kind`, lần ghi đổi loại của một bản ghi đã giữ cũng vậy. Loại
-  liên kết (`task`, `agent`, `reminder`) phải gửi `source_ref` ở mọi lần
+  liên kết (`task`, `agent`, `reminder`, `sdk`) phải gửi `source_ref` ở mọi lần
   ghi; bản ghi `voice` thì tùy. `source_ref` là
   `{service, id, session?, computer?}`: object chỉ gồm các trường đó, mỗi
   trường là chữ không có ký tự điều khiển, `service` và `id` không rỗng, tối
@@ -610,7 +614,9 @@ mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 (`lamp-voice` `service_records::linked`). Mỗi bên ghi đến cùng công tắc
 riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 [tasks_vi.md](tasks_vi.md)); dòng lời nhắc (`LAMP_SERVICE_RECORDS_REMINDERS`,
-[schedule.md](../schedule.md)); dòng của agent đến sau (`_AGENT`). Khi
+[schedule.md](../schedule.md)); các lệnh gọi của lượt chạy kỹ năng
+(`LAMP_SERVICE_RECORDS_AGENT`, phần 5, [services_vi.md](services_vi.md));
+`LAMP_SERVICE_RECORDS_SDK` bên dưới. Khi
 `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
@@ -701,6 +707,54 @@ ghi ("kể thêm đi", "nó nói gì?"), nó lấy thứ bản ghi trỏ tới t
 - **Bản cũ.** lamp-memory cũ từ chối `key` (`deny_unknown_fields`): lần gọi
   là `timed_out`. Tắt (công tắc nào cũng vậy) thì không cấp công cụ và
   không ai chạy.
+
+### Số lần đổi ghi chú mỗi ngày của một máy tính đã ghép đôi (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, tắt)
+
+Dòng tracker C157 (quyết định của chủ bộ nhớ và cái gật đầu của builder
+đầu tiên, 17/11 trên #6811): mỗi ngày một bản ghi liên kết cho mỗi máy tính
+lập trình mà chủ nhân ghép đôi từ app, "The paired computer Dev laptop
+changed its notes 4 times on 2026-11-17". Chỉ là con số: không bao giờ có
+khóa của ghi chú, tên khóa hay giá trị.
+
+- **Phía bộ nhớ.** `sdk` là loại nguồn thứ năm. Bản ghi `sdk` chỉ là một
+  con số: service `sdk`, action `notes_changed`, trạng thái `done`, không
+  có `detail`, `reason`, `result_id`, `links` hay `replaced_by`; khác đi
+  thì bị từ chối `bad_detail`, nên không khóa hay giá trị ghi chú nào của
+  máy tính có thể được lưu vào đó. Khác các bản ghi đã chốt, lần ghi sau
+  cùng khóa (con số cao hơn trong ngày) cập nhật tại chỗ tóm tắt,
+  `source_ref`, thời điểm việc làm và thời điểm đổi; trạng thái vẫn là
+  `done`. Nó chịu giới hạn theo loại (2.000) và quy tắc quên theo thời điểm
+  việc làm; quên hết, quên người và quên về một điều khớp với tóm tắt đều
+  xóa nó như mọi dòng.
+- **Con số.** lamp-control đếm mỗi `notes.set` hay `notes.delete` đã giữ
+  (xóa một khóa không có thì không tính) của từng máy tính theo ô 15 phút,
+  chỉ trong bộ nhớ, 25 giờ gần nhất, gồm số lần và thời điểm lần đổi cuối
+  (`notes::Notes::changes_since`); thu hồi máy tính thì xóa chúng. Socket
+  của chủ nhân trả lời `{"note_changes": {"since_unix_ms": N}}` cho riêng
+  voice (theo cgroup), bằng `{"computers": [{client, name, changes,
+  last_unix_ms}]}`, chỉ cho các máy tính mà tệp phụ đánh dấu là ghép đôi từ
+  app của chủ nhân (`paired-by.json`, control.md, "Notes").
+- **Của ai.** Lần ghép đôi được tệp phụ đánh dấu `app`, đúng `paired_at` của
+  lần ghép đó, là của chủ nhân; mã `lamp-control code` của người giữ máy,
+  dấu đã cũ, agent cục bộ hay không có tệp phụ thì không có con số nào. Dòng
+  được giữ dưới id bộ nhớ của chủ nhân (`person::owner_ids`, id `p-` đầu
+  tiên); không biết chủ nhân thì không giữ gì.
+- **Phía voice** (`service_records::sdk_counts`, tuyến thứ hai). Cứ 5 phút
+  một luồng riêng hỏi lamp-control (mỗi chiều tối đa 1 giây) và đưa qua hộp
+  chờ liên kết một dòng cho mỗi máy tính có con số cao hơn lần đưa trước:
+  khóa `s-<client>-<YYYYMMDD>` (ngày địa phương của đèn), `source_ref`
+  `{service: "sdk", id: <client>, computer: <tên máy, bỏ ký tự điều khiển,
+  tối đa 64 byte>}`, thời điểm việc làm là lần đổi cuối được đếm. Nó đếm từ
+  mốc muộn nhất trong nửa đêm địa phương, lúc voice khởi động và lần quên
+  hết gần nhất của chủ nhân, nên con số không bao giờ tính lùi qua một lần
+  quên; khởi động lại một trong hai phần thì đếm lại từ đầu ngày (có thể
+  đếm thiếu, không bao giờ đếm thừa).
+- **Tắt.** Trừ khi `LAMP_SERVICE_RECORDS_SDK=on` cùng
+  `LAMP_SERVICE_RECORDS=on`, không hỏi, không giữ và không ghi gì.
+- **Quay về bản cũ.** lamp-control cũ trả lời op bằng `error`, và không giữ
+  gì. Bộ nhớ đã được migrate bởi bản có `CHECK` bốn loại (lát 1 trước thay
+  đổi này, chưa từng có trong sản phẩm) giữ `CHECK` đó, nên từ chối dòng
+  `sdk` và không giữ gì.
 
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 

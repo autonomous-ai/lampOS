@@ -605,6 +605,7 @@ Added by the seventh builder on 2026-10-16 (#938). The type lives in
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `SkillEvent` | `skills/events` | event | none / none | One stage of a run of a physical skill ([skills.md](skills.md)): the skill's name, the `SkillStage` (`triggered`, `asked`, `answered`, `done`), why in words, and, with `answered` only, whether the Policy `allowed` it |
+| `SkillTask` | `skills/tasks` | event | none / none | A skill's `do.task` run and its answer at its gate (#7873): the skill's name and a `SkillTaskStage`. `lamp-tasks` (with `serve --progress`) says `started` with the run's id (`task-<ms>-<pid>-<n>`, as its journal names it) and the engine it began on, then `ran` or `failed`; `lamp-skills` says `held` with the gate's own reason (`not alone`, `a voice heard`, `private`), then `told` or `dropped`. `run` only with `started`/`ran`/`failed`, `engine` only with `started`, `gate` only with `held`. Never a word of the task's, the agent's or the answer's: a skill's run is no task in the store, so `tasks/status` never lists it |
 
 Published by `lamp-skills` only. `check()` holds the name to 1 to 64
 lowercase letters, digits and hyphens, `why` to 2,000 bytes, and `allowed`

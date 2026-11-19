@@ -136,9 +136,12 @@ struct Lamp {
     read_times: Vec<Duration>,
     /// Each servo id asked for its position limits (registers 9..=12).
     limit_reads: Vec<u8>,
-    /// This many reads of the force limits (register 48) go unanswered, as
-    /// when a servo just started is slow on the wire (#6591).
-    lost_force_reads: u8,
+    /// Sync reads that go unanswered, as when a servo just started is slow
+    /// on the wire (#6591): the register first read, and how many more reads
+    /// of it are lost.
+    lost_reads: Vec<(u8, u8)>,
+    /// The first register of each sync read asked, in order.
+    sync_reads: Vec<u8>,
 }
 
 struct Clock {
@@ -231,7 +234,8 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             misreads: Vec::new(),
             read_times: Vec::new(),
             limit_reads: Vec::new(),
-            lost_force_reads: 0,
+            lost_reads: Vec::new(),
+            sync_reads: Vec::new(),
         },
         Clock {
             time,
@@ -476,8 +480,13 @@ impl Lamp {
                     if address == 9 {
                         self.limit_reads.extend(parameters[2..].iter().copied());
                     }
-                    if address == 48 && self.lost_force_reads > 0 {
-                        self.lost_force_reads -= 1;
+                    self.sync_reads.push(address);
+                    if let Some(lost) = self
+                        .lost_reads
+                        .iter_mut()
+                        .find(|(read, left)| *read == address && *left > 0)
+                    {
+                        lost.1 -= 1;
                         continue;
                     }
                     for asked in parameters[2..].iter().copied() {
@@ -1600,7 +1609,7 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
         ..Limits::FOLDED
     };
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
-    lamp.lost_force_reads = 1;
+    lamp.lost_reads = vec![(48, 1)];
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
@@ -1609,7 +1618,7 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
 
     // A servo that never answers still ends the run before anything moves.
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
-    lamp.lost_force_reads = u8::MAX;
+    lamp.lost_reads = vec![(48, u8::MAX)];
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
     assert_eq!(
@@ -1621,6 +1630,49 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
     );
     assert!(!report.moved && lamp.goals.is_empty());
     assert_eq!(report.force, None);
+}
+
+/// Each of a start's read-backs is asked `READ_BACK_TRIES` times in all
+/// while no answer comes (#6591, Heron's P2 on #7096): two lost answers are
+/// ridden, a third ends it with the read's own error, and nothing is asked
+/// a fourth time. The same for the arm's profiles, the commanded joints'
+/// profiles and the force limits.
+#[test]
+fn every_start_read_back_is_asked_three_times_in_all_and_no_more() {
+    type Read = fn(&mut Bus<'_, Lamp, Clock>) -> Result<(), String>;
+    let reads: [(&str, u8, Read); 3] = [
+        ("arm profiles", 40, |bus| bus.arm_profiles().map(drop)),
+        ("profiles", 40, |bus| bus.profiles().map(drop)),
+        ("force limits", 48, |bus| {
+            bus.force_limits(&[Joint::BaseYaw]).map(drop)
+        }),
+    ];
+    for (name, address, read) in reads {
+        for lost in 0..=3u8 {
+            let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+            lamp.lost_reads = vec![(address, lost)];
+            let result = {
+                let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
+                bus.read_back(read)
+            };
+            let asked = lamp
+                .sync_reads
+                .iter()
+                .filter(|read| **read == address)
+                .count();
+            if lost < 3 {
+                assert_eq!(result, Ok(()), "{name}, {lost} lost");
+                assert_eq!(asked, usize::from(lost) + 1, "{name}, {lost} lost");
+            } else {
+                assert_eq!(
+                    result,
+                    Err("a reply did not come in time".into()),
+                    "{name}, {lost} lost"
+                );
+                assert_eq!(asked, 3, "{name}, {lost} lost");
+            }
+        }
+    }
 }
 
 #[test]

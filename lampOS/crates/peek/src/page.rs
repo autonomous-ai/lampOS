@@ -4,7 +4,7 @@
 //! made here, with everything a message, a record or a unit carries
 //! escaped; the page's few lines of script only put it in its place.
 use crate::{
-    timeline::{self, Agent, Entry},
+    timeline::{self, Agent, Entry, SkillRun},
     turns::{ReadFailure, ReadStatus, Snapshot, Step, Turn},
     units::UnitRow,
     view::{self, escape},
@@ -13,7 +13,8 @@ use crate::{
 use lamp_bus::Message;
 use lamp_msgs::{
     AgentState, DecisionKind, ExpressionBody, Faces, HandStage, Health, JointState, Level, Light,
-    RoomPresence, Sign, StepKind, TaskStatus, TaskStep, TurnVerdict, VoiceDecision, VoiceState,
+    RoomPresence, Sign, SkillTaskStage, StepKind, TaskStatus, TaskStep, TurnVerdict, VoiceDecision,
+    VoiceState,
 };
 use std::fmt::Write;
 
@@ -624,6 +625,23 @@ fn path(decision: Option<&VoiceDecision>) -> String {
     }
 }
 
+/// The path of a turn that began a skill's run (#7873): AGENT, the engine
+/// it began on, the task as lamp-tasks' journal names it ([`run_name`]),
+/// and how it is going: started, ran or failed.
+fn skill_path(run: &SkillRun) -> String {
+    let stage = match run.ended {
+        None => "started",
+        Some((SkillTaskStage::Failed, _)) => "failed",
+        Some(_) => "ran",
+    };
+    // `engine_name` and `run_name` escape what they carry.
+    format!(
+        "<span class=\"badge badge-blue\">AGENT · {} · {} · {stage}</span>",
+        engine_name(run.engine.as_deref().unwrap_or("?")),
+        run_name(run)
+    )
+}
+
 /// One step of a task's agent: its kind, number and tool always (✗ on a
 /// call that failed); its arguments and result, the reply's or the error's
 /// text, only with `words`.
@@ -726,7 +744,10 @@ fn card(
              <b>{}</b>{}{}{}{}<span class=\"small\">request {} · {}</span></div>",
             type_icon(heard.is_some()),
             escape(kind),
-            path(decision),
+            entry
+                .skill_run
+                .as_ref()
+                .map_or_else(|| path(decision), skill_path),
             turn_status(entry, record, index == 0, now),
             turn_total(entry).map(total).unwrap_or_default(),
             lightning,
@@ -1168,16 +1189,34 @@ pub fn tasks_line(status: Option<&TaskStatus>) -> String {
 /// task's words, prompt, folder and answer are never on the bus, and
 /// nothing else about tasks is read.
 pub fn tasks(status: Option<&TaskStatus>, now_unix_ms: u64) -> String {
+    tasks_with(status, &[], now_unix_ms)
+}
+
+/// [`tasks`], and under **Skill tasks** the skills' runs and answers
+/// (`skills/tasks`, #7873, newest first): a skill's `do.task` run is no
+/// task in the store, so `tasks/status` never lists it. While one works,
+/// nothing is said to be not worked on.
+pub fn tasks_with(status: Option<&TaskStatus>, runs: &[SkillRun], now_unix_ms: u64) -> String {
+    let skills = skill_tasks(runs, now_unix_ms);
+    let working = runs
+        .iter()
+        .any(|run| run.run.is_some() && run.ended.is_none());
+    let nothing = if working {
+        ""
+    } else {
+        "<p>Nothing is being worked on.</p>"
+    };
     let Some(status) = status else {
-        return "<p>No word from lamp-tasks: its progress (tasks/status) is not on the bus.</p>"
-            .to_owned();
+        return format!(
+            "<p>No word from lamp-tasks: its progress (tasks/status) is not on the bus.</p>{skills}"
+        );
     };
     if status.tasks.is_empty() && status.unread.is_empty() && status.settled.is_empty() {
-        return "<p>Nothing is being worked on.</p>".to_owned();
+        return format!("{nothing}{skills}");
     }
     let mut html = String::new();
     if status.tasks.is_empty() && status.unread.is_empty() {
-        html.push_str("<p>Nothing is being worked on.</p>");
+        html.push_str(nothing);
     }
     for task in &status.tasks {
         let (state, colour) = state_badge(task.state, false);
@@ -1233,5 +1272,70 @@ pub fn tasks(status: Option<&TaskStatus>, now_unix_ms: u64) -> String {
             span(now_unix_ms.saturating_sub(task.at_unix_ms) / 1000)
         );
     }
+    html.push_str(&skills);
     html
+}
+
+/// A skill's run as lamp-tasks' journal names it, `task <ms>-<pid>-<n>`,
+/// or, with no run, a skill's answer.
+fn run_name(run: &SkillRun) -> String {
+    match &run.run {
+        Some(id) => format!("task {}", escape(id.strip_prefix("task-").unwrap_or(id))),
+        None => "an answer".to_owned(),
+    }
+}
+
+/// The Tasks section's skill tasks (#7873): a card for each, its run, its
+/// engine, its state (working blue, done green, failed red; an answer with
+/// no run, grey), its skill and when it began, and what became of its
+/// answer at its gate ([`gate_line`]). Names, ids and the gate's fixed
+/// reasons only.
+fn skill_tasks(runs: &[SkillRun], now_unix_ms: u64) -> String {
+    if runs.is_empty() {
+        return String::new();
+    }
+    let mut html = "<h3>Skill tasks</h3>".to_owned();
+    for run in runs {
+        let (state, colour) = match run.ended {
+            Some((SkillTaskStage::Failed, _)) => ("failed", "badge-red"),
+            Some(_) => ("done", "badge-green"),
+            None if run.run.is_some() => ("working", "badge-blue"),
+            None => ("its answer", "badge-grey"),
+        };
+        let mut said = vec![
+            format!("skill {}", escape(&run.skill)),
+            format!(
+                "began {} ago",
+                span(now_unix_ms.saturating_sub(run.at_unix_ms) / 1000)
+            ),
+        ];
+        said.extend(gate_line(run));
+        let _ = write!(
+            html,
+            "<div class=\"card task{}\"><b>{}</b> <span class=\"badge\">{}</span>\
+             <span class=\"badge {colour}\">{state}</span><div class=\"small\">{}</div></div>",
+            if run.ended.is_some() { " ended" } else { "" },
+            run_name(run),
+            engine_name(run.engine.as_deref().unwrap_or("?")),
+            said.join(" · ")
+        );
+    }
+    html
+}
+
+/// What became of a skill's answer at its gate (#7873): "held for its
+/// gate: <why>", then told or dropped; or told or dropped at once.
+fn gate_line(run: &SkillRun) -> Option<String> {
+    let answer = run.answer.map(|(stage, _)| match stage {
+        SkillTaskStage::Told => "told",
+        _ => "dropped",
+    });
+    match (&run.held, answer) {
+        (Some(why), None) => Some(format!("held for its gate: {}", escape(why))),
+        (Some(why), Some(answer)) => {
+            Some(format!("held for its gate: {}, then {answer}", escape(why)))
+        }
+        (None, Some(answer)) => Some(answer.to_owned()),
+        (None, None) => None,
+    }
 }

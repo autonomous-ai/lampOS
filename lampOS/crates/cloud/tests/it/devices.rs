@@ -51,6 +51,7 @@ fn lamp(name: &str, on: bool) -> (Real, PathBuf) {
         services: None,
         control: None,
         consent: None,
+        desk_noticing: None,
         monitor: None,
         devices: on.then(Default::default),
         apps: None,

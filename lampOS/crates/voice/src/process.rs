@@ -1188,6 +1188,14 @@ fn worker_command(
             role,
             var(crate::service_records::source::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_records_agent_worker_environment(
+            role,
+            var(crate::service_records::agent_rows::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_records_sdk_worker_environment(
+            role,
+            var(crate::service_records::sdk_counts::ENVIRONMENT).as_deref(),
+        ))
         .envs(service_read_ids_worker_environment(
             role,
             var(crate::service_read_ids::ENVIRONMENT).as_deref(),
@@ -1389,6 +1397,10 @@ fn worker_command(
         .envs(night_worker_environment(
             role,
             var(crate::ring_night::ENVIRONMENT).as_deref(),
+        ))
+        .envs(ring_update_worker_environment(
+            role,
+            var(crate::ring_update::ENVIRONMENT).as_deref(),
         ))
         .envs(rest_through_sounds_worker_environment(
             role,
@@ -1933,6 +1945,29 @@ fn service_records_source_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::source::ENVIRONMENT, "on"))
+}
+
+// Agent rows (the linked-service memory plan, slice 5), passed the same
+// narrow way: the exact `on`, to the second route alone, where a skill
+// run's write is read back. It acts only beside `LAMP_SERVICE_RECORDS`
+// (`service_records::agent_rows::on`).
+fn service_records_agent_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::agent_rows::ENVIRONMENT, "on"))
+}
+
+// A paired computer's daily notes count (tracker row C157), passed the
+// same narrow way: the exact `on`, to the second route alone. It acts only
+// beside `LAMP_SERVICE_RECORDS` (`service_records::sdk_counts::on`).
+fn service_records_sdk_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::sdk_counts::ENVIRONMENT, "on"))
 }
 
 // A calendar read's event ids kept for the next request (tracker row
@@ -2666,6 +2701,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::GUIDE_ENVIRONMENT,
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+        // A make while another is made waits its turn (#7679).
+        crate::make_queue::ENVIRONMENT,
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
@@ -2693,6 +2730,8 @@ fn second_route_worker_environment(
         crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
         // A skill's yes carried from its say-back's end (#7148).
         crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT,
+        // The face last named, the same track alone in view, carries (C63(b)).
+        crate::second_provider::CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         // A carried line read and kept as its person's (9 Nov, #5842).
         crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
@@ -2802,6 +2841,16 @@ fn night_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::ring_night::ENVIRONMENT, "on"))
+}
+
+// An update on the ring (#7516), the same narrow way: the exact `on`, to
+// the ring only, which shapes its resting face while a build comes.
+fn ring_update_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_update::ENVIRONMENT, "on"))
 }
 
 // Resting through sounds at night (#1672, #4285), the same narrow way: the
@@ -2994,6 +3043,7 @@ mod tests {
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+            crate::make_queue::ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
             crate::make_core_offer::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
@@ -3024,6 +3074,7 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
             crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT,
             crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT,
@@ -3506,6 +3557,18 @@ mod tests {
                     (
                         service_records_source_worker_environment,
                         "LAMP_SERVICE_RECORDS_SOURCE",
+                        ["second"].as_slice(),
+                    ),
+                    // Agent rows: the second route alone.
+                    (
+                        service_records_agent_worker_environment,
+                        "LAMP_SERVICE_RECORDS_AGENT",
+                        ["second"].as_slice(),
+                    ),
+                    // A computer's daily notes count: the second route alone.
+                    (
+                        service_records_sdk_worker_environment,
+                        "LAMP_SERVICE_RECORDS_SDK",
                         ["second"].as_slice(),
                     ),
                     // A read's event ids kept: the second route alone.
@@ -4012,6 +4075,8 @@ mod tests {
                     crate::service_records::task_rows::ENVIRONMENT,
                     crate::service_records::reminder_rows::ENVIRONMENT,
                     crate::service_records::source::ENVIRONMENT,
+                    crate::service_records::agent_rows::ENVIRONMENT,
+                    crate::service_records::sdk_counts::ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -4034,6 +4099,7 @@ mod tests {
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
+                    crate::ring_update::ENVIRONMENT,
                     crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                     crate::known_faces::AT_DESK_ENVIRONMENT,
@@ -4135,6 +4201,7 @@ mod tests {
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
+                    || name == crate::make_queue::ENVIRONMENT
                     || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::make_core_offer::ENVIRONMENT
@@ -4166,6 +4233,7 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::SKILL_YES_CARRY_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT
                     || name == crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT
@@ -4302,6 +4370,7 @@ mod tests {
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",
+                    "LAMP_CONVERSATION_CARRIES_OWN_TRACK=on",
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
@@ -4340,6 +4409,7 @@ mod tests {
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_CORE_OFFER=on",
                     "LAMP_MAKE_NO_CANNOT=on",
+                    "LAMP_MAKE_QUEUE=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",
@@ -4464,7 +4534,9 @@ mod tests {
                     "LAMP_SERVICE_CONTACTS=on",
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
+                    "LAMP_SERVICE_RECORDS_AGENT=on",
                     "LAMP_SERVICE_RECORDS_REMINDERS=on",
+                    "LAMP_SERVICE_RECORDS_SDK=on",
                     "LAMP_SERVICE_RECORDS_SOURCE=on",
                     "LAMP_SERVICE_RECORDS_TASKS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
@@ -4507,6 +4579,7 @@ mod tests {
                 vec![
                     "LAMP_DID_RING=on",
                     "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_RING_UPDATE=on",
                     "LAMP_SHUTDOWN=on",
                     "LAMP_UNPLUG=on",
                 ],

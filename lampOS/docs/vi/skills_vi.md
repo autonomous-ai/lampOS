@@ -2848,7 +2848,9 @@ carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
 Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay một câu trả lời cần
 nói, nhật ký ghi kèm lý do (`skill:<name>: waits for its gate: quiet
 hours`, `Room::waits`), để câu trả lời bị giữ trong giờ yên lặng vẫn để lại
-một dòng (#7180); mỗi lần lý do đó đổi trong lúc chờ, nhật ký ghi thêm một
+một dòng (#7180), và trên `skills/tasks` là `held` kèm cùng lý do, rồi `told`
+hoặc `dropped` khi kết thúc (`service_read::held_news`, `answer_news`; #7873,
+cho lamp-peek); mỗi lần lý do đó đổi trong lúc chờ, nhật ký ghi thêm một
 lần, tối đa một dòng mỗi giây (`service_read::SAY_WHY_EVERY`), không bao giờ
 ghi ở mỗi lần nhìn, để một lần chờ kéo dài cho thấy điều kiện nào đang giữ
 (lamp-9adf, 17 Nov). Kết thúc vẫn được ghi như trước (`told N`, hoặc `skipped:
@@ -3172,7 +3174,10 @@ cả hai người viết.
   namespace đó, và không token nào được tạo.
 - **Cả trên OpenClaw, qua đường chạy chung
   (`LAMP_MAKE_AGENT_ONE_PATH=on`, bật trong unit lamp-voice của sản phẩm;
-  #7245).** Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
+  #7245).** Nút MAKE IT trong app cũng đi đường này, đọc từ môi trường
+  của chính coordinator (`Agent::for_app`), nên một lần tạo gõ trong app
+  trên đèn OpenClaw được giao cho OpenClaw như lần tạo bằng giọng nói;
+  trước đây lần tạo từ app chỉ giao cho Hermes. Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
   báo agent đó nhận lần chạy, Hermes hay OpenClaw
   (`make_skill_agent::ONE_PATH_ENGINES`), và dòng của nó mang
   `"one_path":true`. lamp-tasks giữ runner namespace của Hermes cho Hermes;
@@ -3388,8 +3393,10 @@ cả hai người viết.
   bắt đầu sau 15 giây). Không bao giờ khi lần giao thất bại ngay, hay khi
   lượt đã bị cắt. Câu báo đã tạo không đổi.
 - **Khi bật `LAMP_MAKE_AGENT_ONE_PATH` (#7371).** Một lần tạo của agent mất
-  khoảng một phút (lamp-c0a4, 16/11: 63 giây từ câu chờ tới kết quả), nên
-  câu chờ nói luôn là bao lâu: "This takes about a minute. I'm on it."
+  khoảng một phút khi đã chạy sẵn (lamp-c0a4, 16/11: 63 giây từ câu chờ tới
+  kết quả) và khoảng ba phút khi khởi động lạnh (lamp-c0a4, 18/11: 184 giây
+  sau khi gateway khởi động lại), nên câu chờ nói luôn là bao lâu: "This can
+  take a few minutes. I'll tell you when it's ready."
   (`make_skill_agent::ONE_PATH_WAITING_LINE`, trong lượt cũng như qua dịch
   vụ nói). Trong lượt, một lần tạo vẫn chưa có câu trả lời 85 giây sau câu
   chờ (`make_skill_agent::LONG_WAIT_AFTER`, khoảng 90 giây từ lúc hỏi) nói
@@ -3515,6 +3522,82 @@ cả hai người viết.
   mail (`write`) mà bước của nó vẫn còn sau kiểm tra của hướng dẫn ở đó, cũng
   cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
   kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
+
+### Một lần tạo khi lần khác đang chạy sẽ chờ đến lượt (`LAMP_MAKE_QUEUE=on`, tắt)
+
+Trên lamp-9adf (stock 14083, #7679) một người tạo một kỹ năng, 47 giây sau
+nhờ thêm một cái nữa ("check the gold price every evening at six"), và nghe
+"The lamp's agent is busy; ask me again in a minute." Đèn đẩy hàng đợi của
+chính nó sang cho người dùng. Khi `LAMP_MAKE_QUEUE=on` (đúng `on`; worker
+của tuyến thứ hai đọc, `crate::make_queue`), giọng nói tạo mỗi lần một kỹ
+năng, theo thứ tự được nhờ, và `busy` một-lần-một của lamp-tasks chỉ còn là
+lớp chặn cuối:
+
+- **Rảnh:** một lần tạo mới (`make_skill` có `request`, được nói thành
+  tiếng, không phải các cách dùng khác của hàm) chạy ngay trong lượt của nó,
+  như khi tắt công tắc, và giữ chỗ duy nhất.
+- **Đang bận:** lần tạo mới chờ, tối đa hai lần, vào trước ra trước. Mô hình
+  được báo ngay `{"ok":true,"queued":true,"place":n,"id":…,"note":…}` và nói
+  một câu bằng ngôn ngữ của cuộc trò chuyện ("mình sẽ làm cái giá vàng ngay
+  sau"), không bao giờ nói là đã làm xong. Việc xếp hàng chỉ là một khóa và
+  một lần thêm, nên câu đó đến nhanh như mọi câu trả lời; nhật ký ghi "make
+  queued at place P in X ms (target 10 ms)". Chỉ khi lần tạo phải chờ, người
+  nhờ được giữ kèm: người của câu nói, chủ đèn nếu đó là câu của chủ
+  (`services::owner_of`), và câu đã nghe cho nó, mà lần tạo bám theo khi
+  chạy (`make_skill_local::with_asker_kept`), nên một phòng đông người không
+  đẩy được nó ra khỏi mười hai lượt trao đổi của luồng hội thoại, và với
+  `LAMP_MAKE_NO_ASKS` lần tạo có code của chủ khi chờ vẫn được bật, hoặc thay
+  kỹ năng xung đột của chủ, như lần tạo chạy ngay (của khách thì không bao
+  giờ). Câu mở đầu "I'll make it now." của đèn cho một lời gọi trống (#7554)
+  không được nói khi đang có lần tạo chạy hoặc chờ, nên câu duy nhất là
+  "mình sẽ làm cái giá vàng ngay sau". Với
+  `LAMP_ACTION_CLAIM_CHECKED`, câu đó không phải lời khẳng định, và một
+  `make_skill` đang xếp hàng không bao giờ chống lưng cho "I made …"
+  (`action_claim::queued_makes_in`). Lần thứ ba chờ nhận câu cố định
+  "Two skills are already waiting for me to make them, so I can't take
+  another one yet. Ask me again once they're done."
+  (`make_queue::QUEUE_FULL_LINE`, có bản tiếng Việt, Nhật, Trung và Hàn
+  trong `language::FIXED_LINES`).
+- **Theo lượt:** lần tạo đang chạy giữ chỗ cho đến khi câu của nó đã được
+  đưa cho lượt của nó hoặc đã được nói, và lời đồng ý cho phần nói lại của
+  nó đã được trả lời, bị xóa hoặc quá `skill_write_yes::YES_WITHIN` (120
+  giây): nơi lưu đó chỉ giữ một lần chờ, và lần tạo thứ hai sẽ ghi đè lên.
+  Sau đó lần tạo đầu hàng chạy mà không có lượt
+  (`second_provider::worker::run_queued`), không nói câu chờ, và câu của nó
+  đi qua dịch vụ nói như của một lần tạo bị cắt, lời đồng ý cho phần nói lại
+  được ép như thường lệ (`skill_write_yes::said_by_the_say_service`). Lần
+  tạo xếp hàng mà thất bại luôn được nói, dù người dùng đã nói thêm sau đó
+  (thất bại của lần tạo bị cắt thì không, sau một câu của họ): họ đã được
+  báo là nó đến ngay sau. Lần tạo thất bại mà không có câu riêng (brief bị
+  từ chối, câu nhờ không rõ khi bật `LAMP_MAKE_NO_ASKS`, phần đó không
+  chạy) nói một câu từ lỗi trong câu trả lời, kèm nhãn: "I couldn't make the
+  gold one: …" (`make_queue::failed_line`). Lần tạo bật một kỹ năng lõi đã làm việc đó (#7763)
+  nói câu mà câu trả lời của nó đưa ra (`make_queue::line_to_say`). Các quy
+  tắc không-hỏi, xung đột và kỹ năng lõi áp dụng như với lần tạo chạy ngay:
+  nó đi qua cùng câu trả lời `make_skill`.
+- **Thôi khỏi:** `make_skill` nhận `label` (hai đến bốn từ của mô hình) và
+  `cancel_waiting` (id của lần tạo đang chờ; không phải `cancel`, vì
+  `choice` của một xung đột đã dùng từ đó). Khi còn lần chờ, ghi chú của mỗi
+  câu sau liệt kê nhãn và id của chúng; "thôi khỏi làm cái giá vàng" chỉ bỏ
+  đúng cái đó, và chỉ cho người đã nhờ nó hoặc chủ đèn: khách không bỏ được
+  cái của chủ. Câu "quên hết mọi thứ về tôi" đã được đánh dấu của một người
+  bỏ các lần tạo họ nhờ còn đang chờ, không báo và không bao giờ làm từ lời
+  của họ (`make_queue::forget_with_everything`).
+- **Bị bỏ, không bao giờ làm sau:** lần tạo chờ quá 6 phút, vẫn còn chờ khi
+  giờ yên lặng bắt đầu, hoặc đang chờ khi giọng nói dừng, được báo là chưa
+  làm: "I didn't get to make what you asked for while I was busy, so it
+  wasn't made. Ask me again if you still want it:" kèm các nhãn
+  (`make_queue::QUEUE_DROPPED_LINE`). Qua một lần khởi động lại chỉ giữ các
+  nhãn (`/run/lampos-voice/make-queue.json`), đọc một lần khi worker khởi
+  động, nói khi socket của dịch vụ nói trả lời (tối đa 30 giây, ghi nhật ký
+  cả hai trường hợp) rồi xóa.
+
+Hai chỗ chờ dùng chung cho mọi người mà cổng tạo kỹ năng cho phép tạo. Ở đây
+chỉ xếp hàng lần tạo sau một lần tạo: lần tạo sau một task Harness hoặc
+one-session thuộc #7595. Khi tắt, lần tạo thứ hai bị từ chối như trước,
+từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng giọng nói, cả hai
+được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
+lời đồng ý của lần đầu.
 
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 
@@ -4024,7 +4107,16 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    kèm lý do nêu tên cả hai kỹ năng (câu trả lời 2 của first builder trên
    #7249): "the words “take a photo” would start both test note and another
    skill, photo booth, so neither would start; say other words for test
-   note". Chính kỹ năng đó tạo lại thì không tính là kỹ năng khác.
+   note". Chính kỹ năng đó tạo lại thì không tính là kỹ năng khác. Lý do
+   này được nói nguyên văn cho người dùng (`made_skill::words_taken` trong
+   `plain_reason`; sửa 3 của DEFAULT-ON #7828: trên lamp-9adf người dùng
+   nghe "I couldn't make that one. Try asking for one thing…"): "I couldn't
+   make that: the words “take a photo” would start both test note and
+   another skill, photo booth, so neither would start; say other words for
+   test note.", chỉ khi công tắc `LAMP_MAKE_NO_ASKS` bật (P3 1 của Heron
+   trên #7836: khi tắt, người dùng nghe như trước). Khi bật, một
+   cụm trùng với kỹ năng chính người dùng tạo thì thay thế nó (xem "Không
+   hỏi gì").
 4. **Nói lại kèm các từ** (`made_skill::plainly`): "When you say “send my
    test note”, it mails me@example.com ... It starts only when you say it,
    never on its own. It waits for you to agree before it sends anything."
@@ -4178,6 +4270,27 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   on. Say 'remove it' to undo." Lần tạo có code riêng, và lần tạo của
   agent, không bao giờ thay thế: chúng được bật bên cạnh. Không chờ lựa
   chọn nào.
+- **Cụm từ trùng với kỹ năng của chính họ thì thay thế nó, khi chủ đèn yêu
+  cầu** (DEFAULT-ON của #7828, sửa 3: trên lamp-9adf "the words “flip a
+  coin” would start both coin flip and another skill, flip a coin, so
+  neither would start" đã từ chối lần tạo). Lúc tạo
+  (`made_skill::asks_taken_sparing`), một lần tạo thường bằng giọng nói
+  (không code, không ghi, không tác vụ agent) mà cụm từ sẽ khởi động các
+  kỹ năng tự tạo của chính người dùng đang bật (`made_skill::own_on`: trong
+  chỉ mục kỹ năng tự tạo, đang bật, không bao giờ là kỹ năng thêm từ tệp)
+  thì được giữ; bất kỳ kỹ năng nào khác mà cụm từ sẽ khởi động (của đèn,
+  thêm từ tệp, đẩy lên, kỹ năng tự tạo còn giữ mà chưa bật) vẫn từ chối
+  như trước. Sau đó (`make_skill_local::made_no_asks`,
+  `made_skill::own_asks_taken`), khi chính chủ đèn yêu cầu, các kỹ năng đó
+  đang bật được tắt trước (`make_no_asks::words_turned_off`), rồi kỹ năng
+  mới được bật, và chúng được thay thế cùng với trùng trigger nếu có, như
+  trên: "Made coin flip and replaced your old flip a coin. Say 'keep the
+  old one' to undo." Lần tạo của người khác bị từ chối với cùng lý do và
+  không giữ lại gì (`made_skill::forget_unput`); lần tạo mà kỹ năng cũ
+  không tắt được (không đọc được tệp `off` của lamp-skills, hoặc trình
+  quản lý từ chối, những kỹ năng đã tắt trước đó được bật lại) cũng vậy,
+  không bao giờ bật bên cạnh nó (P3 2 của Heron trên #7836). Bật không
+  được thì chúng được bật lại.
 - **Xóa ngay.** `remove` của `make_skill`, tên được so với các kỹ năng chính
   người dùng tạo như trước (`made_remove::found`), xóa kỹ năng khi chủ đèn
   yêu cầu (`services::owners_yes_now`) mà không hỏi: trình quản lý gỡ nó
@@ -4201,6 +4314,22 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   đường của lời đồng ý khi `LAMP_MADE_SCRIPTS=on`; khi tắt thì nó được đưa
   lại nhưng vẫn tắt, và nói rõ lý do. Bản ghi của một lần thay thế vẫn còn
   sau khi kỹ năng mới của nó bị xóa.
+- **Kỹ năng đã xóa được xin lại theo tên là hoàn tác, không bao giờ là một
+  lần tạo** (DEFAULT-ON của #7828, sửa 2: trên lamp-9adf "Put the flip a
+  coin skill back", vừa bị xóa, được gọi như một lần tạo và tạo ra kỹ năng
+  mới). Mô tả của `undo` nói "When the person asks to put back or restore
+  a skill they removed, call it with that skill, and never make it again."
+  (`make_no_asks::UNDO_RESTORE_TOLD`); một câu có xin điều đó hay không là
+  do mô hình phán đoán. Tên đưa cho `undo` được so với mọi kỹ năng mà các
+  bản ghi nêu, như tên của một lần xóa (`made_remove::named_alone`: gần
+  theo cách viết, khi `LAMP_MADE_SKILL_OFF_SAID` bật thì không bao giờ là
+  tên có số khác, một tên nằm trong một tên khác được nói đúng như viết
+  thì là phần của tên kia), nên "flip a coin" đưa lại flip a coin kể cả
+  khi flip a coin 2 bị xóa sau nó: "flip a coin is back on.", với
+  `{"made": NAME, "on": true, "put_back": true}`. Nhiều kỹ năng gần như
+  nhau, hoặc không có, thì không hoàn tác gì. Một lần tạo không bao giờ
+  đưa lại kỹ năng (P2 của Heron trên #7836: "make a water reminder" đã đưa
+  lại water reminder 2): lời của nó đi tới mô hình tạo như mọi lần tạo.
 - **Nơi cất, chính xác.** Mọi bản ghi việc đã làm được giữ 7 ngày, gói của
   kỹ năng đã xóa đi cùng bản ghi của nó; nhiều nhất 50 kỹ năng đã xóa và
   100 bản ghi tất cả, cũ nhất ra trước, gói đi cùng. `lamp-voice` dọn nó khi
@@ -4215,6 +4344,18 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
 - **Không bao giờ nói "bật" khi đang tắt.** Bật không được thì nói một câu
   rõ ràng kèm lý do ("I made it but couldn't put it on: …"), và không để
   lại gì để hoàn tác.
+- **Gọi ngay, không bao giờ hỏi trước** (DEFAULT-ON của #7828, sửa 1: trên
+  route thứ hai của lamp-9adf mô hình vẫn hỏi "Do you want me to make it
+  again?", "Did you mean the flip-a-coin skill? Say the word and I'll
+  remove it." và, với "remove it", "Which one…?"). Mô tả của `make_skill`
+  kết thúc bằng "Make or remove at once, never asking first, even of one
+  they have: your line gives the undo." (`make_no_asks::AT_ONCE_TOLD`);
+  tham số `remove` thêm "Call it at once, never asking first or for a yes;
+  ask which only when two skills they made fit the words alike, never of
+  "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
+  `make_no_asks::UNDO_RESTORE_TOLD`. Với mọi công
+  tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
+  các tham số trong 4.096 byte.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.

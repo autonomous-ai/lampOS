@@ -53,6 +53,7 @@
 //!   NOT_LINKED`, never one that couldn't be reached) says so once, as
 //!   exact words behind the same gate, kept per skill ([`Room::link_note`])
 //!   until a read of it succeeds again. Off, a refused read says nothing.
+use lamp_msgs::{SkillTask, SkillTaskStage};
 use lamp_services::{serve::NOT_LINKED, spoken};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -601,6 +602,41 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
 /// lines were said, never one.
 pub fn tell(lines: &[String], room: &mut impl Room) -> String {
     tell_within(lines, WAIT, false, room)
+}
+
+/// What `skills/tasks` says of `skill`'s answer found waiting for its gate
+/// ([`Room::waits`], #7873): the gate's own words for why
+/// ([`Closed::words`]), never the answer's.
+pub fn held_news(skill: &str, why: &str) -> SkillTask {
+    SkillTask {
+        skill: skill.to_owned(),
+        stage: SkillTaskStage::Held,
+        run: None,
+        engine: None,
+        gate: Some(why.to_owned()),
+    }
+}
+
+/// What `skills/tasks` says of `skill`'s answer once its read or telling
+/// ended with `outcome` ([`run`], [`tell`], [`tell_failed`]'s words, #7873):
+/// told when its lines were read, told or said (as news too), else dropped.
+pub fn answer_news(skill: &str, outcome: &str) -> SkillTask {
+    // A telling said as news after all ends with the news' own outcome.
+    let last = outcome.rsplit(": ").next().unwrap_or(outcome);
+    let told = ["told", "read ", "said"]
+        .iter()
+        .any(|said| last.starts_with(said));
+    SkillTask {
+        skill: skill.to_owned(),
+        stage: if told {
+            SkillTaskStage::Told
+        } else {
+            SkillTaskStage::Dropped
+        },
+        run: None,
+        engine: None,
+        gate: None,
+    }
 }
 
 /// How long news from work handed over waits for the owner: said once, the
@@ -1988,5 +2024,57 @@ mod tests {
             "skipped: the owner not in view"
         );
         assert!(lamp.reads.is_empty() && lamp.said.is_empty());
+    }
+
+    /// #7873 (c): a skill's answer held at its gate is told on
+    /// `skills/tasks` with the gate's own reason, then told or dropped by
+    /// its outcome; never a word of the answer.
+    #[test]
+    fn an_answer_at_its_gate_is_told_held_then_told_or_dropped() {
+        use lamp_msgs::SkillTaskStage::{Dropped, Held, Told};
+        let held = held_news("mail-check", Closed::NotAlone.words());
+        held.check().unwrap();
+        assert_eq!(
+            (held.stage, held.gate.as_deref(), held.run),
+            (Held, Some("not alone"), None)
+        );
+        for why in [
+            Closed::NoOwner,
+            Closed::Private,
+            Closed::Paused,
+            Closed::Quiet,
+            Closed::NotAlone,
+            Closed::NotOwner,
+            Closed::Nobody,
+            Closed::VoiceHeard,
+            Closed::AnotherRead,
+        ] {
+            held_news("mail-check", why.words()).check().unwrap();
+        }
+        for (outcome, stage) in [
+            ("told 2", Told),
+            ("read 3", Told),
+            ("said in the asking conversation", Told),
+            (
+                "not said in the asking conversation (say: expired), so as news: told 1",
+                Told,
+            ),
+            ("skipped: not alone", Dropped),
+            ("skipped: quiet hours", Dropped),
+            ("stopped: someone came, 1 of 2 told", Dropped),
+            (
+                "stopped: a line was not said (say: expired), 0 of 1 told",
+                Dropped,
+            ),
+            (
+                "not read: the lamp's services were not reached (other)",
+                Dropped,
+            ),
+            ("nothing to tell", Dropped),
+        ] {
+            let news = answer_news("mail-check", outcome);
+            news.check().unwrap();
+            assert_eq!(news.stage, stage, "{outcome}");
+        }
     }
 }

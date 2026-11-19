@@ -1906,6 +1906,10 @@ async fn connection<S>(
 ///   `listening`, whether the door listens on the network (false when lamp-control
 ///   serves only the owner's side and skill runs), so the admin socket's being
 ///   there is not read as the door's being open;
+/// - `{"note_changes": {"since_unix_ms": N}}`, from the voice alone →
+///   `{"computers": [{client, name, changes, last_unix_ms}]}`: each computer
+///   whose pairing the side file marks as the owner's app's
+///   ([`crate::paired_by`]) and whose notes changed since then, a count only;
 ///
 /// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
@@ -2214,6 +2218,34 @@ fn admin_answer(
             "speaker": features.speaker,
         });
     }
+    // The computers' daily notes counts (C157): for the voice alone, only
+    // the pairings the side file marks as the owner's app's, counts only.
+    if let Some(counts) = asked.get(crate::paired_by::OP) {
+        if !from_the_voice {
+            return json!({"error": "only the voice reads the computers' notes counts"});
+        }
+        let Some(since_ms) = counts.get("since_unix_ms").and_then(Value::as_u64) else {
+            return json!({"error": "note_changes: since_unix_ms, a number of milliseconds"});
+        };
+        // The side file is read off the door's lock.
+        let state = {
+            let door = shared.door.lock().expect("door");
+            door.notes()
+                .and_then(|notes| notes.folder().parent())
+                .map(std::path::Path::to_path_buf)
+        };
+        let marks = state
+            .as_deref()
+            .map(crate::paired_by::app_paired)
+            .unwrap_or_default();
+        let door = shared.door.lock().expect("door");
+        return crate::paired_by::note_changes(
+            &door.clients().clients,
+            &marks,
+            door.notes(),
+            since_ms,
+        );
+    }
     if asked.get("clients").is_some() {
         let door = shared.door.lock().expect("door");
         let clients: Vec<Value> = door
@@ -2238,7 +2270,7 @@ fn admin_answer(
             "listening": shared.listening.load(Ordering::Relaxed),
         });
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state, app_settings_set or notes_forget_skills"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, note_changes, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state, app_settings_set or notes_forget_skills"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
@@ -2602,6 +2634,36 @@ mod tests {
             EventKind::BodyState,
             json!({"joints": {"yaw": {"deg": yaw}}, "lamp": {}}),
         )
+    }
+
+    /// The notes counts (C157) are the voice's alone to read, and name a
+    /// since; with no side file nothing is counted.
+    #[test]
+    fn the_notes_counts_are_the_voices_and_need_a_side_file() {
+        let state =
+            std::env::temp_dir().join(format!("lamp-control-note-changes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_notes_folder(state.join(crate::notes::NOTES_FOLDER));
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let asked = r#"{"note_changes": {"since_unix_ms": 0}}"#;
+        assert_eq!(
+            admin_answer(&shared, asked, false, crate::app_yes::Peer::Other),
+            json!({"error": "only the voice reads the computers' notes counts"})
+        );
+        let voice = crate::app_yes::Peer::Voice;
+        assert_eq!(
+            admin_answer(&shared, asked, true, voice),
+            json!({"computers": []})
+        );
+        assert!(admin_answer(&shared, r#"{"note_changes": {}}"#, true, voice)["error"].is_string());
+        let _ = std::fs::remove_dir_all(&state);
     }
 
     /// The Reviewer-lead's P2 on #4564: a stalled computer holds the newest

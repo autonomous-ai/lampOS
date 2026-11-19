@@ -135,7 +135,9 @@ let go, and nothing is written after that, when:
 
 The same let-go ends every run that stops on a surprise, not only one in
 the loop: taking hold, a profile or force limit that does not write or read
-back at start, a wake that does not reach home, and a shoulder that does
+back at start (a read-back with no clean answer is asked three times in all,
+20 ms apart, before it counts, #6591; one that answers a wrong value counts at
+once), a wake that does not reach home, and a shoulder that does
 not come down when it is lowered all end with torque off on all five, after
 the hold where there is one. Every way a run ends passes through one place
 (`run_alive`) that does this. It is not done when the body is asked to

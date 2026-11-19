@@ -159,7 +159,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `desk_noticing.get`/`desk_noticing.set` with `LAMP_SEEN_ACTIVITY=on` (#6543), `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
@@ -181,6 +181,7 @@ lamp says so.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool}` or `{"room_sounds": bool}`, exactly one) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes, both off until a yes. `consent.get` reads the files and answers at once, `{"face_expressions": bool}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool}` on one with none, and `seen_activity` beside them only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` (#6543; elsewhere refused: "seen activity is not on this lamp"). `consent.set` is handed to root's helper, which writes or removes the file and answers at once; `success` carries the same shape as `consent.get`, read after it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
+| `desk_noticing.get` (`{}`), `desk_noticing.set` (`{"allow": bool, "request_id": N}`) | with `LAMP_SEEN_ACTIVITY=on` in `lamp-cloud`'s own unit (#6543, "Desk noticing from the app" below), not behind `LAMP_APP_CONSENT`: the owner's switch for lamp-seen's desk noticing, as mute's. Both answer `{"desk_noticing": {"on": bool, "by": "app"|"voice"|null, "posture": bool}}`, read from `seen-activity.json`; `posture` is `LAMP_SEEN_POSTURE=on` in `lamp-cloud`'s unit, so the app shows the disclosure naming posture. `set` needs `request_id`, the app's send time in Unix milliseconds, and hands `{"desk_noticing": {"allow", "request_id"}}` to root's helper (`"by":"app"`; off removes the file, as the voice's stop does), which keeps a yes only with a `request_id` above the mark kept beside it, and answers with the file after it. `allow` that isn't a JSON bool is `allow must be true or false`; no `request_id`, or one that is no positive integer, `request_id must be the app's send time in Unix milliseconds`; a yes at or below the mark, `this request was sent before the lamp's last change: send a new one`; a yes with a `request_id` more than a day past the lamp's clock, `request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
@@ -2433,6 +2434,14 @@ put back from it runs the previous `lamp-cloud`, which has none. A
 - **Factory reset** removes `/etc/lampOS/setup/reports.json` and empties
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
   asks again, default off.
+- **On by default, dark (#7767):** with `LAMP_NOTICING_BY_DEFAULT=on`
+  (switches.md; off unless set, in no unit), neither record there (setup's
+  and `lamp-cloud`'s own both not found) reads as a yes nobody gave, with
+  no `by` and no time (`read_consent_or`; setup's status reads its record
+  the same way, `kept_share_reports_or`). A kept `false`, setup's or the
+  lamp's own, stays off, and so does a record this build can't read: the
+  same rule as the consent folder's yeses (`lamp_msgs::consent::allowed`).
+  Off, no record is a no, as above.
 
 ### Its files, one release forward (#2052)
 
@@ -3026,7 +3035,113 @@ until its lamp check. Both yeses stay off by default.
   (`crates/cloud/src/wire.rs`) carries no id or send time, and the helper
   stamps the yes when it arrives (`crates/setup/src/change.rs`), so an
   MQTT QoS 1 resend or a late-delivered app yes counts as a new yes, even
-  after a later "no" at the lamp.
+  after a later "no" at the lamp. `desk_noticing.set` closes this for seen
+  activity with its `request_id` and the mark ("Desk noticing from the app"
+  below); `consent.set`'s three keys, its `seen_activity` too, still owe it.
+
+## Desk noticing from the app (#6543, `desk_noticing.get`, `desk_noticing.set`)
+
+The owner's switch for desk noticing (lamp-seen looks now and then at whether
+they eat, drink or take a break, and with posture on how they sit, and sends
+those pictures to the perception service to be labelled), turned on and off
+in the app like the mute (the owner's call on #6543, c6946201674; the first
+builder's plan, c6946710545: the yes comes from the app button while the
+voice offer stays off). Only with `LAMP_SEEN_ACTIVITY=on` exactly in
+`lamp-cloud`'s own unit, with `LAMP_CLOUD=on`, as lamp-seen's and the voice's
+units have it; off, neither kind is in `can`, both are "not on this lamp", and
+`can` and every other page are byte for byte as before. Off by default: no
+file, no yes.
+
+- **The same yes as the spoken one.** `seen-activity.json` in
+  `/var/lib/lampOS/consent`, `{"version":1,"seen_activity":"yes","at_unix_s":N,"by":"app"}`,
+  byte for byte the voice's file but for `by` (`lamp_msgs::consent::bytes`),
+  written whole by root's helper `lamp-setup change` (0640 `root:lampos`) from
+  the line `{"desk_noticing": {"allow": bool, "request_id": N}}`, waited on
+  at most 2 s. A yes already kept, the voice's too, is left as it is.
+- **No yes after a later "no"** (Heron's P2 on #7551). `request_id` is
+  required: the app's send time in Unix milliseconds, a positive integer,
+  new for each tap (a retry of the same tap may keep it). The helper keeps
+  a mark beside the yes, `seen-activity-mark.json`
+  (`{"version":1,"after_unix_ms":N}`, written whole and renamed into place,
+  in the yes's mode), and keeps a yes only with a `request_id` above it,
+  refusing one at or below it: `this request was sent before the lamp's
+  last change: send a new one`, nothing changed. Each request it takes, yes
+  or off, raises the mark to its `request_id`; the voice's
+  `stop_looking_at_my_desk` and any forget (with a yes or a mark there)
+  raise it to the lamp's own now. So an MQTT QoS 1 resend or a late yes
+  after an off stays off, and a yes the app sent before a "no" at the lamp
+  is refused. An off is never refused, and never lowers the mark. A mark
+  there but unreadable refuses a yes (`the lamp's last change could not be
+  read: turn desk noticing off, then on`) until an off rewrites it. A send
+  time, not a counter, since the lamp's own "no" has to be compared with
+  it: with the phone's clock behind the lamp's, a yes right after a spoken
+  stop is refused until the phone's clock passes it (the safe side); with
+  it ahead, a yes sent less than that difference before the stop still
+  lands.
+- **Within a day of the lamp's clock** (Twelve's P2 on #7551, for
+  Fourteen). A `request_id` more than a day past the lamp's now
+  (`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`, 86,400,000 ms; an app
+  sending microseconds, or a phone's clock years ahead) is no send time: a
+  yes with one is refused (`request_id is more than a day ahead of the
+  lamp's clock: send the app's time in Unix milliseconds`), nothing
+  changed, and an off with one still turns it off but raises the mark only
+  to the lamp's now. So the mark never runs far ahead of the clock and
+  refuses every later yes.
+- **One writer at a time** (Twelve's P2 on #7551). Every writer of the yes
+  or the mark holds the mark's lock, `seen-activity-mark.lock` beside it
+  (an empty file, `flock`, made `O_NOFOLLOW` in the yes's mode, kept): the
+  helper across its check of a yes against the mark and its writes, the
+  check made again there after the one on the line it was sent, and the
+  voice's stop and any forget across raising the mark and removing the
+  yes. So a yes checked before a spoken stop is refused under the lock
+  rather than kept after it, and two raises never interleave. The mark is
+  read `O_NOFOLLOW | O_NONBLOCK`: a link or a FIFO in its place refuses a
+  yes.
+- **The reset** removes the mark with the yes (`reset-plan-product.json`),
+  so a reset lamp takes the app's next yes whatever came before.
+- **Off is the voice's stop.** `allow: false` removes the file, as
+  `stop_looking_at_my_desk` does, whoever gave the yes. lamp-seen reads it
+  every 2 s: its gate closes, nothing more is sent, and the sitting it held
+  (posture's window, the held sitting) is forgotten, as for a stop by voice.
+- **The read-back.** `{"desk_noticing": {"on": bool, "by": "app"|"voice"|null, "posture": bool}}`,
+  from both kinds: `on` only while the file holds a yes, `by` `"app"` for the
+  app's and `"voice"` for any other (a file from before `by` is the
+  voice's), null when off; `posture`, whether `lamp-cloud`'s unit has
+  `LAMP_SEEN_POSTURE=on` exactly, set beside lamp-seen's and the voice's,
+  so the app picks the disclosure below.
+- **What the lamp says.** Nothing new: lamp-seen says its own on line once
+  when the yes appears, whoever gave it, and its off line when it goes
+  (`said_back::ON_LINE`, "I'll look now and then to see if you're eating,
+  drinking or slouching. I keep none of the pictures."; with posture,
+  `POSTURE_ON_LINE`; `OFF_LINE`, "Okay, I've stopped looking at the
+  desk."), and no picture goes before the on line has begun.
+- **What the app shows before the switch** (for Fourteen): the voice's
+  disclosure, `SEEN_DISCLOSURE` in `crates/voice/src/seen_yes.rs`, as #7476
+  words it with the lead's "you or anyone else":
+
+  > I can notice when you eat, drink or take a break, so my reminders fit
+  > better. To do that, while you or anyone else is at the desk I'd send a
+  > few pictures from my camera to Autonomous's server to be recognised, and
+  > they're deleted once they're checked. My light shows each time I send
+  > one, and you can tell me to stop any time. Shall I?
+
+  With `"posture": true` in the reply (`LAMP_SEEN_POSTURE=on`),
+  `SEEN_DISCLOSURE_POSTURE`:
+
+  > I can notice when you eat, drink or take a break, and how you're
+  > sitting, so my reminders fit better. To do that, while you or anyone else
+  > is at the desk I'd send a few pictures from my camera to Autonomous's
+  > server to be recognised, and they're deleted once they're checked. My
+  > light shows each time I send one, and you can tell me to stop any time.
+  > Shall I?
+
+  #7506 turns posture on with activity in the product, so that is the
+  wording the app shows there, and the yes names everything the pictures are
+  labelled for. "Deleted once they're checked" still waits on the backend's
+  written retention confirmation (#6912).
+- **Owed:** neither this yes nor the voice's records which disclosure was
+  shown, so a changed wording does not ask again (a `disclosure` id in the
+  set and the file, Heron's P3 on #7551).
 
 ## A person's linked services (Queue #4710, `connector.*`, `services.list`)
 

@@ -58,7 +58,21 @@
 //!   followed within 2 s as it is. `lamp-cloud` sends them only with
 //!   `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide. The
 //!   reset's plan, a forget of everything and a redo of setup remove both,
-//!   whoever gave them.
+//!   whoever gave them;
+//! - the owner's desk noticing switch from the app (`desk_noticing`, #6543,
+//!   `docs/cloud.md`, "Desk noticing from the app"): seen activity's yes as
+//!   `consent`'s, with the app's `request_id` (its send time in Unix ms).
+//!   A yes is kept only with an id above the mark beside it
+//!   ([`lamp_msgs::consent::SEEN_ACTIVITY_MARK`]), so a resent or late yes
+//!   never lands after a later "no"; each request taken raises the mark to
+//!   its id, and the voice's stop and any forget raise it to the lamp's now.
+//!   An off is never refused. The check and the write are made under the
+//!   mark's lock ([`lamp_msgs::consent::lock_mark`]), as the voice's stop
+//!   raises and removes under it, so no yes checked before a stop lands
+//!   after it. A `request_id` more than a day past the lamp's now
+//!   ([`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`]) is no send time: a yes
+//!   is refused, an off raises the mark only to the lamp's now. `lamp-cloud`
+//!   sends it only with `LAMP_SEEN_ACTIVITY=on`.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -127,6 +141,46 @@ pub enum Change {
     /// One of the owner's yeses from the app (a key of
     /// [`lamp_msgs::consent::FILES`]): kept, or removed.
     Consent(&'static str, bool),
+    /// The owner's desk noticing switch from the app (#6543): seen
+    /// activity's yes kept or removed, with the app's `request_id`, checked
+    /// against the mark when a yes.
+    DeskNoticing(bool, u64),
+}
+
+/// A desk noticing yes whose `request_id` is not above the mark: sent
+/// before the lamp's last change, or resent.
+pub const DESK_OLDER: &str = "this request was sent before the lamp's last change: send a new one";
+/// The mark is there but cannot be read: no yes until an off rewrites it.
+pub const DESK_MARK_UNREAD: &str =
+    "the lamp's last change could not be read: turn desk noticing off, then on";
+/// A desk noticing yes whose `request_id` is more than
+/// [`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`] past the lamp's now.
+pub const DESK_AHEAD: &str = "request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds";
+
+/// A change refused under its lock, after `parse` let it through: said back
+/// as `{"refused": why}`, as `parse`'s refusals are.
+#[derive(Debug)]
+struct Refused(&'static str);
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
+
+impl std::error::Error for Refused {}
+
+/// Why a desk noticing yes with `id` is refused against `mark` (as
+/// [`lamp_msgs::consent::read_mark`] read it), or none.
+fn desk_refused(id: u64, mark: Option<u64>) -> Option<&'static str> {
+    if lamp_msgs::consent::too_far_ahead(id) {
+        return Some(DESK_AHEAD);
+    }
+    match mark {
+        None => Some(DESK_MARK_UNREAD),
+        Some(mark) if id <= mark => Some(DESK_OLDER),
+        Some(_) => None,
+    }
 }
 
 /// Where the chosen voice and the character words are kept: beside the
@@ -159,7 +213,9 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
 /// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
-/// with exactly one key of [`lamp_msgs::consent::FILES`].
+/// with exactly one key of [`lamp_msgs::consent::FILES`], or
+/// `{"desk_noticing": {"allow": bool, "request_id": N}}` (N a positive
+/// integer, the app's send time in Unix ms).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -254,6 +310,31 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
                 .find(|known| known == key)
                 .ok_or(why)?;
             Ok(Change::Consent(key, yes.as_bool().ok_or(why)?))
+        }
+        // Checked again here, whatever lamp-cloud sent (#6543): a yes only
+        // with an id above the mark and within a day of the lamp's now; an
+        // off whatever its id. `apply` checks a yes again under the lock.
+        "desk_noticing" => {
+            let why =
+                "desk_noticing holds allow, true or false, and request_id, a positive integer";
+            let asked = given
+                .as_object()
+                .filter(|asked| asked.len() == 2)
+                .ok_or(why)?;
+            let allow = asked.get("allow").and_then(Value::as_bool).ok_or(why)?;
+            let id = asked
+                .get("request_id")
+                .and_then(Value::as_u64)
+                .filter(|id| *id > 0)
+                .ok_or(why)?;
+            if allow {
+                let mark =
+                    lamp_msgs::consent::read_mark(&lamp_msgs::consent::mark_in(&config.consent));
+                if let Some(why) = desk_refused(id, mark) {
+                    return Err(why.into());
+                }
+            }
+            Ok(Change::DeskNoticing(allow, id))
         }
         _ => Err("the request names no change this lamp makes".into()),
     }
@@ -539,6 +620,49 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 ),
             })
         }
+        // All under the mark's lock (Twelve's P2 on #7551): a yes checked
+        // again against the mark there, so a stop by voice between `parse`
+        // and here refuses it. The mark raised before a yes is kept, and
+        // after an off is made, so a failed write never leaves a yes without
+        // its mark; an off's id past a day ahead raises it only to now.
+        Change::DeskNoticing(yes, id) => {
+            let key = lamp_msgs::consent::SEEN_ACTIVITY;
+            let path = lamp_msgs::consent::file_in(&config.consent, key)
+                .ok_or_else(|| io::Error::other("no such yes"))?;
+            let lock = lamp_msgs::consent::lock_mark(&config.consent)?;
+            let before = lamp_msgs::consent::read(&path, key).yes;
+            if *yes {
+                if let Some(why) = desk_refused(*id, lock.read()) {
+                    return Err(io::Error::other(Refused(why)));
+                }
+                lock.raise(*id)?;
+                if !before {
+                    keep_yes(&path, key)?;
+                }
+            } else {
+                remove(&path)?;
+                let id = if lamp_msgs::consent::too_far_ahead(*id) {
+                    lamp_msgs::consent::now_unix_ms()
+                } else {
+                    *id
+                };
+                lock.raise(id)?;
+            }
+            drop(lock);
+            Ok(Done {
+                data: json!({ key: *yes }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!(
+                    "the seen activity yes is {} from the app's desk noticing{}",
+                    if *yes { "on" } else { "off" },
+                    if *yes == before { " already" } else { "" }
+                ),
+            })
+        }
         Change::OwnerPlace(None) => {
             remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
             Ok(Done {
@@ -646,10 +770,16 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
     };
     match apply(&change, config) {
         Ok(done) => (json!({"done": done.data}), Some(done)),
-        Err(error) => (
-            json!({"refused": format!("the change could not be saved: {}", error.kind())}),
-            None,
-        ),
+        Err(error) => match error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<Refused>())
+        {
+            Some(Refused(why)) => (json!({ "refused": why }), None),
+            None => (
+                json!({"refused": format!("the change could not be saved: {}", error.kind())}),
+                None,
+            ),
+        },
     }
 }
 

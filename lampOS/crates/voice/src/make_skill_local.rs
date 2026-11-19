@@ -934,6 +934,11 @@ pub fn tool() -> lamp_gemini::Tool {
     } else {
         REMOVE_TOLD
     });
+    // A make or a remove at once, never asked first (`LAMP_MAKE_NO_ASKS`,
+    // #7828's fix 1), the rest told on the remove's parameter.
+    if crate::make_no_asks::on() {
+        description.push_str(crate::make_no_asks::AT_ONCE_TOLD);
+    }
     // A thing for the lamp to do at a time or on a repeat is a skill, never
     // a reminder (`LAMP_SKILL_RECURRING_TOLD`, lamp-9adf, 17 Nov): told on
     // the request, since with every switch on the description has no room.
@@ -945,6 +950,12 @@ pub fn tool() -> lamp_gemini::Tool {
     {
         parameters["properties"]["request"]["description"] =
             json!(format!("{request}{}", crate::skill_recurring::REQUEST_TOLD));
+    }
+    // A make while another is made waits its turn (`LAMP_MAKE_QUEUE`,
+    // #7679): its label, and the id of a waiting one to drop. Off, the
+    // parameters are as before.
+    if crate::make_queue::on() {
+        crate::make_queue::with_parameters(&mut parameters);
     }
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
@@ -1084,11 +1095,25 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     });
     // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`,
     // [`crate::make_no_asks::undo`]): the model judges the words.
+    // With it, a remove is called at once and asked of only when two fit
+    // (#7828's fix 1), and a removed skill asked back by its name is the
+    // undo, never a new make (fix 2).
     if crate::make_no_asks::on() {
         parameters["properties"][crate::make_no_asks::UNDO] = json!({
             "type": "string",
-            "description": "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request."
+            "description": format!(
+                "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request.{}",
+                crate::make_no_asks::UNDO_RESTORE_TOLD
+            )
         });
+        let remove = format!(
+            "{}{}",
+            parameters["properties"][crate::made_remove::REMOVE]["description"]
+                .as_str()
+                .unwrap_or_default(),
+            crate::make_no_asks::REMOVE_AT_ONCE_TOLD
+        );
+        parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(remove);
     }
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
@@ -1317,12 +1342,15 @@ pub fn make_in(
 ) -> Value {
     // The line heard for the make, as `forget` takes it (`tools`): a
     // write is held to it. None heard is no words, so a write fails
-    // closed; `made_in` 0 is no request of the voice's.
+    // closed; `made_in` 0 is no request of the voice's. A make that waited
+    // its turn (`LAMP_MAKE_QUEUE`, #7679) brings its own, kept at the ask
+    // ([`with_heard_kept`]).
     let heard = (made_in != 0).then(|| {
         crate::thread::THREAD
             .lock()
             .ok()
-            .and_then(|thread| thread.heard_for(made_in, std::time::Instant::now()))
+            .and_then(|thread| heard_for_make(made_in, &thread))
+            .or_else(kept_heard)
             .unwrap_or_default()
     });
     // The person's own line alone, for the judge of a made skill with no
@@ -1333,7 +1361,8 @@ pub fn make_in(
             crate::thread::THREAD
                 .lock()
                 .ok()
-                .and_then(|thread| thread.heard_in_own_line(made_in)),
+                .and_then(|thread| own_line_for_make(made_in, &thread))
+                .or_else(kept_heard),
         )
     });
     make_with_by(
@@ -1346,6 +1375,91 @@ pub fn make_in(
         || crate::services::linked_codes(std::path::Path::new(crate::services::FOLDER)),
         crate::make_skill_agent::Agent::for_voice().as_ref(),
     )
+}
+
+std::thread_local! {
+    /// The line heard for a make that waited its turn, kept when it was
+    /// asked ([`with_asker_kept`]); none for any other make.
+    static KEPT_HEARD: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// The owner read at the ask of a make that waited its turn: `Some`
+    /// while one runs ([`with_asker_kept`]), holding none for an ask not
+    /// the owner's; `None` for any other make, whose lease is read.
+    static KEPT_OWNER: std::cell::RefCell<Option<Option<String>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// `f` run with `heard`, the line heard for a make that waited its turn
+/// (`LAMP_MAKE_QUEUE`, #7679), as [`make_in`]'s heard line and own line
+/// in place of the thread's: kept at the ask, it can't be pushed out of the
+/// thread's history while the make waits. Cleared after, a panic too.
+pub fn with_heard_kept<R>(heard: Option<String>, f: impl FnOnce() -> R) -> R {
+    struct Cleared;
+    impl Drop for Cleared {
+        fn drop(&mut self) {
+            KEPT_HEARD.with(|kept| kept.replace(None));
+        }
+    }
+    KEPT_HEARD.with(|kept| kept.replace(heard));
+    let _cleared = Cleared;
+    f()
+}
+
+/// [`with_heard_kept`], and `owner`, the lamp's owner whose line asked for
+/// it as read at the ask (none for anyone else's): what [`answer`] holds
+/// the make to in place of its lease's, gone by the time a waiting make
+/// runs (`LAMP_MAKE_NO_ASKS`: a make with code put on, or a clash replacing
+/// the owner's skill, only on the owner's ask). Cleared after, a panic too.
+pub fn with_asker_kept<R>(
+    heard: Option<String>,
+    owner: Option<String>,
+    f: impl FnOnce() -> R,
+) -> R {
+    struct Cleared;
+    impl Drop for Cleared {
+        fn drop(&mut self) {
+            KEPT_OWNER.with(|kept| kept.replace(None));
+        }
+    }
+    KEPT_OWNER.with(|kept| kept.replace(Some(owner)));
+    let _cleared = Cleared;
+    with_heard_kept(heard, f)
+}
+
+/// The skill made, kept as made in this conversation (#7660): the owner's
+/// by the owner read at the ask of a make that waited its turn, its lease
+/// gone (#7679), else by its lease's.
+fn keep_just_made(told: &Value, request: u64, lease: Option<&crate::memory_scope::ScopeLease>) {
+    crate::just_made::after_make_by(told, request, || owner_for_make(lease));
+}
+
+/// The owner a make's ask is held to: the one kept at the ask of a make
+/// that waited its turn ([`with_asker_kept`]), else its `lease`'s.
+fn owner_for_make(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    KEPT_OWNER
+        .with(|kept| kept.borrow().clone())
+        .unwrap_or_else(|| crate::services::owner_of(lease))
+}
+
+/// Tests: the owner and the line a make on this thread is held to now.
+#[cfg(test)]
+pub(crate) fn kept_for_test() -> (Option<String>, Option<String>) {
+    (owner_for_make(None), kept_heard())
+}
+
+/// The line kept for a make that waited its turn, if this is one.
+fn kept_heard() -> Option<String> {
+    KEPT_HEARD.with(|kept| kept.borrow().clone())
+}
+
+/// The line `made_in` heard, as [`make_in`] reads it: the kept line of a
+/// make that waited its turn ([`with_heard_kept`]), else the thread's.
+fn heard_for_make(made_in: u64, thread: &crate::thread::Thread) -> Option<String> {
+    kept_heard().or_else(|| thread.heard_for(made_in, std::time::Instant::now()))
+}
+
+/// The person's own line for `made_in`, as [`make_in`] reads it: the kept
+/// line of a make that waited its turn, else the thread's own line.
+fn own_line_for_make(made_in: u64, thread: &crate::thread::Thread) -> Option<String> {
+    kept_heard().or_else(|| thread.heard_in_own_line(made_in))
 }
 
 /// [`make_in`], with the line `heard` for it (`None` for no request of the
@@ -1594,18 +1708,43 @@ fn made_no_asks(
     if !crate::make_no_asks::on() || !crate::make_no_asks::keeps_no_yes(made) {
         return None;
     }
-    if made_in != 0 && !made.uses.code && !made.uses.agent_task {
-        let clashes = crate::made_clash::found(keeping, made);
-        if !clashes.is_empty() {
-            let others: Vec<String> = clashes.into_iter().map(|clash| clash.name).collect();
+    let replaces = made_in != 0 && !made.uses.code && !made.uses.agent_task;
+    // Its words would start skills the person made, kept for this
+    // (`made_skill::asks_taken_sparing`, #7828's fix 3): replaced below on
+    // the owner's ask, as a trigger clash is; anyone else's make, or one
+    // that can't replace, is refused with why, as before.
+    let words = match made_skill::own_asks_taken(keeping, made) {
+        Ok(words) => words,
+        Err(why) => return Some(words_refused(keeping, made, &why)),
+    };
+    let owner = (!words.is_empty()).then(|| replaces && owners_make(made_in));
+    if let (Some(false), Some((_, why))) = (owner, words.first()) {
+        return Some(words_refused(keeping, made, why));
+    }
+    if replaces {
+        let off = crate::make_no_asks::turned_off_here();
+        // Those its words would start are turned off before it goes on;
+        // any not turned off (the `off` file unreadable, the helper's
+        // refusal) refuses it as before, never on beside them (Heron's P3 2
+        // on #7836).
+        let first = match crate::make_no_asks::words_turned_off(keeping, &words, off.as_ref()) {
+            Ok(first) => first,
+            Err(why) => return Some(words_refused(keeping, made, &why)),
+        };
+        let others: Vec<String> = crate::made_clash::found(keeping, made)
+            .into_iter()
+            .map(|clash| clash.name)
+            .filter(|name| !words.iter().any(|(skill, _)| skill == name))
+            .collect();
+        if !others.is_empty() || !first.is_empty() {
             // Only skills on are replaced, and only on the owner's ask
             // (Twelve's P1 on #7783); anyone else's goes on beside them.
             let (told, line) = crate::make_no_asks::clashed(
                 keeping,
                 made,
-                &others,
-                crate::make_no_asks::turned_off_here().as_ref(),
-                || owners_make(made_in),
+                (&others, &first),
+                off.as_ref(),
+                || owner.unwrap_or_else(|| owners_make(made_in)),
             );
             // No clash waits here: put on, or not, as it is told.
             let outcome = Outcome::of(told["on"].as_bool() == Some(true));
@@ -1618,6 +1757,23 @@ fn made_no_asks(
     let outcome = Outcome::of(on.is_ok());
     MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
     Some(told)
+}
+
+/// The made skill `made`, kept and not on, whose words would start skills
+/// the person made, not replaced (anyone else's make, or one that can't
+/// replace): refused as at the make, nothing of it kept, the reason `why`
+/// said as it is ([`made_skill::not_made_line`]). What the model is told,
+/// its line kept for a cut turn.
+fn words_refused(keeping: &Keeping, made: &Made, why: &str) -> Value {
+    made_skill::forget_unput(&keeping.directory, &made.sha256);
+    crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
+    eprintln!(
+        "lamp-voice: a made skill was not made: its words start a skill the person made, not replaced (LAMP_MAKE_NO_ASKS)"
+    );
+    let refused: Result<Made, Refused> = Err(Refused::new(why));
+    let line = said_line(&refused, &Ok(()), None);
+    MADE_LINE.with(|kept| kept.replace(Some((line, Outcome::Failed))));
+    told(refused, Ok(()), None)
 }
 
 /// Whether the line that asked for this thread's make is the owner's,
@@ -2989,6 +3145,25 @@ pub fn take_said_outcome() -> Option<(String, Outcome)> {
 #[cfg(test)]
 pub fn set_said_line(line: String) {
     MADE_LINE.with(|kept| kept.replace(Some((line, Outcome::Made))));
+}
+
+/// A make that failed with no line of its own set on this thread: `line`,
+/// as one failed line, said once by whoever takes it (a make that waited
+/// its turn, `crate::make_queue::Entry::run`). A line already set stays.
+pub fn failed_unless_said(line: impl FnOnce() -> Option<String>) {
+    MADE_LINE.with(|kept| {
+        if kept.borrow().is_none()
+            && let Some(line) = line()
+        {
+            kept.replace(Some((line, Outcome::Failed)));
+        }
+    });
+}
+
+/// Tests: [`set_said_line`] with what the make came to, `outcome`.
+#[cfg(test)]
+pub fn set_said_outcome(line: String, outcome: Outcome) {
+    MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
 }
 
 /// The one short line of a make that kept `made`, `on` or not; or not
@@ -4486,9 +4661,10 @@ pub fn answer(
         .as_deref()
         .unwrap_or_else(|| call.args["request"].as_str().unwrap_or_default());
     // Whose ask it was, asked only for a make with code of its own
-    // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's.
+    // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's, or
+    // the one kept at the ask of a make that waited its turn (#7679).
     if crate::make_no_asks::on() {
-        let owner = crate::services::owner_of(lease);
+        let owner = owner_for_make(lease);
         MAKE_OWNER.with(|asked| {
             *asked.borrow_mut() = Some(Box::new(move || {
                 crate::services::owners_yes_of(request, heard, owner)
@@ -4498,7 +4674,7 @@ pub fn answer(
     let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
-    crate::just_made::after_make(&told, request, lease);
+    keep_just_made(&told, request, lease);
     told
 }
 
@@ -4523,6 +4699,86 @@ pub(crate) mod tests {
         let named: Vec<&str> = beside.split(", ").collect();
         assert_eq!(named, crate::skill_task_yes::PRIVATE_GRANTS, "{told}");
         assert!(!named.contains(&"notes"), "{told}");
+    }
+
+    /// #7679 (`LAMP_MAKE_QUEUE`): a make waiting its turn while a busy room
+    /// talks on (13 more exchanges, past the thread's twelve) still runs
+    /// with its own heard line, kept at the ask, never the newest words; and
+    /// only while it runs.
+    #[test]
+    fn a_queued_make_runs_with_its_own_line_after_thirteen_more_exchanges() {
+        const ASKED: &str = "check the gold price every evening at six";
+        let mut thread = crate::thread::Thread::new();
+        let start = std::time::Instant::now();
+        thread.person(ASKED, true, start);
+        thread.lamp(4, "I'll make the gold one next.", start);
+        assert_eq!(own_line_for_make(4, &thread).as_deref(), Some(ASKED));
+        for request in 5..19 {
+            thread.person(
+                &format!("what is the weather like, number {request}"),
+                true,
+                start,
+            );
+            thread.lamp(request, "Sunny.", start);
+        }
+        // The thread has lost it: none, or another line's words.
+        assert_eq!(own_line_for_make(4, &thread), None);
+        assert_ne!(heard_for_make(4, &thread).as_deref(), Some(ASKED));
+        // Kept at the ask: its own line, for both readings.
+        with_heard_kept(Some(ASKED.to_owned()), || {
+            assert_eq!(heard_for_make(4, &thread).as_deref(), Some(ASKED));
+            assert_eq!(own_line_for_make(4, &thread).as_deref(), Some(ASKED));
+        });
+        // Cleared once it ran: any other make reads the thread as before.
+        assert_eq!(own_line_for_make(4, &thread), None);
+    }
+
+    /// #7679 with #7660: the owner's queued make, run with no lease, is kept
+    /// as just made in the owner's conversation, so "the skill you just
+    /// made" finds it; a guest's queued make is no one's.
+    #[test]
+    fn a_queued_owners_make_is_kept_as_their_just_made_skill() {
+        if crate::person::private_room() {
+            return;
+        }
+        made_skill::set_off_said_here(Some(true));
+        let made = serde_json::json!({ "made": "gold-price", "on": true });
+        assert_eq!(crate::just_made::kept_for_test("ann"), 0);
+        with_asker_kept(None, None, || keep_just_made(&made, 7_679_301, None));
+        assert_eq!(crate::just_made::kept_for_test("ann"), 0);
+        with_asker_kept(None, Some("ann".into()), || {
+            keep_just_made(&made, 7_679_302, None)
+        });
+        assert_eq!(crate::just_made::kept_for_test("ann"), 1);
+        made_skill::set_off_said_here(None);
+    }
+
+    /// #7679 with `LAMP_MAKE_NO_ASKS`: a queued make runs with no lease, so
+    /// its owner is the one read at its ask: the owner's own make is held
+    /// to them (a make with code put on, a clash replacing their skill), a
+    /// guest's to no one; only while it runs, and any other make reads its
+    /// lease as before.
+    #[test]
+    fn a_queued_make_is_held_to_the_owner_read_at_its_ask() {
+        // Outside the private room, no lease is no owner.
+        if crate::person::private_room() {
+            return;
+        }
+        assert_eq!(owner_for_make(None), None);
+        let owners = with_asker_kept(Some("check gold at six".into()), Some("ann".into()), || {
+            owner_for_make(None)
+        });
+        assert_eq!(owners.as_deref(), Some("ann"));
+        let guests = with_asker_kept(Some("check gold at six".into()), None, || {
+            owner_for_make(None)
+        });
+        assert_eq!(guests, None);
+        // Cleared once it ran, a panic too.
+        assert_eq!(owner_for_make(None), None);
+        let _ = std::panic::catch_unwind(|| {
+            with_asker_kept(None, Some("ann".into()), || panic!("the make failed"))
+        });
+        assert_eq!(owner_for_make(None), None);
     }
 
     /// Heron's P1 on #6558: a voice make's write waits for the owner's yes

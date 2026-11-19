@@ -5975,7 +5975,9 @@ length only (`do.task: lamp-tasks' answer carries N bytes of its agent's
 answer`, or `no agent's answer`; #7180). A gate found shut as the wait
 begins, a read's or a told answer's, is said with its reason
 (`skill:<name>: waits for its gate: quiet hours`, `Room::waits`), so an
-answer held in quiet hours leaves a line (#7180); each change of that reason
+answer held in quiet hours leaves a line (#7180), and on `skills/tasks` as
+`held` with the same reason, then `told` or `dropped` once it ends
+(`service_read::held_news`, `answer_news`; #7873, for lamp-peek); each change of that reason
 while it waits is said once more, at most one a second
 (`service_read::SAY_WHY_EVERY`), never each look, so a wait that holds on
 shows which condition held (lamp-9adf, 17 Nov). Its end is said as before
@@ -6370,7 +6372,10 @@ the same code for both writers.
   and no token is minted.
 - **On OpenClaw too, through the one run path
   (`LAMP_MAKE_AGENT_ONE_PATH=on`, on in the product's lamp-voice; #7245).**
-  With it, the make is handed to the lamp's agent whenever lamp-tasks says
+  The app's MAKE IT takes it too, read from the coordinator's own
+  environment (`Agent::for_app`), so a make typed in the app on an
+  OpenClaw lamp goes to OpenClaw as a spoken one does; before, the app's
+  make went to Hermes only. With it, the make is handed to the lamp's agent whenever lamp-tasks says
   it takes runs, Hermes or OpenClaw (`make_skill_agent::ONE_PATH_ENGINES`),
   and its line carries `"one_path":true`. lamp-tasks keeps Hermes's
   namespace runner for Hermes; for OpenClaw it sends the rules as one turn
@@ -6579,9 +6584,11 @@ the same code for both writers.
   begun after 15 s). Never when the hand-over failed at once, nor when the
   turn was cut already. The made line is the same either way.
 - **With `LAMP_MAKE_AGENT_ONE_PATH` on (#7371).** An agent's make takes
-  about a minute (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
-  result), so the waiting line says how long: "This takes about a minute.
-  I'm on it." (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
+  about a minute warm (lamp-c0a4, 16 Nov: 63 s from the waiting line to the
+  result) and about three cold (lamp-c0a4, 18 Nov: 184 s after a gateway
+  restart), so the waiting line says how long: "This can take a few
+  minutes. I'll tell you when it's ready."
+  (`make_skill_agent::ONE_PATH_WAITING_LINE`, in the turn and
   through the say service alike). In the turn, a make still with no answer
   85 s after its waiting line (`make_skill_agent::LONG_WAIT_AFTER`, about
   90 s from the ask) says "It's taking a bit longer, but I'm still on it."
@@ -6704,6 +6711,79 @@ the same code for both writers.
   Hermes's terminal passes the run's `LAMP_*` switches to the check it
   runs; and how long its answer takes
   there.
+
+##### A make while another is made waits its turn (`LAMP_MAKE_QUEUE=on`, off)
+
+On lamp-9adf (stock 14083, #7679) a person made one skill, then 47 s later
+asked for another ("check the gold price every evening at six"), and heard
+"The lamp's agent is busy; ask me again in a minute." The lamp handed its
+own queue to the person. With `LAMP_MAKE_QUEUE=on` (exactly `on`; read by
+the second route's worker, `crate::make_queue`), the voice makes one voice
+make at a time, in the order asked, and lamp-tasks' one-at-a-time `busy`
+stays only as the backstop:
+
+- **Idle:** a new make (`make_skill` with a `request`, heard aloud, none of
+  the function's other uses) runs at once in its own turn, as without the
+  switch, and holds the one slot.
+- **Busy:** a new make waits, at most two of them, first in first out. The
+  model is told at once `{"ok":true,"queued":true,"place":n,"id":…,"note":…}`
+  and says one line in the conversation's language ("I'll make the gold one
+  next"), never that it is made. The enqueue is one lock and a push, so
+  that line comes as fast as any answer; the journal says "make queued at
+  place P in X ms (target 10 ms)". Only when it would wait, who asked is
+  kept with it: the line's person, the owner when it was the owner's line
+  (`services::owner_of`), and the line heard for it, which the make is held
+  to when it runs (`make_skill_local::with_asker_kept`), so a busy room
+  can't push it out of the thread's twelve exchanges, and with
+  `LAMP_MAKE_NO_ASKS` the owner's queued make with code still goes on, or
+  replaces their clashing skill, as an immediate one does (a guest's never
+  does). The lamp's own "I'll make it now." opening for a bare call
+  (#7554) is not said while a make is under way or waits, so the one line
+  is "I'll make the gold one next". With `LAMP_ACTION_CLAIM_CHECKED`, that
+  line is no claim, and a queued `make_skill` never backs "I made …"
+  (`action_claim::queued_makes_in`). A third waiting gets the fixed line
+  "Two skills are already waiting for me to make them, so I can't take
+  another one yet. Ask me again once they're done."
+  (`make_queue::QUEUE_FULL_LINE`, in Vietnamese, Japanese, Chinese and
+  Korean in `language::FIXED_LINES`).
+- **In turn:** the make under way holds the slot until its line was given to
+  its turn or said, and its say-back's yes is answered, cleared or past
+  `skill_write_yes::YES_WITHIN` (120 s): that store holds one wait, and a
+  second make would overwrite it. Then the front make runs with no turn
+  (`second_provider::worker::run_queued`), says no waiting line, and its
+  line goes through the say service as a cut make's does, its say-back's yes
+  forced as usual (`skill_write_yes::said_by_the_say_service`). A queued
+  make that failed is always said, even though the person spoke since (a
+  cut make's failure is not, after a line of theirs): they were told it
+  comes next. One that failed with no line of its own (a brief refused,
+  an unclear ask with `LAMP_MAKE_NO_ASKS`, the part not running) says one
+  line from its answer's error, by its label: "I couldn't make the gold
+  one: …" (`make_queue::failed_line`). One that turned on a core skill already doing it (#7763) says
+  the line its answer gives (`make_queue::line_to_say`). The same
+  no-asks, clash and core rules apply as to an immediate make: it runs
+  through the same `make_skill` answer.
+- **Never mind:** `make_skill` takes `label` (the model's two to four words)
+  and `cancel_waiting` (a waiting make's id; not `cancel`, which a clash's
+  `choice` already uses). While any wait, each later line's note lists their
+  labels and ids; "never mind the gold one" drops only that one, and only for
+  whoever asked for it or the lamp's owner: a guest can't drop the owner's.
+  A person's marked "forget everything about me" drops the makes they asked
+  for that still wait, untold and never made from their words
+  (`make_queue::forget_with_everything`).
+- **Dropped, never made later:** a make that waited more than 6 min, was
+  still waiting when the quiet hours began, or was waiting when the voice
+  stopped is told as not made: "I didn't get to make what you asked for while
+  I was busy, so it wasn't made. Ask me again if you still want it:" and its
+  labels (`make_queue::QUEUE_DROPPED_LINE`). Across a restart only the labels
+  are kept (`/run/lampos-voice/make-queue.json`), read once at the worker's
+  start, said once the say socket answers (at most 30 s, journaled either
+  way) and removed.
+
+The two waiting are shared by everyone the make gate lets make a skill. Only
+a make behind a make is queued here: a make behind a Harness or one-session
+task is #7595's. Off, a second make is refused as before, byte for byte.
+**Not yet shown on a lamp:** two makes in a row by voice, both made in
+order, the second told as next and said back after the first's yes.
 
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, on in the product)
 
@@ -7617,6 +7697,14 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    on #7249), said to the person: "the words “take a photo” would start
    both test note and another skill, photo booth, so neither would start;
    say other words for test note". The same skill made again is no other.
+   That reason is said to the person as it is (`made_skill::words_taken`
+   in `plain_reason`; #7828's DEFAULT-ON, fix 3: on lamp-9adf it was heard
+   as "I couldn't make that one. Try asking for one thing…"): "I couldn't
+   make that: the words “take a photo” would start both test note and
+   another skill, photo booth, so neither would start; say other words for
+   test note.", with `LAMP_MAKE_NO_ASKS` on alone (Heron's P3 1 on #7836:
+   off, it is heard as before). With it on, words that clash with the
+   person's own made skill replace it ("Nothing asked").
 4. **Said back with the words** (`made_skill::plainly`): "When you say
    “send my test note”, it mails me@example.com from your Gmail, subject
    “Test note”, saying “This is my test note.”. It starts only when you say
@@ -7792,6 +7880,25 @@ reset still ask. On (`crate::make_no_asks`):
   "Made evening dim. Your other rest glow is still on. Say 'remove it' to
   undo." A make with code of its own, and an agent make, never replace:
   they go on beside. Nothing waits for a choice.
+- **Words that clash with their own skill replace it, on the owner's ask**
+  (#7828's DEFAULT-ON, fix 3: on lamp-9adf "the words “flip a coin” would
+  start both coin flip and another skill, flip a coin, so neither would
+  start" refused the make). At the make (`made_skill::asks_taken_sparing`),
+  a plain voice make (no code, no write, no agent task) whose words would
+  start the person's own made skills on the lamp (`made_skill::own_on`: in
+  the made skills' index, on, never one added from a file) is kept; any
+  other skill its words would start (the lamp's own, one added from a
+  file, a pushed one, a made one kept and not on) refuses it as before.
+  Then (`make_skill_local::made_no_asks`, `made_skill::own_asks_taken`),
+  on the owner's own ask, those skills that are on are turned off first
+  (`make_no_asks::words_turned_off`), then it goes on, and they are
+  replaced together with any trigger clash, as above: "Made coin flip and
+  replaced your old flip a coin. Say 'keep the old one' to undo." Anyone
+  else's make is refused with the same reason and nothing of it kept
+  (`made_skill::forget_unput`); so is one whose old skill can't be turned
+  off (lamp-skills' `off` file unreadable, or the helper's refusal, those
+  turned off before then back on), never on beside it (Heron's P3 2 on
+  #7836). A put-on that fails turns them back on.
 - **A remove happens at once.** `make_skill`'s `remove`, the name matched
   to the person's own made skills as before (`made_remove::found`), removes
   it on the owner's ask (`services::owners_yes_now`) with no question:
@@ -7814,6 +7921,22 @@ reset still ask. On (`crate::make_no_asks`):
   its own goes on by its yes's own path only with `LAMP_MADE_SCRIPTS=on`;
   with it off it is put back and stays off, and why is said. A record of a
   replace outlives the remove of its new skill.
+- **A removed skill asked back by name is the undo, never a make**
+  (#7828's DEFAULT-ON, fix 2: on lamp-9adf "Put the flip a coin skill
+  back", just removed, was called as a make and made a new one). `undo`'s
+  description says "When the person asks to put back or restore a skill
+  they removed, call it with that skill, and never make it again."
+  (`make_no_asks::UNDO_RESTORE_TOLD`); whether a line asks that is the
+  model's judgment. A name given to `undo` is matched to every skill the
+  records name as a remove's name is (`made_remove::named_alone`: near by
+  spelling, with `LAMP_MADE_SKILL_OFF_SAID` on never a name whose numbers
+  differ, a name inside another named as it is written being that
+  other's part), so "flip a coin" puts flip a coin back even when flip a
+  coin 2 was removed after it: "flip a coin is back on.", with
+  `{"made": NAME, "on": true, "put_back": true}`. Several as near, or
+  none, undo nothing. A make never puts a skill back (Heron's P2 on #7836:
+  "make a water reminder" put back water reminder 2): its words go to the
+  making model as any make's.
 - **The keep, exactly.** Every record of what was done is kept 7 days, a
   removed skill's package with its record; at most 50 removed skills and
   100 records in all, the oldest out first, their packages with them.
@@ -7829,6 +7952,19 @@ reset still ask. On (`crate::make_no_asks`):
 - **Never "on" while off.** A put-on that fails is said in one plain line
   with why ("I made it but couldn't put it on: …"), and leaves nothing to
   undo.
+- **Called at once, never asked first** (#7828's DEFAULT-ON, fix 1: on
+  lamp-9adf's second route the model still asked "Do you want me to make
+  it again?", "Did you mean the flip-a-coin skill? Say the word and I'll
+  remove it." and, to "remove it", "Which one…?"). `make_skill`'s
+  description ends "Make or remove at once, never asking first, even of
+  one they have: your line gives the undo."
+  (`make_no_asks::AT_ONCE_TOLD`); its `remove` parameter adds "Call it at
+  once, never asking first or for a yes; ask which only when two skills
+  they made fit the words alike, never of "it"."
+  (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` adds
+  `make_no_asks::UNDO_RESTORE_TOLD`. With every switch the product's
+  unit sets on, the description stays within the link's 1,024 bytes and
+  the parameters within its 4,096.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.

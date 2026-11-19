@@ -912,7 +912,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 47] = [
+const PERSON_STORES: [&str; 48] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -975,6 +975,9 @@ const PERSON_STORES: [&str; 47] = [
     // The owner's yes to what the lamp sees for its skills, read by
     // lamp-seen (#6543, Fourteen's ruling, docs/seen.md).
     "/var/lib/lampOS/consent/seen-activity.json",
+    // The app's desk noticing mark beside it (Twelve's P2 on #7551): one
+    // from a clock far ahead would refuse every app yes after the reset.
+    "/var/lib/lampOS/consent/seen-activity-mark.json",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
@@ -1160,7 +1163,23 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
 #[test]
 fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
-    const KEPT: [(&str, &str); 6] = [
+    const KEPT: [(&str, &str); 11] = [
+        // The Store apps (#7415, piece C): nothing is installed while
+        // LAMP_STORE_APPS is off, which it is in the product. The wipe of
+        // every app's code, data and marks is the apps' own piece 8 (the
+        // reset plan's Migrate), owed before the switch goes on anywhere
+        // but a test lamp.
+        ("/opt/lampOS/apps", "apps, off: their wipe is piece 8"),
+        ("/var/lib/lampapp-", "app data, off: piece 8"),
+        ("/var/lib/lampapp-%i", "app data, off: piece 8"),
+        (
+            "/var/lib/lampos-apps-staging",
+            "staged packages, off: piece 8",
+        ),
+        (
+            "/var/lib/lampos-apps-state",
+            "the apps' marks, off: piece 8",
+        ),
         // The factory's self-test record, kept on purpose (install.md).
         ("/var/lib/lamp-selftest", "the self-test's runs"),
         // Each servo's highest load and temperature a day (#4501,
