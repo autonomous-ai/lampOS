@@ -1417,6 +1417,52 @@ test('the fake camera gives the picture a test sets', () => withLamp({ grants: [
   assert.deepEqual(await lamp.cameraSnapshot(), fake.picture);
 }));
 
+test('pose sends the JPEG in base64 and answers the 17 keypoints', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const { POSE_KEYPOINTS } = await import('../src/index.js');
+  const answer = await lamp.pose(FAKE_JPEG);
+  assert.deepEqual(fake.asked('pose'), [{ jpeg: FAKE_JPEG.toString('base64') }]);
+  assert.deepEqual(Object.keys(answer).sort(), ['height', 'model', 'ms', 'pose', 'width']);
+  assert.deepEqual([answer.width, answer.height, answer.model], [640, 480, 'fake-movenet']);
+  assert.equal(answer.pose.keypoints.length, POSE_KEYPOINTS.length);
+  assert.equal(POSE_KEYPOINTS.length, 17);
+  assert.deepEqual(Object.keys(answer.ms).sort(), ['decode', 'npu', 'post', 'total']);
+  fake.pose = null;
+  assert.equal((await lamp.pose(new Uint8Array(FAKE_JPEG))).pose, null);
+  await assert.rejects(lamp.pose(Buffer.from('GIF89a')), (error) => error instanceof byCode.bad_request && /not a JPEG/.test(error.why));
+}));
+
+test('pose checks the size before sending and keeps the lamp\'s refusals', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const { POSE_JPEG_MAX_BYTES } = await import('../src/index.js');
+  assert.equal(POSE_JPEG_MAX_BYTES, 45 * 1024);
+  assert.equal(Buffer.alloc(POSE_JPEG_MAX_BYTES).toString('base64').length, 61440);
+  const tooBig = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(POSE_JPEG_MAX_BYTES)]);
+  await assert.rejects(lamp.pose(tooBig), (error) => error.code === 'bad_request' && /over the 46080/.test(error.why));
+  await assert.rejects(lamp.pose(Buffer.alloc(0)), (error) => error.code === 'bad_request' && /empty/.test(error.why));
+  await assert.rejects(lamp.pose('not bytes'), (error) => error.code === 'bad_request');
+  assert.deepEqual(fake.asked('pose'), []);
+  // The biggest that fits goes.
+  await lamp.pose(Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(POSE_JPEG_MAX_BYTES - 2)]));
+  fake.refuseNext('pose', 'preparing', 'fetching the pose model', 2000);
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof byCode.preparing && error.retryMs === 2000
+    && error.name === 'PreparingError' && error.whatToDo.includes('retry_ms'));
+  fake.refuseNext('pose', 'unavailable', 'this lamp has no NPU');
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof byCode.unavailable && error.retryMs === undefined);
+  fake.refuseNext('pose', 'off', 'the NPU service is off on this lamp: switch LAMP_NPU');
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.off);
+  // A code from a newer lamp is still a LampError with its code.
+  fake.refuseNext('pose', 'warming_up', 'a code this SDK has never heard');
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof LampError && error.code === 'warming_up' && error.whatToDo === '');
+  fake.setPrivate(true);
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.private);
+}));
+
+test('pose needs the camera grant', () => withLamp({ grants: ['light'] }, async (lamp) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.no_grant);
+}));
+
 test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {
   const started = await lamp.cameraStream(true, 30);
   assert.equal(started.fps, 30);

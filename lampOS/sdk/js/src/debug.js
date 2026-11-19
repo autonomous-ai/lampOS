@@ -15,7 +15,8 @@ import { createHmac, randomBytes } from 'node:crypto';
 // the person's mail, calendar and the like: never logged.
 // An installed app's panel text (`title`, `lines`) and the owner's `settings` values are the app's own and the
 // person's: never logged; the keys that `changed` and a manifest `trigger`'s name are shown.
-export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix', 'token', 'args', 'result', 'title', 'lines', 'settings']);
+// A `pose` answer's keypoints are where a person's body is in a picture: never logged.
+export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix', 'token', 'args', 'result', 'title', 'lines', 'settings', 'keypoints']);
 // Fields given only as a summary: a said text or a turn's prompt, a pushed
 // skill part's bytes, a camera picture.
 export const SUMMARISED = new Set(['text', 'prompt', 'data', 'jpeg']);
@@ -41,6 +42,9 @@ export const SHOWN = new Set([
   'pm2_5', 'pm4_0', 'temperature', 'temperature_c', 'uptime_s',
   // A camera picture's size, age and a stream's rate (never the picture).
   'age_ms', 'bytes', 'fast', 'fps', 'fps_now', 'stream',
+  // A `pose` answer's shape: whether a person was found (`pose`, its `score`), the picture's size, the model and its
+  // times; the person's keypoints are secret above, never shown.
+  'pose', 'width', 'height', 'model', 'decode', 'npu', 'post',
   // A computer's own notes (`notes.*`) and hello's limits for them: whether a key was found or deleted, how many it
   // keeps and the bounds; a key, a value and a prefix are secret above, never shown.
   'notes', 'found', 'deleted', 'keys', 'count', 'total', 'keys_max', 'bytes_max', 'key_max_bytes', 'value_max_bytes', 'writes', 'reads',
