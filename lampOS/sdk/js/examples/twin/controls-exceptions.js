@@ -9,6 +9,7 @@ export const COVERAGE_EXCEPTIONS = [
   { kind: 'op', name: 'subscribe', reason: 'SDK internal: lamp.on() sends it for the event log' },
   { kind: 'op', name: 'unsubscribe', reason: 'SDK internal: lamp.off() sends it' },
   { kind: 'op', name: 'lease.renew', reason: `${YET} (a Lease renews itself inside withLease; no row asks for it alone)` },
+  { kind: 'op', name: 'pose', reason: `${YET} (lamp.pose takes a JPEG of the program's own; the virtual lamp has no NPU)` },
   { kind: 'op', name: 'service.read', reason: 'the virtual lamp has no service to read (needs a <service>-read grant and lamp-services)' },
   { kind: 'op', name: 'service.write', reason: 'the virtual lamp has no service to write (needs a <service>-write grant and lamp-services)' },
   { kind: 'event', name: 'person.stood_up', reason: 'lamp-sim has no verb for a person standing up yet' },

@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream) and a person's pose in a picture of the computer's own (pose), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -236,6 +236,9 @@
         },
         {
           "$ref": "#/$defs/camera.stream"
+        },
+        {
+          "$ref": "#/$defs/pose"
         },
         {
           "$ref": "#/$defs/skill.push"
@@ -1301,7 +1304,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; pose carries pose, width, height, model and ms; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1652,6 +1655,90 @@
               "description": "camera.stream: true when its frames come binary, every frame the camera makes.",
               "type": "boolean"
             },
+            "pose": {
+              "description": "pose: the person found in the picture, their score (0 to 1) and the 17 COCO keypoints in COCO order (nose, left_eye, right_eye, left_ear, right_ear, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle), each x and y in the sent picture's own pixels and its score (0 to 1); null when no person scored 0.2 or more. The same shape whatever model the lamp runs.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "keypoints": {
+                      "type": "array",
+                      "minItems": 17,
+                      "maxItems": 17,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "score": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "score"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "score",
+                    "keypoints"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "width": {
+              "description": "pose: the sent picture's width in pixels.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "description": "pose: the sent picture's height in pixels.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "model": {
+              "description": "pose: the id of the model the lamp ran.",
+              "type": "string"
+            },
+            "ms": {
+              "description": "pose: how long each step took on the lamp, in ms: decode (the JPEG), npu (the model), post (the keypoints) and total.",
+              "type": "object",
+              "properties": {
+                "decode": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "npu": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "post": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
             "sound": {
               "$ref": "#/$defs/clip"
             },
@@ -1824,14 +1911,16 @@
             "asleep",
             "rate",
             "bad_request",
-            "off"
+            "off",
+            "preparing",
+            "unavailable"
           ]
         },
         "why": {
           "type": "string"
         },
         "retry_ms": {
-          "description": "With rate: when the oldest counted action leaves its window.",
+          "description": "With rate: when the oldest counted action leaves its window. With busy, preparing or unavailable (pose): when to ask again.",
           "type": "integer",
           "minimum": 0
         }
@@ -3383,6 +3472,31 @@
         "id",
         "op",
         "on"
+      ],
+      "additionalProperties": false
+    },
+    "pose": {
+      "description": "One person's pose in a JPEG of the computer's own (a camera frame it has), from the lamp's NPU: the reply's pose (score and the 17 COCO keypoints in the picture's own pixels, or null with no person), width, height, model and ms. jpeg is standard base64, 1 to 61440 characters (a JPEG of at most 45 KiB, so the frame stays under the 64 KiB WebSocket cap): a 640x480 frame at ordinary quality fits; send a smaller or more compressed one otherwise. Needs the camera grant; local network only (refused on a remote connection, as the camera's ops); refused while the lamp is private (private). Off unless the lamp's LAMP_NPU switch is on (off). On first use the lamp fetches its pose model from the Store (preparing, with retry_ms, about 2000); unavailable when no model could be fetched or checked or the lamp has no NPU (with retry_ms when it will try again). One computer asks at most 15 a second, 5 while the board is warm and 1 while hot (rate, with retry_ms); busy (with retry_ms) when the NPU's share for all computers is used; bad_request when jpeg is not a JPEG.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "pose"
+        },
+        "jpeg": {
+          "description": "One JPEG, standard base64.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 61440,
+          "pattern": "^[A-Za-z0-9+/=]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "jpeg"
       ],
       "additionalProperties": false
     },

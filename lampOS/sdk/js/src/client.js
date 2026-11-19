@@ -161,6 +161,18 @@ function hex(colour) {
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
 
+// A `pose` request's longest JPEG: 61440 characters of base64 (protocol.rs
+// POSE_JPEG_MAX_CHARS), 45 KiB of picture, so the frame stays under 64 KiB.
+export const POSE_JPEG_MAX_CHARS = 61440;
+export const POSE_JPEG_MAX_BYTES = (POSE_JPEG_MAX_CHARS / 4) * 3;
+// The 17 COCO keypoints a pose's `keypoints` come in, in this order.
+export const POSE_KEYPOINTS = Object.freeze([
+  'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+  'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+  'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+  'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
+]);
+
 // The refusal for a name that is no event, with the event the name was meant
 // for when it is a lease's or a look's end (`lease.ended` is `lease`, state
 // `lost`); `lease` and `done` come with no subscription.
@@ -1038,6 +1050,30 @@ export class Lamp {
   async cameraSnapshot() {
     const reply = await this.request('camera.snapshot');
     return unb64(reply.jpeg);
+  }
+
+  /** One person's pose in `jpeg`, a JPEG of this computer's own (a Buffer or
+   * Uint8Array; a camera frame it has), from the lamp's NPU: `{ pose, width,
+   * height, model, ms }`. `pose` is `{ score, keypoints }`, the 17 COCO
+   * keypoints in COCO order (`POSE_KEYPOINTS`), each `{ x, y, score }` in the
+   * picture's own pixels, or null with no person. At most 45 KiB of JPEG
+   * (`POSE_JPEG_MAX_BYTES`, so the request stays under the 64 KiB frame): a
+   * 640x480 frame at ordinary quality fits. Needs the camera grant and the
+   * lamp's own network; off unless the lamp's LAMP_NPU is on. `preparing`
+   * (with `retryMs`) while the lamp fetches its model on first use;
+   * `unavailable` with no model or no NPU. */
+  async pose(jpeg) {
+    if (!(jpeg instanceof Uint8Array)) throw new LampError('jpeg: the JPEG as a Buffer or Uint8Array', { code: 'bad_request' });
+    if (jpeg.length === 0) throw new LampError('jpeg: an empty picture, send one JPEG', { code: 'bad_request' });
+    if (jpeg.length > POSE_JPEG_MAX_BYTES) {
+      throw new LampError(
+        `jpeg: ${jpeg.length} bytes, over the ${POSE_JPEG_MAX_BYTES} (45 KiB) a pose takes: `
+          + 'send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)',
+        { code: 'bad_request' },
+      );
+    }
+    const reply = await this.request('pose', { jpeg: Buffer.from(jpeg.buffer, jpeg.byteOffset, jpeg.length).toString('base64') });
+    return { pose: reply.pose ?? null, width: reply.width, height: reply.height, model: reply.model, ms: reply.ms };
   }
 
   /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each

@@ -35,6 +35,8 @@ ALL = {
 NOT_A_TOOL = {
     "pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream", "microphone.stream",
     "service.read", "service.write",
+    # A pose is of a JPEG of the computer's own: an agent's turn has none to send.
+    "pose",
 }
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}

@@ -18,7 +18,9 @@ first: it says exactly what was wrong.
 | `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
 | `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
-| `off` | Developer access is off on this lamp: the owner turns it on in the app. |
+| `off` | Developer access is off on this lamp: the owner turns it on in the app. For `pose`, the lamp's NPU service is off (its LAMP_NPU switch). |
+| `preparing` | The lamp is fetching its pose model from the Store on first use: wait `retry_ms` (about 2 s) and ask again. |
+| `unavailable` | No pose model could be fetched or checked, or this lamp has no NPU: with `retry_ms` the lamp tries again then; without it, pose won't work on this lamp. |
 
 On stable 10824 and older, `busy` with `retry_ms` also means a motion still
 plays (the last gesture, move or feeling's move lamp-control sent, from any computer; the lamp's own motions don't count): wait `retry_ms` and

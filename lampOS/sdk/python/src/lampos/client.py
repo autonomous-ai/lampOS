@@ -216,6 +216,17 @@ def _hex(colour) -> str:
 # lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
 # MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 SAY_MAX_BYTES = 900
+# A `pose` request's longest JPEG: 61440 characters of base64 (protocol.rs
+# POSE_JPEG_MAX_CHARS), 45 KiB of picture, so the frame stays under 64 KiB.
+POSE_JPEG_MAX_CHARS = 61440
+POSE_JPEG_MAX_BYTES = POSE_JPEG_MAX_CHARS // 4 * 3
+# The 17 COCO keypoints a pose's `keypoints` come in, in this order.
+POSE_KEYPOINTS = (
+    "nose", "left_eye", "right_eye", "left_ear", "right_ear",
+    "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist", "left_hip", "right_hip",
+    "left_knee", "right_knee", "left_ankle", "right_ankle",
+)
 
 
 def _check(op: str, fields: dict) -> None:
@@ -1399,6 +1410,32 @@ class Lamp:
         if size is not None:
             fields["size"] = size
         return await self.request("camera.stream", **fields)
+
+    async def pose(self, jpeg: bytes) -> dict:
+        """One person's pose in `jpeg`, a JPEG of this computer's own (a
+        camera frame it has), from the lamp's NPU: `{"pose", "width",
+        "height", "model", "ms"}`. `pose` is `{"score", "keypoints"}`, the 17
+        COCO keypoints in COCO order (`POSE_KEYPOINTS`), each `{"x", "y",
+        "score"}` in the picture's own pixels, or None with no person. At most
+        45 KiB of JPEG (`POSE_JPEG_MAX_BYTES`, so the request stays under the
+        64 KiB frame): a 640x480 frame at ordinary quality fits. Needs the
+        camera grant and the lamp's own network; off unless the lamp's
+        LAMP_NPU is on. `PreparingError` (with `retry_ms`) while the lamp
+        fetches its model on first use; `UnavailableError` with no model or
+        no NPU."""
+        if not isinstance(jpeg, (bytes, bytearray, memoryview)):
+            raise LampError("jpeg: the JPEG's bytes", code="bad_request")
+        size = len(jpeg)
+        if size == 0:
+            raise LampError("jpeg: an empty picture, send one JPEG", code="bad_request")
+        if size > POSE_JPEG_MAX_BYTES:
+            raise LampError(
+                f"jpeg: {size} bytes, over the {POSE_JPEG_MAX_BYTES} (45 KiB) a pose takes: "
+                "send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)",
+                code="bad_request",
+            )
+        reply = await self.request("pose", jpeg=base64.b64encode(bytes(jpeg)).decode())
+        return {k: reply.get(k) for k in ("pose", "width", "height", "model", "ms")}
 
     async def volume(self, *, to: int | None = None, step: str | None = None, mute: bool | None = None) -> dict:
         """The speaker's volume, the person's own: one of `to` (0-100), `step`
