@@ -3008,13 +3008,13 @@ mod tests {
             seen.faces[0].looking = looking;
             eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
         };
-        look(0, true, Some(0.1), Some(true));
-        look(1, true, Some(0.6), None);
+        look(0, true, Some(0.25), Some(true));
+        look(1, true, Some(0.75), None);
         look(2, false, Some(-0.9), Some(false));
         let to = from + EVERY * 3;
         assert_eq!(
             eyes.turned_pose_between(from, to),
-            (Some(0.35), Some(true), 2)
+            (Some(0.5), Some(true), 2)
         );
         assert_eq!(eyes.turned_pose_between(to, to), (None, None, 0));
         let phone = SpeakingFaces::default();
