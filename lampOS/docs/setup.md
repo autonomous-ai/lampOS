@@ -316,7 +316,20 @@ lamp-setup reset-now`). That unit, in this order:
    only at an install (`reset::cut_openclaw_config`): another provider's
    key, a channel's token, a person's skill folders and plugins go, and
    lamp-tasks merges the lamp's keys back in at each start; one that is not
-   a JSON object is removed. The lamp's `gateway-token` is kept as it is:
+   a JSON object is removed. The cut is checked by OpenClaw before it lands
+   (#7868), as the install's and lamp-tasks' writes are: it goes to a new
+   file beside `openclaw.json` with its owner and mode, and lamp-update's
+   own check (`openclaw_install::validate_argv`, `config validate --json`
+   as `lampos` inside `openclaw-ns`, which needs no forwarder token, at
+   most 60 s) runs on it; only status 0 renames it into place
+   (`lamp_checked_replace::replace_checked_in`). Refused, the new file is
+   removed, `openclaw.json` stays byte for byte, the journal says
+   "lamp-setup: reset: ... not cut, kept as it was: <OpenClaw's words>",
+   and the reset goes on, so the lamp still comes back into setup and its
+   gateway never starts on a file OpenClaw refuses; the person's other
+   keys in that file stay until a later reset's cut is taken. With no
+   `openclaw-ns` there (OpenClaw not installed) the cut is written
+   unchecked, said. The lamp's `gateway-token` is kept as it is:
    made once per lamp, it is the lamp's, not the person's. The Hermes a pin
    change moved aside (`/var/lib/lampos-hermes.old`,
    `hermes_install::ASIDE`), with the old Hermes's sessions, memories and
