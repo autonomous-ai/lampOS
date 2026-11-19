@@ -45,6 +45,9 @@ rustix = { version = "=1.1.5", features = ["fs", "process"] }
 # The lamp's local time, for the Hermes install's quiet hour at night (#5978):
 # the zone setup points /etc/localtime at, as the other parts read it.
 lamp-local-time = { path = "../local-time" }
+# The one checked replace of a settings file (#7868): OpenClaw's config
+# checked by OpenClaw before the rename, as lamp-tasks' and lamp-setup's.
+lamp-checked-replace = { path = "../checked-replace" }
 
 [dev-dependencies]
 tempfile = "3"
