@@ -62,7 +62,12 @@ const MOST_FILE_BYTES: u64 = 64 * 1024;
 /// lamp-tasks' cgroup CPU, read before and after each refill: the agent's
 /// run is lamp-tasks' child (the lamp's Hermes), so its CPU is counted
 /// there, with whatever else lamp-tasks did meanwhile (an upper bound).
-pub const CPU_STAT: &str = "/sys/fs/cgroup/system.slice/lamp-tasks.service/cpu.stat";
+/// The product unit's `Slice=lampos-parts.slice` first, then a unit with
+/// no slice; the first that exists is read ([`cpu_stat`]).
+pub const CPU_STATS: [&str; 2] = [
+    "/sys/fs/cgroup/lampos.slice/lampos-parts.slice/lamp-tasks.service/cpu.stat",
+    "/sys/fs/cgroup/system.slice/lamp-tasks.service/cpu.stat",
+];
 
 /// Why no refill begins now, for the journal.
 pub const TALKING: &str = "a turn is open or ended under 15 s ago";
@@ -533,8 +538,13 @@ pub fn checked(answer: &str) -> Result<String, &'static str> {
     }
 }
 
-/// lamp-tasks' cgroup CPU in microseconds (`usage_usec` of [`CPU_STAT`]'s
-/// form), if it could be read.
+/// The first of [`CPU_STATS`] that exists, if any.
+pub fn cpu_stat() -> Option<&'static Path> {
+    CPU_STATS.iter().map(Path::new).find(|stat| stat.exists())
+}
+
+/// lamp-tasks' cgroup CPU in microseconds (`usage_usec` of a
+/// [`CPU_STATS`] file's form), if it could be read.
 pub fn cpu_usec(stat: &Path) -> Option<u64> {
     let text = std::fs::read_to_string(stat).ok()?;
     text.lines()

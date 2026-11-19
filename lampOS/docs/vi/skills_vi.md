@@ -3944,7 +3944,7 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   Hermes (`MEASURED_RUN_SECS`), tối đa 3 lần một kỹ năng một ngày. Mỗi lần nạp
   tốn một trong 20 lần chạy một ngày của kỹ năng. CPU của một lần nạp được đọc
   từ cgroup của lamp-tasks (`usage_usec` của `cpu.stat` trước và sau,
-  `worded_ahead::CPU_STAT`): lần chạy Hermes là con của lamp-tasks nên được
+  `worded_ahead::CPU_STATS`, đường dẫn `lampos-parts.slice` của sản phẩm trước): lần chạy Hermes là con của lamp-tasks nên được
   tính ở đó, cùng mọi việc khác lamp-tasks làm trong lúc ấy (một cận trên).
   Lượt của một gateway agent (OpenClaw) chạy trong service riêng và không được
   tính ở đó.

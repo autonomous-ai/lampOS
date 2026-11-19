@@ -2404,8 +2404,8 @@ fn refill(
         control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
         socket: Some(socket),
     };
-    let cpu = Path::new(worded::CPU_STAT);
-    let before = worded::cpu_usec(cpu);
+    let cpu = worded::cpu_stat();
+    let before = cpu.and_then(worded::cpu_usec);
     let language = language_now();
     let cleared = store.cleared();
     let began = Instant::now();
@@ -2428,7 +2428,7 @@ fn refill(
     );
     let run = began.elapsed();
     let cpu_s = before
-        .zip(worded::cpu_usec(cpu))
+        .zip(cpu.and_then(worded::cpu_usec))
         .map(|(before, after)| after.saturating_sub(before) as f32 / 1_000_000.0);
     worded::allowance().spent(run, cpu_s);
     let mut kept = store.kept();

@@ -2385,7 +2385,7 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   Hermes (`MEASURED_RUN_SECS`), at most 3 a skill a day. Each refill
   spends one of the skill's 20 runs a day. A refill's CPU is read from
   lamp-tasks' cgroup (`cpu.stat`'s `usage_usec` before and after,
-  `worded_ahead::CPU_STAT`): the Hermes run is lamp-tasks' child, so it is
+  `worded_ahead::CPU_STATS`, the product's `lampos-parts.slice` path first): the Hermes run is lamp-tasks' child, so it is
   counted there, with whatever else lamp-tasks did meanwhile (an upper
   bound). A gateway agent's turn (OpenClaw) runs in its own service and is
   not counted there.

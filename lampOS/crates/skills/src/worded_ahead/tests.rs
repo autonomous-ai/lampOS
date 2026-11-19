@@ -371,3 +371,9 @@ fn forget_and_a_language_change_let_the_kept_lines_go() {
     assert!(store.kept().take_in(&sip, NOON_MS, Some("vi\n")).is_some());
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn the_product_slice_is_read_first() {
+    assert!(CPU_STATS[0].contains("/lampos.slice/lampos-parts.slice/lamp-tasks.service/"));
+    assert!(CPU_STATS[1].contains("/system.slice/lamp-tasks.service/"));
+}
