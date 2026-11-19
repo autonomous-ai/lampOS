@@ -165,6 +165,14 @@ impl ReopenHold {
         if reference.playback_epoch != 0 && reference.clock_started_at_us.is_some() {
             return None;
         }
+        // Step 1's reopen has not come: step 2 counts only from it, so a
+        // slow fresh authority never cuts the recovery short. A reopen that
+        // never comes ends at the gap's own 1.5 s bound (the worker's
+        // `REOPEN_US`, the coordinator's retention heartbeat from the gap's
+        // `closed_at_us`).
+        if self.recovery_reopen_owed {
+            return None;
+        }
         let waited = at_us.saturating_sub(since);
         if waited < RECOVER_US {
             return None;
@@ -416,6 +424,33 @@ mod tests {
         assert_eq!(
             UNSTARTED_ERROR,
             "capture frame preceded certified running reference clock"
+        );
+    }
+
+    /// Step 2 waits for step 1's reopen however slow its fresh authority:
+    /// the 800 ms count starts at the reopen, not at step 1.
+    #[test]
+    fn step_2_waits_for_the_recoverys_reopen() {
+        let mut hold = ReopenHold::new(true);
+        let unstarted = started(2, None);
+        hold.reopened(0);
+        let step1 = RECOVER_US;
+        assert!(matches!(
+            hold.due(&unstarted, step1),
+            Some(Recovery::Reopen(_))
+        ));
+        assert_eq!(hold.due(&unstarted, step1 + RECOVER_US + 1), None);
+        assert_eq!(hold.due(&unstarted, step1 + 10 * RECOVER_US), None);
+        assert!(hold.waiting());
+        let reopened = step1 + RECOVER_US + 100_000;
+        hold.reopened(reopened);
+        assert_eq!(hold.due(&unstarted, reopened + RECOVER_US - 1), None);
+        let Some(Recovery::Exit(line)) = hold.due(&unstarted, reopened + RECOVER_US) else {
+            panic!("step 2 from the reopen");
+        };
+        assert!(
+            line.contains("800 ms after the recovery's reopen"),
+            "{line}"
         );
     }
 

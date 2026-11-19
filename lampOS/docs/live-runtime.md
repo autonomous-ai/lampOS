@@ -179,7 +179,9 @@ frames until the clock comes, so at most that sound is lost, never the
 process; it says the counts in a line. A clock still not started 800 ms
 after the reopen is recovered once by a fresh reopen under the next
 authority, as after a stall, the speaker re-priming on its own; another
-800 ms without it ends capture with the old error, so the voice exits and
+800 ms without it, counted from that reopen however slow its authority
+was, ends capture with the old error (a reopen that never comes ends at the
+gap's 1.5 s bound, the worker's and the heartbeat's alike), so the voice exits and
 systemd restarts it, one line per step with counts only, and each reopen
 journals the ms from the reopen to the clock's start. With the switch on
 the hold's two steps run before the coordinator's 1.5 s retention
