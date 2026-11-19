@@ -6593,14 +6593,20 @@ pub fn finished(request: u64) {
         let Some(client) = DAYS.get().and_then(Option::as_ref) else {
             return;
         };
-        let done = match crate::thread::THREAD.lock() {
-            Ok(mut thread) => thread.finished(request, Instant::now()),
+        let (done, waits) = match crate::thread::THREAD.lock() {
+            Ok(mut thread) => (
+                thread.finished(request, Instant::now()),
+                thread.waits_for_look(request),
+            ),
             Err(_) => return,
         };
         hand_on_days(filed_by_one_face(done), wall_ms(), client);
         // What its calls gave and no exchange took (one kept out) is
-        // dropped (#2176 finding 14).
-        client.drop_fetched(request);
+        // dropped (#2176 finding 14); an exchange waiting for its look's
+        // words keeps it until it is handed on (`LAMP_LOOK_KEPT_WITH_ASK`).
+        if !waits {
+            client.drop_fetched(request);
+        }
         return;
     }
     let Some(jobs) = JOBS.get() else { return };

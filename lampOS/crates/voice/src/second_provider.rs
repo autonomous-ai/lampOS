@@ -2335,6 +2335,17 @@ struct Shared {
     /// given once to that session's next look turn, after its question, and
     /// let go as any other turn begins.
     look_note: Mutex<Option<(u64, String)>>,
+    /// The route's own look asked in a spoken turn, with the model's
+    /// arguments and the line's words (`LAMP_LOOK_TOLD`,
+    /// `LAMP_LOOK_KEPT_WITH_ASK`, [`crate::look_told`]): taken by that
+    /// session's next look turn, let go as any other turn begins.
+    look_asked: Mutex<Option<crate::look_told::LookAsk>>,
+    /// `LAMP_LOOK_TOLD=on`: the look's arguments and memory's hits for its
+    /// question go beside the picture ([`Engine::telling_looks_what_was_said`]).
+    look_told: bool,
+    /// `LAMP_LOOK_KEPT_WITH_ASK=on`: the look's turn is the asker's, and is
+    /// kept with the question ([`Engine::keeping_looks_with_their_ask`]).
+    look_kept: bool,
     /// The spoken request being answered and its words, until any of its
     /// answer is heard or its turn ends.
     in_flight: Mutex<Option<Carried>>,
@@ -5275,6 +5286,9 @@ impl Engine {
                 begun: Mutex::new(None),
                 wait_sound_only: Mutex::new(None),
                 look_note: Mutex::new(None),
+                look_asked: Mutex::new(None),
+                look_told: false,
+                look_kept: false,
                 in_flight: Mutex::new(None),
                 send_content_epoch: Arc::new(AtomicU64::new(0)),
                 answered_request: Mutex::new(None),
@@ -5371,6 +5385,12 @@ impl Engine {
         self.shared
             .private_now
             .store(!(now.0 && now.2), Ordering::SeqCst);
+        // A look asked and not begun is dropped by a privacy close or a
+        // mute: its asking exchange is kept at once, as it stands (Twelve's
+        // P2 on #8019).
+        if !(now.0 && now.2) {
+            self.let_go_look(u64::MAX, "a privacy close or a mute");
+        }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
@@ -5477,6 +5497,141 @@ impl Engine {
             .memory_scope
             .as_ref()
             .map(|scope| scope.lease())
+    }
+
+    /// A request scope for `request` in `scope`, as [`Self::memory_scope`]
+    /// admits one; `None` without a memory.
+    fn scope_of(
+        &self,
+        request: u64,
+        session: u64,
+        scope: crate::memory_scope::ScopeSnapshot,
+    ) -> Option<crate::memory_scope::RequestScope> {
+        self.memory.as_ref().map(|(worker, _)| {
+            crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: *worker,
+                    session,
+                    request,
+                },
+                scope,
+            )
+        })
+    }
+
+    /// A look asked by a request up to `through` and not begun is dropped
+    /// (`why`): its asking exchange no longer waits for the look's words and
+    /// is kept at once, as it stands (Twelve's P2 on #8019).
+    fn let_go_look(&self, through: u64, why: &str) {
+        let Some(ask) = self
+            .shared
+            .look_asked
+            .lock()
+            .ok()
+            .and_then(|mut asked| asked.take_if(|ask| ask.request <= through))
+        else {
+            return;
+        };
+        let waited = crate::thread::THREAD.lock().is_ok_and(|mut thread| {
+            let waited = thread.waits_for_look(ask.request);
+            thread.look_let_go(ask.request);
+            waited
+        });
+        eprintln!(
+            "lamp-voice second: request {}: its look was dropped ({why}): its exchange is kept as it stands",
+            ask.request
+        );
+        if waited {
+            crate::remember::finished(ask.request);
+        }
+    }
+
+    /// The route's own look asked in a spoken turn, taken for `session`'s
+    /// look turn `request` (`look`): what the model wrote with it, and the
+    /// asker's scope as it was asked, carried in the ask itself (the look
+    /// request's authority retires the asking turn first, Twelve's P1 on
+    /// #8019). Who is at the lamp is read again now (the memory owner's
+    /// ruling on #8019, privacy first): the asker's scope holds only while
+    /// they are still the one seen, or no face is in view and their gap
+    /// holds them, with no other face, known or not, in the eyes' looks
+    /// ([`asker_still_alone`]); anyone else in view, a privacy change, or
+    /// the camera not allowed, and the look and its hits are the room's.
+    /// Any other turn lets it go.
+    fn look_turn(&mut self, request: u64, session: u64, look: bool) -> Option<LookTurn> {
+        if !look {
+            return None;
+        }
+        let ask = self
+            .shared
+            .look_asked
+            .lock()
+            .ok()
+            .and_then(|mut asked| asked.take())?;
+        if ask.session != session {
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.look_let_go(ask.request);
+            }
+            return None;
+        }
+        let room = crate::memory_scope::ScopeSnapshot::room;
+        let (scope, hits, held) = match &ask.asker {
+            // No memory scope: the look's own lines read as before.
+            None => (room(), None, false),
+            Some(asker) => {
+                let now = Instant::now();
+                let seen_now = match &self.memory {
+                    Some((_, cache)) if self.memory_camera_allowed => cache.snapshot(now),
+                    _ => room(),
+                };
+                let eyes = self.shared.speaking.as_ref().map(|(eyes, known)| {
+                    let face = eyes.known_with_boot(known).map(|(_, face)| face);
+                    (eyes.clone(), face)
+                });
+                let from = now
+                    .checked_sub(crate::speaking_faces::IN_VIEW_BEFORE)
+                    .unwrap_or(now);
+                let alone = asker_still_alone(
+                    &asker.kept,
+                    &seen_now,
+                    eyes.as_ref()
+                        .map(|(eyes, face)| (eyes.as_ref(), face.as_deref())),
+                    from,
+                    now,
+                );
+                if !alone {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the asker is not the one alone at the lamp as the look begins: the look and its hits are the room's"
+                    );
+                }
+                let scope = if alone { asker.kept.clone() } else { room() };
+                let hits = match &asker.hits {
+                    Some(_) if !alone => Some(room()),
+                    hits => hits.clone(),
+                };
+                (scope, hits, asker.held)
+            }
+        };
+        let kept = self.shared.look_kept.then(|| scope.clone());
+        // Its words go on in the asking exchange only while it is the
+        // asker's (`thread::Thread::look_turn`).
+        let theirs = ask
+            .asker
+            .as_ref()
+            .is_none_or(|asker| asker.kept.person() == scope.person());
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            if kept.is_some() && theirs {
+                thread.look_turn(request, ask.request);
+            } else {
+                thread.look_let_go(ask.request);
+            }
+        }
+        Some(LookTurn {
+            told: self.shared.look_told,
+            ask,
+            kept,
+            hits,
+            held,
+        })
     }
 
     fn memory_scope(
@@ -6328,6 +6483,33 @@ impl Engine {
     pub fn noting_looks(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.note_looks = on;
+        }
+        self
+    }
+
+    /// `LAMP_LOOK_TOLD=on` ([`crate::look_told::TOLD_ENVIRONMENT`]): the
+    /// route's own look turn is told, beside the picture and before its
+    /// note, what the model wrote with its `take_a_look` call (`question`,
+    /// `told`) and memory's hits for the question (or the asking line) in
+    /// the asker's scope; none for a held asker. With no arguments and no
+    /// hits the note is as before. Before any turn only.
+    pub fn telling_looks_what_was_said(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.look_told = on;
+        }
+        self
+    }
+
+    /// `LAMP_LOOK_KEPT_WITH_ASK=on` ([`crate::look_told::KEPT_ENVIRONMENT`]):
+    /// the route's own look turn goes on from the spoken turn that asked it,
+    /// in that turn's scope (the room's for a held, carried, revoked or
+    /// unknown asker), and its words are kept with the question as one
+    /// exchange (`thread::Thread::look_asked`). Words only, never the
+    /// picture. A look the lamp began on its own is as before. Before any
+    /// turn only.
+    pub fn keeping_looks_with_their_ask(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.look_kept = on;
         }
         self
     }
@@ -8359,7 +8541,18 @@ impl Engine {
                     .and_then(|mut note| note.take())
                     .filter(|(of, _)| look && *of == session)
                     .map(|(_, note)| note);
+                // The route's own look asked in a spoken turn, and its
+                // asker's scope, read before the asker's turn is let go
+                // (`LAMP_LOOK_TOLD`, `LAMP_LOOK_KEPT_WITH_ASK`).
+                let look_turn = self.look_turn(request, session, look);
                 if !self.begin(request, session) {
+                    // Refused (retired): its look never runs, and the asking
+                    // exchange is kept as it stands (Twelve's P3 on #8019).
+                    if let Some(turn) = &look_turn
+                        && let Ok(mut thread) = crate::thread::THREAD.lock()
+                    {
+                        thread.look_let_go(turn.ask.request);
+                    }
                     return;
                 }
                 // A search's own turn: the search a push may end goes on
@@ -8451,13 +8644,58 @@ impl Engine {
                     // The next line is its answer, judged by the model.
                     crate::onboarding::learn_later::asked_now();
                     None
+                } else if let Some(scope) = look_turn
+                    .as_ref()
+                    .and_then(|turn| turn.kept.clone())
+                    .and_then(|scope| self.scope_of(request, session, scope))
+                {
+                    // The look goes on from the turn that asked it, in its
+                    // scope (`LAMP_LOOK_KEPT_WITH_ASK`).
+                    let kept_lease = scope.lease();
+                    let whose = if kept_lease
+                        .scope()
+                        .and_then(|scope| scope.person())
+                        .is_some()
+                    {
+                        "the asker's"
+                    } else {
+                        "the room's"
+                    };
+                    eprintln!(
+                        "lamp-voice second: request {request}: the look goes on from request {} in {whose} scope (LAMP_LOOK_KEPT_WITH_ASK)",
+                        look_turn.as_ref().map_or(0, |turn| turn.ask.request)
+                    );
+                    Some(scope)
                 } else {
                     self.memory_scope(request, session, false)
                 };
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
+                // What was said of the look goes beside the picture, before
+                // its note (`LAMP_LOOK_TOLD`); never without a picture.
+                let told = look_turn
+                    .filter(|turn| turn.told && picture.is_some())
+                    .map(|turn| {
+                        // With a memory scope, hits only in the asker's; a
+                        // voice without one reads them as its lines do.
+                        let hits = match &self.memory {
+                            Some(_) => match turn.hits {
+                                Some(scope) => LookHits::In(self.scope_of(request, session, scope)),
+                                None => LookHits::None,
+                            },
+                            None => LookHits::In(None),
+                        };
+                        let hits = if turn.held { LookHits::None } else { hits };
+                        (turn.ask, hits)
+                    });
                 let shared = self.shared.clone();
                 let begun = Instant::now();
                 let task = tokio::spawn(async move {
+                    let text = match told {
+                        Some((ask, hits)) => {
+                            look_told_text(&shared, request, &ask, hits, text).await
+                        }
+                        None => text,
+                    };
                     answer(
                         &shared,
                         (request, lease),
@@ -8588,6 +8826,14 @@ impl Engine {
         if let Ok(mut begun) = self.shared.begun.lock() {
             *begun = Some((request, session));
         }
+        // So is a look asked by the route's own call: any other turn lets
+        // it go, and its asking exchange is kept as it stands.
+        if let Ok(mut asked) = self.shared.look_asked.lock()
+            && let Some(ask) = asked.take()
+            && let Ok(mut thread) = crate::thread::THREAD.lock()
+        {
+            thread.look_let_go(ask.request);
+        }
         // A skill's note for its picture is for the look turn alone, which
         // takes it before it begins: any other turn lets it go.
         if let Ok(mut note) = self.shared.look_note.lock()
@@ -8660,6 +8906,12 @@ impl Engine {
         }
         self.let_go_cut("a stop came after it");
         self.let_go_holding_line(through);
+        // A look asked is not dropped here: an authority with no owner
+        // also comes as the asking turn ends ("Let me look." said), before
+        // the look's picture comes with the next request (lamp-06c1, ROW on
+        // #8019: 17 of 17 looks dropped). A mute or privacy close drops it
+        // (`privacy`), a spoken stop or a close (`thread::close_now`), and
+        // any other turn begun (`begin`).
         // Nor do its words heard and not yet asked go on in a chain
         // ([`Self::chain_heard`]).
         if let Ok(mut last) = self.shared.heard_last.lock() {
@@ -11155,6 +11407,10 @@ async fn spoken(
         // a turn or a tap (the local leader, 4 Nov: else it started a fresh
         // 45 s of conversation).
         // Its own exchange is covered however late the line is written.
+        // A look asked and not begun goes with it (#8019).
+        if let Ok(mut asked) = shared.look_asked.lock() {
+            asked.take();
+        }
         crate::thread::close_now(Some(request));
         // An ask with the lamp's agent is stopped too: its answer is never
         // told, and is cancelled if it already waits (Heron's P2 4 on #7509).
@@ -14570,6 +14826,183 @@ pub(crate) fn look_turn_note(search: bool, note: Option<String>) -> Option<Strin
         None if !search => Some(HEAD_STILL_NOTE.to_owned()),
         None => None,
     }
+}
+
+/// A look the route's own call asked, as its look turn takes it
+/// ([`Engine::look_turn`]).
+struct LookTurn {
+    /// `LAMP_LOOK_TOLD`: what was said goes beside the picture.
+    told: bool,
+    ask: crate::look_told::LookAsk,
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: the scope the look turn goes on in.
+    kept: Option<crate::memory_scope::ScopeSnapshot>,
+    /// The scope memory's hits for it are read in; none for a held,
+    /// revoked or gone asker.
+    hits: Option<crate::memory_scope::ScopeSnapshot>,
+    /// The asker was held only by a face's gap: told no hits, as a held
+    /// line never is.
+    held: bool,
+}
+
+/// Where memory's hits for a look are read (`LAMP_LOOK_TOLD`).
+enum LookHits {
+    /// In this scope, the asker's; `None` for a voice with no memory scope,
+    /// read as its lines are.
+    In(Option<crate::memory_scope::RequestScope>),
+    /// Not at all: a held, revoked or gone asker.
+    None,
+}
+
+/// The scope a look turn goes on in from its asker's `lease`
+/// (`LAMP_LOOK_KEPT_WITH_ASK`): the asker's while current, not held only by
+/// a face's gap, and not carried as a conversation going on (whose lines
+/// are never journalled as theirs); the room's otherwise.
+pub(crate) fn look_scope(
+    lease: &crate::memory_scope::ScopeLease,
+) -> crate::memory_scope::ScopeSnapshot {
+    match lease.scope() {
+        Some(scope) if !scope.held() && !lease.reads_carried() && lease.carried_for().is_none() => {
+            scope.clone()
+        }
+        _ => crate::memory_scope::ScopeSnapshot::room(),
+    }
+}
+
+/// The scope memory's hits for a look are read in (`LAMP_LOOK_TOLD`): its
+/// asker's, as the asking line's own hits would be; none for a revoked or
+/// held one, as a held line is told none.
+pub(crate) fn look_hits_scope(
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<crate::memory_scope::ScopeSnapshot> {
+    lease.scope().filter(|scope| !scope.held()).cloned()
+}
+
+/// Whether a look's asker, `asked` (their scope as they asked), is still the
+/// one at the lamp as the look begins (the memory owner's ruling on #8019,
+/// privacy first): the face cache names them now (`now`: seen, or held by
+/// their gap with no face in view), and, with the eyes' view (`eyes`, with
+/// the known face's id), no other face, known or not, was in the eyes' looks
+/// from `from` to `to`: only theirs when seen, none when held. A room's ask
+/// has nobody to keep from: always.
+pub(crate) fn asker_still_alone(
+    asked: &crate::memory_scope::ScopeSnapshot,
+    now: &crate::memory_scope::ScopeSnapshot,
+    eyes: Option<(&crate::speaking_faces::SpeakingFaces, Option<&str>)>,
+    from: Instant,
+    to: Instant,
+) -> bool {
+    let Some(person) = asked.person() else {
+        return true;
+    };
+    if now.person() != Some(person) {
+        return false;
+    }
+    match eyes {
+        None => true,
+        Some((eyes, _)) if now.held() => eyes.no_other_face_in_view(None, from, to),
+        Some((eyes, face)) => face.is_some() && eyes.no_other_face_in_view(face, from, to),
+    }
+}
+
+/// The route's own look, asked by its call in `request`'s spoken turn
+/// (`ask_look` took it): kept for that session's look turn with the
+/// model's `args` and the line's words (`heard`), with `LAMP_LOOK_TOLD` or
+/// `LAMP_LOOK_KEPT_WITH_ASK` on. With the latter, the asking exchange waits
+/// in the thread for the look's words (`thread::Thread::look_asked`), unless
+/// the asker is held or carried: those lines are never journalled as
+/// theirs, and the look's words go to the room's as before.
+fn look_asked_by_call(
+    shared: &Shared,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    args: crate::look_told::LookArgs,
+    heard: &str,
+) {
+    if !(shared.look_told || shared.look_kept) {
+        return;
+    }
+    let Some(session) = shared
+        .begun
+        .lock()
+        .ok()
+        .and_then(|begun| *begun)
+        .filter(|(of, _)| *of == request)
+        .map(|(_, session)| session)
+    else {
+        return;
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: the look call wrote a question: {}, what they told: {}",
+        if args.question.is_some() { "yes" } else { "no" },
+        if args.told.is_some() { "yes" } else { "no" },
+    );
+    // The asker's scope now, from the asking turn's own lease: by the look
+    // turn the authority has retired this turn (Twelve's P1 on #8019).
+    let asker = lease.map(|lease| crate::look_told::AskerScope {
+        kept: look_scope(lease),
+        hits: look_hits_scope(lease),
+        held: lease
+            .scope()
+            .is_some_and(crate::memory_scope::ScopeSnapshot::held),
+    });
+    if let Ok(mut asked) = shared.look_asked.lock() {
+        *asked = Some(crate::look_told::LookAsk {
+            session,
+            request,
+            args,
+            heard: heard.to_owned(),
+            asker,
+        });
+    }
+    let theirs = lease.is_none_or(|lease| {
+        lease.scope().is_some_and(|scope| {
+            !scope.held() && !lease.reads_carried() && lease.carried_for().is_none()
+        })
+    });
+    if shared.look_kept
+        && theirs
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.look_asked(request);
+    }
+}
+
+/// The look turn's words with `LAMP_LOOK_TOLD` ([`crate::look_told::turn_text`]):
+/// the model's arguments and memory's hits for the question, or for the
+/// asking line, read in `hits_scope` as a spoken line's are (none for a held
+/// asker), before `note`. Counts only in the journal.
+async fn look_told_text(
+    shared: &Shared,
+    request: u64,
+    ask: &crate::look_told::LookAsk,
+    hits: LookHits,
+    note: String,
+) -> String {
+    let words = ask.args.hits_words(&ask.heard).map(str::to_owned);
+    let hits = match (shared.remembered.clone(), words, hits) {
+        (Some(remembered), Some(words), LookHits::In(scope)) => {
+            let lease = scope.as_ref().map(|scope| scope.lease());
+            let hits =
+                tokio::task::spawn_blocking(move || remembered(request, &words, lease.as_ref()))
+                    .await
+                    .ok()
+                    .flatten();
+            drop(scope);
+            hits
+        }
+        _ => None,
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: the look is told what was asked: question {}, what they told {}, memory's hits {} (LAMP_LOOK_TOLD)",
+        if ask.args.question.is_some() {
+            "yes"
+        } else {
+            "no"
+        },
+        if ask.args.told.is_some() { "yes" } else { "no" },
+        if hits.is_some() { "yes" } else { "none" },
+    );
+    crate::look_told::turn_text(&ask.args, hits.as_deref(), &note)
 }
 
 /// Asks the coordinator for `request`'s full look (`LookAsked`), made by a
@@ -20485,9 +20918,20 @@ async fn answer(
                 for sentence in offered(&mut offer_hold, remembers, request, round) {
                     queue.push(sentence).await?;
                 }
-                if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
-                    && !queue.started
-                {
+                let asked_look =
+                    ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?;
+                // What the model wrote with its look, and the line's words,
+                // for the look turn (`LAMP_LOOK_TOLD`,
+                // `LAMP_LOOK_KEPT_WITH_ASK`).
+                if asked_look {
+                    let args = calls
+                        .iter()
+                        .find(|call| call.name == LOOK_CALL)
+                        .map(|call| crate::look_told::LookArgs::from_args(&call.args))
+                        .unwrap_or_default();
+                    look_asked_by_call(shared, request, scope.as_ref(), args, &heard_words);
+                }
+                if asked_look && !queue.started {
                     queue.push(shared.fixed(LOOKING).to_owned()).await?;
                 }
                 return Ok(());

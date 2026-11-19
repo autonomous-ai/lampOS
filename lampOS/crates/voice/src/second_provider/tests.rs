@@ -8891,6 +8891,487 @@ async fn the_routes_own_look_tells_the_model_its_head_did_not_move() {
     assert!(tool.contains("never moves your head"), "{tool}");
 }
 
+/// One look's hits asked: its request, the words and the scope's person.
+type LookHit = (u64, String, Option<String>);
+
+/// `LAMP_LOOK_TOLD` and `LAMP_LOOK_KEPT_WITH_ASK` (lamp-06c1, 17 Nov: the
+/// person's red toy motorcycle, which they had named several times, was
+/// called a red toy camera on three looks, and each look was kept as the
+/// room's with nothing said). With both on, the look turn is told what the
+/// model wrote with its call and memory's hits for the question, beside the
+/// picture and before the note, and goes on in the asker's scope; a look
+/// called with nothing, its hits for the asking line finding nothing, has
+/// the note as before. With both off, all is as before.
+#[tokio::test]
+async fn a_look_is_told_what_was_asked_and_goes_on_in_the_askers_scope() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::known_face_of;
+    const STILL: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    for on in [true, false] {
+        let path = std::env::temp_dir().join(format!(
+            "look-told-{on}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, "A").unwrap();
+        std::fs::write(known_face_of(&path), "f1\n").unwrap();
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Lamp, what movie is this toy from?".to_owned()),
+                    Ok("Lamp, look at this.".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            LOOK_CALL,
+                            json!({"question":"what movie is this toy from?","told":"my red toy motorcycle"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("A red toy motorcycle."), Ok(ChatEvent::Done)],
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call("c2", LOOK_CALL, json!({}))])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("A mug."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let cache = Arc::new(FaceCache::default());
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+        // Memory's hits, by request, words and scope.
+        let hits: Arc<Mutex<Vec<LookHit>>> = Arc::default();
+        let hit = hits.clone();
+        let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#)
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([15; 16]).unwrap(),
+                cache.clone(),
+                runner,
+                Some(Arc::new(|lease: &ScopeLease| {
+                    Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+                })),
+            )
+            .remembering(Arc::new(
+                move |request, words: &str, lease: Option<&ScopeLease>| {
+                    hit.lock().unwrap().push((
+                        request,
+                        words.to_owned(),
+                        lease
+                            .and_then(|lease| lease.scope())
+                            .and_then(|scope| scope.person())
+                            .map(str::to_owned),
+                    ));
+                    words.contains("movie").then(|| "HITS".to_owned())
+                },
+            ))
+            .telling_looks_what_was_said(on)
+            .keeping_looks_with_their_ask(on)
+            .announcing(false);
+        engine.memory_camera(true, 1);
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        let look = |request| ProviderInput::Written {
+            search: false,
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::speak_up::LOOK_FULL_NOTE.into(),
+            look: true,
+            quoted: false,
+        };
+        for (spoken, looked) in [(9101, 9102), (9103, 9104)] {
+            engine.submit(start(spoken));
+            engine.submit(audio(spoken, 1));
+            engine.submit(end(spoken));
+            assert_eq!(look_and_words(&mut engine).await.0, Some((spoken, 1, None)));
+            // The lamp's order (`worker.rs`, `Gate::install`), as 06c1's
+            // journal had it: the asking turn ends ("Let me look." said)
+            // and an authority with no owner stops through it; then the
+            // look request's authority retires it, then its input comes
+            // (Twelve's P1 and the ROW on #8019).
+            engine.stop_through(spoken);
+            engine.retire_through(looked - 1);
+            engine.submit(look(looked));
+            look_and_words(&mut engine).await;
+        }
+        let a = crate::remember::person_id("A");
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 4);
+        let note = format!("{}{STILL}", crate::speak_up::LOOK_FULL_NOTE);
+        let told = if on {
+            format!(
+                "They asked: \"what movie is this toy from?\"\nThey told you it is: \"my red toy motorcycle\"\n{}\n\nHITS\n\n{note}",
+                crate::look_told::TOLD_LINE
+            )
+        } else {
+            note.clone()
+        };
+        assert_eq!(
+            asked[1].last(),
+            Some(&Message::user_seeing(told, &jpeg)),
+            "{on}"
+        );
+        assert_eq!(
+            asked[3].last(),
+            Some(&Message::user_seeing(note, &jpeg)),
+            "no arguments, no hits: the note as before ({on})"
+        );
+        let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
+        let room = Message::system("for None");
+        assert_eq!(asked[0][0], a_told, "A's line is A's");
+        for at in [1, 3] {
+            assert_eq!(
+                asked[at][0],
+                if on { a_told.clone() } else { room.clone() },
+                "the look turn's scope ({on})"
+            );
+        }
+        // The look's hits: for the question, then for the asking line, in
+        // A's scope; none asked with the switch off.
+        let looks: Vec<_> = hits
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(request, ..)| [9102, 9104].contains(request))
+            .cloned()
+            .collect();
+        if on {
+            assert_eq!(
+                looks,
+                [
+                    (
+                        9102,
+                        "what movie is this toy from?".to_owned(),
+                        Some(a.clone())
+                    ),
+                    (9104, "Lamp, look at this.".to_owned(), Some(a.clone())),
+                ]
+            );
+        } else {
+            assert!(looks.is_empty(), "{looks:?}");
+        }
+        // Nothing of the look is left waiting in the lamp's thread.
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            thread.look_let_go(9101);
+            thread.look_let_go(9103);
+        }
+        std::fs::remove_file(known_face_of(&path)).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// Who is at the lamp is read again as the look begins (the memory
+/// owner's ruling on #8019, privacy first): a look A asked that finds B is
+/// the room's, its hits read in the room's; a look asked is kept through
+/// its asking turn's end, and a mute before it began drops it, its asking
+/// exchange kept at once (Twelve's P2 on #8019).
+#[tokio::test]
+async fn a_look_that_finds_someone_else_is_the_rooms_and_a_dropped_one_lets_its_ask_go() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::known_face_of;
+    let tag = format!("{}-{:?}", std::process::id(), std::thread::current().id());
+    let known = |name: &str, face: &str| {
+        let path = std::env::temp_dir().join(format!("look-other-{name}-{tag}"));
+        std::fs::write(&path, name).unwrap();
+        std::fs::write(known_face_of(&path), format!("{face}\n")).unwrap();
+        path
+    };
+    let (path_a, path_b) = (known("A", "f1"), known("B", "f2"));
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, what movie is this toy from?".to_owned()),
+                Ok("Lamp, take a look at it.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        LOOK_CALL,
+                        json!({"question":"what movie is this toy from?"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A red toy motorcycle."), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c2", LOOK_CALL, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let cache = Arc::new(FaceCache::default());
+    let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+    let hits: Arc<Mutex<Vec<LookHit>>> = Arc::default();
+    let hit = hits.clone();
+    let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#)
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([17; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .remembering(Arc::new(
+            move |request, words: &str, lease: Option<&ScopeLease>| {
+                hit.lock().unwrap().push((
+                    request,
+                    words.to_owned(),
+                    lease
+                        .and_then(|lease| lease.scope())
+                        .and_then(|scope| scope.person())
+                        .map(str::to_owned),
+                ));
+                None
+            },
+        ))
+        .telling_looks_what_was_said(true)
+        .keeping_looks_with_their_ask(true)
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    let name = |path: &std::path::Path| {
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(path),
+        );
+    };
+    name(&path_a);
+    engine.submit(start(9201));
+    engine.submit(audio(9201, 1));
+    engine.submit(end(9201));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((9201, 1, None)));
+    // B, not A, is at the lamp as the look begins.
+    name(&path_b);
+    engine.stop_through(9201);
+    engine.retire_through(9201);
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 9202,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+        quoted: false,
+    });
+    look_and_words(&mut engine).await;
+    {
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(
+            asked[0][0],
+            Message::system(format!(
+                "for {:?}",
+                Some(crate::remember::person_id("A").as_str())
+            ))
+        );
+        assert_eq!(asked[1][0], Message::system("for None"), "the room's look");
+    }
+    let looked: Vec<_> = hits
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(request, ..)| *request == 9202)
+        .cloned()
+        .collect();
+    assert_eq!(
+        looked,
+        [(9202, "what movie is this toy from?".to_owned(), None)],
+        "its hits are the room's"
+    );
+    assert!(
+        crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| !thread.waits_for_look(9201)),
+        "not kept with A's ask"
+    );
+    // A asks again; the turn ends, which keeps the look asked, and a mute
+    // drops it before it begins.
+    name(&path_a);
+    engine.submit(start(9203));
+    engine.submit(audio(9203, 1));
+    engine.submit(end(9203));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((9203, 1, None)));
+    engine.stop_through(9203);
+    assert!(
+        engine.shared.look_asked.lock().unwrap().is_some(),
+        "the turn over keeps it"
+    );
+    engine.privacy((true, 1, false, 1));
+    assert!(
+        engine.shared.look_asked.lock().unwrap().is_none(),
+        "dropped"
+    );
+    assert!(
+        crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| !thread.waits_for_look(9203)),
+        "its exchange waits no longer"
+    );
+    for path in [path_a, path_b] {
+        std::fs::remove_file(known_face_of(&path)).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// Whether a look's asker is still the one alone at the lamp
+/// ([`asker_still_alone`]): the cache must name them now; with the eyes,
+/// no other face, known or not, may be in view (none at all when their gap
+/// holds them).
+#[test]
+fn a_looks_asker_is_alone_only_with_no_one_else_in_view() {
+    use crate::memory_scope::ScopeSnapshot;
+    use crate::speaking_faces::SpeakingFaces;
+    let face = |id: &str| lamp_msgs::Face {
+        pitch: None,
+        looking: None,
+        id: id.to_owned(),
+        xmin: 0.1,
+        ymin: 0.1,
+        xmax: 0.3,
+        ymax: 0.4,
+        confidence: 1.0,
+        yaw: None,
+        facing: None,
+        speaking: None,
+        follows: None,
+    };
+    let (a, b, room) = (
+        ScopeSnapshot::of("A"),
+        ScopeSnapshot::of("B"),
+        ScopeSnapshot::room(),
+    );
+    let from = Instant::now();
+    let to = Instant::now();
+    // No eyes: the cache alone decides.
+    assert!(asker_still_alone(&a, &a, None, from, to));
+    assert!(
+        !asker_still_alone(&a, &b, None, from, to),
+        "someone else known"
+    );
+    assert!(
+        !asker_still_alone(&a, &room, None, from, to),
+        "nobody known"
+    );
+    assert!(asker_still_alone(&room, &b, None, from, to), "a room's ask");
+    // A alone in view.
+    let eyes = SpeakingFaces::default();
+    let from = Instant::now();
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 1),
+            &lamp_msgs::Faces {
+                faces: vec![face("f1")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(asker_still_alone(
+        &a,
+        &a,
+        Some((&eyes, Some("b/f1"))),
+        from,
+        to
+    ));
+    assert!(
+        !asker_still_alone(&a, &a, Some((&eyes, None)), from, to),
+        "their face not known to the eyes"
+    );
+    // A face the eyes don't know beside A: the room's.
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 2),
+            &lamp_msgs::Faces {
+                faces: vec![face("f1"), face("f9")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(!asker_still_alone(
+        &a,
+        &a,
+        Some((&eyes, Some("b/f1"))),
+        from,
+        to
+    ));
+    // Held by their gap: no face in view, then an unknown one.
+    let held = ScopeSnapshot::held_of("A");
+    let eyes = SpeakingFaces::default();
+    let from = Instant::now();
+    eyes.look(
+        Instant::now(),
+        Some((("b", 1), &lamp_msgs::Faces { faces: vec![] })),
+    );
+    let to = Instant::now();
+    assert!(asker_still_alone(&a, &held, Some((&eyes, None)), from, to));
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 2),
+            &lamp_msgs::Faces {
+                faces: vec![face("f9")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(!asker_still_alone(&a, &held, Some((&eyes, None)), from, to));
+}
+
+/// The scope a look goes on in and the one its hits are read in, from the
+/// asker's lease (`LAMP_LOOK_KEPT_WITH_ASK`, `LAMP_LOOK_TOLD`): a known
+/// person's, theirs; the room's, the room's; a held asker's, the room's
+/// and no hits; a revoked one, the room's and no hits.
+#[test]
+fn a_looks_scope_and_hits_follow_the_asker_held_ones_get_none() {
+    use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+    let key = RequestKey {
+        worker: lamp_turn_owner::BootId::new([16; 16]).unwrap(),
+        session: 1,
+        request: 1,
+    };
+    let a = ScopeSnapshot::of("A");
+    let theirs = RequestScope::new(key, a.clone());
+    assert_eq!(look_scope(&theirs.lease()), a);
+    assert_eq!(look_hits_scope(&theirs.lease()), Some(a.clone()));
+    let room = RequestScope::new(key, ScopeSnapshot::room());
+    assert_eq!(look_scope(&room.lease()), ScopeSnapshot::room());
+    assert_eq!(look_hits_scope(&room.lease()), Some(ScopeSnapshot::room()));
+    let held = RequestScope::new(key, ScopeSnapshot::held_of("A"));
+    assert_eq!(look_scope(&held.lease()), ScopeSnapshot::room());
+    assert_eq!(
+        look_hits_scope(&held.lease()),
+        None,
+        "a held asker is told no hits"
+    );
+    let revoked = RequestScope::new(key, a);
+    let lease = revoked.lease();
+    revoked.revoke();
+    assert_eq!(look_scope(&lease), ScopeSnapshot::room());
+    assert_eq!(look_hits_scope(&lease), None);
+    // The look's function takes its arguments only with the switch.
+    assert!(super::worker::look_tool_with(false).parameters.is_none());
+    let told = super::worker::look_tool_with(true).parameters.unwrap();
+    assert!(told["properties"]["question"].is_object());
+    assert!(told["properties"]["told"].is_object());
+}
+
 /// A skill's answer's note for its picture: the words after "When the
 /// picture comes:", bounded and cut at a character's end; none without them.
 #[test]
