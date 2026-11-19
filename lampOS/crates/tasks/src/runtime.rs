@@ -4850,6 +4850,10 @@ pub fn serve<C: Clock>(
             {
                 eprintln!("tasks: the skill-start launcher's socket is not served: {error}")
             }
+            // The lamp's own refill of a core skill's lines (`"ahead"`) is
+            // cancelled at once for a person's live ask or any other
+            // skill's task: one slot, shared by both sockets.
+            let ahead = crate::skill_task::Ahead::default();
             match crate::skill_task::HandOvers::lamp(
                 &home,
                 skill_harness.clone(),
@@ -4857,6 +4861,7 @@ pub fn serve<C: Clock>(
                 starts,
                 one_session.clone(),
             )
+            .with_ahead(ahead.clone())
             .start(true, stop.clone())
             {
                 Ok(served) => {
@@ -4876,6 +4881,7 @@ pub fn serve<C: Clock>(
                 skill_harness.clone(),
                 ask_default.clone(),
             )
+            .with_ahead(ahead)
             .start(true, stop.clone())
             {
                 Ok(_) => eprintln!(

@@ -1856,6 +1856,15 @@ pub struct MakeHandOvers {
 }
 
 impl MakeHandOvers {
+    /// These makes with their live asks cancelling the lamp's own refill
+    /// kept in `ahead`, the skill tasks' slot ([`crate::skill_task::Ahead`]).
+    pub fn with_ahead(mut self, ahead: crate::skill_task::Ahead) -> Self {
+        if let Some(asks) = self.asks.as_mut().and_then(Arc::get_mut) {
+            asks.ahead = ahead;
+        }
+        self
+    }
+
     /// The lamp's: [`MAKE_SOCKET`], the lamp's Hermes in its namespace
     /// ([`lamp_runner`], the network as [`NET_SWITCH`] says) and its work
     /// folder, lamp-voice alone as caller.
@@ -1896,6 +1905,7 @@ impl MakeHandOvers {
                 tokens: Arc::new(crate::skill_task::ControlTokens::default()),
                 asking: AtomicBool::new(false),
                 news: Default::default(),
+                ahead: Default::default(),
             })
         });
         Self {

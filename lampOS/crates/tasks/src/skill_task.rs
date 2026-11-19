@@ -52,7 +52,7 @@ use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The switch, `on` exactly; off unless set. lamp-skills reads the same one
@@ -341,6 +341,41 @@ pub struct HandOver {
     /// kept for the record; lamp-tasks does not hash the folder again.
     pub sha256: String,
     pub grants: Vec<String>,
+    /// The lamp's own refill of a core skill's lines worded ahead
+    /// (`lamp_skills::worded_ahead`): its run is cancelled at once for a
+    /// person's ask or any other skill's task ([`Ahead`]). No grant.
+    #[serde(default)]
+    pub ahead: bool,
+}
+
+/// The cancel of the lamp's own refill run holding the one run's place, if
+/// one does ([`HandOver::ahead`]): shared by the skill tasks' hand-over
+/// ([`HandOvers::ahead`]) and the voice's live asks
+/// (`crate::voice_ask::Asks::ahead`), so a person's ask or another skill's
+/// task cancels it at once (the first builder's 09:57 and 10:45 on the
+/// Queue: a person's ask always wins).
+pub type Ahead = std::sync::Arc<std::sync::Mutex<Option<std::sync::Arc<AtomicBool>>>>;
+
+/// The refusal's code a cancelled refill's own connection is told.
+pub const CANCELLED_CODE: &str = crate::voice_ask::CANCELLED_CODE;
+/// What a cancelled refill's own connection is told.
+pub const AHEAD_CANCELLED: &str =
+    "the lamp's own refill was cancelled for a person's ask or another skill's task";
+
+/// The refill holding `ahead`'s place cancelled, if one does: whether one
+/// did.
+pub fn cancel_ahead(ahead: &Ahead) -> bool {
+    let held = ahead
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .clone();
+    match held {
+        Some(cancel) => {
+            cancel.store(true, Ordering::Release);
+            true
+        }
+        None => false,
+    }
 }
 
 /// The line's `op`: `skill_task` only.
@@ -435,6 +470,9 @@ impl HandOver {
         }
         if private_beside_net(&self.grants).is_some() {
             return Err(NET_BESIDE_PRIVATE);
+        }
+        if self.ahead && !self.grants.is_empty() {
+            return Err("the lamp's own refill holds no grant");
         }
         Ok(())
     }
@@ -1230,6 +1268,9 @@ pub struct Agent<'a> {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`crate::skill_keys::Keys`]); none: no run is given a key.
     pub keys: Option<&'a dyn crate::skill_keys::Keys>,
+    /// The lamp's own refill's cancel ([`HandOver::ahead`]), given to its
+    /// run ([`SkillRun::cancel`]); none for every other run.
+    pub cancel: Option<std::sync::Arc<AtomicBool>>,
 }
 
 /// A run's keys asked for `hand` through `keys`: the set values, or the
@@ -1421,6 +1462,9 @@ pub fn answer_for(
             token,
         );
         made.net = keeps_net;
+        if let Some(cancel) = &agent.cancel {
+            made.cancel = cancel.clone();
+        }
         // Its own folder and fresh home, removed however it ends, as a
         // make's: `make-<run id>`, by which the one run path's wrapper finds
         // it for a run granted `net` (#7200).
@@ -1476,6 +1520,14 @@ pub fn answer_for(
         }
         Ok((made, fresh))
     });
+    if agent
+        .cancel
+        .as_ref()
+        .is_some_and(|cancel| cancel.load(Ordering::Acquire))
+        && told["ok"] != true
+    {
+        return refusal(CANCELLED_CODE, AHEAD_CANCELLED);
+    }
     match told["message"].as_str() {
         Some(why)
             if fresh_home
@@ -4371,6 +4423,9 @@ pub struct HandOvers {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`Agent::keys`]).
     pub keys: Option<std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>>,
+    /// The lamp's own refill's cancel while it holds the one run's place,
+    /// shared with the voice's live asks ([`Ahead`]).
+    pub ahead: Ahead,
 }
 
 /// What a second run is told while one runs.
@@ -4383,6 +4438,13 @@ pub const STOP_WAIT: Duration = Duration::from_secs(20);
 pub const BUSY: &str = "a skill's task is already running on this lamp; one runs at a time";
 
 impl HandOvers {
+    /// These hand-overs with the lamp's own refill's cancel kept in
+    /// `ahead`, the slot the voice's live asks share ([`Ahead`]).
+    pub fn with_ahead(mut self, ahead: Ahead) -> Self {
+        self.ahead = ahead;
+        self
+    }
+
     /// The lamp's: [`HAND_OVER_SOCKET`], [`SKILLS`], lamp-control's tokens
     /// ([`ControlTokens`]), the lamp's Hermes started through Harness
     /// ([`HarnessRunner::lamp`], #6510 Part 1 step 2, with the Harness
@@ -4455,6 +4517,7 @@ impl HandOvers {
                 std::sync::Arc::new(crate::skill_keys::ServicesKeys::default())
                     as std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>
             }),
+            ahead: Default::default(),
         }
     }
 
@@ -4557,15 +4620,18 @@ impl HandOvers {
                 return;
             }
         };
-        if running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        let ahead = serde_json::from_slice::<Value>(&line)
+            .is_ok_and(|line| line["ahead"] == Value::Bool(true));
+        if !take_run_place(running, &self.ahead, ahead) {
             eprintln!("[lamp-tasks] skill task: refused busy, one already runs");
             write_answer(stream, &refusal("busy", BUSY));
             return;
         }
         let place = Place(running);
+        let cancel = ahead.then(|| std::sync::Arc::new(AtomicBool::new(false)));
+        let _held = cancel
+            .clone()
+            .map(|cancel| AheadHeld::hold(&self.ahead, cancel));
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
             held: self.held.as_deref().map(|held| held as &dyn Runner),
@@ -4575,6 +4641,7 @@ impl HandOvers {
                 .keys
                 .as_deref()
                 .map(|keys| keys as &dyn crate::skill_keys::Keys),
+            cancel,
         };
         let answered = answer_agent(
             &line,
@@ -4595,6 +4662,52 @@ impl HandOvers {
             ),
         }
         write_answer(stream, &answered);
+    }
+}
+
+/// The one run's place, `ahead` the lamp's own refill: free, or held by
+/// the lamp's own refill and `ahead` not, which is cancelled at once and
+/// waited for at most [`crate::voice_ask::CANCEL_WAIT`]. A refill never
+/// cancels anything.
+fn take_run_place(running: &AtomicBool, slot: &Ahead, ahead: bool) -> bool {
+    let take = || {
+        running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    };
+    if take() {
+        return true;
+    }
+    if ahead || !cancel_ahead(slot) {
+        return false;
+    }
+    eprintln!("[lamp-tasks] skill task: the lamp's own refill is cancelled for a skill's task");
+    let until = std::time::Instant::now() + crate::voice_ask::CANCEL_WAIT;
+    loop {
+        if take() {
+            return true;
+        }
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// The lamp's own refill's cancel, kept in [`Ahead`] while it holds the one
+/// run's place, and taken back however it ends.
+struct AheadHeld<'a>(&'a Ahead);
+
+impl<'a> AheadHeld<'a> {
+    fn hold(slot: &'a Ahead, cancel: std::sync::Arc<AtomicBool>) -> Self {
+        *slot.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(cancel);
+        Self(slot)
+    }
+}
+
+impl Drop for AheadHeld<'_> {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
     }
 }
 
@@ -5959,6 +6072,7 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            ahead: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -6061,6 +6175,7 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            ahead: Default::default(),
         }
         .start(false, std::sync::Arc::default())
         .unwrap();
@@ -6275,6 +6390,63 @@ mod tests {
             began.elapsed() < Duration::from_secs(10),
             "{:?}",
             began.elapsed()
+        );
+    }
+
+    /// The lamp's own refill (`"ahead": true`) holding the one run's place
+    /// yields to any other skill's task at once: cancelled, and its place
+    /// taken within the cancel's wait, never told busy. A refill never
+    /// cancels anything, and holds no grant.
+    #[test]
+    fn a_refill_yields_its_place_to_a_skills_task() {
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let slot = Ahead::default();
+        assert!(
+            take_run_place(&running, &slot, true),
+            "free: the refill runs"
+        );
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
+        let held = AheadHeld::hold(&slot, cancel.clone());
+        // Another refill: busy, and nothing cancelled.
+        assert!(!take_run_place(&running, &slot, true));
+        assert!(!cancel.load(Ordering::Acquire));
+        // The refill's run ends once cancelled, as a runner's loop does.
+        let ends = {
+            let (running, cancel) = (running.clone(), cancel.clone());
+            std::thread::spawn(move || {
+                while !cancel.load(Ordering::Acquire) {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                running.store(false, Ordering::Release);
+            })
+        };
+        let asked = std::time::Instant::now();
+        assert!(
+            take_run_place(&running, &slot, false),
+            "a skill's task runs"
+        );
+        assert!(cancel.load(Ordering::Acquire));
+        assert!(asked.elapsed() < crate::voice_ask::CANCEL_WAIT);
+        ends.join().unwrap();
+        drop(held);
+        assert!(slot.lock().unwrap().is_none(), "taken back as it ends");
+        // A skill's task holding the place: another is busy, as before.
+        assert!(!take_run_place(&running, &slot, false));
+        // The line: `ahead` is read, and holds no grant.
+        let ahead = HandOver::parse(
+            &line(|value| {
+                value["ahead"] = json!(true);
+                value["grants"] = json!([]);
+            }),
+            skills(),
+        )
+        .unwrap();
+        assert!(ahead.ahead);
+        assert!(!HandOver::parse(&line(|_| {}), skills()).unwrap().ahead);
+        let granted = HandOver::parse(&line(|value| value["ahead"] = json!(true)), skills());
+        assert_eq!(
+            granted.unwrap_err().1,
+            "the lamp's own refill holds no grant"
         );
     }
 
@@ -7670,6 +7842,7 @@ mod tests {
                 work: Some(work.path()),
                 services: false,
                 keys: None,
+                cancel: None,
             };
             let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
             match code {
@@ -7701,6 +7874,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -7799,6 +7973,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let pair = line(|value| value["grants"] = json!(["camera", NET_GRANT]));
         let told = answer_agent(&pair, true, skills(), &tokens, &held, &agent);
@@ -7830,6 +8005,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
         assert_eq!(told["error"], "no_token", "{told}");
@@ -7848,6 +8024,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told, json!({"ok": true, "id": 0}), "{told}");
@@ -7957,6 +8134,7 @@ mod tests {
             work: Some(&work),
             services: false,
             keys: None,
+            cancel: None,
         };
         let sockets = || std::fs::read_dir(&egress).map_or(0, |dir| dir.count());
         let ran = || seen.with_extension("env").exists();
@@ -8069,6 +8247,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -8105,6 +8284,7 @@ mod tests {
             work: None,
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &bare);
         assert_eq!(told["error"], "run_failed", "{told}");
@@ -8171,6 +8351,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -8211,6 +8392,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &bare);
         assert_eq!(told["message"], NO_FRESH_HOME, "{told}");
@@ -8235,6 +8417,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &lineless);
         assert_eq!(told["message"], NO_RUN_NAMESPACE, "{told}");
@@ -8298,6 +8481,7 @@ mod tests {
                 work: Some(work.path()),
                 services,
                 keys: None,
+                cancel: None,
             };
             let told = answer_agent(line, true, skills(), &tokens, &runner, &agent);
             assert_eq!(told["ok"], true, "{told}");
@@ -8399,6 +8583,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: Some(&keys),
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");

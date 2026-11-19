@@ -11168,6 +11168,7 @@ fn voice_asks(
         tokens: tokens.clone(),
         asking: AtomicBool::new(false),
         news: Default::default(),
+        ahead: Default::default(),
     }
 }
 

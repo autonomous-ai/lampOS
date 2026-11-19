@@ -336,6 +336,10 @@ pub struct Asks {
     /// The cancel of the lamp's own news ask holding the one place, if one
     /// does ([`AskLine::news`]).
     pub news: std::sync::Mutex<Option<Arc<AtomicBool>>>,
+    /// The lamp's own refill of a core skill's lines holding the skill
+    /// tasks' one place, shared with their hand-over
+    /// ([`crate::skill_task::Ahead`]): cancelled at once for a person's ask.
+    pub ahead: crate::skill_task::Ahead,
 }
 
 /// Frees the one place however the ask ends.
@@ -468,6 +472,11 @@ fn take_place(asks: &Asks, news: bool) -> bool {
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
     };
+    // A person's ask cancels the lamp's own refill, which holds the skill
+    // tasks' place, not this one: the agent is theirs at once.
+    if !news && crate::skill_task::cancel_ahead(&asks.ahead) {
+        eprintln!("[lamp-tasks] live ask: the lamp's own refill is cancelled for a person's");
+    }
     if take() {
         return true;
     }
@@ -724,6 +733,7 @@ mod tests {
             tokens,
             asking: AtomicBool::new(false),
             news: Default::default(),
+            ahead: Default::default(),
         }
     }
 
@@ -989,6 +999,7 @@ mod tests {
             tokens: Arc::new(Minting::default()),
             asking: AtomicBool::new(false),
             news: Default::default(),
+            ahead: Default::default(),
         };
         std::thread::scope(|scope| {
             let (began, started) = std::sync::mpsc::channel();
@@ -1037,6 +1048,32 @@ mod tests {
             let _ = person.join().unwrap();
         });
         assert_eq!(*holds.cancelled.lock().unwrap(), vec![true, false]);
+    }
+
+    /// A person's ask cancels the lamp's own refill of a core skill's lines
+    /// (`crate::skill_task::Ahead`) at once and runs; the lamp's news ask
+    /// never does.
+    #[test]
+    fn a_persons_ask_cancels_the_lamps_refill() {
+        let dir = work();
+        let open = Arc::new(Agent {
+            answer: Some("Here it is."),
+            ..Default::default()
+        });
+        let asks = asks(
+            open,
+            Arc::new(Agent::default()),
+            Arc::new(Minting::default()),
+            on(),
+        );
+        let refill = Arc::new(AtomicBool::new(false));
+        *asks.ahead.lock().unwrap() = Some(refill.clone());
+        let news = answer(&news_line("the note"), &asks, dir.path(), &mut || {});
+        assert_eq!(news["ok"], true, "{news}");
+        assert!(!refill.load(Ordering::Acquire), "news never cancels it");
+        let told = answer(&line("what's on today", &[]), &asks, dir.path(), &mut || {});
+        assert_eq!(told, json!({"ok": true, "answer": "Here it is."}));
+        assert!(refill.load(Ordering::Acquire), "a person's ask cancels it");
     }
 
     #[test]
