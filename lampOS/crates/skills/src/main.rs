@@ -1276,7 +1276,7 @@ fn serve(
         waiting: HashMap::new(),
         last: 0,
     };
-    // A told answer a restart dropped while it waited for the read gate:
+    // A told answer a restart dropped while it waited to be said:
     // said once, at this start (#7180).
     if let Some(state) = &options.state {
         match lamp_skills::task::telling_dropped(state) {
@@ -5879,8 +5879,9 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// [`lamp_skills::task::ask_yes`]). The journal says what became of it,
 /// never the task's words. What its agent found, when lamp-tasks' answer
 /// carries it (any run whose runner keeps it, as exact words,
-/// [`lamp_skills::task::told`]), is said to the owner in `room`, behind a
-/// read's gate ([`lamp_skills::service_read::tell`]); the journal says only
+/// [`lamp_skills::task::told`]), is said to the owner in `room` as soon as
+/// it ended, with no read's gate ([`lamp_skills::service_read::tell`],
+/// #7894: held only while the lamp is private or paused); the journal says only
 /// how many sentences. With `LAMP_SKILL_TASK_SURE` on
 /// ([`lamp_skills::task_sure`]), a run lamp-tasks says failed is told as
 /// one fixed line behind the same gate, and one refused `busy` waits its
@@ -5997,7 +5998,8 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
         eprintln!("lamp-skills: skill:{skill}: {said}");
         // A refusal the person must hear (a run granted the internet the
         // lamp's agent can't be given, #7200): said in plain words, behind
-        // the same gate as a told answer, never the journal's words.
+        // the same way as a told answer (no read's gate, #7894), never the
+        // journal's words.
         let refused = refused.take();
         if let Some(line) = refused {
             let told = lamp_skills::service_read::tell(&[line.to_owned()], &mut room);
@@ -6059,7 +6061,7 @@ fn lift_quiet(room: &mut LampRoom, asked: u64, ready: u64) -> Option<u64> {
 }
 
 /// What [`hand_task`] tells of its run, once it ended, on its thread: what
-/// its agent found, behind a read's gate; or, with `LAMP_SKILL_TASK_SURE`
+/// its agent found, at once with no read's gate (#7894); or, with `LAMP_SKILL_TASK_SURE`
 /// on (`sure`), why it didn't run (`failed`), unless a refusal was said
 /// (`refused`). The failure is said in the conversation that asked for the
 /// run while it goes on, a run now its owner asked by voice at `asked_at`
