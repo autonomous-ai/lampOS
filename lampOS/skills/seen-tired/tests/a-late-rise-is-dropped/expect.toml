@@ -1,0 +1,14 @@
+# 14:00, a yawn seen at 10 in a talk from 9 to 12, and at 36 in a talk from 35 to 40: one line at 12, once the voice rests; the one at 36 is kept 3 minutes from the sighting, dropped at 39 while they still talk, and never said after the turn.
+clock = "14:00"
+
+[[expect]]
+at = "12m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "12m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera." }

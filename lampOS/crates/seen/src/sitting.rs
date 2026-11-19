@@ -29,7 +29,8 @@
 //! - With [`ENVIRONMENT`] on ([`more`]), the same bursts also time, on
 //!   `humans/doing_more` (`lamp_msgs::HumanDoingMore`), a topic of its own
 //!   that a skill reads only by naming it, tiredness (V1's `tired`, a yawn, and a stretch of an arm or a leg,
-//!   which still counts as a break too), desk work (V1's `sedentary`, as a
+//!   which still counts as a break too; and each of the two apart, #8123,
+//!   so a line names only what was seen: [`Sitting::saw_more`]), desk work (V1's `sedentary`, as a
 //!   coarse [`DeskWork`]) and celebrating (V1's `celebrate`), by the same
 //!   sureness rule. They never set `last` or `humans/doing_seen`, and V1's
 //!   `emotional` (laughing, crying, singing) is never said. The same topic
@@ -131,6 +132,11 @@ pub fn more(value: Option<&str>) -> bool {
 pub struct More {
     /// A yawn or a stretch counted.
     pub tired: bool,
+    /// A yawn counted on its own (#8123), with its surest confidence.
+    pub yawn: Option<f32>,
+    /// A stretch of an arm or a leg counted on its own (#8123), with its
+    /// surest confidence.
+    pub stretch: Option<f32>,
     /// Desk work counted, as the kind of its surest label.
     pub desk_work: Option<DeskWork>,
     /// Celebrating counted.
@@ -162,6 +168,8 @@ pub fn read_more(answers: &[ActionAnswer]) -> More {
         matches!(group(label), Some("tired") | Some("break"))
     })
     .is_some();
+    let yawn = counted(answers, |label| group(label) == Some("tired"));
+    let stretch = counted(answers, |label| group(label) == Some("break"));
     let celebrate = counted(answers, |label| group(label) == Some("celebrate")).is_some();
     let desk = counted(answers, |label| group(label) == Some("sedentary")).and_then(|_| {
         answers
@@ -180,6 +188,8 @@ pub fn read_more(answers: &[ActionAnswer]) -> More {
     });
     More {
         tired,
+        yawn,
+        stretch,
         desk_work: desk,
         celebrate,
     }
@@ -209,6 +219,13 @@ pub struct Sitting {
     tired_seen: u32,
     /// Whether the last burst that answered saw tiredness.
     tired_last_burst: bool,
+    /// A yawn and a stretch apart (#8123), each counted as `tired_seen` is.
+    yawn_us: Option<u64>,
+    yawn_seen: u32,
+    yawn_last_burst: bool,
+    stretch_us: Option<u64>,
+    stretch_seen: u32,
+    stretch_last_burst: bool,
     desk_work_us: Option<u64>,
     desk_work: DeskWork,
     /// When the last burst that answered saw desk work; `None` when it did
@@ -265,6 +282,12 @@ impl Sitting {
             tired_us: None,
             tired_seen: 0,
             tired_last_burst: false,
+            yawn_us: None,
+            yawn_seen: 0,
+            yawn_last_burst: false,
+            stretch_us: None,
+            stretch_seen: 0,
+            stretch_last_burst: false,
             desk_work_us: None,
             desk_work: DeskWork::Nothing,
             desk_run_us: None,
@@ -285,6 +308,12 @@ impl Sitting {
     /// Take one burst's tiredness, desk work and celebrating at `now_us`.
     /// Returns whether it saw any, with [`ENVIRONMENT`] on; off, it keeps
     /// nothing and returns false. `last` is never changed by it.
+    ///
+    /// A yawn and a stretch are also counted apart (#8123), each as
+    /// `tired_seen` is. A burst that newly saw both counts only the surer
+    /// one (a yawn when as sure), and the other goes on as already seen: a
+    /// yawn while stretching is one move, one count, so one remark, never a
+    /// yawn line and then a stretch line for it.
     pub fn saw_more(&mut self, more: &More, now_us: u64) -> bool {
         if !self.more {
             return false;
@@ -296,6 +325,24 @@ impl Sitting {
             }
         }
         self.tired_last_burst = more.tired;
+        if more.yawn.is_some() {
+            self.yawn_us = Some(now_us);
+        }
+        if more.stretch.is_some() {
+            self.stretch_us = Some(now_us);
+        }
+        let new_yawn = more.yawn.filter(|_| !self.yawn_last_burst);
+        let new_stretch = more.stretch.filter(|_| !self.stretch_last_burst);
+        match (new_yawn, new_stretch) {
+            (Some(yawn), Some(stretch)) if stretch > yawn => {
+                self.stretch_seen = self.stretch_seen.saturating_add(1);
+            }
+            (Some(_), _) => self.yawn_seen = self.yawn_seen.saturating_add(1),
+            (None, Some(_)) => self.stretch_seen = self.stretch_seen.saturating_add(1),
+            (None, None) => {}
+        }
+        self.yawn_last_burst = more.yawn.is_some();
+        self.stretch_last_burst = more.stretch.is_some();
         if let Some(kind) = more.desk_work {
             self.desk_work_us = Some(now_us);
             self.desk_work = kind;
@@ -326,6 +373,12 @@ impl Sitting {
         self.tired_us = None;
         self.tired_seen = 0;
         self.tired_last_burst = false;
+        self.yawn_us = None;
+        self.yawn_seen = 0;
+        self.yawn_last_burst = false;
+        self.stretch_us = None;
+        self.stretch_seen = 0;
+        self.stretch_last_burst = false;
         self.desk_work_us = None;
         self.desk_work = DeskWork::Nothing;
         self.desk_run_us = None;
@@ -414,13 +467,15 @@ impl Sitting {
     }
 
     /// This sitting's counts of moves newly seen, `drank_seen`, `ate_seen`,
-    /// `tired_seen` and `celebrate_seen`: `main` says both topics at once
-    /// when a burst raised one (#7401).
-    pub fn counts(&self) -> [u32; 4] {
+    /// `tired_seen`, `yawn_seen`, `stretch_seen` and `celebrate_seen`:
+    /// `main` says both topics at once when a burst raised one (#7401).
+    pub fn counts(&self) -> [u32; 6] {
         [
             self.drank_seen,
             self.ate_seen,
             self.tired_seen,
+            self.yawn_seen,
+            self.stretch_seen,
             self.celebrate_seen,
         ]
     }
@@ -446,6 +501,10 @@ impl Sitting {
         self.more.then(|| HumanDoingMore {
             tired_s_ago: since(self.tired_us),
             tired_seen: self.tired_seen,
+            yawn_s_ago: since(self.yawn_us),
+            yawn_seen: self.yawn_seen,
+            stretch_s_ago: since(self.stretch_us),
+            stretch_seen: self.stretch_seen,
             drank_seen: self.drank_seen,
             ate_seen: self.ate_seen,
             desk_work_s_ago: since(self.desk_work_us),
@@ -586,6 +645,12 @@ mod tests {
                 tired_us: None,
                 tired_seen: 0,
                 tired_last_burst: false,
+                yawn_us: None,
+                yawn_seen: 0,
+                yawn_last_burst: false,
+                stretch_us: None,
+                stretch_seen: 0,
+                stretch_last_burst: false,
                 desk_work_us: None,
                 desk_work: DeskWork::Nothing,
                 desk_run_us: None,
@@ -733,6 +798,7 @@ mod tests {
             read_more(&yawn),
             More {
                 tired: true,
+                yawn: Some(0.7),
                 ..More::default()
             }
         );
@@ -785,13 +851,88 @@ mod tests {
         assert_eq!(run.desk_work, Some(DeskWork::Reading));
     }
 
+    /// A yawn and a stretch are counted apart (#8123: a yawn was told as
+    /// "Big stretch"), each as `tired_seen` is, which stays the two
+    /// together.
+    #[test]
+    fn a_yawn_and_a_stretch_are_counted_apart() {
+        let burst = |label: &str, conf: f64| read_more(&[answer(&[(label, conf)])]);
+        let counts = |sitting: &Sitting| {
+            let more = sitting.doing_more(0).unwrap();
+            (more.yawn_seen, more.stretch_seen, more.tired_seen)
+        };
+        // "yawning" raises yawn_seen, never stretch_seen.
+        let mut sitting = Sitting::with_more(0, true);
+        assert!(sitting.saw_more(&burst("yawning", 0.7), 60 * S));
+        assert_eq!(counts(&sitting), (1, 0, 1));
+        assert_eq!(sitting.doing_more(90 * S).unwrap().yawn_s_ago, 30);
+        assert_eq!(sitting.doing_more(90 * S).unwrap().stretch_s_ago, 90);
+        // The same yawn in the next burst is the same sighting.
+        sitting.saw_more(&burst("yawning", 0.6), 120 * S);
+        assert_eq!(counts(&sitting), (1, 0, 1));
+        // "stretching arm" and "stretching leg" raise stretch_seen.
+        for label in ["stretching arm", "stretching leg"] {
+            let mut sitting = Sitting::with_more(0, true);
+            assert!(sitting.saw_more(&burst(label, 0.6), 60 * S));
+            assert_eq!(counts(&sitting), (0, 1, 1), "{label}");
+            assert_eq!(sitting.doing_more(60 * S).unwrap().stretch_s_ago, 0);
+        }
+        // A stretch after a yawn, in the next burst, is a stretch of its
+        // own; tiredness is one run, so tired_seen stays as before.
+        sitting.saw_more(&burst("stretching arm", 0.6), 180 * S);
+        assert_eq!(counts(&sitting), (1, 1, 1));
+        // Unsure alone is nothing, as for tiredness; two of the last four
+        // count.
+        let mut unsure = Sitting::with_more(0, true);
+        unsure.saw_more(&burst("yawning", 0.35), 60 * S);
+        assert_eq!(counts(&unsure), (0, 0, 0));
+        unsure.saw_more(
+            &read_more(&[answer(&[("yawning", 0.31)]), answer(&[("yawning", 0.32)])]),
+            120 * S,
+        );
+        assert_eq!(counts(&unsure), (1, 0, 1));
+        // Tiredness counted only from the two together (one unsure yawn
+        // and one unsure stretch): neither is told, as it can't tell which.
+        let mixed = read_more(&[
+            answer(&[("yawning", 0.31)]),
+            answer(&[("stretching leg", 0.32)]),
+        ]);
+        assert!(mixed.tired && mixed.yawn.is_none() && mixed.stretch.is_none());
+        let mut mixed_sitting = Sitting::with_more(0, true);
+        mixed_sitting.saw_more(&mixed, 60 * S);
+        assert_eq!(counts(&mixed_sitting), (0, 0, 1));
+        // A yawn while stretching, in one burst, is one move: only the
+        // surer is counted, and the other is not counted in the next burst.
+        let both = |yawn: f64, stretch: f64| {
+            read_more(&[answer(&[("yawning", yawn), ("stretching arm", stretch)])])
+        };
+        let mut sitting = Sitting::with_more(0, true);
+        sitting.saw_more(&both(0.9, 0.6), 60 * S);
+        assert_eq!(counts(&sitting), (1, 0, 1));
+        sitting.saw_more(&burst("stretching arm", 0.8), 120 * S);
+        assert_eq!(counts(&sitting), (1, 0, 1), "the same stretch");
+        let mut sitting = Sitting::with_more(0, true);
+        sitting.saw_more(&both(0.55, 0.8), 60 * S);
+        assert_eq!(counts(&sitting), (0, 1, 1));
+        // A stretch is still a break.
+        assert_eq!(
+            read(&[answer(&[("stretching leg", 0.6)])])[0].what,
+            Doing::Break
+        );
+        // Forgotten with the rest.
+        sitting.forget_more();
+        assert_eq!(counts(&sitting), (0, 0, 0));
+    }
+
     #[test]
     fn forgetting_more_doings_counts_them_from_the_arrival_again() {
         let mut sitting = Sitting::with_more(100 * S, true);
         let seen = More {
             tired: true,
+            yawn: Some(0.7),
             desk_work: Some(DeskWork::Phone),
             celebrate: true,
+            ..More::default()
         };
         sitting.saw(
             &[DoingSeen {
@@ -813,6 +954,8 @@ mod tests {
         assert!(sitting.saw_more(&seen, 210 * S));
         let more_now = sitting.doing_more(220 * S).unwrap();
         assert_eq!((more_now.tired_s_ago, more_now.tired_seen), (10, 1));
+        assert_eq!((more_now.yawn_s_ago, more_now.yawn_seen), (10, 1));
+        assert_eq!((more_now.stretch_s_ago, more_now.stretch_seen), (120, 0));
         assert_eq!(more_now.celebrate_seen, 1);
         assert_eq!(more_now.desk_work, DeskWork::Phone);
     }
@@ -885,9 +1028,9 @@ mod tests {
             },
         };
         sitting.took(&cheer, true, 100 * S);
-        assert_eq!(sitting.counts(), [0, 0, 0, 1]);
+        assert_eq!(sitting.counts(), [0, 0, 0, 0, 0, 1]);
         sitting.took(&cheer, true, 115 * S);
-        assert_eq!(sitting.counts(), [0, 0, 0, 1], "the same cheer");
+        assert_eq!(sitting.counts(), [0, 0, 0, 0, 0, 1], "the same cheer");
         // Without `more_said`, only what `humans/doing` says is taken.
         let mut sitting = Sitting::with_more(0, true);
         sitting.took(&answered, false, 100 * S);
@@ -929,6 +1072,10 @@ mod tests {
                 desk_work: DeskWork::Nothing,
                 desk_s: 0,
                 celebrate_seen: 0,
+                yawn_seen: 0,
+                yawn_s_ago: 300,
+                stretch_seen: 0,
+                stretch_s_ago: 300,
             })
         );
         // Desk work: its timer and kind, and never `last` or a sighting.
@@ -995,6 +1142,10 @@ mod tests {
                 desk_work: DeskWork::Nothing,
                 desk_s: 0,
                 celebrate_seen: 0,
+                yawn_seen: 0,
+                yawn_s_ago: 60,
+                stretch_seen: 0,
+                stretch_s_ago: 60,
             })
         );
     }

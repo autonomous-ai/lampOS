@@ -162,7 +162,9 @@ Keys of a trigger:
 - `each` and `key`, together: one start per value of `key`.
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
-  `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
+  `rearm` (`"leaves"`, `"ends"`, `{ above | below, for }`, or `{ still }`
+  alone on a trigger with a `rise`, 1m to 1h: again only once the field has
+  not risen for that long, #7668).
 - `lively = true`: its `cooldown` and `rearm` follow the energy level
   (`LAMP_BODY_ENERGY`, [skills.md](skills.md)); level 1 as written.
 - `during` (a window), `days` (with `during`: `["mon", "fri"]`,
@@ -186,8 +188,11 @@ Keys of a trigger:
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on
 `humans/faces/tracked`, `unknown = "holds"` or `unknown = "holds_stale"`
-(#6543: also holds on a value that has run out), and `through` with
-`broken_by`.
+(#6543: also holds on a value that has run out), `through` with
+`broken_by`, and `drops_kept = true` (#6543, #7668: only on `voice/privacy`,
+a field's test without `for` or `unknown`; the slide is told by lamp-skills on
+a change, never subscribed, and its closing drops every chance the skill
+keeps for its `wait`, and a `rise` forgets what it read before).
 
 ### Steps: the actions
 

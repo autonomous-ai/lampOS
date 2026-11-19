@@ -1758,6 +1758,7 @@ fn serve(
         let made = engine.clock_tick(now_us);
         say_dropped(&mut engine);
         dispatch(made, &mut runs, &mut out, &runner, &mut asking);
+        privacy_to_skills(&mut engine, &mut runs, &mut out, &runner, &mut asking);
         for run in engine.tick(now_us) {
             handle(run, &mut runs, &mut out, &runner);
         }
@@ -1878,6 +1879,8 @@ fn observe(
     // on its clock, not this one.
     let now_us = clock::now_us();
     sample_clock(engine, runner, now_us);
+    // The slide as it is now, before this message is judged (#7668).
+    privacy_to_skills(engine, runs, out, runner, asking);
     if message.header.topic == Speech::TOPICS[0]
         && let Some(turn) = message
             .parse::<Speech>()
@@ -2519,9 +2522,48 @@ fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
 /// The privacy switch as the voice last said it, told to the watches
 /// first: closed, every watch is off, and none goes on (#2562).
 fn privacy_now(watching: &mut Watching, runner: &Runner) -> Outs {
-    let closed = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY)
-        .is_some_and(|privacy| privacy["physical_muted"] == json!(true));
-    watching.watches.privacy(closed)
+    watching
+        .watches
+        .privacy(privacy_closed(&runner.bus).unwrap_or(false))
+}
+
+/// Whether the privacy switch is closed, as the voice last said it within
+/// 3 s (none said then: `None`): the bus's newest `voice/privacy`, read
+/// when wanted, never subscribed (the voice renews it every 10 ms).
+fn privacy_closed(bus: &Bus) -> Option<bool> {
+    said_lately::<serde_json::Value>(bus, watch::PRIVACY)
+        .map(|privacy| privacy["physical_muted"] == json!(true))
+}
+
+/// Whether the skills that read the privacy switch (`drops_kept`, #7668)
+/// must hold their tongue, from the newest `voice/privacy` lease said
+/// within 3 s: closed unless the lease's whole `permitted` is true, so the
+/// voice's software mute, a no-slide lamp's only closer, and an unknown
+/// physical state close it too (Heron's HOLD c7017400653); none said: closed.
+/// The watches keep `physical_muted` ([`privacy_closed`]).
+fn closed_for_skills(lease: Option<&serde_json::Value>) -> bool {
+    lease.is_none_or(|privacy| privacy["permitted"] != json!(true))
+}
+
+/// The privacy switch told to the skills that read it (`drops_kept`,
+/// #7668), on a change only, before a message is judged and at each turn
+/// of the loop.
+fn privacy_to_skills(
+    engine: &mut Engine,
+    runs: &mut Runs,
+    out: &mut Publisher,
+    runner: &Runner,
+    asking: &mut Asking,
+) {
+    if !engine.reads_privacy() {
+        return;
+    }
+    // Not said within 3 s: closed for the skills, erring toward silence
+    // (Heron's P3 1 on #7668); the watches keep their own reading.
+    let lease = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY);
+    let closed = closed_for_skills(lease.as_ref());
+    let made = engine.privacy(closed, clock::now_us());
+    dispatch(made, runs, out, runner, asking);
 }
 
 /// `guard.on` or `guard.off` from the owner's app, through lamp-cloud and
@@ -6926,6 +6968,30 @@ fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heron's HOLD c7017400653 on #7668: the seen reactions are told the
+    /// lease's whole `permitted`, not the slide alone. A software mute (or a
+    /// no-slide lamp's) with `physical_muted` false or absent keeps them
+    /// quiet, though the watches, which read the slide, stay on.
+    #[test]
+    fn the_skills_are_told_the_voices_whole_permission_not_the_slide_alone() {
+        for lease in [
+            json!({"permitted": false, "physical_muted": false}),
+            json!({"permitted": false}),
+            json!({"permitted": false, "physical_muted": null}),
+        ] {
+            assert!(closed_for_skills(Some(&lease)), "{lease}");
+            assert_ne!(lease["physical_muted"], json!(true), "{lease}");
+        }
+        assert!(closed_for_skills(Some(
+            &json!({"permitted": false, "physical_muted": true})
+        )));
+        assert!(closed_for_skills(Some(&json!({"physical_muted": false}))));
+        assert!(closed_for_skills(None), "none said within 3 s");
+        assert!(!closed_for_skills(Some(
+            &json!({"permitted": true, "physical_muted": false})
+        )));
+    }
 
     /// A told answer is text from the open web or the agent: the lamp asks
     /// for it as exact words alone, never a turn for the model (no prompt,

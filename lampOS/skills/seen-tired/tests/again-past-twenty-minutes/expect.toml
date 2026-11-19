@@ -1,0 +1,38 @@
+# 14:00, a yawn seen at 10, 12, 40 and 75 minutes: a line at 10, 40 and 75; the one at 12 falls within 20 minutes of the line at 10 (the per-kind rest), the face never moving.
+clock = "14:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera." }
+
+[[expect]]
+at = "40m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "40m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera." }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera." }

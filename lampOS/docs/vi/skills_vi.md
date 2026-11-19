@@ -6275,39 +6275,88 @@ như một lần tạm hoãn). Kiểm thử
 (`crates/skills/tests/it/holds.rs`). Mô tả đầy đủ của `[stop.done]` ở
 [skills.md](../skills.md), hàng `[stop]`.
 
-### Bốn phản ứng với điều thấy được (#6543, tắt)
+### Bốn phản ứng với điều thấy được (#6543, #7668: có trong cây mã, chưa là kỹ năng sản phẩm)
 
 `seen-drink`, `seen-eat`, `seen-tired` và `seen-celebrate`: phản ứng của
 kỹ năng wellbeing V1 với điều nó thấy, mỗi loại một kỹ năng để mỗi loại có
-lệnh tắt riêng. Đều là `installable`, `enabled = false`, nằm trong
-`install::NOT_PRODUCT_SKILLS` cho tới buổi thử cả ngày của chủ đèn tại
-lamp-06c1 (nhiều nhất một lời sai trong một ngày làm việc, qua lead). Quyết
-định của chủ đèn trên #7401 (19/11): mỗi lần thấy là một phản ứng. Mỗi kỹ
+lệnh tắt riêng. Đều là `installable`, tắt (`enabled = false`), có trong cây
+mã nhưng nằm trong `install::NOT_PRODUCT_SKILLS`: chưa được cài làm kỹ năng
+sản phẩm cho tới pull request bật chúng, sau hàng thử một ngày làm việc của
+chủ đèn trên lamp-06c1 (#6543, #7668); kể cả khi đó vẫn im lặng khi chưa có
+lời đồng ý `seen_more` của chủ đèn. Quyết định của chủ đèn trên #7401 (19/11):
+mỗi lần thấy là một phản ứng, cùng các phán quyết của first builder cho lần
+bật (#7401, 19:05 và 19:10). Mỗi kỹ
 năng đọc `humans/doing_more` (quyền dùng `seen_more` của chủ đèn,
 `LAMP_SEEN_MORE_DOINGS=on`) và phản ứng khi bộ đếm của nó tăng một:
-`drank_seen`, `ate_seen`, `tired_seen` hoặc `celebrate_seen` (`rise = { by =
+`drank_seen`, `ate_seen`, `yawn_seen` hoặc `stretch_seen` (`seen-tired` có hai
+trigger, `yawn` và `stretch`, mỗi trigger một câu riêng qua `do.on`, nên
+một cái ngáp được kể là ngáp, một lần vươn vai được kể là vươn vai, không
+bao giờ lẫn cái này thành cái kia, #8123: trên lamp-06c1 một cái ngáp đã
+bị kể thành "Big stretch"; sự mệt mà lamp-seen chỉ đếm được từ cả hai gộp
+lại không làm tăng bộ đếm nào, nên đèn không nói gì) hoặc `celebrate_seen` (`rise = { by =
 1, within = "45s" }`, một giá trị 30 s của lamp-seen và một khoảng dư,
-`rearm = "leaves"`: một lần tăng, một phản ứng; bộ đếm về 0 ở lần ngồi mới
+`rearm = "leaves"` với uống, mệt và ăn mừng: một lần tăng, một phản ứng; `rearm = { still = D }`
+với ăn, xem dưới (chỉ trên trigger có `rise`, 1m đến 1h: lại chỉ khi
+trường không tăng trong D; bị từ chối nếu có `for`, `below`, `above` hay thiếu
+`rise`); bộ đếm về 0 ở lần ngồi mới
 không là gì). lamp-seen đếm một động tác được hai clip liên tiếp bắt được là
 một lần (seen.md). Mỗi kỹ năng quay về khuôn mặt và nói một câu do giọng nói
 đặt lời, nhiều nhất hai mươi từ, chỉ về điều đã thấy: không khuyên, không số
 đếm, không chẩn đoán, không nói về sức khỏe, cơ thể hay ngoại hình, không
-nhắc camera; câu của `seen-tired` không bao giờ nói tới ngủ. Chỉ bị giữ lại
-khi đèn đang nói hoặc đang nghe (`[[while]]` `voice/state` là `resting`,
-không có `for`) và khi đèn ngủ (`asleep` của Expression là false); một lần
-tăng bị giữ giữa lượt nói được giữ lại (`wait = "1h"`, mức lớn nhất `wait`
-nhận, trên một `rise`) và được nói khi giọng nói nghỉ, ở giá trị kế tiếp của
-lamp-seen. Không có cooldown, `most_a_day`, `[budget]`, `[quiet]`, `[rest]`
-hay `[[while]]` nào khác. Một hàm `[stop]`, `seen_remarks`, dùng chung nhờ
+nhắc camera; câu của `seen-tired` không bao giờ nói tới ngủ. **Khoảng nghỉ
+theo loại, theo quyết định của owner trên #7668:** `seen-eat` nhận xét một lần
+mỗi bữa ăn (`rearm = { still = "30m" }`, không có cooldown, 01:5x): bữa ăn kết
+thúc sau 30 phút không thấy ăn, và lần thấy ăn sau đó là một bữa mới.
+`seen-drink` không được nói lại trong 15 phút kể từ câu gần nhất đã được nghe
+(`cooldown = "15m"`, owner 02:1x, first builder đồng ý 02:14), còn
+`seen-tired` và `seen-celebrate` trong 20 phút (`cooldown = "20m"`; với
+`seen-tired` là cho từng trigger, nên một lần vươn vai có thể đến sớm hơn sau
+một cái ngáp; kiểm thử `a_yawn_and_a_stretch_are_each_told_as_what_was_seen`). Loại khác có thể đến sớm hơn, và một câu không ai nghe
+thấy trả lại những gì nó đã dùng, cooldown hoặc bữa ăn của nó (`Engine::unsaid` trả lại
+mọi thứ lần chạy đã dùng, như một lần ghi chưa gửi, `Engine::unwritten`).
+Bị giữ lại khi đèn đang nói hoặc đang nghe (`[[while]]` `voice/state` là
+`resting`, không có `for`) và khi đèn ngủ (`asleep` của Expression là
+false); một lần tăng bị giữ giữa lượt nói được giữ 3 phút kể từ lúc thấy
+(`wait = "3m"`) và được nói khi giọng nói nghỉ, quá thời gian đó thì bỏ. Tính
+từ lúc thấy, một lời nhận xét không bao giờ cũ quá 3 phút; nó vẫn không bao
+giờ đến giữa một lượt nói: lượt nói còn mở lúc 3 phút thì bỏ nó (phán quyết
+của first builder, 00:14 trên #7668).
+Không có giờ yên lặng (owner, 13:1x ngày 20/11 trên #7668: người dùng có thể
+làm việc khuya hoặc dậy sớm): một lời nhận xét vào ban đêm được nói như bình
+thường (`at-night-too` trong mỗi thư mục; kiểm thử
+`a_remark_at_night_is_said_as_normal`). Không bao giờ khi nắp riêng tư đóng (`[[while]]`
+`voice/privacy` `permitted` là true, `drops_kept = true`): đóng nắp bỏ ngay
+một lần tăng đang được giữ, và lần đọc `rise` trước đó bị quên, nên không gì
+thấy trước đó được nói khi nắp mở lại. Không có `most_a_day`, `[budget]`,
+`[quiet]` hay `[rest]`. **Không gì chúng thấy rời khỏi đèn qua chúng:** mỗi kỹ năng chỉ
+được đọc năm chủ đề của nó, nói và quay (không dịch vụ, không ghi, không tin
+nhắn, không camera, không lịch sử hay tìm kiếm), và mọi lệnh gọi chỉ là quay
+về khuôn mặt hoặc một câu (`nothing_the_reactions_see_leaves_the_lamp_through_them`);
+điều rời khỏi đèn vẫn là của riêng lamp-seen, không đổi khi bật. Nhịp clip
+vẫn là một burst mỗi phút: không unit sản phẩm nào đặt
+`LAMP_SEEN_BURST_15S` (`no_product_unit_sets_the_fifteen_second_switch`
+trong `crates/seen`). Một hàm `[stop]`, `seen_remarks`, dùng chung nhờ
 `[stop] group = "seen-remarks"`; một câu không ai nghe thấy không phải là
-câu gần nhất, và không lấy gì của lần sau. Của ai: lamp-seen chỉ gửi ảnh khi
+câu gần nhất. Của ai: lamp-seen chỉ gửi ảnh khi
 có đúng một khuôn mặt đã nhớ, nên điều thấy là của người đang ngồi đó; chưa
 có quy tắc chủ đèn riêng cho tới khi `humans/familiar` nói ai là chủ. Chưa
 thể diễn đạt: kết quả "không nói gì" (một ghi chú luôn được nói), số đếm
 trong lời (ghi chú không có chỗ cho số), tắt theo loại (hàm chung tắt cái
 gần nhất hoặc tất cả). Các ca trong `tests/` của mỗi thư mục; bốn kỹ năng
-cùng nhau, một lần tăng giữa lượt nói và một câu không ai nghe:
-`crates/skills/tests/it/seen.rs`. Hai điều lamp-skills thêm cho chúng
+cùng nhau, khoảng nghỉ, một lần tăng giữa lượt nói, một lần tăng quá muộn bị
+bỏ, nắp riêng tư, một lời nhận xét vào ban đêm và một câu không ai nghe:
+`crates/skills/tests/it/seen.rs`. Khóa `[[while]]` mới
+`drops_kept = true` (#6543): chỉ trên `voice/privacy`, phép thử của một
+trường, không có `for` hay `unknown` (nếu không, kỹ năng bị từ chối).
+lamp-skills khi đó không đăng ký `voice/privacy` (giọng nói gia hạn nó mỗi 10
+ms): chương trình đọc giá trị mới nhất trên bus như các watch, nhưng báo
+cho kỹ năng toàn bộ `permitted` của nó (`closed_for_skills`: đóng trừ khi
+`permitted` là true, nên chế độ tắt mic bằng phần mềm, lamp không có nắp và
+trạng thái vật lý chưa rõ cũng tính là đóng; không có giá trị nào trong 3 s
+cũng là đóng, nghiêng về im lặng; các watch vẫn đọc `physical_muted`) và chỉ báo cho kỹ năng khi nó đổi (`Engine::privacy`); khi một tin của chủ đề
+đó không thỏa, mọi cơ hội mà trigger của kỹ năng đang giữ cho `wait` bị bỏ
+ngay, ghi một lần vào nhật ký, và một `rise` quên các lần đọc trước đó; một
+cơ hội bị nó giữ lại thì bị bỏ, không bao giờ được giữ. Hai điều lamp-skills thêm cho chúng
 (#7401): trên một trigger `rise` có `wait`, cơ hội được giữ vẫn là lần tăng
 đó cho tới khi được dùng hoặc hết `wait`, dù các giá trị sau không còn tăng
 (phép thử của trường, `above = 0`, vẫn phải đúng); và `[stop] group`, trong
@@ -6345,7 +6394,8 @@ had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
   này.
 - **Dành cho số đếm.** Chỗ trống dành cho một số đếm mà người nghe được nói
   lại như số đếm: các bộ đếm theo lần ngồi của lamp-seen trên
-  `humans/doing_more` (`drank_seen`, `ate_seen`, `tired_seen`). Có thể nêu bất
+  `humans/doing_more` (`drank_seen`, `ate_seen`, `tired_seen`, `yawn_seen`,
+  `stretch_seen`). Có thể nêu bất
   kỳ trường số nào của chủ đề kỹ năng đọc, nhưng ghi chú không bao giờ nói số
   về khuôn mặt, sự hiện diện hay khoảng cách (`humans/faces/tracked`,
   `humans/presence`, độ gần), những số chỉ dùng để chọn bước; kỹ năng được

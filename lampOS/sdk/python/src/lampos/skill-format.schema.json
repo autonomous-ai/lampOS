@@ -981,6 +981,10 @@
                 },
                 "for": {
                   "$ref": "#/$defs/duration"
+                },
+                "still": {
+                  "$ref": "#/$defs/duration",
+                  "description": "Alone, on a trigger with a rise (#7668): again only once the rise has not risen for this long, 1m to 1h. One chance a stretch: a meal, a drinking spell."
                 }
               }
             }
@@ -1118,6 +1122,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "drops_kept": {
+          "description": "When a message of its topic does not hold, every chance the skill's triggers keep for their `wait` is dropped at once and a `rise` forgets the readings before it (#6543, the seen reactions' privacy slide); a chance it holds back is never kept. Only on `voice/privacy`, which lamp-skills then tells on a change instead of subscribing (#7668); with a field's test, without `for` or `unknown`.",
+          "type": "boolean"
         }
       }
     },
