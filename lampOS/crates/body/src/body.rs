@@ -2095,6 +2095,57 @@ fn checksum(body: &[u8]) -> u8 {
 
 /// The only single-servo writes there are: acceleration (register 41, one
 /// byte) and goal speed (register 46, two bytes).
+/// The servo's own maximum acceleration, kept in its EEPROM (#7946): 254 on
+/// most, 50 on the STS3215s some lamps shipped with.
+const ACCELERATION_CAP_REGISTER: u8 = 85;
+
+/// The lower of the two caps known on shipped lamps (#7946): what a joint
+/// runs at, at most, when its own cap can't be read. Slower is the safe side.
+const ACCELERATION_CAP_KNOWN_LOW: u8 = 50;
+
+/// The acceleration each joint runs at (by `Joint::index`): `asked`, or the
+/// servo's own lower cap (`caps`, read from register 85, in `joints`' order),
+/// so a capped servo's read back of its cap is a pass, never a stop (#7946).
+/// With no caps read, the known low cap. A cap of 0 is no reading. Each
+/// joint run under `asked` is said, once a start, with its cap.
+fn accelerations(
+    asked: u8,
+    joints: &[Joint],
+    caps: Result<Vec<u8>, String>,
+    say: &mut dyn FnMut(String),
+) -> [u8; 5] {
+    let mut each = [asked; 5];
+    match caps {
+        Ok(caps) => {
+            for (joint, cap) in joints.iter().zip(caps) {
+                let cap = if cap == 0 {
+                    ACCELERATION_CAP_KNOWN_LOW
+                } else {
+                    cap
+                };
+                if cap < asked {
+                    each[joint.index()] = cap;
+                    say(format!(
+                        "{joint} holds a maximum acceleration of {cap} (register {ACCELERATION_CAP_REGISTER}), under the {asked} asked: it runs at {cap} (#7946)"
+                    ));
+                }
+            }
+        }
+        Err(detail) => {
+            let low = asked.min(ACCELERATION_CAP_KNOWN_LOW);
+            for joint in joints {
+                each[joint.index()] = low;
+            }
+            if low < asked {
+                say(format!(
+                    "the servos' maximum acceleration could not be read ({detail}): every joint runs at {low}, the lower known cap, under the {asked} asked (#7946)"
+                ));
+            }
+        }
+    }
+    each
+}
+
 fn acceleration_write(joint: Joint, value: u8) -> [u8; 8] {
     let mut packet = [0xff, 0xff, joint.id(), 4, 0x03, 41, value, 0];
     packet[7] = checksum(&packet[2..7]);
@@ -2894,6 +2945,29 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
             Ok(())
         })?;
         Ok(limits)
+    }
+
+    /// The maximum acceleration each of `joints` holds in its own EEPROM
+    /// (register 85), in their order (#7946): a write of a higher
+    /// acceleration (register 41) reads back as this.
+    fn acceleration_caps(&mut self, joints: &[Joint]) -> Result<Vec<u8>, String> {
+        let window =
+            ReadWindow::new(ACCELERATION_CAP_REGISTER, 1).map_err(|error| error.to_string())?;
+        let request =
+            ReadOnlyRequest::sync_read(joints, window).map_err(|error| error.to_string())?;
+        let mut caps = vec![0u8; joints.len()];
+        self.read(&request, |reply| {
+            let index = joints
+                .iter()
+                .position(|joint| *joint == reply.joint())
+                .ok_or("a reply from a joint that was not asked")?;
+            let [cap] = reply.parameters() else {
+                return Err("an acceleration cap that is not one byte".into());
+            };
+            caps[index] = *cap;
+            Ok(())
+        })?;
+        Ok(caps)
     }
 
     /// The force limit each of `joints` holds, in their order.
@@ -6489,6 +6563,25 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         return report;
     }
 
+    // Each servo's own maximum acceleration (#7946): a joint whose servo
+    // caps lower than asked runs at its cap, so its read back passes.
+    let capped: Vec<Joint> = COMMANDED
+        .iter()
+        .chain(
+            standing
+                .is_some()
+                .then_some(ARM.iter())
+                .into_iter()
+                .flatten(),
+        )
+        .copied()
+        .filter(|joint| !bus.left[joint.index()])
+        .collect();
+    let caps = bus.read_back(|bus| bus.acceleration_caps(&capped));
+    let acceleration_of = accelerations(limits.servo_acceleration, &capped, caps, &mut |line| {
+        eprintln!("lamp-body: {line}");
+    });
+
     // The servo's own speed bound, where it is not already the one wanted
     // (nothing to a joint left as it is).
     for (index, joint) in COMMANDED.iter().enumerate() {
@@ -6501,12 +6594,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             report.profile_writes += 1;
             outcome = bus.write_checked(*joint, &speed_write(*joint, limits.servo_speed));
         }
-        if outcome.is_ok() && acceleration != limits.servo_acceleration {
+        let wanted = acceleration_of[joint.index()];
+        if outcome.is_ok() && acceleration != wanted {
             report.profile_writes += 1;
-            outcome = bus.write_checked(
-                *joint,
-                &acceleration_write(*joint, limits.servo_acceleration),
-            );
+            outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
         }
         if let Err(detail) = outcome {
             report.stop = Stop::Bus {
@@ -6533,12 +6624,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.profile_writes += 1;
                 outcome = bus.write_checked(*joint, &speed_write(*joint, arm_speed));
             }
-            if outcome.is_ok() && acceleration != limits.servo_acceleration {
+            let wanted = acceleration_of[joint.index()];
+            if outcome.is_ok() && acceleration != wanted {
                 report.profile_writes += 1;
-                outcome = bus.write_checked(
-                    *joint,
-                    &acceleration_write(*joint, limits.servo_acceleration),
-                );
+                outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
             }
             if let Err(detail) = outcome {
                 report.stop = Stop::Bus {
@@ -6549,8 +6638,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         match bus.read_back(Bus::arm_profiles) {
             Ok(now)
-                if now.iter().all(|profile| {
-                    (profile.0, profile.1, profile.2) == (1, limits.servo_acceleration, arm_speed)
+                if now.iter().zip(ARM).all(|(profile, joint)| {
+                    (profile.0, profile.1, profile.2)
+                        == (1, acceleration_of[joint.index()], arm_speed)
                 }) => {}
             Ok(now) => {
                 report.stop = Stop::Bus {
@@ -6570,7 +6660,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         Ok(now)
             if now.iter().zip(COMMANDED).all(|(profile, joint)| {
                 bus.left[joint.index()]
-                    || *profile == (1, limits.servo_acceleration, limits.servo_speed)
+                    || *profile == (1, acceleration_of[joint.index()], limits.servo_speed)
             }) => {}
         Ok(now) => {
             report.stop = Stop::Bus {
