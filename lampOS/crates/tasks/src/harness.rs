@@ -782,8 +782,9 @@ pub fn openclaw_holds_key(db: &Path, key: &str) -> Result<bool, String> {
 }
 
 /// How big a session's live conversation is in the Gateway's record
-/// ([`openclaw_session_size`], #7906): its transcript rows with a role, and
-/// their stored bytes.
+/// ([`openclaw_session_size`], #7906): its `user` and `assistant`
+/// transcript rows (every row on a schema with no `message_role`), and
+/// every row's stored bytes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SessionSize {
     pub messages: u64,
@@ -793,7 +794,8 @@ pub struct SessionSize {
 /// The size of the session of Harness's `agent_id` (its key `key`, or
 /// `agent:main:harness-<id8>...` as [`openclaw_record`] matches) in the
 /// Gateway's record at `db`: the rows of the node's current session id
-/// (`session_nodes.current_session_id`), counted, and their bytes summed
+/// (`session_nodes.current_session_id`), its `user` and `assistant` rows
+/// counted, and every row's bytes summed
 /// (`event_utf8_bytes`, else the stored text's or blob's length, whichever
 /// columns this schema has). No node: zero, a session not written yet.
 /// Read only, one open and three short reads over the
@@ -842,8 +844,11 @@ pub fn openclaw_session_size(db: &Path, key: &str, agent_id: &str) -> Result<Ses
     if !has("session_id") {
         return Err("read: no transcript_events.session_id".into());
     }
+    // Only the user's and the assistant's rows are messages: a long make's
+    // tool results never push the next make into a fresh session; their
+    // bytes still count toward the token bound.
     let messages = if has("message_role") {
-        "COUNT(message_role)"
+        "COUNT(CASE WHEN message_role IN ('user', 'assistant') THEN 1 END)"
     } else {
         "COUNT(*)"
     };

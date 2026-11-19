@@ -2182,6 +2182,36 @@ fn a_failed_cancel_close_is_tried_again_now_with_its_record_kept() {
     assert_eq!(*deleted.lock().unwrap(), 1, "deleted once closed");
 }
 
+/// #7906: a cancelled turn's close that fails twice (once at the cancel,
+/// once at the next look) is still the unanswered turn's close at the
+/// third: the kept session's token is kept, never a new one minted.
+#[test]
+fn a_cancel_close_failed_twice_still_keeps_the_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(|_| Ok(())));
+    one.open_if_due(&fake, &place());
+    let token = std::fs::read_to_string(dir.path().join(TOKEN_FILE)).unwrap();
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Make the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    *fake.failing_closes.lock().unwrap() = 2;
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(true), &|| {});
+    drop(turn);
+    assert_eq!(ended, Ended::Cancelled);
+    assert!(one.drop_if_due(&fake), "the second close, refused");
+    assert!(one.drop_if_due(&fake), "the third close, done");
+    assert!(!one.drop_if_due(&fake), "nothing more due");
+    assert_eq!(fake.count("close-kept"), 3, "{:?}", fake.calls());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(TOKEN_FILE)).ok(),
+        Some(token),
+        "its token kept"
+    );
+}
+
 /// OpenClaw's kept session is not rotated by count; a sign-out closes it,
 /// deletes its OpenClaw session by `ensure`'s `engineSession` (Harness's
 /// `close --forget` is not built), and removes its token and record.
@@ -2873,6 +2903,47 @@ fn a_stuck_sessions_failed_close_keeps_its_token_and_the_next_is_fresh() {
     );
 }
 
+/// #7906, the lead's case: a stuck session's close refused at the replace
+/// and at two due looks after it (`drop_if_due` failing twice) still keeps
+/// the same token when it finally closes: no new token minted, so the
+/// next `ensure` on the same name is never refused `NAME_TAKEN`, and it is
+/// `--fresh`.
+#[test]
+fn a_stuck_close_failing_at_two_due_looks_keeps_the_same_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    let token = std::fs::read_to_string(dir.path().join(TOKEN_FILE)).unwrap();
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.failing_closes.lock().unwrap() = 3;
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), None, "the replace's close failed");
+    assert!(again.drop_if_due(&fake), "the first due close, refused");
+    assert!(again.drop_if_due(&fake), "the second due close, refused");
+    assert!(again.drop_if_due(&fake), "the third due close, done");
+    assert!(!again.drop_if_due(&fake), "nothing more due");
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(TOKEN_FILE)).ok(),
+        Some(token.clone()),
+        "the same token"
+    );
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert_eq!(fake.count("close-kept"), 4, "{:?}", fake.calls());
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+    assert!(!fake.calls().iter().any(|call| call.contains("NAME_TAKEN")));
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join(TOKEN_FILE)).ok(),
+        Some(token),
+        "no new token minted at the open"
+    );
+}
+
 /// #7906, P2-b and P2-c: the backoff comes from the replacements in a row,
 /// not `failed_opens`: none at the first, 5 s from the second, doubled.
 #[test]
@@ -3288,6 +3359,46 @@ fn an_ordinary_task_near_the_limit_starts_fresh() {
     );
 }
 
+/// #7906: only the user's and the assistant's rows count toward the
+/// message bounds; a long make's tool results (`toolResult`) do not, so
+/// the next make stays in the kept session with its recall. Their bytes
+/// still count toward the token bound.
+#[test]
+fn tool_result_rows_do_not_count_toward_the_message_bounds() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = openclaw_db(dir.path(), &agent_of(1), 60, 100);
+    let connection = rusqlite::Connection::open(&db).unwrap();
+    for seq in 60..200 {
+        connection
+            .execute(
+                "INSERT INTO transcript_events VALUES ('s1', ?1, 'toolResult', '{}', NULL, 100)",
+                [seq],
+            )
+            .unwrap();
+    }
+    connection
+        .execute(
+            "INSERT INTO transcript_events VALUES ('s1', 200, 'user', '{}', NULL, 100)",
+            [],
+        )
+        .unwrap();
+    drop(connection);
+    let size = crate::harness::openclaw_session_size(&db, "agent:main:x", &agent_of(1)).unwrap();
+    assert_eq!(
+        size,
+        SessionSize {
+            messages: 61,
+            bytes: 201 * 100
+        }
+    );
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_openclaw_db(db);
+    one_turn(&one, &fake, "task-1");
+    one_make(&one, &fake, "make-1");
+    assert_eq!(fresh_ensures(&fake), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
 /// #7906 sign 3: a kept session whose conversation OpenClaw's Gateway no
 /// longer holds (deleted under lamp-tasks) is closed `--now` and let go
 /// before any task is handed to it, and the task goes into the session
@@ -3394,40 +3505,65 @@ fn a_turn_with_steady_progress_is_kept() {
     }
 }
 
-/// #7906 sign 4b: a turn that reached OpenClaw, then `running` with its
-/// record unmoved for 3 min and the model's answer never begun (the user's
-/// row last), is stuck; at 2 min 59 s it is not yet.
+/// #7906 sign 4b with the user's row last: the Gateway writes the
+/// assistant's row only once the whole message is done, so a long first
+/// message (a make's SKILL.md write, long thinking, 429 retries) shows no
+/// move for minutes. A turn that reached OpenClaw, then `running` with its
+/// record unmoved and the user's row last, is not stuck at 300 s nor at
+/// 599 s; it is at 600 s (`TOOL_RESULT_STALL`, as after a tool's result).
+/// So for a refused hand-over waiting on such a turn, and with the bounds
+/// shortened as [`OneSession::with_turn_watch`] scales them.
 #[test]
-fn a_working_turn_unchanged_for_3_min_is_stuck() {
+fn a_user_last_row_is_stuck_only_at_600_s() {
     let t0 = Instant::now();
     let at = |s: u64| t0 + Duration::from_secs(s);
     let last = "user";
     let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
     assert_eq!(
-        watch.look(Some(&record(9, "running", last)), true, at(20)),
+        watch.look(Some(&record(9, "running", last)), true, at(0)),
         None
     );
-    assert_eq!(
-        watch.look(Some(&record(9, "running", last)), true, at(199)),
-        None
-    );
+    for s in [180, 300, 599] {
+        assert_eq!(
+            watch.look(Some(&record(9, "running", last)), true, at(s)),
+            None,
+            "{s} s"
+        );
+    }
     assert!(matches!(
-        watch.look(Some(&record(9, "running", last)), true, at(200)),
-        Some(KeptGone::NotMoving(why)) if why.contains("did not move for 180 s")
+        watch.look(Some(&record(9, "running", last)), true, at(600)),
+        Some(KeptGone::NotMoving(why)) if why.contains("did not move for 600 s")
     ));
     // A refused hand-over waiting on such a turn.
     let mut refused = TurnWatch::refused(t0, TURN_STALL);
+    for s in [0, 180, 300, 599] {
+        assert_eq!(
+            refused.look(Some(&record(9, "running", last)), true, at(s)),
+            None,
+            "{s} s"
+        );
+    }
+    assert!(
+        refused
+            .look(Some(&record(9, "running", last)), true, at(600))
+            .is_some()
+    );
+    // Shortened as `with_turn_watch` does: 600 s is to 180 s as 10 is to 3.
+    let ms = |m: u64| t0 + Duration::from_millis(m);
+    let stall = Duration::from_millis(150);
+    let mut short = TurnWatch::taken(t0, Some(("w1".into(), 7)), Duration::from_millis(80), stall)
+        .tool_stall(stall * 10 / 3);
     assert_eq!(
-        refused.look(Some(&record(9, "running", "user")), true, at(0)),
+        short.look(Some(&record(9, "running", last)), true, ms(0)),
         None
     );
     assert_eq!(
-        refused.look(Some(&record(9, "running", "user")), true, at(179)),
+        short.look(Some(&record(9, "running", last)), true, ms(499)),
         None
     );
     assert!(
-        refused
-            .look(Some(&record(9, "running", "user")), true, at(180))
+        short
+            .look(Some(&record(9, "running", last)), true, ms(500))
             .is_some()
     );
 }
