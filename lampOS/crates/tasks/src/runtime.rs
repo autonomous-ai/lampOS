@@ -5254,6 +5254,13 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "tasks")?;
     // Without `--progress` the topic is not touched at all.
     let mut status_out = if config.progress {
+        // A skill's runs beside it (#7873): `tasks/status` lists only the
+        // tasks in the store, which a skill's run never enters.
+        crate::skill_task::tell_runs_on(bus.publisher_declared(
+            lamp_msgs::SkillTask::TOPIC,
+            &lamp_msgs::SkillTask::declaration(),
+            "tasks",
+        )?);
         Some(bus.publisher_declared(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks")?)
     } else {
         None

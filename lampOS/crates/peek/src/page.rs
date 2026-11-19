@@ -4,7 +4,7 @@
 //! made here, with everything a message, a record or a unit carries
 //! escaped; the page's few lines of script only put it in its place.
 use crate::{
-    timeline::{self, Agent, Entry},
+    timeline::{self, Agent, Entry, SkillRun},
     turns::{ReadFailure, ReadStatus, Snapshot, Step, Turn},
     units::UnitRow,
     view::{self, escape},
@@ -13,7 +13,8 @@ use crate::{
 use lamp_bus::Message;
 use lamp_msgs::{
     AgentState, DecisionKind, ExpressionBody, Faces, HandStage, Health, JointState, Level, Light,
-    RoomPresence, Sign, StepKind, TaskStatus, TaskStep, TurnVerdict, VoiceDecision, VoiceState,
+    RoomPresence, Sign, SkillTaskStage, StepKind, TaskStatus, TaskStep, TurnVerdict, VoiceDecision,
+    VoiceState,
 };
 use std::fmt::Write;
 
@@ -1168,16 +1169,34 @@ pub fn tasks_line(status: Option<&TaskStatus>) -> String {
 /// task's words, prompt, folder and answer are never on the bus, and
 /// nothing else about tasks is read.
 pub fn tasks(status: Option<&TaskStatus>, now_unix_ms: u64) -> String {
+    tasks_with(status, &[], now_unix_ms)
+}
+
+/// [`tasks`], and under **Skill tasks** the skills' runs and answers
+/// (`skills/tasks`, #7873, newest first): a skill's `do.task` run is no
+/// task in the store, so `tasks/status` never lists it. While one works,
+/// nothing is said to be not worked on.
+pub fn tasks_with(status: Option<&TaskStatus>, runs: &[SkillRun], now_unix_ms: u64) -> String {
+    let skills = skill_tasks(runs, now_unix_ms);
+    let working = runs
+        .iter()
+        .any(|run| run.run.is_some() && run.ended.is_none());
+    let nothing = if working {
+        ""
+    } else {
+        "<p>Nothing is being worked on.</p>"
+    };
     let Some(status) = status else {
-        return "<p>No word from lamp-tasks: its progress (tasks/status) is not on the bus.</p>"
-            .to_owned();
+        return format!(
+            "<p>No word from lamp-tasks: its progress (tasks/status) is not on the bus.</p>{skills}"
+        );
     };
     if status.tasks.is_empty() && status.unread.is_empty() && status.settled.is_empty() {
-        return "<p>Nothing is being worked on.</p>".to_owned();
+        return format!("{nothing}{skills}");
     }
     let mut html = String::new();
     if status.tasks.is_empty() && status.unread.is_empty() {
-        html.push_str("<p>Nothing is being worked on.</p>");
+        html.push_str(nothing);
     }
     for task in &status.tasks {
         let (state, colour) = state_badge(task.state, false);
@@ -1231,6 +1250,51 @@ pub fn tasks(status: Option<&TaskStatus>, now_unix_ms: u64) -> String {
             engine_name(&task.engine),
             clock(task.at_unix_ms),
             span(now_unix_ms.saturating_sub(task.at_unix_ms) / 1000)
+        );
+    }
+    html.push_str(&skills);
+    html
+}
+
+/// A skill's run as lamp-tasks' journal names it, `task <ms>-<pid>-<n>`,
+/// or, with no run, a skill's answer.
+fn run_name(run: &SkillRun) -> String {
+    match &run.run {
+        Some(id) => format!("task {}", escape(id.strip_prefix("task-").unwrap_or(id))),
+        None => "an answer".to_owned(),
+    }
+}
+
+/// The Tasks section's skill tasks (#7873): a card for each, its run, its
+/// engine, its state (working blue, done green, failed red; an answer with
+/// no run, grey), its skill and when it began. Names and ids only.
+fn skill_tasks(runs: &[SkillRun], now_unix_ms: u64) -> String {
+    if runs.is_empty() {
+        return String::new();
+    }
+    let mut html = "<h3>Skill tasks</h3>".to_owned();
+    for run in runs {
+        let (state, colour) = match run.ended {
+            Some((SkillTaskStage::Failed, _)) => ("failed", "badge-red"),
+            Some(_) => ("done", "badge-green"),
+            None if run.run.is_some() => ("working", "badge-blue"),
+            None => ("its answer", "badge-grey"),
+        };
+        let said = [
+            format!("skill {}", escape(&run.skill)),
+            format!(
+                "began {} ago",
+                span(now_unix_ms.saturating_sub(run.at_unix_ms) / 1000)
+            ),
+        ];
+        let _ = write!(
+            html,
+            "<div class=\"card task{}\"><b>{}</b> <span class=\"badge\">{}</span>\
+             <span class=\"badge {colour}\">{state}</span><div class=\"small\">{}</div></div>",
+            if run.ended.is_some() { " ended" } else { "" },
+            run_name(run),
+            engine_name(run.engine.as_deref().unwrap_or("?")),
+            said.join(" · ")
         );
     }
     html
