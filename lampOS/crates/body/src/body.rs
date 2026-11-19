@@ -912,15 +912,17 @@ pub struct Asked {
     /// (`room/presence`, `crate::presence_in`, #7301). Only with
     /// `LAMP_BODY_PRESENCE=on`; taken only under [`Limits::presence`].
     pub present: bool,
-    /// lamp-control's lease is taken, held or suspended for a
-    /// conversation (`lamp_body::lease::Lease::taken`, #7513). A paired
-    /// computer's move playing while it is taken ([`crate::moves::from_control`])
-    /// is that lease's: when the lease ends (let go, its holder gone, or
-    /// lapsed), the move ends at once and eases back to rest
-    /// ([`crate::moves::ENDED_BY_LEASE`]). The lamp's own moves are no
-    /// lease's and play on. A suspended lease is still taken, so a
-    /// conversation pauses or ends a move as before, never this.
-    pub leased: bool,
+    /// Whose lamp-control lease is taken, held or suspended for a
+    /// conversation, by the source its motions carry (`control:CLIENT~LEASE`,
+    /// the hold's `source`; `lamp_body::lease::Lease::holder`, #7513). A
+    /// paired computer's move with that source is that lease's while it
+    /// plays or waits: when the lease ends (let go, its holder gone, lapsed,
+    /// or the hold handed to another lease), the move ends at once and eases
+    /// back to rest ([`crate::moves::ENDED_BY_LEASE`]). A move of another
+    /// lease's, of none, or the lamp's own, is never this lease's. A
+    /// suspended lease is still taken, so a conversation pauses or ends a
+    /// move as before, never this.
+    pub leased: Option<Source>,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -954,7 +956,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
-        leased: false,
+        leased: None,
         aim: None,
         limp: false,
         unseat: false,
@@ -987,7 +989,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
-        leased: false,
+        leased: None,
         aim: None,
         limp: false,
         unseat: false,
@@ -5289,7 +5291,7 @@ pub(crate) fn run_looking(
         unplug: false,
         held_by_test: false,
         held: false,
-        leased: false,
+        leased: None,
         aim: None,
         limp: false,
         unseat: false,
@@ -6853,7 +6855,6 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // #7513: whether lamp-control's lease was taken at the last step, and
     // the start of the paired computer's move playing (and of the one
     // waiting) seen under it: that move is the lease's, and ends with it.
-    let mut leased_was = false;
     let mut playing_leased: Option<Duration> = None;
     let mut pending_leased: Option<Duration> = None;
     // Such a gesture's ease back: steps since it ended, its offsets then and
@@ -7498,56 +7499,57 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         // #7513: a paired computer's move belongs to the lease it was sent
-        // under (lamp-control refuses any other client's body op while one
-        // holds it). Seen under a lease, it is marked; when the lease ends
-        // (let go, its holder gone, lapsed), it ends now and eases back to
-        // rest, and one still waiting is dropped. The lamp's own moves,
-        // a skill's and the voice's, are no lease's and play on; a hand,
-        // a conversation, privacy, sleep and strain end any as before.
-        let from_control = |by: &Option<Source>| {
-            by.as_ref()
-                .is_some_and(|by| crate::moves::from_control(by.as_str()))
-        };
-        if asked_now.leased {
-            if let Some((_, since)) = playing.filter(|_| from_control(&playing_by.1)) {
-                playing_leased = Some(since);
-            }
-            if let Some((_, since)) = pending.filter(|_| from_control(&pending_by.1)) {
-                pending_leased = Some(since);
-            }
-        } else if leased_was {
-            if let Some((old, since)) = playing
-                && playing_leased == Some(since)
-            {
-                gesture_fates.push_told(
-                    (old.name, crate::moves::ENDED_BY_LEASE),
-                    Told {
-                        source: playing_by.1,
-                        by: None,
-                    },
-                );
-                playing = None;
-                paused = None;
-                resumed = None;
-                yielding = true;
-                easing_out = Some((0, gesture_now, gesture_moved));
-            }
-            if let Some((old, since)) = pending
-                && pending_leased == Some(since)
-            {
-                gesture_fates.push_told(
-                    (old.name, crate::moves::DROPPED_BY_LEASE),
-                    Told {
-                        source: pending_by.1,
-                        by: None,
-                    },
-                );
-                pending = None;
-            }
+        // under, named in its source (`control:CLIENT~LEASE`) as the hold
+        // names its holder. Seen while that lease is taken, it is marked;
+        // once that lease is no longer the one taken (let go, its holder
+        // gone, lapsed, or the hold handed to another lease), it ends now
+        // and eases back to rest, and one still waiting is dropped. Another
+        // lease's move, one sent with none, and the lamp's own (a skill's,
+        // the voice's) are never marked; a hand, a conversation, privacy,
+        // sleep and strain end any as before.
+        let leased = asked_now.leased;
+        if crate::moves::under_lease(playing_by.1, leased)
+            && let Some((_, since)) = playing
+        {
+            playing_leased = Some(since);
+        }
+        if crate::moves::under_lease(pending_by.1, leased)
+            && let Some((_, since)) = pending
+        {
+            pending_leased = Some(since);
+        }
+        if let Some((old, since)) = playing
+            && playing_leased == Some(since)
+            && !crate::moves::under_lease(playing_by.1, leased)
+        {
+            gesture_fates.push_told(
+                (old.name, crate::moves::ENDED_BY_LEASE),
+                Told {
+                    source: playing_by.1,
+                    by: None,
+                },
+            );
+            playing = None;
             playing_leased = None;
+            paused = None;
+            resumed = None;
+            yielding = true;
+            easing_out = Some((0, gesture_now, gesture_moved));
+        }
+        if let Some((old, since)) = pending
+            && pending_leased == Some(since)
+            && !crate::moves::under_lease(pending_by.1, leased)
+        {
+            gesture_fates.push_told(
+                (old.name, crate::moves::DROPPED_BY_LEASE),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
             pending_leased = None;
         }
-        leased_was = asked_now.leased;
         // A gesture asked of a folded lamp stands it up first, as any
         // mood but rest does (#1011); not a lamp that is stopping, held,
         // slumped or paused.

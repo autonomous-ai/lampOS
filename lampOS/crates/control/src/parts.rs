@@ -232,6 +232,9 @@ pub struct Lamp {
     /// The connection the request in hand came on (`Parts::asking`), for a
     /// motion's `done`.
     asking: Option<u64>,
+    /// The `body` lease the client now asking holds, if any: a motion sent
+    /// under it carries it in its source (#7513, [`source_under`]).
+    under_lease: Option<String>,
 }
 
 /// What each computer has going on the voice.
@@ -335,6 +338,7 @@ impl Lamp {
             speaker: None,
             motions: None,
             asking: None,
+            under_lease: None,
         }
     }
 
@@ -553,7 +557,7 @@ impl Lamp {
         let (Some(path), Some(socket)) = (&self.body, &self.datagram) else {
             return Err(not_here("the body"));
         };
-        ask["source"] = json!(source(client));
+        ask["source"] = json!(source_under(client, self.under_lease.as_deref()));
         ask["priority"] = json!(Priority::Skill);
         socket
             .send_to(ask.to_string().as_bytes(), path)
@@ -1422,6 +1426,17 @@ fn source(client: &str) -> String {
     format!("control:{client}")
 }
 
+/// A motion's source: `control:CLIENT`, and `~LEASE` when the client holds
+/// the body's lease, the same words the door's hold names its holder by
+/// (`body_lease::holder_source`), so the body ends only the motions sent
+/// under the lease that ended (#7513, Twelve's HOLD on #7923).
+pub fn source_under(client: &str, lease: Option<&str>) -> String {
+    match lease {
+        Some(lease) => format!("control:{client}~{lease}"),
+        None => source(client),
+    }
+}
+
 /// How long a call to lamp-actions may take, connecting, asking and the
 /// answer: an `amixer` write and its readback are tens of milliseconds.
 pub const ACTIONS_WAIT: Duration = Duration::from_millis(1_500);
@@ -1613,6 +1628,10 @@ impl Parts for Lamp {
 
     fn asking(&mut self, connection: Option<u64>) {
         self.asking = connection;
+    }
+
+    fn under_lease(&mut self, lease: Option<&str>) {
+        self.under_lease = lease.map(str::to_owned);
     }
 
     fn state(&self, kind: StateKind) -> Value {

@@ -77,6 +77,10 @@ pub trait Parts {
     /// The connection the next `act` or `reply` is for, told just before
     /// it: a part that tells an action's end later sends it there alone.
     fn asking(&mut self, _connection: Option<u64>) {}
+    /// The `body` lease the next `act` or `reply`'s client holds, if any,
+    /// told just before it: a motion sent to the body under it is that
+    /// lease's, and ends with it (#7513).
+    fn under_lease(&mut self, _lease: Option<&str>) {}
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -1588,6 +1592,10 @@ impl Door {
             op => op,
         };
         parts.asking(session.connection);
+        let under = (self.leases.holder(Part::Body, now_us) == Some(client.as_str()))
+            .then(|| self.leases.holding(Part::Body, now_us))
+            .flatten();
+        parts.under_lease(under);
         match parts.reply(&client, re, &op, now_us) {
             Ok(reply) => {
                 // Counted only once the part took it.

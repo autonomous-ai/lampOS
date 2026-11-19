@@ -1601,10 +1601,12 @@ class Lamp:
         following = self._following
         if following is not None:
             following.end("cut_short", "stop")
-        reply = await self._act("stop", False)
-        if following is not None:
-            await following._end()
-        return reply
+        try:
+            return await self._act("stop", False)
+        finally:
+            # Its renewals end even when the stop itself fails.
+            if following is not None:
+                await following._end()
 
     # Skills of this computer's own, put on the lamp (the `skills` grant;
     # docs/control.md, "Skills pushed from a computer").

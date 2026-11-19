@@ -159,6 +159,20 @@ async fn admin(lamp: &Lamp, asked: Value) -> Value {
     serde_json::from_str(&line).unwrap()
 }
 
+/// A hold line without the holder it names (`"source":"control:CLIENT~LEASE"`,
+/// #7513), whose client id differs each run.
+fn plain(line: impl AsRef<str>) -> String {
+    let line = line.as_ref();
+    match line.find(r#","source":""#) {
+        Some(at) => {
+            let rest = &line[at + r#","source":""#.len()..];
+            let end = rest.find('"').map_or(rest.len(), |end| end + 1);
+            format!("{}{}", &line[..at], &rest[end..])
+        }
+        None => line.to_owned(),
+    }
+}
+
 #[tokio::test]
 async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
     let lamp = lamp("pair").await;
@@ -867,9 +881,15 @@ async fn a_body_lease_holds_the_body_and_the_bodys_end_is_told() {
         .unwrap();
     let (read, mut write) = stream.into_split();
     let mut lines = tokio::io::BufReader::new(read).lines();
-    assert_eq!(
-        lines.next_line().await.unwrap().unwrap(),
-        r#"{"hold":{"for_ms":30000}}"#
+    let hold = lines.next_line().await.unwrap().unwrap();
+    assert_eq!(plain(&hold), r#"{"hold":{"for_ms":30000}}"#);
+    // The hold names its holder by the source its motions carry (#7513).
+    let said: Value = serde_json::from_str(&hold).unwrap();
+    let source = said["hold"]["source"].as_str().unwrap();
+    assert!(
+        source.starts_with("control:c_")
+            && source.ends_with(&format!("~{}", take["lease"].as_str().unwrap())),
+        "{hold}"
     );
     write.write_all(b"{\"lease\":\"held\"}\n").await.unwrap();
     // A hand on the head: the body's end is the computer's.
@@ -939,7 +959,7 @@ async fn a_look_goes_on_the_bodys_lease_and_its_end_is_the_computers_done() {
     let (read, mut write) = stream.into_split();
     let mut lines = tokio::io::BufReader::new(read).lines();
     assert_eq!(
-        lines.next_line().await.unwrap().unwrap(),
+        plain(lines.next_line().await.unwrap().unwrap()),
         r#"{"hold":{"for_ms":30000}}"#
     );
     write.write_all(b"{\"lease\":\"held\"}\n").await.unwrap();
@@ -1031,7 +1051,7 @@ async fn a_waiting_look_ends_with_its_lease_and_never_goes_under_the_next() {
     let (read, _write) = stream.into_split();
     let mut lines = tokio::io::BufReader::new(read).lines();
     assert_eq!(
-        lines.next_line().await.unwrap().as_deref(),
+        lines.next_line().await.unwrap().map(plain).as_deref(),
         Some(r#"{"hold":{"for_ms":30000}}"#)
     );
     assert!(
@@ -1131,11 +1151,14 @@ async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
             .unwrap()
             .unwrap()
     }
-    assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
+    assert_eq!(
+        plain(line(&mut lines).await),
+        r#"{"hold":{"for_ms":30000}}"#
+    );
     let look = send(&mut socket, json!({"id": 5, "op": "look", "at": "hand"})).await;
     assert_eq!(look["ok"], true, "{look}");
     assert_eq!(
-        line(&mut lines).await,
+        plain(line(&mut lines).await),
         r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
     );
     // `stop` ends it, never rated as a look is (one motion a second), and
@@ -1255,13 +1278,13 @@ async fn a_follow_ends_with_its_clients_lease_and_never_passes_to_the_next_holde
     assert_eq!(send(&mut a, take(3)).await["lease"], "l_1");
     let (mut lines, _write) = accept().await;
     assert_eq!(
-        line(&mut lines).await.unwrap(),
+        plain(line(&mut lines).await.unwrap()),
         r#"{"hold":{"for_ms":30000}}"#
     );
     let look = send(&mut a, json!({"id": 4, "op": "look", "at": "hand"})).await;
     assert_eq!(look["ok"], true, "{look}");
     assert_eq!(
-        line(&mut lines).await.unwrap(),
+        plain(line(&mut lines).await.unwrap()),
         r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
     );
     // A's lease ends, and B takes the body at once.
@@ -1282,7 +1305,7 @@ async fn a_follow_ends_with_its_clients_lease_and_never_passes_to_the_next_holde
         // B took the body before a check saw it free.
         Some(said) => said.to_owned(),
     };
-    assert_eq!(first_for_b, r#"{"hold":{"for_ms":30000}}"#);
+    assert_eq!(plain(first_for_b), r#"{"hold":{"for_ms":30000}}"#);
 }
 
 /// Sixth's and Fourteen's P3s on #3900: a body that restarts (its end of the
@@ -1318,7 +1341,7 @@ async fn a_restarted_body_is_held_again_at_once_and_a_refused_hold_is_told() {
         let (read, write) = stream.into_split();
         let mut lines = tokio::io::BufReader::new(read).lines();
         assert_eq!(
-            lines.next_line().await.unwrap().unwrap(),
+            plain(lines.next_line().await.unwrap().unwrap()),
             r#"{"hold":{"for_ms":30000}}"#
         );
         (lines, write)
@@ -1371,7 +1394,7 @@ async fn a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease() {
         let (read, write) = stream.into_split();
         let mut lines = tokio::io::BufReader::new(read).lines();
         assert_eq!(
-            lines.next_line().await.unwrap().unwrap(),
+            plain(lines.next_line().await.unwrap().unwrap()),
             r#"{"hold":{"for_ms":30000}}"#
         );
         (lines, write)

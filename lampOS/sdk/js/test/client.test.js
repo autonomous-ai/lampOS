@@ -1327,7 +1327,12 @@ test('followHand stops when asked, at a stop, or when the lamp takes the body ba
     fake.loseLease(following.lease.id, 'hand');
     assert.deepEqual(await following.wait(), { how: 'cut_short', why: 'hand' });
     await following.stop();
-    assert.deepEqual(fake.asked('lease.release'), [{ lease: 'l_1' }, { lease: 'l_2' }]);
+    // The first is let go by its own stop; the second the lamp gave back at
+    // the client's stop (`lost` `released`, #7513), so its release may or
+    // may not still be sent; the third, lost to a hand, is never released.
+    const released = fake.asked('lease.release').map((ask) => ask.lease);
+    assert.equal(released[0], 'l_1');
+    assert.ok(released.every((lease) => lease === 'l_1' || lease === 'l_2'), String(released));
   });
 });
 

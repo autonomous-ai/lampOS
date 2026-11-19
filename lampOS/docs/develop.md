@@ -171,9 +171,11 @@ lamp's lease events (`lease.state`, `lease.lost_why`):
 | the privacy switch, a pause, or sleep | `lost` (`private`, `paused`, `asleep`); new takes are refused |
 | the owner takes it in the app, or revokes this computer | `lost` (`taken_by_owner_app`, `revoked`) |
 | the body gives way under load | `lost` (`slumped`) |
+| your own `lamp.stop()` | `lost` (`released`): each lease of yours that holds `body` is given back, and a move you sent under it eases back to rest |
 
 An act on a lost lease is refused with how it ended. `await lamp.stop()`
-ends this computer's own actions at once, and needs no grant.
+ends this computer's own actions at once, and needs no grant; take a lease
+again before the next `look`, `move` or `play`.
 
 **When the lamp restarts** (every update), the connection closes and
 `wait_closed()` returns. Connect again in a loop, with a few seconds'

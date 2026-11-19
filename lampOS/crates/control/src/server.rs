@@ -754,6 +754,20 @@ impl Shared {
             .map(str::to_owned)
     }
 
+    /// Who holds the protocol's `body` lease now, by the words its motions
+    /// carry as their source (`control:CLIENT~LEASE`,
+    /// [`crate::parts::source_under`]): the door's hold names its holder so,
+    /// and the body ends only the motions sent under the lease that ended
+    /// (#7513).
+    pub fn body_holder_source(&self) -> Option<String> {
+        let now = self.now_us();
+        let mut door = self.door.lock().expect("door");
+        let leases = door.leases();
+        let client = leases.holder(crate::protocol::Part::Body, now)?;
+        let lease = leases.holding(crate::protocol::Part::Body, now)?;
+        Some(crate::parts::source_under(client, Some(lease)))
+    }
+
     /// The `body` lease held now, by its id: a look asked under one is
     /// never sent under another (the Reviewer-lead's P3 on #4023).
     pub fn body_lease(&self) -> Option<String> {

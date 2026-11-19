@@ -1164,9 +1164,12 @@ export class Lamp {
     // it gives back (#7513) never reads as the reason.
     const following = this.following;
     if (following) following.end('cut_short', 'stop');
-    const reply = await this.act('stop', {});
-    if (following) await following.finish();
-    return reply;
+    try {
+      return await this.act('stop', {});
+    } finally {
+      // Its renewals end even when the stop itself fails.
+      if (following) await following.finish();
+    }
   }
 
   // Skills of this computer's own, put on the lamp (the `skills` grant;

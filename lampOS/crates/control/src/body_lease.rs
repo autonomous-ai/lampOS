@@ -296,24 +296,33 @@ pub struct Holding {
     asked_us: Option<u64>,
     /// Whether the last hold said to follow the hand.
     following: bool,
-    /// The client whose `body` lease the last hold was for.
-    for_client: Option<String>,
+    /// Whose `body` lease the last hold was for, by its motions' source
+    /// (`control:CLIENT~LEASE`): said with each hold.
+    for_holder: Option<String>,
 }
 
 impl Holding {
-    /// [`Self::step`] for the client holding `body` now, if any. A hold
-    /// handed from one client to another inside one check is let go first
-    /// (#7513): the body then ends the old holder's move, as it does at any
-    /// lease's end, and the next check takes the hold for the new one.
+    /// [`Self::step`] for the `body` lease held now, if any, by its
+    /// motions' source (`control:CLIENT~LEASE`). A hold handed to another
+    /// lease inside one check, another client's or the same client's
+    /// taken again (Twelve's HOLD on #7923), is let go first (#7513): the
+    /// body then ends the old lease's move, as it does at any lease's end,
+    /// and the next check takes the hold for the new one.
     pub fn step_for(&mut self, holder: Option<&str>, follow: bool, now_us: u64) -> Option<Say> {
         let handed =
-            self.asked_us.is_some() && holder.is_some() && self.for_client.as_deref() != holder;
-        self.for_client = holder.map(str::to_owned);
+            self.asked_us.is_some() && holder.is_some() && self.for_holder.as_deref() != holder;
+        self.for_holder = holder.map(str::to_owned);
         if handed {
             self.asked_us = None;
             return Some(Say::LetGo);
         }
         self.step(holder.is_some(), follow, now_us)
+    }
+
+    /// Whose `body` lease the door holds the body for, by its motions'
+    /// source.
+    pub fn holder(&self) -> Option<&str> {
+        self.for_holder.as_deref()
     }
 
     /// `wanted`: a computer holds the protocol's `body` lease now;
@@ -380,11 +389,16 @@ fn why_of(why: &str) -> Option<LeaseWhy> {
     })
 }
 
-fn line_of(say: &Say) -> String {
+fn line_of(say: &Say, holder: Option<&str>) -> String {
     match say {
-        Say::Hold { follow: false } => format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}}}}}\n"),
-        Say::Hold { follow: true } => {
-            format!("{{\"hold\":{{\"for_ms\":{HOLD_MS},\"follow\":\"hand\"}}}}\n")
+        Say::Hold { follow } => {
+            let follow = if *follow { r#","follow":"hand""# } else { "" };
+            // Whose lease it is, by its motions' source: the body ends only
+            // the motions sent under it when it ends (#7513).
+            let source = holder
+                .map(|holder| format!(r#","source":{}"#, serde_json::Value::from(holder)))
+                .unwrap_or_default();
+            format!("{{\"hold\":{{\"for_ms\":{HOLD_MS}{follow}{source}}}}}\n")
         }
         Say::LetGo => "{\"let_go\":true}\n".to_owned(),
     }
@@ -464,6 +478,7 @@ pub async fn hold(
             end_owed(&owed, &events, "reconnected");
         }
         let holder = shared.body_holder();
+        let holder_source = shared.body_holder_source();
         let wanted = holder.is_some();
         // A look still waiting when nobody holds `body` any more is the
         // old asker's, never a later holder's (the Reviewer-lead's P2 on
@@ -474,8 +489,11 @@ pub async fn hold(
             }
         }
         let following = follows(&mut follower.lock().expect("follower"), holder.as_deref());
-        let Some(say) = holding.step_for(holder.as_deref(), following, lamp_ipc::monotonic_us())
-        else {
+        let Some(say) = holding.step_for(
+            holder_source.as_deref(),
+            following,
+            lamp_ipc::monotonic_us(),
+        ) else {
             continue;
         };
         if writer.is_none() && matches!(say, Say::Hold { .. }) {
@@ -538,7 +556,9 @@ pub async fn hold(
         let Some(write) = writer.as_mut() else {
             continue;
         };
-        let mut sent = write.write_all(line_of(&say).as_bytes()).await;
+        let mut sent = write
+            .write_all(line_of(&say, holding.holder()).as_bytes())
+            .await;
         if sent.is_ok() && matches!(say, Say::Hold { .. }) {
             // Only those asked under the lease that holds the body now: one
             // let go and taken again inside a check is another lease.
@@ -595,24 +615,42 @@ mod tests {
 
     const S: u64 = 1_000_000;
 
-    /// #7513: the body's lease handed from one client to another inside
-    /// one check is let go first, so the body ends the old holder's move,
-    /// then held for the new one at the next check; the same client renews
-    /// as before.
+    /// #7513: the body's lease handed to another lease inside one check,
+    /// another client's or the same client's taken again (Twelve's HOLD on
+    /// #7923), is let go first, so the body ends the old lease's move, then
+    /// held for the new one at the next check, its hold naming the new
+    /// holder; the same lease renews as before.
     #[test]
-    fn a_hold_handed_to_another_client_is_let_go_first() {
+    fn a_hold_handed_to_another_lease_is_let_go_first() {
         let hold = Some(Say::Hold { follow: false });
+        let (a1, b2, a3) = ("control:c_a~l_1", "control:c_b~l_2", "control:c_a~l_3");
         let mut holding = Holding::default();
-        assert_eq!(holding.step_for(Some("c_a"), false, S), hold);
-        assert_eq!(holding.step_for(Some("c_a"), false, 2 * S), None);
+        assert_eq!(holding.step_for(Some(a1), false, S), hold);
         assert_eq!(
-            holding.step_for(Some("c_b"), false, 3 * S),
-            Some(Say::LetGo)
+            line_of(&Say::Hold { follow: false }, holding.holder()),
+            "{\"hold\":{\"for_ms\":30000,\"source\":\"control:c_a~l_1\"}}\n"
         );
-        assert_eq!(holding.step_for(Some("c_b"), false, 3 * S + 250_000), hold);
-        assert_eq!(holding.step_for(Some("c_b"), false, 4 * S), None);
-        assert_eq!(holding.step_for(None, false, 5 * S), Some(Say::LetGo));
-        assert_eq!(holding.step_for(Some("c_a"), false, 6 * S), hold);
+        assert_eq!(holding.step_for(Some(a1), false, 2 * S), None);
+        assert_eq!(holding.step_for(Some(b2), false, 3 * S), Some(Say::LetGo));
+        assert_eq!(holding.step_for(Some(b2), false, 3 * S + 250_000), hold);
+        assert_eq!(holding.holder(), Some(b2));
+        assert_eq!(holding.step_for(Some(b2), false, 4 * S), None);
+        // The same client, let go and taken again inside one check.
+        assert_eq!(holding.step_for(Some(a3), false, 5 * S), Some(Say::LetGo));
+        assert_eq!(holding.step_for(Some(a3), false, 5 * S + 250_000), hold);
+        assert_eq!(holding.step_for(None, false, 6 * S), Some(Say::LetGo));
+        assert_eq!(holding.step_for(Some(a1), false, 7 * S), hold);
+    }
+
+    /// A motion's source names the lease its client holds, as the hold
+    /// names its holder; with none it is the client's alone (#7513).
+    #[test]
+    fn a_motions_source_names_its_clients_body_lease() {
+        assert_eq!(
+            crate::parts::source_under("c_1", Some("l_4")),
+            "control:c_1~l_4"
+        );
+        assert_eq!(crate::parts::source_under("c_1", None), "control:c_1");
     }
 
     #[test]
@@ -630,10 +668,10 @@ mod tests {
         holding.gone();
         assert_eq!(holding.step(true, false, 15 * S), hold);
         assert_eq!(
-            line_of(&Say::Hold { follow: false }),
+            line_of(&Say::Hold { follow: false }, None),
             "{\"hold\":{\"for_ms\":30000}}\n".to_owned()
         );
-        assert_eq!(line_of(&Say::LetGo), "{\"let_go\":true}\n".to_owned());
+        assert_eq!(line_of(&Say::LetGo, None), "{\"let_go\":true}\n".to_owned());
     }
 
     /// The local leader's P3: A follows, A's lease ends and B takes the body
@@ -673,7 +711,7 @@ mod tests {
         holding.gone();
         assert_eq!(holding.step(true, true, 13 * S + 250_000), follow);
         assert_eq!(
-            line_of(&Say::Hold { follow: true }),
+            line_of(&Say::Hold { follow: true }, None),
             "{\"hold\":{\"for_ms\":30000,\"follow\":\"hand\"}}\n".to_owned()
         );
     }

@@ -174,6 +174,11 @@ impl Said {
 #[serde(deny_unknown_fields)]
 struct Hold {
     for_ms: u64,
+    /// Whose lease it is, by the source its motions carry
+    /// (`control:CLIENT~LEASE`, #7513): the body ends only those when it
+    /// ends. Left out, no motion is the lease's.
+    #[serde(default)]
+    source: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -188,6 +193,8 @@ struct Asked {
 pub struct Lease {
     until: Option<Instant>,
     suspended: bool,
+    /// Whose it is, by its motions' source, as its last hold said (#7513).
+    holder: Option<crate::moves::Source>,
 }
 
 impl Lease {
@@ -201,12 +208,13 @@ impl Lease {
                 self.end();
                 Said::FREE
             }
-            (Some(Hold { for_ms }), None) if (1..=MOST_MS).contains(&for_ms) => {
+            (Some(Hold { for_ms, source }), None) if (1..=MOST_MS).contains(&for_ms) => {
                 if let Some(why) = around.ends() {
                     self.end();
                     return Said::lost(why);
                 }
                 self.until = Some(now + Duration::from_millis(for_ms));
+                self.holder = source.as_deref().and_then(crate::moves::Source::new);
                 self.suspended = around.conversation;
                 if self.suspended {
                     Said::SUSPENDED
@@ -252,10 +260,18 @@ impl Lease {
         self.until.is_some()
     }
 
+    /// Whose lease is taken, by its motions' source, while it is taken
+    /// (held or suspended): the body ends only those motions when it ends
+    /// (#7513).
+    pub fn holder(&self) -> Option<crate::moves::Source> {
+        self.holder.filter(|_| self.taken())
+    }
+
     /// Given back, or its holder gone.
     pub fn end(&mut self) {
         self.until = None;
         self.suspended = false;
+        self.holder = None;
     }
 }
 

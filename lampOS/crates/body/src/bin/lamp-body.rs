@@ -2692,7 +2692,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 unplug: false,
                 held_by_test: false,
                 held: false,
-                leased: false,
+                leased: None,
                 aim: None,
                 pose: None,
                 limp: false,
@@ -2786,7 +2786,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             still: true,
                             expression: None,
                             held: true,
-                            leased: true,
+                            leased: door.lease.holder(),
                             aim: door.aim(now),
                             pose: door.pose(now),
                             limp: door.limp(now),
@@ -2797,7 +2797,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                         // Suspended for a conversation, still taken: a
                         // move under it is still its (#7513).
                         lamp_body::body::Asked {
-                            leased: door.lease.taken(),
+                            leased: door.lease.holder(),
                             ..asked
                         }
                     }

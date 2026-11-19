@@ -212,6 +212,19 @@ pub fn from_control(source: &str) -> bool {
     source.starts_with("control:") || source.starts_with("lamp-control/control:")
 }
 
+/// Whether a motion asked by `by` was sent under the lease lamp-control
+/// holds the body for, named `holder` by its hold (`control:CLIENT~LEASE`,
+/// #7513): the same words, or those words as `--caller-caps` names them
+/// after the unit that sent them (`lamp-control/control:…`).
+pub fn under_lease(by: Option<Source>, holder: Option<Source>) -> bool {
+    let (Some(by), Some(holder)) = (by, holder) else {
+        return false;
+    };
+    let by = by.as_str();
+    let holder = holder.as_str();
+    from_control(holder) && (by == holder || by.strip_prefix("lamp-control/") == Some(holder))
+}
+
 /// Why a gesture playing was ended for a `replace` one: it eases out from
 /// where it is, and the new one plays after.
 pub const REPLACED: &str = "ended: replaced by a newer motion";

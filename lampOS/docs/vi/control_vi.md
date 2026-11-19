@@ -46,11 +46,14 @@ và thoát với mã 0.
   lease.
 - **`stop`:** chấm dứt các hành động của chính máy khách, và trả lại trọn mỗi lease
   của chính nó có giữ `body`, cùng các phần khác trong lease đó (`Leases::give_back`, báo một lần là `lost`
-  `released`; #7513). Một cử động thuộc về lease đã gửi nó: khi lease đó
+  `released`; #7513). Một cử động thuộc về lease đã gửi nó (nguồn của nó là
+  `control:CLIENT~LEASE`, lệnh giữ thân đèn cũng nêu đúng tên đó): khi lease đó
   kết thúc (`stop`, buông, kết nối đóng hay hết hạn), thân đèn dừng cử động
   ngay và từ từ trở về tư thế nghỉ (`ended: its lease ended`), không giật,
-  không gập. Cử động riêng của đèn (kỹ năng, giọng nói, Expression) không
-  thuộc lease nào và vẫn chạy tiếp. Lease của máy khách khác không bao giờ
+  không gập. Cử động riêng của đèn (kỹ năng, giọng nói, Expression), cử động
+  của lease khác hay cử động gửi khi không giữ lease đều không bị dừng. Khi
+  lease đổi sang lease khác (máy khác, hay chính máy đó lấy lại) trong một
+  lần kiểm, lamp-control buông trước rồi mới giữ cho lease mới. Lease của máy khách khác không bao giờ
   bị đụng tới.
 - **`say`:** lời được đọc đúng như gửi, qua dịch vụ giọng nói của đèn, phải
   dựng xong trọn câu trong 5 s với câu đến 120 ký tự, thêm 1 s cho mỗi 30 ký

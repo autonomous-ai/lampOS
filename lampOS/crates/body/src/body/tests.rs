@@ -4139,7 +4139,7 @@ fn gesture_run_full(
                 unplug: false,
                 held_by_test: false,
                 held: looking.is_some_and(|(from, _)| time.get() >= from),
-                leased: looking.is_some_and(|(from, _)| time.get() >= from),
+                leased: None,
                 aim: looking.map(|(_, yaw)| [yaw, 0.0]),
                 limp: false,
                 unseat: false,
@@ -4274,7 +4274,7 @@ fn expression_run_with(
             unplug: false,
             held_by_test: false,
             held: false,
-            leased: false,
+            leased: None,
             aim: None,
             limp: false,
             unseat: false,
@@ -4450,7 +4450,7 @@ fn speaking_run_with(
             unplug: false,
             held_by_test: false,
             held: false,
-            leased: false,
+            leased: None,
             aim: None,
             limp: false,
             unseat: false,
@@ -5169,7 +5169,7 @@ fn rest_glances_watched(
             unplug: false,
             held_by_test: false,
             held: false,
-            leased: false,
+            leased: None,
             aim: None,
             limp: false,
             unseat: false,
@@ -6251,7 +6251,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             unplug: false,
             held_by_test: false,
             held: false,
-            leased: false,
+            leased: None,
             aim: None,
             limp: false,
             unseat: false,
@@ -6328,7 +6328,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             unplug: false,
             held_by_test: false,
             held: false,
-            leased: false,
+            leased: None,
             aim: None,
             limp: false,
             unseat: false,
@@ -6423,7 +6423,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 unplug: false,
                 held_by_test: false,
                 held: false,
-                leased: false,
+                leased: None,
                 aim: None,
                 limp: false,
                 unseat: false,
@@ -7204,7 +7204,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     unplug: false,
                     held_by_test: false,
                     held: false,
-                    leased: false,
+                    leased: None,
                     aim: None,
                     limp: false,
                     unseat: false,
@@ -7294,7 +7294,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 unplug: false,
                 held_by_test: false,
                 held: false,
-                leased: false,
+                leased: None,
                 aim: None,
                 limp: false,
                 unseat: false,
@@ -7391,7 +7391,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 unplug: false,
                 held_by_test: false,
                 held: false,
-                leased: false,
+                leased: None,
                 aim: None,
                 limp: false,
                 unseat: false,
@@ -10396,7 +10396,7 @@ fn called_run(
                 unplug: false,
                 held_by_test: false,
                 held: false,
-                leased: false,
+                leased: None,
                 aim: None,
                 limp: false,
                 unseat: false,
@@ -19095,12 +19095,12 @@ fn replace_run_in(
 }
 
 /// As [`replace_run`], lamp-control's lease held until `held_until` and
-/// taken (held, or suspended for a conversation) until `leased_until`
-/// (#7513).
+/// taken (held, or suspended for a conversation) by `holder(now)`, by its
+/// motions' source (#7513).
 fn lease_run(
     asks: Vec<ReplaceAsk>,
     held_until: Duration,
-    leased_until: Duration,
+    holder: impl Fn(Duration) -> Option<&'static str> + 'static,
     seconds: u64,
 ) -> (BodyReport, Fated, Vec<Step>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
@@ -19126,7 +19126,7 @@ fn lease_run(
             let now = time.get();
             let lease = Asked {
                 held: now < held_until,
-                leased: now < leased_until,
+                leased: holder(now).and_then(Source::new),
                 ..Asked::default()
             };
             match asks.front() {
@@ -19167,10 +19167,15 @@ fn a_computers_move_ends_when_its_lease_ends_and_eases_back_to_rest() {
         ms(8_000),
         &crate::clips::STRETCHING,
         Priority::Skill,
-        Some("control:c_1"),
+        Some("control:c_1~l_1"),
     )];
     let end = ms(9_200);
-    let (_, fates, seen) = lease_run(asks, end, end, 14);
+    let (_, fates, seen) = lease_run(
+        asks,
+        end,
+        move |now| (now < ms(9_200)).then_some("control:c_1~l_1"),
+        14,
+    );
     assert_eq!(
         fates,
         [
@@ -19220,26 +19225,123 @@ fn a_computers_move_ends_when_its_lease_ends_and_eases_back_to_rest() {
 #[test]
 fn a_lease_ending_or_suspended_ends_no_move_of_the_lamps_own() {
     let ms = Duration::from_millis;
+    let until = move |now: Duration| (now < ms(9_200)).then_some("control:c_1~l_1");
     let own = vec![(ms(8_000), &crate::clips::STRETCHING, Priority::Skill, None)];
-    let (_, fates, seen) = lease_run(own, ms(9_200), ms(9_200), 14);
+    let (_, fates, seen) = lease_run(own, ms(9_200), until, 14);
     assert_eq!(fates, [("stretching", "taken: it plays")]);
     let after = seen.iter().position(|step| step.0 >= ms(9_400)).unwrap();
     assert_eq!(seen[after].1, Some("stretching"));
+    // A computer's gesture sent under no lease (Twelve's P3 on #7923),
+    // while another's lease is taken, is never that lease's.
+    let unleased = vec![(
+        ms(8_000),
+        &crate::clips::STRETCHING,
+        Priority::Skill,
+        Some("control:c_2"),
+    )];
+    let (_, fates, _) = lease_run(unleased, ms(9_200), until, 14);
+    assert_eq!(fates, [("stretching", "taken: it plays")]);
     // Held, then suspended (taken, not held) past the move's end: the
     // computer's move is never ended by its lease.
     let computers = vec![(
         ms(8_000),
         &crate::clips::STRETCHING,
         Priority::Skill,
-        Some("control:c_1"),
+        Some("lamp-control/control:c_1~l_1"),
     )];
-    let (_, fates, _) = lease_run(computers, ms(9_200), ms(30_000), 14);
+    let (_, fates, _) = lease_run(
+        computers,
+        ms(9_200),
+        move |now| (now < ms(30_000)).then_some("control:c_1~l_1"),
+        14,
+    );
     assert!(
         fates
             .iter()
             .all(|(_, why)| *why != crate::moves::ENDED_BY_LEASE),
         "{fates:?}"
     );
+}
+
+/// #7513 (Twelve's HOLD on #7923): a lease let go and taken again by the
+/// same client, the body held throughout, is another lease: the move sent
+/// under the first ends and eases back, as at any lease's end.
+#[test]
+fn a_lease_taken_again_by_the_same_client_ends_the_first_ones_move() {
+    let ms = Duration::from_millis;
+    let asks = vec![(
+        ms(8_000),
+        &crate::clips::STRETCHING,
+        Priority::Skill,
+        Some("control:c_1~l_1"),
+    )];
+    let (_, fates, seen) = lease_run(
+        asks,
+        ms(30_000),
+        move |now| {
+            Some(if now < ms(9_200) {
+                "control:c_1~l_1"
+            } else {
+                "control:c_1~l_2"
+            })
+        },
+        14,
+    );
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it plays"),
+            ("stretching", crate::moves::ENDED_BY_LEASE),
+        ]
+    );
+    let after = seen.iter().position(|step| step.0 >= ms(9_400)).unwrap();
+    assert!(seen[after..].iter().all(|step| step.1.is_none()));
+}
+
+/// #7513 (Twelve's HOLD on #7923): on a hand-over, the new holder's move
+/// sent before the body is told of its hold (the old one still taken) is
+/// never the old lease's: the old one's move ends with its lease, the new
+/// one's plays on under its own.
+#[test]
+fn a_hand_over_ends_the_old_leases_move_and_plays_the_new_ones() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (
+            ms(8_000),
+            &crate::clips::STRETCHING,
+            Priority::Skill,
+            Some("control:c_1~l_1"),
+        ),
+        (
+            ms(9_000),
+            &crate::clips::STRETCHING,
+            Priority::Skill,
+            Some("control:c_2~l_2"),
+        ),
+    ];
+    let (_, fates, seen) = lease_run(
+        asks,
+        ms(30_000),
+        move |now| {
+            if now < ms(9_400) {
+                Some("control:c_1~l_1")
+            } else if now < ms(9_650) {
+                None
+            } else {
+                Some("control:c_2~l_2")
+            }
+        },
+        16,
+    );
+    assert!(
+        fates
+            .iter()
+            .all(|(_, why)| *why != crate::moves::ENDED_BY_LEASE
+                && *why != crate::moves::DROPPED_BY_LEASE),
+        "{fates:?}"
+    );
+    let after = seen.iter().position(|step| step.0 >= ms(9_800)).unwrap();
+    assert_eq!(seen[after].1, Some("stretching"), "{fates:?}");
 }
 
 /// A paired computer's new motion (`replace`, at `skill`) asked while a
