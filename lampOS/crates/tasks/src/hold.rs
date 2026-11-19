@@ -72,6 +72,17 @@ pub const GRID_BIN: &str = "HARNESS_GRID_BIN";
 pub const CURRENT_GRID: &str = ".harness/runtime/current-grid";
 /// The folder that path must be in, under Harness's home.
 const RUNTIME: &str = ".harness/runtime";
+/// The variable naming Harness's data folder, and its value under
+/// Harness's home (#7906). Harness 0.6.72 (openharness#4469) moves
+/// `~/.harness` into the XDG folders at a daemon start, unless a name in its
+/// `OVERRIDE_NAMES` (`homeMove/conditions.ts`) points inside `~/.harness`,
+/// read from the process and from its `HARNESS_ENV_FILE` (`withEnvFile`):
+/// then it is `skipped-override` and `harnessPath()` stays `~/.harness`.
+/// This one is in that list, and in the names a `harness start` carries
+/// into its user unit (`lib/platformDaemon.ts` `CARRIED_ENV`). The value is
+/// Harness's own default (`config/env.ts`), so nothing moves and the
+/// daemon's socket name and pane tags, which hash it, stay the same.
+pub use lamp_msgs::harness_hold::{DATA_DIR, HARNESS_DATA};
 /// `LAMP_HERMES_ON_LAMP` (#5978): the variable Harness finds Hermes'
 /// sessions by (openharness `config/env.ts`, `engines/hermes/home.ts`).
 /// With the switch it is in the file too, and given to every Harness
@@ -102,6 +113,34 @@ const HEALTH_EVERY: Duration = Duration::from_millis(500);
 const ASK_WITHIN: Duration = Duration::from_secs(2);
 /// The longest answer read.
 const MOST_ANSWER: u64 = 16 * 1024;
+
+/// `<home>/.harness/cli/data` ([`HARNESS_DATA`]), exactly, for [`DATA_DIR`]
+/// (#7906): `None` unless `home` is a plain absolute path with no `..`, no
+/// `.` and no trailing `/`, so the one spelling Harness hashes is given.
+pub fn data_dir(home: &Path) -> Option<String> {
+    let text = home.to_str()?;
+    let plain = text.len() > 1
+        && !text.contains(['\n', '\0', '"'])
+        && text
+            .strip_prefix('/')
+            .is_some_and(|rest| rest.split('/').all(|part| !matches!(part, "" | "." | "..")));
+    plain.then(|| format!("{text}/{HARNESS_DATA}"))
+}
+
+/// `environment` with [`DATA_DIR`] at [`data_dir`] of its `HOME` (#7906),
+/// so a Harness command, and a daemon it starts, keeps Harness's home in
+/// `~/.harness`. A value already set is kept; nothing is added with no
+/// plain absolute `HOME`.
+pub fn with_data_dir(mut environment: BTreeMap<String, OsString>) -> BTreeMap<String, OsString> {
+    if !environment.contains_key(DATA_DIR)
+        && let Some(data) = environment
+            .get("HOME")
+            .and_then(|home| data_dir(Path::new(home)))
+    {
+        environment.insert(DATA_DIR.into(), data.into());
+    }
+    environment
+}
 
 /// `on` exactly.
 pub fn on(value: Option<&str>) -> bool {
@@ -178,6 +217,7 @@ pub fn env_file_changed(
         "OPENCLAW_STATE_DIR is not a plain absolute path",
     )?;
     let grid = hold.then(|| pinned_grid(&home)).flatten();
+    let data = data_dir(&home).ok_or("HOME is not a plain absolute path")?;
     let mut text = String::new();
     if hold {
         text.push_str(TEXT);
@@ -195,10 +235,14 @@ pub fn env_file_changed(
     if lamp_engine {
         text.push_str(&format!("{SHELL}={LAUNCH_SHELL}\n"));
     }
+    // Harness's home kept in `~/.harness` (#7906), read by the daemon
+    // through this file even when it is started without the variable.
+    text.push_str(&format!("{DATA_DIR}={data}\n"));
     let path = home.join(FILE);
     let changed = !matches!(fs::read(&path), Ok(was) if was == text.as_bytes());
     write_whole(&path, text.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))?;
     environment.insert(ENV_FILE.into(), path.clone().into());
+    environment.insert(DATA_DIR.into(), data.into());
     if hold {
         environment.insert(DISABLE.into(), "true".into());
     }
@@ -275,8 +319,8 @@ fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// before it, that line taken out first too. The `exec` line and every
 /// other line are kept as they are, so a launcher already pinned comes back
 /// byte for byte. `None` when there is no `exec` line.
-pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
-    launcher_shaped(text, Some(env_file))
+pub fn pinned_launcher(text: &str, env_file: &str, data: &str) -> Option<String> {
+    launcher_shaped(text, Some(env_file), data)
 }
 
 /// `text`, a Harness launcher, with the hold taken out (#6300): every
@@ -285,11 +329,15 @@ pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
 /// so Harness's own `update` runs on a canary lamp, every other line kept, so one
 /// with neither comes back byte for byte. `None` when there is no `exec`
 /// line.
-pub fn unpinned_launcher(text: &str) -> Option<String> {
-    launcher_shaped(text, None)
+pub fn unpinned_launcher(text: &str, data: &str) -> Option<String> {
+    launcher_shaped(text, None, data)
 }
 
-fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
+/// In both shapes, `export ADAPTER_DATA_DIR=<data>` ([`DATA_DIR`], #7906)
+/// just before the `exec` line, any earlier one taken out, so every
+/// Harness command, by hand too, and a daemon it starts keep Harness's home
+/// in `~/.harness`.
+fn launcher_shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<String> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let exec = lines
         .iter()
@@ -299,6 +347,7 @@ fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text.starts_with(&format!("export {DATA_DIR}="))
             || line_text == REFUSE_UPDATE
         {
             continue;
@@ -311,6 +360,7 @@ fn launcher_shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         pinned.push_str(REFUSE_UPDATE);
         pinned.push('\n');
     }
+    pinned.push_str(&format!("export {DATA_DIR}={data}\n"));
     for line in &lines[exec..] {
         pinned.push_str(line);
     }
@@ -334,18 +384,22 @@ pub enum Launcher {
 /// is not written; a missing one is not made. An error, with the launcher
 /// unchanged, when it is not a plain file, has no `exec` line, or cannot be
 /// written.
-pub fn pin_launcher(launcher: &Path, env_file: &Path) -> Result<Launcher, String> {
-    shape_launcher(launcher, Some(env_file))
+pub fn pin_launcher(launcher: &Path, env_file: &Path, data: &str) -> Result<Launcher, String> {
+    shape_launcher(launcher, Some(env_file), data)
 }
 
 /// The launcher at `launcher` with the hold taken out
 /// ([`unpinned_launcher`]), written as [`pin_launcher`] writes it: one with
 /// no hold is not written, a missing one is not made (#6300).
-pub fn unpin_launcher(launcher: &Path) -> Result<Launcher, String> {
-    shape_launcher(launcher, None)
+pub fn unpin_launcher(launcher: &Path, data: &str) -> Result<Launcher, String> {
+    shape_launcher(launcher, None, data)
 }
 
-fn shape_launcher(launcher: &Path, env_file: Option<&Path>) -> Result<Launcher, String> {
+fn shape_launcher(
+    launcher: &Path,
+    env_file: Option<&Path>,
+    data: &str,
+) -> Result<Launcher, String> {
     let said = |error: &dyn std::fmt::Display| format!("{}: {error}", launcher.display());
     let metadata = match fs::symlink_metadata(launcher) {
         Ok(metadata) => metadata,
@@ -369,7 +423,7 @@ fn shape_launcher(launcher: &Path, env_file: Option<&Path>) -> Result<Launcher, 
         })
         .transpose()?;
     let text = fs::read_to_string(launcher).map_err(|error| said(&error))?;
-    let pinned = launcher_shaped(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
+    let pinned = launcher_shaped(&text, env_file, data).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Launcher::Kept);
     }
@@ -417,8 +471,13 @@ pub fn pin_at_start(hold: HarnessHold, home: Option<&Path>) -> Option<String> {
         return Some("tasks: Harness's launcher not pinned: no absolute HOME".to_owned());
     };
     let launcher = home.join(LAUNCHER);
+    let Some(data) = data_dir(home) else {
+        return Some(
+            "tasks: Harness's launcher not pinned: HOME is not a plain absolute path".to_owned(),
+        );
+    };
     if hold == HarnessHold::Lifted {
-        return Some(match unpin_launcher(&launcher) {
+        return Some(match unpin_launcher(&launcher, &data) {
             Ok(Launcher::Written) => format!(
                 "tasks: Harness's launcher unpinned (the lamp-voice feed's canary, #6300): {}",
                 launcher.display()
@@ -434,7 +493,7 @@ pub fn pin_at_start(hold: HarnessHold, home: Option<&Path>) -> Option<String> {
             Err(why) => format!("tasks: Harness's launcher not unpinned: {why}"),
         });
     }
-    Some(match pin_launcher(&launcher, &home.join(FILE)) {
+    Some(match pin_launcher(&launcher, &home.join(FILE), &data) {
         Ok(Launcher::Written) => format!(
             "tasks: Harness's launcher pinned ({DISABLE}=true and {ENV_FILE} exported before its exec line): {}",
             launcher.display()
@@ -632,17 +691,49 @@ mod tests {
         environment.insert("HOME".to_owned(), OsString::from(home.path()));
         let path = hold(&mut environment).unwrap();
         assert_eq!(path, home.path().join(FILE));
-        assert_eq!(fs::read_to_string(&path).unwrap(), TEXT);
+        let want = format!("{TEXT}{}", data_line(home.path()));
+        assert_eq!(fs::read_to_string(&path).unwrap(), want);
         assert_eq!(
             fs::metadata(&path).unwrap().permissions().mode() & 0o777,
             0o600
         );
         assert_eq!(environment[DISABLE], OsString::from("true"));
         assert_eq!(environment[ENV_FILE], OsString::from(&path));
+        // #7906: Harness's home kept in ~/.harness, its own default exactly.
+        assert_eq!(
+            environment[DATA_DIR],
+            OsString::from(format!("{}/.harness/cli/data", home.path().display()))
+        );
         // Again: the same file, whole.
         fs::write(&path, "ADAPTER_UPDATE_DISABLE=false\n").unwrap();
         hold(&mut environment).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), TEXT);
+        assert_eq!(fs::read_to_string(&path).unwrap(), want);
+    }
+
+    /// #7906: Harness's data folder given exactly as Harness spells its own
+    /// default, and never for a `HOME` it would spell otherwise.
+    #[test]
+    fn harnesss_data_folder_is_its_own_default_exactly() {
+        assert_eq!(
+            data_dir(Path::new("/var/lib/lampos-tasks")).as_deref(),
+            Some("/var/lib/lampos-tasks/.harness/cli/data")
+        );
+        for odd in [
+            "relative",
+            "/",
+            "/var/lib/",
+            "/var/../lib",
+            "/var/./lib",
+            "//var/lib",
+        ] {
+            assert_eq!(data_dir(Path::new(odd)), None, "{odd}");
+        }
+        let given = with_data_dir(BTreeMap::from([(
+            "HOME".to_owned(),
+            OsString::from("/var/lib/lampos-tasks"),
+        )]));
+        assert_eq!(given[DATA_DIR], "/var/lib/lampos-tasks/.harness/cli/data");
+        assert!(!with_data_dir(BTreeMap::new()).contains_key(DATA_DIR));
     }
 
     #[test]
@@ -657,27 +748,43 @@ mod tests {
     /// Harness's launcher as its installer writes it without `--no-updates`.
     const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     /// The same, pinned.
-    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     const ENV_AT: &str = "/var/lib/lampos-tasks/harness-hold.env";
+    /// Harness's data folder on the lamp (#7906), and its launcher line.
+    const DATA_AT: &str = "/var/lib/lampos-tasks/.harness/cli/data";
+    const DATA_LINE: &str = "export ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\n";
+
+    /// [`UNPINNED`] with the hold lifted: only the data folder exported.
+    fn lifted() -> String {
+        UNPINNED.replace("\nexec ", &format!("\n{DATA_LINE}exec "))
+    }
+
+    /// The env file's line for Harness's data folder under `home` (#7906).
+    fn data_line(home: &Path) -> String {
+        format!("ADAPTER_DATA_DIR={}/.harness/cli/data\n", home.display())
+    }
 
     #[test]
     fn the_launcher_text_is_harnesss_pinned_shape_and_keeps_its_exec_line() {
-        assert_eq!(pinned_launcher(UNPINNED, ENV_AT).unwrap(), PINNED);
+        assert_eq!(pinned_launcher(UNPINNED, ENV_AT, DATA_AT).unwrap(), PINNED);
         // Already pinned: byte for byte.
-        assert_eq!(pinned_launcher(PINNED, ENV_AT).unwrap(), PINNED);
+        assert_eq!(pinned_launcher(PINNED, ENV_AT, DATA_AT).unwrap(), PINNED);
         // Harness's own `--no-updates` preamble, or a hold set otherwise,
         // comes back as the one pinned shape, once.
         let other = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=false\nexec node cli.js \"$@\"\n";
         assert_eq!(
-            pinned_launcher(other, ENV_AT).unwrap(),
+            pinned_launcher(other, ENV_AT, DATA_AT).unwrap(),
             format!(
-                "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE={ENV_AT}\n{REFUSE_UPDATE}\nexec node cli.js \"$@\"\n"
+                "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE={ENV_AT}\n{REFUSE_UPDATE}\n{DATA_LINE}exec node cli.js \"$@\"\n"
             )
         );
         // An exec line Harness's update rewrote is kept as it is.
         let updated = PINNED.replace("0.5.39", "0.5.57");
-        assert_eq!(pinned_launcher(&updated, ENV_AT).unwrap(), updated);
-        assert_eq!(pinned_launcher("#!/bin/sh\necho hi\n", ENV_AT), None);
+        assert_eq!(pinned_launcher(&updated, ENV_AT, DATA_AT).unwrap(), updated);
+        assert_eq!(
+            pinned_launcher("#!/bin/sh\necho hi\n", ENV_AT, DATA_AT),
+            None
+        );
     }
 
     /// #5957: the pinned launcher, run by `/bin/sh` as Harness's is,
@@ -686,7 +793,8 @@ mod tests {
     /// too. Unpinned, the line goes with the hold.
     #[test]
     fn the_pinned_launcher_refuses_harness_update_and_runs_the_rest() {
-        let launcher = pinned_launcher("#!/bin/sh\nexec echo ran \"$@\"\n", ENV_AT).unwrap();
+        let launcher =
+            pinned_launcher("#!/bin/sh\nexec echo ran \"$@\"\n", ENV_AT, DATA_AT).unwrap();
         let run = |args: &[&str]| {
             std::process::Command::new("/bin/sh")
                 .arg("-c")
@@ -721,8 +829,8 @@ mod tests {
             assert_eq!(String::from_utf8_lossy(&out.stdout), said);
         }
         assert_eq!(
-            unpinned_launcher(&launcher).unwrap(),
-            "#!/bin/sh\nexec echo ran \"$@\"\n"
+            unpinned_launcher(&launcher, DATA_AT).unwrap(),
+            format!("#!/bin/sh\n{DATA_LINE}exec echo ran \"$@\"\n")
         );
     }
 
@@ -744,7 +852,10 @@ mod tests {
             line.starts_with("tasks: Harness's launcher pinned ("),
             "{line}"
         );
-        let want = PINNED.replace(ENV_AT, &home.path().join(FILE).to_string_lossy());
+        let data = data_dir(home.path()).unwrap();
+        let want = PINNED
+            .replace(ENV_AT, &home.path().join(FILE).to_string_lossy())
+            .replace(DATA_AT, &data);
         assert_eq!(fs::read_to_string(&launcher).unwrap(), want);
         assert_eq!(
             fs::metadata(&launcher).unwrap().permissions().mode() & 0o777,
@@ -759,7 +870,7 @@ mod tests {
         );
         assert_eq!(fs::read_to_string(&launcher).unwrap(), want);
         assert_eq!(
-            pin_launcher(&launcher, &home.path().join(FILE)),
+            pin_launcher(&launcher, &home.path().join(FILE), &data),
             Ok(Launcher::Kept)
         );
     }
@@ -932,8 +1043,9 @@ mod tests {
             .unwrap();
             let text = fs::read_to_string(&path).unwrap();
             let want = format!(
-                "{}HERMES_HOME=/var/lib/lampos-hermes/.hermes\nSHELL=/bin/sh\n",
-                if hold { TEXT } else { "" }
+                "{}HERMES_HOME=/var/lib/lampos-hermes/.hermes\nSHELL=/bin/sh\n{}",
+                if hold { TEXT } else { "" },
+                data_line(home.path())
             );
             assert_eq!(text, want, "hold {hold}");
             assert_eq!(environment[HERMES_HOME], "/var/lib/lampos-hermes/.hermes");
@@ -944,7 +1056,10 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
         hold(&mut environment).unwrap();
-        assert_eq!(fs::read_to_string(home.path().join(FILE)).unwrap(), TEXT);
+        assert_eq!(
+            fs::read_to_string(home.path().join(FILE)).unwrap(),
+            format!("{TEXT}{}", data_line(home.path()))
+        );
         assert!(!environment.contains_key(HERMES_HOME));
         assert!(!environment.contains_key(SHELL));
         assert!(env_file(&mut environment, false, Some(Path::new("relative")), None).is_err());
@@ -972,7 +1087,10 @@ mod tests {
             let mut environment =
                 BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
             let path = env_file(&mut environment, false, hermes_home, Some(state)).unwrap();
-            assert_eq!(fs::read_to_string(&path).unwrap(), want);
+            assert_eq!(
+                fs::read_to_string(&path).unwrap(),
+                format!("{want}{}", data_line(home.path()))
+            );
             assert_eq!(
                 environment[OPENCLAW_STATE_DIR],
                 "/var/lib/lampos-openclaw/state"
@@ -1031,10 +1149,16 @@ mod tests {
         pin_at_start(hold, Some(home.path())).unwrap();
         environment.remove("HOME");
         let env_at = home.path().join(FILE).to_string_lossy().into_owned();
+        let data_at = data_dir(home.path()).unwrap();
         (
-            fs::read_to_string(home.path().join(FILE)).unwrap(),
+            fs::read_to_string(home.path().join(FILE))
+                .unwrap()
+                .replace(&data_at, DATA_AT),
             environment,
-            fs::read_to_string(at).unwrap().replace(&env_at, ENV_AT),
+            fs::read_to_string(at)
+                .unwrap()
+                .replace(&env_at, ENV_AT)
+                .replace(&data_at, DATA_AT),
         )
     }
 
@@ -1049,7 +1173,12 @@ mod tests {
             assert_eq!(hold, HarnessHold::Held, "{exec:?}");
             for launcher in [UNPINNED, PINNED] {
                 let (file, environment, launcher) = writers(hold, launcher);
-                assert_eq!(file, TEXT, "{exec:?}");
+                assert_eq!(
+                    file,
+                    format!("{TEXT}ADAPTER_DATA_DIR={DATA_AT}\n"),
+                    "{exec:?}"
+                );
+                assert!(environment.contains_key(DATA_DIR), "{exec:?}");
                 assert_eq!(environment[DISABLE], OsString::from("true"), "{exec:?}");
                 assert!(environment.contains_key(ENV_FILE), "{exec:?}");
                 assert_eq!(launcher, PINNED, "{exec:?}");
@@ -1067,9 +1196,10 @@ mod tests {
         assert_eq!(hold, HarnessHold::Lifted);
         for launcher in [UNPINNED, PINNED] {
             let (file, environment, launcher) = writers(hold, launcher);
-            assert_eq!(file, "");
+            assert_eq!(file, format!("ADAPTER_DATA_DIR={DATA_AT}\n"));
             assert!(!environment.contains_key(DISABLE));
-            assert_eq!(launcher, UNPINNED);
+            assert!(environment.contains_key(DATA_DIR));
+            assert_eq!(launcher, lifted());
         }
         // A lamp that held before: the file is said changed.
         let home = tempfile::tempdir().unwrap();
@@ -1083,15 +1213,18 @@ mod tests {
         // An updated exec line is kept as Harness wrote it.
         let updated = PINNED.replace("0.5.39", "0.6.13");
         assert_eq!(
-            unpinned_launcher(&updated).unwrap(),
-            UNPINNED.replace("0.5.39", "0.6.13")
+            unpinned_launcher(&updated, DATA_AT).unwrap(),
+            lifted().replace("0.5.39", "0.6.13")
         );
-        assert_eq!(unpinned_launcher("#!/bin/sh\necho hi\n"), None);
+        assert_eq!(unpinned_launcher("#!/bin/sh\necho hi\n", DATA_AT), None);
     }
 
     fn hold_file_then(environment: &mut BTreeMap<String, OsString>, home: &Path) {
         hold(environment).unwrap();
-        assert_eq!(fs::read_to_string(home.join(FILE)).unwrap(), TEXT);
+        assert_eq!(
+            fs::read_to_string(home.join(FILE)).unwrap(),
+            format!("{TEXT}{}", data_line(home))
+        );
         environment.remove(DISABLE);
     }
 
@@ -1111,10 +1244,11 @@ mod tests {
         let grid = grid.to_str().unwrap().to_owned();
         let record = home.path().join(CURRENT_GRID);
         let mut environment = BTreeMap::from([("HOME".to_owned(), OsString::from(home.path()))]);
+        let data = data_line(home.path());
 
         // No record yet: the file is as before #6283.
         let (path, _) = env_file_changed(&mut environment, true, None, None).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), TEXT);
+        assert_eq!(fs::read_to_string(&path).unwrap(), format!("{TEXT}{data}"));
         assert!(!environment.contains_key(GRID_BIN));
 
         // Held, with the installer's record: the file and Harness both have it.
@@ -1123,7 +1257,7 @@ mod tests {
         assert!(changed, "the grid line is new words");
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
-            format!("{TEXT}{GRID_BIN}={grid}\n")
+            format!("{TEXT}{GRID_BIN}={grid}\n{data}")
         );
         assert_eq!(environment[GRID_BIN], OsString::from(&grid));
         assert!(
@@ -1137,7 +1271,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(changed);
-        assert_eq!(fs::read_to_string(&path).unwrap(), "");
+        assert_eq!(fs::read_to_string(&path).unwrap(), data);
         assert!(!environment.contains_key(GRID_BIN));
 
         // A record naming anything else adds nothing.
@@ -1159,7 +1293,11 @@ mod tests {
             fs::write(&record, format!("{bad}\n")).unwrap();
             assert_eq!(pinned_grid(home.path()), None, "{bad:?}");
             env_file_changed(&mut environment, true, None, None).unwrap();
-            assert_eq!(fs::read_to_string(&path).unwrap(), TEXT, "{bad:?}");
+            assert_eq!(
+                fs::read_to_string(&path).unwrap(),
+                format!("{TEXT}{data}"),
+                "{bad:?}"
+            );
             assert!(!environment.contains_key(GRID_BIN), "{bad:?}");
         }
     }

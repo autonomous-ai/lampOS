@@ -1214,8 +1214,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    running takes it; one not running is left alone); runs `loginctl
    enable-linger lampos` (a user manager for `lampos` from boot, with no
    login, started with that `HOME`); then the Harness CLI's own `harness
-   service install` as `lampos` with `HOME=/var/lib/lampos-tasks` and its
-   `XDG_RUNTIME_DIR`.
+   service install` as `lampos` with `HOME=/var/lib/lampos-tasks`, its
+   `XDG_RUNTIME_DIR` and `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`
+   (every Harness run of lamp-update has it, so Harness 0.6.72's move of
+   `~/.harness` into the XDG folders is skipped, #7906; tasks.md,
+   "Harness's home kept in `~/.harness`").
    - **Why the drop-in** (#1676): `lampos` is created with no home
      (`/nonexistent`), and a user manager looks for user units under its
      `HOME`. Without the drop-in, Harness wrote its unit under
@@ -1240,7 +1243,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    with no Harness at `/usr/local/bin/harness`, these steps, in order:
    `id -u lampos`; `/var/lib/lampos-tasks` made `lampos`'s own (0700);
    Harness's installer as `lampos` with `HOME=/var/lib/lampos-tasks`,
-   `XDG_RUNTIME_DIR`, `PATH=/usr/local/bin:/usr/bin:/bin` and
+   `XDG_RUNTIME_DIR`, `ADAPTER_DATA_DIR` (#7906), `PATH=/usr/local/bin:/usr/bin:/bin` and
    `SHELL=/bin/sh`: `curl -fsSL --proto =https --tlsv1.2
    https://cdn.autonomous.ai/harness/cli/install.sh | sh`, the address its
    header names. Then `test -x` of the launcher it writes,

@@ -4977,6 +4977,13 @@ pub fn serve<C: Clock>(
         {
             eprintln!("{line}");
         }
+        // Harness's home moved to the XDG folders after all (#7906): said
+        // once at the start, in one fixed line; nothing is moved back.
+        if let Some(line) = std::env::var_os("HOME")
+            .and_then(|home| lamp_msgs::harness_hold::home_moved_line(Path::new(&home)))
+        {
+            eprintln!("{line}");
+        }
         if absent {
             return Ok(Production::Absent);
         }

@@ -903,7 +903,7 @@ fn an_unpinned_install_still_pipes_the_cdn_installer() {
     assert_eq!(
         installer.join(" "),
         format!(
-            "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/990 PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
+            "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/990 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
             install::HARNESS_INSTALLER
         )
     );
@@ -1120,7 +1120,16 @@ fn a_pinned_install_reporting_another_version_records_version() {
 /// Harness's launcher as its installer writes it without `--no-updates`.
 const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
 /// The same in Harness's pinned shape (#5493).
-const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+/// Harness's data folder on the lamp (#7906).
+const DATA_AT: &str = "/var/lib/lampos-tasks/.harness/cli/data";
+/// [`UNPINNED`] as the canary keeps it: only the data folder exported.
+fn lifted() -> String {
+    UNPINNED.replace(
+        "\nexec ",
+        &format!("\nexport ADAPTER_DATA_DIR={DATA_AT}\nexec "),
+    )
+}
 const HOLD_ON: &str =
     "HOME=/var/lib/lampos-tasks PATH=/usr/local/bin:/usr/bin:/bin LAMP_HARNESS_HOLD_UPDATES=on";
 
@@ -1211,11 +1220,12 @@ fn with_the_hold_on_the_install_pins_harnesss_launcher_once() {
 fn the_launchers_own_exec_line_is_kept() {
     let updated = UNPINNED.replace("0.5.39", "0.5.57");
     let pinned =
-        launcher::pinned_launcher(&updated, "/var/lib/lampos-tasks/harness-hold.env").unwrap();
+        launcher::pinned_launcher(&updated, "/var/lib/lampos-tasks/harness-hold.env", DATA_AT)
+            .unwrap();
     assert_eq!(pinned, PINNED.replace("0.5.39", "0.5.57"));
     assert_eq!(pinned.lines().last(), updated.lines().last());
     assert_eq!(
-        launcher::pinned_launcher("#!/bin/sh\necho no exec\n", "/x"),
+        launcher::pinned_launcher("#!/bin/sh\necho no exec\n", "/x", DATA_AT),
         None
     );
 }
@@ -1289,7 +1299,7 @@ fn stable_and_an_unknown_feed_keep_the_launcher_pinned() {
 fn the_lamp_voice_feed_takes_the_hold_out_of_the_launcher() {
     let shown = exec_start(lamp_msgs::harness_hold::CANARY_FEED);
     let (launcher, said) = install_on_feed(&shown, PINNED);
-    assert_eq!(launcher, UNPINNED);
+    assert_eq!(launcher, lifted());
     assert_eq!(
         said,
         [
@@ -1297,17 +1307,17 @@ fn the_lamp_voice_feed_takes_the_hold_out_of_the_launcher() {
         ]
     );
     let (launcher, said) = install_on_feed(&shown, UNPINNED);
-    assert_eq!(launcher, UNPINNED);
+    assert_eq!(launcher, lifted());
     assert_eq!(
         said,
         [
-            "Harness's launcher not pinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)"
+            "Harness's launcher unpinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)"
         ]
     );
     let updated = PINNED.replace("0.5.39", "0.6.13");
     assert_eq!(
-        launcher::unpinned_launcher(&updated).unwrap(),
-        UNPINNED.replace("0.5.39", "0.6.13")
+        launcher::unpinned_launcher(&updated, DATA_AT).unwrap(),
+        lifted().replace("0.5.39", "0.6.13")
     );
 }
 
@@ -3060,4 +3070,32 @@ fn the_one_shot_makes_the_folder_of_its_entry_points_before_its_sandbox() {
         .unwrap();
     assert!(make < start);
     assert!(TEXT.contains("ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos"));
+}
+
+/// #7906: after an install, a Harness home moved to the XDG folders after
+/// all is said in one fixed line, before the launcher's; none is said
+/// for a home still in `~/.harness`.
+#[test]
+fn a_home_moved_to_xdg_is_said_after_an_install() {
+    let lamp = Lamp::new();
+    launcher_left(&lamp, UNPINNED);
+    let home = lamp.root().join("var/lib/lampos-tasks");
+    fs::create_dir_all(home.join(".harness/runtime")).unwrap();
+    let said = |lamp: &Lamp| {
+        let mut runs = Runs::new();
+        runs.tasks_environment = HOLD_ON.into();
+        let mut run = runs.runner();
+        let mut lines = Vec::new();
+        launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+            lines.push(line.to_owned())
+        });
+        lines
+    };
+    assert!(!said(&lamp).iter().any(|line| line.contains("XDG")));
+    fs::create_dir_all(home.join(".local/state/harness")).unwrap();
+    fs::write(home.join(".local/state/harness/bridge.json"), "{}").unwrap();
+    assert_eq!(
+        said(&lamp)[0],
+        "harness: home moved to XDG (.local/state/harness/bridge.json): lampOS paths need ~/.harness"
+    );
 }
