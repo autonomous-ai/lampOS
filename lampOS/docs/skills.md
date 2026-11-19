@@ -2231,7 +2231,7 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     today for a task's settled news (who did the work, what was asked,
     what it came back with) goes to the lamp's agent word for word after
     the lamp's brief (`news_agent::BRIEF`), as a voice ask on lamp-tasks'
-    make socket (`{"op":"voice_ask","ask","grants":[],"within_ms":10000}`).
+    make socket (`{"op":"voice_ask","ask","grants":[],"within_ms":10000,"news":true}`).
     Nothing else of the news goes, so no more leaves the lamp than the
     model gets today. Only a task's settled news: never a sign-in's code or
     progress. The news is handed over as soon as it is first in line, while
@@ -2239,11 +2239,19 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     agent's line in time is said in the note's place, as it is; otherwise
     the note is told at once, as with the switch off: past 10 s, no tasks
     part, lamp-tasks not reached or refusing (it takes an ask only with
-    `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-tasks, and one at a time, so a
-    person's own ask in those 10 s is told busy), or an answer of `-`,
+    `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-tasks), or an answer of `-`,
     nothing, more than one short line, or one for the owner alone. A line
     that comes after is dropped, and lamp-tasks ends the run at the same
     10 s.
+  - **A person's ask always wins** (the first builder, 19 Nov 09:57). No
+    wording begins while a conversation is going on: a turn open, or one
+    in the last 15 s (`news_agent::in_conversation`); the note is told as
+    before. A person's agent ask that comes while a wording runs cancels it
+    in lamp-tasks at once (`"news": true` marks the lamp's own ask; its run
+    is ended as at its deadline, the same run cancel as a remake's make,
+    #7789) and runs, never told busy; the news ask is told `cancelled`, and
+    the note is told as news is today, at once or after their answer. A
+    news ask never cancels a person's ask.
   - Built-in, each fire's content notwithstanding (the first builder's
     09:26):
     - Welcome back: a greeting must come as they sit down; up to 10 s late

@@ -91,7 +91,7 @@ fn dir() -> Dir {
 /// the steps are given is `at`, so the 10 s never passes here.
 fn settled(wordings: &mut Wordings, news: &News, at: Instant) -> Step {
     for _ in 0..500 {
-        let step = wordings.step(Some(news), at);
+        let step = wordings.step(Some(news), at, true);
         if step != Step::Wait {
             return step;
         }
@@ -123,7 +123,7 @@ fn the_content_handed_is_the_models_note_word_for_word() {
     let mut wordings = Wordings::at(Some(socket));
     let news = news(7);
     let now = Instant::now();
-    assert_eq!(wordings.step(Some(&news), now), Step::Wait);
+    assert_eq!(wordings.step(Some(&news), now, true), Step::Wait);
     assert_eq!(
         settled(&mut wordings, &news, now),
         Step::Line("Your weekly report is done.".into())
@@ -137,7 +137,8 @@ fn the_content_handed_is_the_models_note_word_for_word() {
     let ask = line["ask"].as_str().unwrap();
     assert_eq!(ask.strip_prefix(BRIEF), Some(news.note.as_str()));
     assert!(!ask.contains(&news.key));
-    assert_eq!(line.as_object().unwrap().len(), 4);
+    assert_eq!(line["news"], true);
+    assert_eq!(line.as_object().unwrap().len(), 5);
 }
 
 /// The agent's line in time: said in the note's place, as its words, and
@@ -158,7 +159,7 @@ fn the_agents_line_in_time_is_said_in_the_notes_place() {
     assert!(matches!(settled(&mut wordings, &news, now), Step::Line(_)));
     // In time, it stays the news's while the news waits for its moment.
     assert!(matches!(
-        wordings.step(Some(&news), now + Duration::from_secs(60)),
+        wordings.step(Some(&news), now + Duration::from_secs(60), true),
         Step::Line(_)
     ));
     let turn = wordings.take_line(&news).unwrap();
@@ -195,22 +196,23 @@ fn a_slow_agent_past_10_s_tells_the_note_at_once() {
     let mut wordings = Wordings::at(Some(socket));
     let news = news(7);
     let began = Instant::now();
-    assert_eq!(wordings.step(Some(&news), began), Step::Wait);
+    assert_eq!(wordings.step(Some(&news), began, true), Step::Wait);
     assert_eq!(
         wordings.step(
             Some(&news),
-            began + FALLBACK_WITHIN - Duration::from_millis(1)
+            began + FALLBACK_WITHIN - Duration::from_millis(1),
+            true
         ),
         Step::Wait
     );
     assert_eq!(
-        wordings.step(Some(&news), began + FALLBACK_WITHIN),
+        wordings.step(Some(&news), began + FALLBACK_WITHIN, true),
         Step::Own(LATE.into())
     );
     // Its line comes later: dropped.
     std::thread::sleep(Duration::from_millis(2_500));
     assert_eq!(
-        wordings.step(Some(&news), began + FALLBACK_WITHIN),
+        wordings.step(Some(&news), began + FALLBACK_WITHIN, true),
         Step::Own(LATE.into())
     );
     assert_eq!(wordings.take_line(&news), None);
@@ -229,7 +231,10 @@ fn the_agent_down_tells_the_note_at_once() {
     assert!(matches!(settled(&mut wordings, &news, now), Step::Own(_)));
     // No tasks part on this lamp.
     let mut wordings = Wordings::at(None);
-    assert!(matches!(wordings.step(Some(&news), now), Step::Own(_)));
+    assert!(matches!(
+        wordings.step(Some(&news), now, true),
+        Step::Own(_)
+    ));
     // Refused.
     let socket = dir.path().join("make.sock");
     let _asked = lamp_tasks(
@@ -296,7 +301,7 @@ fn off_or_other_news_hands_nothing_over() {
     {
         let _off = On::new(false);
         let mut wordings = Wordings::at(Some(socket.clone()));
-        assert_eq!(wordings.step(Some(&news), now), Step::Tell);
+        assert_eq!(wordings.step(Some(&news), now, true), Step::Tell);
         assert_eq!(wordings.take_line(&news), None);
     }
     let _on = On::new(true);
@@ -304,14 +309,17 @@ fn off_or_other_news_hands_nothing_over() {
     let mut sign_in = news.clone();
     sign_in.key = "sign-in-3-code".into();
     assert!(crate::sign_in::is_news(&sign_in.key));
-    assert_eq!(wordings.step(Some(&sign_in), now), Step::Tell);
+    assert_eq!(wordings.step(Some(&sign_in), now, true), Step::Tell);
     let mut progress = news.clone();
     progress.key = "0123456789abcdef0123456789abcdef:7:progress-1-2".into();
-    assert_eq!(wordings.step(Some(&progress), now), Step::Tell);
+    assert_eq!(wordings.step(Some(&progress), now, true), Step::Tell);
     let mut long = news.clone();
     long.note = "word ".repeat(500);
-    assert!(matches!(wordings.step(Some(&long), now), Step::Own(_)));
-    assert_eq!(wordings.step(None, now), Step::Tell);
+    assert!(matches!(
+        wordings.step(Some(&long), now, true),
+        Step::Own(_)
+    ));
+    assert_eq!(wordings.step(None, now, true), Step::Tell);
     std::thread::sleep(Duration::from_millis(200));
     assert!(asked.lock().unwrap().is_empty());
 }
@@ -345,4 +353,62 @@ fn the_journal_never_has_the_agents_words() {
     );
     assert_eq!(journal(&Step::Tell, false), None);
     assert_eq!(journal(&Step::Wait, false), None);
+}
+
+/// A person's ask came while the news was worded: lamp-tasks cancelled the
+/// news ask (`lamp_tasks::voice_ask`), and the note is told, at once or
+/// after their answer, as news waits today.
+#[test]
+fn a_persons_ask_first_tells_the_note() {
+    let _on = On::new(true);
+    let dir = dir();
+    let socket = dir.path().join("make.sock");
+    let _asked = lamp_tasks(
+        &socket,
+        vec![
+            json!({"ok": true, "started": true}),
+            json!({"ok": false, "error": "cancelled"}),
+        ],
+        Duration::ZERO,
+    );
+    let mut wordings = Wordings::at(Some(socket));
+    let news = news(7);
+    assert_eq!(
+        settled(&mut wordings, &news, Instant::now()),
+        Step::Own(CANCELLED.into())
+    );
+    assert_eq!(wordings.take_line(&news), None);
+}
+
+/// No wording begins while a conversation is going on (a turn open, or one
+/// in the last 15 s): the news is told as before, and worded only once the
+/// room is quiet; one already worded goes on.
+#[test]
+fn no_wording_starts_mid_conversation() {
+    let _on = On::new(true);
+    let dir = dir();
+    let socket = dir.path().join("make.sock");
+    let asked = lamp_tasks(&socket, answered("Your report is done."), Duration::ZERO);
+    let mut wordings = Wordings::at(Some(socket));
+    let news = news(7);
+    let now = Instant::now();
+    assert_eq!(wordings.step(Some(&news), now, false), Step::Tell);
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(asked.lock().unwrap().is_empty());
+    assert_eq!(wordings.step(Some(&news), now, true), Step::Wait);
+    // Worded already: a conversation that starts doesn't stop it.
+    let mut step = Step::Wait;
+    for _ in 0..500 {
+        step = wordings.step(Some(&news), now, false);
+        if step != Step::Wait {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(step, Step::Line("Your report is done.".into()));
+    assert_eq!(asked.lock().unwrap().len(), 1);
+    // The conversation state, as the coordinator reads it.
+    assert!(in_conversation(true, 100_000_000, 0));
+    assert!(in_conversation(false, 10_000_000, 0));
+    assert!(!in_conversation(false, 15_000_000, 0));
 }

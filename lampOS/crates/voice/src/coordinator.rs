@@ -14145,10 +14145,18 @@ fn conversation_with_gate_inner(
         // With `LAMP_CORE_VIA_AGENT`'s `news` (the first builder's 09:26):
         // the news first in line is handed to the lamp's agent to word as
         // soon as it is, and held at most 10 s for its line
-        // (`news_agent::Wordings::step`). Off, nothing is asked here.
+        // (`news_agent::Wordings::step`). Never begun mid-conversation (a
+        // turn open, or one in the last 15 s; the first builder's 09:57), and
+        // a person's ask that comes while it runs cancels it in lamp-tasks
+        // (`lamp_tasks::voice_ask`). Off, nothing is asked here.
         let news_step = match task_news.as_mut() {
             Some(news) if crate::news_agent::on() => {
-                news_wordings.step(news.waiting(), Instant::now())
+                let talking = crate::news_agent::in_conversation(
+                    reply.is_some() || admission.owns_stream(),
+                    clock,
+                    last_turn_us,
+                );
+                news_wordings.step(news.waiting(), Instant::now(), !talking)
             }
             _ => crate::news_agent::Step::Tell,
         };

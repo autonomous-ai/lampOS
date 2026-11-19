@@ -3909,7 +3909,11 @@ The owner's rulings of 17 Nov: a linked service's live read, and an ask the
 second route's model can't do, go to the lamp's agent, the lamp's default
 (Hermes or OpenClaw, ~17:55), never pinned to Hermes. The make socket takes
 a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
-"within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
+"within_ms","news"}` (`lamp_tasks::voice_ask`; `news`, false unless given,
+marks the lamp's own ask for task news's line, which a person's ask that
+comes while it runs cancels at once: its run ended as at its deadline, told
+`cancelled`, and the person's ask run, never told busy; `MOST_CONNECTIONS`
+is 3 for it), answered as a make is
 (`started`, then `answer` or a refusal), with its own one place beside a
 make's. The agent is picked at each ask as a make with `"one_path":true`
 picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no

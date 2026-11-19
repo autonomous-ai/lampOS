@@ -120,8 +120,9 @@ pub const NO_ANSWER: &str = "the lamp's Hermes wrote no answer";
 pub const BUSY: &str = "a skill is already being made on this lamp; one is made at a time";
 /// How long a connection has to send its line, and to take each answer.
 pub const LINE_WAIT: Duration = Duration::from_secs(5);
-/// The most connections read or answered at once.
-pub const MOST_CONNECTIONS: usize = 2;
+/// The most connections read or answered at once: a make, the lamp's own
+/// news ask and a person's ask that cancels it (`crate::voice_ask`).
+pub const MOST_CONNECTIONS: usize = 3;
 /// How often the socket is looked at while no one connects.
 const ACCEPT_TICK: Duration = Duration::from_millis(20);
 
@@ -702,6 +703,7 @@ pub fn make_run_with(
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -1893,6 +1895,7 @@ impl MakeHandOvers {
                 }),
                 tokens: Arc::new(crate::skill_task::ControlTokens::default()),
                 asking: AtomicBool::new(false),
+                news: Default::default(),
             })
         });
         Self {
