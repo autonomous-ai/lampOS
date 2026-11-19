@@ -296,15 +296,22 @@ giữ, và lamp không hỏi gì. Đây là quy tắc "không hỏi" của chủ
 nghi ngờ đến từ chính mô hình, không từ danh sách từ nào phán xét lời người
 nói: lời của vòng trả lời nghi ngờ điều đã nghe, hoặc câu của mô hình có cách
 viết gần với một từ đã nghe. Một `remember` mà chính vòng của nó nghi ngờ thì
-không chạy, và mô hình được báo là không giữ gì, không hỏi gì (không "did you
-say …?", không bảo nói lại) và không bao giờ nói là đã giữ. Một lần giữ mà vòng
-ngay sau nghi ngờ thì bị quên theo id (cần `LAMP_MEMORY_DOUBT_UNDOES`) và không
-chờ lời "có" nào, nên không cần mắt, và một lời "có" sau đó không giữ gì. Lần
-giữ có từ viết gần từ đã nghe như trên thì không chạy và không hỏi gì, dù có
-hay không có `LAMP_MEMORY_ASK_NEAR_HEARD`. Mô tả của `remember` và ghi chú của
-`LAMP_KEEP_QUIETLY` nói rằng từ còn nghi ngờ thì không giữ và không hỏi. Câu
-trả lời của mô hình giữ nguyên, không thêm câu nào; lần giữ rõ ràng vẫn được
-giữ như trước. Câu hỏi "chắc chưa?" trước "forget everything" vẫn còn. Nhật ký
+không chạy, và mô hình được báo là không giữ gì, phải nói ngắn gọn cho người
+đó biết, không kèm câu hỏi ("I didn't catch that well enough to keep it."),
+không hỏi gì (không "did you say …?", không bảo nói lại) và không bao giờ nói là
+đã giữ: người nói phải nghe được là chưa lưu, để nói lại (P1 của Twelve trên
+#7966). Một lần giữ mà vòng ngay sau nghi ngờ thì bị quên theo id (cần
+`LAMP_MEMORY_DOUBT_UNDOES`) và không chờ lời "có" nào, nên không cần mắt, và
+một lời "có" sau đó không giữ gì. Vì lần giữ ấy đã được nói lại, lamp nói rõ
+là rốt cuộc chưa lưu: mô hình được báo nếu vòng đó còn gọi lệnh khác, nếu không
+lamp tự nói câu "Sorry, I didn't keep that after all." bằng ngôn ngữ của chủ.
+Với `LAMP_MEMORY_ASK_NEAR_HEARD` bật, lần giữ có từ viết gần từ đã nghe như
+trên thì không chạy và không hỏi gì, chỉ nói câu ấy; khi công tắc đó tắt (bản
+sản phẩm), cách viết gần ("Ngoc" cho "Ngok" nghe được) vẫn được giữ như trước
+(P2 của Twelve). Mô tả của `remember` nói không giữ từ còn nghi ngờ và nói,
+không kèm câu hỏi, là chưa nghe đủ rõ để lưu; ghi chú của `LAMP_KEEP_QUIETLY`
+nói từ còn nghi ngờ thì không giữ và không hỏi. Lần giữ rõ ràng vẫn được giữ
+như trước. Câu hỏi "chắc chưa?" trước "forget everything" vẫn còn. Nhật ký
 chỉ ghi số đếm.
 
 Câu có gọi `remember` hay `forget` không vào nhật ký: nó bị đánh dấu ở ngoài

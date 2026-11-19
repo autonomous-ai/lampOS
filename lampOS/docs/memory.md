@@ -2071,19 +2071,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     doubt is the model's own, never a word list judging the person: its
     round's words doubt what was heard, or its sentence has a near spelling
     of a heard word. A `remember` its own round doubts is not run, and the
-    model is told nothing is kept, to ask nothing (no "did you say …?", no
-    "say it again") and never to say it was kept
-    (`doubted::NOT_KEPT_NO_ASK`). A keep the round right after it doubts is
-    forgotten by its id, with `LAMP_MEMORY_DOUBT_UNDOES`, and never held for
-    a yes, so the eyes are not needed and a later "yes" keeps nothing
-    (`doubted::UNDONE_NO_ASK_NOTE` if that round called more). A keep with a
-    near spelling of a heard word, as above, is not run and nothing is asked
-    (`heard::near_not_kept_told`), with or without
-    `LAMP_MEMORY_ASK_NEAR_HEARD`. `remember`'s description
-    (`REMEMBER_DESCRIBED_UNSURE`) and `LAMP_KEEP_QUIETLY`'s note
-    (`keep_quietly::QUIET_NOTE_UNSURE`) say a doubted word is neither kept
-    nor asked about. The model's reply stands, and no line is added; a
-    clear keep is kept as before. The "sure?" before "forget everything"
+    model is told nothing is kept, to tell them so in a few words with no
+    question ("I didn't catch that well enough to keep it.",
+    `doubted::NOT_CAUGHT_LINE`), never to ask ("did you say …?", "say it
+    again") and never to say it was kept (`doubted::NOT_KEPT_NO_ASK`): the
+    person must hear it wasn't kept, so they can say it again (Twelve's P1
+    on #7966). A keep the round right after it doubts is forgotten by its
+    id, with `LAMP_MEMORY_DOUBT_UNDOES`, and never held for a yes, so the
+    eyes are not needed and a later "yes" keeps nothing. That keep was
+    already said back, so the person is told plainly: if that round called
+    more, the model is told `doubted::UNDONE_NO_ASK_NOTE` (say so, as
+    "Sorry, I didn't keep that after all."); if not, the lamp says
+    `doubted::TAKEN_BACK_LINE` itself, in the owner's language. With
+    `LAMP_MEMORY_ASK_NEAR_HEARD` on, a keep with a near spelling of a heard
+    word, as above, is not run and nothing is asked
+    (`heard::near_not_kept_told`, which says the same line); with it off
+    (the product), a near spelling ("Ngoc" for a heard "Ngok") is kept as
+    before (Twelve's P2). `remember`'s description
+    (`REMEMBER_DESCRIBED_UNSURE`) says not to keep a doubted word and to
+    say, with no question, that it wasn't caught well enough to keep;
+    `LAMP_KEEP_QUIETLY`'s note (`keep_quietly::QUIET_NOTE_UNSURE`) says a
+    doubted word is neither kept nor asked about. A clear keep is kept as
+    before. The "sure?" before "forget everything"
     stays. The journal says not kept or taken back, with counts only.
     Tests:
     `second_provider::tests::held_forget::an_unsure_line_is_not_kept_and_nothing_is_asked`,
