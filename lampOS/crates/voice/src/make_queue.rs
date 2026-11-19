@@ -71,9 +71,9 @@ const LABEL_MOST: usize = 40;
 const STEP_EVERY: Duration = Duration::from_millis(500);
 /// How long after a voice restart the makes it dropped wait at most for the
 /// say service to answer ([`ready_within`]): it starts beside the worker.
-const SAY_READY_WITHIN: Duration = Duration::from_secs(30);
+pub(crate) const SAY_READY_WITHIN: Duration = Duration::from_secs(30);
 /// How often the say service is tried while it isn't there yet.
-const SAY_READY_EVERY: Duration = Duration::from_millis(250);
+pub(crate) const SAY_READY_EVERY: Duration = Duration::from_millis(250);
 
 /// A make past [`MOST_WAITING`]: what the person hears, honest about the
 /// wait (in each language, `language::FIXED_LINES`).
@@ -473,6 +473,15 @@ pub fn forget_if(told: &(Value, bool), admitted: Option<&str>) -> usize {
     if dropped > 0 {
         eprintln!(
             "lamp-voice: {dropped} waiting make(s) dropped with everything about the person who asked: never made"
+        );
+    }
+    // A make of theirs written down for a restart of its route (#7224,
+    // fault 5) is never made again after it.
+    let resumable =
+        crate::make_resume::forget_person(std::path::Path::new(crate::make_resume::FILE), admitted);
+    if resumable > 0 {
+        eprintln!(
+            "lamp-voice: {resumable} make(s) under way dropped from the restart file with everything about the person who asked"
         );
     }
     dropped

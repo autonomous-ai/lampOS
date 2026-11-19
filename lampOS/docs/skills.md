@@ -7354,33 +7354,50 @@ On lamp-c0a4 (19 Nov 23:26) a service cycle ended during an OpenClaw make's
 `Broken pipe`: the person was never told whether their skill was made. With
 `LAMP_MAKE_SKILL_AGENT=on` (no switch of its own):
 
-- **Written down while it is made:** a voice make heard in its own turn is
-  written at `/run/lampos-voice/make-in-flight.json` (the voice's runtime
-  folder, 0700, kept across a restart; the file 0600, at most 2 makes): its
-  request, the model's `make_skill` arguments and who asked (the queue's
-  `Asker`: the person, the owner, the line heard). It is taken out as the make
-  ends, however it ends (`make_resume::Held`).
+- **Written down while lamp-tasks holds it:** a voice make heard in its own
+  turn is written at `/run/lampos-voice/make-in-flight.json` (the voice's
+  runtime folder, 0700, kept across a restart; the file 0600, at most 2
+  makes) at each hand-over to the agent, the first and each repair
+  (`make_resume::handed_over`): its request, the model's `make_skill`
+  arguments and who asked (the queue's `Asker`: the person, the owner, the
+  line heard). It is taken out the moment lamp-tasks' answer is read, before
+  the voice checks or puts on anything (`make_resume::answered`), so a
+  restart then never asks the make again. A restart while the voice itself
+  checks between two hand-overs, or while DeepSeek alone makes it, leaves
+  nothing. "Forget everything" drops the person's makes from the file
+  (`make_resume::forget_person`).
+- **One id per make:** each hand-over of a voice make carries `"make_id"`
+  (its request and the time of its ask, `InFlight::id`), the same on its
+  repairs and on the make made again after a restart. Any other make (the
+  app's MAKE IT) carries none, its line as before, and nothing is kept for it.
 - **Kept by lamp-tasks:** when the voice is gone as a make's outcome comes
   (the write fails), lamp-tasks keeps that outcome in its memory only, by the
-  make's rules, at most 4, for 30 min (`skill_make::KeptOutcomes`,
-  `KEPT_FOR`, `MOST_KEPT`); journaled "the voice was gone as its outcome came
-  (…): kept for the same make asked again, at most 30 min". An outcome the
-  voice took is never kept.
+  make's id, never by its rules (which a repair or a new day changes), at
+  most 4, for 30 min (`skill_make::KeptOutcomes`, `KEPT_FOR`, `MOST_KEPT`);
+  journaled "the voice was gone as its outcome came (…): kept for the same
+  make asked again, at most 30 min". A refusal is kept too: the make asked
+  again is told it, with no new run. An outcome the voice took is never kept.
+  "Forget everything" doesn't reach it: it lasts at most its 30 min.
 - **Told once:** the next route's worker reads the file once at its start and
   removes it (`make_resume::left_at`); each make younger than 30 min is made
   again with no turn, as a make that waited its turn is (`run_queued_with`),
-  held to who asked and the line heard. Its hand-over asks lamp-tasks the same
-  make: it is given the kept outcome at once, or waits for the one still being
-  made, never refused busy and never run twice. Its line is the make's own
-  ("I made your …", or why it wasn't made), said once through the say
-  service, as a cut make's is; journaled "its route stopped while make_skill
-  ran: made again now, its outcome said once". One kept nowhere (lamp-tasks
-  restarted too) is made anew. A resumed make is written down again while it
-  is made, so a second restart leaves it too, within its first ask's 30 min.
+  held to who asked and the line heard. Its hand-over asks lamp-tasks the
+  same make by its id: it is given the kept outcome at once, or waits for the
+  one still being made (a repair round too), not refused busy and not run
+  again; only a make whose outcome lamp-tasks no longer holds (restarted, or
+  past 30 min) is made anew. Its line is the make's own ("I made your …", or
+  why it wasn't made), said once through the say service once it answers
+  (at most 30 s, `make_queue::SAY_READY_WITHIN`, then said all the same;
+  journaled when the line still wasn't said); journaled "its route stopped
+  while lamp-tasks held its make: made again now, its outcome said once". A
+  resumed make is written down again at its hand-overs, so a second restart
+  leaves it too, within its first ask's 30 min. It takes no `LAMP_MAKE_QUEUE`
+  slot (off in the product).
 
-Tests: `skill_make::tests::a_route_restarted_during_a_make_gets_its_outcome_once`,
-`the_same_make_asked_again_while_made_waits_for_it`,
-`kept_outcomes_are_given_once_and_expire`, and `make_resume::tests`.
+Tests: `skill_make::tests::a_route_restarted_during_a_make_gets_its_outcome_once`
+(a restart during repair round 2), `the_same_make_asked_again_while_made_waits_for_it`,
+`a_make_with_no_id_keeps_nothing`, `kept_outcomes_are_given_once_and_expire`,
+`make_resume::tests`, and the worker's `resume_tests`.
 **Not yet shown on a lamp:** a route restart during an agent's make, its
 outcome said once after it.
 

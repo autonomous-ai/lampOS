@@ -6,25 +6,38 @@
 //! was made.
 //!
 //! With `LAMP_MAKE_SKILL_AGENT` on (a make that may go to the lamp's agent,
-//! the long one), a voice make heard in its own turn is written down as it
-//! begins ([`begin`]): its request number, the model's `make_skill`
-//! arguments, and who asked (the queue's [`crate::make_queue::Asker`]: the
-//! person, the owner and the line heard), at [`FILE`] in the voice's own
-//! runtime folder (`RuntimeDirectory=lampos-voice`, 0700, kept across a
-//! restart, gone at boot), 0600, at most [`MOST`]. It is taken out again as
-//! the make ends, however it ends ([`Held`]).
+//! the long one), a voice make heard in its own turn carries a template
+//! on its thread ([`on_this_thread`]): its request number, the model's
+//! `make_skill` arguments, and who asked (the queue's
+//! [`crate::make_queue::Asker`]: the person, the owner and the line
+//! heard). It is written down only while lamp-tasks holds the make: at each
+//! hand-over to the agent ([`handed_over`], the first and each repair),
+//! at [`FILE`] in the voice's own runtime folder
+//! (`RuntimeDirectory=lampos-voice`, 0700, kept across a restart, gone at
+//! boot), 0600, at most [`MOST`]; and taken out the moment lamp-tasks'
+//! answer is read ([`answered`]), before the voice checks or puts on
+//! anything, so a restart then never asks the make again.
 //!
-//! What a route that stopped mid-make left there is read once as the next
-//! route's worker starts, and the file removed ([`left_at`]): each make
-//! younger than [`RESUMED_WITHIN`] is made again with no turn, as a make
-//! that waited its turn is (`LAMP_MAKE_QUEUE`'s `run_queued`), its line
-//! said through the say service once. Its hand-over to the agent asks
-//! lamp-tasks the same make, by the same rules: lamp-tasks gives it the
-//! outcome it kept when the old route was gone, or waits for the one still
-//! being made (`lamp_tasks::skill_make::KeptOutcomes`), never a second
-//! run. One kept nowhere (lamp-tasks restarted too) is made anew.
+//! Each hand-over carries the make's id ([`InFlight::id`], its request and
+//! the time of its ask), the same on its repairs and on the make made again
+//! after a restart: lamp-tasks keeps an outcome its voice was gone for by
+//! that id, never by the rules, which a repair or a new day changes
+//! (`lamp_tasks::skill_make::KeptOutcomes`).
+//!
+//! What a route that stopped mid-hand-over left there is read once as the
+//! next route's worker starts, and the file removed ([`left_at`]): each
+//! make younger than [`RESUMED_WITHIN`] is made again with no turn, as a
+//! make that waited its turn is (`LAMP_MAKE_QUEUE`'s `run_queued`), its line
+//! said through the say service once it answers. Its first hand-over asks
+//! lamp-tasks the same make by its id: lamp-tasks gives it the outcome it
+//! kept, a refusal too, or waits for the one still being made, with no run
+//! of its own. One kept nowhere (lamp-tasks restarted too) is made anew.
+//! The person's "forget everything" drops their makes written here
+//! ([`forget_person`]); lamp-tasks' kept outcome, in its memory only, lasts
+//! at most its 30 minutes.
 use crate::make_queue::Asker;
 use serde_json::{Value, json};
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -51,6 +64,12 @@ pub struct InFlight {
 }
 
 impl InFlight {
+    /// The make's id, sent with each of its hand-overs: its request and the
+    /// time of its ask, the same when it is made again after a restart.
+    pub fn id(&self) -> String {
+        format!("{}-{}", self.request, self.at_unix_ms)
+    }
+
     fn to_json(&self) -> Value {
         json!({
             "request": self.request,
@@ -139,10 +158,73 @@ pub fn begin_at(path: &Path, make: InFlight) -> Held {
     }
 }
 
-/// `make` written down at [`FILE`] with `LAMP_MAKE_SKILL_AGENT` on (a make
-/// that may wait minutes for the agent); none otherwise.
-pub fn begin(make: InFlight) -> Option<Held> {
-    crate::make_skill_agent::on().then(|| begin_at(Path::new(FILE), make))
+std::thread_local! {
+    /// The voice make on this thread and where it is written down while
+    /// lamp-tasks holds it ([`on_this_thread`]).
+    static ON_THREAD: RefCell<Option<(PathBuf, InFlight)>> = const { RefCell::new(None) };
+    /// It written down now: from a hand-over until its answer is read.
+    static HELD: RefCell<Option<Held>> = const { RefCell::new(None) };
+}
+
+/// The voice make on this thread, until dropped (a panic too): nothing
+/// held once it is.
+pub struct OnThisThread(());
+
+impl Drop for OnThisThread {
+    fn drop(&mut self) {
+        let held = HELD.with(|held| held.borrow_mut().take());
+        drop(held);
+        ON_THREAD.with(|on| on.borrow_mut().take());
+    }
+}
+
+/// `make`, the voice make run on this thread, written down at [`FILE`]
+/// while lamp-tasks holds it; none for any other make.
+pub fn on_this_thread(make: Option<InFlight>) -> OnThisThread {
+    on_this_thread_at(Path::new(FILE), make)
+}
+
+/// [`on_this_thread`] at `path`.
+pub fn on_this_thread_at(path: &Path, make: Option<InFlight>) -> OnThisThread {
+    let held = HELD.with(|held| held.borrow_mut().take());
+    drop(held);
+    ON_THREAD.with(|on| *on.borrow_mut() = make.map(|make| (path.to_owned(), make)));
+    OnThisThread(())
+}
+
+/// A hand-over of this thread's voice make to lamp-tasks begins: it is
+/// written down, and its id given for the line. None for a make with no
+/// [`on_this_thread`].
+pub fn handed_over() -> Option<String> {
+    let (path, make) = ON_THREAD.with(|on| on.borrow().clone())?;
+    let id = make.id();
+    answered();
+    let held = begin_at(&path, make);
+    HELD.with(|kept| *kept.borrow_mut() = Some(held));
+    Some(id)
+}
+
+/// lamp-tasks' answer to this thread's hand-over was read (or the
+/// hand-over ended without one): taken out at once, before any check.
+pub fn answered() {
+    let held = HELD.with(|held| held.borrow_mut().take());
+    drop(held);
+}
+
+/// The makes written down at `path` that `person` asked for, dropped (the
+/// person's "forget everything"): never made again after a restart.
+pub fn forget_person(path: &Path, person: &str) -> usize {
+    let _writing = WRITING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut makes = read(path);
+    let before = makes.len();
+    makes.retain(|make| make.asker.speaker.as_deref() != Some(person));
+    let dropped = before - makes.len();
+    if dropped > 0 {
+        write(path, &makes);
+    }
+    dropped
 }
 
 /// The makes a route that stopped left at `path`, read once and the file
@@ -252,5 +334,65 @@ mod tests {
         let within = RESUMED_WITHIN.as_millis() as u64;
         let left = left_at(&path, 2_000 + within + 1);
         assert_eq!(left, vec![make(3, 3_000)]);
+    }
+
+    /// Written down only while lamp-tasks holds the make: from each of its
+    /// hand-overs (the first and each repair, one id) until its answer is
+    /// read, before any check, so a restart then asks nothing again.
+    #[test]
+    fn a_make_is_written_down_only_while_lamp_tasks_holds_it() {
+        let dir = Dir::new("held");
+        let path = dir.path().join("make-in-flight.json");
+        let on = on_this_thread_at(&path, Some(make(7, 1_000)));
+        assert!(!path.exists(), "not before its hand-over");
+        assert_eq!(handed_over().as_deref(), Some("7-1000"));
+        assert_eq!(read(&path), vec![make(7, 1_000)]);
+        answered();
+        assert!(!path.exists(), "gone once its answer is read");
+        // A repair's hand-over: the same id, written down again.
+        assert_eq!(handed_over().as_deref(), Some("7-1000"));
+        assert_eq!(read(&path).len(), 1);
+        drop(on);
+        assert!(!path.exists());
+        // Any other make carries no id and writes nothing.
+        let _none = on_this_thread_at(&path, None);
+        assert_eq!(handed_over(), None);
+        assert!(!path.exists());
+    }
+
+    /// The route stops during a repair round: the make is left, with the
+    /// id its repairs carried, for the next worker.
+    #[test]
+    fn a_restart_during_a_repair_leaves_the_make_with_its_id() {
+        let dir = Dir::new("repair");
+        let path = dir.path().join("make-in-flight.json");
+        let at = path.clone();
+        let left = std::thread::spawn(move || {
+            let on = on_this_thread_at(&at, Some(make(7, 1_000)));
+            handed_over();
+            answered();
+            handed_over();
+            // The worker ends here, mid-repair.
+            std::mem::forget(on);
+            left_at(&at, 2_000)
+        })
+        .join()
+        .unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].id(), "7-1000");
+        assert!(!path.exists());
+    }
+
+    /// "Forget everything": the person's makes written down are dropped.
+    #[test]
+    fn forget_everything_drops_the_persons_makes() {
+        let dir = Dir::new("forget");
+        let path = dir.path().join("make-in-flight.json");
+        std::mem::forget(begin_at(&path, make(7, 1_000)));
+        let mut other = make(8, 1_100);
+        other.asker.speaker = Some("Sam".into());
+        std::mem::forget(begin_at(&path, other.clone()));
+        assert_eq!(forget_person(&path, "Alex"), 1);
+        assert_eq!(left_at(&path, 2_000), vec![other]);
     }
 }

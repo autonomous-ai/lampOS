@@ -4094,33 +4094,49 @@ OpenClaw tạo kỹ năng, tuyến khởi động lại trong cùng pid, và câ
 lamp-tasks gặp `Broken pipe`: người dùng không bao giờ được báo kỹ năng có
 được tạo hay không. Khi `LAMP_MAKE_SKILL_AGENT=on` (không có công tắc riêng):
 
-- **Ghi lại trong khi tạo:** một lần tạo bằng giọng nói nghe trong lượt của
-  nó được ghi ở `/run/lampos-voice/make-in-flight.json` (thư mục runtime của
-  voice, 0700, giữ qua lần khởi động lại; tệp 0600, tối đa 2 lần tạo): số
-  request, đối số `make_skill` của mô hình và người hỏi (`Asker` của hàng
-  đợi: người nói, chủ, câu nghe được). Nó được xóa khi lần tạo kết thúc, dù
-  kết thúc thế nào (`make_resume::Held`).
+- **Ghi lại trong khi lamp-tasks giữ nó:** một lần tạo bằng giọng nói nghe
+  trong lượt của nó được ghi ở `/run/lampos-voice/make-in-flight.json` (thư
+  mục runtime của voice, 0700, giữ qua lần khởi động lại; tệp 0600, tối đa 2
+  lần tạo) ở mỗi lần chuyển giao cho agent, lần đầu và mỗi lần sửa
+  (`make_resume::handed_over`): số request, đối số `make_skill` của mô hình
+  và người hỏi (`Asker` của hàng đợi: người nói, chủ, câu nghe được). Nó được
+  xóa ngay khi đọc được câu trả lời của lamp-tasks, trước khi voice kiểm tra
+  hay bật gì (`make_resume::answered`), nên khởi động lại lúc đó không bao giờ
+  hỏi lại lần tạo. Khởi động lại khi chính voice đang kiểm tra giữa hai lần
+  chuyển giao, hoặc khi chỉ DeepSeek tạo, không để lại gì. "Quên mọi thứ" xóa
+  các lần tạo của người đó khỏi tệp (`make_resume::forget_person`).
+- **Một id cho mỗi lần tạo:** mỗi lần chuyển giao của một lần tạo bằng giọng
+  nói mang `"make_id"` (request và thời điểm hỏi, `InFlight::id`), giống nhau
+  ở các lần sửa và ở lần tạo lại sau khi khởi động lại. Lần tạo khác (MAKE IT
+  của ứng dụng) không mang id, dòng như trước, và không có gì được giữ cho nó.
 - **lamp-tasks giữ lại:** khi voice đã mất lúc kết quả đến (ghi thất bại),
-  lamp-tasks giữ kết quả đó chỉ trong bộ nhớ, theo rules của lần tạo, tối đa
-  4, trong 30 phút (`skill_make::KeptOutcomes`, `KEPT_FOR`, `MOST_KEPT`);
+  lamp-tasks giữ kết quả đó chỉ trong bộ nhớ, theo id của lần tạo, không bao
+  giờ theo rules (mà một lần sửa hay một ngày mới làm thay đổi), tối đa 4,
+  trong 30 phút (`skill_make::KeptOutcomes`, `KEPT_FOR`, `MOST_KEPT`);
   journal ghi "the voice was gone as its outcome came (…): kept for the same
-  make asked again, at most 30 min". Kết quả voice đã nhận thì không bao giờ
-  được giữ.
+  make asked again, at most 30 min". Lời từ chối cũng được giữ: lần tạo được
+  hỏi lại sẽ nhận nó, không chạy mới. Kết quả voice đã nhận thì không bao giờ
+  được giữ. "Quên mọi thứ" không chạm tới nó: nó tồn tại tối đa 30 phút.
 - **Báo một lần:** worker của tuyến kế tiếp đọc tệp một lần khi khởi động và
   xóa nó (`make_resume::left_at`); mỗi lần tạo chưa quá 30 phút được tạo lại
   không có lượt, như lần tạo đã chờ đến lượt (`run_queued_with`), gắn với
-  người hỏi và câu nghe được. Lần chuyển giao hỏi lamp-tasks cùng lần tạo đó:
-  nó nhận ngay kết quả đã giữ, hoặc chờ lần đang tạo, không bao giờ bị từ chối
-  busy và không chạy hai lần. Câu nói là câu của chính lần tạo ("I made your
-  …", hoặc lý do không tạo được), nói một lần qua dịch vụ say, như lần tạo bị
-  cắt; journal ghi "its route stopped while make_skill ran: made again now,
-  its outcome said once". Nếu không đâu giữ (lamp-tasks cũng khởi động lại),
-  lần tạo được làm mới. Lần tạo được tiếp tục lại được ghi lại trong khi tạo,
-  nên lần khởi động lại thứ hai cũng để lại nó, trong 30 phút của lần hỏi đầu.
+  người hỏi và câu nghe được. Lần chuyển giao hỏi lamp-tasks cùng lần tạo đó
+  theo id: nó nhận ngay kết quả đã giữ, hoặc chờ lần đang tạo (kể cả một lần
+  sửa), không bị từ chối busy và không chạy lại; chỉ lần tạo mà lamp-tasks
+  không còn giữ kết quả (đã khởi động lại, hoặc quá 30 phút) mới được làm
+  mới. Câu nói là câu của chính lần tạo ("I made your …", hoặc lý do không
+  tạo được), nói một lần qua dịch vụ say khi nó trả lời (tối đa 30 giây,
+  `make_queue::SAY_READY_WITHIN`, sau đó vẫn nói; journal ghi khi câu vẫn
+  chưa được nói); journal ghi "its route stopped while lamp-tasks held its
+  make: made again now, its outcome said once". Lần tạo được tiếp tục lại
+  được ghi lại ở các lần chuyển giao, nên lần khởi động lại thứ hai cũng để
+  lại nó, trong 30 phút của lần hỏi đầu. Nó không lấy chỗ của
+  `LAMP_MAKE_QUEUE` (tắt trong sản phẩm).
 
-Kiểm thử: `skill_make::tests::a_route_restarted_during_a_make_gets_its_outcome_once`,
-`the_same_make_asked_again_while_made_waits_for_it`,
-`kept_outcomes_are_given_once_and_expire`, và `make_resume::tests`.
+Kiểm thử: `skill_make::tests::a_route_restarted_during_a_make_gets_its_outcome_once`
+(khởi động lại trong lần sửa thứ 2), `the_same_make_asked_again_while_made_waits_for_it`,
+`a_make_with_no_id_keeps_nothing`, `kept_outcomes_are_given_once_and_expire`,
+`make_resume::tests`, và `resume_tests` của worker.
 **Chưa thấy trên đèn:** tuyến khởi động lại trong lúc agent tạo, kết quả được
 nói một lần sau đó.
 
