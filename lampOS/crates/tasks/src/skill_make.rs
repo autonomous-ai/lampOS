@@ -297,9 +297,11 @@ pub const EXAMPLES_FOLDER: &str = "examples";
 /// keeps a note, a say again every 30 minutes while someone stays, and a
 /// reminder set in the lamp's schedule, and a script that leads breaths
 /// with the light and the voice, and a reminder every 30 minutes started
-/// by words. lamp-skills' `tests/it/make_check.rs` packs each with the
+/// by words; a linked-service read started by words (the one-line stub,
+/// the `task` the work for the lamp's agent), and a `net` script that
+/// fetches one public value and says it. lamp-skills' `tests/it/make_check.rs` packs each with the
 /// real `lamp-skills pack`, so none can be one the check refuses.
-pub const MAKE_EXAMPLES: [(&str, &str); 19] = [
+pub const MAKE_EXAMPLES: [(&str, &str); 25] = [
     (
         "desk-light/skill.toml",
         include_str!("make_examples/desk-light/skill.toml"),
@@ -375,6 +377,30 @@ pub const MAKE_EXAMPLES: [(&str, &str); 19] = [
     (
         "water-breaks/SKILL.md",
         include_str!("make_examples/water-breaks/SKILL.md"),
+    ),
+    (
+        "agenda-count/skill.toml",
+        include_str!("make_examples/agenda-count/skill.toml"),
+    ),
+    (
+        "agenda-count/SKILL.md",
+        include_str!("make_examples/agenda-count/SKILL.md"),
+    ),
+    (
+        "agenda-count/scripts/main.py",
+        include_str!("make_examples/agenda-count/scripts/main.py"),
+    ),
+    (
+        "sun-times/skill.toml",
+        include_str!("make_examples/sun-times/skill.toml"),
+    ),
+    (
+        "sun-times/SKILL.md",
+        include_str!("make_examples/sun-times/SKILL.md"),
+    ),
+    (
+        "sun-times/scripts/main.py",
+        include_str!("make_examples/sun-times/scripts/main.py"),
     ),
 ];
 
@@ -2515,6 +2541,24 @@ mod tests {
         assert!(GUIDE.contains(&format!(
             "{CHECK_PROGRAM} pack --out {CHECK_OUT} draft/NAME"
         )));
+        // #7874: how a made skill runs, and the `task` words' rule.
+        let flat = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+        for told in [
+            "## How a made skill runs",
+            "`Run <skill-start> <run id>`",
+            "The agent sees only what the script prints.",
+            "the agent answers only a dash",
+            "`Said aloud through the lamp.`",
+            "one plain sentence a person understands, at most 120 characters",
+            "print(\"The lamp's agent does this task with its lamp-services tools.\")",
+            "`services_connected`, `service_read`, `service_write`",
+            "granted `net` and `speak`",
+            "`HTTPS_PROXY`",
+            "examples/agenda-count",
+            "examples/exchange-rate, sun-times",
+        ] {
+            assert!(flat.contains(told), "{told}");
+        }
         // Anything but a boolean is no make's line.
         let refused = answer(
             &guided(json!("yes")),

@@ -3271,12 +3271,15 @@ cả hai người viết.
   `format.md`, toàn bộ `docs/skill-format.md` của bản build này
   (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, toàn bộ tài liệu SDK
   Python của đèn (`skill_make::SDK`, `sdk/python/README.md`, để code của
-  kỹ năng dùng được mọi hàm), và `examples/`, bảy kỹ năng hoàn chỉnh
+  kỹ năng dùng được mọi hàm), và `examples/`, mười kỹ năng hoàn chỉnh
   (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu nói
   theo `asks`, cử chỉ và câu nói khi ngồi lâu, tung đồng xu bằng code, câu
   nói lặp mỗi 30 phút khi có người, hẹn giờ nghỉ bằng `remind`, nhắc uống
   nước mỗi 30 phút bằng `remind every`, và script dẫn ba nhịp thở bằng đèn
-  và giọng nói), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
+  và giọng nói; #7874: `agenda-count`, đọc lịch theo `asks`, `main.py` là
+  dòng stub lamp-services; và, với grant `net` và `speak`, `exchange-rate`
+  (#7742) và `sun-times`, mỗi cái là code urllib riêng qua `HTTPS_PROXY` của
+  lần chạy, nói một giá trị lấy được bằng `lamp.say`), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
   nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
   ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
   của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
@@ -3287,7 +3290,10 @@ cả hai người viết.
   (0600), cạnh `rules.md` trong thư mục của lần tạo
   (`lamp_tasks::skill_make::GUIDE`, từ `skill_make_guide.md`: bản cho đèn
   của `skills/skill-creator/SKILL.md` của V1, Apache-2.0, dòng đầu ghi
-  nguồn gốc và giấy phép đó; bỏ phần eval, benchmark và viewer của V1).
+  nguồn gốc và giấy phép đó; bỏ phần eval, benchmark và viewer của V1;
+  #7874: mục "How a made skill runs" nói cách kỹ năng chạy, luật lời
+  `task` là một câu dễ hiểu tối đa 120 ký tự, kỹ năng dịch vụ liên kết và
+  kỹ năng `net`).
   Lần chạy được dặn đọc hướng dẫn trước, luật thắng khi hai bên khác nhau:
   lấy ý định chỉ từ lời người dùng (đèn làm gì, khi nào, và điều gì dạng
   kỹ năng không làm được, ghi là bỏ ra), viết nháp kỹ năng trong

@@ -650,10 +650,12 @@ fn agent_services() -> String {
          topics, and speak = true only beside a say step; its \
          trigger the lamp's own (a time, someone coming or leaving, as above){words}; and exactly one \
          [[do]] step, alone in its step: task = {{ task = \"...\", run = \"scripts/main.py\" }}, \
-         the task's words, at most {most} characters, saying plainly for the lamp's agent what \
+         the task's words, one plain sentence of at most {most} characters, read back whole for \
+         the person's yes, saying plainly for the lamp's agent what \
          to read and what to tell the person, or what to send, in the request's own words, and \
          to whom (an address the request says, or the person's own for me); and one \
-         ```scripts/main.py block that only prints a line, as in the example. Never a read = \
+         ```scripts/main.py block that is exactly the example's one line, which holds no token. \
+         Never a read = \
          {{ ... }} or write = {{ ... }} step. What the agent finds comes back as the lamp's task \
          news. Any send is read back by the lamp and goes only on the person's spoken yes. A \
          request to delete or change anything already in a service is answered with one line \
