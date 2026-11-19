@@ -2480,7 +2480,9 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   ở hạn chót để phiên giữ lại ở trạng thái `working`, và mọi lần make sau đều
   bị báo `NOT_IDLE` cho tới khi gateway khởi động lại); đăng xuất hoặc đổi
   engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
-  và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
+  và trong lúc đó không mở pane nào; lần đóng của một lượt bị huỷ hay bị
+  kẹt mà lại lỗi lần nữa vẫn là của lượt đó, nên lần đóng thành công sau
+  cùng giữ nguyên token (không tạo token mới, không `NAME_TAKEN`). Factory reset xoá thư mục store, cả
   token.
 - **Phiên mới khi gần giới hạn ngữ cảnh (#7906).** Điều này sửa quy tắc
   "không bắt đầu lại" của #7246: trên lamp-52e6 một lần make làm tràn phiên
@@ -2492,8 +2494,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   nên trước mỗi lượt, một lần, lamp-tasks đọc kích thước phiên trong bản ghi
   của chính OpenClaw (`harness::openclaw_session_size`: phiên hiện tại của
   node trong `<OPENCLAW_STATE_DIR>/agents/main/agent/openclaw-agent.sqlite`,
-  mở chỉ đọc; đếm các dòng có vai trò, cộng số byte đã lưu và tính 4 byte
-  một token). Một lần make được vào phiên mới khi phiên cũ đã có 76.800
+  mở chỉ đọc; chỉ các dòng `user` và `assistant` được đếm là tin nhắn,
+  không bao giờ `toolResult`, nên một lần make dài không đẩy lần make sau
+  sang phiên mới và mất phần nhớ, còn schema không có `message_role` thì
+  đếm mọi dòng; số byte đã lưu của mọi dòng được cộng và tính 4 byte một
+  token, đây là chốt chặn chính). Một lần make được vào phiên mới khi phiên cũ đã có 76.800
   token (`MAKE_FRESH_TOKENS`, 60% của 128k, chừa khoảng 51k cho hướng dẫn
   make, các ví dụ nó đọc, đầu ra công cụ và bản nháp) hoặc hơn 100 tin nhắn
   (`MAKE_FRESH_MESSAGES`; phiên của 52e6 khoảng 725 token một tin nhắn, nên
@@ -2565,12 +2570,13 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     `wait` của lượt (`TURN_WATCH`, `harness::openclaw_turn_at`, cùng key):
     bản ghi không vượt quá chỗ lúc giao sau 60 s kể từ `taken` của Harness
     (`TURN_START_WITHIN`, 4a); phiên đang `running` mà `seq` cao nhất không
-    đổi trong 3 phút và dòng cuối là của `user`, model chưa hề bắt đầu trả
-    lời (`TURN_STALL`, 4b, cũng chặn một lần giao bị `NOT_IDLE`), hoặc không
-    đổi trong 10 phút khi dòng cuối là `toolResult` (`TOOL_RESULT_STALL`:
-    Gateway chỉ ghi dòng của assistant khi cả tin nhắn đã xong, nên một lần
-    make viết SKILL.md dài, model chậm hay suy nghĩ lâu đều không thấy thay
-    đổi trong nhiều phút); hoặc lượt còn mở trong khi trạng thái phiên là
+    đổi trong 10 phút và dòng cuối là của `user` hoặc là `toolResult`
+    (`TOOL_RESULT_STALL`, 4b, cũng chặn một lần giao bị `NOT_IDLE`: Gateway
+    chỉ ghi dòng của assistant khi cả tin nhắn đã xong, nên một tin nhắn
+    đầu dài, một lần make viết SKILL.md dài, model chậm, suy nghĩ lâu hay
+    các lần thử lại vì 429 đều không thấy thay đổi trong nhiều phút;
+    `TURN_STALL`, 3 phút, chỉ là mức sàn mà nó không bao giờ thấp hơn và là
+    gốc để test rút ngắn cả hai); hoặc lượt còn mở trong khi trạng thái phiên là
     `killed`, `failed` hay `timeout` (`DEAD_STATUSES`; không bao giờ là
     `done`, rỗng hay trạng thái khác) suốt 15 s (`DEAD_WORKING`). Lượt đã
     kết thúc idle giữ câu trả lời của nó dù có kết luận cùng lúc. Luồng theo

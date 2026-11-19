@@ -38,7 +38,8 @@
 //!   read): a make goes into a fresh session once the old one holds
 //!   [`MAKE_FRESH_TOKENS`] (60%) or more than [`MAKE_FRESH_MESSAGES`],
 //!   any other task once it holds [`TASK_FRESH_TOKENS`] (85%) or more than
-//!   [`TASK_FRESH_MESSAGES`] ([`near_context_limit`]); the record
+//!   [`TASK_FRESH_MESSAGES`] ([`near_context_limit`]), counting only the
+//!   `user` and `assistant` rows as messages, never a tool's result; the record
 //!   unreadable, the pane's own token count is weighed instead. The full
 //!   session is replaced as at a rotation: the kept session `ensure
 //!   --fresh`, its token kept, as for one gone or stuck, but closed by that
@@ -72,7 +73,12 @@
 //!   (sign 1), or a plain shell or gone (sign 2), goes through
 //!   [`OneSession::replace_kept`]: closed `--now`, forgotten, its
 //!   conversation deleted, and a fresh one opened; bounded by
-//!   [`REPLACE_MOST`].
+//!   [`REPLACE_MOST`]. A turn not moving (sign 4, [`TurnWatch`]): nothing
+//!   past the hand-over in [`TURN_START_WITHIN`] (4a), or the record
+//!   unmoved for [`TOOL_RESULT_STALL`] with the `user`'s row or a tool's
+//!   result last (4b: the Gateway writes the assistant's row only once a
+//!   whole message is done). A close that fails is tried again at the next
+//!   look as the same close, so a cancelled or stuck turn's keeps its token.
 //! - **No reply, no pane for tasks.** Harness takes a reply only with the
 //!   person's `programs-reply` setting on, off by default. A reply refused
 //!   `REPLY_OFF` sends that task, and every later one until lamp-tasks
@@ -287,17 +293,19 @@ pub fn near_context_limit(size: Option<SessionSize>, tokens: u64, make: bool) ->
 /// this long after: the Gateway writes the task's message as soon as it
 /// gets it, so no exec of this turn can be live.
 pub const TURN_START_WITHIN: Duration = Duration::from_secs(60);
+/// #7906 sign 4b's floor and test base: [`TOOL_RESULT_STALL`] is never
+/// below it, and [`OneSession::with_turn_watch`] shortens both from it in
+/// tests (as 600 s is to 180 s). No row is cut at it alone.
+pub const TURN_STALL: Duration = Duration::from_secs(180);
 /// #7906 sign 4b: a turn open (`working`), its session `running`, and the
 /// record's highest `seq` unmoved this long, with its last row the
-/// `user`'s: the model never began its answer. A last row of the
-/// assistant's (a tool call still running, a long exec) is never cut here:
-/// lamp-tasks can't see the exec's process, so it is left to the run's
-/// deadline.
-pub const TURN_STALL: Duration = Duration::from_secs(180);
-/// #7906 sign 4b after a tool's result (`toolResult` last): the Gateway
-/// writes the assistant's row only once a whole message is done, so a long
-/// tool-call write (a make's SKILL.md), a slow model or long thinking shows
-/// no move for minutes. Only this long unmoved is stuck.
+/// `user`'s or a tool's result (`toolResult`): the Gateway writes the
+/// assistant's row only once a whole message is done, so a long first
+/// message, a long tool-call write (a make's SKILL.md), a slow model, long
+/// thinking or 429 retries show no move for minutes. Only this long
+/// unmoved is stuck. A last row of the assistant's (a tool call still
+/// running, a long exec) is never cut here: lamp-tasks can't see the
+/// exec's process, so it is left to the run's deadline.
 pub const TOOL_RESULT_STALL: Duration = Duration::from_secs(600);
 /// The session statuses that say its run ended badly ([`DEAD_WORKING`]);
 /// `done`, none or any other is never taken as dead.
@@ -357,7 +365,6 @@ pub struct TurnWatch {
     /// The record at the hand-over; [`TURN_START_WITHIN`] needs it.
     base: Option<(String, i64)>,
     start_within: Option<Duration>,
-    stall: Duration,
     /// [`TOOL_RESULT_STALL`], shorter in tests.
     tool_stall: Duration,
     dead_within: Duration,
@@ -379,7 +386,6 @@ impl TurnWatch {
             since,
             base,
             start_within: Some(start_within),
-            stall,
             tool_stall: TOOL_RESULT_STALL.max(stall),
             dead_within: DEAD_WORKING,
             last: None,
@@ -390,7 +396,8 @@ impl TurnWatch {
     }
 
     /// A hand-over refused `NOT_IDLE` since `since`: the turn it waits on
-    /// is judged by [`TURN_STALL`] and [`DEAD_WORKING`] only.
+    /// is judged by sign 4b ([`TOOL_RESULT_STALL`], for a `user` or a
+    /// `toolResult` last row) and [`DEAD_WORKING`] only, never by 4a.
     pub fn refused(since: Instant, stall: Duration) -> Self {
         Self {
             start_within: None,
@@ -456,8 +463,9 @@ impl TurnWatch {
         }
         let still = now.saturating_duration_since(self.changed);
         let stall = match record.last_role.as_deref() {
-            Some("user") => Some(self.stall),
-            Some("toolResult") => Some(self.tool_stall),
+            // The user's row last or a tool's result: the Gateway writes
+            // the assistant's row only once its whole message is done.
+            Some("user" | "toolResult") => Some(self.tool_stall),
             _ => None,
         };
         (working && running && stall.is_some_and(|stall| still >= stall)).then(|| {
@@ -1567,6 +1575,9 @@ impl OneSession {
                 let mut inner = self.lock();
                 inner.drop_due = Some(why.to_owned());
                 inner.drop_now |= now;
+                // An unanswered turn's close stays one (`take_due` cleared
+                // it): the close that succeeds keeps the token.
+                inner.drop_keeps_token |= !token;
                 return;
             }
             self.kept_closed(&agent, kind);

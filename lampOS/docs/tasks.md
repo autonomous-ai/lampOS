@@ -5128,7 +5128,9 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   at its deadline left the kept session `working`, and every later make was
   told `NOT_IDLE` until the gateway restarted); a sign-out or an engine
   switch removes the token file too. One not closed is tried again at the
-  next look, and no pane is opened meanwhile. A factory reset wipes the
+  next look, and no pane is opened meanwhile; a cancelled or stuck turn's
+  close that fails again stays that turn's, so the close that finally
+  succeeds keeps the token (no new token, no `NAME_TAKEN`). A factory reset wipes the
   store folder, token included.
 - **A fresh session near the context's limit (#7906).** This revises
   #7246's "no fresh start": on lamp-52e6 a make overflowed the kept session
@@ -5140,8 +5142,11 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   once, lamp-tasks reads the session's size in OpenClaw's own record
   (`harness::openclaw_session_size`: the node's current session in
   `<OPENCLAW_STATE_DIR>/agents/main/agent/openclaw-agent.sqlite`, opened
-  read-only; its rows with a role counted, their stored bytes summed and
-  taken at 4 bytes a token). A make goes into a fresh session once the old
+  read-only; only its `user` and `assistant` rows counted as messages,
+  never a `toolResult`, so one long make does not send the next into a
+  fresh session and lose its recall, every row counted on a schema with no
+  `message_role`; every row's stored bytes summed and taken at 4 bytes a
+  token, the main guard). A make goes into a fresh session once the old
   one holds 76,800 tokens (`MAKE_FRESH_TOKENS`, 60% of 128k, leaving about
   51k for the make's guide, the examples it reads, its tool output and its
   draft) or more than 100 messages (`MAKE_FRESH_MESSAGES`; 52e6's ran about
@@ -5214,12 +5219,13 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     `wait` (`TURN_WATCH`, `harness::openclaw_turn_at`, the same key): the
     record not past the hand-over 60 s after Harness's `taken`
     (`TURN_START_WITHIN`, 4a); the session `running` with its highest
-    `seq` unmoved for 3 min and its last row the `user`'s, the model's
-    answer never begun (`TURN_STALL`, 4b, which also bounds a `NOT_IDLE`
-    hand-over), or unmoved for 10 min with a `toolResult` last
-    (`TOOL_RESULT_STALL`: the Gateway writes the assistant's row only once a
-    whole message is done, so a make writing a long SKILL.md, a slow model
-    or long thinking shows no move for minutes); or the turn open while the
+    `seq` unmoved for 10 min with its last row the `user`'s or a
+    `toolResult` (`TOOL_RESULT_STALL`, 4b, which also bounds a `NOT_IDLE`
+    hand-over: the Gateway writes the assistant's row only once a whole
+    message is done, so a long first message, a make writing a long
+    SKILL.md, a slow model, long thinking or 429 retries show no move for
+    minutes; `TURN_STALL`, 3 min, is only the floor it is never below and
+    the base tests shorten both from); or the turn open while the
     session's status is `killed`, `failed` or `timeout` (`DEAD_STATUSES`;
     never `done`, none or another) for 15 s (`DEAD_WORKING`). A turn that
     ended idle keeps its answer even if a verdict came at the same moment.
