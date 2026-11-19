@@ -1299,6 +1299,31 @@ cho đúng quyền đó, cấu hình home mới có `mcp_servers.lamp-services`.
 Hermes, lời người nói nằm trong tệp quy tắc (không bao giờ trong đối số),
 câu trả lời đọc từ `answer.md`, gộp khoảng trắng và tối đa 3.000 byte, thư
 mục bị xoá và token kết thúc dù lượt chạy kết thúc thế nào, tối đa 120 s.
+Với đường chạy chung của lamp-update (`LAMP_SKILL_DEFAULT_AGENT=on`), có
+wrapper chỉ tách khỏi mạng một lượt chạy trong thư mục `skill-<run id>` của
+riêng nó, runner tạo kỹ năng đã tách mạng sẽ bị từ chối
+(`NOT_HELD_OFF_ONE_PATH`, lamp-9adf, 20/11), nên một yêu cầu có quyền đi qua
+`skill_make::AskRunner`: wrapper của Hermes do chính lamp-tasks khởi động
+bằng lối vào việc (task entry) của nó (`HarnessRunner::run_task_entry`, như
+lượt chạy của một kỹ năng không có Harness), trong thư mục `skill-<run id>`
+của riêng nó (wrapper đọc tệp token, cho `--net` và không cho lượt chạy lối
+ra nào), home mới là `make-<run id>/home` của chính yêu cầu, báo cho wrapper
+bằng `LAMP_NS_HOME` như của một lần tạo. Không bao giờ qua Harness, vì
+Harness không truyền biến nào của lamp-tasks cho wrapper: một lượt chạy có
+home mới và không có lối ra bị từ chối ở đó. Trước khi cấp token nào,
+wrapper phải nhận lượt chạy bằng lối vào việc và home của một lần tạo, và
+namespace của agent phải hiện home đó, ẩn home lâu dài
+(`HarnessRunner::takes_fresh_tasks`), nếu không yêu cầu bị từ chối
+`no_namespace` và không gì khởi động. Đường này chỉ thêm hai lần đọc tệp
+nhỏ, một thư mục, tệp token và tệp việc trước khi khởi động: không khởi
+động Harness, nên một lần đọc bắt đầu nhanh như trước. Khi công tắc tắt,
+yêu cầu có quyền chạy trên runner tạo kỹ năng đã tách mạng như trước.
+Một yêu cầu khó giữ runner của lần tạo: không tách mạng (mặc định) thì nó
+khởi động như trước; với `LAMP_MAKE_AGENT_NET=held` nó không có token, thứ
+mà wrapper của đường chạy chung cần cho một lượt chạy trong thư mục riêng
+(lamp-control chỉ cấp token cho một yêu cầu đọc dịch vụ liên kết), nên ở đó
+nó vẫn đóng an toàn, báo `not_held_off` (như `NOT_HELD_OFF_ONE_PATH` bây
+giờ), không bao giờ `run_failed`.
 Tắt thì dòng bị từ chối `off` và các lần tạo như trước
 ([services_vi.md](services_vi.md)).
 
