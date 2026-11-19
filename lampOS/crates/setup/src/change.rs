@@ -33,7 +33,9 @@
 //!   written and answered, then, once no update is at work (no quiet: its
 //!   restart makes no sound), `systemctl daemon-reload` and a restart of
 //!   [`CONTROL_UNIT`] ([`restart_control_when_unlocked`]). Off: the door is
-//!   closed before the answer ([`close_before_answer`]);
+//!   closed before the answer ([`close_before_answer`]): the drop-in goes and
+//!   lamp-control is restarted, not stopped, so it comes back with the door
+//!   shut and still serves the voice's yes records, skill runs and apps;
 //! - the owner's dev monitor (`monitor.set`, #5883, `docs/peek.md`):
 //!   lamp-peek's drop-in ([`MONITOR_DROPIN`], `LAMP_PEEK=monitor`), as
 //!   developer access: on is written, answered, then [`PEEK_UNIT`] is
@@ -1224,10 +1226,12 @@ impl Ears for Clock {
 /// before the app is told. lamp-update's lock first, at most
 /// [`CLOSE_LOCK_MOST`], else refused with nothing changed; then, holding it,
 /// the drop-in removed (developer off also the agent's), `daemon-reload` and
-/// `stop` of its unit (a `restart` for the agent off beside developer access
-/// still on, so the agent's socket goes and the developer door stays), and
-/// only then the reply, which this returns for the caller to write. A stop
-/// that failed is said, never claimed closed. `None` when `line` is not such
+/// `restart` of its unit (lamp-control: with the drop-in gone it starts with
+/// the door shut and serves only the owner's side, so no computer can reach
+/// the lamp and the voice's yes records, skill runs and apps keep working;
+/// lamp-peek, for the dev monitor, is stopped), and only then the reply,
+/// which this returns for the caller to write. A restart or stop that failed
+/// is said, never claimed closed. `None` when `line` is not such
 /// a request: it is answered by [`answer`] as any other.
 pub fn close_before_answer(
     line: &str,
@@ -1263,7 +1267,12 @@ pub fn close_before_answer(
                     CONTROL_UNIT,
                     "lamp-control",
                     CLOSE_MAY_STAY_OPEN,
-                    false,
+                    // A restart, never a stop: with the drop-in gone the unit
+                    // starts again with the door shut (no `LAMP_CONTROL=on`:
+                    // nothing listens on the network), and goes on serving
+                    // what the product needs of it (the voice's yes records,
+                    // lamp-tasks' mints, the run socket, the apps' socket).
+                    true,
                 )
             }
             Ok(Change::LocalAgent(false)) if there(&config.agent_dropin) => (
@@ -1272,7 +1281,9 @@ pub fn close_before_answer(
                 CONTROL_UNIT,
                 "lamp-control",
                 CLOSE_MAY_STAY_OPEN,
-                there(&config.control_dropin),
+                // Always restarted, as developer access off is: what the
+                // product needs of lamp-control goes on without the door.
+                true,
             ),
             Ok(Change::Monitor(false)) if there(&config.monitor_dropin) => (
                 vec![config.monitor_dropin.as_path()],
@@ -1299,7 +1310,11 @@ pub fn close_before_answer(
             failed.get_or_insert(error.kind());
         }
     }
-    let (verb, did) = if restart {
+    // A restart only when every removal worked: a drop-in left in place
+    // would start lamp-control with the door open again at once (Heron on
+    // #7998), so then it is stopped, as before, and stays down until its
+    // next start.
+    let (verb, did) = if restart && failed.is_none() {
         ("restart", "restarted")
     } else {
         ("stop", "stopped")
