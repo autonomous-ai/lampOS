@@ -897,6 +897,40 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   It likely also ended a running voice with exit 1 in the field; that has
   no journal yet.
 
+- **One late privacy reading ended a make's hold (#7224 fault 5, part
+  1).** On lamp-c0a4 at 23:26 on 19 Nov, during a make's 3-4 min hold, the
+  cycle ended on `privacy_unreadable` ("service privacy freshness lost
+  before next observation"), a fresh privacy worker read the switch open
+  88 ms later, and the make's answer was lost. Controls' health was steady,
+  with 0 reconnects. From the code: with `LAMP_PRIVACY_GAP_RIDE` off, the
+  privacy worker itself ends when a reading is 50 ms late
+  (`SourceGap::missing`), and the loop's 50 ms gate check ends the cycle;
+  the `ENOTCONN` in the trace (`stop_delivery_error`) is the shutdown's Stop
+  to a worker already gone, not the cause. `LAMP_PRIVACY_GAP_RIDE=on` is now
+  in the product unit beside `LAMP_PRIVACY_RIDES_STALL` (the first builder,
+  19 Nov 23:59), so such a lapse is ridden for up to 1 s
+  (`service-privacy.md`): no frame is taken, the turn in flight is cut, and
+  the conversation goes on. A make's answer cut by a ride is fault 5 part 2
+  (its outcome kept past its turn). The install test pins the unit line.
+  Twelve's forced gap on lamp-c0a4 (20 Nov 07:08, ROW FAIL) found the ride
+  covered only a missing reading: Controls kept publishing while the slide's
+  reading lapsed, the fence refused the stale acquisition
+  (`SwitchFence::accept`, "physical privacy acquisition unavailable"), and
+  the worker ended 4 ms into the ride ("privacy worker failed"). With the
+  ride on and capture granted, a stale or level-less acquisition is now
+  `Acquired::Stale` (`SwitchFence::accept_riding`): the fence keeps its
+  envelope so the next state continues the order, the worker closes its
+  gate, says `PrivacyUnavailable` (`SourceGap::stale`), keeps its last fresh
+  reading and goes on reading. Another clock, a reading ahead of now, and
+  session and order errors still end it, and so does a fresh reading that
+  regressed or changed its reader or identity. A stale reading is not
+  checked against the last one, so one that regressed is ridden, closed:
+  the gate is shut, the last fresh reading kept, and the next fresh one is
+  checked against it. The 1 s bound still ends the conversation; a fresh
+  muted reading is still the mute at once.
+  Off, nothing changes. Owed: the same forced-gap leg on lamp-c0a4, then a
+  count of gaps over the hour.
+
 Not found yet: the power cut's first exit (exit 1 at 19.8 s, with no message
 of its own) and the provider's "Connection refused" at 24.7 s; that boot's
 journal is gone, and both need a second power cut with this build to see.

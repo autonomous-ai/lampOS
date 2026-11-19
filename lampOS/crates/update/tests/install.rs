@@ -1813,6 +1813,25 @@ fn the_product_keeps_what_was_heard() {
     );
 }
 
+/// A split-second lapse of the privacy switch's readings is ridden in the
+/// product (#7224 fault 5, the first builder's ruling of 19 Nov 23:59): the
+/// gap ride beside the stall ride, both exactly `on`.
+#[test]
+fn the_product_rides_a_short_privacy_gap() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PRIVACY_RIDES_STALL=on",
+        "Environment=LAMP_PRIVACY_GAP_RIDE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
 /// decision of 4 Nov) stays off in the product: the lead's ruling of 11 Nov
 /// (#1711) keeps the lead's 20 Oct ruling, as CAM++'s weights are trained on
