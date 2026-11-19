@@ -4294,6 +4294,25 @@ gone ([switches.md](switches.md)). What happens:
      it is. The voice's `make_skill` answer's `error` and `next` carry the
      same plain line. Tests: `a_failed_make_is_told_in_plain_words`,
      `a_cut_after_its_repairs_is_told_as_the_refusal`.
+   - **The name the person gave is the skill's** (#7911, lamp-9adf, 19
+     Nov: "make a skill called evening rate" was kept as the model's
+     `nightly-dollar-rate`, and "change evening rate" then found none and
+     made a second skill). `make_skill` takes `given_name`
+     (`make_skill_local::GIVEN_NAME`): the name the person gives the new
+     skill as they ask for it, in any words ("called evening rate", "name
+     it evening rate"), word for word, left out when they give none. The
+     voice's model judges their words; no word list reads them. Code then
+     makes it the skill's name whoever writes the skill, DeepSeek or the
+     lamp's agent (both answers go through `made_skill::keep_asked`):
+     written as a kept skill's name is (`made_skill::given_name`,
+     `made_skill::name_asked`: `evening-rate`), cut to the name's bound,
+     and put on the card in place of the maker's (`named_as_given`), before
+     a taken name gets a free one, below. With none given, or one that
+     gives no skill's name (no letter first, or letters a skill's name
+     can't have, "tỷ giá"), the maker's own name stands, as before. An
+     undo never takes one. Tests:
+     `a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models`,
+     `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`.
    - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
      keeps the lamp's own skills, welcome-back, bedtime-morning,
      light-out, sip-of-water among them, so a skill the model named
