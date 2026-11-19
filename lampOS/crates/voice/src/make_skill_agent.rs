@@ -894,6 +894,17 @@ impl Agent {
     /// [`WAITING_LINE`] is said once lamp-tasks says the run starts, never
     /// when it was refused at once.
     pub fn write(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
+        // A voice make's id, written down for a restart of its route while
+        // lamp-tasks holds it (#7224, fault 5), and taken out the moment
+        // this returns: its answer read, before any check.
+        struct Answered;
+        impl Drop for Answered {
+            fn drop(&mut self) {
+                crate::make_resume::answered();
+            }
+        }
+        let make_id = crate::make_resume::handed_over();
+        let _answered = Answered;
         let mut stream = UnixStream::connect(self.tasks.join(MAKE_SOCKET_NAME))
             .map_err(|_| NotWritten::NoMakeRun)?;
         // lamp-tasks ends the run at `within`; its answer comes just after.
@@ -909,6 +920,12 @@ impl Agent {
         if self.guide {
             line["guide"] = json!(true);
             line["switches"] = check_switches();
+        }
+        // Its id with every hand-over of a voice make, its repairs too, so
+        // lamp-tasks keeps its outcome by it when this route is gone; none
+        // for any other make, its line as before.
+        if let Some(id) = make_id {
+            line["make_id"] = json!(id);
         }
         // The one run path asked for only with its switch: off, the line
         // is as above, byte for byte.

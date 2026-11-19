@@ -2510,6 +2510,9 @@ pub fn serve(
     let checked = checks_sounds(&files);
     let tools = files.tools;
     start_tasks(&tools);
+    if tools.make_skill {
+        resume_made_after_restart(&tools);
+    }
     // As the Live route says them, when this route is the only voice.
     let reminders = route.only_voice && tools.schedule_speak;
     if reminders {
@@ -6273,7 +6276,30 @@ async fn run_call(
             }
         }
     }
+    // A voice make heard in its own turn, written down while lamp-tasks
+    // holds it (`LAMP_MAKE_SKILL_AGENT`, #7224 fault 5): a route that stops
+    // then leaves it for the next worker, which makes it again
+    // ([`resume_made_after_restart`]). Read only with the switch on.
+    let resumable = (made
+        && heard
+        && crate::make_skill_agent::on()
+        && crate::make_queue::is_new_make(&call.args))
+    .then(|| crate::make_resume::InFlight {
+        request,
+        args: call.args.clone(),
+        asker: crate::make_queue::Asker {
+            speaker: speaker_of(scope.as_ref()),
+            owner: crate::services::owner_of(scope.as_ref()),
+            heard: crate::thread::THREAD.lock().ok().and_then(|thread| {
+                thread
+                    .heard_in_own_line(request)
+                    .or_else(|| thread.heard_for(request, Instant::now()))
+            }),
+        },
+        at_unix_ms: crate::make_resume::unix_ms(),
+    });
     let running = move || {
+        let _resumable = resumable_on_this_thread(Path::new(crate::make_resume::FILE), resumable);
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
         // The Live route's line for a call the Policy held and then
@@ -6347,6 +6373,226 @@ async fn run_call(
     tokio::task::spawn_blocking(running)
         .await
         .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+}
+
+/// At the worker's start (#7224, fault 5): each voice make a route that
+/// stopped during its hand-over left ([`crate::make_resume::left_at`]) made
+/// again with no turn, as a make that waited its turn is
+/// ([`run_queued_with`]), held to who asked and the line heard at its ask,
+/// its line said at most once, once the say service answers
+/// ([`say_resumed_line`]). Its
+/// hand-over asks lamp-tasks the same make by its id, which gives it the
+/// outcome it kept, or waits for the one still being made.
+fn resume_made_after_restart(settings: &crate::tools::Settings) {
+    if !crate::make_skill_agent::on() {
+        return;
+    }
+    resume_made_at(
+        Path::new(crate::make_resume::FILE),
+        settings,
+        |request, work| run_queued_with(request, work, say_resumed_line, || ()),
+    );
+}
+
+/// [`resume_made_after_restart`] from `path`, each make's work given to
+/// `run` with its request. How many.
+fn resume_made_at(
+    path: &Path,
+    settings: &crate::tools::Settings,
+    mut run: impl FnMut(u64, crate::make_queue::Work),
+) -> usize {
+    let left = crate::make_resume::left_at(path, crate::make_resume::unix_ms());
+    let count = left.len();
+    for make in left {
+        let request = make.request;
+        eprintln!(
+            "lamp-voice second: request {request}: its route stopped while lamp-tasks held its make: made again now, its outcome said at most once"
+        );
+        let label = crate::make_queue::label_of(&make.args);
+        let call = lamp_gemini::ToolCall {
+            id: format!("resumed-{request}"),
+            name: crate::made_skill::MAKE.to_owned(),
+            args: make.args.clone(),
+        };
+        let work = queued_work(settings.clone(), call, request);
+        // Written down again at each of its hand-overs: a second restart
+        // leaves it too, still within its first ask's bound and id.
+        let (asker, path) = (make.asker.clone(), path.to_owned());
+        run(
+            request,
+            Box::new(move || {
+                let _on = resumable_on_this_thread(&path, Some(make));
+                let answer =
+                    crate::make_skill_local::with_asker_kept(asker.heard, asker.owner, work);
+                crate::make_skill_local::failed_unless_said(|| {
+                    crate::make_queue::failed_line(&label, &answer.told)
+                });
+                answer
+            }),
+        );
+    }
+    count
+}
+
+/// A voice make's own `make` (`resumable`, none for any other) on this
+/// thread, the one its hand-overs run on: its id rides each of them and it
+/// is written down at `path` while lamp-tasks holds it.
+fn resumable_on_this_thread(
+    path: &Path,
+    resumable: Option<crate::make_resume::InFlight>,
+) -> crate::make_resume::OnThisThread {
+    crate::make_resume::on_this_thread_at(path, resumable)
+}
+
+/// A resumed make's line, said at most once, once the say service answers (it starts
+/// beside the worker, and a kept outcome comes at once), waited for at most
+/// `make_queue`'s 30 s and said all the same; journaled when it still
+/// wasn't said.
+fn say_resumed_line(line: String) {
+    say_when_ready(
+        line,
+        say_service_answers,
+        crate::make_queue::SAY_READY_WITHIN,
+        |line| {
+            crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line)
+                == Some(crate::say::Outcome::Spoken)
+        },
+    );
+}
+
+/// `line` given to `say` once `ready` holds, or after `within` all the
+/// same; whether it was said, journaled when not.
+fn say_when_ready(
+    line: String,
+    ready: impl Fn() -> bool,
+    within: Duration,
+    say: impl FnOnce(String) -> bool,
+) -> bool {
+    if !crate::make_queue::ready_within(ready, within, crate::make_queue::SAY_READY_EVERY) {
+        eprintln!(
+            "lamp-voice second: the say service didn't answer within {} s of the start: a resumed make's line is said all the same",
+            within.as_secs()
+        );
+    }
+    let said = say(line);
+    if !said {
+        eprintln!("lamp-voice second: a resumed make's line was not said");
+    }
+    said
+}
+
+#[cfg(test)]
+mod resume_tests {
+    use super::*;
+
+    /// #7224, fault 5: what a route that stopped mid-make left is read at
+    /// the worker's start and given to be made once; a second start finds
+    /// nothing.
+    #[test]
+    fn a_make_left_is_resumed_once_at_the_start() {
+        let dir = std::env::temp_dir().join(format!("resume-at-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("make-in-flight.json");
+        let make = crate::make_resume::InFlight {
+            request: 7,
+            args: serde_json::json!({"request": "check the gold price at six"}),
+            asker: crate::make_queue::Asker::default(),
+            at_unix_ms: crate::make_resume::unix_ms(),
+        };
+        std::mem::forget(crate::make_resume::begin_at(&path, make));
+        let settings = crate::tools::Settings::default();
+        let mut runs = Vec::new();
+        assert_eq!(
+            resume_made_at(&path, &settings, |request, _| runs.push(request)),
+            1
+        );
+        assert_eq!(runs, vec![7]);
+        assert_eq!(
+            resume_made_at(&path, &settings, |request, _| runs.push(request)),
+            0
+        );
+        assert_eq!(runs, vec![7], "never twice");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #7224 fault 5, the wire: a voice make on its thread
+    /// ([`resumable_on_this_thread`]) sends its id on its first hand-over
+    /// and on a repair, the same both times, and is written down while
+    /// lamp-tasks holds it; a make with none (the app's MAKE IT) sends no
+    /// id. Fails with the thread's make or the line's id taken out.
+    #[test]
+    fn a_voice_makes_id_rides_each_hand_over_and_an_app_makes_none() {
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(|_: &str| Some("A".to_owned())),
+        );
+        let agent = tasks.agent();
+        let dir = std::env::temp_dir().join(format!("resume-wire-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("make-in-flight.json");
+        let make = crate::make_resume::InFlight {
+            request: 9,
+            args: serde_json::json!({"request": "check the gold price at six"}),
+            asker: crate::make_queue::Asker::default(),
+            at_unix_ms: 1_700_000_000_000,
+        };
+        let ids = |sent: &[serde_json::Value]| -> Vec<Option<String>> {
+            sent.iter()
+                .filter(|line| line["op"] == "skill_make")
+                .map(|line| line["make_id"].as_str().map(str::to_owned))
+                .collect()
+        };
+        {
+            let _on = resumable_on_this_thread(&path, Some(make));
+            assert_eq!(agent.write("S", "BRIEF", false).unwrap(), "A");
+            assert!(!path.exists(), "taken out once its answer is read");
+            assert_eq!(agent.write("S", "BRIEF\n\nREPAIR 2", false).unwrap(), "A");
+        }
+        let sent = tasks.sent.lock().unwrap().clone();
+        let id = Some("9-1700000000000".to_owned());
+        assert_eq!(
+            ids(&sent),
+            vec![id.clone(), id],
+            "the same id, first and repair"
+        );
+        tasks.sent.lock().unwrap().clear();
+        assert_eq!(agent.write("S", "BRIEF", false).unwrap(), "A");
+        let sent = tasks.sent.lock().unwrap().clone();
+        assert_eq!(ids(&sent), vec![None], "an app make's line has no id");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The resumed line waits for the say service, and is said at most once; said
+    /// all the same past the wait.
+    #[test]
+    fn a_resumed_line_waits_for_the_say_service() {
+        let tries = std::sync::atomic::AtomicUsize::new(0);
+        let mut said = Vec::new();
+        assert!(say_when_ready(
+            "I made your gold price skill.".into(),
+            || tries.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 2,
+            Duration::from_secs(5),
+            |line| {
+                said.push(line);
+                true
+            },
+        ));
+        assert!(tries.load(std::sync::atomic::Ordering::Relaxed) >= 3);
+        assert_eq!(said, vec!["I made your gold price skill.".to_owned()]);
+        let mut late = 0;
+        assert!(!say_when_ready(
+            "x".into(),
+            || false,
+            Duration::from_millis(1),
+            |_| {
+                late += 1;
+                false
+            },
+        ));
+        assert_eq!(late, 1);
+    }
 }
 
 /// A voice make's line said through the say service, at the product's
