@@ -9449,6 +9449,26 @@ reset still ask. On (`crate::make_no_asks`):
   (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, room for a later
   parameter; #8002: 4,174 before, each description said shorter, every
   parameter and its meaning kept).
+- **A split make is still one make** (#7976: on lamp-9adf, 19 Nov, "Lamp,
+  make a skill called tea reminder: every day at five in the afternoon,
+  glow green and say time for tea." came as two lines cut at the colon;
+  the second began 0.76 s after the first ended and cut it short before
+  any of its answer, the join refused them for want of a voice check or a
+  face seen speaking both, and the second line, asked alone, turned an
+  older skill, time for tea, off). On the second route, a line that began
+  within the join's 3 s (`JOIN_WITHIN`) of words cut short just before it,
+  none of their answer heard and not joined to it (the lamp's name alone
+  and words carried through a held line aside), has its turn's first
+  `make_skill` call that acts on a skill (a make, `turn_off`, `turn_on`,
+  `remove`, `undo` or `run`) not run: the model is told those words
+  (`make_no_asks::split_told`) and to judge whether the line goes on with
+  them; if so the two are one ask, made with one call whose request holds
+  both, and no other skill is turned off, on, removed, undone or run for
+  it (`make_no_asks::SPLIT_NEXT`). Only if the line asks that by itself
+  does the model call it again, and that call runs: one told per line,
+  never a list of words. A line with nothing cut just before it, one past
+  the 3 s, or one joined, is as before, with no extra round or wait; the
+  one told costs one model round only on such a line's first such call.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
