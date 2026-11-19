@@ -494,6 +494,93 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
+/// Where the second worker reads the switch for a keep claimed anywhere in
+/// a reply (#7878). `on` only, off unless set: on a turn whose spoken line
+/// is a statement about the person ([`about_someone`], never a question),
+/// while no `remember` of the turn has run, the reply is held to its round's
+/// end and judged whole ([`claims_a_change`]), not only its opening. On
+/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on Level
+/// B1, spot 7 now." got no call and "Got it — your car is on Level B1, spot
+/// 7 now. That replaces wherever it was before.": its opening claims
+/// nothing, so it was said, and its second sentence claimed a keep that
+/// never happened.
+pub const WHOLE_ENVIRONMENT: &str = "LAMP_KEEP_CLAIM_WHOLE";
+
+/// Whether [`WHOLE_ENVIRONMENT`] is on in this process's environment.
+pub fn whole_on() -> bool {
+    std::env::var(WHOLE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a sentence may open with that says something was kept, replaced or
+/// updated, past a lead-in ("Okay,", "Got it —"): the replace and update
+/// claims [`keep_claim`] doesn't read ("That replaces wherever it was
+/// before.", "I've updated that.", "Updated.").
+const CHANGE_CLAIMS: [&str; 14] = [
+    "that replaces",
+    "this replaces",
+    "it replaces",
+    "that'll replace",
+    "that will replace",
+    "that's replaced",
+    "that has replaced",
+    "i've updated",
+    "i have updated",
+    "i updated",
+    "updated",
+    "i've replaced",
+    "i replaced",
+    "i've changed it",
+];
+
+/// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
+const CHANGE_LEADS: [&str; 9] = [
+    "okay",
+    "ok",
+    "got it",
+    "sure",
+    "alright",
+    "all right",
+    "done",
+    "so",
+    "and",
+];
+
+/// Whether any sentence of the whole `reply` claims a keep: one of today's
+/// keep claims ([`keep_claim`], hard or soft) or a replace or update said
+/// done ([`CHANGE_CLAIMS`]), at the sentence's start or after a lead-in
+/// ([`CHANGE_LEADS`]), never in a sentence asked as a question (#7878).
+/// Structure only, as [`keep_claim`] reads a reply.
+pub fn claims_a_change(reply: &str) -> bool {
+    let text = reply
+        .replace('\u{2019}', "'")
+        .replace(['\u{2014}', '\u{2013}'], ",");
+    text.split_inclusive(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|sentence| !sentence.is_empty() && !sentence.ends_with('?'))
+        .any(|sentence| {
+            keep_claim(sentence).is_some() || {
+                let mut rest = sentence.to_lowercase();
+                for _ in 0..2 {
+                    let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
+                        rest.strip_prefix(**lead).is_some_and(|after| {
+                            after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
+                        })
+                    }) else {
+                        break;
+                    };
+                    rest = rest[lead.len()..]
+                        .trim_start_matches(|c: char| !c.is_alphanumeric())
+                        .to_owned();
+                }
+                CHANGE_CLAIMS.iter().any(|claim| {
+                    rest.strip_prefix(claim).is_some_and(|after| {
+                        after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
+                    })
+                })
+            }
+        })
+}
+
 /// What the model is told of a reply that said it saved, or was saving,
 /// their face with no `remember_my_face` call ([`KeepClaim::Face`], #5141
 /// row 8). Its words were not said.
@@ -2936,7 +3023,7 @@ const NOT_POSSESSIVE: [&str; 11] = [
 /// [`NOT_POSSESSIVE`] ("Mai's favourite colour"). Lowercased, `’` read as
 /// `'`, whole words only ("mine" in "determined" is not one). Careful on
 /// purpose: a fact about nobody, such as "the meeting is at four", passes.
-fn about_someone(text: &str) -> bool {
+pub(crate) fn about_someone(text: &str) -> bool {
     let lower = text.to_lowercase().replace('\u{2019}', "'");
     lower
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
@@ -33034,5 +33121,30 @@ mod chapter_tests {
                 "chapter":"A new library job.","about":CHAPTER_ABOUT,"theirs":true})
         );
         assert!(chapters_found(&json!({"ok":false,"error":"bad_person"})).is_empty());
+    }
+
+    /// #7878: a keep, replace or update said done in any sentence is a
+    /// claim; a restatement, a question or a reply about something else is
+    /// not.
+    #[test]
+    fn a_change_claimed_in_any_sentence_is_read_whole() {
+        for reply in [
+            "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.",
+            "Okay, your car is on B1. I've updated that.",
+            "Your car is on Level B1 now. Updated.",
+            "Sure. I'll remember that.",
+            "Spot 7 on B1. Kept.",
+        ] {
+            assert!(claims_a_change(reply), "{reply}");
+        }
+        for reply in [
+            "Your car is on Level B1, spot 7 now. Good to know where to look.",
+            "Got it \u{2014} your car is on Level B1, spot 7 now.",
+            "Should I remember that your car is on B1?",
+            "Updates come every night.",
+            "That replacement part sounds expensive.",
+        ] {
+            assert!(!claims_a_change(reply), "{reply}");
+        }
     }
 }
