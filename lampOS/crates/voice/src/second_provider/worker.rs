@@ -7199,6 +7199,18 @@ pub(crate) fn run_queued(entry: crate::make_queue::Entry) {
     );
 }
 
+/// A voice make changed as its say-back waited for a yes (#7912), made
+/// again for the line `request` that changed it, off that line's turn
+/// (Heron's HOLD 3 on #7936: the turn is told the change at once), as a
+/// make that waited its turn is: its line said through the say service,
+/// and with `LAMP_MAKE_QUEUE` the slot it took
+/// (`make_queue::retake`) told once that line is said.
+pub(crate) fn run_remade(request: u64, work: crate::make_queue::Work) {
+    run_queued_with(request, work, say_made_line, move || {
+        crate::make_queue::said(request);
+    });
+}
+
 /// [`run_queued`] with its `say` and what is done once the line is said,
 /// `ended`.
 fn run_queued_with(

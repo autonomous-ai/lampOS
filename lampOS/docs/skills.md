@@ -5015,23 +5015,48 @@ gone ([switches.md](switches.md)). What happens:
     changed said whole, and that a change is never a no: only a line that
     means stop declines it. Whether a line is a change, a no or about
     something else is the model's judgment, never a word list; code
-    applies it (`make_skill_local::making_changed`). Under way, the change
-    is held for the make: at its last look (`OneAsk::settled`) the skill
-    written first is let go as a declined one is (`forget_unput`, never
-    said) and the ask made again, in the same make, with the first request
-    whole and the change after it, said to win where the two differ, and
-    the change's heard line after the first (a write is held to both); a
-    later no or change still finds it under way. The change's turn is told
-    it is taken (`"changed": true`, `CHANGED_NEXT`), never that it won't be
-    made; a change declined a moment before takes the make back; one past
-    the last look is told it is almost done and the change can be asked
-    once it is ready (`FINISHING_CHANGE_NEXT`). A voice make's code waiting
-    for its yes, changed by its make's id or the wait's own: the wait is
-    dropped, its package (never on) forgotten, and it is made again at
-    once in the change's turn (`Making::Again`). A make done and on is
-    told its change is a new make of it, the whole ask with the change.
-    A line about something else leaves the make alone. Tests:
+    applies it (`make_skill_local::making_changed`). A change counts only
+    from whoever asked for the make (their person in the memory scope,
+    kept with the ask, `AskedBy`; a make that waited its turn keeps the
+    one read at its ask) or the lamp's owner, the queue's cancel rule
+    (Heron's HOLD 1 on #7936): anyone else's, or a line no one known said,
+    changes nothing, never enters the make's heard line, and is told only
+    whoever asked can change it (`"error": "not_theirs"`). A change that
+    would make the ask longer than `made_skill::MOST_REQUEST_BYTES` changes
+    nothing and is told so at once (`"error": "too_long"`), never
+    "changed" and then "too long". Under way, the change is held for the
+    make: at its last look (`OneAsk::settled`) the skill written first is
+    let go as a declined one is (`forget_unput`, never said) and the ask
+    made again, in the same make, with the first request whole and the
+    change after it, said to win where the two differ, and the change's
+    heard line after the first (a write is held to both); a later no or
+    change still finds it under way. The change's turn is told it is taken
+    (`"changed": true`, `CHANGED_NEXT`), never that it won't be made. A
+    change after "never mind", while the make is still under way, takes
+    the make back: it is made, with the change. One past the last look is
+    told it is almost done and the change can be asked once it is ready
+    (`FINISHING_CHANGE_NEXT`). A voice make's code waiting for its yes,
+    changed by its make's id or the wait's own: with `LAMP_MAKE_QUEUE` the
+    remake first takes the queue's slot from the make that waits
+    (`make_queue::retake`, HOLD 2), so a make queued behind it never starts
+    beside the remake and the one yes wait is never shared; while another
+    make holds the slot nothing changes (`"error": "busy"`). Then the wait
+    is dropped, its package (never on) forgotten, and the change's turn is
+    told at once, as under way (`CHANGED_NEXT`, HOLD 3); the remake runs
+    off the turn (`second_provider::worker::run_remade`), held to whoever
+    asked first, its line said through the say service as a make that
+    waited its turn's is, which frees the slot. A make done and on is told
+    its change is a new make of it, the whole ask with the change. A line
+    about something else leaves the make alone. "change" on a wait that is
+    no voice make's (a skill's task, a remove, a record let go) reads as
+    unclear, never as a no. Tests:
     `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
+    `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `a_change_to_a_wait_of_no_make_reads_as_unclear`,
+    `a_change_past_the_longest_ask_is_told_at_once`,
+    `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
     `never_mind_said_while_made_ends_it`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
