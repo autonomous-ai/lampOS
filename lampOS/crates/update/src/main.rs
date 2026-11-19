@@ -635,19 +635,32 @@ fn writer_probe(options: &BTreeMap<String, String>) -> Result<(), String> {
 }
 
 /// `lamp-update writer-refresh`: the running lamp-update put at the settings
-/// writer's fixed path, the copy there kept (#3689). Run as root by
+/// writer's fixed path, the copy there kept (#3689), and the build's lampos
+/// SDK put in place when it differs (#7415). Run as root by
 /// `lamp-update-writer.service`, which a round starts; by hand only when no
 /// round is at work.
 fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let running = lamp_update::fixed_copy::own_bytes()?;
-    let done = lamp_update::writer_swap::refresh(
+    let sdk_dir = lamp_update::sdk_tree::DIR;
+    let ran = lamp_update::writer_swap::unit_run(
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &running,
         &lamp_update::records::unix_ms,
         &mut |path: &Path| lamp_update::fixed_copy::run_probe(path),
     )?;
+    let (done, sdk) = match ran {
+        lamp_update::writer_swap::UnitRun::Sdk { written: true } => {
+            println!("the build's lampos SDK is written at {sdk_dir}");
+            return Ok(());
+        }
+        lamp_update::writer_swap::UnitRun::Sdk { written: false } => {
+            println!("the build's lampos SDK already is at {sdk_dir}");
+            return Ok(());
+        }
+        lamp_update::writer_swap::UnitRun::Writer { done, sdk } => (done, sdk),
+    };
     // A new writer is judged by its own `back` only: a failure systemd
     // still shows from the copy before is cleared (Seventh's P3 on #4107).
     if done.before.is_some() && !done.proven {
@@ -666,6 +679,11 @@ fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
         (Some(_), false) => {
             println!("the settings writer is build {build}, but its folder could not be synced")
         }
+    }
+    match sdk {
+        None => {}
+        Some(Ok(())) => println!("the build's lampos SDK is written at {sdk_dir}"),
+        Some(Err(why)) => println!("the build's lampos SDK is not written: {why}"),
     }
     Ok(())
 }

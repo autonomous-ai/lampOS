@@ -1743,7 +1743,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      writes them to `/usr/local/lib/lampos/sdk-python` (root's, files 0644:
      the namespace leaves `/usr` as it is, so a run reads it and cannot change
      it). The folder holding anything but exactly this build's files counts
-     as Hermes missing, so a newer build has it written again; a skill's run
+     as Hermes missing, so a newer build has it written again. Every lamp,
+     whatever its agent, also gets it from lamp-update's own round through
+     the writer's one-shot unit (#7415, `docs/updates.md`, "The writer's
+     one-shot unit"); a skill's run
      has it on `PYTHONPATH` (`docs/tasks.md`). Hermes's own launcher replaces
      the `PYTHONPATH` it is started with, so the same one-shot also writes
      `/usr/local/lib/lampos/hermes-run-env.sh` (root's, 0644, never run),
