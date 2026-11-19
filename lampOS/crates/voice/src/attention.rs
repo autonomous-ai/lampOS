@@ -5694,6 +5694,35 @@ mod tests {
         verdicts
     }
 
+    /// #7698: on lamp-06c1 on 18 Nov (14072) the owner's "Lamp, …", seen
+    /// speaking with their own face, was written with a word one letter
+    /// from "Lamp" ("Lap,", "Lamps,", "Clamp,", "Laam,") and held six times
+    /// as said to someone it calls by name. Such a word is nobody's name,
+    /// on either route; a real name set off ("Bea, …") still is.
+    #[test]
+    fn a_spelling_one_letter_from_lamp_is_no_ones_name() {
+        for heard in [
+            "Lap, what's my name?",
+            "Lamps, did you keep that?",
+            "Clamp, what's my name?",
+            "Laam, did you keep that?",
+        ] {
+            assert!(!addresses_someone_else(heard), "{heard}");
+            assert!(!addresses_someone_else_on(heard, true), "{heard}");
+            assert_ne!(
+                judged_run(false, Room::Quiet, &[(heard, true)])[0],
+                Verdict::Hold(TO_ANOTHER),
+                "{heard}"
+            );
+        }
+        let other = "Bea, can you pass me that?";
+        assert!(addresses_someone_else(other));
+        assert_eq!(
+            judged_run(false, Room::Quiet, &[(other, true)])[0],
+            Verdict::Hold(TO_ANOTHER)
+        );
+    }
+
     /// #4710: on lamp-3e83 on 2 Nov a tester's "Lamp, …" was written
     /// "One, …" (and "Wang, …"), held as said to someone it calls by name,
     /// and her retries and a bare "Hello?" held as that someone's replies.

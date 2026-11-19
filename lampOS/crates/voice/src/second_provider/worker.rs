@@ -18277,8 +18277,8 @@ mod tests {
     /// check and the eyes' speaking faces, and `LAMP_SAME_SPEAKER_CARRIES`
     /// when `carries`. The owner, face "f1", calls the lamp in a room not
     /// yet busy and is answered; then two people make the room busy.
-    struct CarryDesk {
-        heeding: Heeding,
+    pub(super) struct CarryDesk {
+        pub(super) heeding: Heeding,
         eyes: Arc<crate::speaking_faces::SpeakingFaces>,
         late: Arc<std::sync::atomic::AtomicBool>,
         /// The clocks the lines' windows are laid out from: each line 2 s
@@ -18300,7 +18300,7 @@ mod tests {
         }
 
         /// [`Self::new`], the room made busy after the call only when `busy`.
-        fn new_in(carries: bool, busy: bool) -> Self {
+        pub(super) fn new_in(carries: bool, busy: bool) -> Self {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -18395,13 +18395,13 @@ mod tests {
             self.heeding.said_until_free_us = until;
         }
 
-        fn answered(&mut self, gap: u64) {
+        pub(super) fn answered(&mut self, gap: u64) {
             self.answered_ms(gap * 1_000);
         }
 
         /// A line of `words` in `voice`, `face` seen speaking it ("" none):
         /// why it is held, if it is.
-        fn line(&mut self, voice: i16, face: &str, words: &str) -> Option<&'static str> {
+        pub(super) fn line(&mut self, voice: i16, face: &str, words: &str) -> Option<&'static str> {
             let index = self.request + 1;
             let (_, now_us) = self.start;
             let began = now_us + (index * 3_000 + 1_000) * 1_000;
@@ -34537,3 +34537,7 @@ mod held_keeps_caller;
 #[cfg(test)]
 #[path = "worker/busy_follow_up_tests.rs"]
 mod busy_follow_up;
+
+#[cfg(test)]
+#[path = "worker/near_lamp_name_tests.rs"]
+mod near_lamp_name;
