@@ -1258,7 +1258,11 @@ Quyết định của chủ đèn ngày 17/11: một lần đọc dịch vụ đ
 yêu cầu mà mô hình của tuyến thứ hai không làm được, đi tới tác tử mặc định
 của đèn (Hermes hoặc OpenClaw, ~17:55), không bao giờ cố định là Hermes.
 Socket tạo kỹ năng nhận thêm một loại dòng từ lamp-voice,
-`{"op":"voice_ask","ask","grants","within_ms"}` (`lamp_tasks::voice_ask`),
+`{"op":"voice_ask","ask","grants","within_ms","news"}` (`lamp_tasks::voice_ask`;
+`news`, mặc định false, đánh dấu câu hỏi của chính đèn cho câu của task news,
+mà câu hỏi của một người đến khi nó đang chạy sẽ hủy ngay: lần chạy kết thúc
+như ở hạn chót, được báo `cancelled`, và câu hỏi của người đó được chạy, không
+bao giờ bị báo bận; `MOST_CONNECTIONS` là 3 cho điều đó),
 được trả lời như một lần tạo (`started`, rồi `answer` hoặc một lời từ chối),
 với một chỗ riêng bên cạnh lần tạo. Tác tử được chọn ở mỗi yêu cầu như một
 lần tạo với `"one_path":true` (`skill_make::MakeGateway`,

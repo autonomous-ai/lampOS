@@ -7480,6 +7480,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -11084,6 +11085,7 @@ fn voice_asks(
         default_engine: Box::new(move || default),
         tokens: tokens.clone(),
         asking: AtomicBool::new(false),
+        news: Default::default(),
     }
 }
 

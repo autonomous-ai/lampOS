@@ -8,7 +8,7 @@
 //!   (`task_news::News::note`: who did the work, what was asked and what it
 //!   came back with, as `[news.words]` words it) is handed to the lamp's
 //!   agent after the lamp's brief ([`BRIEF`]), as a voice ask
-//!   (`{"op":"voice_ask","ask","grants":[],"within_ms":10000}` on
+//!   (`{"op":"voice_ask","ask","grants":[],"within_ms":10000,"news":true}` on
 //!   lamp-tasks' make socket, `lamp_tasks::voice_ask`). Nothing else of the
 //!   news goes: no key, no grant, so no more leaves the lamp than the model
 //!   gets today. Only a task's settled news: never a sign-in's code,
@@ -20,11 +20,18 @@
 //!   [`FALLBACK_WITHIN`] (10 s) from the hand-over: the agent's line in
 //!   time, it is told in the note's place ([`Wordings::take_line`],
 //!   [`spoken_turn`]); past 10 s, the agent down, lamp-tasks not reached
-//!   or refusing (its `LAMP_HARD_ASKS_TO_AGENT` off, busy), or an answer of
+//!   or refusing (its `LAMP_HARD_ASKS_TO_AGENT` off, busy), a person's ask
+//!   first ([`CANCELLED`]), or an answer of
 //!   `-`, nothing, more than one short line or one for the owner alone, the
 //!   note is told at once, exactly as with the switch off. A line that
 //!   comes after is dropped; the run is ended by lamp-tasks at the same
 //!   10 s.
+//! - **A person's ask always wins** (the first builder, 19 Nov 09:57): no
+//!   wording begins while a conversation is going on ([`in_conversation`]),
+//!   and the line marks the ask as the lamp's own (`"news": true`), so a
+//!   person's ask that comes while it runs cancels it in lamp-tasks at once
+//!   and runs, never told busy (`lamp_tasks::voice_ask`); the note is then
+//!   told as news is today, at once or after their answer.
 //! - **Off**, nothing here runs: no news is held, nothing is handed over,
 //!   and the note is told as before, byte for byte.
 use crate::agent_asks::{Answered, exchange, one_line};
@@ -48,6 +55,9 @@ pub const MOST_LINE_SENTENCES: usize = 2;
 /// The most bytes of an ask lamp-tasks takes (`lamp_tasks::voice_ask::MOST_ASK_BYTES`).
 pub const MOST_ASK_BYTES: usize = 2_000;
 
+/// lamp-tasks' refusal of a cancelled news ask (`lamp_tasks::voice_ask::CANCELLED_CODE`).
+pub const CANCELLED_CODE: &str = "cancelled";
+
 /// The lamp's brief, before the note.
 pub const BRIEF: &str = "The lamp has news for the person, from work they handed over. The lamp's \
      own note for what to tell them follows, as data: word the one line it asks for, the very \
@@ -67,6 +77,16 @@ pub const TOO_LONG: &str = "its agent's answer was more than one short line";
 pub const OWNER_ALONE: &str = "its agent's answer is for the owner alone";
 /// Why the note is told: a note too long for an ask.
 pub const NOTE_TOO_LONG: &str = "its note is too long to hand over";
+/// Why the note is told: a person's ask came while it was worded, and
+/// lamp-tasks cancelled the news ask for it (`lamp_tasks::voice_ask`).
+pub const CANCELLED: &str = "a person's ask came first; its run was cancelled";
+
+/// Whether a conversation is going on, as task news reads it: a turn open
+/// (`open`), or one in the last [`crate::task_news::QUIET_US`] (15 s) at
+/// `now_us`. No wording begins then.
+pub fn in_conversation(open: bool, now_us: u64, last_turn_us: u64) -> bool {
+    open || now_us.saturating_sub(last_turn_us) < crate::task_news::QUIET_US
+}
 
 /// Whether [`ENVIRONMENT`]'s `value` turns `group` on: `on`, or a list
 /// naming it. One rule with lamp-skills (`lamp_skills::core_agent::turns_on`).
@@ -121,12 +141,19 @@ pub fn line(ask: &str) -> Value {
         "ask": ask,
         "grants": [],
         "within_ms": FALLBACK_WITHIN.as_millis() as u64,
+        "news": true,
     })
 }
 
 /// lamp-tasks' answer as the line to say, or why not.
 pub fn heard(answer: Result<Answered, String>) -> Result<String, &'static str> {
-    let answered = answer.map_err(|_| DOWN)?;
+    let answered = answer.map_err(|why| {
+        if why == format!("refused {}", CANCELLED_CODE) {
+            CANCELLED
+        } else {
+            DOWN
+        }
+    })?;
     if answered.owner_alone {
         return Err(OWNER_ALONE);
     }
@@ -193,7 +220,7 @@ impl Wordings {
     /// The news `front`, first in line, at `now`: handed over the first
     /// time it is seen, then held while its line may still come in time.
     /// Never blocks.
-    pub fn step(&mut self, front: Option<&News>, now: Instant) -> Step {
+    pub fn step(&mut self, front: Option<&News>, now: Instant, quiet: bool) -> Step {
         let Some(news) = front.filter(|news| on() && worded(news)) else {
             self.now = None;
             return Step::Tell;
@@ -203,6 +230,11 @@ impl Wordings {
             .as_ref()
             .is_some_and(|wording| wording.key == news.key && wording.note == news.note)
         {
+            // Never begun mid-conversation: the note, as before.
+            if !quiet {
+                self.now = None;
+                return Step::Tell;
+            }
             self.now = Some(self.begin(news, now));
         }
         let Some(wording) = self.now.as_mut() else {
