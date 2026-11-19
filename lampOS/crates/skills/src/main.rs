@@ -696,7 +696,8 @@ fn publish(out: &mut Publisher, mut event: SkillEvent) {
 }
 
 /// The face-expressions yes's file (`lamp_msgs::consent`), read for where a
-/// face looks before a skill sees it (#7442).
+/// face looks before a skill sees it (#7442), by `consent::allowed`'s rule
+/// with `LAMP_NOTICING_BY_DEFAULT`'s default (#7767).
 const FACE_EXPRESSIONS_YES: &str = "/var/lib/lampOS/consent/face-expressions.json";
 
 /// The light shown now, if the ring's owner has said within 3 s (as the
@@ -1898,6 +1899,7 @@ fn observe(
         &message.header.topic,
         &message.payload,
         Path::new(FACE_EXPRESSIONS_YES),
+        lamp_msgs::consent::noticing_by_default(),
     );
     let made = engine.observe(
         &message.header.topic,

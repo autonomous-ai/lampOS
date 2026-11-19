@@ -30,7 +30,15 @@ seventh line. The lead approved all seven, adding to the seventh that the
 lamp also says once when the opt-in is turned off.
 
 1. **The opt-in is off by default.** It is the owner's yes on that lamp,
-   given in the app or spoken.
+   given in the app or spoken. `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+   switches.md; off unless set, in no unit) turns a missing
+   `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
+   time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
+   expressions, room sounds and health reports: exactly `"yes"` is on,
+   exactly `"no"` stays off with the switch on, and a file that can't be
+   read is off. With it off, a missing file is no, as before. Nothing
+   writes a kept no yet: a later slice of #7767 (the voice's "stop
+   looking" and the app's off keeping a no) comes before any unit sets it.
 2. **The ring shows its mark whenever a frame is going out.**
 3. **No frames** while the privacy slide is on, nobody is at the desk, or
    the lamp is asleep. Phase 0 also closed on a stranger in view; the

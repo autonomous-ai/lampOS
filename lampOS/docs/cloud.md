@@ -2434,6 +2434,14 @@ put back from it runs the previous `lamp-cloud`, which has none. A
 - **Factory reset** removes `/etc/lampOS/setup/reports.json` and empties
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
   asks again, default off.
+- **On by default, dark (#7767):** with `LAMP_NOTICING_BY_DEFAULT=on`
+  (switches.md; off unless set, in no unit), neither record there (setup's
+  and `lamp-cloud`'s own both not found) reads as a yes nobody gave, with
+  no `by` and no time (`read_consent_or`; setup's status reads its record
+  the same way, `kept_share_reports_or`). A kept `false`, setup's or the
+  lamp's own, stays off, and so does a record this build can't read: the
+  same rule as the consent folder's yeses (`lamp_msgs::consent::allowed`).
+  Off, no record is a no, as above.
 
 ### Its files, one release forward (#2052)
 
