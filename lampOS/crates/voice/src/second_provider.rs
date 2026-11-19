@@ -20294,6 +20294,7 @@ async fn answer(
             // Or asks whether a kept word was another: "is that
             // ranunculus?" after "renunctinus" was kept (lamp-06c1, 10 Nov),
             // whose yes keeps the word asked.
+            let mut taken_back_unsaid = false;
             if let Some(kept) = just_kept.take().filter(|kept| kept.round + 1 == round)
                 && let offered = crate::remember::doubted::offered_word(
                     &text,
@@ -20319,18 +20320,9 @@ async fn answer(
                 } else if shared.unsure_not_kept {
                     // Its keep was said back and no round follows: the lamp
                     // says itself, plainly and asking nothing, that it is
-                    // not kept after all (Twelve's P1 on #7966).
-                    eprintln!(
-                        "lamp-voice second: request {request} chat round {round}: the take-back is said at once ({})",
-                        crate::remember::doubted::UNSURE_ENVIRONMENT
-                    );
-                    queue
-                        .push(
-                            shared
-                                .fixed(crate::remember::doubted::TAKEN_BACK_LINE)
-                                .to_owned(),
-                        )
-                        .await?;
+                    // not kept after all (Twelve's P1 on #7966), after the
+                    // round's own words.
+                    taken_back_unsaid = true;
                 }
             }
             let first_calls = !called_earlier;
@@ -20417,6 +20409,22 @@ async fn answer(
             }
             for sentence in offered(&mut offer_hold, remembers, request, round) {
                 queue.push(sentence).await?;
+            }
+            // A keep said back and taken back for doubt, with no round to
+            // follow (`LAMP_MEMORY_UNSURE_NOT_KEPT`): the take-back is the
+            // reply's last line.
+            if taken_back_unsaid {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the take-back is said after the round's words ({})",
+                    crate::remember::doubted::UNSURE_ENVIRONMENT
+                );
+                queue
+                    .push(
+                        shared
+                            .fixed(crate::remember::doubted::TAKEN_BACK_LINE)
+                            .to_owned(),
+                    )
+                    .await?;
             }
             // The round's words held while a made skill is not on (#7270):
             // unsaid beside its yes's call, whose answer the next round
