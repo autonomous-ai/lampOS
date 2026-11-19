@@ -23,8 +23,10 @@
 //!   builder's yes on #7680 under the owner's no-asks rule): nothing is
 //!   written, no yes is waited for, and the lamp says the one plain line
 //!   [`crate::made_skill::not_found_line`] alone
-//!   (`make_skill_local::make_with_by`). Found, no search, a timeout, an
-//!   error or `unsure` make it as before: the check fails open.
+//!   (`make_skill_local::make_with_by`). Found, no search, a search with
+//!   no results (the judge is never asked: a search misses small real
+//!   things), a timeout, an error or `unsure` make it as before: the check
+//!   fails open.
 //! - **The journal names the kind, never the name** ([`Check::not_kept`],
 //!   and the make's own line says [`NOT_FOUND`]).
 //!
@@ -409,6 +411,12 @@ impl Check {
                 "the search failed"
             });
         }
+        // No hits (`{"results": []}`, or a 2xx with no `results`) says
+        // nothing either way: a small real thing a search misses ("phở 24")
+        // is made as before, and the judge is never asked (#7840 HOLD).
+        if !has_results(&answer) {
+            return Found::Unknown("no results");
+        }
         judged(chat, question(&self.looks_up, &answer), judge_within)
     }
 
@@ -451,6 +459,13 @@ pub fn found(
         name: name.to_owned(),
     })
     .found(chat)
+}
+
+/// Whether the search's `answer` has at least one hit.
+fn has_results(answer: &Value) -> bool {
+    answer["results"]
+        .as_array()
+        .is_some_and(|results| !results.is_empty())
 }
 
 /// What the judge is asked of `looks_up` and the search's `answer`.
@@ -574,7 +589,7 @@ fn judge_once(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn looks_up(kind: &str, name: &str) -> LooksUp {
@@ -582,6 +597,39 @@ mod tests {
             kind: kind.into(),
             name: name.into(),
         }
+    }
+
+    /// A search that finds other coins, none called zorbo: what the judge
+    /// reads to say `not_found`.
+    pub(crate) fn other_coins() -> Value {
+        json!({"results": [
+            {"title": "Bitcoin (BTC) price", "text": "Bitcoin is the first cryptocurrency."},
+            {"title": "Zcash (ZEC)", "text": "Zcash is a privacy coin."},
+            {"title": "Zora (ZORA)", "text": "Zora is a coin of the Zora network."}
+        ]})
+    }
+
+    /// #7840 HOLD: a search with no hits, `{"results": []}` or a 2xx with
+    /// no `results`, is unknown ("no results") and the judge is never
+    /// asked, so a small real thing a search misses is made as before.
+    #[test]
+    fn an_empty_search_is_unknown_and_never_judged() {
+        let judged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        set_judge_here(Some(Arc::new({
+            let judged = Arc::clone(&judged);
+            move |_: &str| {
+                judged.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Some("not_found".to_owned())
+            }
+        })));
+        for empty in [json!({"results": []}), json!({}), json!({"results": null})] {
+            set_search_here(Some(Arc::new(move |_: &str| empty.clone())));
+            let chat = Arc::new(|| -> Result<Chat, String> { Err("no chat".into()) });
+            assert_eq!(found("place", "phở 24", chat), Found::Unknown("no results"));
+        }
+        assert_eq!(judged.load(std::sync::atomic::Ordering::SeqCst), 0);
+        set_search_here(None);
+        set_judge_here(None);
     }
 
     #[test]
@@ -624,7 +672,7 @@ mod tests {
             let searched = Arc::clone(&searched);
             move |query: &str| {
                 searched.lock().unwrap().push(query.to_owned());
-                json!({"results": []})
+                other_coins()
             }
         })));
         set_judge_here(Some(Arc::new({

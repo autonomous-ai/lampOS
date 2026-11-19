@@ -6040,10 +6040,14 @@ the same code for both writers.
   again if it's different." (`made_skill::not_found_line`; the tool's
   answer is that line as its `error` and "Say exactly this and nothing
   else", the line a cut turn says too). Saying the name again is a new ask,
-  checked anew. Found, no search on the route, a timeout, an error or
-  `unsure` make it as before, with its one-line undo: the check fails open,
-  so a real coin is never lost to a slow search. A make with no `net`
-  grant (one that only speaks or lights) is never searched for, nor is the
+  checked anew. Found, no search on the route, a search with no results, a
+  timeout, an error or `unsure` make it as before, with its one-line undo:
+  the check fails open, so a real coin is never lost to a slow search. A
+  search with no hits (`{"results": []}`, or an answer with no `results`)
+  is `unknown (no results)` and the judge is never asked: a search misses
+  small real things (a local shop like "phở 24"), so only the judge reading
+  results that show no such thing says `not_found` (#7840). A make with no
+  `net` grant (one that only speaks or lights) is never searched for, nor is the
   app's make. Only the query leaves the lamp, through the search the voice
   already uses for questions; the journal names the kind, never the name:
   `lamp-voice: a skill made here: it looks a coin up by name: checked

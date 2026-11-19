@@ -10262,11 +10262,12 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
     }
 
-    /// A search that finds nothing, and a judge that answers `judge`.
+    /// A search that finds other coins (Bitcoin, Zcash, Zora), none the
+    /// one looked up, and a judge that answers `judge` reading them.
     fn found_fakes(judge: Option<&'static str>) {
         crate::make_found::set_search_here(Some(Arc::new(|query: &str| {
             assert!(!query.is_empty());
-            json!({"results": []})
+            crate::make_found::tests::other_coins()
         })));
         crate::make_found::set_judge_here(Some(Arc::new(move |_: &str| judge.map(str::to_owned))));
     }
@@ -10473,7 +10474,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     fn an_unsure_or_timed_out_check_makes_it_as_now() {
         type Search = Option<Arc<dyn Fn(&str) -> Value + Send + Sync>>;
         let none: Search = None;
-        let results: Search = Some(Arc::new(|_: &str| json!({"results": []})));
+        let results: Search = Some(Arc::new(|_: &str| crate::make_found::tests::other_coins()));
+        let empty: Search = Some(Arc::new(|_: &str| json!({"results": []})));
         let failed: Search = Some(Arc::new(
             |_: &str| json!({"error": "the search failed: 500"}),
         ));
@@ -10484,6 +10486,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         for (index, (search, judge)) in [
             (results.clone(), Some("unsure")),
             (results, None),
+            (empty, Some("not_found")),
             (late, Some("not_found")),
             (failed, Some("not_found")),
             (none, Some("not_found")),
@@ -10506,13 +10509,15 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             ]);
             let told = make_with(0, None, ZORBO, &keeping, chat_at(url), NOW, || None);
             assert_eq!(served.join().unwrap(), 2, "{index}: {told}");
+            // What was told first: a make not kept never installs, so the
+            // helper's join below would wait for ever.
+            assert_eq!(told["made"], "zorbo-coin-price", "{index}: {told}");
+            assert_eq!(told["on"], true, "{index}: {told}");
             assert!(
                 helper.join().unwrap()["install_made"].is_string(),
                 "{index}"
             );
             assert_eq!(crate::make_found::searches_here() - before, 1, "{index}");
-            assert_eq!(told["made"], "zorbo-coin-price", "{index}: {told}");
-            assert_eq!(told["on"], true, "{index}: {told}");
             assert!(told.get("code_waits_for_yes").is_none(), "{index}: {told}");
             assert!(any_on(&keeping.directory), "{index}");
             let _ = take_said_line();

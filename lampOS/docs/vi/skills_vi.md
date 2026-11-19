@@ -2836,9 +2836,14 @@ cả hai người viết.
   câu trả lời của tool là câu đó trong `error` cùng "Say exactly this and
   nothing else", cũng là câu được nói khi lượt bị cắt). Nói lại cái tên là
   một yêu cầu mới, được kiểm tra lại. Tìm thấy, không có công cụ tìm kiếm
-  trên tuyến, quá giờ, lỗi hay `unsure` thì tạo như trước, với câu hoàn tác
-  một dòng: phép kiểm tra mở khi lỗi, nên một đồng coin có thật không bao
-  giờ bị mất vì một lần tìm chậm. Một lần tạo không có quyền `net` (chỉ
+  trên tuyến, tìm không ra kết quả nào, quá giờ, lỗi hay `unsure` thì tạo
+  như trước, với câu hoàn tác một dòng: phép kiểm tra mở khi lỗi, nên một
+  đồng coin có thật không bao giờ bị mất vì một lần tìm chậm. Một lần tìm
+  không có kết quả (`{"results": []}`, hoặc câu trả lời không có `results`)
+  là `unknown (no results)` và không bao giờ hỏi bên phán xét: tìm kiếm có
+  thể bỏ sót những thứ nhỏ có thật (một quán quen như "phở 24"), nên chỉ khi
+  bên phán xét đọc các kết quả cho thấy không có thứ đó mới ra `not_found`
+  (#7840). Một lần tạo không có quyền `net` (chỉ
   nói hay chỉ bật đèn) không bao giờ được tìm, lần tạo trong ứng dụng cũng
   vậy. Chỉ câu tìm kiếm rời khỏi đèn, qua công cụ tìm kiếm giọng nói vốn
   dùng để trả lời câu hỏi; nhật ký chỉ ghi loại, không bao giờ ghi tên:
