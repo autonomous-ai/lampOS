@@ -5145,6 +5145,40 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   owner asked to forget); a new one opens` (or `(no task for 120 min)`),
   `dropped the kept session <id> (…); its conversation forgotten`, then
   `kept session new <id> (openclaw, …) in <ms> ms`.
+- **A kept session gone or stuck: closed and replaced, never resumed for
+  ever (#7906).** `harness ensure` finds the kept session by its name and
+  token, not by the id in `one-session.json`. So once lamp-tasks has closed
+  it itself (a deadline, a cancel, an ask no one answered, a stuck sign) and
+  deleted its OpenClaw conversation, a token file with no kept record makes
+  the next `ensure` `--fresh`. The token is kept, since a new token on the
+  same name could be refused `NAME_TAKEN`. Before this, on lamp-52e6 a
+  make's 600 s deadline closed and deleted the session, and every later
+  `ensure` resumed it (`kept session resumed <id> (openclaw, starting)`).
+  Its engine exited ("No session found"), and every task waited until busy.
+  Two signs are acted on:
+  - **Sign 1, still `starting`.** At an open that found a session (`live`
+    or `resumed`, never `new`), one `show` is made. If the session stays
+    `starting` (or `offline`, `unknown`) 120 s (`OPEN_IDLE_WITHIN`) from
+    the open's start, it is stuck. During a task's hand-over, replies
+    refused `NOT_IDLE` or `ENGINE_NOT_READY` for 120 s lead to one `show`,
+    and a session still `starting` is stuck.
+  - **Sign 2, a plain shell.** `show` names the agent `Terminal` (its
+    engine exited, and `wait` reads it idle), or Harness no longer has the
+    session. The shell is never typed into, adopted or answered from.
+
+  Either sign calls `OneSession::replace_kept`, the one path for every
+  sign. It does a `close --now`, `sessions.delete` and the record removed,
+  then lets the session go. The next open is `ensure --fresh` (a pane of
+  `harness new` gets a plain `new`), and the waiting task, or the next
+  one, goes on there. A failed close is tried `--now` again at the next
+  look. Retries are bounded: past `REPLACE_MOST` (2) replacements in a row
+  with no answer between, the next open waits its backoff (5 s, doubled,
+  at most 300 s). A healthy session costs one `show` per open and nothing
+  per turn. The worst case from a jam to a fresh session is about 120 s
+  plus one `ensure`. `OneSession::with_on_replaced` is the hook for
+  #7895's one told line to the person, not wired here. Journal: `<id> is
+  gone or stuck (<why>); closed, forgotten and replaced with a fresh
+  session (#7906)`.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

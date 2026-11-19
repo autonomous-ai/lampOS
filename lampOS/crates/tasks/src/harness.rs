@@ -426,6 +426,10 @@ pub struct PaneSeen {
     /// `told.taken` is true. Words typed while earlier ones are untaken
     /// are queued by Harness behind them, which mixes two tasks' answers.
     pub taken: bool,
+    /// `show` names the pane's agent "Terminal": its engine exited and
+    /// Harness keeps the pane as a plain shell (#6835 gap 1, #7906's sign
+    /// 2), which `wait` reads idle.
+    pub shell: bool,
 }
 
 /// Whether `show`'s answer says the last words typed were taken
@@ -3548,6 +3552,7 @@ impl Cli {
         let seen = parse_reading(&reply.stdout, agent_id).map_err(str::to_string)?;
         Ok(PaneSeen {
             taken: told_taken(&reply.stdout),
+            shell: shown_agent(&reply.stdout, agent_id).as_deref() == Some(SHELL_AGENT),
             seen,
         })
     }
@@ -6011,6 +6016,10 @@ fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
         .unwrap_or_default();
     Some(serde_json::json!({"id": id, "name": name, "state": state}))
 }
+
+/// The agent `show` names a pane whose engine exited and that Harness
+/// keeps as a plain shell ([`PaneSeen::shell`]).
+pub const SHELL_AGENT: &str = "Terminal";
 
 /// The `agent` of `harness show <id> --json`'s answer of `id`: plain
 /// letters, digits, spaces and `-`, at most 32; `None` for another id, a
