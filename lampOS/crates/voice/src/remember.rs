@@ -14887,7 +14887,7 @@ fn legacy_exchange(
         None => {
             let answer = crate::tools::exchange(socket, line, budget)?;
             // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
-            crate::history_forget::answered(line, &answer);
+            crate::history_forget::answered(socket, line, &answer);
             Some(answer)
         }
     }
@@ -15067,7 +15067,7 @@ fn exchange_guarded(
                     // What a forget removed reaches the account's history
                     // too, whether or not this caller still wants the answer
                     // (`LAMP_HISTORY_FORGET`, #7771).
-                    crate::history_forget::answered(line, &value);
+                    crate::history_forget::answered(socket, line, &value);
                     if !current() {
                         return None;
                     }

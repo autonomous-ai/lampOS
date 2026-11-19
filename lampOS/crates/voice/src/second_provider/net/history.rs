@@ -20,12 +20,19 @@ use tokio::sync::Notify;
 /// The most of an answer read.
 const MOST_ANSWER: usize = 64 * 1024;
 
-/// Where deletes go, from the route's `llm_base_url`: the lamp's cloud API
-/// (`…/api/v1/ai`), with or without its `/v1`.
-pub fn url(llm_base_url: &str) -> String {
+/// Where deletes go, from the route's `llm_base_url`: the lamp's own cloud
+/// API (`https://campaign-api.autonomous.ai/…/api/v1/ai`, with or without
+/// its `/v1`), the host the turn's save goes to too. Any other base (a
+/// direct provider, a test address) is `None`: nothing is sent, and the
+/// forgets wait on the lamp (the first builder's P2 on #7935).
+pub fn url(llm_base_url: &str) -> Option<String> {
     let base = llm_base_url.trim().trim_end_matches('/');
+    let host = base.strip_prefix("https://")?.split('/').next()?;
+    if host != crate::second_config::COMPANY_RELAY_HOST {
+        return None;
+    }
     let base = base.strip_suffix("/v1").unwrap_or(base);
-    format!("{base}/history/turns/delete")
+    Some(format!("{base}/history/turns/delete"))
 }
 
 /// How long a kept call waits before it is tried again.
@@ -251,6 +258,12 @@ mod tests {
         Fake { url, seen }
     }
 
+    /// The fake's delete address: [`url`] takes only the lamp's own cloud
+    /// API, so a test server is addressed as the path it would give.
+    fn delete_at(base: &str) -> String {
+        format!("{base}/history/turns/delete")
+    }
+
     fn client() -> reqwest::Client {
         http_client().unwrap()
     }
@@ -293,9 +306,25 @@ mod tests {
             "https://campaign-api.autonomous.ai/api/v1/ai/v1",
         ] {
             assert_eq!(
-                url(base),
-                "https://campaign-api.autonomous.ai/api/v1/ai/history/turns/delete"
+                url(base).as_deref(),
+                Some("https://campaign-api.autonomous.ai/api/v1/ai/history/turns/delete")
             );
+        }
+    }
+
+    /// With a direct base, or any host but the lamp's own cloud API,
+    /// nothing is sent: there is no address to send to.
+    #[test]
+    fn a_direct_base_sends_nothing() {
+        for base in [
+            "https://api.deepseek.com",
+            "https://generativelanguage.googleapis.com/v1beta",
+            "http://campaign-api.autonomous.ai/api/v1/ai",
+            "https://campaign-api.autonomous.ai.evil.example/api/v1/ai",
+            "http://127.0.0.1:9/api/v1/ai",
+            "",
+        ] {
+            assert_eq!(url(base), None, "{base}");
         }
     }
 
@@ -312,7 +341,7 @@ mod tests {
             r#"{"status":1,"data":{"missing":["x"]}}"#,
         ] {
             let server = fake(vec![Say::Answer(200, body)]).await;
-            let outcome = send(&client(), &url(&server.url), "k-lamp", &ids()).await;
+            let outcome = send(&client(), &delete_at(&server.url), "k-lamp", &ids()).await;
             assert!(matches!(outcome, Outcome::Done(_)), "{body}: {outcome:?}");
             let seen = server.seen.lock().unwrap().clone();
             assert_eq!(seen.len(), 1);
@@ -326,13 +355,13 @@ mod tests {
     #[tokio::test]
     async fn a_network_error_or_5xx_keeps_the_call() {
         let hung = fake(vec![Say::Hang]).await;
-        let outcome = send(&client(), &url(&hung.url), "k", &ids()).await;
+        let outcome = send(&client(), &delete_at(&hung.url), "k", &ids()).await;
         assert!(matches!(outcome, Outcome::Kept(_)), "{outcome:?}");
         let failing = fake(vec![Say::Answer(503, "{}")]).await;
-        let outcome = send(&client(), &url(&failing.url), "k", &ids()).await;
+        let outcome = send(&client(), &delete_at(&failing.url), "k", &ids()).await;
         assert_eq!(outcome, Outcome::Kept("HTTP 503".into()));
         let refused = fake(vec![Say::Answer(400, r#"{"error":"person_required"}"#)]).await;
-        let outcome = send(&client(), &url(&refused.url), "k", &ids()).await;
+        let outcome = send(&client(), &delete_at(&refused.url), "k", &ids()).await;
         assert_eq!(outcome, Outcome::Dropped("HTTP 400".into()));
     }
 
@@ -357,7 +386,7 @@ mod tests {
             .unwrap();
         let bell = Arc::new(Notify::new());
         let task = tokio::spawn(task(
-            url(&server.url),
+            delete_at(&server.url),
             "k".into(),
             queue,
             bell.clone(),
