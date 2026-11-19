@@ -599,7 +599,7 @@ pub fn called(heard: &str) -> bool {
         .filter(|word| !word.is_empty());
     let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
     let all: Vec<&str> = words.by_ref().collect();
-    if all.iter().any(|word| is(word, &["lamp", "lamb"])) {
+    if all.iter().any(|word| is(word, &REAL_NAMES)) {
         return true;
     }
     // A misheard name stands where the name stood: first, or after a
@@ -608,6 +608,39 @@ pub fn called(heard: &str) -> bool {
         || calls_as_written(heard, crate::language::at_start())
             .next()
             .is_some()
+}
+
+/// The lamp's name as the service writes it in English, and "lamb", which it
+/// writes for it as often ([`called`]).
+const REAL_NAMES: [&str; 2] = ["lamp", "lamb"];
+
+/// `heard` past the lamp's name when the line opens with it (what it is
+/// called by, as [`called`] reads it, and as the owner's language writes
+/// it, [`Written::real`]), else `None`: the rest of a line, for a check
+/// that wants the words and not the call ("Lamp, start english practice"
+/// is "start english practice"). Only the name itself: a greeting before it,
+/// or a stand-in word, is no name here, so a line that opens that way is
+/// left whole.
+pub(crate) fn past_the_name(heard: &str) -> Option<&str> {
+    let line = heard.trim_start_matches(|c: char| !c.is_alphanumeric());
+    let lower = line.to_lowercase();
+    let after = |name: &str, whole: bool| -> Option<&str> {
+        // Lower-casing keeps a name's bytes only for text that does not
+        // change length; a line that does is left whole.
+        (lower.len() == line.len()).then_some(())?;
+        let rest = past(&lower, name, whole)?;
+        Some(&line[line.len() - rest.len()..])
+    };
+    let mut names: Vec<(&str, bool)> = REAL_NAMES.iter().map(|name| (*name, true)).collect();
+    if let Some(language) = crate::language::at_start() {
+        let written = written(language);
+        names.extend(written.real.iter().map(|name| (*name, written.whole_words)));
+    }
+    names.into_iter().find_map(|(name, whole)| {
+        let rest = after(name, whole)?;
+        let rest = rest.trim_start_matches(|c: char| !c.is_alphanumeric());
+        (!rest.is_empty()).then_some(rest)
+    })
 }
 
 /// Words the service has written in the lamp's name's place ([`called`]).
@@ -3424,6 +3457,31 @@ impl Attention {
 
 #[cfg(test)]
 mod tests {
+
+    /// #7415: the line past the lamp's name, for a check of its words
+    /// (`app_triggers::matched`): only a line that opens with the name, and
+    /// only the name itself.
+    #[test]
+    fn a_line_is_read_past_the_lamp_name_it_opens_with() {
+        assert_eq!(
+            past_the_name("Lamp, start english practice"),
+            Some("start english practice")
+        );
+        assert_eq!(past_the_name("  Lamb start it."), Some("start it."));
+        assert_eq!(past_the_name("LAMP: start it"), Some("start it"));
+        // Not the name: a longer word, a greeting before it, the name later,
+        // the name alone.
+        for line in [
+            "Lamps start it",
+            "Hey lamp, start it",
+            "start the lamp",
+            "Lamp",
+            "Lamp, ",
+            "",
+        ] {
+            assert_eq!(past_the_name(line), None, "{line}");
+        }
+    }
     /// #753: this home's bar is read from setup's file once it fits, looked
     /// at again only every [`NEAR_READ_EVERY`], and the default is kept
     /// without one, or with one its own tries don't make.

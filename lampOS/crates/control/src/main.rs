@@ -692,6 +692,11 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 Err(error) => eprintln!("lamp-control: the app socket {}: off: {error}", path.display()),
             }
         }
+        // The running apps' spoken triggers to the voice and a turn an app
+        // took back (piece 3b-2b), with the apps on and a bus.
+        if let (true, Some(bus)) = (lamp_control::app_yes::on(), &bus) {
+            lamp_control::app_triggers::start(bus, shared.clone());
+        }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;

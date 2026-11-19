@@ -3753,6 +3753,67 @@ async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() 
     drop(socket);
 }
 
+/// #7979: an app's `say` within 3 s of a trigger offered it takes that line,
+/// but only once the door has accepted the `say`; a refused one takes nothing
+/// and the voice is not told (Heron's P2).
+#[tokio::test]
+async fn an_apps_say_takes_a_trigger_only_when_the_door_accepts_it() {
+    let says = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let lamp = lamp_with("app-say-took", Box::new(Says(says.clone()))).await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    // The manifest with a trigger: `install_app` has none.
+    let manifest_path = lamp
+        .dir
+        .join("apps")
+        .join("demo")
+        .join("current")
+        .join("lamp-skill.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["triggers"] = json!(["start english practice"]);
+    std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, u64)>::new()));
+    let sink = told.clone();
+    lamp.shared
+        .set_took_sink(std::sync::Arc::new(move |app, turn| {
+            sink.lock().unwrap().push((app.to_owned(), turn));
+        }));
+    let mut socket = agent_connect(&path).await.unwrap();
+    let welcome = agent_next(&mut socket).await.unwrap();
+    assert_eq!(welcome["ev"], "welcome");
+    let hello = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    assert_eq!(app_ask(&mut socket, hello).await["ok"], true);
+    let said = |turn: u64| lamp_msgs::AppTrigger {
+        turn,
+        app: "demo".into(),
+        trigger: "start english practice".into(),
+        phrase: "start english practice".into(),
+        at_ms: 1,
+    };
+    // A refused say (no text) within the hold takes nothing.
+    assert!(lamp.shared.offer_trigger(&said(5)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["ev"], "app.trigger", "{offered}");
+    assert_eq!(offered["turn"], "5", "{offered}");
+    let refused = app_ask(&mut socket, json!({"id": 20, "op": "say", "text": ""})).await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "a refused say took the line"
+    );
+    // An accepted say takes the newest turn offered, once.
+    assert!(lamp.shared.offer_trigger(&said(6)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["turn"], "6", "{offered}");
+    let accepted = app_ask(
+        &mut socket,
+        json!({"id": 21, "op": "say", "text": "Hello."}),
+    )
+    .await;
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(*told.lock().unwrap(), vec![("demo".to_owned(), 6)]);
+}
+
 #[tokio::test]
 async fn the_ops_only_an_app_has_are_not_the_doors_on_any_other_socket() {
     let lamp = lamp("app-sock-door").await;

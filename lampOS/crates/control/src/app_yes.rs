@@ -74,6 +74,11 @@ pub const SETTINGS_FILE: &str = "app-settings.json";
 pub const READ_EVERY: Duration = Duration::from_millis(100);
 /// The one panel an app may set in a minute.
 pub const PANEL_EVERY: Duration = Duration::from_secs(60);
+/// How long an app has to take a trigger offered it: the voice's own hold
+/// (`lamp_voice::app_triggers::HOLD`), after which it goes the model's way.
+pub const TRIGGER_FOR: Duration = Duration::from_secs(3);
+/// The triggers offered and not yet taken, at most.
+pub const MOST_OFFERED: usize = 16;
 
 /// Who is asking, by cgroup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -300,6 +305,11 @@ pub struct Live {
     /// reconnecting is not a way round one a minute (the first builder's P2
     /// on #7714). Only a remove forgets it.
     panel_last: BTreeMap<String, Instant>,
+    /// The triggers offered to an app and not yet taken (`app.trigger`,
+    /// piece 3b-2b): by app and the voice's turn, when each was offered.
+    offered: BTreeMap<(String, u64), Instant>,
+    /// The turns taken (`app.took`) and not yet told to the voice.
+    took_out: Vec<(String, u64)>,
 }
 
 impl Live {
@@ -375,8 +385,81 @@ impl Live {
         Ok(())
     }
 
+    /// The names of the apps with a socket up now, in order.
+    pub fn running(&self) -> Vec<String> {
+        self.sockets
+            .iter()
+            .filter(|(_, count)| **count > 0)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Whether `name` has a socket up now.
+    pub fn is_running(&self, name: &str) -> bool {
+        self.socket(name)
+    }
+
+    /// A trigger for the voice's request `turn` is offered to `name` at
+    /// `now`. The offers kept are bounded, and an old one is dropped.
+    /// False when it was not recorded (too many are waiting): the app must
+    /// then not be told, or its answer could never count.
+    pub fn offer(&mut self, name: &str, turn: u64, now: Instant) -> bool {
+        self.offered
+            .retain(|_, at| now.saturating_duration_since(*at) < TRIGGER_FOR);
+        if self.offered.len() >= MOST_OFFERED {
+            return false;
+        }
+        self.offered.insert((name.to_owned(), turn), now);
+        true
+    }
+
+    /// The app `name` says it took `turn` (`app.took`) at `now`: true, once,
+    /// when it was offered that turn within [`TRIGGER_FOR`] (the voice's hold
+    /// is as long, so a later word is of no use). The turn is told to the
+    /// voice by [`Live::drain_took`].
+    pub fn took_turn(&mut self, name: &str, turn: &str, now: Instant) -> bool {
+        let Ok(turn) = turn.parse::<u64>() else {
+            return false;
+        };
+        match self.offered.remove(&(name.to_owned(), turn)) {
+            Some(at) if now.saturating_duration_since(at) <= TRIGGER_FOR => {
+                self.took_out.push((name.to_owned(), turn));
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The app `name` said something (`say`) at `now`: when a trigger was
+    /// offered it within [`TRIGGER_FOR`], the newest such turn is taken as if
+    /// the app had answered `app.took` (App Only on #7979: an app that speaks
+    /// its opener must not be answered over by the model). Only that app's
+    /// own offers count, and a turn counts once.
+    pub fn took_by_say(&mut self, name: &str, now: Instant) -> bool {
+        let newest = self
+            .offered
+            .iter()
+            .filter(|((app, _), at)| {
+                app == name && now.saturating_duration_since(**at) <= TRIGGER_FOR
+            })
+            .map(|((_, turn), _)| *turn)
+            .max();
+        let Some(turn) = newest else {
+            return false;
+        };
+        self.offered.retain(|(app, _), _| app != name);
+        self.took_out.push((name.to_owned(), turn));
+        true
+    }
+
+    /// The turns taken since the last call, for the voice.
+    pub fn drain_took(&mut self) -> Vec<(String, u64)> {
+        std::mem::take(&mut self.took_out)
+    }
+
     /// An app that was removed: everything held of it, its panel's rate too.
     pub fn forget_app(&mut self, name: &str) {
+        self.offered.retain(|(app, _), _| app != name);
         self.forget_run(name);
         self.sockets.remove(name);
         self.reads.remove(name);
@@ -392,6 +475,7 @@ impl Live {
     /// It is in memory only: a restart of lamp-control starts it again at 1.
     pub fn forget_run(&mut self, name: &str) {
         self.panels.remove(name);
+        self.offered.retain(|(app, _), _| app != name);
     }
 
     /// The revision of the app's panel, if it has one.
