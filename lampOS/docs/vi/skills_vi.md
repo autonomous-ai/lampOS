@@ -3782,17 +3782,22 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     air, Dusty air); một `do.read` (Morning agenda, Morning mail, Tomorrow's
     plan); một kỹ năng do cuộc trò chuyện gọi (Dance, Pose, Light scenes, Light
     show, Prepare to unplug: câu của nó là câu trả lời của chính cuộc trò
-    chuyện). Welcome back và Reminders giữ nguyên: lời của một task cố định
-    trong tệp của nó, nên nó không mang được ai vừa quay lại (`who` của giọng
-    nói) hay lời nhắc chính người đó đặt, điều câu nói mỗi lần kích hoạt cần.
-  - Chưa, vì cùng lý do: FAQ (câu hỏi và phần `knowledge.md` của nó), Who was
-    here (bản ghi 12 giờ), các câu nói của Guard mode (`[watch.words]` của nó,
-    do watch nói, không phải một bước `[[do]]`), Task news (`say = { from =
-    "tasks" }`) và Onboarding (`say = { from = "onboarding" }`) đều cần những gì
-    lần kích hoạt hay lần gọi này mang theo, và ba cái đầu còn là lệnh gọi công
-    cụ của một cuộc trò chuyện. Chúng chờ một phần theo từng lần kích hoạt của
-    task, một phán quyết riêng: nó đưa nội dung riêng tư (một bản ghi, một câu
-    hỏi, một lời nhắc) vào lần chạy của agent. Các kỹ năng nhìn (Desk tutor, các
+    chuyện). Cũng không bao giờ Onboarding hay Guard mode (first builder,
+    08:57 ngày 19/11): chúng giữ câu nói có sẵn của mình, với mọi giá trị của
+    công tắc.
+  - `complex`, được phép nhưng chưa xây (08:57 của first builder: nội dung
+    riêng của mỗi lần kích hoạt, chỉ những gì ghi chú của DeepSeek có hôm
+    nay, nên những gì rời khỏi đèn không đổi): Welcome back (ai vừa quay lại),
+    Reminders (lời nhắc nguyên văn), FAQ (phần `knowledge.md` và câu hỏi), Who
+    was here (bản ghi 12 giờ) và Task news (kết quả của agent). Mỗi kỹ năng bị
+    chặn bởi một thứ lamp-skills không giữ. Với Welcome back, Reminders và Task
+    news, lamp-voice dựng nội dung khi nói câu (`who`, `from = "schedule"`,
+    `from = "tasks"`), và một lời nhắc chỉ tính là đã báo khi đã được nói. FAQ
+    và Who was here trả lời lệnh gọi công cụ của một cuộc trò chuyện, mà giọng
+    nói chờ tối đa 1,5 giây (`lamp_voice::tools::ASK_DEADLINE`), không bao giờ
+    10 giây, và một lần chạy agent mất khoảng 75 giây. Nên nhóm này còn trống
+    và năm kỹ năng giữ câu nói của mình cho đến khi giọng nói trao nội dung của
+    nó. Các kỹ năng nhìn (Desk tutor, các
     dấu của nó, Look for things, Point the light) cũng giữ nguyên: lamp-tasks
     không đưa ảnh nào cho agent; một lần chạy có quyền `camera` có thể lấy khung
     hình rộng 320 của mắt từ lamp-control (`camera.snapshot`), sau cái gật đầu
@@ -3801,7 +3806,7 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
 - **Mỗi trigger một task.** Task của biến thể có thể nêu trigger của nó (`on`),
   như câu say của nó, cho kỹ năng mà các bước nêu trigger: mỗi câu như vậy một
   task, mỗi task một mình trong bảng của nó trừ `on` (chỉ trong biến thể; mọi kỹ
-  năng khác giữ một `do.task`). Phần đọc lại để xin gật đầu nói task đầu tiên.
+  năng khác giữ một `do.task`).
 - **Biến thể** (`agent.toml` cạnh `skill.toml`, và `scripts/agent.py`): nó chỉ
   thay `grants`, `[[do]]` và `[[present.do]]` (`core_agent::overlaid`), nên
   trigger và guard không bao giờ bị chép lại. Nó chỉ được đọc khi đúng y của bản
@@ -3815,11 +3820,16 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   with that one line alone, … If nothing fitting comes to mind, answer -.". Khác
   đi thì kỹ năng nạp như cũ, với một dòng nhật ký nêu lý do. Đây là kỹ năng lõi
   duy nhất được mang `do.task`; nó không bị `task::origin_refuses` giữ, vì brief
-  của nó được biên dịch vào lamp-skills. Cái gật đầu của chủ đèn cho thư mục của
-  nó (phần đọc lại nói "Its script comes from the lamp itself, and it uses none
-  of the lamp's parts."), token một lần chạy của lamp-control, 20 lần chạy một
-  ngày cho mỗi kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Chưa
-  có trong bản cài của sản phẩm: trên đèn, hai tệp được chép cạnh kỹ năng.
+  của nó được biên dịch vào lamp-skills. **Được duyệt sẵn** (first builder,
+  08:57 ngày 19/11: "They're ours and have no grants"): không bao giờ hỏi cái
+  gật đầu cho nó, bằng lời hay với lamp-control, ở lần kích hoạt đầu hay bất
+  kỳ lần nào (`core_agent::pre_approved`: thư mục là của một bản thử nghiệm,
+  mang tên thư mục của nó, và biến thể đúng y của đèn, bất kể công tắc).
+  lamp-control cấp token một lần chạy cho nó mà không có quyền nào, và chỉ cho
+  các kỹ năng của chính đèn, không bao giờ một thư mục được đẩy lên. Mọi thư
+  mục khác cần cái gật đầu của chủ đèn như trước. 20 lần chạy một ngày cho mỗi
+  kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Chưa có trong bản
+  cài của sản phẩm: trên đèn, hai tệp được chép cạnh kỹ năng.
 - **Mỗi lần kích hoạt**: `do.task` của nó được giao cho lamp-tasks trên luồng
   riêng, như mọi task, và câu say của lần kích hoạt chờ câu của nó trên luồng
   riêng của lần chạy, không bao giờ trên vòng lặp của trigger.
@@ -3828,9 +3838,8 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   lần kích hoạt thì được nói thay câu say, như lời chính xác ở độ ưu tiên của
   câu say, với cái nhìn, ánh sáng và cử động mà câu say mang theo. Nếu không,
   câu say của chính kỹ năng được nói ngay, đúng như khi tắt công tắc: quá 10
-  giây; agent không chạy, ngoại tuyến, không liên lạc được, bị từ chối, hoặc
-  đang chờ cái gật đầu của chủ đèn (lần kích hoạt đầu hỏi điều đó như mọi
-  task); hoặc câu trả lời là `-`, rỗng, hay dài hơn một câu ngắn (hai câu, 200 ký
+  giây; agent không chạy, ngoại tuyến, không liên lạc được hoặc bị từ chối;
+  hoặc câu trả lời là `-`, rỗng, hay dài hơn một câu ngắn (hai câu, 200 ký
   tự, `core_agent::heard`). Câu đến sau đó bị bỏ, không bao giờ nói trễ, và một
   lần chạy thất bại không tự nói gì (không câu thất bại, không lời từ chối):
   không bao giờ nói sai.

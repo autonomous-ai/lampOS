@@ -2222,18 +2222,22 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     or a move; a fixed line (Head pat, Smoky air, Dusty air); a `do.read`
     (Morning agenda, Morning mail, Tomorrow's plan); a skill a conversation
     calls (Dance, Pose, Light scenes, Light show, Prepare to unplug: its
-    line is the conversation's own reply). Welcome back and Reminders stay
-    as they are: a task's words are fixed in its file, so it can't carry
-    who came back (the voice's `who`) or the person's own reminder text,
-    which each fire's line needs.
-  - Not yet, for the same reason: FAQ (the question and its section of
-    `knowledge.md`), Who was here (the 12-hour record), Guard mode's spoken
-    lines (its `[watch.words]`, said by the watch, not a `[[do]]` step),
-    Task news (`say = { from = "tasks" }`) and Onboarding (`say = { from =
-    "onboarding" }`) each need what this fire or call carries, and the
-    first three are a conversation's tool call besides. They wait for a
-    per-fire part of a task, a ruling of its own: it puts private content
-    (a record, a question, a reminder) in the agent's run. The look skills
+    line is the conversation's own reply). Never Onboarding or Guard mode
+    either (the first builder, 19 Nov 08:57): they stay on their own
+    built-in lines, with any value of the switch.
+  - `complex`, allowed but not built yet (the first builder's 08:57: each
+    fire's own content, only what DeepSeek's note has today, so what
+    leaves the lamp is unchanged): Welcome back (who came back), Reminders
+    (the reminder's own text, verbatim), FAQ (`knowledge.md`'s section and
+    the question), Who was here (the 12-hour record) and Task news (the
+    agent's result). Each is blocked on something lamp-skills doesn't
+    hold. For Welcome back, Reminders and Task news, lamp-voice builds the
+    content as it says the line (`who`, `from = "schedule"`, `from =
+    "tasks"`), and a reminder counts as delivered only once it is spoken.
+    FAQ and Who was here answer a conversation's tool call, which the voice
+    waits for at most 1.5 s (`lamp_voice::tools::ASK_DEADLINE`), never
+    10 s, and an agent run takes about 75 s. So the group stays empty and
+    the five keep their lines until the voice hands over its content. The look skills
     (Desk tutor, its marks, Look for things, Point the light) stay too:
     lamp-tasks hands the agent no picture; a run granted `camera` may fetch
     the eyes' 320-wide frame from lamp-control (`camera.snapshot`), behind
@@ -2242,8 +2246,7 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
 - **One task a trigger.** A variant's task may name its trigger (`on`), as
   its say does, for a skill whose steps name theirs: one task for each such
   line, each alone in its table but for its `on` (only in a variant; any
-  other skill keeps one `do.task`). The read-back for the yes says the
-  first.
+  other skill keeps one `do.task`).
 - **The variant** (`agent.toml` beside `skill.toml`, and
   `scripts/agent.py`): it stands in for `grants`, `[[do]]` and
   `[[present.do]]` alone (`core_agent::overlaid`), so the trigger and the
@@ -2259,11 +2262,15 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   Anything else and the skill loads as it is, with one journal line why.
   This is the one core skill that may carry a `do.task`; it is not held to
   `task::origin_refuses`, since its brief is compiled into lamp-skills.
-  The owner's yes to its folder (its read-back says "Its script comes from
-  the lamp itself, and it uses none of the lamp's parts."), lamp-control's
-  one-run token, the day's 20 runs a skill and one run at a time hold as for
-  every `do.task`. Not yet in the product's install: on a lamp the two files
-  are copied beside the skill.
+  **Pre-approved** (the first builder, 19 Nov 08:57: "They're ours and have
+  no grants"): no yes is ever asked for it, aloud or of lamp-control, on
+  its first fire or any other (`core_agent::pre_approved`: the folder is a
+  pilot's, named as its folder, and its variant is exactly the lamp's,
+  whatever the switch). lamp-control mints its one-run token with no
+  grant, and only for the lamp's own skills, never a pushed folder. Any
+  other folder needs the owner's yes, as before. The day's 20 runs a skill
+  and one run at a time hold as for every `do.task`. Not yet in the
+  product's install: on a lamp the two files are copied beside the skill.
 - **Each fire**: its `do.task` is handed to lamp-tasks on its own thread, as
   every task is, and the fire's say waits for its line on the run's own
   thread, never the trigger's loop.
@@ -2272,8 +2279,7 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   fire, it is said in the say's place as exact words at the say's priority,
   with the look, the light and the move the say brings. Otherwise the
   skill's own say is said at once, exactly as with the switch off: past
-  10 s; the agent down, offline, not reached, refused, or waiting for the
-  owner's yes (its first fire asks for it as any task does); or an answer
+  10 s; the agent down, offline, not reached or refused; or an answer
   of `-`, nothing, or more than one short line (two sentences, 200
   characters, `core_agent::heard`). A line that comes after is dropped,
   never said late, and a failed run says nothing of its own (no failed
