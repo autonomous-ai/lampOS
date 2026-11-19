@@ -65,6 +65,10 @@ pub const SKILL_PARTS_MAX: u32 = 32;
 /// The longest skill name, as the skill format has it.
 pub const SKILL_NAME_MAX_CHARS: usize = 64;
 
+/// The longest `pose` JPEG, in base64 characters: 45 KiB of JPEG, so the
+/// request stays under the door's 64 KiB frame (`server::FRAME_MAX`).
+pub const POSE_JPEG_MAX_CHARS: usize = 60 * 1024;
+
 /// A part a lease holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -739,6 +743,12 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         size: Option<String>,
     },
+    /// One person's pose in a JPEG of the client's own (a camera frame it
+    /// was given), from the lamp's NPU service (`lamp-npu`, docs/npu.md):
+    /// 17 COCO keypoints in the picture's pixels and a score. Needs
+    /// `camera`; off unless `LAMP_NPU=on`.
+    #[serde(rename = "pose")]
+    Pose { jpeg: String },
     /// The microphone's sound as binary `microphone.audio` frames, each
     /// 20 ms block the ears share, until `on: false`, `stop`, the client
     /// goes, the lamp turns private or no block comes for 2 s
@@ -827,7 +837,10 @@ impl Op {
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
-            Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
+            // A pose is of a camera's picture: the camera's own grant.
+            Self::CameraSnapshot {} | Self::CameraStream { .. } | Self::Pose { .. } => {
+                vec![Grant::Camera]
+            }
             Self::MicrophoneStream { .. } => vec![Grant::Microphone],
             Self::SpeakerStream { .. } => vec![Grant::Speaker],
             Self::NotesSet { .. }
@@ -956,6 +969,18 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
+            Self::Pose { jpeg } => {
+                if jpeg.is_empty()
+                    || jpeg.len() > POSE_JPEG_MAX_CHARS
+                    || !jpeg
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+                {
+                    return Err(format!(
+                        "jpeg: a JPEG in base64, 1 to {POSE_JPEG_MAX_CHARS} characters (45 KiB)"
+                    ));
+                }
+            }
             Self::CameraStream { fps, size, .. } => {
                 if fps.is_some_and(|fps| !(1..=crate::camera::FPS_MOST).contains(&fps)) {
                     return Err(format!("fps: 1 to {}", crate::camera::FPS_MOST));
@@ -1327,6 +1352,12 @@ pub enum ErrorCode {
     BadRequest,
     /// Developer access is off in the app.
     Off,
+    /// The part is getting ready (the NPU's model being fetched on first
+    /// use): `retry_ms` says when to ask again.
+    Preparing,
+    /// The part can't do it now (no model could be fetched or checked, or
+    /// no NPU): `retry_ms`, when given, says when it tries again.
+    Unavailable,
 }
 
 /// An error's body: its code and why, and when to try again for `rate`.
@@ -2092,6 +2123,35 @@ mod tests {
             .chain(SERVICE_CODES_FOLDED.iter().map(|(other, _)| *other))
             .collect();
         assert_eq!(codes, ours);
+    }
+
+    /// `pose` rides the camera's grant (#7415's ruling) and holds one JPEG
+    /// in base64 that fits a frame.
+    #[test]
+    fn a_pose_needs_the_camera_and_one_jpeg_that_fits() {
+        let checked = |frame: String| parse(&frame).map(|request| request.op);
+        let op =
+            checked(json!({"id": 1, "op": "pose", "jpeg": "/9j/4AAQ+w=="}).to_string()).unwrap();
+        assert_eq!(op.needs(), vec![Grant::Camera]);
+        assert_eq!(op.needs_lease(), None);
+        for jpeg in [
+            String::new(),
+            "not base64!".to_owned(),
+            "A".repeat(POSE_JPEG_MAX_CHARS + 1),
+        ] {
+            assert!(
+                checked(json!({"id": 1, "op": "pose", "jpeg": jpeg}).to_string()).is_err(),
+                "{}",
+                jpeg.len()
+            );
+        }
+        assert!(checked(json!({"id": 1, "op": "pose"}).to_string()).is_err());
+        assert!(
+            checked(json!({"id": 1, "op": "pose", "jpeg": "AAAA", "size": 1}).to_string()).is_err()
+        );
+        let most = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(POSE_JPEG_MAX_CHARS)});
+        assert!(checked(most.to_string()).is_ok());
+        assert!(most.to_string().len() < crate::server::FRAME_MAX);
     }
 
     #[test]

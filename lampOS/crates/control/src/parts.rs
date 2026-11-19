@@ -212,6 +212,9 @@ pub struct Lamp {
     /// The camera, read from the eyes' newest frame (`--sight-file`); none
     /// without one.
     camera: Option<crate::camera::Camera>,
+    /// The lamp's NPU service, for `pose` (`LAMP_NPU=on`, `crate::npu`);
+    /// none, and `pose` is told it is off.
+    npu: Option<crate::npu::Npu>,
     /// Where the computers' own clips are kept (`crate::sounds`), which the
     /// voice plays from; none, and `sound` is the hum only.
     clips: Option<PathBuf>,
@@ -326,6 +329,7 @@ impl Lamp {
             clock: lamp_ipc::monotonic_us,
             follow: None,
             camera: None,
+            npu: None,
             clips: None,
             voice: Arc::default(),
             actions: None,
@@ -439,6 +443,39 @@ impl Lamp {
         });
         self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark, drawn));
         self
+    }
+
+    /// `pose` through lamp-npu's socket at `path` (`LAMP_NPU=on`).
+    pub fn posing(mut self, path: PathBuf) -> Self {
+        self.npu = Some(crate::npu::Npu::new(path));
+        self
+    }
+
+    /// `pose`: never while `watch` says the lamp is private, asked and
+    /// again when the answer comes; without a watch the lamp is taken as
+    /// private. Sent on off the door's lock.
+    fn pose(&self, client: &str, jpeg: &str) -> Result<Reply, Error> {
+        let npu = self
+            .npu
+            .clone()
+            .ok_or_else(|| Error::new(ErrorCode::Off, crate::npu::OFF))?;
+        let watch = self.watch.clone();
+        let private = move || {
+            watch
+                .as_ref()
+                .is_none_or(|watch| watch.lock().map_or(true, |watch| watch.private()))
+        };
+        if private() {
+            return Err(Error::new(ErrorCode::Private, "the lamp is private"));
+        }
+        let (client, jpeg) = (client.to_owned(), jpeg.to_owned());
+        Ok(Reply::Later(Box::new(move || {
+            let answer = npu.pose(&client, &jpeg)?;
+            if private() {
+                return Err(Error::new(ErrorCode::Private, "the lamp is private"));
+            }
+            Ok(answer)
+        })))
     }
 
     /// The `volume` op through lamp-actions' call socket at `path`.
@@ -1578,6 +1615,7 @@ impl Parts for Lamp {
         match op {
             Op::TurnEnd {} => self.turn_end(client),
             Op::ListenSet { on } => self.listen(client, re, *on),
+            Op::Pose { jpeg } => self.pose(client, jpeg),
             _ => self.act(client, re, op, now_us).map(Reply::Now),
         }
     }
@@ -2246,6 +2284,74 @@ mod tests {
             asked
         });
         (path, serving)
+    }
+
+    /// `pose` (#7415): off without `LAMP_NPU`'s socket; never while the
+    /// lamp is private, or with no watch to say it isn't; else sent on to
+    /// lamp-npu off the door's lock, its answer given back, and dropped if
+    /// the lamp turned private meanwhile.
+    #[test]
+    fn a_pose_goes_to_the_npu_service_and_never_while_private() {
+        let pose = op(r#"{"id":1,"op":"pose","jpeg":"AAAA"}"#);
+        let mut off = Lamp::new(None, None, None, "boot".into(), quiet());
+        assert_eq!(
+            off.reply("c_1", 1, &pose, 0).unwrap_err().code,
+            ErrorCode::Off
+        );
+        let dir = dir("pose");
+        let path = dir.join("npu.sock");
+        let _ = std::fs::remove_file(&path);
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let unwatched = Lamp::new(None, None, None, "boot".into(), quiet()).posing(path.clone());
+        let mut unwatched = unwatched;
+        assert_eq!(
+            unwatched.reply("c_1", 1, &pose, 0).unwrap_err().code,
+            ErrorCode::Private
+        );
+        let watch = Arc::new(Mutex::new(crate::watch::Watch::new()));
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet())
+            .watching(watch.clone())
+            .posing(path);
+        let served = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in [
+                r#"{"ok":true,"pose":null,"width":640,"height":480,"model":"m","ms":{"total":12.5}}"#,
+                r#"{"ok":false,"code":"preparing","why":"the pose model is being fetched","retry_ms":2000}"#,
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                writeln!(stream, "{answer}").unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            asked
+        });
+        let later = |reply: Result<Reply, Error>| match reply.unwrap() {
+            Reply::Later(run) => run(),
+            Reply::Now(now) => panic!("answered at once: {now}"),
+        };
+        let answer = later(lamp.reply("c_1", 1, &pose, 0)).unwrap();
+        assert_eq!(answer["width"], 640);
+        assert_eq!(answer["ms"]["total"], 12.5);
+        let preparing = later(lamp.reply("c_1", 2, &pose, 0)).unwrap_err();
+        assert_eq!(
+            (preparing.code, preparing.retry_ms),
+            (ErrorCode::Preparing, Some(2000))
+        );
+        let asked = served.join().unwrap();
+        assert_eq!(
+            asked[0],
+            json!({"op": "pose", "client": "c_1", "jpeg": "AAAA"})
+        );
+        // Private: refused at the ask, nothing sent.
+        watch
+            .lock()
+            .unwrap()
+            .take("voice/privacy", &json!({"permitted": false}), 1);
+        assert_eq!(
+            lamp.reply("c_1", 3, &pose, 0).unwrap_err().code,
+            ErrorCode::Private
+        );
     }
 
     #[test]
