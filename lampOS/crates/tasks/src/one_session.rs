@@ -314,6 +314,18 @@ pub const DEAD_STATUSES: &[&str] = &["killed", "failed", "timeout"];
 /// [`DEAD_STATUSES`] this long: dead, though Harness still says working
 /// (its own close needs two 1 s reads).
 pub const DEAD_WORKING: Duration = Duration::from_secs(15);
+/// #7906 sign 5: a kept session (not one `ensure` made new within
+/// [`OPEN_IDLE_WITHIN`], whose first words may still be refused) whose
+/// `harness reply` is refused `ENGINE_NOT_READY` this many times in a
+/// row, with no reply taken and no turn answered between...
+pub const KEPT_NOT_READY_REFUSALS: u32 = 2;
+/// ...over at least this long, from the first refusal to the last, is
+/// gone or stuck (lamp-c0a4, 19 Nov: its OpenClaw process frozen, `show`
+/// still `idle`, each refusal after Harness's own ~62 s wait). Two
+/// refusals of a frozen engine span about 2 min; a fresh session's
+/// refusals (~35 s seen) fall in its own window above, and a refusal
+/// Harness gives at once needs 60 s of nothing but refusals.
+pub const KEPT_NOT_READY_FOR: Duration = Duration::from_secs(60);
 /// How often a kept turn's record is read while its end is waited for:
 /// beside `harness wait`, never in a healthy turn's way.
 pub const TURN_WATCH: Duration = Duration::from_secs(5);
@@ -728,6 +740,9 @@ struct Pane {
     /// The last turn's hand-over and the Gateway's record then (#7906
     /// sign 4).
     handed: Option<(Instant, Option<(String, i64)>)>,
+    /// When `ensure` made it new (#7906 sign 5): its first words may be
+    /// refused `ENGINE_NOT_READY` within [`OPEN_IDLE_WITHIN`] of this.
+    made_new: Option<Instant>,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -743,6 +758,7 @@ impl Pane {
             full: false,
             checked_at_open: false,
             handed: None,
+            made_new: None,
         }
     }
 
@@ -821,6 +837,12 @@ struct Inner {
     /// The kept session given its one plain resume (#7906 step a), until a
     /// turn is answered: died again, it is replaced fresh.
     revived: Option<String>,
+    /// The kept session's replies refused `ENGINE_NOT_READY` in a row
+    /// (#7906 sign 5): since when, the last, and how many; a gap past
+    /// twice [`KEPT_NOT_READY_FOR`] since the last starts again. Cleared by a reply taken,
+    /// a turn answered or a session `ensure` made new; kept across a plain
+    /// resume, so one more refusal after it is `--fresh`.
+    not_ready_replies: Option<(Instant, Instant, u32)>,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -2692,7 +2714,14 @@ impl OneSession {
         let mut pane = Pane::new(&agent, place, true);
         pane.session = ensured.engine_session.clone();
         pane.checked_at_open = checked || ensured.result == "new";
-        self.lock().pane = Some(pane);
+        {
+            let mut inner = self.lock();
+            if ensured.result == "new" {
+                pane.made_new = Some(Instant::now());
+                inner.not_ready_replies = None;
+            }
+            inner.pane = Some(pane);
+        }
         if let Some((key, old)) = old
             && old != agent
             && place.engine == EngineKind::Openclaw
@@ -2961,6 +2990,45 @@ impl OneSession {
         let mut inner = self.lock();
         inner.replaced_in_row = 0;
         inner.revived = None;
+        inner.not_ready_replies = None;
+    }
+
+    /// #7906 sign 5: the kept session `agent`'s reply refused
+    /// `ENGINE_NOT_READY`, counted. Why it is gone or stuck once
+    /// [`KEPT_NOT_READY_REFUSALS`] in a row span [`KEPT_NOT_READY_FOR`]
+    /// (never past `open_idle_within`, shorter in tests), each within twice
+    /// that of the one before: an old refusal (its task given up at its
+    /// run's end) never joins a later one. A session
+    /// `ensure` made new within `open_idle_within` is in its first words'
+    /// window: its refusals are not counted.
+    fn reply_not_ready(&self, agent: &str) -> Option<String> {
+        let mut inner = self.lock();
+        let made_new = inner
+            .pane
+            .as_ref()
+            .filter(|pane| pane.kept && pane.agent == agent)?
+            .made_new;
+        let now = Instant::now();
+        if made_new.is_some_and(|at| now.saturating_duration_since(at) < self.open_idle_within) {
+            return None;
+        }
+        let bound = KEPT_NOT_READY_FOR.min(self.open_idle_within);
+        let (first, count) = match inner.not_ready_replies {
+            Some((first, last, count))
+                if now.saturating_duration_since(last) <= bound.saturating_mul(2) =>
+            {
+                (first, count.saturating_add(1))
+            }
+            _ => (now, 1),
+        };
+        inner.not_ready_replies = Some((first, now, count));
+        let span = now.saturating_duration_since(first);
+        (count >= KEPT_NOT_READY_REFUSALS && span >= bound).then(|| {
+            format!(
+                "its replies refused ENGINE_NOT_READY {count} times in a row over {} s",
+                span.as_secs()
+            )
+        })
     }
 
     /// #7906, the owner's ladder, the lightest reopen first. (a) A kept
@@ -3140,7 +3208,9 @@ impl OneSession {
     /// The kept session `agent` took a turn now, the Gateway's record at
     /// `base` just before (#7906 sign 4's start bound).
     fn handed_over(&self, agent: &str, base: Option<(String, i64)>) {
-        if let Some(pane) = self.lock().pane.as_mut()
+        let mut inner = self.lock();
+        inner.not_ready_replies = None;
+        if let Some(pane) = inner.pane.as_mut()
             && pane.agent == agent
         {
             pane.handed = Some((Instant::now(), base));
@@ -3310,6 +3380,9 @@ impl Turn<'_> {
         // hand-over (sign 3), and a refused hand-over's wait watched (sign 4).
         let mut checked: Option<String> = None;
         let mut refused: Option<(TurnWatch, Instant)> = None;
+        // #7906 sign 5's last step was a plain resume (ladder (a)): one
+        // more sign in this send is the `--fresh` (b), not a give-up.
+        let mut revived = false;
         loop {
             let agent = if self.opens {
                 self.one.ensure(harness, place, until, ended)
@@ -3373,6 +3446,29 @@ impl Turn<'_> {
                     // lamp-tasks' own queue, tried again until its end, or
                     // until what it waits on stops moving (#7906 sign 4).
                     Took::NotIdle | Took::EngineNotReady => {
+                        // #7906 sign 5, before the run's end is looked at:
+                        // a frozen engine's refusal can take Harness ~62 s,
+                        // past a spoken task's whole bound.
+                        if took == Took::EngineNotReady
+                            && let Some(why) = self.one.reply_not_ready(&agent)
+                        {
+                            if replaced && !revived {
+                                return self
+                                    .fallback(&format!("the kept session ensured again: {why}"));
+                            }
+                            replaced = true;
+                            self.restarted.store(true, Ordering::Release);
+                            refused = None;
+                            refused_since = None;
+                            revived = self.one.revive_or_replace(
+                                harness,
+                                &place.machine,
+                                &agent,
+                                &why,
+                                true,
+                            );
+                            continue;
+                        }
                         if ended() || Instant::now() >= until {
                             return self
                                 .fallback("the kept session stayed busy until the run's end");
