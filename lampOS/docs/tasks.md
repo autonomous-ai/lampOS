@@ -3034,8 +3034,10 @@ gateway's namespaces as lamp-tasks' check is; with no gateway running (as
 at a first install) there is no lock to clash with, so it runs in
 `openclaw-ns` of its own as before. `GATEWAY_WAITS`, `NO_GATEWAY`,
 `NODE_NOT_READY` and `gateway_not_there` now live in
-`lamp_checked_replace` (lamp-tasks re-exports them in `openclaw_config`),
-and lamp-update's one-shot uses the same schedule: only a refusal because
+`lamp_checked_replace` (lamp-tasks re-exports them in `openclaw_config`,
+lamp-update re-exports `NODE_NOT_READY` in `openclaw_install`, and a test
+pins `NO_GATEWAY` to the wrapper's no-gateway line), and lamp-update's
+one-shot uses the same schedule: only a refusal because
 the gateway was not there to check is tried again, never a refusal of the
 text.
 

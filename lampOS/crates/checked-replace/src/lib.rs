@@ -25,8 +25,7 @@ pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
 /// join, and fails closed.
 pub const NO_GATEWAY: &str = "is not running in its own namespaces";
 /// What it says joining a gateway just started whose namespace does not
-/// show Node yet (`lamp_update::openclaw_install::NODE_NOT_READY`, the
-/// same words).
+/// show Node yet (re-exported as `lamp_update::openclaw_install::NODE_NOT_READY`).
 pub const NODE_NOT_READY: &str = "'node': No such file or directory";
 /// The waits before each new try of a write OpenClaw's gateway was not
 /// there to check (lamp-tasks' `write_waiting`, lamp-update's one-shot
