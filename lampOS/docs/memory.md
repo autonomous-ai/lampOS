@@ -3238,6 +3238,26 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `i64::MAX`, not an integer) is not sent, so the text is kept as a plain
     remember. A resumed fresh session forgets the hits told by id before
     it, as it does its sources.
+  - **A kept thing said again, in other words** (C81 on lamp-06c1, stock
+    13417, 16 Nov: "Locker number is 441." kept, then "Gym locker number
+    is 441." kept as a second id, never marked said again): `remember`
+    also takes `again` (an integer id), described on the parameter itself
+    (so the description stays within the link's 1,024 bytes): the
+    model gives it when they only say a shown kept thing again, unchanged,
+    in any words. With `LAMP_MEMORY_REMEMBER_ONCE` too, no `replaces`
+    given, an id this session was shown with its text, and a line that is
+    not its person's by the one-face rule alone, the voice sends that kept
+    thing in the words it was shown, with its id as `replaces`: the store's
+    said-again check (`Days::restates`) answers `existing`, no new id, and
+    the time it was said again is kept (`last_said_unix_ms`). The model's
+    id alone is not trusted (Twelve's P2 on #8023): the keep's sentence
+    must name the kept thing's numbers, and the heard line no other
+    (`same_numbers`, "four four one" read as "441"; a fact check, not a word
+    list), so "my locker is 512 now" named as 441 said again is kept as
+    said. Once taken, the kept thing stays shown in its stored words, so a
+    third saying finds it too. Anything else
+    is a plain remember, as before. The model judges the meaning; no word
+    list. `remember::tests::a_kept_thing_said_again_in_other_words_is_sent_as_itself`.
   - **A correction in their words, with no id** (lamp-06c1, 26 Oct: the
     model left `replaces` out, so "bakery" and "library" both stayed
     current): a `remember` with no `replaces` whose line, as heard (or the
