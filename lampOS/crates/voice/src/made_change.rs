@@ -100,6 +100,16 @@ pub fn changed(
     now_ms: u64,
 ) -> Value {
     drop_old(&keeping.directory, now_ms);
+    // Only the owner's ask, read before any skill of theirs is named
+    // (Twelve's P2 1 on #8008: a guest was told their names).
+    if !owner() {
+        eprintln!("lamp-voice: a made skill wasn't changed: not the owner's ask");
+        return json!({
+            "error": NOT_OWNER,
+            "next": "Say plainly, in a few words, that only the lamp's owner can change a skill \
+                     they made, and nothing changed. Name no skill. Call nothing."
+        });
+    }
     let (name, sha256) = match made_remove::found(asked, keeping) {
         Found::Made { name, sha256, .. } => (name, sha256),
         Found::Alike(names) => return which_told(&names[..names.len().min(MOST_NAMED)]),
@@ -128,14 +138,6 @@ pub fn changed(
             });
         }
     };
-    if !owner() {
-        eprintln!("lamp-voice: a made skill wasn't changed: not the owner's ask");
-        return json!({
-            "error": NOT_OWNER,
-            "next": "Say plainly, in a few words, that only the lamp's owner can change a skill \
-                     they made, and nothing changed. Name no skill. Call nothing."
-        });
-    }
     let was = made_skill::entries(&keeping.directory)
         .into_iter()
         .find(|entry| entry["sha256"] == sha256.as_str())
@@ -180,9 +182,12 @@ fn finished(keeping: &Keeping, name: &str, old_sha: &str, was_off: bool, mut tol
         crate::make_skill_local::said_line_now(line, crate::make_skill_local::Outcome::Made);
         return told;
     }
-    // Waiting for the person's yes (a skill that sends): it replaces the
-    // old one in place once it goes on.
-    if told.get(crate::skill_write_yes::APPROVE_ID).is_some() {
+    // Waiting for the person's yes (a skill that sends), or for their
+    // choice on a clash (`LAMP_MAKE_NO_ASKS` off): it replaces the old one
+    // in place once it goes on.
+    if told.get(crate::skill_write_yes::APPROVE_ID).is_some()
+        || told.get(crate::made_clash::CLASH_ID).is_some()
+    {
         return told;
     }
     // Made and kept, not on: nothing of it kept; the old one as it was.
@@ -315,10 +320,17 @@ fn now_unix_ms() -> u64 {
 /// The changed skill `name`'s old version put back on, in place, within
 /// [`UNDO_FOR`] of `now_ms`: its entry back in the new one's place, put on
 /// by its SHA-256 (the manage helper puts it in the same folder, so its
-/// on/off state stays), the new one's package then deleted. On a failed
-/// put-on the new one stays, as it was. Only the owner's ask (`owner`).
-/// What the model is told.
-pub fn put_back(keeping: &Keeping, name: &str, owner: impl FnOnce() -> bool, now_ms: u64) -> Value {
+/// on/off state stays: `off`, lamp-skills' `off` file as read, says it is
+/// told as off), the new one's package then deleted. On a failed put-on
+/// the new one stays, as it was. Only the owner's ask (`owner`). What the
+/// model is told.
+pub fn put_back(
+    keeping: &Keeping,
+    name: &str,
+    owner: impl FnOnce() -> bool,
+    off: Option<&BTreeSet<String>>,
+    now_ms: u64,
+) -> Value {
     if !owner() {
         return json!({
             "error": NOT_OWNER,
@@ -398,11 +410,18 @@ pub fn put_back(keeping: &Keeping, name: &str, owner: impl FnOnce() -> bool, now
         let _ = fs::remove_file(directory.join(package));
     }
     eprintln!("lamp-voice: a changed skill's old version is put back");
+    // Turned off, it stays off in its folder: told so, never as on.
+    let stays_off = off.is_some_and(|off| off.contains(name));
+    let line = if stays_off {
+        format!("Your old {spoken} is back. It stays off.")
+    } else {
+        format!("Your old {spoken} is back.")
+    };
     json!({
         "made": name,
-        "on": true,
+        "on": !stays_off,
         "put_back": true,
-        "next": crate::make_no_asks::said(&format!("Your old {spoken} is back.")),
+        "next": crate::make_no_asks::said(&line),
     })
 }
 
@@ -424,6 +443,7 @@ pub fn put_back_here(
         &keeping,
         name,
         || crate::services::owners_yes_now(request, heard, lease),
+        crate::make_no_asks::turned_off_here().as_ref(),
         now_unix_ms(),
     )
 }
