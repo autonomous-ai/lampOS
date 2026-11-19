@@ -2473,7 +2473,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      own, as the install's `--version` does, with a stand-in
      `LAMP_HERMES_TOKEN` (the check reads the file and calls no provider).
      Only status 0 renames it into place
-     (`lamp_checked_replace::replace_checked`). Refused, the new file is
+     (`lamp_checked_replace::replace_checked`), the state folder's lock
+     (`lamp_checked_replace::hold`, a `flock` on the folder, at most 90 s,
+     shared with lamp-tasks' and the reset's writes, docs/tasks.md) held
+     from the read to the rename. Refused, the new file is
      removed, `openclaw.json` stays byte for byte, and the install fails
      with error `config` and OpenClaw's words ("... OpenClaw's own config
      check refused it: ..."), so the gateway is not restarted onto it. With

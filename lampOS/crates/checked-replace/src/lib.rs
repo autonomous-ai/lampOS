@@ -4,11 +4,14 @@
 //! one. Refused, the new file is removed and the old one is left byte for
 //! byte. lamp-tasks', lamp-update's and lamp-setup's writers of OpenClaw's
 //! `openclaw.json` all go through it, each with OpenClaw's own
-//! `config validate --json` ([`validate`]) as the check.
+//! `config validate --json` ([`validate`]) as the check, and each holds
+//! the folder's lock ([`hold`], [`lock`]) from before its read until
+//! after its rename, so no writer's rename lands inside another's check
+//! and drops the other's keys (Seventh's P2 on #7872).
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::os::fd::{AsFd, BorrowedFd};
+use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -20,6 +23,58 @@ use rustix::fs::{AtFlags, Gid, Mode, OFlags, Uid};
 // ponytail: a fixed bound, unmeasured on a lamp; tune once a lamp's check
 // is timed.
 pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
+
+/// The longest a writer waits for another writer of the same folder to let
+/// its lock go ([`lock`]): one checked write holds it at most about
+/// [`VALIDATE_WITHIN`] (OpenClaw's check) and a few file steps.
+// ponytail: a fixed bound over VALIDATE_WITHIN, unmeasured on a lamp.
+pub const LOCK_WITHIN: Duration = Duration::from_secs(90);
+
+/// `folder` opened and locked for one writer ([`lock`]): the lock is held
+/// while the returned folder stays open, so a writer takes it before its
+/// read and drops it after its rename.
+pub fn hold(folder: &Path, within: Duration) -> io::Result<OwnedFd> {
+    let dir = rustix::fs::open(
+        folder,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    lock(dir.as_fd(), within)?;
+    Ok(dir)
+}
+
+/// An exclusive `flock` on the open folder `dir` itself (Seventh's P2 on
+/// #7872): every writer of a settings file in it that reads, merges, checks
+/// and renames takes it first, so each one's read sees the other's rename.
+/// The folder, not a file beside the settings: nothing to create, own or
+/// leave behind, and a reset that removes every name a folder does not
+/// keep cannot split it. Let go when every descriptor of that open folder
+/// is closed (never inherited: `O_CLOEXEC`). Waited for at most `within`;
+/// past it the write fails with why, as a check that could not run does.
+pub fn lock(dir: BorrowedFd<'_>, within: Duration) -> io::Result<()> {
+    use rustix::fs::FlockOperation;
+    use rustix::io::Errno;
+    let began = Instant::now();
+    loop {
+        match rustix::fs::flock(dir, FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => return Ok(()),
+            Err(Errno::INTR) => {}
+            Err(Errno::WOULDBLOCK) if began.elapsed() < within => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(Errno::WOULDBLOCK) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!(
+                        "another writer held the folder's lock past {} s",
+                        within.as_secs()
+                    ),
+                ));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
 
 /// What lamp-update's wrapper says when it finds no running gateway to
 /// join, and fails closed.
