@@ -4502,6 +4502,21 @@ pub fn serve(
         );
     }
     engine = engine.checking_keep_claims_whole(keep_whole);
+    // A wellbeing nudge said stopped, snoozed or turned off with no
+    // `wellbeing_nudges` that ran (`LAMP_NUDGE_CLAIM_CHECKED=on`, #7878),
+    // only beside the check above.
+    let nudge_claims = crate::action_claim::nudge_on();
+    if nudge_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply saying a wellbeing nudge was stopped, snoozed or turned off with no wellbeing_nudges that ran is held the same way (LAMP_NUDGE_CLAIM_CHECKED)"
+            } else {
+                "lamp-voice second: LAMP_NUDGE_CLAIM_CHECKED does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_nudge_claims(action_claims && nudge_claims);
     // A made skill said removed, turned off or on in the lamp's own result
     // words, untrue and with no `make_skill` that did it, is held the same
     // way (`LAMP_SKILL_CLAIM_CHECKED=on`, #7683), with a voice make offered:

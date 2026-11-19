@@ -1970,6 +1970,8 @@ struct Shared {
     doing_claims: bool,
     /// [`Engine::checking_keep_claims_whole`] (#7878).
     keep_whole: bool,
+    /// [`Engine::checking_nudge_claims`] (#7878).
+    nudge_claims: bool,
     /// [`Engine::reading_made_names`] (#7683).
     made_names: Option<MadeNames>,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
@@ -5133,6 +5135,7 @@ impl Engine {
                 made_not_on: false,
                 doing_claims: false,
                 keep_whole: false,
+                nudge_claims: false,
                 made_names: None,
                 one_path_wait: None,
                 no_words_again: false,
@@ -6518,6 +6521,20 @@ impl Engine {
     pub fn checking_keep_claims_whole(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.keep_whole = on;
+        }
+        self
+    }
+
+    /// `LAMP_NUDGE_CLAIM_CHECKED=on` ([`crate::action_claim::nudge_claim`],
+    /// #7878), beside [`Engine::checking_action_claims`]: a reply that opens
+    /// by saying a wellbeing nudge was stopped, snoozed or turned off ("I've
+    /// turned off the water nudge for today.") is held and judged: it
+    /// stands only beside a `wellbeing_nudges` that ran in the turn; with no
+    /// call, asked again once, then said not done. Nothing without the claim
+    /// check. Before any turn only.
+    pub fn checking_nudge_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.nudge_claims = on;
         }
         self
     }
@@ -16731,12 +16748,12 @@ fn claim_lets_go(
     read_asked: bool,
     called: &[(String, Value)],
     statuses: &[Value],
-    (made, made_asked): (&[crate::action_claim::MadeSkill], bool),
+    (made, made_asked, nudge): (&[crate::action_claim::MadeSkill], bool, bool),
 ) -> bool {
     if !claims {
         return true;
     }
-    match crate::action_claim::claim_made_on(held, false, turns, made, made_asked) {
+    match crate::action_claim::claim_checked_on(held, false, turns, (made, made_asked), nudge) {
         Some(None) => true,
         Some(Some(kind)) => crate::action_claim::stands_made_on(
             kind,
@@ -18652,7 +18669,7 @@ async fn answer(
                                 read_asked,
                                 &called,
                                 &call_statuses,
-                                (&made_names, made_asked),
+                                (&made_names, made_asked, shared.nudge_claims),
                             )
                     }) {
                         eprintln!(
@@ -18886,7 +18903,7 @@ async fn answer(
                                     read_asked,
                                     &turn_called,
                                     &call_statuses,
-                                    (&made_names, made_asked),
+                                    (&made_names, made_asked, shared.nudge_claims),
                                 ) {
                                     continue;
                                 }
@@ -19752,12 +19769,12 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let unmade = crate::action_claim::claim_made_on(
+                let unmade = crate::action_claim::claim_checked_on(
                     &held,
                     true,
                     (worded_turn, forget_turn, doing_turn),
-                    &made_names,
-                    made_asked,
+                    (&made_names, made_asked),
+                    shared.nudge_claims,
                 )
                 .flatten()
                 .filter(|kind| {
@@ -21036,10 +21053,13 @@ async fn answer(
                     keep_refused |= crate::remember::needs_face::refused(&answer.told);
                     keep_held |= answer.told.get("held").is_some();
                 }
-                // A `use_skill` that ran an unplug tool is kept under that
-                // tool's name, for the unplug claim's outcome (#6457).
+                // A `use_skill` that ran an unplug tool, or the wellbeing
+                // nudges' own function, is kept under that tool's name, for
+                // its claim's outcome (#6457, #7878).
                 call_statuses.push(after_forget::status(
-                    crate::action_claim::unplug_tool(&call.name, &call.args).unwrap_or(&call.name),
+                    crate::action_claim::unplug_tool(&call.name, &call.args)
+                        .or_else(|| crate::action_claim::nudge_tool(&call.name, &call.args))
+                        .unwrap_or(&call.name),
                     &answer.told,
                 ));
                 if crate::remember::is_forget(&call.name) {
