@@ -3304,38 +3304,66 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
 
 /// #7868: the reset's cut of `openclaw.json` is checked by OpenClaw's own
 /// config check on a file beside it, the old file's owner and mode, before
-/// it is renamed into place. Refused, the old file stays byte for byte,
-/// nothing is left beside it, and the reset goes on (the lamp's gateway
-/// keeps a file it took, never one OpenClaw refuses); taken, the cut lands.
+/// it is renamed into place. A check that does not take it (refused, past
+/// its time, or not started) leaves no person's key behind: a reset fails
+/// toward wiping, so the file is removed, nothing is left beside it, the
+/// reset goes on, and the journal says it was removed and why, never a key
+/// (lamp-update's next install writes the `gateway` block again). Taken,
+/// the cut lands.
 #[test]
-fn a_cut_openclaws_own_check_refuses_never_lands() {
+fn a_cut_openclaws_own_check_does_not_take_is_removed() {
+    let theirs =
+        r#"{"gateway":{"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}}}"#;
+    let cut = reset::cut_openclaw_config(theirs.as_bytes()).unwrap();
+    for why in [
+        "OpenClaw's own config check refused it (status 1): gateway.port: Unrecognized key",
+        "OpenClaw's own config check ran past 60 s",
+        "OpenClaw's config check did not start: No such file or directory",
+    ] {
+        let root = Root::new();
+        let state = root.path("var/lib/lampos-openclaw/state");
+        fs::create_dir_all(&state).unwrap();
+        let json = state.join("openclaw.json");
+        fs::write(&json, theirs).unwrap();
+        fs::set_permissions(&json, fs::Permissions::from_mode(0o640)).unwrap();
+        let checked = RefCell::new(Vec::new());
+        let mut refuse = |file: &Path| {
+            assert_eq!(file.parent(), Some(state.as_path()));
+            assert_ne!(file, json.as_path());
+            assert_eq!(
+                fs::metadata(file).unwrap().permissions().mode() & 0o7777,
+                0o640
+            );
+            checked.borrow_mut().push(fs::read(file).unwrap());
+            Err(why.to_owned())
+        };
+        let mut said = Vec::new();
+        let removed = reset::forget_agents_checked(&root.0, &mut refuse, &mut |line| {
+            said.push(line.to_owned())
+        })
+        .unwrap();
+        assert_eq!(*checked.borrow(), [cut.clone()], "{why}");
+        assert!(fs::symlink_metadata(&json).is_err(), "{why}");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 0, "{why}");
+        assert!(removed > 0, "{why}");
+        let line = said
+            .iter()
+            .find(|line| line.contains("openclaw.json"))
+            .unwrap_or_else(|| panic!("no journal line: {said:?}"));
+        assert!(line.contains("removed") && line.contains(why), "{line}");
+        assert!(
+            said.iter().all(|line| !line.contains("sk-person")),
+            "{said:?}"
+        );
+    }
+
     let root = Root::new();
     let state = root.path("var/lib/lampos-openclaw/state");
     fs::create_dir_all(&state).unwrap();
     let json = state.join("openclaw.json");
-    let theirs =
-        r#"{"gateway":{"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}}}"#;
     fs::write(&json, theirs).unwrap();
-    fs::set_permissions(&json, fs::Permissions::from_mode(0o640)).unwrap();
-    let cut = reset::cut_openclaw_config(theirs.as_bytes()).unwrap();
-    let checked = RefCell::new(Vec::new());
-    let mut refuse = |file: &Path| {
-        assert_eq!(file.parent(), Some(state.as_path()));
-        assert_ne!(file, json.as_path());
-        assert_eq!(
-            fs::metadata(file).unwrap().permissions().mode() & 0o7777,
-            0o640
-        );
-        checked.borrow_mut().push(fs::read(file).unwrap());
-        Err("gateway.port: Unrecognized key".to_owned())
-    };
-    reset::forget_agents_checked(&root.0, &mut refuse).unwrap();
-    assert_eq!(fs::read_to_string(&json).unwrap(), theirs);
-    assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
-    assert_eq!(*checked.borrow(), [cut.clone()]);
-
     let mut take = |_: &Path| Ok(());
-    assert!(reset::forget_agents_checked(&root.0, &mut take).unwrap() > 0);
+    assert!(reset::forget_agents_checked(&root.0, &mut take, &mut |_| {}).unwrap() > 0);
     assert_eq!(fs::read(&json).unwrap(), cut);
     assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
 }

@@ -688,14 +688,18 @@ pub fn remove_installed_apps(root: &Path) -> io::Result<Vec<PathBuf>> {
 /// without Hermes or OpenClaw removes nothing; nothing is followed through
 /// a link. Run again after a cut, it finishes what is left.
 pub fn forget_agents(root: &Path) -> io::Result<usize> {
-    forget_agents_checked(root, &mut |file| openclaw_check(root, file))
+    forget_agents_checked(root, &mut |file| openclaw_check(root, file), &mut |line| {
+        eprintln!("{line}")
+    })
 }
 
 /// [`forget_agents`], with `check` run on the new `openclaw.json` before
-/// it is renamed into place (#7868).
+/// it is renamed into place (#7868), and what the reset says to the
+/// journal given to `say`.
 pub fn forget_agents_checked(
     root: &Path,
     check: &mut dyn FnMut(&Path) -> Result<(), String>,
+    _say: &mut dyn FnMut(&str),
 ) -> io::Result<usize> {
     walk_agents(root, true, &mut Vec::new(), check)
 }
