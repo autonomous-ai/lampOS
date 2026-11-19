@@ -13,6 +13,14 @@ publish.workspace = true
 name = "lamp-skills"
 path = "src/main.rs"
 
+[features]
+default = []
+# The switches' and the reading's folder's per-thread stand-ins
+# (`task::set_on_here`, `relay_share::set_here`) for another crate's test:
+# lamp-cloud's forwarder test of the voice's share (#7342) turns it on as a
+# dev-dependency. Never in a product build.
+share-fixture = []
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true

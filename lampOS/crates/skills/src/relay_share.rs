@@ -61,7 +61,7 @@ pub const HEADER: &str = "x-usage-day-used";
 const MOST_BYTES: u64 = 4096;
 const DAY_MS: u64 = 86_400_000;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "share-fixture"))]
 thread_local! {
     /// The share as a test of this thread sets it (`Some(None)`: off).
     static SHARE_HERE: std::cell::Cell<Option<Option<f64>>> = const { std::cell::Cell::new(None) };
@@ -83,7 +83,7 @@ pub fn share_from(value: Option<&str>) -> Option<f64> {
 
 /// The voice's share in this process, or `None` with the switch off.
 pub fn share() -> Option<f64> {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "share-fixture"))]
     if let Some(share) = SHARE_HERE.with(std::cell::Cell::get) {
         return share;
     }
@@ -95,15 +95,17 @@ pub fn on() -> bool {
     share().is_some()
 }
 
-/// The share and the reading's folder for this test's thread alone.
-#[cfg(test)]
+/// The share and the reading's folder for this test's thread alone: in
+/// this crate's tests, and in another's with the `share-fixture` feature
+/// (lamp-cloud's forwarder test, a dev-dependency only).
+#[cfg(any(test, feature = "share-fixture"))]
 pub fn set_here(share: Option<f64>, directory: Option<&Path>) {
     SHARE_HERE.with(|here| here.set(Some(share)));
     DIRECTORY_HERE.with(|here| *here.borrow_mut() = directory.map(Path::to_path_buf));
 }
 
 fn directory() -> PathBuf {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "share-fixture"))]
     if let Some(directory) = DIRECTORY_HERE.with(|here| here.borrow().clone()) {
         return directory;
     }
