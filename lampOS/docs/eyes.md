@@ -1705,7 +1705,17 @@ With the switch:
   held for their yes, and two faces are the eyes' own refusal (#7653,
   row-7422c on lamp-52e6;
   `a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename`).
-  Off, a new face is kept on the call as before
+  With `LAMP_REMEMBER_SPEAKER` on too and `LAMP_FACE_NO_ASK` off, the
+  speaker-bound save asks the same (`known_faces::run_speaker`, Heron's P1
+  on #7622), read from the speaker's own line, after the name's own checks,
+  and not for a face the eyes know that is the one seen saying it (the
+  first builder's P2 on #7622). On either save, a line keeping the face out
+  (face words with "out", "off" or "forget" and no refusal word: "Keep my
+  face out of this, I'm Kesh.") keeps nothing and asks nothing, never the
+  face question it just refused (`FACE_KEPT_OUT`, at setup
+  `SETUP_NOT_KEPT_NO_ASK`; Heron's HOLD on #7622); "Don't forget my face"
+  is asked first as before. Off, a new face is kept
+  on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
   checked; off unless set; the first builder 18:50, 18 Nov, from the
@@ -2121,7 +2131,9 @@ service writes a name said once right.
 
 ### Remember only the person who spoke (`LAMP_REMEMBER_SPEAKER=on`)
 
-Off by default in both Voice and Eyes. Eyes needs its recognizer and who
+Off by default in both Voice and Eyes, and off in the product units: it goes
+on together with `LAMP_FACE_NO_ASK` and the coming `LAMP_FACE_LEARN_LATER`
+(the first builder's ruling on #7622, 18 Nov). Eyes needs its recognizer and who
 socket, `LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; Voice also needs
 `LAMP_EYES_SPEAKING=on` and the bus. With `LAMP_NAMES=checked`, the second
 voice route binds `remember_my_face` to the current microphone line, its
@@ -2153,8 +2165,15 @@ to it without asking anything ("Yes, my name is Kess."). A refusal word
 anywhere in the line, someone else's face ("remember her face") or a plain
 "I'm Kess." refuses before Eyes is asked, and the model is told to ask the
 face question and wait for a yes that includes the name. The lamp's last
-line is its own words and never supplies a name. Past setup, and with the
-switch off, nothing changes.
+line is its own words and never supplies a name. Past setup, with
+`LAMP_NAME_LEARN_FIX` on (as in the product, #7331), a name alone keeps no
+face either: the same leave is needed, except for a rename or a line
+correcting letters the lamp just spelled back, and the model is told
+`ASK_FACE_FIRST` (Heron's P1 on #7622), unless `LAMP_FACE_NO_ASK` is on:
+then the speaker-bound proof replaces the ask, and a face seen saying
+"I'm X" is kept with nothing asked
+(`remember_speaker_with_no_ask_and_name_learn_fix_keeps_the_speaker_unasked`).
+Past setup with that switch off, and with this switch off, nothing changes.
 With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
 this same request's enrollment proof through the live scope check. It does
 not replace the proof with visibility or a room speaker. A cancelled,

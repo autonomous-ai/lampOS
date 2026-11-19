@@ -890,6 +890,10 @@ pub(crate) fn face_agreed(name: &str, said: &Said) -> bool {
         && plain_yes_beside(name, &said.this, BESIDE_THE_SAVE)
 }
 
+/// Words that, beside the face words, keep a face out rather than ask for
+/// it ([`speaker_gave_face_leave`]): "out", "off", "forget".
+const NOT_THE_FACE: &[&str] = &["out", "off", "forget"];
+
 /// Whether the speaker's own line gives leave to keep their face, which a
 /// speaker-bound first save at setup needs (`LAMP_REMEMBER_SPEAKER`, B3472
 /// after #3472): the line asks to keep their own face ("My name is Kesh,
@@ -906,12 +910,39 @@ pub(crate) fn speaker_gave_face_leave(heard: &str, lamp_before: Option<&str>) ->
     {
         return false;
     }
+    // "Keep my face out of this", "Leave my face off it", "Forget my face":
+    // the face words beside these keep it out, whatever their order
+    // (Heron's P3 on #7622).
+    if words
+        .iter()
+        .any(|word| NOT_THE_FACE.contains(&word.as_str()))
+    {
+        return false;
+    }
     let asks_for_their_face = words.windows(2).any(|two| two == ["my", "face"])
         && words
             .iter()
             .any(|word| ["remember", "keep", "save"].contains(&word.as_str()));
     asks_for_their_face
         || (lamp_before.is_some_and(asks_for_the_face) && agrees(heard) && !heard.contains('?'))
+}
+
+/// Whether the speaker's own line asks to keep their face out: face words
+/// with "out", "off" or "forget" ([`NOT_THE_FACE`]), and no refusal word
+/// beside them ([`NOT_A_PLAIN_ASK`]), so "Keep my face out of this, I'm
+/// Kesh." is one and "Don't forget my face" is not. Such a line keeps
+/// nothing of the face and asks nothing ([`FACE_KEPT_OUT`], Heron's HOLD
+/// on #7622): asking "Shall I remember your face?" right after it would
+/// not be listening.
+pub(crate) fn keeps_face_out(heard: &str) -> bool {
+    let words = lower_words(heard);
+    words.iter().any(|word| word == "face")
+        && words
+            .iter()
+            .any(|word| NOT_THE_FACE.contains(&word.as_str()))
+        && !words
+            .iter()
+            .any(|word| NOT_A_PLAIN_ASK.contains(&word.as_str()) || word.ends_with("n't"))
 }
 
 /// The name a setup face save runs under with no save called
@@ -942,6 +973,7 @@ pub(crate) fn refused_here(told: &Value) -> bool {
             SAY_IT_BACK,
             NOT_AGREED,
             ASK_FACE_FIRST,
+            FACE_KEPT_OUT,
             NOT_KEPT_NO_ASK,
             CANT_KEEP_NO_ASK,
         ]
@@ -2060,6 +2092,9 @@ const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this req
 /// agreed to the new one.
 /// With `LAMP_NAME_LEARN_FIX` (#7331): a new face not kept for want of
 /// the person's yes to keeping it ([`run_switched`]).
+/// What the model is told when the speaker's own line asked to keep their
+/// face out ([`keeps_face_out`]): nothing kept, nothing to ask.
+pub(crate) const FACE_KEPT_OUT: &str = "They asked to keep their face out: it was not kept. Don't ask them about their face, don't tell them to try again, and never say you'll know them; just say that's fine and carry on.";
 pub(crate) const ASK_FACE_FIRST: &str = "I have not kept their face: a name is not a yes to keeping a face. Ask them only this, with their name: \"Shall I remember your face as <their name>?\" Call this again only after their yes; if they say no, keep nothing and say that's fine.";
 /// With `LAMP_FACE_NO_ASK`: a face the eyes could not see alone (more than
 /// one face, none, too far, the eye shut) for a save the person did not ask
@@ -2459,6 +2494,21 @@ fn run_speaker(
     // Earlier names may belong to someone else. This path uses only the
     // request's own heard words, including its spelling checks.
     let said = Said::now(&proof.heard);
+    // "Keep my face out of this, I'm Kesh.": nothing kept and nothing asked,
+    // at setup or past it, with `LAMP_FACE_NO_ASK` or without (Heron's HOLD
+    // on #7622), before the name's own checks: a line like that may not
+    // read as a plain self-introduction. At setup the step then ends with
+    // the name only ([`SETUP_NOT_KEPT_NO_ASK`]). Not a rename, whose face is
+    // already kept.
+    let renaming = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    if keeps_face_out(&said.this) && !renaming {
+        let error = if switches.at_setup {
+            SETUP_NOT_KEPT_NO_ASK
+        } else {
+            FACE_KEPT_OUT
+        };
+        return (json!({"error": error}), true);
+    }
     if !name_heard(name, &said) {
         return (json!({"error": NOT_HEARD}), true);
     }
@@ -2484,6 +2534,41 @@ fn run_speaker(
         }
     }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    // Past setup, with `LAMP_NAME_LEARN_FIX` (#7331) and without
+    // `LAMP_FACE_NO_ASK`, a new face needs the same leave, else
+    // `ASK_FACE_FIRST` (Heron's P1 on #7622: this path never read the
+    // switch). Not for a rename, a line correcting the letters the lamp just
+    // spelled back, or a speaker the eyes already know: the known face
+    // beside their known file as the line was heard is the proof's own (the
+    // first builder's P2 on #7622), whose "Call me Jay." goes to the eyes
+    // and their rename's own yes. With `LAMP_FACE_NO_ASK` the speaker-bound
+    // proof replaces the ask: a face seen saying "I'm X" is kept, nothing
+    // asked (the first builder's ruling on #7622, 18 Nov 23:10).
+    if !switches.at_setup && switches.name_learn_fix && !switches.face_no_ask && !replace {
+        let lamp = crate::thread::THREAD.lock().ok().and_then(|thread| {
+            thread
+                .names_window(1)
+                .before
+                .last()
+                .map(|(_, lamp)| lamp.clone())
+        });
+        let corrected = lamp.as_deref().is_some_and(|lamp| {
+            spelled_back_in(lamp).is_some()
+                && corrects_spelled_back(
+                    name,
+                    &Said {
+                        this: said.this.clone(),
+                        before: vec![(String::new(), lamp.to_owned())],
+                    },
+                )
+        });
+        let speaker_known = line
+            .and_then(|line| line.known.as_ref())
+            .is_some_and(|(_, face)| *face == proof.face);
+        if !corrected && !speaker_known && !speaker_gave_face_leave(&said.this, lamp.as_deref()) {
+            return (json!({"error": ASK_FACE_FIRST}), true);
+        }
+    }
     // No earlier speaker confirmation is proven. Keep the existing
     // replacement check; it conservatively refuses on this scoped path.
     if replace && !agreed_to(name, &said) {
@@ -2619,6 +2704,8 @@ pub fn refusal_reason(error: &str) -> &'static str {
         (ONLY_THE_CALL, "only_the_call"),
         (NOT_OWN_NAME, "not_own_name"),
         (FACE_LEAVE, "face_leave"),
+        (ASK_FACE_FIRST, "ask_face_first"),
+        (FACE_KEPT_OUT, "face_kept_out"),
         (NOT_SEEN_NO_ASK, "not_seen_no_ask"),
         (SETUP_NOT_KEPT_NO_ASK, "setup_not_kept_no_ask"),
         (NOT_KEPT_NO_ASK, "not_kept_no_ask"),
@@ -2821,6 +2908,16 @@ fn run_switched(
     let new_face = checked && call.name == REMEMBER && !replacing && !setup && !corrected;
     if new_face && switches.face_no_ask && known_now(&known_file_of(socket)).is_none() {
         return (no_ask_unkept(Some(name), &said.this, lamp_before), true);
+    }
+    // A line keeping their face out ("Keep my face out of this, I'm
+    // Kesh.") keeps nothing and asks nothing, never the face question it
+    // just refused (Heron's HOLD on #7622).
+    if new_face
+        && switches.name_learn_fix
+        && keeps_face_out(&said.this)
+        && known_now(&known_file_of(socket)).is_none()
+    {
+        return (json!({"error": FACE_KEPT_OUT}), true);
     }
     if new_face
         && switches.name_learn_fix
@@ -6512,6 +6609,21 @@ mod tests {
             assert_eq!(told["error"], ASK_FACE_FIRST, "{said:?}: {told}");
             assert!(refused_here(&told));
         }
+        // On: a line keeping their face out keeps nothing and asks nothing,
+        // never the face question it just refused (Heron's HOLD on #7622);
+        // "Don't forget my face" is a refusal word's plain ask, asked first.
+        for this in [
+            "Keep my face out of this, my name is Ada.",
+            "My name is Ada. Leave my face off it.",
+            "Forget my face, I'm Ada.",
+        ] {
+            let told = run(true, &Said::now(this));
+            assert_eq!(told, json!({"error": FACE_KEPT_OUT}), "{this}");
+            assert!(refused_here(&told));
+            assert!(!told.to_string().contains("Shall I"), "{told}");
+        }
+        let told = run(true, &Said::now("Don't forget my face, my name is Ada."));
+        assert_eq!(told["error"], ASK_FACE_FIRST, "{told}");
         // On: their yes to the face question, or their own ask, keeps it.
         assert_eq!(run(true, &asked("Yes."))["ok"], true);
         assert_eq!(
@@ -8324,6 +8436,8 @@ mod tests {
             (ONLY_THE_CALL, "only_the_call"),
             (NOT_OWN_NAME, "not_own_name"),
             (FACE_LEAVE, "face_leave"),
+            (ASK_FACE_FIRST, "ask_face_first"),
+            (FACE_KEPT_OUT, "face_kept_out"),
             (NAME_UNCHANGED, "name_unchanged"),
             (NOT_AGREED, "not_agreed"),
             (NEAR_TO, "near_to"),
