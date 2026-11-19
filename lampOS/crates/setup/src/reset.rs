@@ -2083,6 +2083,16 @@ fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
+    // Before the plan's wipes (#7868, the first builder, 02:02): OpenClaw's
+    // check of the cut joins a running gateway through OpenClaw's wrapper,
+    // which exits without lamp-cloud's forwarder token, wiped below.
+    let forgotten = effects.forget_agents()?;
+    if forgotten > 0 {
+        eprintln!(
+            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
+        );
+        steps.push(Step::AgentsForgotten);
+    }
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {
             for copy in WIFI_COPIES {
@@ -2109,13 +2119,6 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
             "lamp-setup: reset: removed {apps} Store app entries (code, data, marks, staged packages)"
         );
         steps.push(Step::InstalledAppsRemoved);
-    }
-    let forgotten = effects.forget_agents()?;
-    if forgotten > 0 {
-        eprintln!(
-            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
-        );
-        steps.push(Step::AgentsForgotten);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {
