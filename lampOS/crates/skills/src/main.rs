@@ -6875,6 +6875,7 @@ mod tests {
         let window = (minute, (minute + 2) % (24 * 60));
         let step = |quiet| lamp_skills::task::TaskStep {
             task: "Sum up this morning's mail".into(),
+            words: "Sum up this morning's mail".into(),
             run: "scripts/main.py".into(),
             quiet,
         };
@@ -7050,6 +7051,7 @@ mod tests {
     fn a_skill_tools_run_the_voice_asked_answers_its_failure_in_the_conversation() {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Find the bitcoin price".into(),
+            words: "Find the bitcoin price".into(),
             run: "scripts/main.py".into(),
             quiet: None,
         }));
@@ -8714,6 +8716,7 @@ mod tests {
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Read my unread mail.".into(),
+                words: "Read my unread mail.".into(),
                 run: "scripts/mail.sh".into(),
                 quiet: None,
             }))
@@ -8788,6 +8791,7 @@ mod tests {
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Start a study block.".into(),
+                words: "Start a study block.".into(),
                 run: "scripts/study.sh".into(),
                 quiet: None,
             }))
