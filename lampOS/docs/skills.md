@@ -4118,7 +4118,7 @@ gone ([switches.md](switches.md)). What happens:
    - **On at once, with `LAMP_MADE_CODE_ON_AT_ONCE=on`** (the owner's ask
      here in chat: a made skill goes on at once, and whether it worked or
      not the lamp just says so, with no confirming; `on` only, off unless
-     set, in no product unit; in `lamp-voice` passed to both routes, read
+     set; on in the product's `lamp-voice` (the make flow's switch-on, the first builder's DEFAULT-ON, 19 Nov 21:42 on #7814); in `lamp-voice` passed to both routes, read
      only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
      first builder's ruling on #6059 (19:14, and the first builder's 19:44 line: "sound"
      is the lamp's own sounds and voice) draws the line
@@ -6504,8 +6504,8 @@ the same code for both writers.
   make becomes one task for the agent (below).
 - **No "couldn't" with `LAMP_MAKE_NO_CANNOT=on`** (the owner, 16 Nov:
   "Every task must be doable; no 'couldn't' here"; #7234;
-  `crate::make_no_cannot`; off unless `on`, lamp-voice alone reads it, in
-  no product unit). A make whose last answer is the model's own `cannot:`
+  `crate::make_no_cannot`; off unless `on`, lamp-voice alone reads it; on
+  in the product's `lamp-voice`, the make flow's switch-on, the first builder's DEFAULT-ON, 19 Nov 21:42 on #7814). A make whose last answer is the model's own `cannot:`
   (the lamp's own model's, or the agent's), or a skill that would only
   tell the person to do what they asked of it (`ECHOES_THE_ASK`), is not
   dropped (the owner, 16 Nov 11:4x: "every skill a person asks for must be
@@ -8584,7 +8584,8 @@ Off, every make and remove is byte for byte as before.
 
 #### What a skill on the lamp already does, turned on (`LAMP_MAKE_CORE_OFFER=on`, off)
 
-Off unless `LAMP_MAKE_CORE_OFFER=on`, in no product unit (#7747: on
+Off unless `LAMP_MAKE_CORE_OFFER=on`; on in the product's `lamp-voice`
+(the make flow's switch-on, the first builder's DEFAULT-ON, 19 Nov 21:42 on #7814; #7747: on
 lamp-9adf three water reminders made by voice sat beside the core
 `sip-of-water`, none with its guards; the person asked for a better water
 reminder and got a second, worse one). Turned on, never offered (first
