@@ -56,8 +56,8 @@ sau:
      cùng yêu cầu này (`a_second_make_is_sent_only_its_own_ask`: hai lần tạo
      trong cùng một cuộc trò chuyện, lần thứ hai không được gửi gì của lần
      đầu). Đối số `request` mà mô hình của giọng nói truyền là "in the
-     person's own words for this ask, nothing else: never a time, step or
-     trigger of an earlier skill or turn".
+     person's own words for this ask alone: never a time, step or trigger
+     of an earlier skill or turn".
    - Bản hướng dẫn chỉ nêu trigger và cử chỉ là "one [trigger] as listed
      (coming to the desk is room/presence)" và `body = { gesture }`: system
      prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
@@ -2321,9 +2321,9 @@ remove; on: turn_on; delete: remove; run now: run; list: made; say nothing
 first." (`make_skill_local::TURN_OFF_TOLD`, 155 byte so với 149 byte của
 câu nó thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte của liên
 kết, ở đúng 1.024), tham số `turn_off` nói "turn off, pause or stop a skill
-they made or added (by voice, in the app or from a file), which keeps it to
-turn back on ... Never remove for this. Even one that starts only when they
-say its words. Call it at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
+they made or added (even from a file), kept to turn back on ... Never
+remove for this, even one that starts only when they say its words. Call it
+at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
 `remove` nói "delete
 or remove a skill for good, never to turn one off, pause or stop it". Lời
 gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
@@ -2704,7 +2704,7 @@ send or write anything", vì `make_skill` không có gì nói tới việc liệ
 Các kỹ năng người dùng đã tạo được kể qua chính `make_skill`, chỉ với
 `made`, `true` (`made_list::LIST`): một tham số của hàm giọng nói đã có,
 như việc gỡ. Một câu có hỏi điều đó hay không là do mô hình phán đoán, theo
-mô tả của hàm (ở trên) và của tham số ("Never answer that from the
+mô tả của hàm (ở trên) và của tham số ("Never answer from the
 conversation."), không bao giờ là một danh sách từ. Mô tả của hàm vẫn trong
 1.024 byte khi mọi công tắc bật: câu "Call it only when the person asks for
 a skill to be made." thành "Make one only when the person asks for one.",
@@ -4854,8 +4854,8 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
 - **Kỹ năng đã xóa được xin lại theo tên là hoàn tác, không bao giờ là một
   lần tạo** (DEFAULT-ON của #7828, sửa 2: trên lamp-9adf "Put the flip a
   coin skill back", vừa bị xóa, được gọi như một lần tạo và tạo ra kỹ năng
-  mới). Mô tả của `undo` nói "When the person asks to put back or restore
-  a skill they removed, call it with that skill, and never make it again."
+  mới). Mô tả của `undo` nói "To put back or restore a skill they removed,
+  call it with that skill, never make it again."
   (`make_no_asks::UNDO_RESTORE_TOLD`); một câu có xin điều đó hay không là
   do mô hình phán đoán. Tên đưa cho `undo` được so với mọi kỹ năng mà các
   bản ghi nêu, như tên của một lần xóa (`made_remove::named_alone`: gần
@@ -4888,10 +4888,13 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   kết thúc bằng "Make or remove at once, never asking first, even of one
   they have: your line gives the undo." (`make_no_asks::AT_ONCE_TOLD`);
   tham số `remove` thêm "Call it at once, never asking first; ask which
-  only when two skills they made fit the words alike, never of "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
+  only when two skills they made fit alike, never of "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
   `make_no_asks::UNDO_RESTORE_TOLD`. Với mọi công
   tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
-  các tham số trong 4.096 byte.
+  các tham số trong 3.750 byte của 4.096 byte
+  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, chừa chỗ cho một
+  tham số sau này; #8002: trước đó là 4.174, mỗi mô tả được nói ngắn hơn,
+  giữ mọi tham số và ý nghĩa của nó).
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.

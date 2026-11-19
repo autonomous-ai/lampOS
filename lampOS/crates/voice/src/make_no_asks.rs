@@ -122,14 +122,14 @@ pub const AT_ONCE_TOLD: &str =
 /// only when two skills they made fit the words alike, never of "it",
 /// which the conversation's note of what was just made names.
 pub const REMOVE_AT_ONCE_TOLD: &str = " Call it at once, never asking first; ask which only \
-     when two skills they made fit the words alike, never of \"it\".";
+     when two skills they made fit alike, never of \"it\".";
 
 /// What `make_skill`'s `undo` adds (#7828's fix 2, the first builder's
 /// call on #7836): a removed skill asked back, by any words, is the undo
 /// with its name, never a make; the model judges the words, and the code
 /// never puts back from a make's (Heron's P2 on #7836).
-pub const UNDO_RESTORE_TOLD: &str = " When the person asks to put back or restore a skill they \
-     removed, call it with that skill, and never make it again.";
+pub const UNDO_RESTORE_TOLD: &str = " To put back or restore a skill they removed, call it \
+     with that skill, never make it again.";
 
 /// Why a skill with code of its own isn't put on for anyone but the owner.
 pub const NOT_OWNERS_CODE: &str =
