@@ -2200,7 +2200,7 @@ model-worded line at each fire: lamp-skills keeps the trigger, the
 `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`,
 `wait`, `[budget]`, `[rest]` and `[stop]` exactly, and only the fire's line
 becomes a `do.task` for the lamp's agent (Hermes or OpenClaw, through
-lamp-tasks). Off unless set, in lamp-skills and its manage helper; set in
+lamp-tasks). Off unless set, in lamp-skills, its manage helper and lamp-voice; set in
 no unit (the first builder's rulings, 19 Nov 05:42: behind a new switch,
 off; 06:05: quick reactions stay DeepSeek's, and every other model-worded
 core line goes to the agent, group by group). `LAMP_CORE_VIA_AGENT=on`
@@ -2223,19 +2223,35 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     line is the conversation's own reply). Never Onboarding or Guard mode
     either (the first builder, 19 Nov 08:57): they stay on their own
     built-in lines, with any value of the switch.
-  - `complex`, allowed but not built yet (the first builder's 08:57: each
-    fire's own content, only what DeepSeek's note has today, so what
-    leaves the lamp is unchanged): Welcome back (who came back), Reminders
-    (the reminder's own text, verbatim), FAQ (`knowledge.md`'s section and
-    the question), Who was here (the 12-hour record) and Task news (the
-    agent's result). Each is blocked on something lamp-skills doesn't
-    hold. For Welcome back, Reminders and Task news, lamp-voice builds the
-    content as it says the line (`who`, `from = "schedule"`, `from =
-    "tasks"`), and a reminder counts as delivered only once it is spoken.
-    FAQ and Who was here answer a conversation's tool call, which the voice
-    waits for at most 1.5 s (`lamp_voice::tools::ASK_DEADLINE`), never
-    10 s, and an agent run takes about 75 s. So the group stays empty and
-    the five keep their lines until the voice hands over its content. The look skills
+  - `news`: Task news alone of the lines that need each fire's own content
+    (the first builder, 19 Nov 08:57 and 09:26). lamp-voice words it, not
+    lamp-skills (`lamp_voice::news_agent`): the note the model is given
+    today for a task's settled news (who did the work, what was asked,
+    what it came back with) goes to the lamp's agent word for word after
+    the lamp's brief (`news_agent::BRIEF`), as a voice ask on lamp-tasks'
+    make socket (`{"op":"voice_ask","ask","grants":[],"within_ms":10000}`).
+    Nothing else of the news goes, so no more leaves the lamp than the
+    model gets today. Only a task's settled news: never a sign-in's code or
+    progress. The news is handed over as soon as it is first in line, while
+    it waits for its moment as before, and held at most 10 s from then. The
+    agent's line in time is said in the note's place, as it is; otherwise
+    the note is told at once, as with the switch off: past 10 s, no tasks
+    part, lamp-tasks not reached or refusing (it takes an ask only with
+    `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-tasks, and one at a time, so a
+    person's own ask in those 10 s is told busy), or an answer of `-`,
+    nothing, more than one short line, or one for the owner alone. A line
+    that comes after is dropped, and lamp-tasks ends the run at the same
+    10 s.
+  - Built-in, each fire's content notwithstanding (the first builder's
+    09:26):
+    - Welcome back: a greeting must come as they sit down; up to 10 s late
+      reads as a machine. A later piece could word it ahead, when they
+      leave.
+    - Reminders: the line must say exactly what they set, and a reminder
+      counts as delivered only once it is spoken.
+    - FAQ and Who was here: they answer a conversation's tool call, which
+      the voice waits for at most 1.5 s (`lamp_voice::tools::ASK_DEADLINE`).
+    The look skills
     (Desk tutor, its marks, Look for things, Point the light) stay too:
     lamp-tasks hands the agent no picture; a run granted `camera` may fetch
     the eyes' 320-wide frame from lamp-control (`camera.snapshot`), behind
