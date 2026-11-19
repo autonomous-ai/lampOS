@@ -2173,6 +2173,72 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     );
 }
 
+/// #7988: a restart of a lamp signed in, its targets file as the machines
+/// last wrote it. The targets are known from the first look, and the lamp
+/// stops being "starting" once the machines have answered, not at the next
+/// look a minute later (lamp-52e6 on 19 Nov: settled after 60 s, its
+/// machines unchanged). A hand-over in between is not refused.
+#[test]
+fn a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look() {
+    let mut s = Running::unstarted(false, false, false, false);
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    // A look a minute, as on a lamp: the next look is never within the test.
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_secs(60),
+        from_machines: Some(EngineKind::Claude),
+        engines: false,
+        lamp: None,
+    });
+    let machines = vec![
+        AccountMachine {
+            machine_id: "a".repeat(32),
+            label: "lamp".into(),
+            current: true,
+            status: None,
+        },
+        AccountMachine {
+            machine_id: "b".repeat(32),
+            label: "Office iMac".into(),
+            current: false,
+            status: None,
+        },
+    ];
+    // As the last run wrote it: the machines' answer changes nothing.
+    lamp_tasks::runtime::write_targets_from_machines(
+        &path,
+        &machines,
+        EngineKind::Claude,
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    *s.counts.machines.lock().unwrap() = machines;
+    s.start();
+    assert_eq!(told_targets(&s), 1);
+    let prepared = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"office"}),
+    );
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    let start = Instant::now();
+    while s.counts.machine_reads.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "machines not read");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let answered = Instant::now();
+    loop {
+        let told = s.ask(json!({"op":"targets"}));
+        if told["ok"] == true && told.get("lamp").is_none() {
+            break;
+        }
+        assert!(
+            answered.elapsed() < Duration::from_secs(10),
+            "still starting 10 s after the machines answered: {told}"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// How long a test waits for the engine reads to come round again: a
 /// bound, not a delay, so a quick machine passes in a second or two. Five
 /// seconds failed twice on a loaded ARM64 PR runner (#6912's runs, 14 Nov),
