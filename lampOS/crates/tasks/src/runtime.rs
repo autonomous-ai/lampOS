@@ -7093,6 +7093,11 @@ mod tests {
         assert_eq!(config["tools"]["exec"]["mode"], "full");
         assert_eq!(config["tools"]["exec"].get("security"), None);
         assert_eq!(config["tools"]["exec"].get("ask"), None);
+        // #7906: no tool that waits for a person in the pane.
+        assert_eq!(
+            config["tools"]["deny"],
+            json!(crate::openclaw_config::NO_ASK_TOOLS)
+        );
         assert_eq!(
             set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"

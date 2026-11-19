@@ -3200,7 +3200,23 @@ là phần của một coder khác trong #6226; thiết kế:
     khóa này theo kênh nhắn tin của nó. Lượt Harness trên gateway đi vào
     qua kênh riêng `webchat` của OpenClaw. Các kênh khác được giữ;
   - `agents.defaults.elevatedDefault`: `"full"`;
-  - `agents.defaults.sandbox.mode`: `"off"`.
+  - `agents.defaults.sandbox.mode`: `"off"`;
+  - `tools.deny`: thêm `ask_user`, `secrets` và `suggest_task` (#7906), giữ
+    các mục riêng của người dùng, so khớp không phân biệt hoa thường như
+    OpenClaw. Đây là các công cụ mà khi model gọi sẽ hiện một lời hỏi trong
+    pane OpenClaw và chờ một người: lựa chọn của `ask_user` (mặc định chờ
+    tới 900 s), ô nhập credential ẩn của `secrets`, và lời đề nghị của
+    `suggest_task` trong TUI nối với Gateway (tài liệu OpenClaw 2026.11.2
+    `tools/ask-user.md`, `tools/secrets.md`,
+    `gateway/config-tools/tool-policy.md`). Harness đọc pane như vậy là
+    `needs-input`, rồi luồng one-session kết thúc tác vụ và xóa cuộc hội
+    thoại được giữ. Chặn chúng chỉ bớt công cụ đi: không có `ask_user`,
+    agent tiếp tục theo phán đoán tốt nhất của nó, như sau `no_answer` của
+    chính OpenClaw. Exec không cần thêm gì: với `mode: "full"` và không có
+    `security`/`ask` trong tài liệu host approvals (lamp-update chỉ thêm mục
+    allow-list ở đó), OpenClaw cũng ra `full`/`off` ở phía host, nên không
+    lệnh nào phải hỏi. Khi công tắc là `off`, ba mục này lại bị bỏ khỏi
+    `tools.deny`, và bỏ luôn danh sách khi không còn gì khác.
 
   Việc gộp chạy ở mỗi lần lamp-tasks khởi động. Vì vậy một đèn đang có file
   cũ sẽ nhận các khóa này ở lần khởi động hay cập nhật kế tiếp. Model,

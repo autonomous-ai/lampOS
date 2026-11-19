@@ -26,9 +26,13 @@
 //!   `true` with `allowFrom.`[`ELEVATED_CHANNEL`] = `["*"]` (V1 keys it by
 //!   its messaging channel; a Harness turn comes in on OpenClaw's own
 //!   `webchat`), the other channels kept; `agents.defaults.elevatedDefault`
-//!   = `full`; `agents.defaults.sandbox.mode` = `off`. So the lamp's
-//!   OpenClaw runs a command headless as V1's did, with no ask nobody can
-//!   answer; its namespace (`openclaw-ns`) still bounds what it sees;
+//!   = `full`; `agents.defaults.sandbox.mode` = `off`; and
+//!   [`NO_ASK_TOOLS`] in `tools.deny` (#7906), the tools that stop a turn
+//!   on a question in the pane (`ask_user`'s choice, `secrets`' masked
+//!   prompt, `suggest_task`'s offer), a person's own denies kept. So the
+//!   lamp's OpenClaw runs a command headless as V1's did, with no ask
+//!   nobody can answer, and no tool it may call waits for a person; its
+//!   namespace (`openclaw-ns`) still bounds what it sees;
 //! - with it off: `tools.exec.mode` = [`EXEC_MODE`], OpenClaw asking
 //!   before a command not allowed already (Hermes' `approvals.mode:
 //!   manual`), and V1's values above taken out where they are V1's, so the
@@ -96,6 +100,16 @@ pub const V1_TOOLS_SWITCH: &str = "LAMP_OPENCLAW_V1_TOOLS";
 /// OpenClaw's own internal channel (its `INTERNAL_MESSAGE_CHANNEL`), the
 /// one a Harness turn on the gateway comes in on.
 pub const ELEVATED_CHANNEL: &str = "webchat";
+/// The tools denied with V1's tools on (#7906): each one, when the model
+/// calls it, shows a prompt in the OpenClaw pane and waits for a person
+/// (OpenClaw 2026.11.2 docs: `tools/ask-user.md`, up to 900 s by default;
+/// `tools/secrets.md`, "to remove it, deny it like any other tool";
+/// `suggest_task`, "a Gateway-backed TUI shows an equivalent interactive
+/// prompt", `gateway/config-tools/tool-policy.md`). Harness then reads the
+/// pane as `needs-input`, and the task ends with its kept conversation
+/// deleted. Denying them only takes tools away; without `ask_user` the
+/// agent goes on with its best judgment, as after OpenClaw's `no_answer`.
+pub const NO_ASK_TOOLS: [&str; 3] = ["ask_user", "secrets", "suggest_task"];
 
 /// Whether [`V1_TOOLS_SWITCH`] is on: anything but `off` exactly.
 pub fn v1_tools_on(value: Option<&str>) -> bool {
@@ -202,6 +216,17 @@ fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
         elevated.insert("enabled".into(), json!(true));
         object(elevated, "allowFrom", "tools.elevated.allowFrom")?
             .insert(ELEVATED_CHANNEL.into(), json!(["*"]));
+        let deny = deny_list(tools)?;
+        for tool in NO_ASK_TOOLS {
+            // OpenClaw matches tool names case-insensitively.
+            if !deny
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|name| name.eq_ignore_ascii_case(tool))
+            {
+                deny.push(json!(tool));
+            }
+        }
     } else {
         take(tools, "profile", &json!("full"));
         let exec = object(tools, "exec", "tools.exec")?;
@@ -218,8 +243,28 @@ fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
             take(elevated, "enabled", &json!(true));
         }
         take_empty(tools, "elevated");
+        if tools.get("deny").is_some_and(|deny| !deny.is_null()) {
+            let deny = deny_list(tools)?;
+            deny.retain(|name| !NO_ASK_TOOLS.iter().any(|tool| name == tool));
+            if deny.is_empty() {
+                tools.remove("deny");
+            }
+        }
     }
     Ok(())
+}
+
+/// `tools.deny`, made when missing or `null`; refused when it is not a
+/// list of tool names.
+fn deny_list(tools: &mut Map<String, Value>) -> Result<&mut Vec<Value>, Refused> {
+    let deny = tools.entry("deny").or_insert(Value::Null);
+    if deny.is_null() {
+        *deny = json!([]);
+    }
+    match deny.as_array_mut() {
+        Some(list) if list.iter().all(Value::is_string) => Ok(list),
+        _ => Err(Refused("`tools.deny` is not a list of tool names".into())),
+    }
 }
 
 /// `openclaw.json`'s text with the lamp's keys merged in, on the
@@ -398,6 +443,7 @@ mod tests {
                 "profile": "full",
                 "exec": {"host": "gateway", "mode": "full"},
                 "elevated": {"enabled": true, "allowFrom": {"webchat": ["*"]}},
+                "deny": ["ask_user", "secrets", "suggest_task"],
             })
         );
         assert_eq!(value["agents"]["defaults"]["elevatedDefault"], "full");
@@ -540,6 +586,42 @@ mod tests {
         };
         assert_eq!(exec(true), json!({"host": "gateway", "mode": EXEC_MODE_V1}));
         assert_eq!(exec(false), json!({"mode": EXEC_MODE}));
+    }
+
+    /// #7906: with V1's tools on, the tools that wait for a person in the
+    /// pane are denied, a person's own denies (any case) kept and nothing
+    /// doubled; off takes ours out and keeps theirs; a deny that is not a
+    /// list of names is refused.
+    #[test]
+    fn the_tools_that_wait_for_a_person_are_denied_with_v1s_tools() {
+        let deny = |text: &str, v1| {
+            let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            serde_json::from_str::<Value>(&merged).unwrap()["tools"]
+                .get("deny")
+                .cloned()
+        };
+        assert_eq!(deny("", true), Some(json!(NO_ASK_TOOLS)));
+        assert_eq!(deny("", false), None);
+        let own = r#"{"tools": {"deny": ["browser", "ASK_USER"]}}"#;
+        assert_eq!(
+            deny(own, true),
+            Some(json!(["browser", "ASK_USER", "secrets", "suggest_task"]))
+        );
+        let on = merge_config(own, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_eq!(deny(&on, false), Some(json!(["browser", "ASK_USER"])));
+        let ours = merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_eq!(deny(&ours, false), None, "an empty deny is taken out");
+        for text in [
+            r#"{"tools": {"deny": "secrets"}}"#,
+            r#"{"tools": {"deny": [1]}}"#,
+        ] {
+            for v1 in [true, false] {
+                assert!(
+                    merge_config(text, 7741, Path::new(WORKSPACE), true, v1).is_err(),
+                    "{text} {v1}"
+                );
+            }
+        }
     }
 
     /// `INSTALLED` with its `tools.exec` set to `exec`.
