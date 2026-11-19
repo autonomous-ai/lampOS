@@ -293,6 +293,19 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         eprintln!("lamp-control: a skill run's linked services go to {socket}");
         door = door.with_skill_services(PathBuf::from(socket));
     }
+    // `pose` (#7415): only with LAMP_NPU=on, sent on to lamp-npu's socket
+    // (`--npu-socket`); off, it is told so.
+    let npu = lamp_control::npu::on(
+        std::env::var(lamp_control::npu::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    )
+    .then(|| {
+        let socket = option(arguments, "--npu-socket")
+            .unwrap_or_else(|| lamp_control::npu::SOCKET.to_owned());
+        eprintln!("lamp-control: poses go to {socket}");
+        PathBuf::from(socket)
+    });
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
@@ -525,6 +538,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
+        }
+        if let Some(npu) = npu {
+            lamp = lamp.posing(npu);
         }
         let on_demand = arguments.iter().any(|a| a == "--camera-opens-on-demand");
         let lamp = match sight {
