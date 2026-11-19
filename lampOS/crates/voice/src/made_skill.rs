@@ -9407,16 +9407,26 @@ fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
     })
 }
 
-/// The packages of the index entries `gone`, each unless one of `entries`,
-/// still kept, names it.
+/// The package files an index entry names: its own, and a changed skill's
+/// old one kept to be put back (its `old`, `crate::made_change`).
+pub(crate) fn packages_named(entry: &Value) -> impl Iterator<Item = &str> {
+    [&entry["package"], &entry["old"]["package"]]
+        .into_iter()
+        .filter_map(Value::as_str)
+}
+
+/// The packages of the index entries `gone`, a changed one's kept old one
+/// too, each unless one of `entries`, still kept, names it.
 fn drop_packages(directory: &Path, gone: Vec<Value>, entries: &[Value]) {
     for entry in gone {
         // The same words make the same package: kept while one still names it.
-        if let Some(package) = entry["package"].as_str().filter(|package| {
+        for package in packages_named(&entry).filter(|package| {
             !package.is_empty()
                 && !package.contains('/')
                 && !package.starts_with('.')
-                && !entries.iter().any(|kept| kept["package"] == *package)
+                && !entries
+                    .iter()
+                    .any(|kept| packages_named(kept).any(|named| named == *package))
         }) {
             let _ = fs::remove_file(directory.join(package));
         }
@@ -10215,6 +10225,15 @@ fn free_name(
     toml: &str,
     most: usize,
 ) -> Result<String, Refused> {
+    // A change to a skill the person made (`crate::made_change`): kept
+    // under that skill's own name, to replace it in place once it is on;
+    // the same words as it is are "you already have that skill".
+    if let Some(change) = change_as() {
+        if same_made_on(keeping, installed, &change.name, toml) {
+            return Err(Refused::new(already_have_line(&change.name)));
+        }
+        return Ok(change.name);
+    }
     drop_gone(keeping);
     if !name_taken(keeping, installed, name) {
         return Ok(name.to_owned());
@@ -10248,6 +10267,76 @@ fn free_name(
 
 /// The most numbers [`free_name`] tries after a taken name.
 const MOST_NAME_TRIES: u32 = 99;
+
+/// The skill the person made that a make on this thread changes
+/// (`crate::made_change`): its name, its package's SHA-256, and whether it
+/// was turned off.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ChangeOf {
+    pub name: String,
+    pub sha256: String,
+    pub was_off: bool,
+}
+
+std::thread_local! {
+    /// [`ChangeAs`]'s skill, while its make runs on this thread.
+    static CHANGE_AS: std::cell::RefCell<Option<ChangeOf>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The skill a make on this thread changes ([`ChangeAs`]), if any.
+pub(crate) fn change_as() -> Option<ChangeOf> {
+    CHANGE_AS.with(|change| change.borrow().clone())
+}
+
+/// While held, a skill kept on this thread takes the changed skill's name
+/// ([`free_name`], never `name-2`), and its index entry says which one it
+/// changes (`"changes"`), so that one is kept under its `old` once it is on
+/// ([`put_on_within`]).
+pub(crate) struct ChangeAs;
+
+impl ChangeAs {
+    pub(crate) fn set(change: ChangeOf) -> Self {
+        CHANGE_AS.with(|kept| *kept.borrow_mut() = Some(change));
+        Self
+    }
+}
+
+impl Drop for ChangeAs {
+    fn drop(&mut self) {
+        CHANGE_AS.with(|kept| *kept.borrow_mut() = None);
+    }
+}
+
+/// A changed skill's new entry (`new`) on: the entry it changes (its
+/// `"changes"`) taken out of `entries` and kept under its `old`, with when
+/// and whether it was off, for `crate::made_change::put_back`.
+fn changed_in_place(entries: &mut Vec<Value>, sha256: &str, now_unix_ms: u64) {
+    let Some(at) = entries.iter().position(|entry| entry["sha256"] == sha256) else {
+        return;
+    };
+    let Some(change) = entries[at]
+        .as_object_mut()
+        .and_then(|entry| entry.remove("changes"))
+    else {
+        return;
+    };
+    let Some(old_at) = entries
+        .iter()
+        .position(|entry| entry["sha256"] == change["sha256"] && entry["sha256"] != sha256)
+    else {
+        return;
+    };
+    let mut old = entries.remove(old_at);
+    // An older version kept already goes: one undo, of the latest change.
+    if let Some(object) = old.as_object_mut() {
+        object.remove("old");
+    }
+    old["replaced_at_ms"] = json!(now_unix_ms);
+    old["was_off"] = json!(change["was_off"] == true);
+    let at = if old_at < at { at - 1 } else { at };
+    entries[at]["changed_from"] = change["sha256"].clone();
+    entries[at]["old"] = old;
+}
 
 /// A marked `SKILL.md` ([`card_marked`]) with its front matter's `name:`
 /// line saying `name`.
@@ -10445,6 +10534,14 @@ pub fn keep_agent_asked(
             crate::make_no_cannot::ASKED_MARK
         ),
     )?;
+    // A change (`crate::made_change`): under the changed skill's name.
+    let (name, marked) = match change_as() {
+        Some(change) if change.name != name => {
+            let marked = renamed_card(&marked, &change.name);
+            (change.name, marked)
+        }
+        _ => (name, marked),
+    };
     let made = packed_and_kept(
         keeping,
         from,
@@ -11236,6 +11333,16 @@ fn remember_in(
     if let Some(made_with) = made_with {
         entry[MADE_WITH] = json!(made_with);
     }
+    // A change of the person's own made skill, on, under its name
+    // ([`ChangeAs`]): which one it changes, kept under its `old` once on.
+    if let Some(change) = change_as().filter(|change| change.name == made.name)
+        && change.sha256 != made.sha256
+        && entries
+            .iter()
+            .any(|old| old["sha256"] == change.sha256.as_str() && old["on"] == true)
+    {
+        entry["changes"] = json!({ "sha256": change.sha256, "was_off": change.was_off });
+    }
     entries.push(entry);
     while entries.len() > KEPT_MOST {
         // The newest, just kept, is never let go.
@@ -11252,7 +11359,11 @@ fn remember_in(
         if let Some(package) = old["package"]
             .as_str()
             .filter(|name| !name.is_empty() && !name.contains('/') && !name.starts_with('.'))
-            .filter(|name| entries.iter().all(|entry| entry["package"] != *name))
+            .filter(|name| {
+                entries
+                    .iter()
+                    .all(|entry| packages_named(entry).all(|named| named != *name))
+            })
         {
             let _ = fs::remove_file(directory.join(package));
         }
@@ -11917,6 +12028,9 @@ pub fn put_on_within(
                         }
                     }
                 }
+                // A change (`crate::made_change`): the helper put it in its
+                // old one's folder, so that one is kept under its `old`.
+                changed_in_place(&mut entries, sha256, now_unix_ms);
                 write_index(directory, &entries)
             });
             if let Err(error) = written {

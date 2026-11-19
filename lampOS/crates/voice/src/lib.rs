@@ -109,6 +109,7 @@ pub mod light_told;
 pub mod listen_gaps;
 pub mod local_time;
 pub mod long_make;
+pub mod made_change;
 pub mod made_clash;
 pub mod made_counts;
 pub mod made_list;

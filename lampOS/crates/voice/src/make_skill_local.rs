@@ -1114,15 +1114,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
+    // A spoken change to a skill the person made ([`crate::made_change`],
+    // #7975, #8008): its name as heard, with the change as `request`;
+    // re-made in place, never a new skill and never a remove. The model
+    // judges whether a line asks a change.
+    parameters["properties"][crate::made_change::CHANGE] = json!({
+        "type": "string",
+        "description": "To change a skill they made: its name, with request as the change. Never a new one or a remove. Unsure which: ask."
+    });
     // A skill the person made or added turned off and back on by voice
     // (#7445, #7594, [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`):
     // never a remove, which is then told as for good alone. Nor is a
     // change (#7975, lamp-9adf, 19 Nov: "change rain check to seven
-    // thirty" removed it): no made skill is changed by voice yet, so the
-    // model says so and the skill is left as it is.
+    // thirty" removed it): that is `change`.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
-            "Only when they ask to delete or remove a skill for good, never to turn one off, pause, stop or change it (no change yet: say so): its name as they said it, alone."
+            "Only when they ask to delete or remove a skill for good, never to turn one off, pause, stop or change it: its name as they said it, alone."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
@@ -3244,6 +3251,12 @@ pub fn take_said_outcome() -> Option<(String, Outcome)> {
     MADE_LINE.with(|kept| kept.take())
 }
 
+/// The line [`take_said_line`] gives next on this thread, said in place of
+/// the make's own (`crate::made_change`: a change is told as one).
+pub(crate) fn said_line_now(line: String, outcome: Outcome) {
+    MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
+}
+
 /// Tests: the line [`take_said_line`] gives next on this thread, as a make
 /// of another kind (one with code, cut) would leave it.
 #[cfg(test)]
@@ -4892,6 +4905,11 @@ pub fn answer(
     if crate::make_no_asks::on()
         && let Some(asked) = call.args[crate::make_no_asks::UNDO].as_str()
     {
+        // "Put it back" after a change, the latest thing done: its old
+        // version back in place ([`crate::made_change::put_back`]).
+        if let Some(name) = crate::made_change::put_back_for_undo_here(asked) {
+            return crate::made_change::put_back_here(&name, request, heard, lease);
+        }
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
     }
     // A skill the person made, removed by voice (#6960): matched in code
@@ -5007,10 +5025,18 @@ pub fn answer(
     let Some(keeping) = Keeping::when(true) else {
         return crate::tools::unavailable();
     };
+    // A change to a skill the person made ([`crate::made_change`]): that
+    // one re-made in place. Never after an undo.
+    let changing = call.args[crate::made_change::CHANGE]
+        .as_str()
+        .map(str::trim)
+        .filter(|asked| undone.is_none() && !asked.is_empty());
     // What a turned-off skill on the lamp already does turns it on, with
     // one line and its undo, never an offer (#7747, `LAMP_MAKE_CORE_OFFER`;
-    // the first builder, 18 Nov 18:41). Never after an undo.
+    // the first builder, 18 Nov 18:41). Never after an undo, nor for a
+    // change, which changes the skill named.
     if undone.is_none()
+        && changing.is_none()
         && let Some(turned) = crate::make_core_offer::before_make_here(&call.args, request, skills)
     {
         return turned;
@@ -5041,9 +5067,20 @@ pub fn answer(
             "with no given_name"
         }
     );
-    let told = named_make(given, || {
-        make_in(request, request_words, &keeping, own_chat, now_unix_ms)
-    });
+    let told = match changing {
+        Some(asked) => crate::made_change::changed(
+            &keeping,
+            asked,
+            request_words,
+            || crate::services::owners_yes_of(request, heard, owner_for_make(lease)),
+            crate::make_no_asks::turned_off_here().as_ref(),
+            |words| make_in(request, words, &keeping, own_chat, now_unix_ms),
+            now_unix_ms,
+        ),
+        None => named_make(given, || {
+            make_in(request, request_words, &keeping, own_chat, now_unix_ms)
+        }),
+    };
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
     keep_just_made(&told, request, lease);

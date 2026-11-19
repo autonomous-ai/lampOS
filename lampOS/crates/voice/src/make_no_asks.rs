@@ -543,11 +543,39 @@ fn records(directory: &Path, now_unix_ms: u64) -> Vec<Value> {
     kept
 }
 
+/// When the latest action [`undo`]'s "last" would take was done, by the
+/// lamp's clock: none with no record kept. `crate::made_change` reads it
+/// so a change told after it is the one "put it back" undoes.
+pub fn latest_at(directory: &Path, now_unix_ms: u64) -> Option<u64> {
+    records(directory, now_unix_ms)
+        .iter()
+        .filter_map(|record| record["at_unix_ms"].as_u64())
+        .max()
+}
+
+/// The make record of the made skill `sha256` dropped (`crate::made_change`:
+/// a change is put back, never undone as a make, whose undo removes it).
+pub(crate) fn forget_record_of(directory: &Path, sha256: &str) {
+    let all = records(directory, now_unix_ms());
+    let kept: Vec<Value> = all
+        .iter()
+        .filter(|record| !(record["kind"] != "removed" && record["sha256"] == sha256))
+        .cloned()
+        .collect();
+    if kept.len() != all.len()
+        && let Err(error) = write_records(directory, &kept)
+    {
+        eprintln!("lamp-voice: a changed skill's make record wasn't dropped: {error}");
+    }
+}
+
 /// The keep trimmed ([`records`]), and any package in [`KEPT_FOLDER`] no
 /// record names (a crash's) deleted: at the voice's start and every
 /// [`PURGE_EVERY`] ([`start_purge`]), so a kept package goes within an
 /// hour of its 7 days, whether or not anything else is made.
 pub fn purge(directory: &Path, now_unix_ms: u64) {
+    // A changed skill's old version past its week, too.
+    crate::made_change::drop_old(directory, now_unix_ms);
     if !directory.join(RECORDS).exists() && !directory.join(KEPT_FOLDER).exists() {
         return;
     }
@@ -587,10 +615,11 @@ pub fn start_purge() {
     }
 }
 
-/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`]:
-/// whether there was any.
+/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`],
+/// and with it every changed skill's kept old version
+/// (`crate::made_change::clear`): whether there was any.
 pub fn clear(directory: &Path) -> io::Result<bool> {
-    let mut any = false;
+    let mut any = crate::made_change::clear(directory)?;
     match fs::remove_file(directory.join(RECORDS)) {
         Ok(()) => any = true,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -705,7 +734,7 @@ pub fn remove_at_once(
     remove: impl FnOnce(&str) -> Result<(), String>,
 ) -> Result<(), String> {
     let entries = made_skill::entries(&keeping.directory);
-    let Some(entry) = entries
+    let Some(mut entry) = entries
         .iter()
         .find(|entry| entry["name"] == name && entry["sha256"] == sha256)
         .cloned()
@@ -729,6 +758,11 @@ pub fn remove_at_once(
         .filter(|other| !(other["name"] == name && other["sha256"] == sha256))
         .cloned()
         .collect();
+    // A changed skill's kept old version goes with it, its package too:
+    // one undo, of what was removed.
+    if let Some(old) = entry.as_object_mut().and_then(|entry| entry.remove("old")) {
+        crate::made_change::drop_package_of(&keeping.directory, &old, &rest);
+    }
     let record = json!({ "kind": "removed", "name": name, "entry": entry });
     // Its package kept aside: moved, or copied while another entry still
     // names the same file.
