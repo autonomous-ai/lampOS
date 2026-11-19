@@ -2240,9 +2240,10 @@ pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
             let state = match value.as_str() {
                 Some("cleared") => "cleared",
                 Some("kept") => "kept",
+                Some(CONSENT_KEPT_AS_NO) => CONSENT_KEPT_AS_NO,
                 _ => "uncertain",
             };
-            partial |= state != "cleared";
+            partial |= state != "cleared" && state != CONSENT_KEPT_AS_NO;
             face[field] = json!(state);
         }
     }
@@ -2726,11 +2727,28 @@ fn forget_said_result(answer: Option<&Value>) -> &'static str {
     }
 }
 
+/// A household consent's cleanup state when `forget_everything` leaves a
+/// person's kept no in place (`LAMP_NOTICING_BY_DEFAULT` on, #7767; Twelve's
+/// P3 4 on #7928): the model may say the no was kept, and it is no failed
+/// step, so `everything` stays as it is.
+pub(crate) const CONSENT_KEPT_AS_NO: &str = "kept as a no";
+
+/// What a forget that left `key`'s file at `path` in place tells: a kept
+/// no is [`CONSENT_KEPT_AS_NO`]; a file that can't be read holds no yes to
+/// take back (off either way), so it is `cleared`, as before.
+fn consent_kept_state(path: &std::path::Path, key: &str) -> &'static str {
+    if lamp_msgs::consent::kept_no(path, key) {
+        CONSENT_KEPT_AS_NO
+    } else {
+        "cleared"
+    }
+}
+
 /// Fixed step names and states only: no path, person id, error text or memory.
 /// A later successful step must never upgrade an earlier partial result.
 fn note_forget_cleanup(told: &mut Value, field: &str, state: &str) {
     told[field] = json!(state);
-    if state != "cleared" {
+    if state != "cleared" && state != CONSENT_KEPT_AS_NO {
         told["everything"] = json!(false);
     }
 }
@@ -11206,15 +11224,27 @@ impl DaysClient {
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
-            // #2110), whoever asked.
+            // #2110), whoever asked. With `LAMP_NOTICING_BY_DEFAULT` on
+            // (#7767) only a kept yes goes: a kept no stays, so the forget
+            // never turns either on ([`crate::seen_yes::forget_takes`]).
             if call.name == FORGET_EVERYTHING {
-                for (field, consent) in [
-                    ("sound_consent_result", self.room_sounds.clone()),
+                let by_default = lamp_msgs::consent::noticing_by_default();
+                for (field, key, consent) in [
+                    (
+                        "sound_consent_result",
+                        lamp_msgs::consent::ROOM_SOUNDS,
+                        self.room_sounds.clone(),
+                    ),
                     (
                         "face_expression_consent_result",
+                        lamp_msgs::consent::FACE_EXPRESSIONS,
                         crate::onboarding::face_expressions_beside(&self.room_sounds),
                     ),
                 ] {
+                    if !crate::seen_yes::forget_takes(&consent, key, by_default) {
+                        note_forget_cleanup(&mut told, field, consent_kept_state(&consent, key));
+                        continue;
+                    }
                     let state = match std::fs::remove_file(&consent) {
                         Ok(()) => {
                             eprintln!(
@@ -32936,6 +32966,47 @@ mod tests {
                 std::fs::remove_file(socket).unwrap();
                 std::fs::remove_dir(folder).unwrap();
             }
+        }
+
+        /// Twelve's P3 4 on #7928 (#7767): with `LAMP_NOTICING_BY_DEFAULT`
+        /// on, a household consent the forget leaves as a kept no is told
+        /// as `"kept as a no"`, never `"cleared"`, and is no failed step: it
+        /// leaves `everything` as it is, through the face adapter too.
+        #[test]
+        fn a_forget_that_keeps_a_no_says_so() {
+            let folder = std::env::temp_dir().join(format!(
+                "remember-kept-no-{}",
+                crate::process::boot_text(crate::process::new_boot().unwrap())
+            ));
+            std::fs::create_dir_all(&folder).unwrap();
+            let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+            let key = lamp_msgs::consent::FACE_EXPRESSIONS;
+            std::fs::write(
+                &face,
+                lamp_msgs::consent::no_bytes(key, 5, lamp_msgs::consent::BY_VOICE),
+            )
+            .unwrap();
+            assert!(!crate::seen_yes::forget_takes(&face, key, true));
+            assert_eq!(consent_kept_state(&face, key), CONSENT_KEPT_AS_NO);
+            let mut told = json!({"forgotten": true, "everything": true});
+            note_forget_cleanup(
+                &mut told,
+                "face_expression_consent_result",
+                consent_kept_state(&face, key),
+            );
+            assert_eq!(told["face_expression_consent_result"], "kept as a no");
+            assert_eq!(told["everything"], true);
+            // A file that can't be read holds no yes to take: cleared.
+            std::fs::write(&face, b"not json").unwrap();
+            assert_eq!(consent_kept_state(&face, key), "cleared");
+            // The face adapter carries it, and it is no partial cleanup.
+            let carried = face_and_memory(
+                json!({"face_forgotten": true}),
+                &json!({"forgotten": true, "face_expression_consent_result": "kept as a no"}),
+            );
+            assert_eq!(carried["face_expression_consent_result"], "kept as a no");
+            assert_eq!(carried["memory"], "forgotten too");
+            let _ = std::fs::remove_dir_all(folder);
         }
 
         #[test]

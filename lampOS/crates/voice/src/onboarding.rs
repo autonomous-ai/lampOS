@@ -1820,6 +1820,7 @@ impl Onboarding {
             near_call: file.parent().unwrap().join("near-call.json"),
             room_sounds: file.parent().unwrap().join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         })
         .unwrap();
         let mut walk = Self::with_storage(file, owner.client());
