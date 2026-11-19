@@ -3393,9 +3393,11 @@ cả hai người viết.
   giây trên Orange Pi đó, khoảng 13 giây trước khi phiên của Hermes bắt
   đầu, và một lần tạo gmail không có script mất 30 giây trên một đèn khác;
   90 giây chừa khoảng một phút cho việc tạo sau khi Hermes đã chạy. Một lần
-  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 10 phút 30 giây của
-  agent (`make_skill_agent::MAKE_WITHIN`, #7245; trước là 120 giây), nên
-  khi không có hướng dẫn các lần sửa có chỗ.
+  sửa chỉ bắt đầu khi còn ít nhất 2 phút trong 10 phút 30 giây của agent
+  (`make_skill_local::REPAIR_AT_LEAST` trong `make_skill_agent::MAKE_WITHIN`,
+  #7874; trước đây chỉ khi còn vừa thêm một câu trả lời trọn vẹn, nên một
+  lần tạo có hướng dẫn quá 30 giây không được sửa lần nào), và phần viết của
+  nó bị giới hạn bởi thời gian còn lại.
   Agent không trả lời trong thời gian của nó (10 phút khi có hướng dẫn, 90
   giây khi không), lỗi, hay không có câu trả lời đầu: kỹ
   năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
