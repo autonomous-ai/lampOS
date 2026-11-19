@@ -19807,6 +19807,17 @@ async fn answer(
                     && calls.iter().any(|call| {
                         crate::action_claim::unplug_tool(&call.name, &call.args).is_some()
                     });
+                // A wellbeing nudge said stopped in the round that calls
+                // `wellbeing_nudges` (to stop, snooze or turn off, never
+                // `how: "on"`): the words ran ahead of the call, so they are
+                // not said and no note is told; the next round speaks from
+                // its answer, as an unplug's and a forget's (Twelve's P1 on
+                // #7917).
+                let nudge_calling = unmade == Some(crate::action_claim::Claim::NudgeOff)
+                    && calls.iter().any(|call| {
+                        crate::action_claim::nudge_tool(&call.name, &call.args).is_some()
+                            && call.args["how"] != "on"
+                    });
                 // A forget said done is told its own note (C88).
                 let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
                 // So is a made skill's change said done (#7683).
@@ -19908,6 +19919,13 @@ async fn answer(
                     Some(_) if skill_calling => {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says a made skill's change before its make_skill ran: not said, its {} call(s) run, no note (LAMP_SKILL_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                    }
+                    Some(_) if nudge_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says a wellbeing nudge stopped before its wellbeing_nudges ran: not said, its {} call(s) run, no note (LAMP_NUDGE_CLAIM_CHECKED)",
                             calls.len()
                         );
                         text.clear();
