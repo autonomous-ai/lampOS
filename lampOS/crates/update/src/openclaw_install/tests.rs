@@ -986,18 +986,27 @@ fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     assert_eq!(mode(&lamp.at(WRAPPER)), 0o755);
 }
 
-/// Each fetch, the unpacking and `npm ci` get [`STEP_WITHIN`]; OpenClaw's
-/// other steps the plain bound.
+/// Each fetch, the unpacking and `npm ci` get [`LONG_STEP_WITHIN`]
+/// ([`STEP_WITHIN`] and the most it may be frozen, as Hermes's stage);
+/// OpenClaw's other steps the plain bound.
 #[test]
 fn openclaw_s_long_steps_get_the_long_bound() {
     let downloads = Downloads::make().unwrap();
     let file = downloads.file("node.tar.gz").to_string_lossy().into_owned();
     let unpack = as_lampos(&["tar", "-xzf", file.as_str()]);
     assert!(runs_long_step(&unpack));
-    assert_eq!(install::bound_of(&unpack), STEP_WITHIN);
+    assert_eq!(install::bound_of(&unpack), LONG_STEP_WITHIN);
     let npm = in_namespace("1000", "1000", true, &[]);
     assert!(runs_long_step(&npm));
-    assert_eq!(install::bound_of(&npm), STEP_WITHIN);
+    assert_eq!(install::bound_of(&npm), LONG_STEP_WITHIN);
+    assert_eq!(
+        LONG_STEP_WITHIN,
+        STEP_WITHIN + crate::hermes_schedule::MOST_FROZEN
+    );
+    assert!(
+        LONG_STEP_WITHIN <= Duration::from_secs(3600),
+        "the one-shot's hour"
+    );
     let version = in_namespace("1000", "1000", false, &["--version"]);
     assert!(!runs_long_step(&version));
     assert_eq!(install::bound_of(&version), crate::world::RESTART_WITHIN);
@@ -1083,6 +1092,95 @@ fn openclaw_asks_while_hermes_s_install_is_under_way() {
     assert_eq!(round(&lamp, &mut systemd, false, 200), None);
     assert!(lamp.asked().is_some(), "OpenClaw's ask is written");
     assert!(!systemd.asked.contains(&"start"), "no second one-shot");
+}
+
+/// Heron's HOLD on #7942: `npm ci` paused for a hot board 2 min in, kept
+/// frozen 38 min (past [`STEP_WITHIN`], under `MOST_FROZEN`), then 3 min
+/// more to finish: the watch never stops it, and the step's 43 min are
+/// inside its bound, so it is not recorded `timeout` on the thaw.
+#[test]
+fn a_long_step_frozen_past_20_min_for_heat_is_not_timed_out() {
+    use crate::hermes_schedule::{Act, Lease, Watch};
+    const MIN: u64 = 60_000;
+    let lease = Lease::Fresh {
+        boot: "a".into(),
+        physical: Some(false),
+        no_slide: false,
+    };
+    let npm = in_namespace("1000", "1000", true, &[]);
+    let mut watch = Watch::default();
+    assert_eq!(watch.look_with_heat(0, Ok(()), false, &lease), Act::Nothing);
+    assert_eq!(
+        watch.look_with_heat(2 * MIN, Ok(()), true, &lease),
+        Act::Pause
+    );
+    for at in (3..40).map(|minute| minute * MIN) {
+        assert_eq!(watch.look_with_heat(at, Ok(()), true, &lease), Act::Nothing);
+    }
+    assert_eq!(
+        watch.look_with_heat(40 * MIN, Ok(()), false, &lease),
+        Act::Resume
+    );
+    assert_eq!(
+        watch.look_with_heat(43 * MIN, Ok(()), false, &lease),
+        Act::Nothing
+    );
+    let step = Duration::from_millis(43 * MIN);
+    assert!(step > STEP_WITHIN, "the old bound killed it as timeout");
+    assert!(step < install::bound_of(&npm), "not timed out");
+}
+
+/// #7879: a pause for heat freezes the one-shot and says so in one line,
+/// and the resume thaws it with one line.
+#[test]
+fn the_watch_pauses_openclaws_install_for_heat_with_a_line_each_way() {
+    use crate::hermes_schedule::{Act, carry_out_turns};
+    let lamp = Lamp::new();
+    let records = lamp.records();
+    fs::write(
+        records.join(RECORD),
+        serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 1}).to_string(),
+    )
+    .unwrap();
+    let mut systemd = Fake {
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    let mut lines = Vec::new();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    for act in [Act::Pause, Act::Resume] {
+        assert_eq!(
+            carry_out_turns(&act, &records, &mut systemd, 2, &mut say),
+            Carried::Done
+        );
+    }
+    assert_eq!(systemd.asked, ["state", "freeze", "state", "thaw"]);
+    assert_eq!(
+        lines,
+        [
+            "OpenClaw's install pauses while the board is hot (board/heat)",
+            "OpenClaw's install goes on: the board is no longer hot and the voice is quiet",
+        ]
+    );
+    // The turn passed to Hermes during the pause: the resume says so, not
+    // that the board cooled (Heron's P3 on #7942).
+    fs::write(
+        records.join(hermes_install::RECORD),
+        serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 1}).to_string(),
+    )
+    .unwrap();
+    lines.clear();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    assert_eq!(
+        carry_out_turns(&Act::Resume, &records, &mut systemd, 3, &mut say),
+        Carried::Done
+    );
+    assert_eq!(
+        lines,
+        [
+            "the pause for a hot board ends: the turn passed to Hermes's install, which heat does not pause"
+        ]
+    );
 }
 
 /// One watch for both: a freeze with OpenClaw's install alone under way is

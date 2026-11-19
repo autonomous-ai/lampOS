@@ -271,8 +271,17 @@ pub const GATEWAY_ENV: &str = "LAMP_OPENCLAW_GATEWAY";
 /// killed and the install recorded `failed` with `timeout` (#6226: on
 /// lamp-c0a4 an npm install with no output flags hung 38 min at its
 /// extract; with `--foreground-scripts --loglevel=http` it took 3 min).
-/// The clock goes on while the watch has the one-shot frozen.
+/// The clock goes on while the watch has the one-shot frozen, so the
+/// bound a step is given is [`LONG_STEP_WITHIN`].
 pub const STEP_WITHIN: Duration = Duration::from_secs(20 * 60);
+/// The bound each long step is given ([`crate::install::bound_of`]):
+/// [`STEP_WITHIN`] running and the most the one-shot may be kept frozen
+/// ([`crate::hermes_schedule::MOST_FROZEN`]), as Hermes's stage has
+/// (`HERMES_STAGE_WITHIN`). A step frozen past 20 min, for talk or a hot
+/// board (#7879), is not taken for timed out on its thaw; frozen 40 min
+/// in all, the watch stops it as `interrupted`, tried again next round.
+pub const LONG_STEP_WITHIN: Duration =
+    Duration::from_secs(STEP_WITHIN.as_secs() + crate::hermes_schedule::MOST_FROZEN.as_secs());
 /// The largest file fetched (`curl --max-filesize`).
 const MOST_BYTES: &str = "536870912";
 /// The prefix of the folder fetched files are kept in while the install
