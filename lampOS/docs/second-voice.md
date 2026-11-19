@@ -6525,10 +6525,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   and the model told to ask "Shall I forget what you kept about …?" with
   the subject in their words, never the kept text (the Reviewer-lead's P2
   on #6673). Their
-  plain yes on a later line within 30 s, the same session's same person
+  yes on a later line within 30 s, the same session's same person
   (`keep_asker`), seen saying it or in the private room on a one-face line,
-  (`known_faces::plain_agreement_to_forget`: "Yes, forget it.", "Ừ, quên
-  đi.", or "Forget it." alone as that answer) runs that forget by id, in
+  judged by the model with no yes word list (its `forget` on that line,
+  naming nothing else, `agree_held_forget`; the first builder's ruling on
+  leg (e) of #7960's ROW) runs that forget by id, exactly as held, in
   their scope only; a line narrowed since forgets nothing and keeps it
   (`remember::AGREED_FORGET_NOT_NOW`) (`OneFaceForgetYes`,
   `ScopeLease::mark_forget_agreed`, which both runners and the memory route
