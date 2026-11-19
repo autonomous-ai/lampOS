@@ -86,6 +86,8 @@ Environment=LAMP_BUS=on
 Environment=LAMP_PRIVACY_CONTROLS=on
 # LAMP_PRIVACY_RIDES_STALL: its why and rules are its row in docs/switches.md (#5611, #5224).
 Environment=LAMP_PRIVACY_RIDES_STALL=on
+# LAMP_VOICE_UNSTARTED_FRAME_DROP: its why and rules are its row in docs/switches.md (#7224).
+Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
