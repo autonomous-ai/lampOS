@@ -3012,8 +3012,14 @@ hoặc "'node': No such file or directory" từ một gateway vừa khởi độ
 thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
 (`openclaw_config::GATEWAY_WAITS`), mỗi lần chờ một dòng nhật ký
 "OpenClaw's settings wait for its gateway to check them; tried again in N
-s"; không ghi gì trước khi gateway kiểm tra nó. Quá lần chờ cuối thì không
-ghi cho tới lần lamp-tasks khởi động sau; văn bản bị OpenClaw từ chối thì
+s"; không ghi gì trước khi gateway kiểm tra nó. Lần kiểm tra bị một signal
+kết thúc trước khi OpenClaw trả lời ("status killed": trên lamp-52e6,
+lamp-tasks và gateway khởi động lại cùng lúc và lần kiểm tra đua với lúc
+gateway tự khởi động, FINDING của #7268) cũng được thử lại theo cùng các lần
+chờ đó, mỗi lần một dòng nhật ký "OpenClaw's settings were not checked,
+OpenClaw's check was killed before it answered; tried again in N s", không
+có giá trị nào của file. Quá lần chờ cuối thì không
+ghi cho tới lần lamp-tasks khởi động sau, dòng nhật ký nói lần từ chối cuối; văn bản bị OpenClaw từ chối thì
 không bao giờ thử lại. Việc ghi chạy trên một thread riêng, nên lamp-tasks
 khởi động không bao giờ phải chờ nó.
 

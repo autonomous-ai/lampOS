@@ -2888,8 +2888,14 @@ refusal alone (the wrapper's "is not running in its own namespaces", or
 again after 5, 10, 20, 40 s and then 60 s four times, 5 min 15 s in all
 (`openclaw_config::GATEWAY_WAITS`), each wait one journal line "OpenClaw's
 settings wait for its gateway to check them; tried again in N s"; nothing
-is written before the gateway checks it. Past the last wait it is not
-written until lamp-tasks' next start; a text OpenClaw refuses is never
+is written before the gateway checks it. A check ended by a signal before
+OpenClaw gave a verdict ("status killed": on lamp-52e6, lamp-tasks and the
+gateway restarted together and the check raced the gateway's own start,
+#7268's FINDING) is tried again over the same waits, each one journal line
+"OpenClaw's settings were not checked, OpenClaw's check was killed before
+it answered; tried again in N s", no value of the file in it. Past the last wait it is not
+written until lamp-tasks' next start, the journal line saying the last
+refusal; a text OpenClaw refuses is never
 tried again. The write runs on a thread of its own, so lamp-tasks' start
 never waits for it.
 

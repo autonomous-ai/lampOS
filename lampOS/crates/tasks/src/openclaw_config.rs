@@ -493,11 +493,17 @@ pub fn gateway_not_there(error: &str) -> bool {
     error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
 }
 
+/// What [`validate`] says of a check ended by a signal, OpenClaw's verdict
+/// never given: #7268's FINDING, a check racing the gateway's own start
+/// when both restart together.
+pub const KILLED: &str = "(status killed)";
+
 /// [`write_checked`] tried again after each of `waits` while OpenClaw's
-/// gateway is not there to check the text ([`gateway_not_there`]), each
-/// wait said in one line with no value of the file; anything else (written,
-/// right already, refused for its text) ends it at once, and past the last
-/// wait the refusal is returned.
+/// gateway is not there to check the text ([`gateway_not_there`]) or the
+/// check was killed before it answered ([`KILLED`]), each wait said in one
+/// line with no value of the file; anything else (written, right already,
+/// refused for its text) ends it at once, and past the last wait the
+/// refusal is returned.
 #[allow(clippy::too_many_arguments)]
 pub fn write_waiting(
     state_dir: &Path,
@@ -512,12 +518,19 @@ pub fn write_waiting(
     let mut waits = waits.iter();
     loop {
         match write_checked(state_dir, port, workspace, skills, v1, validator) {
-            Err(error) if gateway_not_there(&error.to_string()) => {
+            Err(error)
+                if gateway_not_there(&error.to_string()) || error.to_string().contains(KILLED) =>
+            {
                 let Some(wait) = waits.next() else {
                     return Err(error);
                 };
+                let why = if gateway_not_there(&error.to_string()) {
+                    "wait for its gateway to check them"
+                } else {
+                    "were not checked, OpenClaw's check was killed before it answered"
+                };
                 say(&format!(
-                    "tasks: OpenClaw's settings wait for its gateway to check them; tried again in {} s",
+                    "tasks: OpenClaw's settings {why}; tried again in {} s",
                     wait.as_secs()
                 ));
                 std::thread::sleep(*wait);
