@@ -225,10 +225,11 @@ and `lamp_skill_remove(name)`.
 ## Errors
 
 Every refusal is a `LampError` (Python `lampos.errors.BY_CODE[code]`, JS
-`byCode[code]`) with `code`, `why` and, for `rate`, `retry_ms`. The codes:
+`byCode[code]`) with `code`, `why` and, for `rate` (and `busy`, `preparing`
+or `unavailable` from `pose`), `retry_ms`. The codes:
 `unpaired`, `no_hello`, `no_grant`, `no_lease`, `lease_lost`, `busy`,
 `refused`, `quiet_hours`, `private`, `paused`, `asleep`, `rate`,
-`bad_request`, `off`. What to do about each: [errors.md](errors.md).
+`bad_request`, `off`, `preparing`, `unavailable`. What to do about each: [errors.md](errors.md).
 
 ## The command line
 
