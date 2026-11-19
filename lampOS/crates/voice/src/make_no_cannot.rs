@@ -644,6 +644,27 @@ fn phrase(text: &str) -> Option<String> {
     (!text.is_empty() && text.chars().count() <= 80).then(|| text.to_owned())
 }
 
+/// A task's name: the one the person gave (`named`, #7911,
+/// [`made_skill::given_name`]) when it is one a made skill may have
+/// ([`name_kept`]), else the model's own `name`, as before.
+fn name_given(name: String, named: Option<&str>) -> String {
+    match named.and_then(|said| made_skill::given_name(said, MOST_NAME_CHARS)) {
+        Some(given) if name_kept(&given) == given => {
+            if given != name {
+                eprintln!(
+                    "lamp-voice: a task only asked for takes the name its person gave: {given}, not {name}"
+                );
+            }
+            given
+        }
+        Some(_) => {
+            eprintln!("lamp-voice: a task's given name is no skill's name: {name} stands");
+            name
+        }
+        None => name,
+    }
+}
+
 /// A name as a made skill may have it: lowercase ASCII letters, digits and
 /// `-`, beginning with a letter, at most [`MOST_NAME_CHARS`]; else
 /// [`FALLBACK_NAME`].
@@ -1224,6 +1245,7 @@ pub fn made(
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     kept_asked: impl Fn(&made_skill::Files, &str) -> Result<Made, Refused>,
     hint: Option<&str>,
+    named: Option<&str>,
 ) -> Result<Made, Refused> {
     if !made_skill::scripts_on() || !crate::skill_task_yes::on() {
         return Err(Uncovered::TasksOff.refused());
@@ -1272,6 +1294,8 @@ pub fn made(
                 if !crate::upload_agent::on() {
                     return Err(Uncovered::NoWhen.refused());
                 }
+                // The name the person gave it, its tool's too (#7911).
+                let name = name_given(name, named);
                 // Its instructions carry the words read back alone: a
                 // request longer than them is worded by the model and
                 // checked, never cut unheard.
@@ -1632,14 +1656,14 @@ mod tests {
             Err(Refused::new("kept here"))
         };
         assert_eq!(
-            made(&long, |_| answer(), || true, &kept, kept_asked, None),
+            made(&long, |_| answer(), || true, &kept, kept_asked, None, None),
             Err(Uncovered::TooLong.refused())
         );
         assert!(made_files.borrow().is_empty());
         let short = "when I say desk report, tell me how tidy my desk is.";
         assert!(!task_cut(short));
         assert_eq!(
-            made(short, |_| answer(), || true, &kept, kept_asked, None),
+            made(short, |_| answer(), || true, &kept, kept_asked, None, None),
             Err(Refused::new("kept here"))
         );
         let scripts = made_files.borrow();
@@ -1655,6 +1679,61 @@ mod tests {
             ),
             "{instructions}"
         );
+        crate::upload_agent::set_on_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        set_on_here(None);
+    }
+
+    /// #7911 (Twelve's HOLD on #7926, item 2): a task only asked for takes
+    /// the name the person gave ("make a skill called dollar check that
+    /// tells me the rate when I ask"), its card's and its voice tool's;
+    /// with none given, or one no made skill may have, the model's name
+    /// stands, as before.
+    #[test]
+    fn a_task_only_asked_for_takes_the_name_the_person_gave() {
+        set_on_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        let request = "when I ask for the dollar check, tell me the dollar to dong rate.";
+        let answer = || Ok("name: rate-teller\ngrants: speak\nasks: dollar check".into());
+        let kept = |_: Result<String, String>| -> Result<Made, Refused> { unreachable!() };
+        for (named, name) in [
+            (Some("Dollar check"), "dollar-check"),
+            (None, "rate-teller"),
+            (Some("tỷ giá"), "rate-teller"),
+            (Some("ab"), "rate-teller"),
+        ] {
+            let made_files = std::cell::RefCell::new(Vec::new());
+            let kept_asked = |files: &made_skill::Files, _: &str| {
+                made_files.borrow_mut().push(files.clone());
+                Err(Refused::new("kept here"))
+            };
+            assert_eq!(
+                made(
+                    request,
+                    |_| answer(),
+                    || true,
+                    &kept,
+                    kept_asked,
+                    None,
+                    named
+                ),
+                Err(Refused::new("kept here"))
+            );
+            let files = made_files.borrow();
+            let [files] = files.as_slice() else {
+                panic!("{named:?}: {files:?}")
+            };
+            let tool = format!("tool = \"{}\"", name.replace('-', "_"));
+            assert!(files.toml.contains(&tool), "{named:?}: {}", files.toml);
+            assert!(
+                files.card.starts_with(&format!("---\nname: {name}\n")),
+                "{named:?}: {}",
+                files.card
+            );
+        }
         crate::upload_agent::set_on_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);

@@ -18926,22 +18926,23 @@ async fn answer(
                 // make and round 2): the lamp says the make's own opening
                 // at once, once, from its clip rendered ahead. Words the
                 // model gave are said as they came instead. A new make is
-                // a call whose arguments name its `request`; a remove, a
-                // run, a list or a yes gives its own argument alone and is
-                // said nothing first. Both paths read that one rule, and
-                // neither weighs what else the call carries: the stream
-                // must decide before the rest of the arguments come, so
-                // it reads the first argument's name
+                // a call whose arguments name its `request` or its
+                // `given_name` (#7911, which the schema lists first); a
+                // remove, a run, a list or a yes gives its own argument
+                // alone and is said nothing first. Both paths read that one
+                // rule, and neither weighs what else the call carries: the
+                // stream must decide before the rest of the arguments come,
+                // so it reads the first argument's name
                 // ([`ChatEvent::Argued`]); with no stream event for the
                 // round's make_skill calls their whole calls are read, for
-                // a `request` among the arguments (parsed, they keep no
-                // order). Once the stream named a make_skill argument,
-                // its decision stands and the whole calls are not read
-                // again for it.
+                // a `request` or a `given_name` among the arguments
+                // (parsed, they keep no order). Once the stream named a
+                // make_skill argument, its decision stands and the whole
+                // calls are not read again for it.
                 let new_make = match &event {
                     ChatEvent::Argued(name, first) if name == crate::made_skill::MAKE => {
                         make_argued = true;
-                        first == crate::make_skill_local::REQUEST
+                        crate::make_skill_local::new_make_argument(first)
                     }
                     ChatEvent::ToolCalls(asked) if !words_round && !make_argued => {
                         asked.iter().any(|call| {

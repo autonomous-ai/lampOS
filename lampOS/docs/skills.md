@@ -4300,19 +4300,30 @@ gone ([switches.md](switches.md)). What happens:
      made a second skill). `make_skill` takes `given_name`
      (`make_skill_local::GIVEN_NAME`): the name the person gives the new
      skill as they ask for it, in any words ("called evening rate", "name
-     it evening rate"), word for word, left out when they give none. The
-     voice's model judges their words; no word list reads them. Code then
-     makes it the skill's name whoever writes the skill, DeepSeek or the
-     lamp's agent (both answers go through `made_skill::keep_asked`):
-     written as a kept skill's name is (`made_skill::given_name`,
-     `made_skill::name_asked`: `evening-rate`), cut to the name's bound,
-     and put on the card in place of the maker's (`named_as_given`), before
-     a taken name gets a free one, below. With none given, or one that
-     gives no skill's name (no letter first, or letters a skill's name
-     can't have, "tỷ giá"), the maker's own name stands, as before. An
-     undo never takes one. Tests:
+     it evening rate"), the name alone (`evening rate`), left out when
+     they give none. The voice's model judges their words; no word list
+     reads them. `answer` holds it for that make
+     (`make_skill_local::named_make`), never for an undo, which makes the
+     first ask again. Code then makes it the skill's name on every make
+     path: DeepSeek's answer and the lamp's agent's (both through
+     `made_skill::keep_asked`, its card renamed by `named_as_given`), and
+     a cannot made one task for the agent only asked for
+     (`make_no_cannot::made`, `name_given`: its card and its voice tool
+     both take it). It is written as a kept skill's name is
+     (`made_skill::given_name`, `made_skill::name_asked`: `evening-rate`),
+     cut to the name's bound, before a taken name gets a free one, below.
+     With none given, or one that gives no skill's name (no letter first,
+     or letters a skill's name can't have, "tỷ giá"), the maker's own name
+     stands, as before. The schema lists `given_name` before `request`
+     (its keys in order), so a named make may stream it first: either is
+     a new make's first argument (`make_skill_local::new_make_argument`,
+     `asks_a_new_make`), and the lamp's opening line is said for it as
+     for any new make (Twelve's HOLD on #7926). Tests:
      `a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models`,
-     `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`.
+     `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`,
+     `answer_holds_the_calls_given_name_for_its_make_but_an_undos`,
+     `a_task_only_asked_for_takes_the_name_the_person_gave`,
+     `a_make_whose_first_argument_is_its_given_name_is_opened`.
    - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
      keeps the lamp's own skills, welcome-back, bedtime-morning,
      light-out, sip-of-water among them, so a skill the model named
