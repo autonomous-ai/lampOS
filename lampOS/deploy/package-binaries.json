@@ -9,7 +9,7 @@
     "lamp-surround", "lamp-update", "lamp-ears", "lamp-schedule", "lamp-tasks", "lamp-air",
     "lamp-records", "lamp-mood", "lamp-bus", "lamp-selftest", "lamp-settings", "lamp-setup",
     "lamp-cloud", "lamp-skills", "lamp-peek", "lamp-addons", "lamp-control", "lamp-services",
-    "lamp-same-voice", "lamp-seen", "lamp-apps"
+    "lamp-same-voice", "lamp-seen", "lamp-apps", "lamp-npu"
   ],
   "provisioning": [
     "lamp-body-measure", "lamp-body-mood"

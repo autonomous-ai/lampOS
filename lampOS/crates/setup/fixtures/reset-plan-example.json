@@ -32,6 +32,7 @@
     "/var/lib/lampos-services",
     "/var/lib/lampos-control",
     "/var/lib/lampos-seen",
+    "/var/lib/lampos-npu",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/onboarding",
     "/var/lib/lampOS/consent/room-sounds.json",

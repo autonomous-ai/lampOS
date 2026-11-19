@@ -144,6 +144,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-seen.service",
         include_str!("../../../deploy/product/lamp-seen.service"),
     ),
+    // The NPU's one owner (#7415, docs/npu.md); off unless LAMP_NPU=on, so
+    // with it unset it idles touching nothing. lamp-control forwards `pose`.
+    (
+        "lamp-npu.service",
+        include_str!("../../../deploy/product/lamp-npu.service"),
+    ),
     // The developers' door (#3504, docs/control.md); off unless the owner's
     // setting writes LAMP_CONTROL=on.
     (
@@ -305,6 +311,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
+    "lamp-npu.service",
     "lamp-peek.service",
     "lamp-policy.service",
     "lamp-records.service",
@@ -689,6 +696,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "f36f4b63210494cc8848061509c7b085996bfbf3154f2059c58111e0ad623d3c", // #7415: lamp-npu's state folder, its fetched models
     "0192f1ca63da3391fcb14e072afef96244691c35edef6388c8cd91abc05a7b55", // #6543: the app's desk noticing mark, seen-activity-mark.json
     "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts
     "73d29d8ffa197507ad12bcf41037e12a2a9e5f25c9444a82243c1a07c6ff8666", // #6893: the energy beside the character words
