@@ -73,6 +73,14 @@ pub const SERVICES_SWITCH: &str = "LAMP_SERVICES_TO_AGENT";
 pub const SKILL: &str = "voice-ask";
 /// The line's `op`.
 pub const OP: &str = "voice_ask";
+/// The refusal's code a cancelled news ask's own connection is told, as a
+/// cancelled remake's make (`crate::skill_make`'s, #7789).
+pub const CANCELLED_CODE: &str = "cancelled";
+/// What a cancelled news ask's own connection is told.
+pub const CANCELLED: &str = "the lamp's own ask was cancelled for a person's ask";
+/// How long a person's ask waits for the cancelled news ask to end, as a
+/// make's cancel does (#7789's `CANCEL_WAIT`).
+pub const CANCEL_WAIT: Duration = Duration::from_millis(750);
 /// The most bytes of the person's ask.
 pub const MOST_ASK_BYTES: usize = 2_000;
 /// The most grants: one service's read (writes come with their own gates
@@ -160,6 +168,11 @@ pub struct AskLine {
     #[serde(default)]
     pub grants: Vec<String>,
     pub within_ms: u64,
+    /// The lamp's own ask for task news's line (`lamp_voice::news_agent`,
+    /// `LAMP_CORE_VIA_AGENT`'s `news`), no grant: a person's ask that comes
+    /// while it runs cancels it ([`answer`]). Never a person's.
+    #[serde(default)]
+    pub news: bool,
 }
 
 /// The line's `op`: `voice_ask` only.
@@ -320,6 +333,9 @@ pub struct Asks {
     pub default_engine: DefaultEngine,
     pub tokens: Arc<dyn Tokens + Send + Sync>,
     pub asking: AtomicBool,
+    /// The cancel of the lamp's own news ask holding the one place, if one
+    /// does ([`AskLine::news`]).
+    pub news: std::sync::Mutex<Option<Arc<AtomicBool>>>,
 }
 
 /// Frees the one place however the ask ends.
@@ -340,14 +356,13 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
         Ok(ask) => ask,
         Err((code, why)) => return refusal(code, &why),
     };
-    if asks
-        .asking
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_err()
-    {
+    if !take_place(asks, ask.news) {
         return refusal("busy", BUSY);
     }
     let _place = Place(&asks.asking);
+    // The lamp's own news ask may be cancelled by a person's while it runs.
+    let cancel = Arc::new(AtomicBool::new(false));
+    let _news = ask.news.then(|| NewsHeld::hold(asks, cancel.clone()));
     let services = !ask.grants.is_empty();
     match pick(asks) {
         Ok(MakeAgent::Hermes) => {}
@@ -359,7 +374,7 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
             let Some(gateway) = asks.agent.as_deref() else {
                 return refusal("run_failed", "the lamp's default agent can't be reached");
             };
-            return on_gateway(&ask, gateway, work, started);
+            return on_gateway(&ask, gateway, work, &cancel, started);
         }
         Err(refused) => return refused,
     }
@@ -379,6 +394,7 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     let mut run = crate::skill_make::make_run(&folder.path, ask.within());
     run.skill = SKILL.into();
     run.prompt = prompt(&folder.path);
+    run.cancel = cancel;
     let mut minted = None;
     if services {
         match asks.tokens.mint_ask(&ask.grants, &run.run) {
@@ -410,6 +426,7 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     let read = crate::skill_make::answer_in(&folder.path);
     drop(folder);
     match ran {
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => told(read),
     }
@@ -441,6 +458,68 @@ pub fn answer_beside_make(
     answer(line, asks, work, started)
 }
 
+/// The one place for an ask, `news` the lamp's own: free, or held by the
+/// lamp's own news ask and `news` not, which is cancelled at once and waited
+/// for at most [`CANCEL_WAIT`] (the first builder's 09:57: a person's ask
+/// always wins). A news ask never cancels anything.
+fn take_place(asks: &Asks, news: bool) -> bool {
+    let take = || {
+        asks.asking
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    };
+    if take() {
+        return true;
+    }
+    if news {
+        return false;
+    }
+    let Some(cancel) = asks
+        .news
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .clone()
+    else {
+        return false;
+    };
+    cancel.store(true, Ordering::Release);
+    eprintln!("[lamp-tasks] live ask: the lamp's own news ask is cancelled for a person's");
+    let until = std::time::Instant::now() + CANCEL_WAIT;
+    loop {
+        if take() {
+            return true;
+        }
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// The lamp's own news ask's cancel, kept in [`Asks::news`] while it holds
+/// the one place, and taken back however it ends.
+struct NewsHeld<'a>(&'a Asks);
+
+impl<'a> NewsHeld<'a> {
+    fn hold(asks: &'a Asks, cancel: Arc<AtomicBool>) -> Self {
+        *asks
+            .news
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = Some(cancel);
+        Self(asks)
+    }
+}
+
+impl Drop for NewsHeld<'_> {
+    fn drop(&mut self) {
+        *self
+            .0
+            .news
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = None;
+    }
+}
+
 /// The lamp's default agent for an ask now ([`Asks::agent`]), or its
 /// refusal: a Hermes pick on a lamp whose default isn't Hermes is
 /// [`NOT_READY`], never a Hermes run.
@@ -469,6 +548,7 @@ fn on_gateway(
     ask: &AskLine,
     gateway: &MakeGateway,
     work: &Path,
+    cancel: &Arc<AtomicBool>,
     started: &mut dyn FnMut(),
 ) -> Value {
     if let Err(why) = gateway.ready() {
@@ -487,6 +567,7 @@ fn on_gateway(
     run.skill = SKILL.into();
     run.prompt = prompt(&folder.path);
     run.env = Vec::new();
+    run.cancel = cancel.clone();
     started();
     let ran = gateway.run(&run, &|| {});
     let read = run
@@ -496,6 +577,7 @@ fn on_gateway(
         .or_else(|| crate::skill_make::answer_in(&folder.path));
     drop(folder);
     match ran {
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         Err(why) if crate::skill_make::not_ready(&why) => {
             eprintln!("[lamp-tasks] live ask: not ready: {why}");
             refusal(NOT_READY, NOT_READY_LINE)
@@ -641,6 +723,7 @@ mod tests {
             default_engine: Box::new(|| None),
             tokens,
             asking: AtomicBool::new(false),
+            news: Default::default(),
         }
     }
 
@@ -854,6 +937,106 @@ mod tests {
             .permissions(std::fs::Permissions::from_mode(0o700))
             .tempdir()
             .unwrap()
+    }
+
+    /// Holds any ask whose rules say `HOLD` until it is cancelled or its
+    /// deadline, keeping whether it was cancelled, and answers any other at
+    /// once.
+    #[derive(Default)]
+    struct Holds {
+        cancelled: Mutex<Vec<bool>>,
+    }
+
+    impl Runner for Holds {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            let rules =
+                std::fs::read_to_string(folder.join(crate::skill_make::RULES_FILE)).unwrap();
+            if rules.contains("HOLD") {
+                let began = std::time::Instant::now();
+                while !run.cancelled() && began.elapsed() < run.deadline {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                self.cancelled.lock().unwrap().push(run.cancelled());
+                return Ok(0);
+            }
+            std::fs::write(folder.join(crate::skill_make::ANSWER_FILE), "Here it is.").unwrap();
+            Ok(0)
+        }
+    }
+
+    fn news_line(ask: &str) -> Vec<u8> {
+        json!({"op": OP, "ask": ask, "grants": [], "within_ms": 10_000, "news": true})
+            .to_string()
+            .into_bytes()
+    }
+
+    /// The first builder (19 Nov 09:57): a person's ask always wins. One
+    /// that comes while the lamp's own news ask runs cancels it in
+    /// lamp-tasks at once (its run ended, told `cancelled`, so the voice
+    /// tells its note) and runs, never told busy. A news ask never cancels
+    /// a person's, and a person's ask still waits for another person's.
+    #[test]
+    fn a_persons_ask_cancels_the_lamps_news_ask_and_runs() {
+        let dir = work();
+        let holds = Arc::new(Holds::default());
+        let asks = Asks {
+            switches: on(),
+            open: holds.clone(),
+            held: holds.clone(),
+            agent: None,
+            default_engine: Box::new(|| None),
+            tokens: Arc::new(Minting::default()),
+            asking: AtomicBool::new(false),
+            news: Default::default(),
+        };
+        std::thread::scope(|scope| {
+            let (began, started) = std::sync::mpsc::channel();
+            let (asks, dir) = (&asks, &dir);
+            let news = scope.spawn(move || {
+                answer(
+                    &news_line("HOLD the news note"),
+                    asks,
+                    dir.path(),
+                    &mut || began.send(()).unwrap(),
+                )
+            });
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+            let asked = std::time::Instant::now();
+            let told = answer(&line("what's on today", &[]), asks, dir.path(), &mut || {});
+            assert_eq!(told, json!({"ok": true, "answer": "Here it is."}));
+            assert!(
+                asked.elapsed() < Duration::from_millis(1_500),
+                "{:?}",
+                asked.elapsed()
+            );
+            let news = news.join().unwrap();
+            assert_eq!(news["error"], CANCELLED_CODE, "{news}");
+        });
+        assert_eq!(*holds.cancelled.lock().unwrap(), vec![true]);
+        // A person's ask held: the lamp's news ask is told busy, and so is
+        // another person's; neither cancels it.
+        std::thread::scope(|scope| {
+            let (began, started) = std::sync::mpsc::channel();
+            let (asks, dir) = (&asks, &dir);
+            let person = scope.spawn(move || {
+                answer(&line("HOLD a long one", &[]), asks, dir.path(), &mut || {
+                    began.send(()).unwrap()
+                })
+            });
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_eq!(
+                answer(&news_line("the note"), asks, dir.path(), &mut || {})["error"],
+                "busy"
+            );
+            assert_eq!(
+                answer(&line("and this", &[]), asks, dir.path(), &mut || {})["error"],
+                "busy"
+            );
+            // Ends at its deadline (5 s): never cancelled.
+            let _ = person.join().unwrap();
+        });
+        assert_eq!(*holds.cancelled.lock().unwrap(), vec![true, false]);
     }
 
     #[test]
