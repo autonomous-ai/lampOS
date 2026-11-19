@@ -1563,7 +1563,9 @@ impl Reply {
         // a gap in a stream's sound is its computer's, not a cut.
         // A long exact line's pieces (#7892) are `spoken` once the last
         // played out and none went unrendered: a gap while a piece renders
-        // is no cut.
+        // is no cut. One cut short, a piece not rendered, is never said
+        // whole, however the rest played (Fourteen's HOLD on #7897).
+        let fed_whole = self.notice.fed_whole() != Some(false);
         let sound = (matches!(
             self.notice.origin(),
             SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
@@ -1571,6 +1573,7 @@ impl Reply {
             || self.notice.origin() == SpeechOrigin::ComputerStream
             || self.notice.origin() == SpeechOrigin::ExactLine
                 && self.notice.fed_whole() == Some(true))
+            && fed_whole
             && self.settled(speaker_pending)
             && self.notice.retired();
         // A reminder that played through gaps and counts as said
@@ -1580,10 +1583,11 @@ impl Reply {
         // (#6749 D: a skill task's ask said whole was answered `dropped`
         // for its gaps, so lamp-skills counted it unsaid and asked again
         // 10 min later). Only a cut, a failed answer or no audio drops it.
-        let played_whole = sound
-            || self.heard_whole(speaker_pending, snapshot)
-            || self.said_through_gaps(speaker_pending, snapshot)
-            || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot);
+        let played_whole = fed_whole
+            && (sound
+                || self.heard_whole(speaker_pending, snapshot)
+                || self.said_through_gaps(speaker_pending, snapshot)
+                || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot));
         // complete_reminder runs first. Read its resulting settlement, not the
         // pre-completion eligibility that successful completion consumes.
         let reminder_complete = self
