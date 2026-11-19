@@ -2885,6 +2885,13 @@ pinned Harness (docs/install.md, "Hermes on the lamp").
 
 ## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
 
+A skill's run is no task in the store, so `tasks/status` never lists it:
+with `serve --progress`, each one is said on `skills/tasks` instead (#7873,
+[msgs.md](msgs.md) `SkillTask`, for lamp-peek), `started` with its run id
+and the engine it began on (`skill_task::tell_run`, where `HarnessRunner`
+picks the engine, with Harness or without), then `ran` or `failed` when its
+runner ends (`run_on_token`). A make's and a voice ask's runs are not said.
+
 A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
 hands its slower part to the lamp's own Hermes. lamp-skills sends one line
 for each run, and is answered once the run ends
