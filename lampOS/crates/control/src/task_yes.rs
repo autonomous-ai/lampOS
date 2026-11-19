@@ -1079,6 +1079,18 @@ mod tests {
             &ours.join("stretch-break"),
             &dir.join(PUSHED_NAME).join("stretch-break"),
         );
+        // The brief is no file of the repository's folder: on a lamp,
+        // install writes it beside the variant (`core_brief!`), so here too.
+        for folder in [
+            skills.join("sip-of-water"),
+            dir.join(PUSHED_NAME).join("stretch-break"),
+        ] {
+            let name = folder.file_name().unwrap().to_str().unwrap().to_owned();
+            let brief = folder.join(lamp_skills::core_agent::RUN);
+            std::fs::create_dir_all(brief.parent().unwrap()).unwrap();
+            let pilot = lamp_skills::core_agent::pilot(&name).unwrap();
+            std::fs::write(&brief, lamp_skills::core_agent::script(pilot)).unwrap();
+        }
         let kept = KeptYes {
             state: state.clone(),
             skills: skills.clone(),
