@@ -909,6 +909,47 @@ fn an_unpinned_install_still_pipes_the_cdn_installer() {
     );
 }
 
+/// #7906: `~/.harness` is made by `lampos`, 0700, before Harness's
+/// installer runs, pinned or not, so a fresh lamp's installer finds it and
+/// keeps Harness's home there instead of picking the XDG folders.
+#[test]
+fn harnesss_home_folder_is_made_before_the_installer() {
+    for pinned in [false, true] {
+        let mut log = Vec::new();
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            log.push(argv.join(" "));
+            Ok(if argv[0] == "id" {
+                "990\n".into()
+            } else {
+                String::new()
+            })
+        };
+        let urls = [];
+        let pinned_run = install::Pinned {
+            installer: "/tmp/x/harness-install.sh",
+            urls: &urls,
+        };
+        install::harness_on_pinned_with(
+            &mut run,
+            USER,
+            HARNESS_HOME,
+            pinned.then_some(&pinned_run),
+        )
+        .unwrap();
+        let made = log
+            .iter()
+            .position(|line| {
+                line == "runuser -u lampos -- mkdir -p -m 0700 /var/lib/lampos-tasks/.harness"
+            })
+            .unwrap_or_else(|| panic!("{pinned}: {log:?}"));
+        let installer = log
+            .iter()
+            .position(|line| line.contains("harness-install.sh") || line.contains("| sh"))
+            .unwrap();
+        assert!(made < installer, "{pinned}: {log:?}");
+    }
+}
+
 /// The installer's bound ([`install::INSTALLER_WITHIN`]) holds for both
 /// runs: the CDN pipe and a pinned file. Other `sh` runs are not it.
 #[test]
@@ -3098,4 +3139,54 @@ fn a_home_moved_to_xdg_is_said_after_an_install() {
         said(&lamp)[0],
         "harness: home moved to XDG (.local/state/harness/bridge.json): lampOS paths need ~/.harness"
     );
+}
+
+/// #7906 (the reboot gap): after an install or a move, lamp-update itself
+/// puts Harness's data folder in the `harness-hold.env` an older lamp-tasks
+/// wrote, every other line kept, with lamp-tasks' own line, so a daemon
+/// started from it after a reboot, before the new lamp-tasks writes it,
+/// still keeps Harness's home in `~/.harness`. Held or not; once only; a
+/// missing file is not made.
+#[test]
+fn an_install_puts_the_data_folder_in_the_hold_file_lamp_tasks_wrote() {
+    let lamp = Lamp::new();
+    launcher_left(&lamp, UNPINNED);
+    let home = lamp.root().join("var/lib/lampos-tasks");
+    let file = home.join(launcher::HOLD_FILE);
+    let after = |lamp: &Lamp, environment: &str| {
+        let mut runs = Runs::new();
+        runs.tasks_environment = environment.into();
+        let mut run = runs.runner();
+        let mut lines = Vec::new();
+        launcher::after_install(lamp.root(), &mut run, &mut |line: &str| {
+            lines.push(line.to_owned())
+        });
+        lines
+    };
+    after(&lamp, HOLD_ON);
+    assert!(!file.exists());
+    let older =
+        "ADAPTER_UPDATE_DISABLE=true\nHERMES_HOME=/var/lib/lampos-hermes/.hermes\nSHELL=/bin/sh\n";
+    for environment in [HOLD_ON, "HOME=/var/lib/lampos-tasks"] {
+        write_whole(&file, older.as_bytes(), 0o600).unwrap();
+        let said = after(&lamp, environment);
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            format!("{older}{}", lamp_msgs::harness_hold::data_line(DATA_AT))
+        );
+        assert_eq!(
+            fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(
+            said.iter()
+                .any(|line| line.starts_with("ADAPTER_DATA_DIR set in")),
+            "{said:?}"
+        );
+        let said = after(&lamp, environment);
+        assert!(
+            !said.iter().any(|line| line.contains("ADAPTER_DATA_DIR")),
+            "{said:?}"
+        );
+    }
 }

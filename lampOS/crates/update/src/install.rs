@@ -1509,6 +1509,22 @@ pub(crate) fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> 
     argv
 }
 
+/// `<home>/.harness` made by `user` (`mkdir -p -m 0700`), before Harness's
+/// installer runs (#7906).
+pub(crate) fn harness_dir(user: &str, home: &str) -> Vec<String> {
+    vec![
+        "runuser".to_owned(),
+        "-u".to_owned(),
+        user.to_owned(),
+        "--".to_owned(),
+        "mkdir".to_owned(),
+        "-p".to_owned(),
+        "-m".to_owned(),
+        "0700".to_owned(),
+        format!("{home}/.harness"),
+    ]
+}
+
 /// `user`'s id, from `id -u`, through `run`.
 pub(crate) fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
     let uid = run(&["id".to_owned(), "-u".to_owned(), user.to_owned()])?
@@ -1754,6 +1770,11 @@ pub fn harness_on_pinned_with(
 ) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    // `~/.harness` there before the installer runs (#7906): on a fresh lamp
+    // Harness's installer otherwise picks the XDG folders and writes
+    // `.harness-root` there. Made by `user` itself (never followed as root),
+    // 0700 as its home; one already there is left as it is.
+    run(&harness_dir(user, home))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
