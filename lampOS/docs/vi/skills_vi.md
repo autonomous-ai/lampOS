@@ -884,8 +884,8 @@ sau:
      cầu.
    - **Bật ngay, khi `LAMP_MADE_CODE_ON_AT_ONCE=on`** (chủ nhân yêu cầu
      trong chat: một kỹ năng tự tạo được bật ngay, và dù được hay không,
-     đèn chỉ nói vậy, không cần xác nhận; chỉ `on`, tắt nếu không đặt,
-     không có trong unit sản phẩm nào; trong `lamp-voice` được truyền cho
+     đèn chỉ nói vậy, không cần xác nhận; chỉ `on`, tắt nếu không đặt;
+     bật trong `lamp-voice` của sản phẩm (lần bật của luồng tạo kỹ năng, DEFAULT-ON của người xây dựng đầu tiên, 19/11 lúc 21:42 trên #7814); trong `lamp-voice` được truyền cho
      cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
      `made_skill::code_on_at_once`). Phán quyết của first builder trên
      #6059 (19:14, và dòng 19:44 của builder đầu tiên: "sound" là âm thanh và giọng
@@ -3121,8 +3121,8 @@ cả hai người viết.
   vẫn bị bỏ, và lần tạo trở thành một việc cho agent (bên dưới).
 - **Không có "couldn't" khi `LAMP_MAKE_NO_CANNOT=on`** (chủ sở hữu, 16/11:
   "Every task must be doable; no 'couldn't' here"; #7234;
-  `crate::make_no_cannot`; tắt trừ khi là `on`, chỉ lamp-voice đọc, không có
-  trong unit sản phẩm nào). Một lần tạo mà câu trả lời cuối là `cannot:` của
+  `crate::make_no_cannot`; tắt trừ khi là `on`, chỉ lamp-voice đọc; bật
+  trong `lamp-voice` của sản phẩm, lần bật của luồng tạo kỹ năng, DEFAULT-ON của người xây dựng đầu tiên, 19/11 lúc 21:42 trên #7814). Một lần tạo mà câu trả lời cuối là `cannot:` của
   chính model (của model riêng của đèn, hoặc của agent), hoặc một kỹ năng
   chỉ bảo người dùng tự làm điều họ nhờ (`ECHOES_THE_ASK`), không bị bỏ (chủ
   sở hữu, 16/11 11:4x: "every skill a person asks for must be made"), trừ
@@ -4900,8 +4900,8 @@ mọi lần tạo và xóa giống hệt từng byte như trước.
 
 #### Việc một kỹ năng trên đèn đã làm thì nó được bật lên (`LAMP_MAKE_CORE_OFFER=on`, tắt)
 
-Tắt nếu không đặt `LAMP_MAKE_CORE_OFFER=on`, chưa có trong unit sản phẩm
-nào (#7747: trên lamp-9adf ba lời nhắc uống nước tạo bằng giọng nói nằm cạnh
+Tắt nếu không đặt `LAMP_MAKE_CORE_OFFER=on`; bật trong `lamp-voice` của
+sản phẩm (lần bật của luồng tạo kỹ năng, DEFAULT-ON của người xây dựng đầu tiên, 19/11 lúc 21:42 trên #7814; #7747: trên lamp-9adf ba lời nhắc uống nước tạo bằng giọng nói nằm cạnh
 kỹ năng lõi `sip-of-water`, không cái nào có các điều kiện giữ của nó; người
 dùng xin một lời nhắc uống nước tốt hơn và nhận được cái thứ hai, kém hơn).
 Được bật lên, không bao giờ đề nghị (First, 18:41): quy tắc của First ngày

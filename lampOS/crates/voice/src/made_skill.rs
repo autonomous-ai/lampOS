@@ -1726,8 +1726,8 @@ pub fn service_grant(grant: &str) -> Option<(&str, bool)> {
 /// The switch that puts a made skill with code of its own (#6307,
 /// [`SCRIPTS_ENVIRONMENT`]) on at once, by voice or from the app, with no
 /// spoken yes (the owner's ask: a made skill goes on at once, and the lamp
-/// says whether it worked, with no confirming). `on` only; off unless set,
-/// in no product unit. On, it goes on through its yes's own path
+/// says whether it worked, with no confirming). `on` only; off unless set;
+/// on in the product's `lamp-voice`. On, it goes on through its yes's own path
 /// (`make_skill_local::code_approve`: that package by its SHA-256, then its
 /// task's yes recorded), its say-back says it is on and what its code may
 /// use ([`code_said`], with no [`RUNS_AFTER_YES`]), and nothing waits. Off,
