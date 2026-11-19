@@ -3953,9 +3953,29 @@ config with `mcp_servers.lamp-services`. On Hermes, either way a fresh folder an
 of its own, the person's words in its rules file (never its arguments), its
 answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
 the folder removed and the token ended however it ends, at most 120 s.
-On a lamp whose makes take the one run path (`LAMP_MAKE_AGENT_ONE_PATH`),
-an ask with a grant has no held-off runner and is refused `not_held_off`,
-and the voice says its fixed failure line: it fails closed.
+With lamp-update's one run path (`LAMP_SKILL_DEFAULT_AGENT=on`), whose
+wrapper holds off the network only a run in its own `skill-<run id>`
+folder, the held make's runner would be refused
+(`NOT_HELD_OFF_ONE_PATH`, lamp-9adf, 20 Nov), so an ask with a grant goes
+through `skill_make::AskRunner` instead: Hermes's wrapper started by
+lamp-tasks itself by its task entry (`HarnessRunner::run_task_entry`, as a
+skill's run with no Harness), in its own `skill-<run id>` folder (the
+wrapper reads its token file, gives `--net` and the run no way out), its
+fresh home the ask's own `make-<run id>/home`, named to the wrapper by
+`LAMP_NS_HOME` as a make's is. Never through Harness, which passes the
+wrapper none of lamp-tasks' variables: a run with a fresh home and no way
+out is refused there. Before any token is minted, the wrapper must take a
+run by its task entry and a make's home, and the agent namespace must show
+that home with the lasting one hidden (`HarnessRunner::takes_fresh_tasks`),
+or the ask is refused `no_namespace` and nothing starts. The path adds two
+small file reads, a folder, the token file and the task file before the
+start: no Harness launch, so a read starts as quickly as before. With the
+switch off, an ask with a grant runs on the held make's runner as before.
+A hard ask keeps the make's runner: un-held (the default) it starts as
+before; with `LAMP_MAKE_AGENT_NET=held` it has no token, which the one run
+path's wrapper needs for a run in its own folder (lamp-control mints an ask
+only for a linked service's read), so there it still fails closed, told
+`not_held_off` (as `NOT_HELD_OFF_ONE_PATH` now is), never `run_failed`.
 Off, the line is refused `off` and makes are as before
 ([services.md](services.md), "Reads through the lamp's agent";
 [switches.md](switches.md)).

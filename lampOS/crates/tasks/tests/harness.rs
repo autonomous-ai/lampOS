@@ -9267,6 +9267,36 @@ fn a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone(
     );
 }
 
+/// A run with a fresh home of its own and no way out (a live ask held off
+/// the network, `skill_make::AskRunner`) finds that home only by its
+/// agent's task entry, named in the wrapper's `LAMP_NS_HOME`: Harness
+/// passes the wrapper none of lamp-tasks' variables, so through Harness it
+/// would see the agent's lasting home. Refused before Harness is asked, no
+/// token file written.
+#[test]
+fn a_fresh_home_run_with_no_way_out_never_goes_through_harness() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    let folder = rig.root.path().join("work/make-task-1");
+    fs::create_dir_all(folder.join("home")).unwrap();
+    let mut run = skill_run(Duration::from_secs(20));
+    run.start_in = Some(folder);
+    let said = harness.run(&run, &|| {}).unwrap_err();
+    assert!(said.contains("never through Harness"), "{said}");
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+    assert!(
+        !rig.root.path().join("runs/task-1").exists(),
+        "no token file"
+    );
+    nothing_left(&rig);
+}
+
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
 /// with none); each look notes whether Harness was already asked `new`.
 struct SkillProbe {
