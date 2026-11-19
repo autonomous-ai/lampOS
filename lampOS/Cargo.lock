@@ -2375,6 +2375,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-npu"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "jpeg-encoder",
+ "lamp-bus",
+ "lamp-msgs",
+ "lamp-skills",
+ "lamp-update",
+ "libloading 0.9.0",
+ "ring",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "zune-jpeg",
+]
+
+[[package]]
 name = "lamp-observer"
 version = "0.1.0"
 dependencies = [

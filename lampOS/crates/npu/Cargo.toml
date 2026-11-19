@@ -1,0 +1,43 @@
+[package]
+name = "lamp-npu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The lamp's NPU service (docs/npu.md, #7415): the one process that opens
+# /dev/vipcore, with `pose` as its first op. Models are not in the image:
+# the first use, or a pose-using app's install, fetches the board's model
+# from the Store, checked with the Store's key before anything is kept.
+# Off unless LAMP_NPU=on.
+[[bin]]
+name = "lamp-npu"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+base64 = "0.22"
+lamp-bus = { path = "../bus" }
+lamp-msgs = { path = "../msgs" }
+# The Store's signature check and its keys (`lamp_skills::package`), so a
+# model is trusted exactly as an app's package is, by the same key.
+lamp-skills = { path = "../skills" }
+# The HTTPS client (`lamp_update::fetch`): only https, bounded, behind a
+# trait the tests replace.
+lamp-update = { path = "../update" }
+# Pure Rust JPEG decoding, as the eyes use.
+zune-jpeg = "=0.4.21"
+# VIPLite is opened at run time (dlopen), so the build needs no vendor
+# library; already in the lock through ort.
+libloading = "=0.9.0"
+
+[dev-dependencies]
+# JPEGs for the tests, as the eyes make theirs.
+jpeg-encoder = "=0.7.1"
+ring = "0.17"
+tempfile = "3"
+
+[lints]
+workspace = true
