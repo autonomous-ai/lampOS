@@ -7259,6 +7259,7 @@ mod tests {
         use lamp_skills::service_read::Asker;
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Check my mail".into(),
+            words: "Check my mail".into(),
             run: "scripts/main.py".into(),
             quiet: None,
         }));
