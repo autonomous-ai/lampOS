@@ -4927,7 +4927,14 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   được ghép, hoặc câu đã được phân biệt, vẫn như trước: không có ghi chú,
   không thêm lượt và không chờ; một câu bị tách được cho biết ngay trong
   lượt nó vốn được hỏi, nên cũng không tốn thêm lượt mô hình nào, chỉ thêm
-  lời của ghi chú.
+  lời của ghi chú. Nhưng một cuộc chat bắt đầu sớm trên lời sớm của câu bị
+  tách sẽ bị bỏ (ghi chú đi bên cạnh lời, `Prepared::misfit`), nên câu đó
+  chờ lượt đầu tiên từ lời cuối cùng của nó. Không có gì cho thấy một
+  người đã nói tất cả, nên việc ghi nhớ của câu bị tách là của căn phòng
+  (`narrow_to_room`), như lời được báo trước. Một câu bị cắt mà các lượt
+  chat của nó đã chạy một lời gọi thì không được báo, cũng như mọi lời đã
+  báo cho nó trước đó: nó đã làm theo những lời ấy. Lời giữ cho một chuỗi
+  bị bỏ khi dừng, khi đóng quyền riêng tư hoặc khi tắt tiếng.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.

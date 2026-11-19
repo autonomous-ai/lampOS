@@ -5100,7 +5100,10 @@ after a take-over, but now for every turn:
     line is told the cut words beside its own in its first chat round,
     with any the cut line was told in turn (a line split in three), and
     the model judges whether they are one ask, whatever it calls first
-    (#7976; the skills doc's "A split make is still one make"). One person
+    (#7976; the skills doc's "A split make is still one make"). No extra
+    model round, but a chat begun early on its early words is dropped
+    (`Prepared::misfit`: a note goes beside the words), and its keep is
+    the room's. One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
     check runs for another rule; or else one face, the same passing id,
