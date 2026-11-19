@@ -601,16 +601,43 @@ impl std::fmt::Display for AgentStep {
 /// without Hermes or OpenClaw removes nothing; nothing is followed through
 /// a link. Run again after a cut, it finishes what is left.
 pub fn forget_agents(root: &Path) -> io::Result<usize> {
-    walk_agents(root, true, &mut Vec::new())
+    forget_agents_checked(root, &mut |file| openclaw_check(root, file))
 }
 
 /// [`forget_agents`], with `check` run on the new `openclaw.json` before
 /// it is renamed into place (#7868).
 pub fn forget_agents_checked(
     root: &Path,
-    _check: &mut dyn FnMut(&Path) -> Result<(), String>,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
 ) -> io::Result<usize> {
-    forget_agents(root)
+    walk_agents(root, true, &mut Vec::new(), check)
+}
+
+/// OpenClaw's own check of the reset's cut of `openclaw.json` in `file`
+/// (#7868): lamp-update's ([`lamp_update::openclaw_install::validate_argv`],
+/// `config validate --json` as `lampos` in OpenClaw's namespace, with the
+/// file's own ids), bounded by [`lamp_checked_replace::VALIDATE_WITHIN`].
+/// It needs no forwarder token, which the reset has wiped by then. With no
+/// OpenClaw namespace script under `root`, OpenClaw can't run and the cut
+/// is written unchecked, said.
+fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+    let ns = lamp_update::openclaw_install::NS;
+    if fs::symlink_metadata(root.join(ns.trim_start_matches('/'))).is_err() {
+        eprintln!("lamp-setup: reset: OpenClaw's openclaw.json cut unchecked: no {ns}");
+        return Ok(());
+    }
+    let owner = fs::metadata(file).map_err(|error| format!("{}: {error}", file.display()))?;
+    let argv = lamp_update::openclaw_install::validate_argv(
+        &owner.uid().to_string(),
+        &owner.gid().to_string(),
+        &file.to_string_lossy(),
+    );
+    lamp_checked_replace::validate(
+        &argv,
+        &[("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")],
+        lamp_checked_replace::VALIDATE_WITHIN,
+    )
 }
 
 /// What [`forget_agents`] would do under `root`, one step an entry, with
@@ -619,11 +646,16 @@ pub fn forget_agents_checked(
 /// the reset. Nothing is followed through a link.
 pub fn plan_agents(root: &Path) -> io::Result<Vec<AgentStep>> {
     let mut steps = Vec::new();
-    walk_agents(root, false, &mut steps)?;
+    walk_agents(root, false, &mut steps, &mut |_| Ok(()))?;
     Ok(steps)
 }
 
-fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result<usize> {
+fn walk_agents(
+    root: &Path,
+    act: bool,
+    steps: &mut Vec<AgentStep>,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
+) -> io::Result<usize> {
     if !root.is_absolute() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -710,6 +742,7 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
         cut_hermes_config,
         yaml_keys,
         steps,
+        &mut |_| Ok(()),
     )?);
     removed += usize::from(kept.cut(
         OPENCLAW_STATE,
@@ -717,6 +750,7 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
         cut_openclaw_config,
         json_keys,
         steps,
+        check,
     )?);
     for shell in [".bashrc", ".profile"] {
         removed += usize::from(kept.cut(
@@ -725,6 +759,7 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
             |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
             |_| Vec::new(),
             steps,
+            &mut |_| Ok(()),
         )?);
     }
     Ok(removed)
@@ -827,11 +862,16 @@ impl Kept<'_> {
     /// to the lamp's own keys, in place, its owner and mode kept; whether it
     /// changed. A file that is not a regular one, is too large, or that
     /// `cut` can't read (`None`) is removed: a reset fails toward wiping.
-    /// The cut is written beside it as `NAME.cut` and renamed over it, so a
-    /// cut stopped half-way leaves the old file whole and the leftover, a
-    /// name the folder does not keep, is removed by the next run. A missing
-    /// folder or file is nothing to do. `keys` names the top-level keys for
-    /// the step listed, never their values.
+    /// The cut is written beside it (`lamp_checked_replace`, the one checked
+    /// replace) and renamed over it, so a cut stopped half-way leaves the
+    /// old file whole and the leftover, a name the folder does not keep, is
+    /// removed by the next run. `check` runs on the new file first (#7868:
+    /// OpenClaw's own config check for `openclaw.json`): refused, the old
+    /// file stays byte for byte, nothing is left beside it, the refusal is
+    /// said, and the reset goes on, so the gateway keeps a file OpenClaw
+    /// took, never one it refuses. A missing folder or file is nothing to
+    /// do. `keys` names the top-level keys for the step listed, never their
+    /// values.
     fn cut(
         &self,
         folder: &str,
@@ -839,8 +879,10 @@ impl Kept<'_> {
         cut: fn(&[u8]) -> Option<Vec<u8>>,
         keys: fn(&[u8]) -> Vec<String>,
         steps: &mut Vec<AgentStep>,
+        check: &mut dyn FnMut(&Path) -> Result<(), String>,
     ) -> io::Result<bool> {
         use std::io::Read;
+        use std::os::fd::AsFd;
         let folder = self.root.join(folder.trim_start_matches('/'));
         let path = folder.join(name);
         let dir = match open_dir(&folder) {
@@ -894,30 +936,30 @@ impl Kept<'_> {
         if !self.act {
             return Ok(true);
         }
-        let staged = format!("{name}.cut");
-        match rustix::fs::unlinkat(&dir, staged.as_str(), AtFlags::empty()) {
-            Ok(()) | Err(rustix::io::Errno::NOENT) => {}
-            Err(error) => return Err(error.into()),
+        let mut refused = None;
+        let written = lamp_checked_replace::replace_checked_in(
+            dir.as_fd(),
+            &folder,
+            OsStr::new(name),
+            &new,
+            Mode::from_raw_mode(stat.st_mode),
+            Some((
+                rustix::fs::Uid::from_raw(stat.st_uid),
+                rustix::fs::Gid::from_raw(stat.st_gid),
+            )),
+            &mut |file| check(file).inspect_err(|why| refused = Some(why.clone())),
+        );
+        match (written, refused) {
+            (Ok(()), _) => Ok(true),
+            (Err(_), Some(why)) => {
+                eprintln!(
+                    "lamp-setup: reset: {} not cut, kept as it was: {why}",
+                    folder.join(name).display()
+                );
+                Ok(false)
+            }
+            (Err(error), None) => Err(error),
         }
-        let mode = Mode::from_raw_mode(stat.st_mode);
-        let out = rustix::fs::openat(
-            &dir,
-            staged.as_str(),
-            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            mode,
-        )?;
-        rustix::fs::fchown(
-            &out,
-            Some(rustix::fs::Uid::from_raw(stat.st_uid)),
-            Some(rustix::fs::Gid::from_raw(stat.st_gid)),
-        )?;
-        rustix::fs::fchmod(&out, mode)?;
-        let mut out = File::from(out);
-        out.write_all(&new)?;
-        out.sync_all()?;
-        rustix::fs::renameat(&dir, staged.as_str(), &dir, name)?;
-        rustix::fs::fsync(&dir)?;
-        Ok(true)
     }
 }
 
