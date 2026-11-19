@@ -11,7 +11,7 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{run_calls, skill_secrets, skill_writes, spoken, tools};
+use crate::{health, run_calls, skill_secrets, skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -189,6 +189,10 @@ fn peer_cgroup(stream: &UnixStream) -> Option<String> {
 pub enum Admin {
     /// Link a service with the backend's `connector.set.<code>` data.
     Set { code: String, connector: Value },
+    /// Keep a local service's data from the app (`health.summary`, with
+    /// `LAMP_APPLE_HEALTH=on`): `{"op":"set_local","code","data":{...}}`,
+    /// for a code whose catalog row is local alone; no token.
+    SetLocal { code: String, data: Value },
     /// Unlink one service: its file deleted.
     Remove(String),
     /// Unlink every service (unpairing, a reset).
@@ -212,6 +216,11 @@ impl fmt::Debug for Admin {
                 .field("code", code)
                 .field("connector", &"<hidden>")
                 .finish(),
+            Self::SetLocal { code, .. } => f
+                .debug_struct("SetLocal")
+                .field("code", code)
+                .field("data", &"<hidden>")
+                .finish(),
             Self::Remove(code) => f.debug_tuple("Remove").field(code).finish(),
             Self::Wipe => f.write_str("Wipe"),
             Self::List => f.write_str("List"),
@@ -225,6 +234,7 @@ impl fmt::Debug for Admin {
 }
 
 /// The admin line: `{"op":"set","code","connector":{...}}`,
+/// `{"op":"set_local","code","data":{...}}` (a local service's code alone),
 /// `{"op":"remove","code"}`, `{"op":"wipe"}` or `{"op":"list"}`. Its
 /// refusals never repeat the line.
 pub fn parse_admin(line: &str) -> Result<Admin, String> {
@@ -254,6 +264,18 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
                 connector,
             })
         }
+        Some("set_local") if only(&["op", "code", "data"]) => {
+            let code = code()?;
+            if !catalog::service(&code).is_some_and(|service| service.local) {
+                return Err("set_local is for a service whose data comes from the app".into());
+            }
+            let data = object
+                .get("data")
+                .filter(|data| data.is_object())
+                .cloned()
+                .ok_or("set_local needs the service's data")?;
+            Ok(Admin::SetLocal { code, data })
+        }
         Some("remove") if only(&["op", "code"]) => Ok(Admin::Remove(code()?)),
         Some("wipe") if only(&["op"]) => Ok(Admin::Wipe),
         Some("list") if only(&["op"]) => Ok(Admin::List),
@@ -272,11 +294,11 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
         ) => skill_secrets::Ask::parse(op, object)
             .map(Admin::SkillSecrets)
             .map_err(str::to_owned),
-        Some("set" | "remove" | "wipe" | "list" | skill_writes::APPROVE) => {
+        Some("set" | "set_local" | "remove" | "wipe" | "list" | skill_writes::APPROVE) => {
             Err("the request has fields it doesn't take".into())
         }
         _ => Err(format!(
-            "op is set, remove, wipe, list or {}",
+            "op is set, set_local, remove, wipe, list or {}",
             skill_writes::APPROVE
         )),
     }
@@ -388,7 +410,19 @@ pub struct Services<H, M> {
     /// calls across all skill runs, no content, for the voice's
     /// `run_calls_since` ([`run_calls`]); none off.
     pub run_calls: Option<run_calls::RunCalls>,
+    /// `LAMP_APPLE_HEALTH=on` ([`health`]): Apple Health's summaries from
+    /// the app are kept (`set_local`), listed and read by the owner's
+    /// voice. Off, none is kept and the service is never listed or read; a
+    /// summary kept while it was on still goes with a remove or a wipe.
+    pub apple_health: bool,
 }
+
+/// What a made skill's or a skill run's read of a local service (Apple
+/// Health) is told, after its name: only the owner's own voice reads it.
+pub const LOCAL_OWNER_ONLY: &str = "is read only by the owner's own voice, never by a skill";
+
+/// What a write to a local service (Apple Health) is told, after its name.
+pub const LOCAL_NEVER_WRITTEN: &str = "is read only: the lamp never writes to it";
 
 /// What a call to a service not linked is told, after its name: and where
 /// the person links it, so the lamp says the way, not only the lack.
@@ -502,7 +536,35 @@ impl<H: Http, M: Mail> Services<H, M> {
             desk: Desk::default(),
             skill_secrets: None,
             run_calls: None,
+            apple_health: false,
         }
+    }
+
+    /// With `LAMP_APPLE_HEALTH` as `on` gives it.
+    pub fn with_apple_health(mut self, on: bool) -> Self {
+        self.apple_health = on;
+        self
+    }
+
+    /// Whether `code` is a local service whose switch is off here: then it
+    /// is never listed, kept or read.
+    fn local_off(&self, code: &str) -> bool {
+        catalog::service(code).is_some_and(|service| service.local)
+            && !(code == health::CODE && self.apple_health)
+    }
+
+    /// What is linked now ([`Store::list`]), less a local service whose
+    /// switch is off.
+    fn listed(&self, now: i64) -> Vec<Value> {
+        self.store
+            .list(now)
+            .into_iter()
+            .filter(|linked| {
+                !linked["code"]
+                    .as_str()
+                    .is_some_and(|code| self.local_off(code))
+            })
+            .collect()
     }
 
     /// With `LAMP_SKILL_SECRETS` as `on` gives it: the keys kept in the
@@ -932,8 +994,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let linked: Vec<String> = self
-            .store
-            .list(crate::now_secs())
+            .listed(crate::now_secs())
             .iter()
             .filter_map(|linked| linked["code"].as_str().map(str::to_owned))
             .collect();
@@ -956,7 +1017,7 @@ impl<H: Http, M: Mail> Services<H, M> {
     pub async fn admin(&self, line: &str) -> (Value, String) {
         let changes = matches!(
             parse_admin(line.trim_end_matches(['\r', '\n'])),
-            Ok(Admin::Set { .. } | Admin::Remove(_) | Admin::Wipe)
+            Ok(Admin::Set { .. } | Admin::SetLocal { .. } | Admin::Remove(_) | Admin::Wipe)
         );
         let answer = self.admin_once(line).await;
         if changes {
@@ -983,7 +1044,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 ),
             },
             Admin::List => (
-                json!({"ok": true, "connected": self.store.list(crate::now_secs())}),
+                json!({"ok": true, "connected": self.listed(crate::now_secs())}),
                 "listed".into(),
             ),
             Admin::ApproveSkillWrites(args) => match self.skill_write_approve(&args).await {
@@ -1024,6 +1085,34 @@ impl<H: Http, M: Mail> Services<H, M> {
                     Err(error) => (
                         refused("the service could not be unlinked"),
                         format!("{code} not unlinked: {}", error.kind()),
+                    ),
+                }
+            }
+            // Apple Health's summary from the app: checked again here
+            // (lamp-cloud checked it first) and kept whole as a token is.
+            // The journal says how many days, never a value.
+            Admin::SetLocal { code, data } => {
+                if self.local_off(&code) {
+                    let why = "Apple Health is off on this lamp";
+                    return (refused(why), format!("{code} not kept: its switch is off"));
+                }
+                let now = crate::now_secs();
+                let summary = match health::fit(&data, now) {
+                    Ok(summary) => summary,
+                    Err(why) => return (refused(&why), format!("{code} not kept: {why}")),
+                };
+                let days = summary.days.len();
+                match self
+                    .store
+                    .keep_local(&code, &health::Kept::record(&summary, now))
+                {
+                    Ok(()) => (
+                        json!({"ok": true, "connector": code, "days": days}),
+                        format!("{} stored, {days} days", health::KIND),
+                    ),
+                    Err(error) => (
+                        refused("the data could not be kept"),
+                        format!("{code} not kept: {}", error.kind()),
                     ),
                 }
             }
@@ -1432,8 +1521,7 @@ impl<H: Http, M: Mail> Services<H, M> {
 
     fn connected(&self) -> Value {
         let connected: Vec<Value> = self
-            .store
-            .list(crate::now_secs())
+            .listed(crate::now_secs())
             .into_iter()
             .map(|linked| {
                 let code = linked["code"].as_str().unwrap_or("");
@@ -1963,6 +2051,12 @@ impl<H: Http, M: Mail> Services<H, M> {
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
+        if let Some(service) = asked
+            .and_then(|asked| self.named(asked))
+            .filter(|service| service.local)
+        {
+            return self.local_read(service, args, asker);
+        }
         if let Some(why) = asked.and_then(reads::never_read).or_else(|| {
             asked
                 .and_then(|asked| self.named(asked))
@@ -1991,6 +2085,36 @@ impl<H: Http, M: Mail> Services<H, M> {
             .await
             .map(|quoted| reads::drive_none_told(service.code, args, quoted))
             .map_err(|why| (Stage::Service, why))
+    }
+
+    /// A read of a local service (Apple Health), from its kept file alone:
+    /// the owner's voice's only, never a made skill's or a skill's run,
+    /// and with its switch off it is a service the lamp can't link.
+    fn local_read(
+        &self,
+        service: &'static catalog::Service,
+        args: &Value,
+        asker: Asker,
+    ) -> Result<Value, (Stage, String)> {
+        if self.local_off(service.code) {
+            let asked = args.get("service").and_then(Value::as_str);
+            return Err((Stage::Link, cant_link(asked)));
+        }
+        if asker != Asker::Owner {
+            return Err((Stage::Link, format!("{} {LOCAL_OWNER_ONLY}", service.name)));
+        }
+        let kept = self
+            .store
+            .load_local(service.code)
+            .and_then(|record| health::Kept::from_record(&record));
+        reads::local_read(service.code, args, kept.as_ref(), crate::now_secs()).map_err(|why| {
+            let stage = if why == health::NO_DATA {
+                Stage::Link
+            } else {
+                Stage::Asked
+            };
+            (stage, why)
+        })
     }
 
     /// A read planned: asked of the service.
@@ -2094,6 +2218,14 @@ impl<H: Http, M: Mail> Services<H, M> {
             return Err("writing to services is off on this lamp".into());
         }
         let args = &self.gmail_args(args);
+        if let Some(service) = args
+            .get("service")
+            .and_then(Value::as_str)
+            .and_then(|asked| self.named(asked))
+            .filter(|service| service.local)
+        {
+            return Err(format!("{} {LOCAL_NEVER_WRITTEN}", service.name));
+        }
         let Some(send_id) = args.get("send_id").and_then(Value::as_str) else {
             let edit = args
                 .get("service")
@@ -2552,6 +2684,8 @@ fn why_said(stage: Stage, why: &str) -> &'static str {
     let has = |words: &str| why.contains(words);
     match stage {
         Stage::Link if why == reads::GMAIL_APP_NO_READS => "refused: a send-only link",
+        Stage::Link if why == health::NO_DATA => "refused: no data kept",
+        Stage::Link if why.ends_with(LOCAL_OWNER_ONLY) => "refused: the owner's voice alone",
         Stage::Link if why.ends_with(NOT_LINKED) => "refused: not linked",
         Stage::Link if has("has expired") => "refused: its link has expired",
         Stage::Link if has(CANT_LINK) => "refused: a service the lamp can't link",
@@ -3055,6 +3189,171 @@ mod tests {
         run(on.admin(r#"{"op":"wipe"}"#));
         let (given, _) = on.run_secrets(r#"{"op":"run_secrets","skill":"photo-booth"}"#);
         assert_eq!(given["missing"], json!(["GEMINI_API_KEY"]));
+    }
+
+    /// Apple Health's summary as the app sends it now: today, in UTC.
+    fn health_line(steps: u32) -> String {
+        let now = jiff::Timestamp::from_second(crate::now_secs()).unwrap();
+        let today = now.to_zoned(jiff::tz::TimeZone::UTC).date().to_string();
+        json!({"op": "set_local", "code": "apple_health", "data": {
+            "as_of": now.to_string(), "tz": "UTC",
+            "days": [{"date": today, "steps": steps, "sleep_min": 412,
+                "workouts": [{"type": "running", "min": 32, "km": 5.1}]}]}})
+        .to_string()
+    }
+
+    /// With `LAMP_APPLE_HEALTH=on`, the app's summary is kept with no token
+    /// and read by the owner's voice from the lamp alone; the journal says
+    /// how many days, never a value; a remove and a wipe take it; a made
+    /// skill, a skill's run and a write never reach it.
+    #[test]
+    fn apple_healths_summary_is_kept_read_by_the_owner_and_wiped() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true)
+            .with_apple_health(true)
+            .with_skill_reads(true)
+            .with_skill_tasks(true);
+        let read = |what: &str| {
+            run(services.tool(&read_line(json!({"service": "apple_health", "what": what}))))
+        };
+        // Nothing kept: said plainly, and not listed.
+        assert_eq!(read("steps")["error"], health::NO_DATA);
+        let (answer, said) = run(services.admin(&health_line(8421)));
+        assert_eq!(
+            answer,
+            json!({"ok": true, "connector": "apple_health", "days": 1})
+        );
+        assert_eq!(said, "health.summary stored, 1 days");
+        let file = dir.path().join("s/apple_health.json");
+        assert_eq!(fs_mode(&file), 0o600);
+        let (list, _) = run(services.admin(r#"{"op":"list"}"#));
+        assert_eq!(
+            list["connected"],
+            json!([{"code": "apple_health", "account": "", "expired": false}])
+        );
+        let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
+        assert_eq!(connected["result"]["connected"][0]["name"], "Apple Health");
+        // The owner's read, from the file, by code or by name.
+        let steps = read("steps");
+        assert_eq!(steps["ok"], true, "{steps}");
+        assert_eq!(steps["result"]["quoted"][0]["steps"], 8421);
+        assert!(steps["result"]["as_of"].is_string());
+        let by_name = run(services.tool(&read_line(
+            json!({"service": "Apple Health", "what": "sleep"}),
+        )));
+        assert_eq!(by_name["result"]["quoted"][0]["asleep"], "6 h 52 min");
+        // A new summary replaces the old one whole.
+        run(services.admin(&health_line(9000)));
+        assert_eq!(read("steps")["result"]["quoted"][0]["steps"], 9000);
+        // A refused summary keeps the last and says the field, not the value.
+        let bad = json!({"op": "set_local", "code": "apple_health",
+            "data": {"as_of": "x", "tz": "UTC", "days": [], "planted": 123_457}})
+        .to_string();
+        let (answer, said) = run(services.admin(&bad));
+        assert_eq!(answer["ok"], false);
+        assert!(
+            !said.contains("123457") && !answer.to_string().contains("123457"),
+            "{said}"
+        );
+        assert_eq!(read("steps")["result"]["quoted"][0]["steps"], 9000);
+        // Never a made skill's read, a skill run's or a write.
+        let skill = run(services.skill_tool(&read_line(
+            json!({"service": "apple_health", "what": "steps"}),
+        )));
+        assert_eq!(skill["ok"], false, "{skill}");
+        let ran = run(services.run_tool(&run_line(
+            tools::READ,
+            json!({"service": "apple_health", "what": "steps"}),
+        )));
+        assert_eq!(ran["error"], format!("Apple Health {LOCAL_OWNER_ONLY}"));
+        let write = run(services.tool(
+            &json!({"op": "call", "name": "service_write",
+            "args": {"service": "apple_health", "action": "log", "text": "x"}})
+            .to_string(),
+        ));
+        assert_eq!(
+            write["error"],
+            format!("Apple Health {LOCAL_NEVER_WRITTEN}")
+        );
+        // Never linked as a token is.
+        let (answer, _) = run(services.admin(&set_line(
+            "apple_health",
+            json!({"auth_type": "oauth", "access_token": "t"}),
+        )));
+        assert_eq!(answer["ok"], false);
+        // The app's disconnect (a remove) takes it.
+        let (answer, said) = run(services.admin(r#"{"op":"remove","code":"apple_health"}"#));
+        assert_eq!(answer["ok"], true);
+        assert_eq!(said, "apple_health unlinked");
+        assert!(!file.exists());
+        assert_eq!(read("steps")["error"], health::NO_DATA);
+        // A sign-out, an unpairing or a reset (a wipe) takes it too.
+        run(services.admin(&health_line(8421)));
+        assert!(file.exists());
+        run(services.admin(r#"{"op":"wipe"}"#));
+        assert!(!file.exists());
+        let (list, _) = run(services.admin(r#"{"op":"list"}"#));
+        assert_eq!(list["connected"], json!([]));
+    }
+
+    fn fs_mode(path: &std::path::Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    /// With `LAMP_APPLE_HEALTH` off, no summary is kept, and one kept while
+    /// it was on is neither listed nor read; a remove still takes it.
+    #[test]
+    fn apple_health_off_keeps_lists_and_reads_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = services(dir.path(), "[]", true).with_apple_health(true);
+        run(on.admin(&health_line(8421)));
+        let off = services(dir.path(), "[]", true);
+        let (answer, said) = run(off.admin(&health_line(1)));
+        assert_eq!(answer["error"], "Apple Health is off on this lamp");
+        assert_eq!(said, "apple_health not kept: its switch is off");
+        let (list, _) = run(off.admin(r#"{"op":"list"}"#));
+        assert_eq!(list["connected"], json!([]));
+        let connected = run(off.tool(r#"{"op":"call","name":"services_connected"}"#));
+        assert_eq!(connected["result"]["connected"], json!([]));
+        let read = run(off.tool(&read_line(
+            json!({"service": "apple_health", "what": "steps"}),
+        )));
+        assert!(
+            read["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("The lamp can't link apple_health yet."),
+            "{read}"
+        );
+        assert!(!read.to_string().contains("8421"));
+        // The one kept while on was not replaced, and a remove takes it.
+        assert_eq!(
+            run(on.tool(&read_line(
+                json!({"service": "apple_health", "what": "steps"})
+            )))["result"]["quoted"][0]["steps"],
+            8421
+        );
+        run(off.admin(r#"{"op":"remove","code":"apple_health"}"#));
+        assert!(!dir.path().join("s/apple_health.json").exists());
+    }
+
+    #[test]
+    fn set_local_is_parsed_strictly_and_never_shows_its_data() {
+        let line = health_line(8421);
+        let parsed = parse_admin(&line).unwrap();
+        assert!(matches!(&parsed, Admin::SetLocal { code, .. } if code == "apple_health"));
+        assert!(!format!("{parsed:?}").contains("8421"));
+        for refused in [
+            r#"{"op":"set_local","code":"gmail","data":{}}"#,
+            r#"{"op":"set_local","code":"apple_health"}"#,
+            r#"{"op":"set_local","code":"apple_health","data":null}"#,
+            r#"{"op":"set_local","code":"apple_health","data":[1]}"#,
+            r#"{"op":"set_local","code":"apple_health","data":{},"extra":1}"#,
+            r#"{"op":"set_local","code":"../apple_health","data":{}}"#,
+        ] {
+            assert!(parse_admin(refused).is_err(), "{refused}");
+        }
     }
 
     fn run_line(name: &str, args: Value) -> String {

@@ -3461,7 +3461,7 @@
     "service_grant": {
       "description": "A linked service's grant, a skill run's alone (on the control socket, from the owner's yes; never a paired computer's): <code>-read reads it, <code>-write prepares a write the person's spoken yes sends. The codes are lamp-services' (gmail covers gmail-app, figma covers figma-api).",
       "type": "string",
-      "pattern": "^(gmail|google_calendar|google_drive|figma|github|linear|asana|ahrefs|facebook|slack|mondaydotcom|hubspot|amplitude|notion)-(read|write)$"
+      "pattern": "^(gmail|google_calendar|google_drive|figma|github|linear|asana|ahrefs|facebook|slack|mondaydotcom|hubspot|amplitude|notion|apple_health)-(read|write)$"
     },
     "service_code": {
       "description": "A linked service's code, as lamp-services' catalog has it.",
@@ -3481,7 +3481,8 @@
         "mondaydotcom",
         "hubspot",
         "amplitude",
-        "notion"
+        "notion",
+        "apple_health"
       ]
     },
     "service.read": {

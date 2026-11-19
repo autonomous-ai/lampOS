@@ -342,6 +342,12 @@ pub const WHATS: &[(&str, &str)] = &[
     ),
     ("ahrefs", "get {path, params}"),
     ("facebook", "page, posts {count}"),
+    // Answered from the summary the phone pushed, never the network
+    // ([`local_read`]); listed only with `LAMP_APPLE_HEALTH=on`.
+    (
+        "apple_health",
+        "sleep {date}, steps {date, days}, heart {date}, workouts {days}, week",
+    ),
 ];
 
 /// `service_read`'s `query` field with a calendar search by words
@@ -476,6 +482,49 @@ fn mail_id<'a>(args: &'a Value, what: &str, entry: &Entry) -> Result<&'a str, St
         ));
     }
     Ok(id)
+}
+
+/// A read of a local service (`catalog::Service::local`), answered from
+/// what the lamp keeps (`kept`, the store's file, `None` with none), at
+/// `now`: never the network, and never a value the phone didn't send.
+/// Apple Health's reads ([`crate::health`]): `sleep {date}` (the night that
+/// ended on that day, by default the latest), `steps {date, days}` (a day's,
+/// today by default, or the total of the days ending today), `heart {date}`
+/// (the resting heart rate), `workouts {days}` (the latest, or those of the
+/// days ending today) and `week` (the 7 days ending today). Each answer
+/// carries the summary's `as_of`; with none kept the read is refused with
+/// [`crate::health::NO_DATA`], and one past
+/// [`crate::health::STALE_AFTER_S`] is answered with no value.
+pub fn local_read(
+    code: &str,
+    args: &Value,
+    kept: Option<&crate::health::Kept>,
+    now: i64,
+) -> Result<Value, String> {
+    use crate::health;
+    let service = catalog::service(code)
+        .filter(|service| service.local)
+        .ok_or("the lamp doesn't know that service")?;
+    let what = text(args, "what").ok_or("what to read is needed")?;
+    if code != health::CODE {
+        return Err(unknown(code));
+    }
+    // A kind it doesn't read is told so first, data or none.
+    if !kinds(code).contains(&what) {
+        return Err(unknown(code));
+    }
+    let summary = match health::usable(service.name, kept, now)? {
+        Ok(summary) => summary,
+        Err(stale) => return Ok(stale),
+    };
+    match what {
+        "sleep" => health::sleep(service.name, &summary, args, now),
+        "steps" => health::steps(service.name, &summary, args, now),
+        "heart" => health::heart(service.name, &summary, args, now),
+        "workouts" => health::workouts(service.name, &summary, args, now),
+        "week" => health::week(service.name, &summary, now),
+        _ => Err(unknown(code)),
+    }
 }
 
 /// How `what` is read from `code`, for `entry`'s account, at `now`, with
@@ -1302,6 +1351,16 @@ mod tests {
                 continue;
             }
             if kinds(code).is_empty() {
+                continue;
+            }
+            // A local service's reads are answered from what it keeps.
+            if service.local {
+                let refused = local_read(code, &json!({"what":"unread"}), None, 0).unwrap_err();
+                assert!(is_no_such_kind(&refused), "{code}: {refused}");
+                for kind in kinds(code) {
+                    let why = local_read(code, &json!({"what": kind}), None, 0).unwrap_err();
+                    assert_eq!(why, crate::health::NO_DATA, "{code} {kind}");
+                }
                 continue;
             }
             let refused = plan(code, &json!({"what":"unread"}), &entry(), 0).unwrap_err();

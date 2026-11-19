@@ -240,6 +240,7 @@ pub const SERVICE_GRANTS: &[&str] = &[
     "hubspot",
     "amplitude",
     "notion",
+    "apple_health",
 ];
 /// The switch for the task grant [`NET_GRANT`] (`on` exactly; off unless
 /// set; on in the product units that read it, #7200): with it, a run whose grants name `net` reaches
@@ -5767,7 +5768,7 @@ mod tests {
             &runner,
         );
         assert_eq!(answer, json!({"ok": true, "id": 5}));
-        assert_eq!(MOST_GRANTS, 12 + 2 * 14 + 1);
+        assert_eq!(MOST_GRANTS, 12 + 2 * 15 + 1);
     }
 
     /// Every service in lamp-services' catalog has its grants here, a

@@ -273,6 +273,7 @@ pub fn reply(
                     || kind == crate::settings::WIFI_KIND
                     || crate::services::connector_kind(&kind).is_some()
                     || kind == crate::apps::INSTALL_KIND
+                    || kind == crate::services::HEALTH_KIND
                     || crate::upload::id_of(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
@@ -1616,6 +1617,79 @@ mod tests {
         // A save is answered, as every other kind.
         let saved = br#"{"cmd":"data","kind":"led.resting.set","data":{"mode":"off"}}"#;
         assert!(reply(&identity(), &mut lamp, saved, now).is_some());
+    }
+
+    /// Apple Health's summary from the app: `starting` at once and its
+    /// result later; a summary that doesn't fit `failure` at once; listed
+    /// in `can` only with `LAMP_APPLE_HEALTH=on`, and refused off, but its
+    /// disconnect (`null`) taken with the services' switch alone.
+    #[test]
+    fn a_health_summary_is_starting_at_once_and_refused_with_its_switch_off() {
+        use crate::services::tests::{admin, health_data, health_services, results};
+        let now = "2026-11-18T00:30:00Z";
+        let said = |lamp: &mut Fake, data: &serde_json::Value| -> serde_json::Value {
+            let ask = serde_json::json!({"cmd": "data", "kind": "health.summary", "data": data});
+            serde_json::from_str(
+                &reply(&identity(), lamp, ask.to_string().as_bytes(), now).unwrap(),
+            )
+            .unwrap()
+        };
+        let can = |lamp: &mut Fake| -> Vec<serde_json::Value> {
+            let ask = br#"{"cmd":"data","kind":"system.info"}"#;
+            let info: serde_json::Value =
+                serde_json::from_str(&reply(&identity(), lamp, ask, now).unwrap()).unwrap();
+            info["data"]["can"].as_array().unwrap().clone()
+        };
+        let admin = admin(r#"{"ok":true}"#);
+        let mut on = Fake {
+            services: Some(health_services(admin.socket(), true)),
+            ..Fake::default()
+        };
+        assert!(can(&mut on).contains(&"health.summary".into()));
+        let starting = said(&mut on, &health_data(8421));
+        assert_eq!(starting["status"], "starting", "{starting}");
+        let shared = on.services.clone().unwrap();
+        let stored = results(&shared, 1)[0].reply(&identity(), now);
+        assert_eq!(stored["status"], "success");
+        assert_eq!(
+            stored["data"],
+            serde_json::json!({"connector": "apple_health", "days": 1})
+        );
+        let mut bad = health_data(8421);
+        bad["days"][0]["steps"] = serde_json::json!(-5);
+        let refused = said(&mut on, &bad);
+        assert_eq!(refused["status"], "failure");
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("data.days[0].steps")
+        );
+        // Off: not listed, a summary refused, its disconnect still taken.
+        let mut off = Fake {
+            services: Some(health_services(admin.socket(), false)),
+            ..Fake::default()
+        };
+        assert!(!can(&mut off).contains(&"health.summary".into()));
+        let refused = said(&mut off, &health_data(8421));
+        assert_eq!(refused["error"], "not on this lamp: health.summary");
+        assert_eq!(
+            said(&mut off, &serde_json::Value::Null)["status"],
+            "starting"
+        );
+        let cleared = results(off.services.as_ref().unwrap(), 1)[0].reply(&identity(), now);
+        assert_eq!(
+            cleared["data"],
+            serde_json::json!({"connector": "apple_health", "cleared": true})
+        );
+        // No services at all: neither is taken.
+        let mut none = Fake::default();
+        for data in [health_data(1), serde_json::Value::Null] {
+            assert_eq!(
+                said(&mut none, &data)["error"],
+                "not on this lamp: health.summary"
+            );
+        }
     }
 
     /// The person's services (Queue #4710): off, each kind is "not on this

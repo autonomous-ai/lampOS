@@ -257,7 +257,7 @@ mod tests {
         // As services.md quotes it.
         assert_eq!(
             said,
-            "Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion"
+            "Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion, Apple Health"
         );
         let listed: Vec<&str> = said.split(", ").collect();
         assert_eq!(listed.first(), Some(&"Gmail"), "{said}");

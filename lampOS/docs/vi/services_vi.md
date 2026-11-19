@@ -6,7 +6,7 @@ bản tiếng Anh đúng.
 Một người liên kết các tài khoản của chính mình trong ứng dụng, như ở V1:
 Gmail (và trên Lamp 2 một đăng nhập Google chỉ-gửi cho nó), Google Calendar và Drive, Figma, GitHub, Linear, Asana, Ahrefs
 và một Facebook Page, các dịch vụ MCP của V1, Slack, monday.com, HubSpot
-và Amplitude, cùng Notion, qua máy chủ MCP của chính nó. Đèn giữ token của mỗi liên kết và chỉ dùng nó khi chủ của đèn
+và Amplitude, cùng Notion, qua máy chủ MCP của chính nó; với `LAMP_APPLE_HEALTH=on`, các bản tóm tắt hằng ngày của Apple Health, do ứng dụng trên điện thoại tự đẩy lên, không cần đăng nhập hay token ("Apple Health", bên dưới). Đèn giữ token của mỗi liên kết và chỉ dùng nó khi chủ của đèn
 nói ra thành lời: đèn đọc, và với một công tắc thứ hai thì đèn ghi, mỗi lần
 ghi được đọc lại đầy đủ và chỉ gửi khi người đó nói "send". Không ai khác tại
 đèn (một người khách, một người lạ, cả phòng) dùng được chúng.
@@ -160,6 +160,7 @@ dịch vụ.
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
 | `lamp-services --run-calls` (kế hoạch bộ nhớ dịch vụ liên kết, phần 4; không unit nào của sản phẩm truyền) | `lamp-services` | Không lệnh gọi nào của lượt chạy kỹ năng được giữ và lệnh `run_calls_since` của giọng nói bị từ chối ("Giữ 64 lệnh gọi gần nhất của mọi lượt chạy", bên dưới) |
+| `LAMP_APPLE_HEALTH=on` (bật trong cả hai unit của sản phẩm theo quyết định của chủ sở hữu, 19/11; một drop-in đặt `off` sẽ tắt nó) | `lamp-cloud` (với `LAMP_CLOUD=on` và `LAMP_SERVICES=on`) và `lamp-services`, mỗi chương trình trong unit của nó | `lamp-cloud` trả lời `health.summary` của ứng dụng có kèm bản tóm tắt bằng "not on this lamp: health.summary" và không liệt kê nó trong `can`; lệnh ngắt kết nối (`"data": null`) vẫn được nhận, như một lần gỡ. `lamp-services` không giữ bản tóm tắt nào (`set_local`: "Apple Health is off on this lamp"), không liệt kê, và một lần đọc `apple_health` là "The lamp can't link apple_health yet."; `tools.json` không nêu Apple Health. Một bản tóm tắt đã giữ khi công tắc bật vẫn nằm trên đĩa, không được đọc, cho tới một lần gỡ, đăng xuất hay đặt lại ("Apple Health", bên dưới) |
 | `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; bật trong unit lamp-voice của sản phẩm, cùng #6410) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -222,6 +223,7 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   | Dòng | Câu trả lời |
   |---|---|
   | `{"op":"set","code":"gmail","connector":{...}}`, `connector` là `data` mà `get-message` của backend trả về | `{"ok":true,"connector":"gmail","scopes":[...]}` hoặc `{"ok":false,"error":"<plain reason, no secret>"}` |
+  | `{"op":"set_local","code":"apple_health","data":{...}}`, `data` là bản tóm tắt `health.summary` của ứng dụng như `lamp-cloud` đã kiểm tra; chỉ cho code của một dịch vụ cục bộ (`catalog::Service::local`), và chỉ với `LAMP_APPLE_HEALTH=on` ("Apple Health", bên dưới) | `{"ok":true,"connector":"apple_health","days":N}` hoặc `{"ok":false,"error":"<tên trường, không bao giờ là giá trị>"}` |
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
@@ -275,6 +277,13 @@ một liên kết không có hạn theo thời gian: [Làm mới](#làm-mới)).
 `credentials`; không lời từ chối nào nêu một giá trị. Một thông tin xác thực
 dài hơn 8,192 byte, hoặc có một ký tự điều khiển (một dấu xuống dòng có thể
 tách một header), bị từ chối ở `set`.
+
+File của Apple Health, `apple_health.json`, được giữ cùng cách, cùng quyền,
+ghi bên cạnh rồi đổi tên đè lên (`store::Store::keep_local`):
+`{"connector": "apple_health", "stored_at", "summary": {"as_of", "tz",
+"days"}}`, bản tóm tắt đã kiểm tra, không bao giờ là token. `Store::load`
+không bao giờ đọc nó như một liên kết, `Store::keep` từ chối ghi một liên
+kết dưới code của nó, và cùng các lần gỡ và xoá bên dưới sẽ xoá nó.
 
 Bị xoá khi:
 
@@ -335,6 +344,7 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 | `notion` | Notion | `mcp.notion.com` | như Slack | như Slack |
+| `apple_health` | Apple Health (với `LAMP_APPLE_HEALTH=on`) | không có: cục bộ, không token, không bao giờ ra mạng | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, từ bản tóm tắt đã giữ ("Apple Health", bên dưới) | không có |
 
 Calendar không có lần đọc `calendars`: liên kết của nó chỉ giữ
 `calendar.events` (#5385), và Google chỉ liệt kê lịch với scope calendar hoặc
@@ -3064,7 +3074,9 @@ khoản và khoá của đèn ([cloud.md](../cloud.md), "A person's linked servi
 | `connector.set.<code>` | Loại "privacy" của V1: tin nhắn không mang token. Nó lấy `GET <base>/devices/get-message?kind=connector.set.<code>` với khoá của đèn làm bearer và `X-Device-ID` (`privacy_fetch.go` của V1, 30 s, không theo chuyển hướng, tối đa 256 KB), lấy `data` bên trong của `{status: 1, data: {kind, data}}`, kiểm tra nó nêu `connector` (code này) và `auth_type`, và đưa nó cho `{"op":"set"}` | `starting` ngay; rồi `success` với `{"connector", "scopes"}`, hoặc `failure` kèm lý do |
 | `connector.remove.<code>` | `{"op":"remove"}`; không lấy gì | `starting`; rồi `success` với `{"connector"}`, hoặc `failure` |
 | `services.list` | `{"op":"list"}`, trực tiếp, 5 s | `success` với `{"connected": [{"code", "account", "expired"}]}` |
-| `can` của `system.info` | `services` (các kind `connector.*`, quá nhiều để liệt kê) và `services.list`, chỉ khi công tắc bật và `admin.sock` có mặt | |
+| `health.summary` (`{"as_of", "tz", "days": [...]}`, hoặc `null`), cần thêm `LAMP_APPLE_HEALTH=on` | kiểm tra bản tóm tắt (`lamp_services::health::fit`) và đưa bản đã kiểm tra cho `{"op":"set_local","code":"apple_health"}`; `null` (hoặc không có `data`) là `{"op":"remove","code":"apple_health"}`, nhận chỉ với `LAMP_SERVICES=on` ("Apple Health", bên dưới) | `starting`; rồi `success` với `{"connector": "apple_health", "days": N}` (`null`: `{"connector": "apple_health", "cleared": true}`), hoặc `failure`; một bản tóm tắt không hợp lệ là `failure` ngay, nêu tên trường |
+| `connector.set.apple_health` | bị từ chối ngay, không lấy gì | `failure`, "Apple Health takes no link: the app sends its summaries as health.summary" |
+| `can` của `system.info` | `services` (các kind `connector.*`, quá nhiều để liệt kê) và `services.list`, chỉ khi công tắc bật và `admin.sock` có mặt; `health.summary` chỉ khi có thêm `LAMP_APPLE_HEALTH=on` | |
 
 Câu trả lời theo dạng của V1, `{"type":"data","kind":"connector.set.<code>",
 "status":"starting|success|failure","data":{...},"error":...}`. Một `set` hoặc
@@ -3072,7 +3084,7 @@ Câu trả lời theo dạng của V1, `{"type":"data","kind":"connector.set.<co
 "the lamp's services are busy: try again in a moment"), chờ 30 s (việc kiểm
 tra Gmail, một lần đăng nhập IMAP hoặc một lần đọc profile, nằm trong đó); kết quả của nó đi ra ở tick kế tiếp và được gửi lại
 nếu kết nối mất trước khi broker ack. Lỗi bằng lời thường: "not a service this
-lamp knows" (một code không nằm trong 15 code, ngay lập tức), "the lamp's
+lamp knows" (một code không nằm trong 17 code, ngay lập tức), "the lamp's
 services are not running", "the lamp's services did not answer in time",
 "fetch privacy data: http <status>" / "backend rejected: …" / "backend
 response missing data block", "connector is required", "auth_type is
@@ -3080,6 +3092,127 @@ required", "the connector fetched is not <code>'s", hoặc lý do riêng của
 `lamp-services`. Dữ liệu lấy về chỉ đi vào dòng admin và không nơi nào khác:
 không bao giờ vào một câu trả lời, một lỗi, một dòng journal (chỉ ghi kind và
 trạng thái của nó) hay một `Debug`.
+
+## Apple Health (`LAMP_APPLE_HEALTH`, bật trong sản phẩm)
+
+Ứng dụng trên điện thoại đọc HealthKit và đẩy các bản tóm tắt hằng ngày
+lên đèn; giọng nói của chủ đèn trả lời "tối qua tôi ngủ thế nào", "hôm nay
+bao nhiêu bước" hay "các lần chạy tuần này" từ đó qua `service_read`, dưới
+cùng cổng chủ đèn như mọi lần đọc khác ("Ai dùng được chúng", ở trên).
+Không có đăng nhập, không token và không host: dòng catalog `apple_health`
+là `local` (`catalog.rs`), và đèn không bao giờ ra mạng vì nó. Các quy tắc
+nằm ở một chỗ, `crates/services/src/health.rs`, do `lamp-cloud` và
+`lamp-services` cùng đọc.
+
+**Bật trong sản phẩm: `LAMP_APPLE_HEALTH=on`**, tắt trừ khi bật, trong cả `lamp-cloud.service` (cạnh
+`LAMP_CLOUD=on` và `LAMP_SERVICES=on`) và `lamp-services.service`; cả hai
+unit của sản phẩm đều bật nó, theo quyết định của chủ sở hữu (19/11). Khi tắt
+(một drop-in đặt `LAMP_APPLE_HEALTH=off`): bản tóm tắt bị từ chối, không gì được liệt
+kê hay đọc ("Các công tắc", ở trên).
+
+**Tin nhắn của ứng dụng**, trên kênh tài khoản như mọi kind, nên chỉ tài
+khoản đã đăng nhập của chính đèn gửi được (`online::commanded`, cùng cổng
+với `owner.place`):
+
+```
+{"cmd":"data","kind":"health.summary","data":{
+  "as_of":"2026-11-18T07:30:00+07:00", "tz":"Asia/Ho_Chi_Minh",
+  "days":[{"date":"2026-11-18",
+    "steps":8421, "active_kcal":412, "resting_hr":58,
+    "sleep_min":412, "sleep_start":"23:48", "sleep_end":"06:40",
+    "workouts":[{"type":"running","start":"06:55","min":32,"km":5.1}]}]}}
+```
+
+Được kiểm tra chặt, trước bởi `lamp-cloud` và lại bởi `lamp-services`
+(`health::fit`); lời từ chối nêu tên trường, không bao giờ nêu giá trị:
+
+- `data` tối đa 16,384 byte ở dạng JSON gọn (`DATA_MOST`), một object có
+  `as_of`, `tz` và `days` và không trường nào khác.
+- `as_of`: RFC 3339 có offset (nhận `Z`), tối đa 40 ký tự, và không quá một
+  ngày sau đồng hồ của đèn. `tz`: tên một múi giờ IANA, tối đa 64 ký tự gồm
+  chữ, số, `/`, `_`, `+` và `-`.
+- `days`: 1 tới 14 ngày (`DAYS_MOST`), mỗi `date` (`YYYY-MM-DD`, một ngày có
+  thật) một lần; được giữ theo thứ tự cũ trước. Mọi trường khác của ngày đều
+  không bắt buộc, và `null` như không có: `steps` 0 tới 200,000,
+  `active_kcal` 0 tới 20,000, `resting_hr` 20 tới 250, `sleep_min` 0 tới
+  1,440 (đêm kết thúc vào `date`), `sleep_start` và `sleep_end` dạng `HH:MM`
+  (00:00 tới 23:59), tất cả là số nguyên; `sleep_kind` chỉ là `"in_bed"`
+  (mọi giá trị khác bị từ chối), gửi khi đêm đó chỉ lấy từ thời gian nằm
+  trên giường (một iPhone không có Apple Watch), nên `sleep_min` là thời gian
+  trên giường, và không có khi có các giai đoạn ngủ; `workouts` tối đa 10
+  (`WORKOUTS_MOST`).
+- Một buổi tập: `type` bắt buộc, một từ viết thường (`a` tới `z` và `_`,
+  tối đa 40 chữ, như `running` hay `traditional_strength_training`); `start`
+  dạng `HH:MM`, `min` số nguyên 0 tới 1,440, `km` một số 0 tới 1,000, giữ hai
+  chữ số thập phân; mỗi trường không bắt buộc.
+- Mọi trường không nêu ở đây đều bị từ chối, ở bất kỳ cấp nào.
+
+`lamp-cloud` trả lời `starting` ngay (một bản tóm tắt không hợp lệ là
+`failure` ngay), rồi đưa bản đã kiểm tra cho `lamp-services`
+(`{"op":"set_local","code":"apple_health","data":…}`), nơi kiểm tra lại và
+giữ trọn, thay bản trước ("Token được giữ ở đâu", ở trên): `success` với
+`{"connector":"apple_health","days":N}`. `"data": null` (hoặc không có
+`data`) là ngắt kết nối: `{"op":"remove"}`, `success` với
+`{"connector":"apple_health","cleared":true}`; nó được nhận chỉ với
+`LAMP_SERVICES=on`, công tắc bật hay tắt, nên một bản tóm tắt giữ khi công
+tắc bật không bao giờ tồn tại lâu hơn nó (quy tắc của `owner.place.clear`).
+`connector.remove.apple_health` của ứng dụng làm cùng việc;
+`connector.set.apple_health` bị từ chối. Lần xoá khi đăng xuất và lần đặt
+lại nhà máy lấy đi file cùng các token. `services.list` và
+`services_connected` liệt kê `apple_health`, không tài khoản, không bao giờ
+hết hạn, khi có bản tóm tắt được giữ và công tắc bật.
+
+**Các lần đọc** (`reads::local_read`, chỉ từ file đã giữ). "Hôm nay" là
+ngày hiện tại của chủ đèn theo `tz` (theo offset của `as_of` nếu đèn không
+biết múi giờ đó).
+
+| `what` | Trường | Câu trả lời |
+|---|---|---|
+| `sleep` | `date` | Đêm kết thúc vào `date` (`YYYY-MM-DD`, `today` hoặc `yesterday`): `asleep` ("6 h 52 min"), `asleep_min`, `fell_asleep`, `woke`; một đêm có `sleep_kind` `in_bed` thì thay bằng `in_bed`, `in_bed_min` và `"sleep_kind": "in_bed"`, kèm ghi chú nói đó là thời gian trên giường ("about 7 hours in bed"), không bao giờ là giấc ngủ. Không có ngày thì là đêm gần nhất đã giữ, kèm lời nói rõ đó không phải đêm qua khi nó không phải của hôm nay |
+| `steps` | `date`, `days` | Số bước của một ngày (mặc định hôm nay, nói là "tới giờ"), hoặc với `days` (1 tới 14) tổng và trung bình mỗi ngày của các ngày kết thúc hôm nay có số bước, và bao nhiêu ngày có |
+| `heart` | `date` | Nhịp tim lúc nghỉ của ngày đó (`resting_heart_rate_bpm`), mặc định là ngày gần nhất có nó |
+| `workouts` | `days` | Buổi tập gần nhất, hoặc với `days` các buổi của những ngày kết thúc hôm nay, mới nhất trước, tối đa 10: `type`, `started`, `minutes`, `km` |
+| `week` | không có | Mỗi ngày đã giữ trong 7 ngày kết thúc hôm nay, và `week`: số ngày đã chia sẻ, số buổi tập, tổng và trung bình mỗi ngày của số bước, trung bình giấc ngủ mỗi đêm và nhịp tim lúc nghỉ trên những ngày có chúng; các đêm trên giường là `in_bed` và được tính trung bình riêng (`in_bed_nightly_average`), không bao giờ trộn với giấc ngủ đo được |
+
+Mọi câu trả lời là dữ liệu trích dẫn từ Apple Health kèm `as_of` và `tz`
+của bản tóm tắt và một `note`, để giọng nói nói "tính tới 7:30 sáng nay".
+Một ngày hay một giá trị điện thoại không gửi thì không bao giờ được đoán:
+câu trả lời không trích gì, có `"found": "none"` và một ghi chú nói cái gì
+thiếu. Không có bản tóm tắt nào được giữ thì lần đọc bị từ chối, "Apple
+Health has no data on this lamp yet…"; một bản tóm tắt có `as_of` cũ hơn
+48 giờ (`STALE_AFTER_S`) không cho giá trị nào, chỉ `"stale": true` và rằng
+nó đã cũ. Trong `tools.json` (khi có công tắc) các kind của nó nằm trên
+`what` ("apple_health: sleep, steps, heart, workouts, week") và các trường
+của nó là `date` và `days`. Mô tả của lần đọc nói, ở câu thứ hai
+(`tools::HEALTH_READS`): "The person's own sleep, steps, heart rate and
+workouts ("How did I sleep last night?", "How many steps today?", "Tối qua
+tôi ngủ thế nào?") are read from apple_health with this, never from recall
+or memory." Trên một đèn ngày 19/11 đã liên kết Apple Health, "How did I
+sleep last night?" gọi `recall` và không bao giờ gọi lần đọc này; chỉ "What
+does Apple Health say about my sleep last night?" mới đọc nó. Đặt thứ hai
+để phần cắt của giọng nói sau luật riêng của nó vẫn giữ câu này. Có câu này,
+mô tả sẽ vượt 1,024 byte khi mọi dịch vụ được nêu tên, nên danh sách "what,
+by service: …" được nói trên mô tả riêng của `what`; khi tắt công tắc, mô tả
+và `what` như trước, và `tools.json` không có gì trong số này.
+
+**Ai đọc được.** Chỉ giọng nói của chủ đèn: lần đọc của một kỹ năng tự tạo
+bị từ chối ngay ở cửa (`spoken::not_readable`, "read only by the owner's own
+voice"), lượt chạy của một kỹ năng cũng vậy, dù có quyền gì
+(`apple_health-read` là một code trong `SERVICE_CODES`, bị `lamp-services`
+từ chối); nó không bao giờ được ghi ("Apple Health is read only: the lamp
+never writes to it"), và máy chủ MCP của tác tử không bao giờ liệt kê nó.
+
+**Riêng tư.** Không giá trị sức khoẻ nào nằm trong một dòng journal, lỗi
+của câu trả lời hay một `Debug` (`Debug` của `Summary` chỉ cho số ngày):
+`lamp-services` ghi "health.summary stored, N days", `lamp-cloud` ghi kind
+và trạng thái, và dòng của một lần đọc là "the voice's service_read of
+apple_health steps: found 1". Bản ghi dịch vụ (`LAMP_SERVICE_RECORDS`) chỉ
+giữ từ các mục của một lần đọc tiêu đề, người gửi, ngày, link, id và một
+đoạn trích ngắn (`service_records::found`); một mục của Apple Health nêu
+ngày của nó bằng `date` và không có trường nào khác trong số đó, nên bản
+ghi của một lần đọc giữ kind, `date` hay `days` được hỏi và các ngày tìm
+thấy, không bao giờ một con số (đường an toàn hơn: không giữ con số nào,
+thay vì giữ con số đã che).
 
 ## Ba hàm của giọng nói
 
@@ -3429,7 +3562,7 @@ Notion, Gmail. They are yours to use for the owner: read from one with
 service_read, and send, post or create with service_write, when they ask.
 Asked about one, use it, or say plainly what you can do with it; never say
 it is the app's job or that you don't know it. A service the lamp can link
-(Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It can be linked
+(Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion, Apple Health) but not in this list isn't linked to this lamp yet. It can be linked
 in the app: open this lamp, then Settings, then Linked accounts. Any other
 service the lamp can't link yet: say so. The services it can link are in
 the app: open this lamp, then Settings, then Linked accounts.)"
@@ -3516,6 +3649,18 @@ không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
   `get-message` và làm mới của backend, và API riêng của từng dịch vụ.
 
 ## Kiểm thử
+
+Apple Health (`health::tests`, `store::tests`, `serve::tests`,
+`tools::tests` và `services::tests`, `online::tests` của `lamp-cloud`): hợp
+đồng được giữ trọn; mọi trường ngoài khoảng, sai kiểu hay không biết bị từ
+chối theo tên trường, không bao giờ theo giá trị; quá 16 KB, 15 ngày, 11
+buổi tập và một ngày hai lần bị từ chối; file 0600 trong thư mục 0700,
+không bao giờ là liên kết, mất đi khi gỡ, khi ứng dụng gửi `null` và khi
+xoá; mỗi lần đọc kèm `as_of`, một đêm hay ngày thiếu được nói là thiếu,
+không có gì được giữ và một bản tóm tắt cũ không cho giá trị; kỹ năng tự
+tạo, lượt chạy của kỹ năng và một lần ghi bị từ chối; công tắc tắt ở cả hai
+chương trình (không giữ, liệt kê, đọc hay đưa ra gì, lệnh ngắt kết nối vẫn
+được nhận).
 
 `cargo test -p lamp-services`: kho chỉ root (0700/0600) và được ghi trọn, một
 code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật nào trong một

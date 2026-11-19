@@ -15,7 +15,7 @@
 use lamp_services::{
     CALENDAR_EDITS_ENVIRONMENT, CALENDAR_EVENT_SEARCH_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT,
     ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT, SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT,
-    WRITE_ENVIRONMENT,
+    WRITE_ENVIRONMENT, health,
     mail::{self, Gmail},
     mcp_server,
     net::Https,
@@ -180,6 +180,12 @@ fn main() -> ExitCode {
     if run_calls_on {
         say("skill runs' calls kept: the last 64 across all runs, no content, for the voice alone");
     }
+    // Apple Health's summaries from the app (LAMP_APPLE_HEALTH): kept here
+    // with no token, listed and read by the owner's voice alone.
+    let apple_health = on(std::env::var(health::ENVIRONMENT).ok().as_deref());
+    if apple_health {
+        say("Apple Health on: the app's summaries kept, read by the owner's voice alone");
+    }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
         .with_skill_reads(skill_reads)
         .with_skill_writes(skill_writes)
@@ -189,12 +195,14 @@ fn main() -> ExitCode {
         .with_calendar_event_search(event_search)
         .with_draft_edits(draft_edits)
         .with_skill_secrets(skill_secrets)
-        .with_run_calls(run_calls_on);
+        .with_run_calls(run_calls_on)
+        .with_apple_health(apple_health);
     let tools_dir = run.join("tools");
     let edits = tools::Edits {
         calendar: calendar_edits,
         drafts: draft_edits,
         event_search,
+        apple_health,
     };
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
         fs::create_dir_all(&tools_dir)?;

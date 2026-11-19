@@ -6,7 +6,7 @@
 //! in a log, the journal, the bus, the conversation or the model.
 //!
 //! Two sockets: the admin one, which only `lamp-cloud.service` may ask
-//! (`set`, `remove`, `wipe`, `list`), and a tools folder for the voice
+//! (`set`, `set_local`, `remove`, `wipe`, `list`), and a tools folder for the voice
 //! (`tools.json` and `call.sock`), which only `lamp-voice.service` may call
 //! (and, with `LAMP_SKILL_READS=on`, `lamp-skills.service`, for reads alone).
 //! Reads go through an allow-list per service; writes are behind their own
@@ -18,8 +18,11 @@
 //! write, for a skill's run under its grants (#6432). With
 //! `LAMP_SKILL_SECRETS=on`, an uploaded skill's keys given in the app are
 //! kept here too, and `lamp-tasks.service` may ask for a run's
-//! ([`skill_secrets`]).
+//! ([`skill_secrets`]). With `LAMP_APPLE_HEALTH=on`, the phone app's
+//! Apple Health summaries are kept here too, with no token, and read by
+//! the owner's voice from the lamp alone ([`health`]).
 pub mod catalog;
+pub mod health;
 pub mod mail;
 pub mod mcp;
 pub mod mcp_server;

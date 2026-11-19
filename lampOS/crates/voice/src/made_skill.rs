@@ -1314,7 +1314,7 @@ pub(crate) fn set_agent_services_here(on: Option<bool>) {
 /// catalog code (the first builder's ruling on #6432): its grants are
 /// `<code>-read` and `<code>-write`, as `lamp_control::protocol::SERVICE_CODES`
 /// names them (the same list; lamp-tasks' grant check follows it).
-pub const SERVICE_GRANT_CODES: [&str; 14] = [
+pub const SERVICE_GRANT_CODES: [&str; 15] = [
     "gmail",
     "google_calendar",
     "google_drive",
@@ -1329,6 +1329,7 @@ pub const SERVICE_GRANT_CODES: [&str; 14] = [
     "hubspot",
     "amplitude",
     "notion",
+    "apple_health",
 ];
 
 /// A service task's grant (`gmail-read`, `github-write`): its service's

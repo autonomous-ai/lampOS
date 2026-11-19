@@ -47,7 +47,7 @@ TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device
 # skill, only not one a computer may push.
 SERVICE_CODES = (
     "gmail", "google_calendar", "google_drive", "figma", "github", "linear", "asana",
-    "ahrefs", "facebook", "slack", "mondaydotcom", "hubspot", "amplitude", "notion",
+    "ahrefs", "facebook", "slack", "mondaydotcom", "hubspot", "amplitude", "notion", "apple_health",
 )
 SOUND_MOST_S = 3.0
 SOUND_RATE = 24_000

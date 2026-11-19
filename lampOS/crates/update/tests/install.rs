@@ -2015,6 +2015,41 @@ fn the_product_moves_and_cancels_a_calendar_event() {
     }
 }
 
+/// The phone app's Apple Health summaries in the product (the owner's
+/// decision, 19 Nov): `LAMP_APPLE_HEALTH=on` once in the two units that
+/// read it, `lamp-cloud` (checks `health.summary`) and `lamp-services`
+/// (keeps it and reads it to the owner's voice), each beside
+/// `LAMP_SERVICES=on`, and no other product unit names it.
+#[test]
+fn the_product_keeps_apple_health() {
+    let owners = ["lamp-cloud.service", "lamp-services.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_APPLE_HEALTH=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_APPLE_HEALTH"))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SERVICES=on"),
+                "{unit} lacks LAMP_SERVICES"
+            );
+        }
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A made skill reads a linked service to its owner alone (#5288, #5303):
 /// `LAMP_SKILL_READS=on` in the four units that read it, `lamp-services`
 /// (lets `lamp-skills` onto its tools socket), `lamp-skills` (runs the

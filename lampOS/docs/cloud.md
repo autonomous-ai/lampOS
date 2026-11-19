@@ -218,8 +218,9 @@ lamp says so.
 | `voice.set` (`{"provider"?, "voice", "language"?, "speed"?}`, V1's `tts.set` shape), `character.set` (`{"text"}`) | with `LAMP_CHOSEN_VOICE=on` beside `LAMP_SETTINGS_CHANGE=on` (#5394, [chosen-voice.md](chosen-voice.md)): checked here and handed to root's helper as the names are; `starting` at once, then `success` with `{"provider": "elevenlabs", "voice", "speed": 1.0}` or `{"text"}`, or `failure` with why. `provider` absent or `elevenlabs`; `voice` one of the lamp's voices (every name in `lamp-2-tts-catalog`), `""` for the default; `language` and `speed` are taken and left alone. `text` plain, one line, at most 200 characters, `""` clears. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `voice.get` (`{}`) | with the same switch (#5394): answered at once with what the lamp keeps, read from `/etc/lampOS/setup/voice` and `character` as `language` is read, writing nothing: `{"provider": "elevenlabs", "voice", "text"}`, `""` for none kept and for a kept value that does not fit the rules (the default voice, no words, as the voice takes them). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `tts.preview` (`{"text", "provider"?, "voice"?, "language"?, "speed"?}`, V1's shape) | with the same switch (#7485, [chosen-voice.md](chosen-voice.md) "The voice preview"): answered `starting`, then `success` once the lamp has said `text` whole in that voice, or `failure` with why (`the lamp is busy; try again in a moment` while someone talks with it past 15 s, or a second preview while one plays). Nothing is kept. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
-| `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `gmail-app`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
 | `apps.install`, `apps.list`, `apps.start`, `apps.stop`, `apps.remove`, `apps.settings.get`, `apps.settings.set` | with `LAMP_STORE_APPS=on` (#7415 piece 4): the apps installed from the Store. `apps.list` is `{"apps": [{"id" (the manifest's name), "title", "version", "state" (`installing`, `running`, `stopped`, `stopped_after_failures`), "grants", "net", "logs", "phrases", "triggers", "settings" (the schema), "values", "skills", "panel", "connected"}]}`, from the installed manifest (`current/lamp-skill.json`), the helper's marks, systemd (`systemctl show`, at most 2 s a call, killed past that, so a hung systemd leaves an app as stopped and never stalls the loop) and lamp-control's `app_state`; `{"id"}` of the others; `apps.start`, `apps.stop` and `apps.remove` are refused while an install or remove of the app is under way; `apps.settings.get` says so when lamp-control can't be reached or refuses (it never shows "nothing set"); `apps.remove` records the owner's yes in lamp-control (`app_yes_record`, the installed version and package SHA-256, no grants, `net` and `logs` false) and then asks the helper, which waits until the app's processes are gone; `apps.settings.set` `{"id", "values"}` is checked against the schema by lamp-control, all or nothing. `apps.install` `{"id", "url", "sha256", "version"}` (an optional `request_id` said back; nothing else) is taken `starting` at once, one at a time: the Store URL checked as `skills.install`'s, the package fetched here into the staging folder (`/var/lib/lampos-apps-staging/<sha256>.tar`, at most 18 MiB, no redirect), its SHA-256 and its manifest's name and version held to what was asked, the owner's yes recorded in lamp-control for it (the key carries the `net` and `logs` the helper's record holds, like grants: an install what it turns on, an update only the grants, `net` and `logs` it newly asks, so an update turning the internet on is never a yes to "no new grants"), the helper asked to install the staged file by its path, the staged file deleted either way (an install that breaks off unexpectedly still answers `failure` and frees its place); then `success` with `{"id", "version", "updated"}` or `failure` with why. Pushes while it runs: `app.stopped` `{"id", "reason"}` once when an app gives up after its restart limit, and `app.panel` `{"id"}` when its panel moved (at most a minute apart per app); the first look after a start says nothing of what was already so. `can` says `apps` and each kind. **Who may ask:** only the lamp's own account channel (`online::commanded`), the owner's; no kind reads a person from the payload. `failure` carries the reason as the helper or lamp-control gave it, in plain words. Without the switch, V1's "not on this lamp" |
+| `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `gmail-app`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`, and `apple_health`, whose remove alone is taken: its `connector.set` is refused, "Apple Health takes no link: the app sends its summaries as health.summary"); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
+| `health.summary` (`{"as_of", "tz", "days": [{"date", "steps"?, "active_kcal"?, "resting_hr"?, "sleep_min"?, "sleep_start"?, "sleep_end"?, "sleep_kind"?, "workouts"?: [{"type", "start"?, "min"?, "km"?}]}]}`, or `null` to disconnect) | with `LAMP_APPLE_HEALTH=on` beside `LAMP_SERVICES=on` ("Apple Health's summaries" below, [services.md](services.md), "Apple Health"): the phone's Apple Health summaries, checked here strictly (at most 16,384 bytes, 1 to 14 days, at most 10 workouts a day, no unknown field, every number in its range) and handed to `lamp-services`' `{"op":"set_local"}`, which checks them again and keeps them; `starting` at once, then `success` with `{"connector": "apple_health", "days": N}`, or `failure` with why; one that doesn't fit fails at once, naming the field, never a value. `null` (or no `data`) is a remove, `success` with `{"connector": "apple_health", "cleared": true}`, and is taken with `LAMP_SERVICES=on` alone, unlisted. Listed in `can` only with both switches and the admin socket there. Without `LAMP_APPLE_HEALTH`, a summary gets V1's "not on this lamp" |
 | `control.code` (`{"grants": [...], "seal_to", "request_id"}`), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`), `control.take_back` (`{}` or `{"client": "c_1"}`), `control.set_grants` (`{"client": "c_1", "grants": [...]}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false); the lamp taken back from one computer or every one, `{"taken": N}`, the computers still paired. `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
@@ -3156,8 +3157,10 @@ root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
 - A set or a remove is `starting` at once and its `success` or `failure`
   comes on a later tick, from a thread of its own (at most 4 at once, each
   waited on 30 s), said again if the connection drops before the broker's
-  ack. A code not among the 16 known is refused at once
-  (`gmail-app`, a Lamp 2's send-only Google sign-in for Gmail, is one).
+  ack. A code not among the 17 known is refused at once
+  (`gmail-app`, a Lamp 2's send-only Google sign-in for Gmail, is one;
+  `apple_health` is one too, whose `connector.set` is refused at once: it
+  has no link).
 - `can` lists `services` and `services.list` only while the switch is on and
   the admin socket is there.
 - **Signed out** (whatever `LAMP_SIGNED_OUT` says): every token wiped once a
@@ -3166,6 +3169,40 @@ root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
 
 The services, their reads and writes, the voice's functions and its send
 gate are in [services.md](services.md).
+
+### Apple Health's summaries (`health.summary`, `LAMP_APPLE_HEALTH`)
+
+Off unless `LAMP_APPLE_HEALTH=on` beside `LAMP_SERVICES=on` and
+`LAMP_CLOUD=on` (and in `lamp-services.service` too, which keeps and reads
+them); on in both product units by the owner's decision (19 Nov), and a
+drop-in with `LAMP_APPLE_HEALTH=off` turns it off. The phone app reads HealthKit and sends
+`{"cmd":"data","kind":"health.summary","data":{"as_of", "tz", "days"}}`
+itself: no sign-in, no token, nothing fetched from the backend. It comes on
+the account channel like every kind, so only the lamp's own signed-in
+account sends it (`online::commanded`), the gate `owner.place` has.
+
+`lamp-cloud` checks it (`lamp_services::health::fit`, the one copy of the
+rules, which `lamp-services` checks it with again): `data` at most 16,384
+bytes as compact JSON; `as_of` RFC 3339 with its offset, no more than a day
+after the lamp's clock; `tz` an IANA zone's name; 1 to 14 `days`, each
+`date` (`YYYY-MM-DD`) once, with `steps` (0 to 200,000), `active_kcal` (0
+to 20,000), `resting_hr` (20 to 250), `sleep_min` (0 to 1,440),
+`sleep_start` and `sleep_end` (`HH:MM`), `sleep_kind` (`"in_bed"` alone:
+the night is time in bed, not measured sleep) and at most 10 `workouts` (`type`
+one lowercase word, `start` `HH:MM`, `min` 0 to 1,440, `km` 0 to 1,000),
+each optional but `date` and a workout's `type`; any other field refused.
+What doesn't fit is `failure` at once, naming the field. What fits is
+`starting`, and the checked summary goes to
+`{"op":"set_local","code":"apple_health","data":…}` on a thread of its own,
+as a set does: `success` with `{"connector": "apple_health", "days": N}`.
+
+`"data": null` (or no `data`) disconnects: `{"op":"remove","code":
+"apple_health"}`, `success` with `{"connector": "apple_health", "cleared":
+true}`, taken with `LAMP_SERVICES=on` whatever `LAMP_APPLE_HEALTH` says, so
+a summary kept while it was on never outlives it (as `owner.place.clear`,
+#4356). A sign-out's wipe takes it with the tokens. The journal says the
+kind and its status only, and `lamp-services` "health.summary stored, N
+days": never a value.
 
 ## The developer door (#5299, `control.code`, `control.clients`, `control.revoke`, `control.code_cancel`, `control.take_back`, `control.set_grants`)
 

@@ -15,6 +15,14 @@
 //!
 //! The fetched connector goes into the admin socket's line and nowhere
 //! else: never a reply, an error, a journal line or a `Debug`.
+//!
+//! Apple Health (`apple_health`) has no link and no token: with
+//! `LAMP_APPLE_HEALTH=on` too, the app sends its daily summaries itself as
+//! [`HEALTH_KIND`], checked here (`lamp_services::health::fit`) and handed
+//! to the admin socket as `{"op":"set_local"}`, which checks and keeps them;
+//! `"data": null` disconnects it, a remove, taken switch on or not, so a
+//! summary kept while it was on never outlives it. No value of it is in a
+//! reply, an error or a journal line.
 use crate::account::Account;
 use crate::settings::Outcome;
 use serde_json::{Map, Value, json};
@@ -35,9 +43,11 @@ pub const ADMIN_SOCKET: &str = "/run/lampos-services/admin.sock";
 /// The services this lamp knows, by V1's codes. Figma is `figma-api` as
 /// the backend lists it for lamps, and `figma` as V1's helper named it.
 /// `gmail-app` is a Lamp 2's Google sign-in for Gmail, send only; `gmail`
-/// its app password. The last five are MCP services: V1's four, then
-/// Notion, whose app sign-in gives a token only its MCP server takes.
-pub const CODES: [&str; 16] = [
+/// its app password. Then five MCP services: V1's four, then Notion, whose
+/// app sign-in gives a token only its MCP server takes. Last Apple Health,
+/// whose data the app sends itself ([`HEALTH_KIND`]): never a
+/// `connector.set`, only its remove.
+pub const CODES: [&str; 17] = [
     "gmail",
     "gmail-app",
     "google_calendar",
@@ -54,6 +64,7 @@ pub const CODES: [&str; 16] = [
     "hubspot",
     "amplitude",
     "notion",
+    lamp_services::health::CODE,
 ];
 
 /// A service linked: `connector.set.<code>`, its connector fetched.
@@ -62,6 +73,15 @@ pub const SET_PREFIX: &str = "connector.set.";
 pub const REMOVE_PREFIX: &str = "connector.remove.";
 /// The services linked now, by code and account, nothing secret.
 pub const LIST_KIND: &str = "services.list";
+/// The app's Apple Health summaries (`{"as_of", "tz", "days": [...]}`, or
+/// `null` to disconnect), with `LAMP_APPLE_HEALTH=on` ([`HEALTH_ENVIRONMENT`]).
+pub const HEALTH_KIND: &str = lamp_services::health::KIND;
+/// `on`, beside `LAMP_SERVICES` and `LAMP_CLOUD`, takes [`HEALTH_KIND`]'s
+/// summaries; its disconnect is taken whatever it says.
+pub const HEALTH_ENVIRONMENT: &str = lamp_services::health::ENVIRONMENT;
+/// What a `connector.set.apple_health` is told: it has no link.
+pub const HEALTH_NO_LINK: &str =
+    "Apple Health takes no link: the app sends its summaries as health.summary";
 /// The word in `system.info`'s `can` that says `connector.set.<code>` and
 /// `connector.remove.<code>` are taken (they are many, so not each listed).
 pub const CAN: &str = "services";
@@ -325,6 +345,8 @@ pub struct Services {
     /// Requests under way, at most [`MOST_AT_ONCE`].
     under_way: Arc<AtomicUsize>,
     done: Arc<Mutex<Vec<Outcome>>>,
+    /// `LAMP_APPLE_HEALTH=on`: [`HEALTH_KIND`]'s summaries are taken.
+    pub health: bool,
 }
 
 impl std::fmt::Debug for Services {
@@ -337,11 +359,22 @@ impl std::fmt::Debug for Services {
 
 impl Services {
     pub fn new(socket: impl Into<PathBuf>, fetch: Arc<dyn Fetch>) -> Arc<Self> {
+        Self::with_health(socket, fetch, false)
+    }
+
+    /// [`Self::new`], taking Apple Health's summaries when `health`
+    /// (`LAMP_APPLE_HEALTH=on`).
+    pub fn with_health(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+    ) -> Arc<Self> {
         Arc::new(Self {
             socket: socket.into(),
             fetch,
             under_way: Arc::default(),
             done: Arc::default(),
+            health,
         })
     }
 
@@ -352,7 +385,8 @@ impl Services {
             return None;
         }
         let backend = Backend::of(account, key)?;
-        Some(Self::new(ADMIN_SOCKET, Arc::new(backend)))
+        let health = std::env::var(HEALTH_ENVIRONMENT).ok().as_deref() == Some("on");
+        Some(Self::with_health(ADMIN_SOCKET, Arc::new(backend), health))
     }
 
     /// Whether `lamp-services` is here to ask: `can` names [`CAN`] and
@@ -369,6 +403,52 @@ impl Services {
         if !known(code) {
             return Err(NOT_KNOWN.to_owned());
         }
+        if asked == Asked::Set && code == lamp_services::health::CODE {
+            return Err(HEALTH_NO_LINK.to_owned());
+        }
+        let code = code.to_owned();
+        let fetch = self.fetch.clone();
+        self.spawn(kind, move |socket, kind| match asked {
+            Asked::Set => set(&*fetch, socket, kind, &code),
+            Asked::Remove => ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
+                .map(|_| Some(json!({"connector": code}))),
+        })
+    }
+
+    /// Takes [`HEALTH_KIND`] (the app's Apple Health summaries): checked
+    /// now (`lamp_services::health::fit`), a refusal said at once, and the
+    /// checked summary handed to the admin socket's `set_local` on a thread
+    /// of its own, its result kept for [`Self::take`]: `{"connector",
+    /// "days"}`. `null` disconnects it, a remove, whatever
+    /// [`Self::health`] says: `{"connector", "cleared": true}`. Off, a
+    /// summary is "not on this lamp".
+    pub fn start_health(&self, data: &Value) -> Result<(), String> {
+        let code = lamp_services::health::CODE;
+        if data.is_null() {
+            return self.spawn(HEALTH_KIND, move |socket, _| {
+                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
+                    .map(|_| Some(json!({"connector": code, "cleared": true})))
+            });
+        }
+        if !self.health {
+            return Err(crate::wire::not_here(HEALTH_KIND));
+        }
+        let summary = lamp_services::health::fit(data, lamp_services::now_secs())?;
+        let days = summary.days.len();
+        let line = json!({"op": "set_local", "code": code, "data": summary});
+        self.spawn(HEALTH_KIND, move |socket, _| {
+            ask(socket, &line, ADMIN_WAIT).map(|_| Some(json!({"connector": code, "days": days})))
+        })
+    }
+
+    /// `job` on a thread of its own, with the admin socket and `kind`, its
+    /// result kept for [`Self::take`]; [`BUSY`] at once past
+    /// [`MOST_AT_ONCE`].
+    fn spawn(
+        &self,
+        kind: &str,
+        job: impl FnOnce(&Path, &str) -> Result<Option<Value>, String> + Send + 'static,
+    ) -> Result<(), String> {
         if self
             .under_way
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
@@ -378,15 +458,11 @@ impl Services {
         {
             return Err(BUSY.to_owned());
         }
-        let (kind, code) = (kind.to_owned(), code.to_owned());
-        let (socket, fetch) = (self.socket.clone(), self.fetch.clone());
+        let kind = kind.to_owned();
+        let socket = self.socket.clone();
         let (under_way, done) = (self.under_way.clone(), self.done.clone());
         std::thread::spawn(move || {
-            let result = match asked {
-                Asked::Set => set(&*fetch, &socket, &kind, &code),
-                Asked::Remove => ask(&socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
-                    .map(|_| Some(json!({"connector": code}))),
-            };
+            let result = job(&socket, &kind);
             under_way.fetch_sub(1, Ordering::AcqRel);
             if let Ok(mut done) = done.lock() {
                 done.push(Outcome {
@@ -589,6 +665,27 @@ pub mod tests {
         )
     }
 
+    /// [`services`], taking Apple Health's summaries when `health`.
+    pub fn health_services(socket: PathBuf, health: bool) -> Arc<Services> {
+        Services::with_health(
+            socket,
+            Arc::new(FakeFetch {
+                answer: Err("never fetched".into()),
+                asked: Mutex::default(),
+            }),
+            health,
+        )
+    }
+
+    /// The app's Apple Health summary as it sends it now, in UTC, with
+    /// `steps` for today.
+    pub fn health_data(steps: u32) -> Value {
+        let as_of = lamp_services::reads::rfc3339(lamp_services::now_secs());
+        json!({"as_of": as_of, "tz": "UTC", "days": [
+            {"date": &as_of[..10], "steps": steps, "resting_hr": 58,
+             "workouts": [{"type": "running", "start": "06:55", "min": 32, "km": 5.1}]}]})
+    }
+
     /// The results within a few seconds, at least `count` of them.
     pub fn results(services: &Services, count: usize) -> Vec<Outcome> {
         let by = Instant::now() + Duration::from_secs(5);
@@ -598,6 +695,77 @@ pub mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         all
+    }
+
+    /// Apple Health's summary: checked here, a refusal at once and by its
+    /// field; the checked summary handed on as `set_local`, `null` as a
+    /// remove whatever the switch says; with it off, a summary is not on
+    /// this lamp. Never a `connector.set`, and no value in any result.
+    #[test]
+    fn a_health_summary_is_checked_here_and_kept_by_lamp_services() {
+        let admin = admin(r#"{"ok":true,"connector":"apple_health","days":1}"#);
+        let on = health_services(admin.socket(), true);
+        let data = health_data(84_217);
+        on.start_health(&data).unwrap();
+        let done = results(&on, 1);
+        assert_eq!(done[0].kind, HEALTH_KIND);
+        assert_eq!(
+            done[0].result,
+            Ok(Some(json!({"connector": "apple_health", "days": 1})))
+        );
+        let sent: Value = serde_json::from_str(admin.lines.lock().unwrap()[0].trim()).unwrap();
+        assert_eq!(
+            sent,
+            json!({"op": "set_local", "code": "apple_health", "data": data})
+        );
+        // Refused at once, by its field; nothing handed on.
+        let mut bad = health_data(84_217);
+        bad["days"][0]["spo2"] = json!(97);
+        let why = on.start_health(&bad).unwrap_err();
+        assert_eq!(why, "data.days[0] has a field it doesn't take: spo2");
+        bad = health_data(84_217);
+        bad["days"][0]["steps"] = json!(999_999);
+        assert!(on.start_health(&bad).unwrap_err().contains("steps"));
+        assert!(on.start_health(&json!({"as_of": "x"})).is_err());
+        assert!(
+            on.start_health(&json!("x".repeat(20_000)))
+                .unwrap_err()
+                .contains("over 16384")
+        );
+        assert_eq!(admin.lines.lock().unwrap().len(), 1);
+        // A disconnect is a remove, switch on or off.
+        let off = health_services(admin.socket(), false);
+        for services in [&on, &off] {
+            services.start_health(&Value::Null).unwrap();
+            assert_eq!(
+                results(services, 1)[0].result,
+                Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+            );
+        }
+        let lines = admin.lines.lock().unwrap().clone();
+        for line in &lines[1..] {
+            let sent: Value = serde_json::from_str(line.trim()).unwrap();
+            assert_eq!(sent, json!({"op": "remove", "code": "apple_health"}));
+        }
+        // Off, a summary is not on this lamp, and nothing is asked.
+        assert_eq!(
+            off.start_health(&health_data(1)).unwrap_err(),
+            "not on this lamp: health.summary"
+        );
+        assert_eq!(admin.lines.lock().unwrap().len(), 3);
+        // Never linked as a token is; its remove is a service's remove.
+        assert_eq!(
+            on.start("connector.set.apple_health").unwrap_err(),
+            HEALTH_NO_LINK
+        );
+        on.start("connector.remove.apple_health").unwrap();
+        assert_eq!(
+            results(&on, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health"})))
+        );
+        // No value in a result, its journal line or a Debug.
+        let everything = format!("{done:?} {} {on:?}", done[0].journal());
+        assert!(!everything.contains("84217"), "{everything}");
     }
 
     #[test]

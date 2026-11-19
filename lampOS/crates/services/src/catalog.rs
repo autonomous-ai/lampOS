@@ -46,6 +46,12 @@ pub struct Service {
     /// names none; its token then goes to `hosts` exactly (no subdomain),
     /// and its reads and writes are tools sorted by `mcp.rs`.
     pub mcp: Option<&'static str>,
+    /// A service whose data the phone app pushes to the lamp and the lamp
+    /// keeps itself (`store::Store::keep_local`): no token, no host, no
+    /// network. Its reads answer from the kept file (`reads::local_read`)
+    /// and it is never written. Apple Health's alone, with
+    /// `LAMP_APPLE_HEALTH=on` (`crate::health`).
+    pub local: bool,
 }
 
 use Method::{Delete, Get, Patch, Post};
@@ -64,7 +70,8 @@ const FIGMA_WRITES: &[(Method, &str)] = &[(Post, "/v1/files/*/comments")];
 /// Every service, in the order a list says them. A new token service is
 /// one more entry here, with its reads in `reads.rs` and any write in
 /// `writes.rs`; a new MCP service one more entry with `mcp`, and its tool
-/// names in `mcp.rs`.
+/// names in `mcp.rs`; a new local service (data the app pushes) one more
+/// entry with `local`, and its reads in `reads::local_read`.
 pub const SERVICES: &[Service] = &[
     Service {
         code: "gmail",
@@ -84,6 +91,7 @@ pub const SERVICES: &[Service] = &[
         ],
         writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
+        local: false,
     },
     // A Lamp 2's Google sign-in for Gmail (Queue #4710): send only, its
     // scopes the account's identity and `gmail.send`, so it reads nothing.
@@ -97,6 +105,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
+        local: false,
     },
     Service {
         code: "google_calendar",
@@ -118,6 +127,7 @@ pub const SERVICES: &[Service] = &[
             (Delete, "/calendar/v3/calendars/*/events/*"),
         ],
         mcp: None,
+        local: false,
     },
     Service {
         code: "google_drive",
@@ -135,6 +145,7 @@ pub const SERVICES: &[Service] = &[
         // never an update, a copy, a share or a delete.
         writes: &[(Post, "/upload/drive/v3/files")],
         mcp: None,
+        local: false,
     },
     Service {
         code: "figma",
@@ -145,6 +156,7 @@ pub const SERVICES: &[Service] = &[
         reads: FIGMA_READS,
         writes: FIGMA_WRITES,
         mcp: None,
+        local: false,
     },
     // The backend's own code for Figma; V1's table has both.
     Service {
@@ -156,6 +168,7 @@ pub const SERVICES: &[Service] = &[
         reads: FIGMA_READS,
         writes: FIGMA_WRITES,
         mcp: None,
+        local: false,
     },
     Service {
         code: "github",
@@ -183,6 +196,7 @@ pub const SERVICES: &[Service] = &[
             (Post, "/repos/*/*/issues/*/comments"),
         ],
         mcp: None,
+        local: false,
     },
     Service {
         code: "linear",
@@ -193,6 +207,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[(Post, "/graphql")],
         writes: &[(Post, "/graphql")],
         mcp: None,
+        local: false,
     },
     Service {
         code: "asana",
@@ -211,6 +226,7 @@ pub const SERVICES: &[Service] = &[
         ],
         writes: &[(Post, "/api/1.0/tasks")],
         mcp: None,
+        local: false,
     },
     Service {
         code: "ahrefs",
@@ -222,6 +238,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[(Get, "/v3/**")],
         writes: &[],
         mcp: None,
+        local: false,
     },
     Service {
         code: "facebook",
@@ -241,6 +258,7 @@ pub const SERVICES: &[Service] = &[
         ],
         writes: &[(Post, "/*/*/feed")],
         mcp: None,
+        local: false,
     },
     // V1's MCP connectors. V1 takes each endpoint from the backend's
     // `mcp_url` and has no table of them; the lamp pins each to the
@@ -255,6 +273,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[],
         mcp: Some("https://mcp.slack.com/mcp"),
+        local: false,
     },
     Service {
         code: "mondaydotcom",
@@ -265,6 +284,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[],
         mcp: Some("https://mcp.monday.com/mcp"),
+        local: false,
     },
     Service {
         code: "hubspot",
@@ -275,6 +295,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[],
         mcp: Some("https://mcp.hubspot.com/"),
+        local: false,
     },
     Service {
         code: "amplitude",
@@ -286,6 +307,7 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[],
         mcp: Some("https://mcp.amplitude.com/mcp"),
+        local: false,
     },
     // The app's Notion sign-in is Notion's MCP OAuth, and its token is good
     // only at Notion's hosted MCP server: api.notion.com refused it (401) on
@@ -299,6 +321,22 @@ pub const SERVICES: &[Service] = &[
         reads: &[],
         writes: &[],
         mcp: Some("https://mcp.notion.com/mcp"),
+        local: false,
+    },
+    // The phone app's daily Apple Health summaries (`health.summary` in
+    // lamp-cloud, `crate::health`): no sign-in and no host, kept on the
+    // lamp and read from there alone. Listed and read only with
+    // `LAMP_APPLE_HEALTH=on`; never written.
+    Service {
+        code: "apple_health",
+        name: "Apple Health",
+        hosts: &[],
+        api: None,
+        graphql: false,
+        reads: &[],
+        writes: &[],
+        mcp: None,
+        local: true,
     },
 ];
 
@@ -493,6 +531,21 @@ mod tests {
         // Every service's hosts are V1's, but Gmail's (IMAP and SMTP for an
         // app password, its own REST host for a Google sign-in).
         for service in SERVICES {
+            // A local service has no host at all: nothing goes anywhere.
+            if service.local {
+                assert!(
+                    service.hosts.is_empty() && service.api.is_none(),
+                    "{}",
+                    service.code
+                );
+                assert!(
+                    service.mcp.is_none() && service.reads.is_empty(),
+                    "{}",
+                    service.code
+                );
+                assert!(service.writes.is_empty(), "{}", service.code);
+                continue;
+            }
             assert!(!service.hosts.is_empty(), "{}", service.code);
             if let Some(api) = service.api {
                 let host = api.strip_prefix("https://").unwrap();
@@ -513,9 +566,24 @@ mod tests {
             ("slack", "mcp.monday.com"),
             ("hubspot", "api.hubapi.com"),
             ("amplitude", "amplitude.com"),
+            ("apple_health", "apple.com"),
+            ("apple_health", "health.apple.com"),
         ] {
             assert!(!host_allowed(code, host), "{code} to {host}");
         }
+    }
+
+    #[test]
+    fn apple_health_is_local_read_only_and_reaches_no_host() {
+        let health = service("apple_health").unwrap();
+        assert!(health.local);
+        assert_eq!(health.name, "Apple Health");
+        assert!(health.api.is_none() && health.mcp.is_none());
+        assert!(health.reads.is_empty() && health.writes.is_empty());
+        assert!(read_allowed("apple_health", Get, "/", None).is_err());
+        assert!(!write_allowed("apple_health", Post, "/"));
+        // The only local service.
+        assert_eq!(SERVICES.iter().filter(|service| service.local).count(), 1);
     }
 
     #[test]

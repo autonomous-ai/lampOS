@@ -421,7 +421,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 89] = [
+pub const KINDS: [(&str, Switch); 90] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -510,6 +510,8 @@ pub const KINDS: [(&str, Switch); 89] = [
     // both rows wait for lamp-services' admin socket as well.
     (crate::services::CAN, SERVICES),
     (crate::services::LIST_KIND, SERVICES),
+    // The app's Apple Health summaries, with `LAMP_APPLE_HEALTH=on` too.
+    (crate::services::HEALTH_KIND, HEALTH),
     // Harness signed in from the app (#5198): the code shown there. The
     // feature's word first, as `services`: an app shows the screen only
     // on a lamp that names it.
@@ -564,6 +566,8 @@ const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
 /// The switch (`LAMP_STORE_APPS=on`).
 const APPS: Switch = |lamp| lamp.apps().is_some();
+/// The services' switch and `LAMP_APPLE_HEALTH=on`, and lamp-services there.
+const HEALTH: Switch = |lamp| lamp.services().is_some_and(|s| s.health && s.here());
 /// The switch, and root's change helper for `monitor.set`.
 const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
 /// The switch, the skills page, and lamp-services there to ask.
@@ -1057,6 +1061,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The lamp turned off from the app (#3697): asked of the same helper,
         // which answers first and runs `lamp-setup shutdown`; never here.
         "system.shutdown" if on(lamp, kind) => lamp.shut_down().map(Some),
+        // The app's Apple Health summaries, with LAMP_APPLE_HEALTH=on too:
+        // checked here, then kept by lamp-services. Its disconnect (`null`)
+        // is taken with the services' switch alone, so a summary kept while
+        // it was on never outlives it; `can` lists the kind only with it on.
+        crate::services::HEALTH_KIND
+            if on(lamp, kind) || (data.is_null() && lamp.services().is_some()) =>
+        {
+            let services = lamp.services().ok_or_else(|| not_here(kind))?;
+            services.start_health(data)?;
+            Ok(None)
+        }
         // A service linked or unlinked from the app (Queue #4710): taken on
         // the switch alone, answered `starting` now and its result later
         // (`crate::services`); a set's connector is fetched from the backend,
@@ -2452,6 +2467,17 @@ pub mod tests {
                     ))
                 },
                 &["services", "services.list"],
+            ),
+            (
+                // With LAMP_APPLE_HEALTH=on too: the app's health summaries.
+                "apple health",
+                |f| {
+                    f.services = Some(crate::services::tests::health_services(
+                        std::env::temp_dir(),
+                        true,
+                    ))
+                },
+                &["services", "services.list", "health.summary"],
             ),
             (
                 // lamp-control's admin socket there: a path that is.
