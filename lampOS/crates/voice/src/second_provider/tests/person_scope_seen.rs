@@ -3418,10 +3418,11 @@ async fn a_held_keeps_yes_on_their_one_face_line_keeps_it_with_the_switch() {
     let _ = std::fs::remove_file(path);
 }
 
-/// Thirteen's P2 on #6673: the natural answers to "Shall I forget what you
-/// kept about …?" run the held one-face forget, as plain yeses do, in
-/// English and Vietnamese, and the forget said back alone counts as the
-/// answer; any no, keep, wait or a question keeps it. Run through
+/// Thirteen's P2 on #6673, under the first builder's leg (e) ruling (no yes
+/// word list): every answer to "Shall I forget what you kept about …?", a
+/// yes or a no, in English or Vietnamese, leaves the held one-face forget
+/// to the model's call on that line (`Taken::Agrees`, carrying exactly the
+/// held call); no word in the line runs it or drops it here. Run through
 /// `take_held_forget` in the private room, on a line theirs by one face.
 #[tokio::test]
 async fn the_natural_answers_to_the_one_face_question_run_it_and_a_no_keeps_it() {
@@ -3429,7 +3430,8 @@ async fn the_natural_answers_to_the_one_face_question_run_it_and_a_no_keeps_it()
     let (engine, _, _) = scripted(script);
     let asker = (7, crate::remember::person_id("A"));
     crate::person::set_private_room_for_test(Some(true));
-    for (said, runs) in [
+    // The second field is what a person means; the model judges it.
+    for (said, _a_yes) in [
         ("Yes.", true),
         ("Yes please.", true),
         ("Yeah, go ahead.", true),
@@ -3480,12 +3482,10 @@ async fn the_natural_answers_to_the_one_face_question_run_it_and_a_no_keeps_it()
             now,
         );
         match taken {
-            Taken::Runs(call, _, true) => {
-                assert!(runs, "{said:?}: kept, not run");
+            Taken::Agrees(call) => {
                 assert_eq!(call.args, json!({"source_id": 7}), "{said:?}");
             }
-            Taken::Nothing => assert!(!runs, "{said:?}: should run"),
-            _ => panic!("{said:?}: neither run nor kept"),
+            _ => panic!("{said:?}: not left to the model's call"),
         }
     }
     crate::person::set_private_room_for_test(None);
