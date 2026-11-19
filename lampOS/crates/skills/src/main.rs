@@ -5829,6 +5829,7 @@ fn lamp_room(
         local_time,
         quiet,
         quiet_lifted: None,
+        faces: Default::default(),
     }
 }
 
@@ -6325,6 +6326,9 @@ struct LampRoom {
     /// lifted for a told answer its owner asked for by voice (#7180,
     /// `lamp_voice::told_when_asked`); none, they hold.
     quiet_lifted: Option<u64>,
+    /// The eyes' looks the gate has counted
+    /// ([`lamp_skills::service_read::FacesSeen`]).
+    faces: lamp_skills::service_read::FacesSeen,
 }
 
 /// What [`LampRoom`] asks the voice's say socket for a read's line or a
@@ -6339,10 +6343,15 @@ fn exact_words(text: &str) -> serde_json::Value {
 impl lamp_skills::service_read::Room for LampRoom {
     fn seen(&mut self) -> lamp_skills::service_read::Seen {
         let now_ms = unix_ms();
-        // The eyes' list said whole within 3 s: the faces in view.
-        let faces = said_lately::<lamp_msgs::Faces>(&self.bus, lamp_msgs::Faces::TOPIC)
-            .filter(|faces| faces.check().is_ok())
-            .map(|faces| faces.faces.len());
+        // The people at the lamp as lamp-voice counts them: faces at the
+        // desk, in two of the eyes' looks of the last 3 s (V2, 19 Nov).
+        let newest = self.bus.latest(lamp_msgs::Faces::TOPIC).ok().flatten();
+        let faces = self.faces.count(
+            std::time::Instant::now(),
+            now_ms,
+            newest.as_ref(),
+            lamp_voice::known_faces::at_desk_only(),
+        );
         // The eyes' known face at the lamp, fresh: the owner's own.
         let owner_in_view = match (&self.owner, &self.known_file) {
             (Some(owner), Some(file)) => {
@@ -6948,6 +6957,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            faces: Default::default(),
         };
         assert!(room.seen().quiet);
         let ready = unix_ms();
@@ -7010,6 +7020,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            faces: Default::default(),
         };
         let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
             "lamp-tasks couldn't be reached".into(),
@@ -7135,6 +7146,7 @@ mod tests {
             local_time: Some(local),
             quiet: Some((minute, (minute + 2) % (24 * 60))),
             quiet_lifted: None,
+            faces: Default::default(),
         };
         let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
             "lamp-tasks couldn't be reached".into(),
@@ -7181,6 +7193,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            faces: Default::default(),
         };
         // No local time is quiet; a told answer its owner asked for by voice
         // lifts it until its lift's end, and no longer (#7180).

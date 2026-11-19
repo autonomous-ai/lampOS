@@ -2859,6 +2859,25 @@ quiet hours` sau một giờ); trong lúc chờ nó được giữ trong
 bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
 lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
 lamp-skills restarted while it waited`, `task::telling_dropped`).
+Các khuôn mặt mà cổng đếm, của một lần đọc hay một câu trả lời cần nói, là
+những người mà lamp-voice đếm ở đèn, theo chính quy tắc của nó
+(`service_read::FacesSeen`, `known_faces::most_faces_lately`): với
+`LAMP_FACES_AT_DESK_ONLY=on` (bật trong unit sản phẩm của `lamp-skills` như
+trong unit của voice) chỉ các khuôn mặt ở bàn (`known_faces::count_at_desk`),
+và số lớn nhất trong số đó thấy được trong ít nhất hai lần nhìn của mắt trong
+3 giây gần nhất, mỗi lần nhìn chỉ đếm một lần. Vì vậy một khuôn mặt nhỏ hoặc
+không chắc ở xa phía sau chủ, hay khuôn mặt của một lần nhìn không bao giờ
+thấy lại, không phải là người đang ở cùng chủ; một khuôn mặt thứ hai ở bàn
+trong hai lần nhìn vẫn giữ cổng ("not alone") hoặc dừng một lần đọc đang
+diễn ra. Một lần nhìn mà bus báo đã hết hạn, cũ hơn 3 giây hoặc không trọn
+vẹn thì không phải là một lần nhìn, và không có lần nhìn nào trong 3 giây
+gần nhất là không có ai. Trước đây, mọi khuôn mặt trong lần nhìn mới nhất
+của mắt đều được đếm: trên lamp-52e6 (19/11, 09:44, báo cáo của V2) câu trả
+lời kiểm tra thư của một skill tự tạo chờ "not alone" 29 lần trong hai phút
+trong khi lamp-voice đọc thấy một khuôn mặt ở bàn và "2 faces not at the
+desk". Test (`service_read::tests`):
+`one_face_at_the_desk_beside_a_far_one_is_alone`,
+`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`.
 
 Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, tắt nếu không
 đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng

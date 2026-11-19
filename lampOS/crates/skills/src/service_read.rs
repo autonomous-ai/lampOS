@@ -31,7 +31,9 @@
 //!   ownership check runs: one face alone in view will do, with no owner's
 //!   name or known face. Counting faces is not an ownership check, so two
 //!   faces still hold it and a face that comes still stops it; a voice
-//!   heard still does, and nobody in view still holds it.
+//!   heard still does, and nobody in view still holds it. The faces are
+//!   counted as lamp-voice counts the people at the lamp ([`FacesSeen`]):
+//!   only faces at the desk, in two of the eyes' looks of the last 3 s.
 //! - **One read at a time** ([`Turns`], [`TURNS`] for the lamp): two
 //!   skills' reads due together (Morning agenda held at its gate while
 //!   Morning mail came due, #5618) would say their lines in turn, one
@@ -533,6 +535,58 @@ pub fn judge(seen: &Seen) -> Result<(), Closed> {
         return Err(Closed::VoiceHeard);
     }
     Ok(())
+}
+
+/// The faces the gate counts ([`Seen::faces`]): the people lamp-voice
+/// counts at the lamp, by its own rule. V2's report (19 Nov 09:53): on
+/// lamp-52e6 a made skill's `do.task` answer waited from 09:44 with "not
+/// alone" 29 times in two minutes, while lamp-voice read one face at the
+/// desk and "2 faces not at the desk": the gate counted every face in the
+/// eyes' newest look. Now, as `lamp_voice::known_faces::most_faces_lately`
+/// counts (the voice's `services::owner_alone`, the owner alone for a
+/// service's records read in full):
+///
+/// - only faces at the desk, with `desk_only`
+///   (`LAMP_FACES_AT_DESK_ONLY`, `known_faces::count_at_desk`): a small or
+///   unsure face far behind the owner is not someone with them;
+/// - the most faces seen in at least two of the eyes' looks of the last
+///   `known_faces::FACES_WITHIN` (3 s), each look counted once by its
+///   publisher's boot and number (`FacesLately`): one look's face that is
+///   never seen again (a track lost at once) is not someone, and a second
+///   face at the desk in two looks is;
+/// - a look the bus says expired, older than 3 s or not whole is no look,
+///   and with none in the last 3 s nobody is counted, which holds the gate.
+#[derive(Debug, Default)]
+pub struct FacesSeen(lamp_voice::known_faces::FacesLately);
+
+impl FacesSeen {
+    /// The faces counted at `at` (wall clock `now_unix_ms`), with the eyes'
+    /// newest look on the bus (`humans/faces/tracked`), if any, taken in.
+    pub fn count(
+        &mut self,
+        at: std::time::Instant,
+        now_unix_ms: u64,
+        newest: Option<&lamp_bus::Message>,
+        desk_only: bool,
+    ) -> Option<usize> {
+        use lamp_voice::known_faces::{FACES_WITHIN, count_at_desk};
+        let fresh = newest.filter(|message| {
+            !message.expired
+                && now_unix_ms.saturating_sub(message.header.at_unix_ms)
+                    <= FACES_WITHIN.as_millis() as u64
+        });
+        if let Some(message) = fresh
+            && let Ok(faces) = message.parse::<lamp_msgs::Faces>()
+            && faces.check().is_ok()
+        {
+            self.0.look(
+                at,
+                (message.header.boot.clone(), message.header.seq),
+                count_at_desk(&faces, desk_only),
+            );
+        }
+        self.0.most(at)
+    }
 }
 
 /// What a read needs of the lamp.
@@ -2076,5 +2130,177 @@ mod tests {
             news.check().unwrap();
             assert_eq!(news.stage, stage, "{outcome}");
         }
+    }
+
+    /// A face `width` of the frame wide at `confidence`, square in a 4:3
+    /// frame, as the eyes report it.
+    fn face(id: &str, width: f32, confidence: f32) -> lamp_msgs::Face {
+        lamp_msgs::Face {
+            id: id.to_owned(),
+            xmin: 0.3,
+            ymin: 0.2,
+            xmax: 0.3 + width,
+            ymax: 0.2 + width * 4.0 / 3.0,
+            confidence,
+            yaw: None,
+            facing: Some(true),
+            pitch: None,
+            looking: None,
+            speaking: None,
+            follows: None,
+        }
+    }
+
+    /// The eyes' look number `seq` on the bus, said at `at_unix_ms`, with
+    /// `faces` (width, confidence) in it.
+    fn look(seq: u64, at_unix_ms: u64, faces: &[(f32, f32)], expired: bool) -> lamp_bus::Message {
+        let faces = lamp_msgs::Faces {
+            faces: faces
+                .iter()
+                .enumerate()
+                .map(|(k, (width, confidence))| face(&format!("f{}", 115 + k), *width, *confidence))
+                .collect(),
+        };
+        lamp_bus::Message {
+            header: lamp_bus::Header {
+                topic: lamp_msgs::Faces::TOPIC.to_owned(),
+                kind: lamp_bus::Kind::Latest,
+                enc: lamp_bus::JSON.to_owned(),
+                type_name: Some(lamp_msgs::Faces::TYPE.to_owned()),
+                source: "eyes".to_owned(),
+                boot: "b".to_owned(),
+                seq,
+                at_us: seq * 250_000,
+                at_unix_ms,
+                expires_ms: Some(2_000),
+                clock: None,
+            },
+            payload: serde_json::to_vec(&faces).unwrap(),
+            gap: 0,
+            publisher_restarted: false,
+            expired,
+        }
+    }
+
+    /// The gate's count through `looks` read every 250 ms, as the gate
+    /// polls ([`POLL`]): each the newest look then, or none.
+    fn counted(looks: &[Option<lamp_bus::Message>]) -> Vec<Option<usize>> {
+        let at = std::time::Instant::now();
+        let mut seen = FacesSeen::default();
+        looks
+            .iter()
+            .enumerate()
+            .map(|(k, newest)| {
+                let after = 250 * k as u64;
+                seen.count(
+                    at + Duration::from_millis(after),
+                    1_000_000 + after,
+                    newest.as_ref(),
+                    true,
+                )
+            })
+            .collect()
+    }
+
+    /// The owner at the desk (f115, facing) on lamp-52e6, 19 Nov.
+    const OWNER: (f32, f32) = (0.15, 0.88);
+    /// A face far from the desk beside them: lamp-voice's "faces not at the
+    /// desk" (a0ae's far faces, 0.02 to 0.06 wide at 0.61 to 0.78).
+    const FAR: (f32, f32) = (0.05, 0.75);
+    /// A second person at the desk, beside the owner.
+    const BESIDE: (f32, f32) = (0.14, 0.86);
+
+    /// V2's report (19 Nov 09:53): on lamp-52e6 a made skill's `do.task`
+    /// answer waited at its gate from 09:44 with "not alone" 29 times in two
+    /// minutes while lamp-voice read one face at the desk. One face at the
+    /// desk beside a far one is alone, as lamp-voice counts it
+    /// (`known_faces::at_desk`), and the read is said.
+    #[test]
+    fn one_face_at_the_desk_beside_a_far_one_is_alone() {
+        let looks: Vec<_> = (1..=8)
+            .map(|seq| {
+                let faces: &[(f32, f32)] = if seq % 2 == 0 {
+                    &[OWNER, FAR]
+                } else {
+                    &[OWNER]
+                };
+                Some(look(seq, 1_000_000 + 250 * (seq - 1), faces, false))
+            })
+            .collect();
+        for count in counted(&looks) {
+            assert_eq!(count, Some(1));
+        }
+        let seen = Seen {
+            faces: counted(&looks).last().copied().flatten(),
+            ..private_one()
+        };
+        assert_eq!(judge(&seen), Ok(()));
+    }
+
+    /// A stale or lost look is not counted: one the bus says expired, one
+    /// older than 3 s, and one look's second face that the eyes never show
+    /// again (a track lost at once; lamp-52e6, 29 Oct 16:52, the one screen
+    /// face) all leave the owner alone; the eyes gone quiet for 3 s is
+    /// nobody, never the last look kept.
+    #[test]
+    fn a_stale_or_lost_track_is_not_counted() {
+        // Expired on the bus, or said 4 s ago: not a look now.
+        assert_eq!(
+            counted(&[Some(look(1, 1_000_000, &[OWNER, BESIDE], true))]),
+            vec![None]
+        );
+        assert_eq!(
+            counted(&[Some(look(1, 996_000, &[OWNER, BESIDE], false))]),
+            vec![None]
+        );
+        // One look with a second face at the desk, lost the next look.
+        let looks = [
+            Some(look(1, 1_000_000, &[OWNER], false)),
+            Some(look(2, 1_000_250, &[OWNER, BESIDE], false)),
+            Some(look(3, 1_000_500, &[OWNER], false)),
+        ];
+        assert_eq!(counted(&looks), vec![Some(1), Some(1), Some(1)]);
+        // The same look read again is one look, not two.
+        let looks = [
+            Some(look(1, 1_000_000, &[OWNER], false)),
+            Some(look(2, 1_000_250, &[OWNER, BESIDE], false)),
+            Some(look(2, 1_000_250, &[OWNER, BESIDE], false)),
+        ];
+        assert_eq!(counted(&looks), vec![Some(1), Some(1), Some(1)]);
+        // The eyes stop: their last look stops counting after 3 s.
+        let mut looks = vec![Some(look(1, 1_000_000, &[OWNER], false))];
+        looks.extend((2..=14).map(|_| Some(look(1, 1_000_000, &[OWNER], false))));
+        let counts = counted(&looks);
+        assert_eq!(counts[0], Some(1));
+        assert_eq!(counts.last().copied().flatten(), None, "{counts:?}");
+    }
+
+    /// Fail safe: a second face that is at the desk still holds the read,
+    /// and one that comes mid-read still stops it within two looks.
+    #[test]
+    fn two_faces_at_the_desk_are_not_alone() {
+        let looks = [
+            Some(look(1, 1_000_000, &[OWNER, BESIDE], false)),
+            Some(look(2, 1_000_250, &[OWNER, BESIDE], false)),
+            Some(look(3, 1_000_500, &[OWNER, BESIDE, FAR], false)),
+        ];
+        let counts = counted(&looks);
+        assert_eq!(counts[1..], [Some(2), Some(2)]);
+        for faces in counts {
+            assert_eq!(
+                judge(&Seen {
+                    faces,
+                    ..private_one()
+                }),
+                Err(Closed::NotAlone)
+            );
+        }
+        // Coming while the owner is alone: two looks and it holds.
+        let looks = [
+            Some(look(1, 1_000_000, &[OWNER, FAR], false)),
+            Some(look(2, 1_000_250, &[OWNER, BESIDE], false)),
+            Some(look(3, 1_000_500, &[OWNER, BESIDE], false)),
+        ];
+        assert_eq!(counted(&looks)[2], Some(2));
     }
 }

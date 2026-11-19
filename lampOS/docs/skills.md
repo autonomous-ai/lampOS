@@ -5986,6 +5986,22 @@ kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
 said at the next start (`what its agent found: dropped unsaid, lamp-skills
 restarted while it waited`, `task::telling_dropped`).
+The faces the gate counts, a read's and a told answer's, are the people
+lamp-voice counts at the lamp, by its own rule (`service_read::FacesSeen`,
+`known_faces::most_faces_lately`): with `LAMP_FACES_AT_DESK_ONLY=on` (on in
+`lamp-skills`' product unit as in the voice's) only faces at the desk
+(`known_faces::count_at_desk`), and the most of them seen in at least two of
+the eyes' looks of the last 3 s, each look counted once. So a small or unsure
+face far behind the owner, or one look's face never seen again, is not
+someone with them; a second face at the desk in two looks still holds the
+gate ("not alone") or stops a read under way. A look the bus says expired,
+older than 3 s or not whole is no look, and none in the last 3 s is nobody.
+Before, every face in the eyes' newest look counted: on lamp-52e6 (19 Nov,
+09:44, V2's report) a made skill's mail-check answer waited "not alone" 29
+times in two minutes while lamp-voice read one face at the desk and "2 faces
+not at the desk". Tests (`service_read::tests`):
+`one_face_at_the_desk_beside_a_far_one_is_alone`,
+`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`.
 
 With `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` and `lamp-voice`, off unless
 set; #7180, the first builder's ruling): a run the owner asked for by voice
