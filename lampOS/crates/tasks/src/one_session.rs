@@ -2314,12 +2314,14 @@ impl OneSession {
         // while lamp-tasks is down still removes it.
         self.keep(&agent, place);
         if ensured.result == "new" {
-            // openharness#4484 (proposed): Harness itself replaced a dead
-            // conversation. The record now names the new one (kept above);
-            // no extra close or `--fresh`.
-            if ensured.why_code.as_deref() == Some("ENGINE_SESSION_GONE") {
+            // openharness#4484: a `new` with any `whyCode`
+            // (`ENGINE_SESSION_GONE`, `HARNESS_GONE`, `ENGINE_EXITED`, or
+            // one not known yet): Harness itself replaced the session. The
+            // record now names the new one (kept above); no extra close or
+            // `--fresh`.
+            if let Some(code) = ensured.why_code.as_deref() {
                 eprintln!(
-                    "tasks: one session: Harness replaced the kept session's dead conversation (ENGINE_SESSION_GONE); the old record forgotten, {} kept",
+                    "tasks: one session: Harness replaced the kept session ({code}); the old record forgotten, {} kept",
                     short(&agent)
                 );
             }
@@ -2373,7 +2375,17 @@ impl OneSession {
         until: Instant,
         ended: &dyn Fn() -> bool,
     ) {
-        let input = match harness.reply_kept(name, token, OPEN_PROMPT) {
+        // A fresh OpenClaw session refuses its first reply ENGINE_NOT_READY
+        // for a while (~35 s seen): tried again within the open's bound,
+        // never counted as stuck.
+        let gap = ENGINE_RETRY.min(self.look.saturating_mul(50));
+        let within = until.min(Instant::now() + self.open_idle_within);
+        let mut took = harness.reply_kept(name, token, OPEN_PROMPT);
+        while took == Took::EngineNotReady && Instant::now() + gap < within && !ended() {
+            std::thread::sleep(gap);
+            took = harness.reply_kept(name, token, OPEN_PROMPT);
+        }
+        let input = match took {
             Took::Taken(input) => input,
             other => {
                 eprintln!(

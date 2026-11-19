@@ -2540,11 +2540,16 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   token. Các trường của openharness#4484 (đề xuất; thiếu trường nào thì như
   hiện nay): `state: "stopped"` của `ensure` được thay ngay, không cần
   `show`; `confirmed: false` (resume mà Harness không xác nhận được) được
-  thay khi `show` không cho kết luận trước giới hạn; `result: "new"` với
-  `whyCode: "ENGINE_SESSION_GONE"` (Harness tự thay một hội thoại đã chết)
-  được giữ và ghi đè bản ghi cũ, không close thêm hay `--fresh`, có ghi
-  journal. `ensure` được cho 120 s (`ENSURE_TIMEOUT`), dài hơn mức chờ tới
-  ~15 s của Harness sau một lần resume. Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
+  thay khi `show` không cho kết luận trước giới hạn; `result: "new"` với bất kỳ
+  `whyCode` nào (`ENGINE_SESSION_GONE`, `HARNESS_GONE`, `ENGINE_EXITED`,
+  hoặc mã chưa biết: Harness đã tự thay phiên) được giữ và ghi đè bản ghi
+  cũ, không close thêm hay `--fresh`, có ghi journal kèm mã. `ensure` được
+  cho 120 s (`ENSURE_TIMEOUT`), dài hơn ~60 s mà một lần `ensure` có thể
+  tốn (gọi Gateway, resume, thời gian ổn định và các lần thử lại
+  `AGENT_BUSY`); phiên khoẻ không bị chậm đi. Lời đầu tiên của một phiên
+  OpenClaw mới bị từ chối `ENGINE_NOT_READY` (đã thấy ~35 s) được thử lại
+  mỗi 5 s trong 120 s của lần mở, và reply bị từ chối của một việc được
+  thử lại trong giới hạn của chính nó: cả hai đều không phải dấu hiệu. Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
   Trường hợp xấu nhất từ lúc kẹt tới phiên mới là khoảng 120 s cộng một lần
   `ensure`. `OneSession::with_on_replaced` là hook cho câu báo duy nhất tới
   người dùng của #7895, chưa nối ở đây. Journal: `<id> is gone or stuck
