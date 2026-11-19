@@ -505,14 +505,21 @@ impl Net {
 
     /// The task that sends forgets to the account's history, with the
     /// route's key at the lamp's cloud API (`LAMP_HISTORY_FORGET`, #7771,
-    /// [`net::history::task`]); `None` with the switch off.
+    /// [`net::history::task`]); `None` with the switch off, or a route
+    /// whose base is not the lamp's own cloud API ([`net::history::url`]).
     pub fn history_forget_task(&self) -> Option<BoxFuture<'static, ()>> {
         if !crate::history_forget::on() {
             return None;
         }
+        let Some(url) = net::history::url(&self.config.llm_base_url) else {
+            eprintln!(
+                "lamp-voice second: the route is not the lamp's own cloud API; forgets wait on the lamp (LAMP_HISTORY_FORGET)"
+            );
+            return None;
+        };
         let (queue, bell) = crate::history_forget::queue();
         Some(Box::pin(net::history::task(
-            net::history::url(&self.config.llm_base_url),
+            url,
             self.config.llm_key.expose().to_owned(),
             queue,
             bell.clone(),

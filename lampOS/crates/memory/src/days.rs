@@ -222,6 +222,9 @@ pub struct Days {
     /// turns. Never on disk; taken by the request's answer
     /// ([`Self::take_forgot`]).
     forgot: Vec<(String, u64)>,
+    /// What the last forget's answer had no room for, paged by
+    /// `forgot_exchanges` ([`Self::forgot_page`]). Never on disk.
+    forgot_rest: std::collections::VecDeque<(String, u64)>,
     _held: File,
 }
 
@@ -295,6 +298,7 @@ impl Days {
             records_forgot_about: std::collections::VecDeque::new(),
             records_forgot_addresses: std::collections::VecDeque::new(),
             forgot: Vec::new(),
+            forgot_rest: std::collections::VecDeque::new(),
             taste_rules: false,
             _held: held,
         };
@@ -1540,6 +1544,20 @@ impl Days {
     /// id, and none kept after (#7771).
     pub fn take_forgot(&mut self) -> Vec<(String, u64)> {
         std::mem::take(&mut self.forgot)
+    }
+
+    /// The ids a forget's answer had no room for, kept for paging in place
+    /// of any earlier forget's.
+    pub fn keep_forgot_rest(&mut self, rest: Vec<(String, u64)>) {
+        self.forgot_rest = rest.into();
+    }
+
+    /// The next `most` of what [`Self::keep_forgot_rest`] kept, and
+    /// whether more remain.
+    pub fn forgot_page(&mut self, most: usize) -> (Vec<(String, u64)>, bool) {
+        let take = self.forgot_rest.len().min(most);
+        let page = self.forgot_rest.drain(..take).collect();
+        (page, !self.forgot_rest.is_empty())
     }
 
     /// Everything kept for one person and every rule in their rules scope
