@@ -16,7 +16,8 @@
 //! starts it once OpenClaw is there, an install restarts it, and the
 //! switch off disables and stops it. The install leaves the gateway's token ([`GATEWAY_TOKEN`])
 //! in OpenClaw's first config ([`CONFIG`], its `gateway` block only:
-//! lamp-tasks merges its models, agents and skills keys in at its start).
+//! lamp-tasks merges its models, agents and skills keys in at its start),
+//! checked by OpenClaw's own `config validate` before it lands (#7868).
 //!
 //! **As `lampos`, in a namespace, as Hermes.** [`WRAPPER`] and [`NS`] are
 //! Hermes's ([`crate::hermes_install::WRAPPER_TEXT`],
@@ -2030,7 +2031,12 @@ pub fn runs_long_step(argv: &[String]) -> bool {
 /// and OpenClaw's config given its `gateway` block: written when there is
 /// none, the block set in one there (every other key kept) when it lacks
 /// it or the token was just made. A config lamp-update cannot read as a
-/// JSON object is left as it is, and said.
+/// JSON object is left as it is, and said. The new text is checked by
+/// OpenClaw's own `config validate --json` ([`validate_argv`], #7868) on a
+/// file beside the config, `lampos`'s, before it is renamed into place
+/// (`lamp_checked_replace`, lamp-tasks' checked replace): refused, the
+/// config stays byte for byte, nothing is left beside it, and the install
+/// fails (`config`) with OpenClaw's words.
 fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> Result<(), String> {
     let token_path = on(root, GATEWAY_TOKEN);
     let kept = fs::symlink_metadata(&token_path)
@@ -2077,7 +2083,35 @@ fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> R
     }
     config.insert("gateway".to_owned(), gateway);
     let text = serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?;
-    write_whole(&config_path, &text, 0o600).map_err(|error| format!("{CONFIG}: {error}"))?;
+    // #7868: checked by OpenClaw itself before it is renamed into place,
+    // as lamp-tasks' writes are (#7108). With no namespace script OpenClaw
+    // can't run, so there is nothing to check with: written unchecked.
+    let ids = if fs::metadata(on(root, NS)).is_ok() {
+        Some((install::uid_of(run, USER)?, gid_of(run, USER)?))
+    } else {
+        say(&format!(
+            "{CONFIG} written unchecked: no OpenClaw namespace at {NS}"
+        ));
+        None
+    };
+    let mut check = |file: &Path| -> Result<(), String> {
+        let Some((uid, gid)) = &ids else {
+            return Ok(());
+        };
+        let file = Path::new("/").join(file.strip_prefix(root).unwrap_or(file));
+        let file = file.to_string_lossy();
+        give_to_lampos(run, &file)?;
+        run(&validate_argv(uid, gid, &file))
+            .map(drop)
+            .map_err(|why| format!("OpenClaw's own config check refused it: {why}"))
+    };
+    lamp_checked_replace::replace_checked(
+        &config_path,
+        &text,
+        rustix::fs::Mode::from_raw_mode(0o600),
+        &mut check,
+    )
+    .map_err(|error| format!("{CONFIG}: {error}"))?;
     give_to_lampos(run, CONFIG)
 }
 
@@ -2142,6 +2176,28 @@ fn in_namespace(uid: &str, gid: &str, npm_ci: bool, args: &[&str]) -> Vec<String
     tail.push(NS);
     tail.extend(args);
     as_lampos(&tail)
+}
+
+/// What OpenClaw's own config check sees for `${LAMP_HERMES_TOKEN}`
+/// ([`validate_argv`]): a stand-in, as the check reads the file and calls
+/// no provider, and the forwarder's own token never goes on a command line.
+const CHECK_TOKEN: &str = "LAMP_HERMES_TOKEN=lamp-config-check";
+
+/// OpenClaw's own check of the config in `file` (a path on the lamp beside
+/// `openclaw.json`, never the live one, readable by `lampos`): `config
+/// validate --json` as `lampos` inside OpenClaw's namespace, as the
+/// install's `--version` runs ([`in_namespace`]), pointed at `file` by
+/// `OPENCLAW_CONFIG_PATH`, with [`CHECK_TOKEN`]. Status 0 takes it. The
+/// install's `gateway` block (#7868) and lamp-setup's reset cut both run it.
+pub fn validate_argv(uid: &str, gid: &str, file: &str) -> Vec<String> {
+    let mut argv = in_namespace(uid, gid, false, &["config", "validate", "--json"]);
+    let at = argv
+        .iter()
+        .position(|arg| arg == "/usr/bin/unshare")
+        .unwrap_or(argv.len());
+    argv.insert(at, CHECK_TOKEN.to_owned());
+    argv.insert(at, format!("OPENCLAW_CONFIG_PATH={file}"));
+    argv
 }
 
 /// `text` written whole at `path` under `root` (beside, then renamed in),
