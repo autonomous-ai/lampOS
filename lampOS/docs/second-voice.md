@@ -5442,10 +5442,10 @@ after a take-over, but now for every turn:
     the gap, the cosine, which line has no print, or no one face seen.
     Not joined and not told apart (never two voices by their prints or
     two faces seen speaking them), with `LAMP_MAKE_NO_ASKS=on`, the new
-    line's `make_skill` calls that act on a skill in its first round with
-    one are not run and the model is told the cut words, to judge whether
-    the two are one ask (#7976; the skills doc's "A split make is still one
-    make"). One person
+    line is told the cut words beside its own in its first chat round,
+    with any the cut line was told in turn (a line split in three), and
+    the model judges whether they are one ask, whatever it calls first
+    (#7976; the skills doc's "A split make is still one make"). One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
     check runs for another rule, or, with `LAMP_JOIN_SAME_VOICE=on`, from

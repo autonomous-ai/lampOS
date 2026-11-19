@@ -8,12 +8,17 @@
 //! 16 was asked alone, and its first round called `make_skill`'s turn off
 //! of `time-for-tea`, a skill made with them minutes before: "Time for tea
 //! is off". A split make is still one make, and its second half never acts
-//! on another skill by itself (the first builder's ruling): with the
-//! switch, the `make_skill` calls acting on a skill in the first round of a
-//! line that goes on from words cut short just before it, not joined to
-//! them and not told apart from them, are not run, and the model is told
-//! those words to judge whether the two are one ask
-//! ([`crate::make_no_asks::split_told`]).
+//! on another skill by itself (the first builder's ruling).
+//!
+//! And on 20 Nov 01:01 one line, "Lamp, make a skill called tea reminder:
+//! every afternoon at three, remind me to drink a cup of green tea.", came
+//! as three, each cut short by the next; the last was asked alone, its
+//! first call `list_reminders`, and the make was lost. So with the switch,
+//! a line that goes on from words cut short just before it, not joined to
+//! them and not told apart from them, is told those words, all of a chain
+//! of them, beside its own in its first chat round
+//! ([`crate::make_no_asks::split_note`]), whatever the model calls first,
+//! and the model judges whether they are one ask.
 use super::*;
 
 const FIRST: &str = "Lamp, make a skill called tea reminder";
@@ -28,26 +33,34 @@ fn nothing_to_tell() -> Joined {
     Joined::Not(NOTHING_TO_TELL.to_owned())
 }
 
-/// Request 1 says `first`, its answer never played; request 2 says
-/// `second` `gap_ms` later, cutting it short, the join's verdict `verdict`
-/// ([`nothing_to_tell`] on 9adf), and its rounds are `rounds`. With `on`,
-/// `LAMP_MAKE_NO_ASKS`. The calls run (name and arguments) and what each
-/// chat was asked.
-async fn split(
+/// What each line cut short begins to say, its speech held so none of it
+/// is heard.
+const CUT_ANSWERS: [&str; 2] = ["Sure.", "Okay."];
+
+/// Requests 1.. say `lines`, each but the last answered by a line whose
+/// speech is never heard, and each after the first begun `gaps_ms` after
+/// the one before it ended, cutting it short; the join's verdict is
+/// `verdict` ([`nothing_to_tell`] on 9adf), and the last line's rounds are
+/// `rounds`. With `on`, `LAMP_MAKE_NO_ASKS`. The calls run (name and
+/// arguments) and what each chat was asked.
+async fn split_lines(
     on: bool,
-    (first, second): (&'static str, &'static str),
-    gap_ms: u64,
+    lines: &[&'static str],
+    gaps_ms: &[u64],
     verdict: Joined,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> (Vec<(String, Value)>, Vec<Vec<Message>>) {
+    assert_eq!(gaps_ms.len() + 1, lines.len());
+    assert!(lines.len() <= CUT_ANSWERS.len() + 1);
     crate::make_no_asks::set_here(Some(on));
-    let (release, hold) = tokio::sync::oneshot::channel();
-    let mut chats = vec![vec![text("Sure."), Ok(ChatEvent::Done)]];
+    let mut chats: Vec<Vec<net::Result<ChatEvent>>> = CUT_ANSWERS[..lines.len() - 1]
+        .iter()
+        .map(|answer| vec![text(answer), Ok(ChatEvent::Done)])
+        .collect();
     chats.extend(rounds);
     let script = Arc::new(Script {
-        heard: Mutex::new([Ok(first.to_owned()), Ok(second.to_owned())].into()),
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
         chats: Mutex::new(chats.into()),
-        speech_hold: Mutex::new(Some(("Sure.", hold))),
         ..Script::default()
     });
     let ran = Arc::new(Mutex::new(Vec::new()));
@@ -70,40 +83,65 @@ async fn split(
     )
     .announcing(false)
     .joining_cut_words(Arc::new(move |_, _| verdict.clone()));
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
-    engine.submit(end(1));
+    let mut releases = Vec::new();
+    for (at, answer) in CUT_ANSWERS[..lines.len() - 1].iter().enumerate() {
+        let request = at as u64 + 1;
+        let (release, hold) = tokio::sync::oneshot::channel();
+        releases.push(release);
+        *script.speech_hold.lock().unwrap() = Some((answer, hold));
+        if request > 1 {
+            *now.lock().unwrap() += Duration::from_millis(gaps_ms[at - 1]);
+        }
+        engine.submit(start(request));
+        if request > 1 {
+            engine.retire_through(request - 1);
+        }
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the cut line's text comes");
+            if matches!(&event, ProviderOutput::Transcript { request: Some(r), text, .. } if *r == request && text.trim() == *answer)
+            {
+                break;
+            }
+        }
+        while tokio::time::timeout(Duration::from_millis(100), engine.next())
+            .await
+            .is_ok()
+        {}
+    }
+    let last = lines.len() as u64;
+    *now.lock().unwrap() += Duration::from_millis(gaps_ms[gaps_ms.len() - 1]);
+    engine.submit(start(last));
+    engine.retire_through(last - 1);
+    engine.submit(audio(last, 1));
+    engine.submit(end(last));
     loop {
         let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
             .await
-            .expect("request 1's text comes");
-        if matches!(&event, ProviderOutput::Transcript { request: Some(1), text, .. } if text.trim() == "Sure.")
-        {
+            .expect("the last line's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request, .. } if request == last) {
             break;
         }
     }
-    while tokio::time::timeout(Duration::from_millis(100), engine.next())
-        .await
-        .is_ok()
-    {}
-    *now.lock().unwrap() += Duration::from_millis(gap_ms);
-    engine.submit(start(2));
-    engine.retire_through(1);
-    engine.submit(audio(2, 1));
-    engine.submit(end(2));
-    loop {
-        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
-            .await
-            .expect("request 2's turn ends");
-        if matches!(event, ProviderOutput::TurnComplete { request: 2, .. }) {
-            break;
-        }
-    }
-    drop(release);
+    drop(releases);
     crate::make_no_asks::set_here(None);
     let ran = ran.lock().unwrap().clone();
     let asked = script.asked.lock().unwrap().clone();
     (ran, asked)
+}
+
+/// Two lines, the second begun `gap_ms` after the first ended.
+async fn split(
+    on: bool,
+    (first, second): (&'static str, &'static str),
+    gap_ms: u64,
+    verdict: Joined,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+) -> (Vec<(String, Value)>, Vec<Vec<Message>>) {
+    split_lines(on, &[first, second], &[gap_ms], verdict, rounds).await
 }
 
 fn turn_off() -> ToolCall {
@@ -123,24 +161,33 @@ fn ran_once(args: Value) -> [(String, Value); 1] {
     [(crate::made_skill::MAKE.to_owned(), args)]
 }
 
-/// What call `id` was told, in the first chat that holds its answer.
-fn held_told(asked: &[Vec<Message>], id: &str) -> String {
-    asked
+/// The system notes of the chats asked for the last line (`lines` lines
+/// in all, one chat for each line before it), its first round first.
+fn last_line_notes(asked: &[Vec<Message>], lines: usize) -> Vec<Vec<String>> {
+    asked[lines - 1..]
         .iter()
-        .find_map(|chat| {
-            chat.iter().find(|message| {
-                message.role == "tool" && message.tool_call_id.as_deref() == Some(id)
-            })
+        .map(|chat| {
+            chat.iter()
+                .filter(|message| message.role == "system")
+                .filter_map(Message::words)
+                .map(str::to_owned)
+                .collect()
         })
-        .and_then(Message::words)
-        .unwrap_or_default()
-        .to_owned()
+        .collect()
 }
 
-/// The 9adf shape: the second half's turn off is not run; the model, told
-/// the first half, makes one skill with both, and nothing is turned off.
+/// The note in `notes` telling the cut words, if any.
+fn split_told(notes: &[String]) -> Option<&String> {
+    notes
+        .iter()
+        .find(|note| note.contains(crate::make_no_asks::SPLIT_NEXT))
+}
+
+/// The 9adf shape of 18:34: the model is told the first half in its first
+/// round, makes one skill with both, and nothing is turned off; no round is
+/// held for it.
 #[tokio::test]
-async fn a_make_cut_at_its_colon_makes_one_skill_and_turns_nothing_off() {
+async fn a_make_cut_at_its_colon_makes_one_skill_in_its_first_round() {
     let (ran, asked) = split(
         true,
         (FIRST, SECOND),
@@ -148,79 +195,94 @@ async fn a_make_cut_at_its_colon_makes_one_skill_and_turns_nothing_off() {
         nothing_to_tell(),
         vec![
             vec![
-                Ok(ChatEvent::ToolCalls(vec![turn_off()])),
-                Ok(ChatEvent::Done),
-            ],
-            vec![
-                Ok(ChatEvent::ToolCalls(vec![make_whole("c2")])),
+                Ok(ChatEvent::ToolCalls(vec![make_whole("c1")])),
                 Ok(ChatEvent::Done),
             ],
             vec![text("Made tea reminder."), Ok(ChatEvent::Done)],
         ],
     )
     .await;
-    assert_eq!(
-        ran,
-        ran_once(json!({ "request": WHOLE })),
-        "only the one make runs, no turn off"
-    );
-    // Request 2's second round was told the cut words, to judge.
-    let told = held_told(&asked, "c1");
+    assert_eq!(ran, ran_once(json!({ "request": WHOLE })));
+    let notes = last_line_notes(&asked, 2);
+    assert_eq!(notes.len(), 2, "no round held: {notes:?}");
+    let told = split_told(&notes[0]).expect("round 1 is told the cut words");
     assert!(told.contains(FIRST), "{told}");
-    assert!(
-        told.contains(crate::make_no_asks::SPLIT_NEXT),
-        "the model is told to judge: {told}"
-    );
+    assert!(told.contains("760 ms"), "{told}");
 }
 
-/// Heron's P2 on #7990: two acting calls in the held round, the turn off
-/// and a make of the second half alone, run neither; only the round after
-/// it, told the cut words, makes the one skill.
+/// 20 Nov 01:01, 9adf: the model's first call is `list_reminders`, not
+/// `make_skill`; it is still told the cut words, in that first round.
 #[tokio::test]
-async fn every_acting_call_of_the_held_round_is_held() {
-    let half = call("c1b", crate::made_skill::MAKE, json!({ "request": SECOND }));
+async fn a_split_line_is_told_the_cut_words_whatever_its_first_call() {
     let (ran, asked) = split(
         true,
-        (FIRST, SECOND),
+        (
+            FIRST,
+            "every afternoon at three, remind me to drink a cup of green tea.",
+        ),
         760,
         nothing_to_tell(),
         vec![
             vec![
-                Ok(ChatEvent::ToolCalls(vec![turn_off(), half])),
-                Ok(ChatEvent::Done),
-            ],
-            vec![
-                Ok(ChatEvent::ToolCalls(vec![make_whole("c2")])),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    "list_reminders",
+                    json!({}),
+                )])),
                 Ok(ChatEvent::Done),
             ],
             vec![text("Made tea reminder."), Ok(ChatEvent::Done)],
         ],
     )
     .await;
-    assert_eq!(
-        ran,
-        ran_once(json!({ "request": WHOLE })),
-        "neither call of the held round runs, then the one make"
-    );
-    for id in ["c1", "c1b"] {
-        let told = held_told(&asked, id);
-        assert!(
-            told.contains(crate::make_no_asks::SPLIT_NEXT),
-            "{id}: {told}"
-        );
-    }
+    assert_eq!(ran, [("list_reminders".to_owned(), json!({}))]);
+    let notes = last_line_notes(&asked, 2);
+    let told = split_told(&notes[0]).expect("round 1 is told the cut words");
+    assert!(told.contains(FIRST), "{told}");
+}
+
+/// 20 Nov 01:01, 9adf: one line came as three, each cut short by the
+/// next. The last is told both earlier parts, oldest first; a link past
+/// the join's window ends the chain there.
+#[tokio::test]
+async fn a_line_split_in_three_is_told_both_earlier_parts_in_order() {
+    const MIDDLE: &str = "every afternoon at three";
+    const LAST: &str = "remind me to drink a cup of green tea.";
+    let rounds = || vec![vec![text("Made tea reminder."), Ok(ChatEvent::Done)]];
+    let (_, asked) = split_lines(
+        true,
+        &[FIRST, MIDDLE, LAST],
+        &[700, 900],
+        nothing_to_tell(),
+        rounds(),
+    )
+    .await;
+    let notes = last_line_notes(&asked, 3);
+    let told = split_told(&notes[0]).expect("told the cut words");
+    let first = told.find(FIRST).expect("the first part is told");
+    let middle = told.find(MIDDLE).expect("the middle part is told");
+    assert!(first < middle, "oldest first: {told}");
+    assert!(told.contains("900 ms"), "{told}");
+
+    let (_, asked) = split_lines(
+        true,
+        &[FIRST, MIDDLE, LAST],
+        &[4_000, 900],
+        nothing_to_tell(),
+        rounds(),
+    )
+    .await;
+    let notes = last_line_notes(&asked, 3);
+    let told = split_told(&notes[0]).expect("told the middle part");
+    assert!(told.contains(MIDDLE), "{told}");
+    assert!(!told.contains(FIRST), "past the window: {told}");
 }
 
 /// The model, told, still judges the line asks the turn off itself: its
-/// call in the next round runs; never held twice.
+/// call runs at once, never held.
 #[tokio::test]
-async fn a_turn_off_called_again_once_told_runs() {
-    let again = call(
-        "c2",
-        crate::made_skill::MAKE,
-        json!({ crate::made_turn::TURN_OFF: "time for tea" }),
-    );
-    let (ran, _) = split(
+async fn a_turn_off_asked_by_the_line_itself_runs_in_its_first_round() {
+    let (ran, asked) = split(
         true,
         (FIRST, "And turn off my time for tea skill."),
         760,
@@ -230,7 +292,6 @@ async fn a_turn_off_called_again_once_told_runs() {
                 Ok(ChatEvent::ToolCalls(vec![turn_off()])),
                 Ok(ChatEvent::Done),
             ],
-            vec![Ok(ChatEvent::ToolCalls(vec![again])), Ok(ChatEvent::Done)],
             vec![text("Time for tea is off."), Ok(ChatEvent::Done)],
         ],
     )
@@ -239,47 +300,17 @@ async fn a_turn_off_called_again_once_told_runs() {
         ran,
         ran_once(json!({ crate::made_turn::TURN_OFF: "time for tea" }))
     );
+    let notes = last_line_notes(&asked, 2);
+    assert_eq!(notes.len(), 2, "no round held: {notes:?}");
+    assert!(split_told(&notes[0]).is_some());
 }
 
-/// Heron's P2 on #7990: a held new make that is its own ask ("what time is
-/// it", then "make a skill that glows blue at nine") is told to be called
-/// again as it was, and that call runs.
-#[tokio::test]
-async fn a_held_make_of_its_own_is_told_to_call_again_and_runs() {
-    const BLUE: &str = "a skill that glows blue at nine";
-    let make = |id: &str| call(id, crate::made_skill::MAKE, json!({ "request": BLUE }));
-    let (ran, asked) = split(
-        true,
-        ("What time is it?", "make a skill that glows blue at nine"),
-        1_000,
-        nothing_to_tell(),
-        vec![
-            vec![
-                Ok(ChatEvent::ToolCalls(vec![make("c1")])),
-                Ok(ChatEvent::Done),
-            ],
-            vec![
-                Ok(ChatEvent::ToolCalls(vec![make("c2")])),
-                Ok(ChatEvent::Done),
-            ],
-            vec![text("Made blue at nine."), Ok(ChatEvent::Done)],
-        ],
-    )
-    .await;
-    assert_eq!(ran, ran_once(json!({ "request": BLUE })));
-    let told = held_told(&asked, "c1");
-    assert!(
-        told.contains("If it is its own ask, make the call again as it was."),
-        "{told}"
-    );
-}
-
-/// No extra round where nothing was cut just before it, or where the join
+/// Nothing changes where nothing was cut just before it, or where the join
 /// told the lines apart: past the join's window, joined, with the switch
 /// off, or another person by the voice prints or two speaking faces
-/// (Heron's P2 on #7990), the turn off runs in the first round as before.
+/// (Heron's P2 on #7990): no note, no extra round, the call run at once.
 #[tokio::test]
-async fn a_line_not_going_on_from_cut_words_runs_its_call_at_once() {
+async fn a_line_not_going_on_from_cut_words_is_asked_as_before() {
     for (on, gap_ms, verdict) in [
         (true, 4_000, nothing_to_tell()),
         (true, 760, Joined::Same("the two lines' voices")),
@@ -307,10 +338,11 @@ async fn a_line_not_going_on_from_cut_words_runs_its_call_at_once() {
             ran_once(json!({ crate::made_turn::TURN_OFF: "time for tea" })),
             "{case}"
         );
-        let told = held_told(&asked, "c1");
+        let notes = last_line_notes(&asked, 2);
+        assert_eq!(notes.len(), 2, "{case}: {notes:?}");
         assert!(
-            !told.contains(crate::make_no_asks::SPLIT_NEXT),
-            "{case}: {told}"
+            notes.iter().all(|notes| split_told(notes).is_none()),
+            "{case}: {notes:?}"
         );
     }
 }
@@ -331,4 +363,20 @@ fn only_a_print_or_two_speaking_faces_tell_the_lines_apart() {
         .told_apart()
     );
     assert!(!Joined::Same("the two lines' voices").told_apart());
+}
+
+/// The note names every part, oldest first, and the gap, then asks the
+/// model to judge; never a list of words.
+#[test]
+fn the_note_tells_every_part_oldest_first() {
+    let note = crate::make_no_asks::split_note(
+        &[FIRST, "every afternoon at three"],
+        Duration::from_millis(820),
+    );
+    assert!(
+        note.contains(&format!("\"{FIRST}\", then \"every afternoon at three\"")),
+        "{note}"
+    );
+    assert!(note.contains("820 ms"), "{note}");
+    assert!(note.ends_with(crate::make_no_asks::SPLIT_NEXT), "{note}");
 }
