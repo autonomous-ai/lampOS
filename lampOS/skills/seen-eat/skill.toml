@@ -5,10 +5,16 @@
 # skill so its off is its own kind's. Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
 #
-# The owner's call on #7401 (19 Nov): each one seen is one reaction. No
-# cooldown, no day's most, no group's hour or gap, no quiet hours, no rest
-# and no other wait: only never while the lamp talks or listens, and never
-# while it sleeps.
+# The owner's call on #7401 (19 Nov): each one seen is one reaction, with
+# no day's most, no group's hour or gap and no rest. The switch-on (#7668)
+# keeps the first builder's rulings (#7401, 19:05 and 19:10) and the
+# owner's call (01:5x on #7668, "30m for meal, 5m for drink"): one remark
+# a meal, which ends after 30 minutes with no eating seen (a line
+# never heard costs nothing; a different kind may come sooner); a rise kept
+# through a talk is dropped 3 minutes after it was seen; no quiet
+# hours (the owner, 20 Nov 13:1x on #7668: someone may work late or wake
+# early); and never with the privacy slide closed, which drops a kept rise
+# at once. Never while the lamp talks or listens, and never while it sleeps.
 #
 # Whose: lamp-seen sends frames only with exactly one remembered face at
 # the desk, no stranger, awake and the slide open (docs/seen.md), so a
@@ -21,20 +27,23 @@
 # a reading, so the line carries no number. No "say nothing" outcome (B2):
 # the guards below are the silence.
 needs = ["eyes", "body", "voice"]
-# Off, and not in the product's install (`install::NOT_PRODUCT_SKILLS`),
-# until the owner's day-long row at lamp-06c1 (at most one wrong remark in
-# a working day, through the lead); installable until then, since every
-# core skill is a product skill.
-kind = "installable"
-enabled = false
+# A product skill (#6543, the owner's call at c6957458843: the four seen
+# reactions ship as product skills, on for every lamp whose owner said
+# yes): core, on, in the product's install (`install::PRODUCT_SKILLS`). It
+# says nothing without that yes: it reads only `humans/doing_more`, which
+# lamp-seen says with `LAMP_SEEN_MORE_DOINGS=on` and the owner's
+# `seen_more` use.
+kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: what lamp-seen saw beyond
 # drinking, eating and breaks (the owner's `seen_more` use), the voice's
-# state, whether the lamp sleeps, and the faces for a turn toward the face.
+# state and privacy, whether the lamp sleeps, and the faces for a turn
+# toward the face. Nothing else: no service, no write, no history, so
+# nothing it sees leaves the lamp through it.
 [permissions]
 speak = true
-topics = ["humans/doing_more", "voice/state", "expression/state", "humans/faces/tracked"]
+topics = ["humans/doing_more", "voice/state", "voice/privacy", "expression/state", "humans/faces/tracked"]
 body = true
 
 # Eating newly seen: `ate_seen` went up by one since lamp-seen's last word
@@ -46,8 +55,8 @@ topic = "humans/doing_more"
 field = "ate_seen"
 above = 0
 rise = { by = 1, within = "45s" }
-rearm = "leaves"          # one rise, one reaction
-wait = "1h"               # a rise mid-turn is kept, and said once the turn ends (the most `wait` takes)
+rearm = { still = "30m" } # one remark a meal: again only after 30 minutes with none seen (the owner's call, 01:5x on #7668)
+wait = "3m"               # a rise mid-turn is kept, said once the turn ends, dropped 3 minutes after it was seen
 
 [[while]]                 # never while the lamp talks or listens
 topic = "voice/state"
@@ -59,14 +68,20 @@ topic = "expression/state"
 field = "asleep"
 equals = false
 
+[[while]]                 # never with the privacy slide closed: closing it drops a kept rise at once (told by lamp-skills on a change, never subscribed)
+topic = "voice/privacy"
+field = "permitted"
+equals = true
+drops_kept = true
+
 # One function for the four seen reactions, shared by its `group` (no
 # limit with it): it stops the one that came last, or with all, every one.
 # Kept off until asked on again.
 [stop]
 tool = "seen_remarks"
 group = "seen-remarks"
-about = "When someone asks the lamp to stop remarking on what it sees them do (a drink, eating, a yawn or stretch, celebrating): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
-when = "When asked to snooze, turn off or turn on again the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating)."
+about = "Stop the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating): snooze till morning, off till asked, or on again. All out: the last one; all = true: every one."
+when = "When asked to snooze, turn off or on again the lamp's remarks on what it sees them do."
 
 [ask]
 policy = "nudge"

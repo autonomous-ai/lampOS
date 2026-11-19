@@ -329,7 +329,14 @@ that one too, aborts a burst under way.
   no file, one that can't be read or is over 4096 bytes, not exactly those
   two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
   With the switch off it is a minute whatever the cloud says; the heat
-  pace multiplies the period in force ("The board's heat"). At 15 s,
+  pace multiplies the period in force ("The board's heat"). The seen
+  reactions' switch-on (#7668) changes none of this: no product unit sets
+  the switch (`no_product_unit_sets_the_fifteen_second_switch`), so every
+  lamp stays at a burst a minute until a unit sets it and Backend sends
+  `seen_clip`. Nor do the reactions send anything: they read
+  `humans/doing_more` on the lamp and make only a turn and a line
+  (skills.md, the seen reactions' row), so nothing seen leaves the lamp
+  but what lamp-seen already sends and counts here. At 15 s,
   against a minute, a seated lamp then sends the
   perception server four times the bursts and spends about four times the
   encode and TLS work. At either rate a burst under way holds the next back

@@ -681,6 +681,43 @@ fn a_stop_still_aborts_the_burst_on_a_hot_board() {
     );
 }
 
+/// #7668, the reactions' switch-on: the camera stays at a burst a minute
+/// until the cloud sends `seen_clip`, and even then only on a lamp whose
+/// unit sets `LAMP_SEEN_BURST_15S=on`. No product unit sets it, so the
+/// switch-on leaves every lamp at 60 s.
+#[test]
+fn no_product_unit_sets_the_fifteen_second_switch() {
+    fn each_file(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                each_file(&path, files);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    let deploy = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+    let mut files = Vec::new();
+    for dir in ["product", "units"] {
+        each_file(&deploy.join(dir), &mut files);
+    }
+    assert!(
+        files
+            .iter()
+            .any(|file| file.ends_with("product/lamp-seen.service")),
+        "{files:?}"
+    );
+    for file in files {
+        let text = std::fs::read(&file).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&text).contains(FAST_ENVIRONMENT),
+            "{} sets {FAST_ENVIRONMENT}",
+            file.display()
+        );
+    }
+}
+
 /// #7401: a burst a minute by default; as fast as every 15 s only with
 /// `LAMP_SEEN_BURST_15S=on` exactly, which no unit sets.
 #[test]

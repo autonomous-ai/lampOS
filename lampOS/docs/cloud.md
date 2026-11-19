@@ -3141,21 +3141,22 @@ file, no yes.
   disclosure, `SEEN_DISCLOSURE` in `crates/voice/src/seen_yes.rs`, as #7476
   words it with the lead's "you or anyone else":
 
-  > I can notice when you eat, drink or take a break, so my reminders fit
-  > better. To do that, while you or anyone else is at the desk I'd send a
-  > few pictures from my camera to Autonomous's server to be recognised, and
-  > they're deleted once they're checked. My light shows each time I send
-  > one, and you can tell me to stop any time. Shall I?
+  > I can notice when you eat, drink, take a break, look tired or
+  > celebrate, and I react to what I notice. To do that, while you or anyone
+  > else is at the desk I'd send a few pictures from my camera to
+  > Autonomous's server to be labelled, and they're deleted once they're
+  > checked. My light shows each time I send one, and you can tell me to stop
+  > any time. Shall I?
 
   With `"posture": true` in the reply (`LAMP_SEEN_POSTURE=on`),
   `SEEN_DISCLOSURE_POSTURE`:
 
-  > I can notice when you eat, drink or take a break, and how you're
-  > sitting, so my reminders fit better. To do that, while you or anyone else
-  > is at the desk I'd send a few pictures from my camera to Autonomous's
-  > server to be recognised, and they're deleted once they're checked. My
-  > light shows each time I send one, and you can tell me to stop any time.
-  > Shall I?
+  > I can notice when you eat, drink, take a break, look tired or
+  > celebrate, and how you're sitting, and I react to what I notice. To do
+  > that, while you or anyone else is at the desk I'd send a few pictures from
+  > my camera to Autonomous's server to be labelled, and they're deleted once
+  > they're checked. My light shows each time I send one, and you can tell me
+  > to stop any time. Shall I?
 
   #7506 turns posture on with activity in the product, so that is the
   wording the app shows there, and the yes names everything the pictures are

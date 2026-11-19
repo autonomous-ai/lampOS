@@ -1,11 +1,16 @@
-//! The four seen reactions together (#6543, the owner's call on #7401, 19
-//! Nov): Seen celebrating, a drink, eating and tired each say one line
-//! each time lamp-seen's count of their kind rises, with no cooldown, day's
-//! most, group's hour or gap, quiet hours or rest; never while the lamp
-//! talks or listens (a rise then is said once it rests) or sleeps; one
-//! function stops them; and a line never heard takes nothing.
+//! The four seen reactions together, as the product ships them (#6543, the
+//! owner's call on #7401 and the first builder's rulings for the switch-on,
+//! #7668): Seen celebrating, a drink, eating and tired each say one line
+//! when lamp-seen's count of their kind rises, with no day's most, group's
+//! hour or gap, or rest; the same kind not again within 20 minutes of its
+//! last line heard (a different kind may come sooner, and a line never
+//! heard costs nothing); never while the lamp talks or listens (a rise then
+//! is said once it rests, or dropped 3 minutes after it was seen), sleeps
+//! or with the privacy slide closed, whose closing drops a kept rise at
+//! once; no quiet hours, so a remark at night is said as normal; one
+//! function stops them; and nothing they see leaves the lamp through them.
 use crate::skills::seen_more_yes;
-use lamp_skills::{Call, Engine, Run, Skill, load, tools_file};
+use lamp_skills::{Call, Engine, Permissions, Run, Skill, SkillKind, load, tools_file};
 use std::path::{Path, PathBuf};
 
 const SEEN: [&str; 4] = ["seen-celebrate", "seen-drink", "seen-eat", "seen-tired"];
@@ -14,29 +19,35 @@ fn skills_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
 }
 
-/// The seen reactions named, loaded and turned on, as a lamp that has them
-/// on would hold them.
+/// The seen reactions named, loaded as the product installs them: core
+/// skills, on.
 fn seen(names: &[&str]) -> Vec<Skill> {
     names
         .iter()
         .map(|name| {
-            let mut skill = load(&skills_root().join(name)).unwrap();
-            assert!(!skill.enabled, "{name} comes off");
-            skill.enabled = true;
+            let skill = load(&skills_root().join(name)).unwrap();
+            assert!(skill.enabled, "{name} comes on");
+            assert_eq!(skill.kind, SkillKind::Core, "{name}");
             skill
         })
         .collect()
 }
 
-/// A sitting from 10:00 to play: every 30 s as lamp-seen says it, each
-/// kind of `sightings` (minute, `drank`, `ate`, `tired` or `celebrate`)
-/// newly seen at its minute, the face moving a fifth of the picture each
-/// time; the voice listening through each of `talks` (from, to minutes)
-/// and resting otherwise.
+/// A sitting from `starts` (local, in seconds of the day; 10:00 unless
+/// said) to play: every 30 s as lamp-seen says it, each kind of
+/// `sightings` (minute, `drank`, `ate`, `tired` or `celebrate`) newly seen
+/// at its minute, the face moving a fifth of the picture each time; the
+/// voice listening through each of `talks` (from, to minutes) and resting
+/// otherwise; the privacy slide closed through each of `closed` (from, to
+/// minutes) and open otherwise; each kind of `spells` (from, to minutes)
+/// seen every 15 s through it, so its count rises by two at each word.
 struct Sitting<'a> {
     minutes: u64,
     sightings: &'a [(u64, &'a str)],
+    spells: &'a [(u64, u64, &'a str)],
     talks: &'a [(u64, u64)],
+    closed: &'a [(u64, u64)],
+    starts: u64,
 }
 
 impl<'a> Sitting<'a> {
@@ -44,7 +55,10 @@ impl<'a> Sitting<'a> {
         Self {
             minutes,
             sightings,
+            spells: &[],
             talks: &[],
+            closed: &[],
+            starts: 10 * 3600,
         }
     }
 }
@@ -57,8 +71,8 @@ fn play_on(
     sitting: &Sitting,
     mut each: impl FnMut(&mut Engine, u64, &[Run]),
 ) -> Vec<(u64, String)> {
-    // 10:00 local at 0 s.
-    engine.clock(0, 0, 36_000_000);
+    // The sitting's start, local, at 0 s.
+    engine.clock(0, 0, sitting.starts * 1_000);
     engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
     let (mut drank, mut ate, mut tired, mut celebrated) = (0, 0, 0, 0);
     let mut said = Vec::new();
@@ -74,8 +88,24 @@ fn play_on(
             let state = format!(r#"{{"state":"{state}"}}"#);
             runs.extend(engine.observe("voice/state", at, state.as_bytes(), None));
         }
-        for (minute, kind) in sitting.sightings {
-            if minute * 2 == half {
+        let open = !sitting
+            .closed
+            .iter()
+            .any(|(from, to)| (from * 2..to * 2).contains(&half));
+        // Told by the program on a change, as `main` reads the bus (#7668).
+        runs.extend(engine.privacy(!open, at + 1_000));
+        let spelled = sitting
+            .spells
+            .iter()
+            .filter(|(from, to, _)| (from * 2..to * 2).contains(&half))
+            .flat_map(|(_, _, kind)| [kind, kind]);
+        let sighted = sitting
+            .sightings
+            .iter()
+            .filter(|(minute, _)| minute * 2 == half)
+            .map(|(_, kind)| kind);
+        for kind in sighted.chain(spelled) {
+            {
                 match *kind {
                     "drank" => drank += 1,
                     "ate" => ate += 1,
@@ -156,27 +186,37 @@ fn named(said: &[(u64, String)]) -> Vec<(u64, &str)> {
 }
 
 #[test]
-fn the_seen_reactions_come_off_with_no_limit_and_one_function_to_stop_them() {
+fn the_seen_reactions_ship_with_a_rest_a_short_wait_and_one_function_to_stop_them() {
     let skills = seen(&SEEN);
     for skill in &skills {
         let name = &skill.name;
         assert_eq!(skill.budget, None, "{name}: no group's hour or gap");
-        assert!(skill.rest.is_none(), "{name}: no rest");
+        assert!(skill.rest.is_none(), "{name}: no rest after lines ignored");
         assert_eq!(skill.most_a_day, None, "{name}: no day's most");
         assert_eq!(skill.triggers.len(), 1, "{name}: one trigger, one line");
         let trigger = &skill.triggers[0];
-        assert_eq!(trigger.cooldown_us, 0, "{name}: no cooldown");
-        assert!(trigger.wait_us > 0, "{name}: a rise mid-turn waits");
-        assert!(skill.permissions.speak, "{name}");
+        // One remark a meal, which ends after 30 minutes with none seen
+        // (the owner, 01:5x on #7668); a drink rests 15 minutes (the owner,
+        // 02:1x, the first builder's yes 02:14); tired and celebrating 20.
+        let (cooldown, still) = match name.as_str() {
+            "seen-eat" => (0, Some(30)),
+            "seen-drink" => (15, None),
+            _ => (20, None),
+        };
         assert_eq!(
-            skill.permissions.topics,
-            [
-                "humans/doing_more",
-                "voice/state",
-                "expression/state",
-                "humans/faces/tracked"
-            ],
-            "{name}: no topic it no longer reads"
+            trigger.cooldown_us,
+            cooldown * 60_000_000,
+            "{name}: the per-kind rest"
+        );
+        assert_eq!(
+            trigger.rearm_line.as_ref().map(|line| line.for_us),
+            still.map(|minutes| minutes * 60_000_000),
+            "{name}: the meal or stretch"
+        );
+        assert_eq!(
+            trigger.wait_us,
+            3 * 60_000_000,
+            "{name}: a kept rise, 3 minutes"
         );
         let stop = skill.stop.as_ref().unwrap();
         assert_eq!(
@@ -195,18 +235,70 @@ fn the_seen_reactions_come_off_with_no_limit_and_one_function_to_stop_them() {
     assert_eq!(functions, ["seen_remarks"], "{tools}");
 }
 
+/// Nothing seen leaves the lamp through the reactions (#7668, the first
+/// builder's condition): each may read its five topics, speak and turn,
+/// and nothing else (no service, write, message, camera, history, search
+/// or watch), and every call they make is a turn to the face or a line.
+/// What leaves the lamp stays lamp-seen's own, as before the switch-on.
 #[test]
-fn each_one_seen_has_its_line_whatever_came_just_before() {
-    // A minute apart, and twice in a row of a kind: a line each.
+fn nothing_the_reactions_see_leaves_the_lamp_through_them() {
+    for skill in seen(&SEEN) {
+        let name = &skill.name;
+        assert_eq!(
+            skill.permissions,
+            Permissions {
+                topics: [
+                    "humans/doing_more",
+                    "voice/state",
+                    "voice/privacy",
+                    "expression/state",
+                    "humans/faces/tracked"
+                ]
+                .map(String::from)
+                .to_vec(),
+                speak: true,
+                body: true,
+                // How the file was written, not a permission.
+                format_2: skill.permissions.format_2,
+                ..Permissions::default()
+            },
+            "{name}"
+        );
+        assert!(
+            skill.history.is_none()
+                && skill.search.is_none()
+                && skill.knowledge.is_none()
+                && skill.watch.is_none()
+                && skill.tool.is_none(),
+            "{name}"
+        );
+    }
+    let sightings = [(10, "drank"), (11, "ate"), (12, "tired"), (13, "celebrate")];
+    let (said, called) = play_calls(seen(&SEEN), &Sitting::of(20, &sightings), true);
+    assert_eq!(said.len(), 4, "{said:?}");
+    assert_eq!(called.len(), 8, "{called:?}");
+    for (_, name, call) in &called {
+        assert!(
+            matches!(call, Call::Say(_) | Call::Gaze { .. }),
+            "{name}: {call:?}"
+        );
+    }
+}
+
+#[test]
+fn a_kind_rests_twenty_minutes_from_its_line_and_another_kind_may_come_sooner() {
+    // A drink at 10, then each other kind a minute apart: a line each. The
+    // drink at 14 is within 15 minutes of the one at 10 and says nothing;
+    // the one at 31 is past them.
     let sightings = [
         (10, "drank"),
         (11, "ate"),
         (12, "celebrate"),
         (13, "tired"),
         (14, "drank"),
-        (16, "drank"),
+        (31, "drank"),
     ];
-    let said = play(seen(&SEEN), &Sitting::of(20, &sightings));
+    let said = play(seen(&SEEN), &Sitting::of(35, &sightings));
     assert_eq!(
         named(&said),
         [
@@ -214,44 +306,300 @@ fn each_one_seen_has_its_line_whatever_came_just_before() {
             (11, "seen-eat"),
             (12, "seen-celebrate"),
             (13, "seen-tired"),
-            (14, "seen-drink"),
-            (16, "seen-drink")
+            (31, "seen-drink")
         ]
     );
 }
 
 #[test]
-fn a_rise_while_the_lamp_talks_is_said_once_it_rests() {
-    // Seen at 10 in a talk from 9 to 14: said at 14, though lamp-seen's
-    // count stopped rising four minutes before. Two seen in one talk are
-    // one line after it.
-    for kind in ["drank", "ate", "tired", "celebrate"] {
-        let sightings = [(10, kind)];
-        let sitting = Sitting {
-            talks: &[(9, 14)],
-            ..Sitting::of(20, &sightings)
-        };
-        let said = play(seen(&SEEN), &sitting);
-        assert_eq!(said.len(), 1, "{kind}: {said:?}");
-        assert_eq!(said[0].0, 14, "{kind}: {said:?}");
-    }
-    let sightings = [(10, "drank"), (12, "drank")];
+fn half_an_hour_seated_with_water_often_has_two_lines() {
+    // The switch-on's row, played (#7401, the first builder's 19:05): 30
+    // minutes seated, water drunk six times. Two lines, the second past the
+    // first's 15 minutes (the owner, 02:1x on #7668).
+    let sightings = [
+        (2, "drank"),
+        (6, "drank"),
+        (11, "drank"),
+        (17, "drank"),
+        (23, "drank"),
+        (28, "drank"),
+    ];
+    let said = play(seen(&SEEN), &Sitting::of(30, &sightings));
+    assert_eq!(named(&said), [(2, "seen-drink"), (17, "seen-drink")]);
+}
+
+/// The owner's call, 01:5x on #7668: "30m for meal, 5m for drink".
+#[test]
+fn a_meal_has_one_remark_and_eating_again_past_half_an_hour_is_a_new_one() {
+    // Eating seen every 15 s from 5 to 45, a 40-minute meal: one remark, at
+    // 5. Its last bite just before 45; eating again at 76, 31 minutes
+    // after: a new meal, a second remark.
+    let spells = [(5, 45, "ate")];
+    let sightings = [(76, "ate")];
     let sitting = Sitting {
-        talks: &[(9, 14)],
-        ..Sitting::of(20, &sightings)
+        spells: &spells,
+        ..Sitting::of(80, &sightings)
     };
     assert_eq!(
-        named(&play(seen(&["seen-drink"]), &sitting)),
-        [(14, "seen-drink")]
+        named(&play(seen(&SEEN), &sitting)),
+        [(5, "seen-eat"), (76, "seen-eat")]
+    );
+    // At 74, under 30 minutes after the last bite: the same meal.
+    let sightings = [(74, "ate")];
+    let sitting = Sitting {
+        spells: &spells,
+        ..Sitting::of(80, &sightings)
+    };
+    assert_eq!(named(&play(seen(&SEEN), &sitting)), [(5, "seen-eat")]);
+}
+
+/// The owner, 02:1x on #7668 (the first builder's yes, 02:14): a drink
+/// rests 15 minutes from its last line heard.
+#[test]
+fn sips_for_half_an_hour_have_three_lines_fifteen_minutes_apart() {
+    // A sip each minute from 1 to 31 (the sitting's first word, at 0, is
+    // its count's first reading, so the first sip is at 1): lines at 1, 16
+    // and 31, three in 31 minutes, 15 minutes apart.
+    let sips: Vec<(u64, &str)> = (1..=31).map(|at| (at, "drank")).collect();
+    let said = play(seen(&SEEN), &Sitting::of(32, &sips));
+    assert_eq!(
+        named(&said),
+        [(1, "seen-drink"), (16, "seen-drink"), (31, "seen-drink")]
+    );
+    // A sip every 2 minutes, 2 to 34: the first sip 15 or more minutes past
+    // each line, at 2, 18 and 34.
+    let sips: Vec<(u64, &str)> = (2..=34).step_by(2).map(|at| (at, "drank")).collect();
+    let said = play(seen(&SEEN), &Sitting::of(35, &sips));
+    assert_eq!(
+        named(&said),
+        [(2, "seen-drink"), (18, "seen-drink"), (34, "seen-drink")]
     );
 }
 
 #[test]
-fn a_line_never_heard_takes_nothing() {
+fn rearm_still_is_refused_but_alone_on_a_rise() {
+    for (what, rearm) in [
+        ("with for", "rearm = { still = \"5m\", for = \"1m\" }"),
+        ("with below", "rearm = { still = \"5m\", below = 1 }"),
+        ("under a minute", "rearm = { still = \"30s\" }"),
+        ("over an hour", "rearm = { still = \"2h\" }"),
+    ] {
+        let refused = drink_with(|toml| toml.replace("rearm = \"leaves\"", rearm));
+        assert!(refused.is_err(), "{what}");
+    }
+    let no_rise = drink_with(|toml| {
+        toml.replace("rise = { by = 1, within = \"45s\" }\n", "")
+            .replace("rearm = \"leaves\"", "rearm = { still = \"5m\" }")
+    });
+    assert!(
+        no_rise
+            .as_ref()
+            .is_err_and(|why| why.contains("on a trigger with a rise")),
+        "{no_rise:?}"
+    );
+    let still = drink_with(|toml| toml.replace("rearm = \"leaves\"", "rearm = { still = \"5m\" }"));
+    assert!(still.is_ok(), "{still:?}");
+}
+
+#[test]
+fn a_rise_while_the_lamp_talks_is_said_once_it_rests() {
+    // Seen at 10 in a talk from 9 to 12: said at 12, though lamp-seen's
+    // count stopped rising two minutes before. Two seen in one talk are
+    // one line after it.
+    for kind in ["drank", "ate", "tired", "celebrate"] {
+        let sightings = [(10, kind)];
+        let sitting = Sitting {
+            talks: &[(9, 12)],
+            ..Sitting::of(20, &sightings)
+        };
+        let said = play(seen(&SEEN), &sitting);
+        assert_eq!(said.len(), 1, "{kind}: {said:?}");
+        assert_eq!(said[0].0, 12, "{kind}: {said:?}");
+    }
+    let sightings = [(10, "drank"), (11, "drank")];
+    let sitting = Sitting {
+        talks: &[(9, 12)],
+        ..Sitting::of(20, &sightings)
+    };
+    assert_eq!(
+        named(&play(seen(&["seen-drink"]), &sitting)),
+        [(12, "seen-drink")]
+    );
+}
+
+#[test]
+fn a_rise_kept_past_three_minutes_is_dropped_never_said_after_the_turn() {
+    // The first builder's 00:14 on #7668: `wait` counts from the sighting,
+    // so a remark is never more than 3 minutes stale, and never comes
+    // during a turn. Seen at 10 in a talk from 9 to 14: kept 3 minutes,
+    // dropped at 13, nothing at 14 or after. In a 30-minute talk, 9 to 39:
+    // nothing at its end either. In a talk from 9 to 12: said at 12.
+    for kind in ["drank", "ate", "tired", "celebrate"] {
+        let sightings = [(10, kind)];
+        for talk in [(9, 14), (9, 39)] {
+            let sitting = Sitting {
+                talks: &[talk],
+                ..Sitting::of(45, &sightings)
+            };
+            assert_eq!(play(seen(&SEEN), &sitting), [], "{kind}: {talk:?}");
+        }
+        let short = Sitting {
+            talks: &[(9, 12)],
+            ..Sitting::of(20, &sightings)
+        };
+        let said = play(seen(&SEEN), &short);
+        assert_eq!(said.len(), 1, "{kind}: {said:?}");
+        assert_eq!(said[0].0, 12, "{kind}: {said:?}");
+    }
+}
+
+/// Heron's P2 on #7668: the voice renews `voice/privacy` every 10 ms, so
+/// lamp-skills never subscribes to it for the four; `main` tells the slide
+/// on a change (`Engine::privacy`).
+#[test]
+fn the_reactions_add_no_subscription_to_the_privacy_lease() {
+    let engine = Engine::new(seen(&SEEN), true);
+    let topics = engine.topics();
+    assert!(
+        !topics.iter().any(|topic| topic == "voice/privacy"),
+        "{topics:?}"
+    );
+    assert!(
+        topics.iter().any(|topic| topic == "humans/doing_more"),
+        "{topics:?}"
+    );
+    assert!(engine.reads_privacy());
+}
+
+/// The seen-drink folder copied with its `skill.toml` changed by `edit`,
+/// loaded.
+fn drink_with(edit: impl Fn(&str) -> String) -> Result<Skill, String> {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("seen-drink");
+    std::fs::create_dir(&folder).unwrap();
+    let from = skills_root().join("seen-drink");
+    std::fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
+    let toml = std::fs::read_to_string(from.join("skill.toml")).unwrap();
+    assert!(toml.contains("drops_kept = true\n"));
+    std::fs::write(folder.join("skill.toml"), edit(&toml)).unwrap();
+    load(&folder).map_err(|error| error.to_string())
+}
+
+#[test]
+fn drops_kept_is_refused_but_on_the_privacy_slides_plain_test() {
+    for (what, edit) in [
+        ("with for", "drops_kept = true\nfor = \"5s\"\n"),
+        ("with unknown", "drops_kept = true\nunknown = \"holds\"\n"),
+        ("not a bool", "drops_kept = \"yes\"\n"),
+    ] {
+        let refused = drink_with(|toml| toml.replace("drops_kept = true\n", edit));
+        assert!(refused.is_err(), "{what}");
+    }
+    let other_topic = drink_with(|toml| {
+        toml.replace(
+            "field = \"asleep\"\nequals = false\n",
+            "field = \"asleep\"\nequals = false\ndrops_kept = true\n",
+        )
+    });
+    assert!(
+        other_topic
+            .as_ref()
+            .is_err_and(|why| why.contains("drops_kept is for voice/privacy")),
+        "{other_topic:?}"
+    );
+    assert!(drink_with(|toml| toml.to_owned()).is_ok());
+}
+
+#[test]
+fn drops_kept_false_or_left_out_changes_nothing() {
+    // Without it, the slide is an ordinary `[[while]]`: read as before
+    // (subscribed), and a rise kept through a talk is kept through the
+    // slide's closing too, said once both hold.
+    for edit in ["drops_kept = false\n", ""] {
+        let drink = drink_with(|toml| toml.replace("drops_kept = true\n", edit)).unwrap();
+        let mut engine = Engine::new(vec![drink], true);
+        assert!(!engine.reads_privacy(), "{edit:?}");
+        assert!(engine.topics().iter().any(|topic| topic == "voice/privacy"));
+        let _yes = seen_more_yes(&mut engine, &["seen-drink"]);
+        let sightings = [(10, "drank")];
+        let sitting = Sitting {
+            talks: &[(9, 12)],
+            ..Sitting::of(20, &sightings)
+        };
+        // The slide said as a message, as a subscribed topic is.
+        let said = play_on(&mut engine, &sitting, |engine, at, _| {
+            let minute = at / 60_000_000;
+            let open = !(11..12).contains(&minute);
+            let told = format!(r#"{{"permitted":{open}}}"#);
+            engine.observe("voice/privacy", at, told.as_bytes(), None);
+        });
+        assert_eq!(named(&said), [(12, "seen-drink")], "{edit:?}");
+    }
+}
+
+#[test]
+fn closing_the_privacy_slide_drops_a_kept_rise_at_once() {
+    // Seen at 10 in a talk from 9 to 12, within its 3 minutes: said at 12
+    // with the slide open. Closed from 11 to 12, while it was kept, and
+    // open again as the talk ends: nothing, then or after.
+    for kind in ["drank", "ate", "tired", "celebrate"] {
+        let sightings = [(10, kind)];
+        let open = Sitting {
+            talks: &[(9, 12)],
+            ..Sitting::of(20, &sightings)
+        };
+        let said = play(seen(&SEEN), &open);
+        assert_eq!(said.len(), 1, "{kind}: open: {said:?}");
+        assert_eq!(said[0].0, 12, "{kind}: open: {said:?}");
+        let closed = Sitting {
+            closed: &[(11, 12)],
+            ..open
+        };
+        assert_eq!(play(seen(&SEEN), &closed), [], "{kind}: closed");
+    }
+}
+
+#[test]
+fn nothing_is_said_with_the_slide_closed() {
+    // The slide closed from 9 to 15, a drink at 10: nothing, and nothing
+    // once it opens.
+    let sightings = [(10, "drank")];
+    let closed = Sitting {
+        closed: &[(9, 15)],
+        ..Sitting::of(30, &sightings)
+    };
+    assert_eq!(play(seen(&SEEN), &closed), []);
+}
+
+#[test]
+fn a_remark_at_night_is_said_as_normal() {
+    // No quiet hours (the owner, 20 Nov 13:1x on #7668: someone may work
+    // late or wake early). A drink at 22:05 is said; a yawn at 07:50 and a
+    // drink at 08:05 are both said.
+    let sightings = [(15, "drank")];
+    let night = Sitting {
+        starts: 21 * 3600 + 50 * 60,
+        ..Sitting::of(30, &sightings)
+    };
+    assert_eq!(named(&play(seen(&SEEN), &night)), [(15, "seen-drink")]);
+    let sightings = [(10, "tired"), (25, "drank")];
+    let morning = Sitting {
+        starts: 7 * 3600 + 40 * 60,
+        ..Sitting::of(30, &sightings)
+    };
+    assert_eq!(
+        named(&play(seen(&SEEN), &morning)),
+        [(10, "seen-tired"), (25, "seen-drink")]
+    );
+}
+
+#[test]
+fn a_line_never_heard_costs_nothing() {
     // The drink's lines at 10 and 12 are dropped unheard (the voice's
     // `no_audio_answer`: `main` gives the run back with `Engine::unsaid`);
-    // eating's at 11 is heard. Each one seen still has its line, and a
-    // "stop that" at 13 stops eating, the one heard last, not the drink.
+    // eating's at 11 is heard. An unheard line begins no rest, so the drink
+    // at 12 and 14 still has its line; and a "stop that" at 13 stops
+    // eating, the one heard last, not the drink.
     let sightings = [(10, "drank"), (11, "ate"), (12, "drank"), (14, "drank")];
     let mut engine = Engine::new(seen(&SEEN), true);
     let _yes = seen_more_yes(&mut engine, &SEEN);
@@ -293,27 +641,12 @@ fn a_line_never_heard_takes_nothing() {
     );
     let (eat, drink, calls) = stopped.unwrap();
     assert!(eat && !drink, "{calls:?}");
-    // Without the give-back, the drink at 12 would have been the one that
-    // came last.
+    // Heard, the drink at 10 rests its kind: the drinks at 12 and 14 say
+    // nothing.
     let mut engine = Engine::new(seen(&SEEN), true);
     let _yes = seen_more_yes(&mut engine, &SEEN);
-    let mut stopped = None;
-    play_on(
-        &mut engine,
-        &Sitting::of(14, &sightings),
-        |engine, at, _| {
-            if at / 30_000_000 == 26 {
-                engine
-                    .tool("seen_remarks", &serde_json::json!({ "how": "snooze" }), at)
-                    .unwrap();
-                stopped = Some((
-                    engine.stopped("seen-eat", at),
-                    engine.stopped("seen-drink", at),
-                ));
-            }
-        },
-    );
-    assert_eq!(stopped, Some((false, true)));
+    let said = play_on(&mut engine, &Sitting::of(16, &sightings), |_, _, _| {});
+    assert_eq!(named(&said), [(10, "seen-drink"), (11, "seen-eat")]);
 }
 
 #[test]
