@@ -1,0 +1,58 @@
+# lampOS NPU: the one owner of the lamp's NPU (/dev/vipcore), with `pose` as its first op, asked through
+# lamp-control by a client that holds the camera grant (lampOS/docs/npu.md, #7415). The product unit
+# (lampOS/docs/install.md): installed and enabled on every lamp, under the keeper (in lampos.target,
+# restarted on a crash and by an update), and off: with LAMP_NPU unset `serve` idles and touches nothing
+# (no socket, no file, no NPU, no network). A drop-in setting LAMP_NPU=on here and in lamp-control.service
+# turns it on. The image carries no model: one is fetched from the Store on first use or when a pose-using
+# app is installed, and kept only once the Store's signature and its SHA-256 are checked.
+[Unit]
+Description=lampOS NPU (lamp-npu)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# LAMP_NPU: its why and rules are its row in docs/switches.md (#7415). Unset here: off.
+# As lampos, the user lamp-control and the eyes run as: its socket's folder below is lampos's with no
+# group or other access, so only the lamp's own parts reach it; an app reaches `pose` only through
+# lamp-control's grant check.
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+# Poses are never worth a late word.
+Nice=10
+# No model source is set until the Store hosts one (#7415: no AGPL model is served to lamps, and the
+# Apache-2.0 model is still being measured). A drop-in adds
+# `--models-url https://HOST/PATH --models-host HOST`, HOST the Store's own.
+ExecStart=/opt/lampOS/npu/current/lamp-npu serve --socket /run/lampos-npu/npu.sock --state /var/lib/lampos-npu --bus-root /run/lampos-bus --apps /opt/lampOS/apps
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-npu
+NoNewPrivileges=yes
+# Its own state, private and writable: the models it fetched and checked. A reset wipes it.
+StateDirectory=lampos-npu
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-npu
+RuntimeDirectoryMode=0700
+ProtectSystem=strict
+# The bus is only read (the privacy lease and the board's heat); nothing outside its own folders is written.
+# What the eyes keep as the same user (frames, faces, the known name, photos) and lamp-control's state are
+# not this part's.
+InaccessiblePaths=-/run/lampos-eyes -%S/lampos-eyes -/run/lampos-eyes-kept -/run/lampos-photos -/var/lib/lampos-control
+ProtectHome=yes
+PrivateTmp=yes
+# The NPU and nothing else of /dev.
+DevicePolicy=closed
+DeviceAllow=/dev/vipcore rw
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=lampos.target
