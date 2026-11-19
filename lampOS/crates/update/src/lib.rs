@@ -23,6 +23,7 @@ pub mod first_update;
 pub mod fixed_copy;
 pub mod harness_install;
 mod head_touch;
+pub mod heat;
 pub mod hermes_install;
 pub mod hermes_schedule;
 pub mod image;

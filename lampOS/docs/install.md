@@ -1689,6 +1689,26 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        frozen). A freeze or thaw systemd refuses stops it too, so the
        one-shot is never left frozen; and a `serve` that starts thaws it
        first, in case one ended mid-freeze;
+     - the board hot, OpenClaw's install only and only with
+       `LAMP_HEAT_BACKOFF=on` exactly in `lamp-update.service`'s
+       environment (#7879; dark, in no unit): the watch reads
+       lamp-health's kept `board/heat` at most once a second, never
+       waiting, and while it says `hot` on OpenClaw's turn (not Hermes's)
+       the one-shot is frozen as for talk, journaled `OpenClaw's install
+       pauses while the board is hot (board/heat)`; it goes on when the
+       board is no longer hot and the voice is quiet, journaled `OpenClaw's
+       install goes on: the board is no longer hot and the voice is quiet`.
+       Warm, an expired, future-dated or invalid value, and no bus are
+       not hot. The app shows the install `frozen` during a heat pause,
+       as it does for talk (the watch's `frozen` flag, #6240). Talk
+       during a heat pause says nothing more; a pause that
+       ends as the turn passes to Hermes's install says so (`the pause for a
+       hot board ends: the turn passed to Hermes's install, …`). A heat
+       pause counts toward `MOST_FROZEN` as talk does, and each of
+       OpenClaw's long steps (fetch, unpack, `npm ci`) is bounded by
+       `LONG_STEP_WITHIN`, its 20 min running and `MOST_FROZEN`, so a step
+       frozen past 20 min is not taken for `timeout` on the thaw
+       (`crates/update/src/heat.rs`);
      - the privacy reading lost: once a fresh lease with the slide read
        (or a lamp with no slide) was seen on `voice/privacy`, its newest
        lease older than 250 ms (`LOST_AFTER`, its life being 50 ms), one
