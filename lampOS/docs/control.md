@@ -70,7 +70,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
 | `air` | `air.changed` and `get` `air`: the air sensor's readings (particles, carbon dioxide, humidity, temperature at the sensor). Carbon dioxide and humidity rise when someone comes in and stays, so they can show when someone is in the room, even to a computer without `look`: the pairing screen says so |
 | `device` | `get` `device`: the lamp's own computer (processor load, memory, disk, its temperatures) |
-| `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera") |
+| `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera"); `pose`: one person's pose in a JPEG of the computer's own, from the lamp's NPU ("Poses") |
 | `microphone` | `microphone.stream`: the room's sound as the ears hear it, 20 ms blocks, never while the lamp is private ("The microphone") |
 | `notes` | `notes.set`, `notes.get`, `notes.delete`, `notes.list`: its own small key/value notes kept on the lamp, which survive restarts and go with its revoke ("Notes" below) |
 
@@ -750,8 +750,10 @@ folded, may wait up to that long for its first motion to begin.
 | `quiet_hours` | `say`, `sound` and `turn.start` in this lamp's quiet hours, when it has them set (off by default), and a skill run's in the lamp's quiet hours, 22:00 to 07:00 (#7625; see "Limits, rates and quiet hours") |
 | `private`, `paused`, `asleep` | reserved: no request is refused with them today. These states reach a client another way: its leases are lost with that `why` (a `lease` event), `lamp.changed`'s `lamp_state` says them, and a `say` the voice's privacy gate doesn't speak ends with a `done` of `how: "dropped"` and the voice's why. A gesture or move the body drops while private or asleep is not told |
 | `rate` | over a rate below; `retry_ms` says when |
+| `preparing` | `pose` while the lamp fetches its pose model on first use; `retry_ms` says when to ask again ("Poses") |
+| `unavailable` | `pose` with no model fetched or checked, or no NPU; `retry_ms`, when given, says when the lamp tries again ("Poses") |
 | `bad_request` | not this schema, or an op it doesn't know |
-| `off` | developer access is off in the app |
+| `off` | developer access is off in the app; for `pose`, the lamp's NPU is off (`LAMP_NPU`) |
 
 ### Every op, its fields and limits
 
@@ -792,6 +794,7 @@ folded, may wait up to that long for its first motion to begin.
 | `camera.snapshot` | — | `camera` | — |
 | `camera.stream` | `on` (true or false), `fps` 1–30 (2), `size` `640x480` or `1280x720` for the fast stream | `camera` | — |
 | `microphone.stream` | `on` (true or false) | `microphone` | — |
+| `pose` | `jpeg`: one JPEG in base64, 1–61,440 chars (45 KiB), local only | `camera` | — |
 | `skill.remove` | `name` | `skills` | — |
 
 `move`'s shape is checked here, and the body's move check
@@ -1135,6 +1138,15 @@ With the `camera` grant, which the owner adds with a new pairing code that names
 - **The ring shows it, and says so.** While a stream runs, the ring shows one small steady red dot, bright on a lit ring and dim on a dark one, and a snapshot blinks it (`light/mark`, ring-choreography.md, "A computer's mark"). The mark is asked for before a picture leaves, and **a picture goes only while the ring says it drew it**: the ring tells `light/mark_drawn` (`lamp_msgs::RingMarkDrawn`) after each frame it shows with the mark, and only when the dot, as written under the ring's ceiling, is not black and the frame was painted. lamp-control hears that word only from the ring's own publisher name (`RingMarkDrawn::SOURCE`; a bus source is the publisher's word, so this keeps out a stray publisher, not one that lies), and sends a frame only within 1 s of it for its computer (`camera::MARK_SHOWN_WITHIN`). A binary frame goes only while its computer's stream still runs and it holds `camera`, so none queued before an `off`, a `stop`, a re-pairing or an end goes after it. A snapshot's wait holds the door for up to that second, so others' requests wait with it. A stream holds its frames back for its first second while the ring starts drawing, then ends, "the ring is not showing the camera's mark", if it never does. A snapshot waits up to 1 s for it, and is refused the same way. So a mark asked but not drawn (the ring's authority lapsed, its ceiling at 0, the shutdown's warning, its marks never started) stops the pictures: it fails closed (Thirteen's P2 on #4521). Where lamp-control can't ask for the mark, or hear the ring's word (no bus), there is no camera.
 - **A camera that opens on demand** (`--camera-opens-on-demand`, off unless given; the virtual desktop lamp's, `crates/sim`): a desktop's camera is closed until it is asked for, so the door asks the ring for the mark before it reads the sight file, a snapshot waits up to 3 s (`OPENS_WITHIN`) for a closed camera's first frame, and a stream with no frame yet asks the mark all the same. A frame caught mid-write or over the size is still told at once. Off, as on a lamp whose eyes keep the camera open, a closed camera is told at once, with no mark.
 - **The microphone** has its own section ("The microphone").
+
+## Poses
+
+With the `camera` grant, a computer or an app may ask for the pose of one person in a JPEG of its own, a camera frame it was given (#7415, the first builder's ruling of 16:48 on 19 Nov: `pose` rides the camera's grant, no new grant). The door sends it on to the lamp's NPU service, `lamp-npu`, the one owner of the NPU (npu.md), and gives its answer back (`crates/control/src/npu.rs`).
+
+- **Ask.** `{"id": 4, "op": "pose", "jpeg": "<base64>"}`. The JPEG is at most 45 KiB (61,440 characters of base64), so the request fits the door's 64 KiB frame: a 640x480 frame at ordinary quality fits; send a smaller or more compressed one otherwise. Local only, as the camera.
+- **Answer.** `pose`: `{"score", "keypoints"}`, the 17 COCO keypoints in COCO order (nose, left_eye, right_eye, left_ear, right_ear, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle), each `{"x", "y", "score"}` with `x` and `y` in the sent picture's own pixels and `score` 0 to 1; or `null` with no person (a score under 0.2). With it, `width` and `height` (the picture's), `model` (the model's id) and `ms` (`decode`, `npu`, `post`, `total`). The shape is the same whatever model the lamp runs.
+- **Refused** `off` without `LAMP_NPU=on` in lamp-control's environment; `private` while the lamp is private, asked and again when the answer comes (an answer that comes after the lamp turned private is dropped); `rate` past one client's share (15 a second, 5 with the board warm, 1 hot) and `busy` past all clients' (20, 6 and 2 a second), each with `retry_ms`; `preparing` while the model is fetched on first use; `unavailable` with none, or no NPU; `bad_request` for a picture that is not a JPEG; `refused` when lamp-npu can't be reached.
+- **Journaled** as `pose`, to "the NPU, by lamp-npu's npu.sock"; no picture and no keypoint is kept by the door or the service.
 
 ## The microphone
 
