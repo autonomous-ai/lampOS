@@ -2226,6 +2226,19 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     as they are: a task's words are fixed in its file, so it can't carry
     who came back (the voice's `who`) or the person's own reminder text,
     which each fire's line needs.
+  - Not yet, for the same reason: FAQ (the question and its section of
+    `knowledge.md`), Who was here (the 12-hour record), Guard mode's spoken
+    lines (its `[watch.words]`, said by the watch, not a `[[do]]` step),
+    Task news (`say = { from = "tasks" }`) and Onboarding (`say = { from =
+    "onboarding" }`) each need what this fire or call carries, and the
+    first three are a conversation's tool call besides. They wait for a
+    per-fire part of a task, a ruling of its own: it puts private content
+    (a record, a question, a reminder) in the agent's run. The look skills
+    (Desk tutor, its marks, Look for things, Point the light) stay too:
+    lamp-tasks hands the agent no picture; a run granted `camera` may fetch
+    the eyes' 320-wide frame from lamp-control (`camera.snapshot`), behind
+    the owner's yes, but no agent here is known to read it, and their
+    answer is the conversation's.
 - **One task a trigger.** A variant's task may name its trigger (`on`), as
   its say does, for a skill whose steps name theirs: one task for each such
   line, each alone in its table but for its `on` (only in a variant; any
