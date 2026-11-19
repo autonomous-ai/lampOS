@@ -481,3 +481,21 @@ fn with_tasks_off_no_wait_begins_and_no_line_approves() {
     assert_eq!(forced("Lamp, use my look title skill."), None);
     task_yes::set_on_here(None);
 }
+
+/// #7634: a made skill's name is written without marks (`den-ngu`); the
+/// model's `named` as heard, "đèn ngủ", is still its yes.
+#[test]
+fn a_yes_named_with_marks_is_its_skills_yes() {
+    let task = TaskAsks {
+        name: "den-ngu".into(),
+        ..page_title()
+    };
+    let id = said_back_unasked_as(task.clone(), Some(&task_yes::line(&task)));
+    let went = went(
+        "Ừ, chạy đèn ngủ đi.",
+        vec![answers_naming(&id, "yes", "đèn ngủ"), said("Okay.")],
+    );
+    assert_eq!(went.ran[0].2["approved"], true, "{:?}", went.ran);
+    assert_eq!(went.approved, 1);
+    task_yes::set_on_here(None);
+}

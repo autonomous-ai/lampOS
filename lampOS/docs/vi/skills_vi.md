@@ -4984,7 +4984,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   không có nếu không đọc được) và rằng một kỹ năng được nêu mà không phải
   kỹ năng đang hỏi, có trên đèn hay không, được đưa đúng như nghe
   (`skill_write_yes::approve_force`). Rồi code chỉ nhận cái "có" khi
-  `named` là `none` hoặc chính kỹ năng đang chờ (`made_remove::same_name`);
+  `named` là `none` hoặc chính kỹ năng đang chờ (`made_remove::same_name`,
+  bỏ dấu khỏi tên được nói vì tên kỹ năng đã tạo không có dấu: "đèn ngủ" là
+  `den-ngu`), và không đúng y tên một kỹ năng khác trên đèn ("timers" khi
+  "timer" đang chờ, `skill_write_yes::exactly_another`);
   mọi tên khác, đã cài hay chưa, là `new_ask`: không giữ gì, bỏ việc chờ,
   và câu đó được trả lời như một yêu cầu riêng bằng một câu đơn giản. Không
   có danh sách từ nào quyết định, nên khi mô hình sai thì kết quả nghiêng

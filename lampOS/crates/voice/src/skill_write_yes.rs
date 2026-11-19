@@ -853,6 +853,22 @@ pub fn set_installed_here(names: Vec<String>) {
     INSTALLED_HERE.with(|here| *here.borrow_mut() = names);
 }
 
+/// Whether `named` is exactly another skill on the lamp than `skill`,
+/// though near it ("timers" on the lamp while "timer" waits): no yes for
+/// `skill` (#7634).
+fn exactly_another(named: &str, skill: &str, installed: &[String]) -> bool {
+    let slug = |said: &str| {
+        let said = crate::made_remove::unmarked(said).to_lowercase();
+        let words: Vec<&str> = said
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect();
+        words.join("-")
+    };
+    let said = slug(named);
+    said != slug(skill) && installed.iter().any(|name| slug(name) == said)
+}
+
 /// The only `make_skill` fields the forced approval round is told, all
 /// required ([`approve_force`], #6921): the wait's id, the person's
 /// answer and the skill their line names ([`NAMED`], #7545), so the
@@ -1257,6 +1273,12 @@ pub fn answered(
     answer: Option<&str>,
     named: Option<&str>,
 ) -> Option<Value> {
+    // Read before the wait's lock: the skills on the lamp, for a name the
+    // model gave.
+    let installed = named
+        .is_some_and(|named| !named.trim().eq_ignore_ascii_case(NAMED_NONE))
+        .then(installed_names)
+        .unwrap_or_default();
     kept::waiting(|kept| {
         let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
         // Only the lamp's name ([`line_heard`]): no answer at all, the wait
@@ -1285,7 +1307,9 @@ pub fn answered(
             match named.map(str::trim).filter(|named| !named.is_empty()) {
                 Some(named)
                     if named.eq_ignore_ascii_case(NAMED_NONE)
-                        || crate::made_remove::same_name(named, &skill) =>
+                        || (crate::made_remove::same_name(named, &skill)
+                            && !(task_wait(waiting)
+                                && exactly_another(named, &skill, &installed))) =>
                 {
                     // A remove's yes, held in code to a plain yes on the
                     // line right after its question (lamp-9adf, 18 Nov,
@@ -2852,6 +2876,32 @@ mod tests {
             lamp_said(1, "It uses the camera.");
             assert_eq!(answered(&id, 2, Some("yes"), Some(named)), None, "{named}");
         }
+        clear_for_test();
+    }
+
+    /// #7634's P3: a name the model gives that is exactly another skill on
+    /// the lamp ("timers"), though near the waiting one ("timer"), is no
+    /// yes; the waiting skill's own name still is.
+    #[test]
+    fn a_name_exactly_another_installed_skill_is_no_yes() {
+        let timer = || Asks {
+            skill: "timer".into(),
+            sha256: "d".repeat(64),
+            writes: Vec::new(),
+            say_back: "It uses the light.".into(),
+            grants: Some(vec!["light".into()]),
+            code: false,
+            remove: false,
+        };
+        set_installed_here(vec!["timer".into(), "timers".into()]);
+        for (named, taken) in [("timers", false), ("timer", true), ("Timer", true)] {
+            clear_for_test();
+            let id = wait_for_yes(timer(), 1, Instant::now());
+            lamp_said(1, "It uses the light.");
+            let told = answered(&id, 2, Some("yes"), Some(named));
+            assert_eq!(told.is_none(), taken, "{named}: {told:?}");
+        }
+        set_installed_here(Vec::new());
         clear_for_test();
     }
 

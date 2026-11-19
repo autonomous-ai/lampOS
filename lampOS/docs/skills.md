@@ -1983,7 +1983,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   and that a skill named that isn't the one asked about, on the lamp or
   not, is given as heard (`skill_write_yes::approve_force`). Code then
   takes the yes only when `named` is `none` or the waiting skill
-  (`made_remove::same_name`); any other name, installed or not, is a
+  (`made_remove::same_name`, which takes marks off the name said, as a
+  made name has none: "đèn ngủ" is `den-ngu`), and not exactly another
+  skill on the lamp ("timers" while "timer" waits,
+  `skill_write_yes::exactly_another`); any other name, installed or not, is a
   `new_ask`: nothing kept, the wait let go, and the line answered as its
   own ask with one plain line. No word list decides it, so a miss by the
   model fails toward no yes. A guest's yes the model names another skill
