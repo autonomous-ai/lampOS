@@ -43,6 +43,7 @@ mod remember_speaker;
 mod remove_words;
 mod sent_write;
 mod short_done;
+mod short_sound_name;
 mod skill_claim;
 mod skill_named_words;
 mod skill_yes_carry;
