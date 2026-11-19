@@ -5,9 +5,9 @@ use lamp_apps::testing::StubApp;
 fn a_good_app_passes_and_net_picks_the_unit() {
     let mut app = StubApp::good("english-lessons");
     assert_eq!(check(&app, Some(200)), Ok(()));
-    assert_eq!(unit_of(&app), "lampapp@english-lessons.service");
+    assert_eq!(unit_of(&app), "lamp-app@english-lessons.service");
     app.net = true;
-    assert_eq!(unit_of(&app), "lampapp-net@english-lessons.service");
+    assert_eq!(unit_of(&app), "lamp-app-net@english-lessons.service");
 }
 
 #[test]

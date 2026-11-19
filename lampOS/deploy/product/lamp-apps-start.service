@@ -1,0 +1,37 @@
+# The Store apps' boot start (#7415, docs/apps.md): once at boot, as root, `lamp-apps-manage start-all` finishes what a cut
+# install or remove left and starts every installed app the owner has not stopped. Only with LAMP_STORE_APPS=on in this
+# environment (a drop-in turns it on); off it does nothing. The same sandbox as the manage helper.
+[Unit]
+Description=lampOS apps' boot start
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-control.service lamp-apps-folders.service
+Wants=lamp-control.service
+# The folders its sandbox names are made first by lamp-apps-folders.service, outside this sandbox (#7920); while they
+# are absent this unit is skipped (the Conditions), never failed, as a lamp that has not yet added that unit.
+Wants=lamp-apps-folders.service
+ConditionPathIsDirectory=/opt/lampOS/apps
+ConditionPathIsDirectory=/var/lib/lampos-apps-state
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+Slice=lampos-parts.slice
+ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage start-all
+SyslogIdentifier=lamp-apps-manage
+TimeoutStartSec=120
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/lampOS/apps /var/lib/lampos-apps-state -/var/lib/lampOS/skills
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_FOWNER
+
+[Install]
+WantedBy=lampos.target

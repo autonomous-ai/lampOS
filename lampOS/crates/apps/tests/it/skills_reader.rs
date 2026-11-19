@@ -133,7 +133,7 @@ fn the_helper_installs_the_signed_sample_behind_the_yes() {
         Some(200),
     )
     .unwrap();
-    assert_eq!(done.unit, "lampapp@store-test.service");
+    assert_eq!(done.unit, "lamp-app@store-test.service");
     let app = layout.code.join("store-test/current");
     assert_eq!(
         std::fs::read_to_string(app.join("entry.env")).unwrap(),

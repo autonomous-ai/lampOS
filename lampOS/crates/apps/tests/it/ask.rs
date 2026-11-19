@@ -25,7 +25,7 @@ fn only_cloud_and_the_voice_may_ask() {
     assert!(is_an_asker(&format!("1:name=systemd:{CLOUD}\n")));
     for other in [
         "/lampos.slice/lampos-parts.slice/lamp-control.service",
-        "/lampos.slice/lampos-apps.slice/lampapp@alpha.service",
+        "/lampos.slice/lampos-apps.slice/lamp-app@alpha.service",
         "/system.slice/lamp-cloud.service",
         "/lampos.slice/lampos-parts.slice/lamp-cloud.service.evil",
         "/lampos.slice/lampos-parts.slice/lamp-cloud.servicex/a",

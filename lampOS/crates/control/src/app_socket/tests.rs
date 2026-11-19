@@ -27,7 +27,7 @@ fn install(apps: &Path, name: &str, grants: Value, settings: Value) {
 #[test]
 fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
     let line = |path: &str| format!("0::{path}\n");
-    let unit = "/lampos.slice/lampos-apps.slice/lampapp@english-lesson.service";
+    let unit = "/lampos.slice/lampos-apps.slice/lamp-app@english-lesson.service";
     assert_eq!(
         app_of_cgroup(&line(unit)),
         Some(("english-lesson".to_owned(), false))
@@ -35,20 +35,20 @@ fn the_app_is_the_unit_its_cgroup_names_and_nothing_else() {
     // An app with `net: true` runs in its own unit, with the same exactness.
     assert_eq!(
         app_of_cgroup(&line(
-            "/lampos.slice/lampos-apps.slice/lampapp-net@english-lesson.service"
+            "/lampos.slice/lampos-apps.slice/lamp-app-net@english-lesson.service"
         )),
         Some(("english-lesson".to_owned(), true))
     );
     for other in [
-        "/lampos.slice/lampos-apps.slice/lampapp@english-lesson.service/sub",
-        "/lampos.slice/lampos-apps.slice/lampapp@Bad.service",
-        "/lampos.slice/lampos-apps.slice/lampapp-net@english-lesson.service/sub",
-        "/lampos.slice/lampos-apps.slice/lampapp-net@.service",
-        "/lampos.slice/lampos-parts.slice/lampapp-net@demo.service",
+        "/lampos.slice/lampos-apps.slice/lamp-app@english-lesson.service/sub",
+        "/lampos.slice/lampos-apps.slice/lamp-app@Bad.service",
+        "/lampos.slice/lampos-apps.slice/lamp-app-net@english-lesson.service/sub",
+        "/lampos.slice/lampos-apps.slice/lamp-app-net@.service",
+        "/lampos.slice/lampos-parts.slice/lamp-app-net@demo.service",
         "/lampos.slice/lampos-apps.slice/lampapp-netx@demo.service",
-        "/lampos.slice/lampos-apps.slice/lampapp@.service",
-        "/lampos.slice/lampos-parts.slice/lampapp@demo.service",
-        "/user.slice/lampapp@demo.service",
+        "/lampos.slice/lampos-apps.slice/lamp-app@.service",
+        "/lampos.slice/lampos-parts.slice/lamp-app@demo.service",
+        "/user.slice/lamp-app@demo.service",
         "/lampos.slice/lampos-apps.slice/lamp-apps-manage@demo.service",
     ] {
         assert_eq!(app_of_cgroup(&line(other)), None, "{other}");

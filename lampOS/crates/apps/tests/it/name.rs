@@ -39,6 +39,6 @@ fn the_longest_name_still_makes_a_user_of_32() {
 
 #[test]
 fn the_two_unit_variants_are_named_by_the_instance() {
-    assert_eq!(plain_unit("x"), "lampapp@x.service");
-    assert_eq!(net_unit("x"), "lampapp-net@x.service");
+    assert_eq!(plain_unit("x"), "lamp-app@x.service");
+    assert_eq!(net_unit("x"), "lamp-app-net@x.service");
 }
