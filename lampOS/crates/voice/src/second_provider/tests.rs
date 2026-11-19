@@ -14388,6 +14388,93 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
     );
 }
 
+thread_local! {
+    /// `LAMP_CARRY_UNANSWERED_SOUND` for a test on this thread.
+    pub(super) static LONG_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// #7939 (lamp-9adf, 19 Nov): a line cut in three pieces none of which came
+/// back with words loses its opening when each piece goes on with only the
+/// last 1.5 s. With `LAMP_CARRY_UNANSWERED_SOUND` the chain keeps up to 6 s
+/// of it; off, as before. A piece whose words came back carries nothing
+/// either way, so a heard line costs the same.
+#[tokio::test]
+async fn a_chain_of_wordless_pieces_keeps_its_opening_only_with_the_switch() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    // Two wordless pieces of 4 s, then the line that is answered, with the
+    // words of the second back or not.
+    let run = |long: bool, second: &'static str| async move {
+        LONG_FOR_TEST.with(|test| test.set(Some(long)));
+        let pieces = 400u64;
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok(String::new()),
+                    Ok(second.to_owned()),
+                    Ok("what's the weather?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        // The first two pieces are held, so they are never answered.
+        let mut engine = engine.heeding(Arc::new(|request, _, _, _, _| {
+            (request <= 2).then_some("not said to the lamp")
+        }));
+        for request in 1..=2u64 {
+            engine.submit(start(request));
+            for sequence in 1..=pieces {
+                engine.submit(audio_at(request, sequence, 1_000));
+            }
+            engine.submit(end(request));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        }
+        engine.submit(start(3));
+        engine.submit(audio_at(3, 1, 9_000));
+        engine.submit(end(3));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let heard = script.samples_heard.load(Ordering::Relaxed);
+        LONG_FOR_TEST.with(|test| test.set(None));
+        // What the third line was sent besides its own frame: all heard,
+        // less the two pieces' own sound, the first's carried into the
+        // second and the second's own frames.
+        let own = 2 * pieces as usize * frame;
+        let first_carried = most_kept(long).min(pieces as usize * frame);
+        heard - own - first_carried - frame
+    };
+    // Both pieces wordless: the second piece carries the first's tail then
+    // its own, to the cap; the third line is sent that.
+    assert_eq!(run(false, "").await, KEPT_SAMPLES, "off: the last 1.5 s");
+    assert_eq!(
+        run(true, "").await,
+        KEPT_SAMPLES_LONG,
+        "on: up to 6 s, the opening kept"
+    );
+    // The second piece's words came back: nothing is carried into the third.
+    assert_eq!(run(true, "Okay yeah sure.").await, 0, "words back: nothing");
+    assert_eq!(KEPT_SAMPLES_LONG, 6 * 16_000);
+    assert!(!matches!(most_kept(false), KEPT_SAMPLES_LONG));
+}
+
+/// The sound kept across pieces is bounded: whatever is added, at most the
+/// cap, the oldest dropped.
+#[test]
+fn the_kept_sound_is_bounded_and_keeps_the_newest() {
+    let mut kept = VecDeque::new();
+    for round in 0..50i16 {
+        keep_sound(&mut kept, &vec![round; 16_000], KEPT_SAMPLES_LONG);
+        assert!(kept.len() <= KEPT_SAMPLES_LONG);
+    }
+    assert_eq!(kept.len(), KEPT_SAMPLES_LONG);
+    assert_eq!(*kept.back().unwrap(), 49);
+    assert_eq!(*kept.front().unwrap(), 44);
+    assert_eq!(most_kept(false), KEPT_SAMPLES);
+    assert_eq!(most_kept(true), KEPT_SAMPLES_LONG);
+}
+
 /// #2002's P1 (the first builder at 01:23): with the next line's socket
 /// kept ready, "Lamp, [600 ms] what time is it?" came back as "Lamp", held
 /// as a short sound, and "what time is it?", held for no name. The name's
