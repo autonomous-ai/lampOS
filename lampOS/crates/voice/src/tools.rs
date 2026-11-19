@@ -1307,6 +1307,11 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A new face past setup kept with nothing asked (`LAMP_FACE_NO_ASK`,
         // the first builder 18:50): only with names checked.
         face_no_ask: settings.names_checked && crate::known_faces::face_no_ask_on(),
+        // A new face's save past the face question on a known file kept
+        // only for a face the eyes know (`LAMP_FACE_SAVE_KNOWN_ONLY`,
+        // #7704): only with names checked.
+        face_save_known_only: settings.names_checked
+            && crate::known_faces::face_save_known_only_on(),
     }
 }
 
@@ -3612,6 +3617,7 @@ mod tests {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
