@@ -58,7 +58,10 @@
 //!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
 //!   sentence by sentence as exact words, never a turn for the model,
 //!   as soon as the run ended, with no read's gate, held only while the
-//!   lamp is private or paused (`crate::service_read::tell`, #7894). Nothing
+//!   lamp is private or paused (`crate::service_read::tell`, #7894), when
+//!   its owner asked it by voice now (`asked_by_owner`); asked by anyone
+//!   else, one short line at once and the read's gate; a run nobody asked
+//!   keeps the read's gate. Nothing
 //!   else of a run is told; the journal says only how many sentences were
 //!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
@@ -712,6 +715,36 @@ pub fn asked_by_voice(skill: &str, at_ms: u64) {
 /// by that run's hand-over, so no later trigger's run counts as asked.
 pub fn take_asked_by_voice(skill: &str) -> Option<u64> {
     ASKED_BY_VOICE
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+}
+
+/// The skills whose last run marked as asked by voice ([`asked_by_voice`])
+/// was asked by their owner (#7894, V2's 12:47 on #7902): a run now, which
+/// the voice runs only for the owner's own line (`lamp_voice::made_run`,
+/// `services::owner_hears`: the person scope naming the owner, seen saying
+/// it alone), or any ask in the private room (`LAMP_PRIVATE_ROOM`, where
+/// whoever speaks is the owner). Its told answer is then said at once.
+static ASKED_BY_OWNER: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// Whether `skill`'s run just marked asked by voice was its owner's
+/// (`owners`), kept with that mark ([`ASKED_BY_OWNER`]).
+pub fn asked_by_owner(skill: &str, owners: bool) {
+    let mut asked = ASKED_BY_OWNER
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
+    if owners {
+        asked.insert(skill.to_owned());
+    } else {
+        asked.remove(skill);
+    }
+}
+
+/// Whether `skill`'s last run asked by voice was its owner's, taken once
+/// with [`take_asked_by_voice`] by that run's hand-over.
+pub fn take_asked_by_owner(skill: &str) -> bool {
+    ASKED_BY_OWNER
         .lock()
         .unwrap_or_else(|poison| poison.into_inner())
         .remove(skill)
