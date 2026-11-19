@@ -2510,6 +2510,9 @@ pub fn serve(
     let checked = checks_sounds(&files);
     let tools = files.tools;
     start_tasks(&tools);
+    if tools.make_skill {
+        resume_made_after_restart(&tools);
+    }
     // As the Live route says them, when this route is the only voice.
     let reminders = route.only_voice && tools.schedule_speak;
     if reminders {
@@ -6273,7 +6276,30 @@ async fn run_call(
             }
         }
     }
+    // A voice make heard in its own turn, written down while it is made
+    // (`LAMP_MAKE_SKILL_AGENT`, #7224 fault 5): a route that stops during
+    // it leaves it for the next worker, which makes it again
+    // ([`resume_made_after_restart`]). Taken out as the make ends.
+    let resumable = (made && heard && crate::make_queue::is_new_make(&call.args))
+        .then(|| {
+            crate::make_resume::begin(crate::make_resume::InFlight {
+                request,
+                args: call.args.clone(),
+                asker: crate::make_queue::Asker {
+                    speaker: speaker_of(scope.as_ref()),
+                    owner: crate::services::owner_of(scope.as_ref()),
+                    heard: crate::thread::THREAD.lock().ok().and_then(|thread| {
+                        thread
+                            .heard_in_own_line(request)
+                            .or_else(|| thread.heard_for(request, Instant::now()))
+                    }),
+                },
+                at_unix_ms: crate::make_resume::unix_ms(),
+            })
+        })
+        .flatten();
     let running = move || {
+        let _resumable = resumable;
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
         // The Live route's line for a call the Policy held and then
@@ -6347,6 +6373,53 @@ async fn run_call(
     tokio::task::spawn_blocking(running)
         .await
         .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+}
+
+/// At the worker's start (#7224, fault 5): each voice make a route that
+/// stopped during it left ([`crate::make_resume::left_at`]) made again with
+/// no turn, as a make that waited its turn is ([`run_queued_with`]), held to
+/// who asked and the line heard at its ask, its line said through the say
+/// service once. Its hand-over asks lamp-tasks the same make, which gives
+/// it the outcome it kept, or the one still being made, never a second run.
+fn resume_made_after_restart(settings: &crate::tools::Settings) {
+    if !crate::make_skill_agent::on() {
+        return;
+    }
+    let left = crate::make_resume::left_at(
+        Path::new(crate::make_resume::FILE),
+        crate::make_resume::unix_ms(),
+    );
+    for make in left {
+        let request = make.request;
+        eprintln!(
+            "lamp-voice second: request {request}: its route stopped while make_skill ran: made again now, its outcome said once"
+        );
+        let label = crate::make_queue::label_of(&make.args);
+        // Written down again while it is made: a second restart leaves it
+        // too, still within its first ask's bound.
+        let held = crate::make_resume::begin(make.clone());
+        let call = lamp_gemini::ToolCall {
+            id: format!("resumed-{request}"),
+            name: crate::made_skill::MAKE.to_owned(),
+            args: make.args,
+        };
+        let work = queued_work(settings.clone(), call, request);
+        let asker = make.asker;
+        run_queued_with(
+            request,
+            Box::new(move || {
+                let _held = held;
+                let answer =
+                    crate::make_skill_local::with_asker_kept(asker.heard, asker.owner, work);
+                crate::make_skill_local::failed_unless_said(|| {
+                    crate::make_queue::failed_line(&label, &answer.told)
+                });
+                answer
+            }),
+            say_made_line,
+            || (),
+        );
+    }
 }
 
 /// A voice make's line said through the say service, at the product's

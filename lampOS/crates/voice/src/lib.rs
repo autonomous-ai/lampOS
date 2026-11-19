@@ -120,6 +120,7 @@ pub mod make_core_offer;
 pub mod make_no_asks;
 pub mod make_no_cannot;
 pub mod make_queue;
+pub mod make_resume;
 pub mod make_skill_agent;
 pub mod make_skill_local;
 pub mod marked;
