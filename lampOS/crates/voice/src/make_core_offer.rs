@@ -100,6 +100,10 @@ const JUDGE_SYSTEM: &str = "You check whether a skill already on a desk lamp doe
 pub struct Turned {
     pub name: String,
     pub request: String,
+    /// The name the person gave the skill in that ask
+    /// (`make_skill_local::GIVEN_NAME`, #7911), for the make the undo
+    /// makes: none when they gave none.
+    pub given: Option<String>,
     pub at: Instant,
 }
 
@@ -257,6 +261,9 @@ pub fn before_make(
     *slot(turned) = Some(Turned {
         name: skill.name.clone(),
         request: asked.to_owned(),
+        given: args[crate::make_skill_local::GIVEN_NAME]
+            .as_str()
+            .map(str::to_owned),
         at: now,
     });
     let line = turned_on_line(&skill.name);
@@ -346,14 +353,14 @@ fn judge_once(question: &str) -> Option<String> {
 /// The undo of the newest turn-on in `turned`, asked in the voice's
 /// request `request` at `now`: within [`UNDO_WITHIN`], that one skill
 /// turned back off by `turn_off`, then the person's first ask, to make as
-/// asked (the undo spent). Else what the model is told: nothing to undo,
+/// asked (the undo spent), with the name they gave in it. Else what the model is told: nothing to undo,
 /// or why it wasn't turned off (the undo kept, to ask again).
 pub fn undo(
     request: u64,
     turned: &Mutex<Option<Turned>>,
     now: Instant,
     turn_off: impl FnOnce(&str) -> Result<(), String>,
-) -> Result<String, Value> {
+) -> Result<Turned, Value> {
     let mut kept = slot(turned);
     let Some(done) = kept
         .clone()
@@ -382,12 +389,12 @@ pub fn undo(
     eprintln!(
         "lamp-voice: request {request}: a skill turned on in place of a make turned back off; the first ask is made (#7747)"
     );
-    Ok(done.request)
+    Ok(done)
 }
 
 /// [`undo`] on the lamp, by `make_skill`'s call: the newest turn-on, the
 /// manage helper's socket.
-pub fn undone_here(request: u64) -> Result<String, Value> {
+pub fn undone_here(request: u64) -> Result<Turned, Value> {
     let manage = Path::new(crate::made_skill::MANAGE_SOCKET);
     undo(request, &TURNED, Instant::now(), |name| {
         crate::made_turn::turned_by_helper(manage, name, true)
@@ -651,7 +658,8 @@ mod tests {
             off.push(name.to_owned());
             Ok(())
         });
-        assert_eq!(undone.as_deref(), Ok(SAT));
+        let undone = undone.unwrap();
+        assert_eq!((undone.request.as_str(), undone.given), (SAT, None));
         assert_eq!(off, ["sip-of-water"]);
         let again = undo(10, &slot, at, never_turned);
         assert_eq!(again.unwrap_err()["error"], NOTHING_TO_UNDO);
@@ -664,6 +672,30 @@ mod tests {
         );
         assert_eq!(late.unwrap_err()["error"], NOTHING_TO_UNDO);
         assert_eq!(*late_slot.lock().unwrap(), None);
+    }
+
+    /// #7911 (Heron's P3 on #7926): the name the person gave in the ask a
+    /// skill on the lamp was turned on for is kept with it, so "make my
+    /// own instead" makes the skill under that name.
+    #[test]
+    fn the_undo_makes_the_first_ask_under_the_name_given_in_it() {
+        set_on_here(Some(true));
+        let slot = Mutex::new(None);
+        let told = before_make(
+            &json!({ "request": SAT, "given_name": "water time" }),
+            4,
+            &slot,
+            || Ok(nines_lamp(State::TurnedOff)),
+            |_| Some("sip-of-water".to_owned()),
+            |_| Ok(()),
+            Instant::now(),
+        );
+        set_on_here(None);
+        assert_eq!(told.unwrap()["turned_on"], "sip-of-water");
+        let kept = slot.lock().unwrap().clone().unwrap();
+        let undone = undo(5, &slot, kept.at, |_| Ok(())).unwrap();
+        assert_eq!(undone.request, SAT);
+        assert_eq!(undone.given.as_deref(), Some("water time"));
     }
 
     /// El's P3 on #7763: the judge is shown at most LISTED_MOST skills.

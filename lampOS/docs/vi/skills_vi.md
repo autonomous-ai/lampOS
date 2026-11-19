@@ -1330,8 +1330,11 @@ sau:
      evening rate"), chỉ riêng cái tên (`evening rate`), bỏ trống khi họ
      không đặt tên. Mô hình của giọng nói tự hiểu lời họ; không có danh
      sách từ nào. `answer` giữ tên đó cho lần tạo ấy
-     (`make_skill_local::named_make`), không bao giờ cho lệnh hoàn tác, vốn
-     tạo lại yêu cầu đầu tiên. Sau đó code lấy nó làm tên kỹ năng trên mọi
+     (`make_skill_local::given_of`, `named_make`); lệnh hoàn tác một kỹ
+     năng được bật thay cho lần tạo ("make my own instead") tạo yêu cầu
+     đầu tiên với tên đã đặt trong yêu cầu đó, được giữ cùng lần bật
+     (`make_core_offer::Turned::given`), không bao giờ lấy tên của lệnh
+     hoàn tác. Sau đó code lấy nó làm tên kỹ năng trên mọi
      đường tạo: câu trả lời của DeepSeek và của agent của đèn (cả hai qua
      `made_skill::keep_asked`, thẻ được đổi tên bởi `named_as_given`), và
      một `cannot` được làm thành một việc cho agent chỉ chạy khi được nhờ
@@ -1341,17 +1344,21 @@ sau:
      cắt theo giới hạn của tên, trước khi tên đã có lấy tên trống, bên
      dưới. Khi không đặt tên, hoặc tên không thành tên kỹ năng được (không
      bắt đầu bằng chữ cái, hoặc có chữ mà tên kỹ năng không có, "tỷ giá"),
-     tên của bên tạo giữ nguyên như trước. Schema liệt kê `given_name`
-     trước `request` (các khóa theo thứ tự), nên một lần tạo có tên có thể
-     stream nó trước: cái nào cũng là đối số đầu tiên của một lần tạo mới
-     (`make_skill_local::new_make_argument`, `asks_a_new_make`), và câu mở
-     đầu của đèn vẫn được nói như với mọi lần tạo mới (HOLD của Twelve trên
-     #7926). Test:
+     tên của bên tạo giữ nguyên như trước. Các khóa của schema được sắp
+     xếp, nên `given_name` được stream trước trong mọi lần gọi có nó, kể cả
+     lệnh xóa: một `given_name` đứng đầu không quyết định gì
+     (`make_skill_local::new_make_argument` trả `None`), và các lần gọi
+     đầy đủ quyết định theo `request` của chúng (`asks_a_new_make`). Một
+     lần tạo có tên vẫn có câu mở đầu của đèn như mọi lần tạo mới (HOLD
+     của Twelve trên #7926); lệnh xóa có `given_name`, hoặc chỉ một
+     `given_name`, thì không có (HOLD của Heron trên #7926). Test:
      `a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models`,
      `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`,
-     `answer_holds_the_calls_given_name_for_its_make_but_an_undos`,
+     `answer_holds_the_calls_given_name_for_its_make_and_an_undos_first`,
+     `the_undo_makes_the_first_ask_under_the_name_given_in_it`,
      `a_task_only_asked_for_takes_the_name_the_person_gave`,
-     `a_make_whose_first_argument_is_its_given_name_is_opened`.
+     `a_make_whose_first_argument_is_its_given_name_is_opened`,
+     `a_given_name_without_a_request_opens_no_make`.
    - **Tên đã có thì lấy tên trống** (chủ đèn, 11/11: khôi phục cài đặt gốc
      giữ lại kỹ năng của đèn, trong đó có welcome-back, bedtime-morning,
      light-out, sip-of-water, nên kỹ năng mô hình đặt tên welcome-back lần

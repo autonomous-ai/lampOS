@@ -702,15 +702,51 @@ async fn a_make_whose_first_argument_is_its_given_name_is_opened() {
             "{first:?}"
         );
     }
-    assert!(crate::make_skill_local::new_make_argument(
-        crate::make_skill_local::GIVEN_NAME
-    ));
-    assert!(crate::make_skill_local::new_make_argument(
-        crate::make_skill_local::REQUEST
-    ));
-    assert!(!crate::make_skill_local::new_make_argument(
-        crate::made_remove::REMOVE
-    ));
+    // `given_name` first decides nothing: the next argument does.
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::make_skill_local::GIVEN_NAME),
+        None
+    );
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::make_skill_local::REQUEST),
+        Some(true)
+    );
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::made_remove::REMOVE),
+        Some(false)
+    );
+}
+
+/// #7911 (Heron's HOLD on #7926): `given_name` sorts first in the schema,
+/// so it streams first in any call that carries it. A remove with it, or
+/// it alone with no `request`, is no new make: nothing is said first, on
+/// the stream and on the whole calls alike.
+#[tokio::test]
+async fn a_given_name_without_a_request_opens_no_make() {
+    let plain = || vec![Message::user("Remove the one called evening rate.")];
+    let next = || vec![text("Done."), Ok(ChatEvent::Done)];
+    let fast = (false, false, Duration::ZERO);
+    let given = crate::make_skill_local::GIVEN_NAME;
+    let removed = json!({given: "evening rate", crate::made_remove::REMOVE: "evening rate"});
+    let alone = json!({given: "evening rate"});
+    for (at, (first, args)) in [
+        (Some(given), removed.clone()),
+        (None, removed),
+        (Some(given), alone.clone()),
+        (None, alone),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let said = a_make_turn(
+            7_911_740 + at as u64,
+            plain(),
+            fast,
+            vec![a_streamed_call(first, args.clone()), next()],
+        )
+        .await;
+        assert_eq!(said, vec!["said:Done.".to_owned()], "{first:?} {args}");
+    }
 }
 
 /// #7554's P3: the opening is one of the lamp's fixed lines, said in the
