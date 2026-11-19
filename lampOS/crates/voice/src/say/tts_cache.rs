@@ -54,6 +54,13 @@ pub const RENDER_MORE_CHARS: usize = 30;
 /// itself is still refused. Reached at 570 characters, past what fits in
 /// [`MOST_FRAMES`] at the voice's pace.
 pub const RENDER_MOST: Duration = Duration::from_secs((MOST_FRAMES / SOUND_RATE) as u64);
+/// The most characters of an exact line rendered as one piece (#7892):
+/// half of what plays in [`MOST_FRAMES`] at the voice's pace
+/// ([`RENDER_MORE_CHARS`] in about 2 s), so a slower voice's piece still
+/// renders within it. A longer line is rendered in pieces
+/// ([`TtsCache::render_once`]); the cap stays [`MOST_FRAMES`] for every
+/// render.
+pub const MOST_PIECE_CHARS: usize = (MOST_FRAMES / SOUND_RATE) as usize * RENDER_MORE_CHARS / 2 / 2;
 /// Rendered at start, after the speech service is configured, until each is
 /// kept: the safe shutdown's line, one source with the shutdown, then the
 /// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`],
@@ -236,17 +243,12 @@ impl TtsCache {
     /// `text` rendered now through the speech service, never kept: a paired
     /// computer's exact words (`exact`, lamp-control's `say`), which are
     /// not the lamp's own fixed lines and must not fill [`MOST_FILES`]. Or
-    /// why not: the service's refusal, or a line empty or past
-    /// [`MOST_FRAMES`].
+    /// why not: the service's refusal, or a piece empty or past
+    /// [`MOST_FRAMES`]. A line past [`MOST_PIECE_CHARS`] is rendered in
+    /// pieces ([`pieces`], #7892) and played as one line, every piece in
+    /// order.
     pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
-        let samples = (self.render)(text).map_err(|why| format!("not rendered: {why}"))?;
-        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
-            return Err(format!(
-                "rendered empty or past {} s",
-                MOST_FRAMES / SOUND_RATE
-            ));
-        }
-        Ok(samples)
+        in_pieces(text, |piece| (self.render)(piece))
     }
 
     /// `text` rendered now in the lamp's voice named `voice`, never kept:
@@ -258,14 +260,7 @@ impl TtsCache {
             .render_in
             .as_ref()
             .ok_or_else(|| "this lamp's speech service speaks in its own voice only".to_owned())?;
-        let samples = render_in(text, voice).map_err(|why| format!("not rendered: {why}"))?;
-        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
-            return Err(format!(
-                "rendered empty or past {} s",
-                MOST_FRAMES / SOUND_RATE
-            ));
-        }
-        Ok(samples)
+        in_pieces(text, |piece| render_in(piece, voice))
     }
 
     /// `text`'s samples if kept already, never rendered here: for a caller
@@ -396,6 +391,92 @@ fn read(path: &Path) -> Option<Vec<i16>> {
 pub fn from_environment() -> Option<Arc<TtsCache>> {
     static SHARED: std::sync::OnceLock<Option<Arc<TtsCache>>> = std::sync::OnceLock::new();
     SHARED.get_or_init(made_from_environment).clone()
+}
+
+/// `text` rendered by `render` piece by piece ([`pieces`]), the samples
+/// one after another, or why not: the service's refusal, or a piece empty
+/// or past [`MOST_FRAMES`], the cap of every render.
+fn in_pieces(
+    text: &str,
+    render: impl Fn(&str) -> Result<Vec<i16>, String>,
+) -> Result<Vec<i16>, String> {
+    let mut samples = Vec::new();
+    for piece in pieces(text) {
+        let rendered = render(&piece).map_err(|why| format!("not rendered: {why}"))?;
+        if rendered.is_empty() || rendered.len() > MOST_FRAMES as usize {
+            return Err(format!(
+                "rendered empty or past {} s",
+                MOST_FRAMES / SOUND_RATE
+            ));
+        }
+        samples.extend_from_slice(&rendered);
+    }
+    Ok(samples)
+}
+
+/// Where a long line is cut, coarsest first: sentence ends, then clause
+/// ends; past both, between words.
+const MARKS: [&[char]; 2] = [&['.', '!', '?'], &[',', ';', ':']];
+
+/// An exact `line` as it is rendered (#7892): whole within
+/// [`MOST_PIECE_CHARS`], else in pieces within it, cut at sentence ends,
+/// then clause ends, then between words, every word kept in its order.
+pub fn pieces(line: &str) -> Vec<String> {
+    split(line, &MARKS)
+}
+
+/// `text` within [`MOST_PIECE_CHARS`]: whole when it fits, else its units
+/// (its words up to each one ending in one of `marks`' first; each word,
+/// with no marks left) packed in order, a unit past it split again by the
+/// finer marks. A word alone past it is cut between its characters.
+fn split(text: &str, marks: &[&[char]]) -> Vec<String> {
+    let count = |text: &str| text.chars().count();
+    if count(text) <= MOST_PIECE_CHARS {
+        return vec![text.to_owned()];
+    }
+    let units: Vec<String> = match marks.first() {
+        Some(ends) => {
+            let mut units = Vec::new();
+            let mut unit = String::new();
+            for word in text.split_whitespace() {
+                if !unit.is_empty() {
+                    unit.push(' ');
+                }
+                unit.push_str(word);
+                if word.ends_with(*ends) {
+                    units.push(std::mem::take(&mut unit));
+                }
+            }
+            if !unit.is_empty() {
+                units.push(unit);
+            }
+            units
+        }
+        None if !text.contains(char::is_whitespace) => {
+            let chars: Vec<char> = text.chars().collect();
+            return chars
+                .chunks(MOST_PIECE_CHARS)
+                .map(|cut| cut.iter().collect())
+                .collect();
+        }
+        None => text.split_whitespace().map(str::to_owned).collect(),
+    };
+    let finer = marks.get(1..).unwrap_or_default();
+    let mut said = Vec::new();
+    let mut piece = String::new();
+    for part in units.iter().flat_map(|unit| split(unit, finer)) {
+        if !piece.is_empty() && count(&piece) + 1 + count(&part) > MOST_PIECE_CHARS {
+            said.push(std::mem::take(&mut piece));
+        }
+        if !piece.is_empty() {
+            piece.push(' ');
+        }
+        piece.push_str(&part);
+    }
+    if !piece.is_empty() {
+        said.push(piece);
+    }
+    said
 }
 
 /// How long rendering `text` whole may take: [`RENDER_WITHIN`] for a short
