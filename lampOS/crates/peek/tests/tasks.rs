@@ -1,7 +1,9 @@
 //! The Tasks section (#7208, step 3): each Harness task the lamp handed
 //! over, from `tasks/status` only, as a card with its engine and state.
-use lamp_msgs::{AgentState, Sign, TaskProgress, TaskSettled, TaskStatus};
-use lamp_peek::page;
+use lamp_msgs::{
+    AgentState, Sign, SkillTask, SkillTaskStage, TaskProgress, TaskSettled, TaskStatus,
+};
+use lamp_peek::{page, timeline::Timeline};
 
 const NOW: u64 = 1_800_000_000_000;
 
@@ -159,4 +161,71 @@ fn a_hostile_engine_is_escaped() {
     assert!(html.contains("&lt;script&gt;"), "{html}");
     let line = page::tasks_line(Some(&sample));
     assert!(!line.contains("<script>"), "{line}");
+}
+
+/// What `skills/tasks` says of a skill's run (#7873).
+fn skill_news(stage: SkillTaskStage, run: Option<&str>) -> SkillTask {
+    SkillTask {
+        skill: "mail-check".into(),
+        stage,
+        run: run.map(str::to_owned),
+        engine: (stage == SkillTaskStage::Started).then_some("openclaw".into()),
+        gate: (stage == SkillTaskStage::Held).then_some("not alone".into()),
+    }
+}
+
+/// #7873 (a), lamp-52e6 on 19 Nov: a skill's `do.task` ran on OpenClaw
+/// (task-1795056147468-853891-0, 09:42:27 to 09:44:26) while Tasks said
+/// "Nothing is being worked on": `tasks/status` lists only the store's
+/// tasks. Its run shows with its engine and state, working, then done.
+#[test]
+fn a_skills_task_shows_on_the_tasks_card_with_its_engine_and_state() {
+    let mut timeline = Timeline::new(false);
+    let run = Some("task-1795056147468-853891-0");
+    timeline.skill_task(skill_news(SkillTaskStage::Started, run), NOW - 60_000);
+    let empty = status(vec![], vec![], vec![]);
+    let html = page::tasks_with(Some(&empty), &timeline.skill_runs(), NOW);
+    assert!(!html.contains("Nothing is being worked on."), "{html}");
+    assert_eq!(html.matches("class=\"card task\"").count(), 1, "{html}");
+    assert!(
+        html.contains("<b>task 1795056147468-853891-0</b>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"badge\">OpenClaw</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"badge badge-blue\">working</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("skill mail-check · began 1 min ago"),
+        "{html}"
+    );
+    // Its end goes to its own run.
+    timeline.skill_task(skill_news(SkillTaskStage::Ran, run), NOW - 20_000);
+    let html = page::tasks_with(Some(&empty), &timeline.skill_runs(), NOW);
+    assert!(html.contains("Nothing is being worked on."), "{html}");
+    assert!(html.contains("class=\"card task ended\""), "{html}");
+    assert!(
+        html.contains("<span class=\"badge badge-green\">done</span>"),
+        "{html}"
+    );
+    // A failed one, red; one that doesn't check is not kept.
+    let other = Some("task-1795056379190-853891-1");
+    timeline.skill_task(skill_news(SkillTaskStage::Started, other), NOW - 10_000);
+    timeline.skill_task(skill_news(SkillTaskStage::Failed, other), NOW - 5_000);
+    let mut hostile = skill_news(SkillTaskStage::Started, Some("<script>"));
+    hostile.engine = Some("<script>".into());
+    timeline.skill_task(hostile, NOW);
+    let runs = timeline.skill_runs();
+    assert_eq!(runs.len(), 2, "{runs:?}");
+    let html = page::tasks_with(None, &runs, NOW);
+    assert!(html.contains("No word from lamp-tasks"), "{html}");
+    assert!(
+        html.contains("<span class=\"badge badge-red\">failed</span>"),
+        "{html}"
+    );
+    assert!(!html.contains("<script>"), "{html}");
 }
