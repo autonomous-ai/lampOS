@@ -1806,7 +1806,18 @@ fn lamp_update_reads_no_gateway_runs_switch() {
 fn the_one_path_writes_nothing_to_openclaws_shared_config() {
     let source = include_str!("../openclaw_install.rs");
     let code = source.split("\n#[cfg(test)]").next().unwrap();
-    assert_eq!(code.matches("on(root, CONFIG)").count(), 1);
+    // The writer, and (#7868) a round's read-only check of the `gateway`
+    // block, which writes nothing.
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 2);
+    let reader = code
+        .split_once("fn gateway_block_due(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(reader.contains("fs::read(on(root, CONFIG))"));
+    assert!(!reader.contains("write") && !reader.contains("replace"));
     let writer = code
         .split_once("fn gateway_config(")
         .unwrap()
