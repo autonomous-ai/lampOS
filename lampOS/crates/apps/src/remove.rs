@@ -5,7 +5,7 @@
 //! still has it.
 //!
 //! Order: mark; stop both unit variants; wait until neither has a process;
-//! clear their failed state; the data (never through the link); the code;
+//! clear their failed state; `systemctl clean --what=state` for both (systemd removes the dynamic user's data and its link; the helper writes in no state folder) and a look that it is gone; lamp-control's `app_forget` (what it kept of the app); the code;
 //! the companion skills (with the apps lock let go); the stopped mark; the
 //! removing mark. There is no
 //! user to delete: systemd's dynamic user goes with the unit.
@@ -44,13 +44,6 @@ pub trait Companions {
     fn taken_by_skill(&mut self, name: &str) -> bool;
 }
 
-fn gone_ok(result: io::Result<()>) -> io::Result<()> {
-    match result {
-        Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
-        _ => Ok(()),
-    }
-}
-
 fn wait_empty(fx: &mut dyn Effects, unit: &str) -> Result<(), String> {
     for _ in 0..WAIT_POLLS {
         if fx.unit_empty(unit)? {
@@ -73,36 +66,17 @@ pub(crate) fn remove_entry(path: &Path) -> io::Result<()> {
     }
 }
 
-/// The data folder is at `private/<name>` behind the link `data/<name>`
-/// that systemd makes. The link must be exactly that or it is left alone,
-/// with whatever it points at.
-fn remove_data(layout: &Layout, name: &str) -> Result<(), String> {
-    let link = layout.data.join(name);
-    let real = layout.private.join(name);
-    let is_link = match fs::symlink_metadata(&link) {
-        Ok(meta) if meta.file_type().is_symlink() => {
-            let target = fs::read_link(&link).map_err(|e| format!("{}: {e}", link.display()))?;
-            if target != real {
-                return Err(format!(
-                    "the data link {} points elsewhere ({}): left alone",
-                    link.display(),
-                    target.display()
-                ));
-            }
-            true
-        }
-        Ok(_) => {
+/// systemd's own state removal has run (`systemctl clean --what=state`):
+/// the app's private data folder and its link are gone, or the remove stops
+/// here with the `removing` mark still set. Nothing is deleted by the helper.
+fn data_gone(layout: &Layout, name: &str) -> Result<(), String> {
+    for path in [layout.data_link(name), layout.data_real(name)] {
+        if fs::symlink_metadata(&path).is_ok() {
             return Err(format!(
-                "{} is not a link to the data folder: left alone",
-                link.display()
+                "{} is still there after systemctl clean: left alone",
+                path.display()
             ));
         }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => false,
-        Err(error) => return Err(format!("{}: {error}", link.display())),
-    };
-    remove_entry(&real).map_err(|e| format!("{}: {e}", real.display()))?;
-    if is_link {
-        gone_ok(fs::remove_file(&link)).map_err(|e| format!("{}: {e}", link.display()))?;
     }
     Ok(())
 }
@@ -119,8 +93,8 @@ pub fn remove(
     let held = AppsLock::take(&layout.state, layout.lock_wait)?;
     let there = |path: &Path| fs::symlink_metadata(path).is_ok();
     if !(there(&layout.code.join(name))
-        || there(&layout.data.join(name))
-        || there(&layout.private.join(name))
+        || there(&layout.data_link(name))
+        || there(&layout.data_real(name))
         || has(&layout.state, name, Mark::Removing))
     {
         return Err(NOT_INSTALLED.to_owned());
@@ -137,7 +111,17 @@ pub fn remove(
     for unit in &units {
         fx.systemctl(Verb::ResetFailed, unit)?;
     }
-    remove_data(layout, name)?;
+    // The data is systemd's: it made it, so it removes it.
+    for unit in &units {
+        fx.systemctl(Verb::Clean, unit)?;
+    }
+    data_gone(layout, name)?;
+    // Both variants have stopped: lamp-control drops what it kept of the app
+    // (settings, panel, notes, clips, moves) and closes its connections. An
+    // answer that is not a yes leaves the remove cut at its mark, resumed by
+    // the next sweep or the owner asking again; an app left half-forgotten
+    // would hand its notes to a new app of the same name.
+    fx.forget(name)?;
     let code = layout.code.join(name);
     remove_entry(&code).map_err(|e| format!("{}: {e}", code.display()))?;
     // The skills have their own lock: not taken inside this one.

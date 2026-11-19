@@ -1,0 +1,29 @@
+# The Store apps' three folders (#7415, #7920): made empty, once at boot, as root, by the apps' own helper
+# (`lamp-apps-manage folders`: a unit of the part, so a round carries and adds it; a round carries binary-backed units
+# only). The helper's two units name two of the folders in ReadWritePaths= (a path missing there fails the unit's
+# namespace, 226) and `Want` this one; while the folders are absent they are SKIPPED, never failed. The product's
+# tmpfiles cannot make the folders: their switch-time run is inside lamp-update-apply.service, which cannot write them
+# on a lamp that already has it. Nothing here needs the apps' switch: no input, empty folders, no app.
+# Not in the target and not enabled: lamp-apps-start.service (which is) and the helper's template Want it.
+[Unit]
+Description=lampOS apps' folders
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+Slice=lampos-parts.slice
+ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage folders
+SyslogIdentifier=lamp-apps-manage
+TimeoutStartSec=30
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER

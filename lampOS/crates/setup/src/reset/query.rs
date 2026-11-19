@@ -354,6 +354,9 @@ mod tests {
             fn remove_installed_skills(&mut self) -> io::Result<usize> {
                 panic!("no wipe after a stop that failed");
             }
+            fn remove_installed_apps(&mut self) -> io::Result<usize> {
+                panic!("no wipe after a stop that failed");
+            }
             fn forget_agents(&mut self) -> io::Result<usize> {
                 panic!("no wipe after a stop that failed");
             }

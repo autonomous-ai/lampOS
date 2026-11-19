@@ -241,6 +241,26 @@ fn the_unit_may_reach_lamp_voices_say_socket() {
     assert!(writable.contains(&"-/run/lampos-say"), "{writable:?}");
 }
 
+/// #7956 (the first builder, 17:35): lamp-cloud puts an install's package in the apps' staging folder, which
+/// `ProtectSystem=strict` made read-only for it (os error 30); the entry is optional (`-`), so a lamp without
+/// the folder still starts.
+#[test]
+fn the_unit_may_write_the_apps_staging_folder_and_starts_without_it() {
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(
+        writable.contains(&"-/var/lib/lampos-apps-staging"),
+        "{writable:?}"
+    );
+    assert!(
+        !writable.contains(&"/var/lib/lampos-apps-staging"),
+        "a plain entry fails the unit's namespace where the folder is missing"
+    );
+}
+
 /// A8 (#6852): the app's removal reaches memory. lamp-cloud's unit names
 /// memory's narrow socket where memory's unit opens it, for lamp-cloud's own
 /// group; the faces page itself stays as `LAMP_FACES_PAGE` sets it.

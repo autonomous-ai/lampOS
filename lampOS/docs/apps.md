@@ -2,7 +2,7 @@
 
 An **app** is a program a developer writes with the SDK, publishes to the
 Skills Store, and an owner installs from the app on their phone; it then runs
-on the lamp as its own unprivileged systemd unit (`lampapp@<name>.service`),
+on the lamp as its own unprivileged systemd unit (`lamp-app@<name>.service`),
 talking to the lamp through the door's vocabulary on a socket of its own. This
 page is the contract between the developer, the Store, the phone's app and the
 lamp. It is in English only ([the docs rule](../AGENTS.md)).
@@ -135,13 +135,14 @@ files read-only to it under `/opt/lampOS/apps/<name>/<version>/` with a
 `/var/lib/private/lampapp-<name>/` (systemd's `DynamicUser`, the units'
 `StateDirectory=lampapp-%i`, one path component), behind the link
 `/var/lib/lampapp-<name>`, which survives an update and is deleted by
-a remove and by forget-everything; the unit `lampapp@<name>.service` from a
+a remove and by forget-everything; the unit `lamp-app@<name>.service` from a
 template (`DynamicUser`, no new privileges, `Slice=lampos-apps.slice`), or
-`lampapp-net@<name>.service` for an app whose manifest says `net: true` (the
+`lamp-app-net@<name>.service` for an app whose manifest says `net: true` (the
 same template with the network). A failed or cut install is cleaned (the
 half-written version and temporary folders go, the old `current` stays). A
 remove runs in one order, every step safe to run again: mark it, stop both
-unit variants, wait until neither has a process, clear their failed state,
+unit variants, wait until neither has a process, clear their failed state (a unit that is not loaded, which `systemctl` says
+with exit 5 or with exit 1 and "not loaded", counts as cleared), 
 delete the data, the code and the companion skills, then, only with both units
 empty, ask lamp-control `{"app_forget": NAME}` so that what it kept of the app
 (settings, panel, notes, clips, moves) goes too, and clear the mark. The boot
@@ -150,6 +151,14 @@ remove the same way and may send `app_forget` as well: lamp-control accepts it
 from that unit for this op alone. (The helper's `app_forget` step is piece 2
 part C, #7813; until that is in, a remove does not send it.) Companion skills
 are placed into the skills folder by the same helper with the skill checks.
+
+A factory reset ("forget everything", `lamp-setup`'s reset) leaves no app of the previous owner: its barrier stops
+every `lamp-app@*` and `lamp-app-net@*` unit with the other writers, and a step after the plan's wipes empties
+`/opt/lampOS/apps` (the apps' code and the helper's launcher), `/var/lib/lampos-apps-state` (the marks) and
+`/var/lib/lampos-apps-staging` (staged packages), keeping the folders the units name, and removes every
+`/var/lib/private/lampapp-*` and its `/var/lib/lampapp-*` link (`reset::remove_installed_apps`, #7956). The next owner
+starts with no app, no app data and nothing to start at boot; the apps' facts in memory go with the person's
+forget-everything.
 
 ### The owner's yes
 
@@ -176,7 +185,7 @@ helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 
 (Built in pieces 3b-1, 3b-2a and 3b-2b; the SDK's fake lamp speaks the first two. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
 `LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in the folder
-`/run/lampos-apps` that the product's `tmpfiles.d` line makes (`d /run/lampos-apps 0755 lampos lampos -`: the shared `lampos` user's, which is also lamp-cloud's and lamp-skills' user, so the folder keeps an app out, not another lampOS part, except that the three `lampos` units with no `ProtectSystem=strict` (lamp-body, lamp-eyes, lamp-tasks, where the agents' shells run) have it hidden, `InaccessiblePaths=-/run/lampos-apps`, and an install test holds every other `lampos` unit to that or to `strict`; lamp-control's unit names it `ReadWritePaths=-/run/lampos-apps` under `ProtectSystem=strict`, and it never makes the folder: its bind fails quietly without it): the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`, or `lampapp-net@<name>.service` for an app whose manifest says `net: true`, and the unit must be the manifest's: a plain unit for a `net` app, or the `net` unit for any other, is refused), and the process must still have the uid the kernel named on connect (a pid that came back as another process is no peer),
+`/run/lampos-apps` that the product's `tmpfiles.d` line makes (`d /run/lampos-apps 0755 lampos lampos -`: the shared `lampos` user's, which is also lamp-cloud's and lamp-skills' user, so the folder keeps an app out, not another lampOS part, except that the three `lampos` units with no `ProtectSystem=strict` (lamp-body, lamp-eyes, lamp-tasks, where the agents' shells run) have it hidden, `InaccessiblePaths=-/run/lampos-apps`, and an install test holds every other `lampos` unit to that or to `strict`; lamp-control's unit names it `ReadWritePaths=-/run/lampos-apps` under `ProtectSystem=strict`, and it never makes the folder: its bind fails quietly without it): the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lamp-app@<name>.service`, or `lamp-app-net@<name>.service` for an app whose manifest says `net: true`, and the unit must be the manifest's: a plain unit for a `net` app, or the `net` unit for any other, is refused), and the process must still have the uid the kernel named on connect (a pid that came back as another process is no peer),
 read from `SO_PEERCRED`'s pid, never a name the app says. It speaks the door's
 WebSocket at `/v1` with no TLS and the same frames; `hello` takes any
 well-formed `client` and `sig` and answers with `app` and `version` beside

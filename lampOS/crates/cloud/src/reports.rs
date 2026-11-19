@@ -116,6 +116,9 @@ pub const UNITS: &[&str] = &[
     "lamp-addons.service",
     "lamp-air-clock.service",
     "lamp-air.service",
+    "lamp-apps-folders.service",
+    "lamp-apps-manage@.service",
+    "lamp-apps-start.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",
@@ -4521,6 +4524,9 @@ pub(crate) mod tests {
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .filter(|name| name.starts_with("lamp-") && name.ends_with(".service"))
+            // The Store apps' two templates are an app's, not a part of the lamp: a third party's program runs
+            // there, in a sandbox with no way to the exit-note folder, so no stop of one is reported by Cloud.
+            .filter(|name| !["lamp-app@.service", "lamp-app-net@.service"].contains(&name.as_str()))
             .collect();
         units.sort();
         assert_eq!(units, UNITS);

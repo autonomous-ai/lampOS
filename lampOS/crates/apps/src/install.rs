@@ -198,6 +198,13 @@ fn lay_and_start(
     }
     let started = !has(&layout.state, name, Mark::Stopped);
     if started {
+        // The shared cap first (it lives in /run: a lost one must not let a new app run uncapped); refused, the
+        // install fails and is put back like any failed start.
+        fx.limit_apps().map_err(|error| {
+            format!("the apps' shared limit is not set, so the app does not start: {error}")
+        })?;
+        // An app that hit its restart limit would refuse the restart of a fixed version: cleared first.
+        fx.systemctl(Verb::ResetFailed, &unit)?;
         fx.systemctl(Verb::Restart, &unit)?;
     }
     clear(&layout.state, name, Mark::Installing).map_err(|e| format!("a mark: {e}"))?;

@@ -24,10 +24,10 @@ pub fn user_name(name: &str) -> String {
 
 /// The instance of the app's own unit (no `net`).
 pub fn plain_unit(name: &str) -> String {
-    format!("lampapp@{name}.service")
+    format!("lamp-app@{name}.service")
 }
 
 /// The instance of the unit with a way out, for a manifest with `"net": true`.
 pub fn net_unit(name: &str) -> String {
-    format!("lampapp-net@{name}.service")
+    format!("lamp-app-net@{name}.service")
 }

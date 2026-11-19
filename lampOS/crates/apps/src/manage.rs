@@ -49,13 +49,22 @@ fn settled(layout: &Layout, name: &str) -> Result<Record, String> {
 pub fn start(layout: &Layout, fx: &mut dyn Effects, name: &str) -> Result<(), String> {
     let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
     let record = settled(layout, name)?;
+    // The shared cap again, idempotent: it lives in /run, so a failed set or a lost one must not let an app run
+    // uncapped. Refused, nothing starts.
+    fx.limit_apps().map_err(|error| {
+        format!("the apps' shared limit is not set, so the app does not start: {error}")
+    })?;
     let other = if record.net {
         plain_unit(name)
     } else {
         net_unit(name)
     };
     fx.systemctl(Verb::Stop, &other)?;
-    fx.systemctl(Verb::Start, &unit_for(&record, name))?;
+    // A unit that hit its restart limit is refused by Start until the window passes: the owner's Start clears it
+    // first (a unit that is not loaded is fine: nothing to clear).
+    let unit = unit_for(&record, name);
+    fx.systemctl(Verb::ResetFailed, &unit)?;
+    fx.systemctl(Verb::Start, &unit)?;
     clear(&layout.state, name, Mark::Stopped).map_err(|e| format!("a mark: {e}"))
 }
 
@@ -90,6 +99,13 @@ fn names(layout: &Layout) -> Vec<String> {
 /// and the rest still start. Returns the names started and the errors.
 pub fn start_all(layout: &Layout, fx: &mut dyn Effects) -> (Vec<String>, Vec<String>) {
     let (mut started, mut errors) = (Vec::new(), Vec::new());
+    // The shared cap first, and no app without it: fails closed (the slice has no unit file).
+    if let Err(error) = fx.limit_apps() {
+        errors.push(format!(
+            "the apps' shared limit is not set, so no app starts: {error}"
+        ));
+        return (started, errors);
+    }
     for name in names(layout) {
         let Ok(_held) = AppsLock::take(&layout.state, layout.lock_wait) else {
             errors.push(format!("{name}: {}", crate::lock::BUSY));
