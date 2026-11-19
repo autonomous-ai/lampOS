@@ -5021,7 +5021,14 @@ gone ([switches.md](switches.md)). What happens:
     one read at its ask) or the lamp's owner, the queue's cancel rule
     (Heron's HOLD 1 on #7936): anyone else's, or a line no one known said,
     changes nothing, never enters the make's heard line, and is told only
-    whoever asked can change it (`"error": "not_theirs"`). A change that
+    whoever asked can change it (`"error": "not_theirs"`); of a skill made
+    a moment ago, that they can ask for one of their own. A line that is
+    the asker's only by their face alone in view
+    (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) is no line of theirs to act on
+    (`services::acting_person`, the owner's own rule; a waiting make's
+    cancel reads it too). The same rule holds for a no to a make under
+    way: a guest's "never mind" never drops the owner's make, told it is
+    still being made (`NOT_THEIRS_NO_NEXT`). A change that
     would make the ask longer than `made_skill::MOST_REQUEST_BYTES` changes
     nothing and is told so at once (`"error": "too_long"`), never
     "changed" and then "too long". Under way, the change is held for the
@@ -5045,7 +5052,12 @@ gone ([switches.md](switches.md)). What happens:
     told at once, as under way (`CHANGED_NEXT`, HOLD 3); the remake runs
     off the turn (`second_provider::worker::run_remade`), held to whoever
     asked first, its line said through the say service as a make that
-    waited its turn's is, which frees the slot. A make done and on is told
+    waited its turn's is, which frees the slot. A remake that fails with
+    no line of its own (the part not running, a brief refused, the judge's
+    unclear ask with `LAMP_MAKE_NO_ASKS`) says why, "I couldn't make it
+    with your change: …", whatever the person said since, as a queued
+    make's failure is; one dropped by their later no says nothing
+    (`run_remade_with`). A make done and on is told
     its change is a new make of it, the whole ask with the change. A line
     about something else leaves the make alone. "change" on a wait that is
     no voice make's (a skill's task, a remove, a record let go) reads as
@@ -5053,7 +5065,9 @@ gone ([switches.md](switches.md)). What happens:
     `a_change_said_while_made_makes_it_with_the_change`,
     `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
     `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_face_only_line_never_changes_the_askers_make`,
     `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `make_queue_runs::a_remake_that_fails_says_its_line`,
     `a_change_to_a_wait_of_no_make_reads_as_unclear`,
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,

@@ -1739,7 +1739,15 @@ sau:
     nhờ) hoặc chủ của đèn, đúng quy tắc huỷ của hàng đợi (HOLD 1 của Heron
     trên #7936): của bất kỳ ai khác, hay một câu không ai được biết nói, không
     đổi gì, không bao giờ vào câu nghe được của lần tạo, và được báo chỉ
-    người đã nhờ mới đổi được (`"error": "not_theirs"`). Một thay đổi làm
+    người đã nhờ mới đổi được (`"error": "not_theirs"`); với một kỹ năng
+    vừa tạo xong, rằng họ có thể nhờ một kỹ năng của riêng mình. Một câu là
+    của người đã nhờ chỉ vì riêng khuôn mặt họ trong tầm nhìn
+    (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) không phải câu của họ để hành động
+    theo (`services::acting_person`, quy tắc của chính chủ; lệnh huỷ của
+    một lần tạo đang chờ cũng đọc nó). Cùng quy tắc áp dụng cho một lời
+    "không" với lần tạo đang chạy: "never mind" của một vị khách không bao
+    giờ bỏ lần tạo của chủ, và được báo là nó vẫn đang được tạo
+    (`NOT_THEIRS_NO_NEXT`). Một thay đổi làm
     lời nhờ dài quá `made_skill::MOST_REQUEST_BYTES` không đổi gì và được
     báo ngay (`"error": "too_long"`), không bao giờ "đã đổi" rồi mới "quá
     dài". Khi đang chạy, thay đổi được giữ cho lần tạo: ở lần nhìn cuối
@@ -1764,7 +1772,12 @@ sau:
     chạy (`CHANGED_NEXT`, HOLD 3); lần tạo lại chạy ngoài lượt
     (`second_provider::worker::run_remade`), theo người đã nhờ đầu tiên,
     câu của nó được nói qua dịch vụ nói như của một lần tạo đã chờ lượt,
-    và việc đó trả chỗ. Một lần tạo đã xong và đã bật được báo rằng thay
+    và việc đó trả chỗ. Một lần tạo lại thất bại mà không có câu riêng
+    (phần đó không chạy, một brief bị từ chối, lời nhờ chưa rõ theo bộ phán
+    xét với `LAMP_MAKE_NO_ASKS`) nói lý do, "I couldn't make it with your
+    change: …", bất kể người đó đã nói gì sau đó, như thất bại của một lần
+    tạo đã xếp hàng; một lần bị bỏ bởi lời "không" sau đó của họ không nói
+    gì (`run_remade_with`). Một lần tạo đã xong và đã bật được báo rằng thay
     đổi của nó là một lần tạo mới, cả lời nhờ cùng thay đổi. Một câu về
     chuyện khác để yên lần tạo. "change" cho một lần chờ không phải của một
     lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
@@ -1772,7 +1785,9 @@ sau:
     `a_change_said_while_made_makes_it_with_the_change`,
     `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
     `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_face_only_line_never_changes_the_askers_make`,
     `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `make_queue_runs::a_remake_that_fails_says_its_line`,
     `a_change_to_a_wait_of_no_make_reads_as_unclear`,
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,

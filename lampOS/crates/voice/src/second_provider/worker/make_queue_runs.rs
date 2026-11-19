@@ -275,3 +275,52 @@ fn a_queued_make_not_acted_on_says_one_failed_line() {
         "once"
     );
 }
+
+/// Twelve's and Heron's HOLD on #7936 (#7912): a remake after a waiting
+/// yes, told "you'll hear when it's ready", that fails with no line of its
+/// own (the part not running; the judge's unclear ask with
+/// `LAMP_MAKE_NO_ASKS`) says why, once, as a queued make's failure is; one
+/// dropped by the person's later no says nothing.
+#[test]
+fn a_remake_that_fails_says_its_line() {
+    for why in [
+        crate::tools::unavailable(),
+        serde_json::json!({
+            "error": crate::make_no_asks::NOT_ACTED,
+            "next": crate::make_no_asks::NOT_ACTED_NEXT
+        }),
+    ] {
+        let (say, said) = mpsc::channel();
+        let (end, ended) = mpsc::channel();
+        super::run_remade_with(
+            10,
+            Box::new(move || ToolAnswer::plain(why)),
+            move |line| say.send(line).unwrap(),
+            move || end.send(()).unwrap(),
+        );
+        let line = said.recv_timeout(Duration::from_secs(5));
+        assert!(
+            line.as_deref()
+                .is_ok_and(|line| line.starts_with("I couldn't make it with your change: ")),
+            "{line:?}"
+        );
+        assert!(ended.recv_timeout(Duration::from_secs(5)).is_ok());
+        assert!(
+            said.recv_timeout(Duration::from_millis(300)).is_err(),
+            "once"
+        );
+    }
+    let (say, said) = mpsc::channel::<String>();
+    let (end, ended) = mpsc::channel();
+    super::run_remade_with(
+        11,
+        Box::new(|| ToolAnswer::plain(serde_json::json!({"dropped": true}))),
+        move |line| say.send(line).unwrap(),
+        move || end.send(()).unwrap(),
+    );
+    assert!(ended.recv_timeout(Duration::from_secs(5)).is_ok());
+    assert!(
+        said.recv_timeout(Duration::from_millis(300)).is_err(),
+        "dropped: nothing"
+    );
+}

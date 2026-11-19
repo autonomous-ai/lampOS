@@ -1771,13 +1771,25 @@ fn owner_among(
     lease: Option<&crate::memory_scope::ScopeLease>,
     owners: &[String],
 ) -> Option<String> {
-    let lease = lease.filter(|lease| !lease.forgets_need_mouth())?;
-    let person = lease
-        .scope()
-        .filter(|scope| !scope.held())?
-        .person()?
-        .to_owned();
+    let person = acting_person(lease)?;
     owners.contains(&person).then_some(person)
+}
+
+/// The person whose line `lease` is, to act as: its scope's person, not
+/// held, and never a line that is theirs only by their face alone in view
+/// (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, `ScopeLease::forgets_need_mouth`),
+/// which counts for saving and recall, never for acting as them. The owner
+/// ([`owner_among`]), a voice make's change (`make_skill_local::AskedBy`)
+/// and a waiting make's cancel (`make_queue::cancel`) all read this one.
+pub(crate) fn acting_person(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    let lease = lease.filter(|lease| !lease.forgets_need_mouth())?;
+    Some(
+        lease
+            .scope()
+            .filter(|scope| !scope.held())?
+            .person()?
+            .to_owned(),
+    )
 }
 
 /// Whether the owner is the only face the eyes see now

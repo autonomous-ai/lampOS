@@ -2590,13 +2590,11 @@ pub struct AskedBy {
 impl AskedBy {
     /// Who said the line of `lease`: its person, unless the scope is held,
     /// and its owner.
+    /// Never a line theirs only by their face alone in view
+    /// (`services::acting_person`, Heron's HOLD on #7936 at e224336).
     fn of(lease: Option<&crate::memory_scope::ScopeLease>) -> Self {
         Self {
-            speaker: lease
-                .and_then(|lease| lease.scope())
-                .filter(|scope| !scope.held())
-                .and_then(|scope| scope.person())
-                .map(str::to_owned),
+            speaker: crate::services::acting_person(lease),
             owner: crate::services::owner_of(lease),
         }
     }
@@ -2651,6 +2649,42 @@ fn asked_by_kept() -> bool {
 const NOT_THEIRS_CHANGE_NEXT: &str = "Nothing was changed: only whoever asked for it can change \
      it, so it is made as they asked. Say so in a few words, in the conversation's language. \
      Call nothing else.";
+
+/// What the model is told of a change, by anyone else, to a skill made a
+/// moment ago for whoever asked (Twelve's P3 on #7936).
+const NOT_THEIRS_MADE_NEXT: &str = "Nothing was changed: that skill was made for whoever asked \
+     for it, and only they can change it. Say so in a few words, in the conversation's language, \
+     and that they can ask for a skill of their own. Call nothing else.";
+
+/// What the model is told of a no, by anyone else, to a make under way
+/// (Twelve's P3 on #7936): the change rule, [`AskedBy::may_change`].
+const NOT_THEIRS_NO_NEXT: &str = "It was not dropped: only whoever asked for it can stop it, so \
+     it is still being made. Say so in a few words, in the conversation's language. Call nothing \
+     else.";
+
+/// A no by `by` in `request` to the voice make under way that `id` names,
+/// refused when `by` neither asked for it nor is the owner: what the model
+/// is told. None for any other no (theirs, the owner's, or no make under
+/// way by that id), which [`making_answered`] takes.
+fn making_no_refused(id: &str, request: u64, by: &AskedBy) -> Option<Value> {
+    let held = id.strip_prefix(MAKING_ID)?.parse::<u64>().ok()?;
+    let asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let ask = asks
+        .iter()
+        .find(|ask| ask.id == held && request > ask.made_in && ask.made.is_none())?;
+    if ask.asked_by.may_change(by) {
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: request {request}: a no to a make under way wasn't taken: the line isn't its asker's or the owner's (#7912)"
+    );
+    Some(json!({
+        "approved": false,
+        "making": true,
+        "error": "not_theirs",
+        "next": NOT_THEIRS_NO_NEXT
+    }))
+}
 
 /// What the model is told of a change that would make the ask too long to
 /// make as one skill (`made_skill::MOST_REQUEST_BYTES`): nothing changed.
@@ -2721,10 +2755,16 @@ pub fn making_changed(
         eprintln!(
             "lamp-voice: request {request}: a change to a make wasn't taken: the line isn't its asker's or the owner's (#7912)"
         );
+        // Made already, it is theirs: anyone else asks for their own.
+        let next = if ask.made.is_some() {
+            NOT_THEIRS_MADE_NEXT
+        } else {
+            NOT_THEIRS_CHANGE_NEXT
+        };
         return Making::Told(json!({
             "approved": false,
             "error": "not_theirs",
-            "next": NOT_THEIRS_CHANGE_NEXT
+            "next": next
         }));
     }
     // The ask as it would be made: every change held, then this one.
@@ -5439,11 +5479,17 @@ pub fn answer(
                 },
             )
         } else {
-            making_answered(
-                id,
-                request,
-                call.args[crate::skill_write_yes::ANSWER].as_str(),
-            )
+            let given = call.args[crate::skill_write_yes::ANSWER].as_str();
+            // A no to a make under way, by the same rule as a change
+            // (Twelve's P3 on #7936): a guest's "never mind" never drops
+            // the owner's make.
+            if heard
+                && given == Some("no")
+                && let Some(refused) = making_no_refused(id, request, &AskedBy::of(lease))
+            {
+                return refused;
+            }
+            making_answered(id, request, given)
         };
         let waits;
         let id = match answered {
@@ -7755,6 +7801,13 @@ light = { dim = 1 }
             assert!(!ask.heard_line.contains("sister"), "{}", ask.heard_line);
             assert_eq!(ask.asked_by, by("ann", true));
         }
+        // A guest's "never mind" never drops the owner's make (Twelve's P3
+        // on #7936); the owner's and the asker's own no are taken on.
+        let no = making_no_refused(&id, 91, &by("guest", false)).expect("refused");
+        assert_eq!(no["error"], "not_theirs", "{no}");
+        assert!(!held.dropped());
+        assert_eq!(making_no_refused(&id, 91, &by("ann", true)), None);
+        assert_eq!(making_no_refused(&id, 91, &by("ann", false)), None);
         // Anyone not known, outside the private room: no one's change.
         let Making::Told(nobody) = making_changed(&id, 91, sister, &AskedBy::default(), free)
         else {
@@ -7805,10 +7858,95 @@ light = { dim = 1 }
             panic!("told");
         };
         assert_eq!(other["error"], "not_theirs", "{other}");
-        drop(guests);
+        // Made already: anyone else is told to ask for their own.
+        guests.made("hum-twice", &json!({"made": "hum-twice", "on": true}), NOW);
+        let Making::Told(made) = making_changed(
+            &id,
+            96,
+            (Some("hum thrice"), "hum three times"),
+            &by("bob", false),
+            free,
+        ) else {
+            panic!("told");
+        };
+        assert_eq!(made["error"], "not_theirs", "{made}");
+        assert_eq!(made["next"], NOT_THEIRS_MADE_NEXT, "{made}");
         ASKS.lock()
             .unwrap()
             .retain(|ask| ask.directory != directory);
+    }
+
+    /// Heron's HOLD on #7936 at e224336: a line that is the asker's only by
+    /// their face alone in view (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, on in
+    /// the product) is no line of theirs to act on: the asker silent and
+    /// alone in view, a guest off camera says "and also message my sister
+    /// every night", and nothing changes. The asker's own voiced line does.
+    #[test]
+    fn a_face_only_line_never_changes_the_askers_make() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        crate::person::set_private_room_for_test(Some(false));
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([79; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let directory =
+            std::env::temp_dir().join(format!("one-ask-face-only-{}", std::process::id()));
+        let asker = AskedBy {
+            speaker: Some(crate::remember::person_id("Ann")),
+            owner: None,
+        };
+        let held = with_asked_by(asker, || {
+            OneAsk::begin_in(
+                &directory,
+                Some("make a skill that dims the light at 10 pm"),
+                "dims the light at 10 pm",
+                NOW,
+                101,
+            )
+        })
+        .unwrap();
+        let id = format!("{MAKING_ID}{}", held.0);
+        let face_only = RequestScope::new(key, ScopeSnapshot::of("Ann"));
+        let lease = face_only.lease();
+        assert!(lease.read_by_one_face(), "the one-face rule takes the line");
+        assert!(lease.forgets_need_mouth());
+        let sister = (
+            Some("also message my sister every night"),
+            "and also message my sister every night",
+        );
+        let Making::Told(refused) =
+            making_changed(&id, 102, sister, &AskedBy::of(Some(&lease)), free)
+        else {
+            panic!("told");
+        };
+        assert_eq!(refused["error"], "not_theirs", "{refused}");
+        assert!(
+            ASKS.lock()
+                .unwrap()
+                .iter()
+                .find(|ask| ask.id == held.0)
+                .unwrap()
+                .changes
+                .is_empty()
+        );
+        // Ann's own line, her voice: taken.
+        let voiced = RequestScope::new(key, ScopeSnapshot::of("Ann"));
+        let Making::Told(taken) = making_changed(
+            &id,
+            103,
+            (Some("at ten fifty"), "make it ten fifty"),
+            &AskedBy::of(Some(&voiced.lease())),
+            free,
+        ) else {
+            panic!("told");
+        };
+        assert_eq!(taken["changed"], true, "{taken}");
+        drop(held);
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != directory);
+        crate::person::set_private_room_for_test(None);
     }
 
     /// Heron's HOLD 3 on #7936: a change to a make waiting for its yes is
@@ -7914,7 +8052,10 @@ light = { dim = 1 }
             REQUEST,
             &keeping,
             move || {
+                // The owner's line: every line is, in the private room.
+                crate::person::set_private_room_for_test(Some(true));
                 let no = answered_while_made(&directory, 73, json!({"answer": "no"}));
+                crate::person::set_private_room_for_test(None);
                 assert_eq!(no["dropped"], true, "{no}");
                 chat()
             },
