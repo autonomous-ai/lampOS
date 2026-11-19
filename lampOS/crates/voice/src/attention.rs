@@ -486,7 +486,8 @@ pub fn addresses_someone_else_on(heard: &str, stand_alone_ins: bool) -> bool {
 
 /// Whether `word` is the lamp's name misheard: three letters or more, one
 /// edit from "lamp" once repeated letters are taken once ("Lap", "Lamps",
-/// "Clamp", "Laam", "Limp", "Ramp"). Never a person's name: on lamp-06c1
+/// "Clamp", "Laam", "Limp", "Ramp"), never "Lam" and another letter
+/// ("Lama"). Never a person's name: on lamp-06c1
 /// on 18 Nov (14072) the owner's "Lamp, …", seen speaking with their own
 /// face, came back so and was held six times as said to someone it calls
 /// by name (#7698).
@@ -496,6 +497,12 @@ fn near_the_lamps_name(word: &str) -> bool {
         return false;
     }
     letters.dedup();
+    // "Lam" and one letter other than "p" ("Lama", "Lamy") is a person's
+    // name, not the lamp's misheard (the Reviewer-lead's P2 on #7999);
+    // "Lam" alone is already a stand-in, [`STAND_INS`].
+    if letters.len() == 4 && letters[..3] == ['l', 'a', 'm'] && letters[3] != 'p' {
+        return false;
+    }
     // One edit (Levenshtein) from "lamp", by a single row of distances.
     let lamp = ['l', 'a', 'm', 'p'];
     let mut row: Vec<usize> = (0..=lamp.len()).collect();
