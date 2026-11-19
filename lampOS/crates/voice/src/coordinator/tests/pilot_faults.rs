@@ -98,6 +98,13 @@ enum Act {
     CaptureReopen,
     /// The same with a 50 ms close, as an XRun the worker reopens at once.
     CaptureXRun,
+    /// `CaptureReopen` racing the speaker's re-prime on the same fresh
+    /// authority (#7224): the reopened epoch counts from 1 again, and its
+    /// first frames were cancelled against a clock not yet started.
+    CaptureReopenUnclocked,
+    /// The next three frames carry no clock start, with no reopen: fired
+    /// before the first frame, the boot's first frame precedes the start.
+    CaptureUnclocked,
     /// The provider peer closes its channels: the provider is gone.
     ProviderGone,
     /// Stop-only stall: the speaker consumes control messages but installs no
@@ -657,6 +664,13 @@ struct Peers {
     capture_lag_us: u64,
     capture_epoch: u64,
     capture_reopen: bool,
+    /// The next reopen is `Act::CaptureReopenUnclocked`'s.
+    capture_reopen_unclocked: bool,
+    /// What the schedule's sequence is ahead of the epoch's own, which
+    /// counts from 1 at a reopen as the worker's does.
+    capture_sequence_base: u64,
+    /// Frames still to send with no clock start.
+    capture_unclocked: u64,
     camera: Option<BootId>,
     camera_started: bool,
     camera_silent: bool,
@@ -713,6 +727,7 @@ impl Peers {
                 }
             }
             Act::CaptureSilent => self.capture_silent = true,
+            Act::CaptureUnclocked => self.capture_unclocked = 3,
             Act::CaptureLag => self.capture_lag_us = 30_000,
             Act::CaptureStall => {
                 // The device keeps its own 10 ms schedule (CaptureSchedule);
@@ -720,8 +735,9 @@ impl Peers {
                 self.capture_stalled_until =
                     Some(crate::scenario_clock::instant() + Duration::from_millis(500));
             }
-            Act::CaptureReopen | Act::CaptureXRun => {
+            Act::CaptureReopen | Act::CaptureXRun | Act::CaptureReopenUnclocked => {
                 let ms = if act == Act::CaptureXRun { 50 } else { 400 };
+                self.capture_reopen_unclocked = act == Act::CaptureReopenUnclocked;
                 self.capture_stalled_until =
                     Some(crate::scenario_clock::instant() + Duration::from_millis(ms));
                 // A closed microphone reads nothing: frames start again at
@@ -938,6 +954,11 @@ impl Peers {
                 if std::mem::take(&mut self.capture_reopen) {
                     self.capture_epoch += 1;
                     self.send_capture_started(index);
+                    if std::mem::take(&mut self.capture_reopen_unclocked) {
+                        self.capture_sequence_base =
+                            self.capture.as_ref().unwrap().next_sequence - 1;
+                        self.capture_unclocked = 3;
+                    }
                 }
                 // Frames follow a fixed 10 ms schedule, like a capture device.
                 for _ in 0..64 {
@@ -965,6 +986,7 @@ impl Peers {
                             .max(attempted_at_us - at);
                     }
                     let speech = self.speech(frame);
+                    let unclocked = self.capture_unclocked > 0;
                     let peer = &mut self.peers[index];
                     let sent = peer.channels.data.send(MicrophoneFrame {
                         raw: None,
@@ -972,7 +994,7 @@ impl Peers {
                         epoch: self.capture_epoch,
                         dsp_epoch: 1,
                         privacy_generation: peer.snapshot.unwrap().microphone_generation(),
-                        frame_sequence: frame,
+                        frame_sequence: frame - self.capture_sequence_base,
                         read_completed_at_us: at,
                         probability: if speech { 0.99 } else { 0.0 },
                         echo: None,
@@ -990,11 +1012,14 @@ impl Peers {
                             aec_queue_delay_ms: 0,
                             reference: ReferenceTiming {
                                 playback_epoch: 1,
-                                clock_started_at_us: Some(at),
+                                clock_started_at_us: (!unclocked).then_some(at),
                                 ..ReferenceTiming::default()
                             },
                         },
                     });
+                    if sent.is_ok() && unclocked {
+                        self.capture_unclocked -= 1;
+                    }
                     if sent.is_err() {
                         // A full socket (the catch-up after a stall can fill
                         // it) loses no block: the device still holds it, and
@@ -1577,6 +1602,9 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         capture_lag_us: 0,
         capture_epoch: 1,
         capture_reopen: false,
+        capture_reopen_unclocked: false,
+        capture_sequence_base: 0,
+        capture_unclocked: 0,
         camera: camera_boot,
         camera_started: false,
         camera_silent: false,
@@ -2133,6 +2161,67 @@ fn a_held_turn_is_not_cut_by_a_slow_pass_while_frames_come_on_time() {
         .filter(|(_, at, ..)| *at < muted_at)
         .collect();
     assert!(lapsed.is_empty(), "{lapsed:?}");
+}
+
+/// lamp-c0a4, 18 Nov 22:31:06 (#7224, fault 4): a held turn's capture
+/// frames stopped, it was cut 40 ms before its lease lapsed, the speaker
+/// re-primed on the fresh authority while capture reopened under it, and
+/// the reopened epoch's first frame came before the clock had started
+/// again: the voice exited 1 on "capture frame preceded certified running
+/// reference clock". With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` that frame
+/// is a gap's dropped frame, the reply is cut once and the voice goes on;
+/// off, it still ends there.
+#[test]
+fn a_held_turn_cut_then_a_reopen_before_the_clock_restarts_goes_on_with_the_switch() {
+    let _one = one_session();
+    for on in [true, false] {
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(on));
+        let run = run(Script {
+            actions: vec![
+                (When::Accepted(3), Act::CaptureReopenUnclocked),
+                (When::Block(400), Act::Mute),
+            ],
+            ..Script::question(Answer::Hold(40))
+        });
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+        if !on {
+            assert!(
+                run.result.as_ref().is_err_and(|error| error
+                    .to_string()
+                    .contains("capture frame preceded certified running reference clock")),
+                "off: {:?}",
+                run.result
+            );
+            continue;
+        }
+        run.assert_invariants();
+        assert!(is_mute(&run.result), "{:?}", run.result);
+        let cancels = run.events("hand_control_cancel");
+        assert_eq!(cancels.len(), 1, "{cancels:?}");
+        assert_eq!(cancels[0]["reason"], "capture_gap");
+        let gaps = run.events("capture_gap");
+        assert_eq!(gaps.len(), 1, "{gaps:?}");
+        assert!(gaps[0]["dropped_frames"].as_u64().unwrap() >= 1, "{gaps:?}");
+    }
+}
+
+/// #7224, fault 4: the boot's barrier is unchanged with the switch on.
+/// A first frame before the speaker's clock has ever started still ends
+/// the voice: nothing has been certified yet.
+#[test]
+fn a_boots_first_frame_before_the_clock_still_ends_the_voice_with_the_switch() {
+    let _one = one_session();
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(true));
+    let run =
+        run(Script::question(Answer::Complete(12)).then(When::Block(0), Act::CaptureUnclocked));
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+    assert!(
+        run.result.as_ref().is_err_and(|error| error
+            .to_string()
+            .contains("capture frame preceded certified running reference clock")),
+        "{:?}",
+        run.result
+    );
 }
 
 /// lamp-e82d, 4 Nov 11:44 (#4332): the privacy slide closed just after a
