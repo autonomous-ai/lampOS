@@ -492,7 +492,7 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
-         the form only: never answer with it. {REMINDER_IS_TIMER}, by the clock trigger \
+         the form only: never answer with it. {NAMED_TOLD} {REMINDER_IS_TIMER}, by the clock trigger \
          below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, \
          {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
@@ -893,6 +893,15 @@ pub const REQUEST: &str = "request";
 /// (`make_no_cannot::made`).
 pub const GIVEN_NAME: &str = "given_name";
 
+/// What the make's model is told of its skill's name (#7911): the name the
+/// request gives the skill, when it gives one. The voice's model gives it
+/// as [`GIVEN_NAME`] too, and code makes it the name
+/// ([`made_skill::given_name`]); told here as well for a call that left
+/// it out but kept it in the request's words (#7926's row on lamp-9adf:
+/// "make a skill called rain check" was kept as `morning-rain-check`).
+pub const NAMED_TOLD: &str = "Its SKILL.md name is the name the request gives the skill when it \
+     gives one, in lowercase words joined by -.";
+
 /// Whether a `make_skill` call's whole `args` ask for a new skill: they
 /// name its [`REQUEST`], as a streamed call whose first argument is
 /// [`REQUEST`] does ([`new_make_argument`], `ChatEvent::Argued`). Neither
@@ -1079,7 +1088,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             },
             GIVEN_NAME: {
                 "type": "string",
-                "description": "The name they give the new skill, the name alone (\"evening rate\"), as said; else left out."
+                "description": "Its name if they give one, alone (\"evening rate\"); else left out."
             }
         },
         "required": []
@@ -3621,7 +3630,13 @@ fn made_and_journaled_by(
                 "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
                  one task of the request; no DeepSeek draft kept"
             );
-            let made = agent_task(request, &chat, began, &agent_kept, (from, keeping, asked.named));
+            let made = agent_task(
+                request,
+                &chat,
+                began,
+                &agent_kept,
+                (from, keeping, asked.named),
+            );
             let line = kept_line(&made, false, began.elapsed().as_millis());
             return (plain_unless_cannot(made, false), line);
         }
@@ -4932,7 +4947,18 @@ pub fn answer(
             }));
         });
     }
-    let told = named_make(given_of(&call.args, undone.as_ref()), || {
+    // Whether the call gave the skill a name (#7926's row: none was kept
+    // on lamp-9adf, so whether the model gave one is journaled).
+    let given = given_of(&call.args, undone.as_ref());
+    eprintln!(
+        "lamp-voice: request {request}: a make {}",
+        if given.is_some() {
+            "with a name its person gave (given_name)"
+        } else {
+            "with no given_name"
+        }
+    );
+    let told = named_make(given, || {
         make_in(request, request_words, &keeping, own_chat, now_unix_ms)
     });
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
@@ -7838,6 +7864,55 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7926's row on lamp-9adf (build bede187d81): "make a skill called
+    /// rain check …", DeepSeek refused, the agent's answer kept long after
+    /// the turn. Here its turn is gone before the agent answers, and the
+    /// answer comes late: the name the person gave still holds, the make
+    /// and its keep being on the one thread the name is held on.
+    #[test]
+    fn a_name_in_the_requests_words_is_the_makers_to_keep_too() {
+        // #7926's row: with no `given_name` in the call, the make's model
+        // and the agent (the same system prompt) are told to name the skill
+        // as the request does; so is the model choosing a task's name.
+        assert!(system().contains(NAMED_TOLD), "{}", system());
+        for agent in [false, true] {
+            assert!(system_for(true, agent).contains(NAMED_TOLD));
+        }
+        assert!(
+            crate::make_no_cannot::system()
+                .contains("the name the request gives the skill when it gives one"),
+            "{}",
+            crate::make_no_cannot::system()
+        );
+    }
+
+    #[test]
+    fn an_agent_make_kept_after_its_turn_ended_keeps_the_given_name() {
+        let (root, kept_in) = keeping("given-name-late-agent");
+        let late = good().replace("name: evening-dim", "name: morning-rain-check");
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(move |_: &str| {
+                std::thread::sleep(Duration::from_millis(300));
+                Some(late.clone())
+            }),
+        );
+        let (url, served) = service(vec![(200, faces())]);
+        let agent = tasks.agent();
+        let turn = std::sync::Arc::new(());
+        set_turn(std::sync::Arc::downgrade(&turn));
+        drop(turn);
+        assert!(turn_cut());
+        let told = {
+            let _given = GivenName::set(Some("rain check".into()));
+            made_by(&kept_in, url, Some(&agent), NOW)
+        };
+        TURN.with(|kept| kept.borrow_mut().take());
+        assert_eq!(told["made"], "rain-check", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
         let _ = std::fs::remove_dir_all(&root);
     }
 

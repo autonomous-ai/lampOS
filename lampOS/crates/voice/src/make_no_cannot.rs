@@ -440,7 +440,8 @@ pub fn system() -> String {
          runs, with only the grants the skill names; the lamp reads the skill back to the person \
          and runs it only once they agree. You never write the task or any code: only its name, \
          its grants and when it runs. Answer exactly in this form and nothing else: a line \
-         name: and a short name, lowercase words joined by -; a line grants: and the fewest \
+         name: and a short name, lowercase words joined by -, the name the request gives the \
+         skill when it gives one; a line grants: and the fewest \
          grants the task needs, joined by commas, or none; then, when the request names a time \
          or a moment for it to run, one fenced block named skill.toml holding only \
          [permissions] with topics = its trigger's topics, and one [trigger] table (never \

@@ -4459,7 +4459,16 @@ gone ([switches.md](switches.md)). What happens:
      cut to the name's bound, before a taken name gets a free one, below.
      With none given, or one that gives no skill's name (no letter first,
      or letters a skill's name can't have, "tỷ giá"), the maker's own name
-     stands, as before. The schema's keys sort, so `given_name` streams
+     stands, as before. An agent's answer kept long after its turn ended
+     keeps it too: the make and its keep run on the one thread the name is
+     held on. The make's model and the agent (one system prompt,
+     `make_skill_local::NAMED_TOLD`), and the model choosing a task's name
+     (`make_no_cannot`), are also told to name the skill as the request
+     does, for a call that left `given_name` out but kept the name in its
+     words (#7926's row on lamp-9adf: "make a skill called rain check" was
+     kept as `morning-rain-check`); each make journals whether its call
+     gave one (`a make with a name its person gave (given_name)` or `a make
+     with no given_name`). The schema's keys sort, so `given_name` streams
      first in any call that carries it, a remove's too: a first
      `given_name` decides nothing (`make_skill_local::new_make_argument`
      gives `None`), and the whole calls decide by their `request`
@@ -4473,7 +4482,9 @@ gone ([switches.md](switches.md)). What happens:
      `the_undo_makes_the_first_ask_under_the_name_given_in_it`,
      `a_task_only_asked_for_takes_the_name_the_person_gave`,
      `a_make_whose_first_argument_is_its_given_name_is_opened`,
-     `a_given_name_without_a_request_opens_no_make`.
+     `a_given_name_without_a_request_opens_no_make`,
+     `an_agent_make_kept_after_its_turn_ended_keeps_the_given_name`,
+     `a_name_in_the_requests_words_is_the_makers_to_keep_too`.
    - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
      keeps the lamp's own skills, welcome-back, bedtime-morning,
      light-out, sip-of-water among them, so a skill the model named
