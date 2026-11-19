@@ -5288,12 +5288,13 @@ fn code_held(
             "a task's words, empty, too long or not plain",
         ));
     }
-    if let Some(summary) = task.get(TASK_SUMMARY) {
-        if !summary.as_str().is_some_and(task_summary_plain) {
-            return Err(scripts_not_held(
-                "a task's summary, not one plain line of at most 120 characters",
-            ));
-        }
+    if task
+        .get(TASK_SUMMARY)
+        .is_some_and(|summary| !summary.as_str().is_some_and(task_summary_plain))
+    {
+        return Err(scripts_not_held(
+            "a task's summary, not one plain line of at most 120 characters",
+        ));
     }
     let runs = task
         .get("run")
