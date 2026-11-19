@@ -1831,6 +1831,8 @@ fn with_the_switch_a_reopen_holds_its_blocks_until_a_late_clock_and_goes_on() {
     // ends the worker before it reopens.
     let mut rig = Rig::start_with("scripted reopen hold", 0, ReferenceRecovery::Bounded);
     rig.stream(&signal, 30);
+    // Every block before the stall handed on, so none counts after it.
+    rig.settle(0);
     rig.hold_up(400);
     rig.wait_for_start(2);
     let before = rig.frames.len();
@@ -1872,18 +1874,36 @@ fn with_the_switch_a_clock_that_never_starts_is_recovered_then_ends_capture() {
     let mut rig = Rig::start_with("scripted reopen never", 0, ReferenceRecovery::Bounded);
     rig.tolerate_fault = true;
     rig.stream(&signal, 30);
+    // Every block before the stall handed on, so none counts after it.
+    rig.settle(0);
     rig.hold_up(400);
     rig.wait_for_start(2);
     rig.reprime();
     let primed = Instant::now();
-    rig.microphone_only(&signal, 1_000);
-    assert_eq!(rig.gaps, 2, "step 1's ClockNotStarted gap");
-    rig.wait_for_start(3);
+    // Fed on the microphone's own 10 ms until step 1 has closed the
+    // microphone as `ClockNotStarted` and reopened it, however slow the
+    // runner: no fixed sleep decides what has happened.
     let deadline = primed + Duration::from_secs(4);
+    while rig.gaps < 2 || rig.epochs.len() < 3 {
+        assert!(
+            Instant::now() < deadline && rig.worker_running(),
+            "no step 1: starts {:?}, gaps {}, fault {:?} {:?}",
+            rig.epochs,
+            rig.gaps,
+            rig.fault,
+            rig.worker_fault
+        );
+        rig.microphone_only(&signal, 50);
+    }
+    assert_eq!(rig.epochs, [1, 2, 3]);
+    let deadline = Instant::now() + Duration::from_secs(4);
     while rig.worker_running() {
         assert!(Instant::now() < deadline, "step 2 never ended capture");
         rig.microphone_only(&signal, 50);
     }
+    rig.take();
+    // Step 2's own end, never the prime barrier's or any reference fault.
+    assert_eq!(rig.fault, None);
     let error = rig.worker.take().unwrap().join().unwrap().unwrap_err();
     assert!(
         error.contains("capture frame preceded certified running reference clock"),
