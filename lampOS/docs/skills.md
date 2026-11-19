@@ -571,18 +571,26 @@ skills".)
   source is found at each load; a run adds one to an atomic, with no lock
   and no file on its way. A thread of its own adds what was counted to
   `DIR/runs.json` at most once a minute (written whole beside it and moved
-  over it, 0600, under a lock on `DIR`), so a restart loses at most a
-  minute's runs. The file is running totals since it began: `{"version": 1,
+  over it, 0600, under `DIR/.runs.lock`, a 0600 file `lamp-skills` makes
+  at its start; never a lock on `DIR` itself, which the daily journal,
+  `DIR/daily.json`, holds for as long as `lamp-skills` runs), so a restart
+  loses at most a minute's runs. A flush waits at most 4 s for the lock
+  (`package::ASKED_LOCK_WAIT`), else counts those runs again at the next. The file is running totals since it began: `{"version": 1,
   "core", "store", "made_voice", "made_app", "made_unknown", "pushed",
   "other", "store_ids"}`, the Store's map by SHA-256, at most 256, the
   smallest let go past that; no skill's name, words or files, nor a made
   skill's SHA-256. One that can't be read is begun again (`lamp-cloud`
   reads a smaller total as a new beginning). The manage helper's
   `{"forget_counts": {}}` (asked by `lamp-cloud` at the person's no to
-  reports) deletes it under the same lock (`usage::forget`), and the
-  voice's `counts.json` with it. No new switch: `lamp-cloud` reads it only
+  reports) deletes it under the same lock (`usage::forget`; with no
+  `.runs.lock` yet, no `lamp-skills` of this version has written, so
+  without it), and the voice's `counts.json` with it, both locks waited for
+  within 4 s in all (`ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s), then
+  refused (`WouldBlock`) with nothing deleted, never a wait until systemd
+  kills the helper. No new switch: `lamp-cloud` reads it only
   with the reports' gates and the person's yes. Tests: `usage::tests`,
-  `package::tests::forget_counts_deletes_both_counts`.
+  `package::tests::forget_counts_deletes_both_counts`,
+  `package::tests::forget_counts_answers_while_the_daily_journal_is_open`.
 - It loads every folder in `--dir` (`/var/lib/lampOS/skills`), looks at the
   folder every two seconds, and loads them all again when a file other
   than a test changed. Cooldowns are kept across a reload.
@@ -7423,8 +7431,9 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    Kept in `counts.json` beside the made skills, numbers and the counted
    skills' SHA-256s only, never sent. Which maker a made
    skill on the lamp has is on its card, so the answer names no package.
-   Deleted, under its lock, by the manage helper's `forget_counts` at the
-   person's no (`made_counts::forget`). Tests: `made_counts::tests`.
+   Deleted, under its lock (`.counts.lock`, waited for at most what is left
+   of the helper's 4 s, then refused), by the manage helper's
+   `forget_counts` at the person's no (`made_counts::forget`). Tests: `made_counts::tests`.
 4. **Put on at once, then told aloud** (#5977; the owner, 10 Nov: a made
    skill goes on with no spoken yes; the app's MAKE IT is the ask). Kept,
    it is put on at once through the manage helper, as by voice
