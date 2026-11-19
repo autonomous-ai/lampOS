@@ -6918,6 +6918,9 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // Task news worded by the lamp's agent (`LAMP_CORE_VIA_AGENT`'s `news`):
+    // nothing is asked of it with the switch off.
+    let mut news_wordings = crate::news_agent::Wordings::from_environment();
     // A skill run's held write, read back for a spoken yes (#6432,
     // `LAMP_SKILL_TASKS=on`): none with the switch off.
     let mut run_writes = if lifetime.continuous() {
@@ -14139,12 +14142,23 @@ fn conversation_with_gate_inner(
                 news.begun(request, vec![key]);
             }
         }
+        // With `LAMP_CORE_VIA_AGENT`'s `news` (the first builder's 09:26):
+        // the news first in line is handed to the lamp's agent to word as
+        // soon as it is, and held at most 10 s for its line
+        // (`news_agent::Wordings::step`). Off, nothing is asked here.
+        let news_step = match task_news.as_mut() {
+            Some(news) if crate::news_agent::on() => {
+                news_wordings.step(news.waiting(), Instant::now())
+            }
+            _ => crate::news_agent::Step::Tell,
+        };
         // News told once more waits for no conversation going on (15 s with
         // nothing said by or to the lamp), whatever the pause switch says:
         // the person speaking always wins (#4342).
         if let Some(news) = task_news.as_mut()
             && !reminder_waiting
             && news.waiting().is_some()
+            && news_step != crate::news_agent::Step::Wait
             && crate::task_news::quiet_for_news(
                 (news.sign_in_first() || news_at_pause) && !news.retelling_first(),
                 clock,
@@ -14205,11 +14219,17 @@ fn conversation_with_gate_inner(
                     "retold":news.retold(&told.key),
                     "at_pause":news_at_pause || crate::sign_in::is_news(&told.key),"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
             )?;
+            // The agent's line, only for the very news and note it worded;
+            // otherwise the note, as before.
+            let agent_turn = news_wordings.take_line(&told);
+            if let Some(journal) = crate::news_agent::journal(&news_step, agent_turn.is_some()) {
+                eprintln!("lamp-voice: {journal}");
+            }
             snapshot = commit_written_turn(
                 owner,
                 reply,
                 &mut provider_queue,
-                &told.note,
+                agent_turn.as_deref().unwrap_or(&told.note),
                 false,
                 "lamp_tells_news",
                 provider_session,
