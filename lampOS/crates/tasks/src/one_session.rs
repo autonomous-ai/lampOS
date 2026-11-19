@@ -491,8 +491,9 @@ pub const NOT_READY_FIRST: Duration = Duration::from_secs(60);
 /// The kept session left with no task this long is dropped as at a
 /// sign-out (closed, its OpenClaw session deleted, its token removed) and a
 /// fresh one opened: OpenClaw's kept session is never rotated by count, so
-/// this bounds how long one conversation lives.
-pub const KEPT_IDLE_MAX: Duration = Duration::from_secs(2 * 60 * 60);
+/// this bounds how long one conversation lives. Seven days (the owner, 19
+/// Nov: a person coming back after hours keeps the conversation's memory).
+pub const KEPT_IDLE_MAX: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// The longest wait between two looks with no agent ready.
 pub const NOT_READY_MOST: Duration = Duration::from_secs(600);
 /// What a run refused with a full queue is told, answered as lamp-tasks'
