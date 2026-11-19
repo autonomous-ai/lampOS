@@ -344,6 +344,9 @@ pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
 /// Off, nothing. On a forget's way only for a small file's write, and for
 /// the pages' reads when it removed more ids than one answer names (400).
 pub fn answered(socket: &Path, line: &Value, answer: &Value) {
+    // What it removed is never posted by the save (`LAMP_HISTORY_SEND`),
+    // whatever this switch.
+    crate::history_send::forget_seen(answer);
     if !on() || answer["ok"] != true {
         return;
     }

@@ -499,10 +499,9 @@ fn a_changed_epoch_after_a_forget_starts_the_marks_again() {
     loop {
         let text = std::fs::read_to_string(&marks).unwrap_or_default();
         if text.contains("99999999") {
-            assert_eq!(
-                serde_json::from_str::<Value>(&text).unwrap(),
-                json!({"epoch":"99999999","marks":{}})
-            );
+            let written: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(written["marks"], json!({}));
+            assert_eq!(written["offered"], json!({}));
             break;
         }
         assert!(started.elapsed() < Duration::from_secs(5), "{text}");
@@ -598,10 +597,14 @@ fn a_restart_with_unsent_turns_sends_them_after() {
         none_within(&told, Duration::from_millis(100));
     }
     let written = marks_once(&marks, A, 1);
-    assert_eq!(written, json!({"epoch":STORE,"marks":{A:1}}));
+    assert_eq!(written["epoch"], STORE);
+    assert_eq!(written["marks"], json!({A:1}));
+    // What was handed over this run, written before its first post.
+    assert_eq!(written["offered"], json!({A:3}));
     let mode = std::fs::metadata(&marks).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
-    // The restart: the memory still holds 2 and 3 (and its newer 4).
+    // The restart: the memory still holds 2 and 3, and a 4 kept while
+    // no sender ran (the switch off, or the Live route): never sent.
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     sender
@@ -622,9 +625,10 @@ fn a_restart_with_unsent_turns_sends_them_after() {
         )
         .unwrap();
     let body = next(&told);
-    assert_eq!(ids(&body), [id(A, 2), id(A, 3), id(A, 4)]);
+    assert_eq!(ids(&body), [id(A, 2), id(A, 3)]);
     assert_eq!(body["turns"][0]["heard"], "second words");
     marks_once(&marks, A, 4);
+    none_within(&told, Duration::from_millis(100));
     // New turns go on after the catch-up.
     offer(&sender, Some(A), 5);
     assert_eq!(ids(&next(&told)), [id(A, 5)]);
@@ -641,7 +645,13 @@ fn a_restart_with_unsent_turns_sends_them_after() {
 fn a_new_store_sends_nothing_from_before() {
     let dir = scratch("new-store");
     let marks = dir.join("history-marks.json");
-    write_marks(&marks, "11111111", &BTreeMap::from([(A.to_owned(), 2)])).unwrap();
+    write_marks(
+        &marks,
+        "11111111",
+        &BTreeMap::from([(A.to_owned(), 2)]),
+        &BTreeMap::from([(A.to_owned(), 9)]),
+    )
+    .unwrap();
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     sender
@@ -652,10 +662,9 @@ fn a_new_store_sends_nothing_from_before() {
             QUICK,
         )
         .unwrap();
-    assert_eq!(
-        marks_once(&marks, A, 9),
-        json!({"epoch":STORE,"marks":{A:9}})
-    );
+    let written = marks_once(&marks, A, 9);
+    assert_eq!(written["epoch"], STORE);
+    assert_eq!(written["marks"], json!({A:9}));
     none_within(&told, Duration::from_millis(100));
     offer(&sender, Some(A), 10);
     assert_eq!(ids(&next(&told)), [id(A, 10)]);
@@ -668,7 +677,13 @@ fn a_new_store_sends_nothing_from_before() {
 fn the_catch_up_leaves_out_what_was_forgotten() {
     let dir = scratch("catch-up-forgotten");
     let marks = dir.join("history-marks.json");
-    write_marks(&marks, STORE, &BTreeMap::from([(A.to_owned(), 0)])).unwrap();
+    write_marks(
+        &marks,
+        STORE,
+        &BTreeMap::from([(A.to_owned(), 0)]),
+        &BTreeMap::from([(A.to_owned(), 2)]),
+    )
+    .unwrap();
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     sender.deleting(&[id(A, 1)]);
@@ -683,6 +698,73 @@ fn the_catch_up_leaves_out_what_was_forgotten() {
     assert_eq!(ids(&next(&told)), [id(A, 2)]);
     marks_once(&marks, A, 2);
     // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The first builder's must-fix (01:16 on #7957): turns the memory kept
+/// while the switch was off (no sender ran) are never sent, on the
+/// switch-on's start nor on any start after; only turns kept after it are.
+#[test]
+fn turns_kept_while_the_switch_was_off_are_never_sent() {
+    let dir = scratch("switch-off");
+    let marks = dir.join("history-marks.json");
+    // On: exchange 3 is kept and saved.
+    {
+        let (post, told) = recording(vec![Answer::Saved]);
+        let sender = Sender::new();
+        sender
+            .spawn(
+                post,
+                memory(STORE, json!({A:2}), vec![]),
+                Some(marks.clone()),
+                QUICK,
+            )
+            .unwrap();
+        marks_once(&marks, A, 2);
+        offer(&sender, Some(A), 3);
+        assert_eq!(ids(&next(&told)), [id(A, 3)]);
+        marks_once(&marks, A, 3);
+    }
+    // Off: 4, 5 and 6 are kept with no sender. On again: none is sent.
+    let kept = vec![
+        (A, 3, "on"),
+        (A, 4, "said while off"),
+        (A, 5, "said while off"),
+        (A, 6, "said while off"),
+    ];
+    {
+        let (post, told) = recording(vec![Answer::Saved]);
+        let sender = Sender::new();
+        sender
+            .spawn(
+                post,
+                memory(STORE, json!({A:6}), kept.clone()),
+                Some(marks.clone()),
+                QUICK,
+            )
+            .unwrap();
+        marks_once(&marks, A, 6);
+        none_within(&told, Duration::from_millis(150));
+        // A turn kept after the switch-on is sent.
+        offer(&sender, Some(A), 7);
+        assert_eq!(ids(&next(&told)), [id(A, 7)]);
+        marks_once(&marks, A, 7);
+    }
+    // A restart after: still none of the off period.
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    let mut all = kept;
+    all.push((A, 7, "on"));
+    sender
+        .spawn(
+            post,
+            memory(STORE, json!({A:7}), all),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    none_within(&told, Duration::from_millis(200));
+    drop(sender);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -921,7 +1003,8 @@ fn the_writers_move_sends_the_room_lines_as_the_persons() {
 
 /// A forget said on the lamp, through the voice's tools: sends are held
 /// while the memory answers it, and the exchanges it names removed are
-/// let go and kept as forgotten; the rest go on.
+/// let go and kept as forgotten; the rest go on. Then a forget about a
+/// thing (Twelve's P2 at 01:14 on #7957): the same.
 #[test]
 fn a_forget_said_on_the_lamp_holds_and_lets_go_of_what_it_removed() {
     let sender = Sender::new();
@@ -937,8 +1020,30 @@ fn a_forget_said_on_the_lamp_holds_and_lets_go_of_what_it_removed() {
         queued(&sender),
         (vec![format!("{A}:18"), format!("{B}:19")], vec![])
     );
+    {
+        let queue = locked(&sender.shared);
+        assert!(queue.is_forgotten(A, 17));
+        assert!(queue.paused_until.is_none());
+    }
+    // "Forget what I said about coffee", with 21 in `ready`: it never goes.
+    offer(&sender, Some(A), 21);
+    offer(&sender, Some(A), 22);
+    *FORGET_PROBE.lock().unwrap() = Some(sender.clone());
+    HELD_AT_FORGET.store(false, std::sync::atomic::Ordering::SeqCst);
+    as_the_voices(&sender, || {
+        crate::remember::forget_about_for_history_test(A, 21)
+    });
+    *FORGET_PROBE.lock().unwrap() = None;
+    assert!(HELD_AT_FORGET.load(std::sync::atomic::Ordering::SeqCst));
+    assert_eq!(
+        queued(&sender),
+        (
+            vec![format!("{A}:18"), format!("{B}:19"), format!("{A}:22")],
+            vec![]
+        )
+    );
     let queue = locked(&sender.shared);
-    assert!(queue.is_forgotten(A, 17));
+    assert!(queue.is_forgotten(A, 21));
     assert!(queue.paused_until.is_none());
 }
 
