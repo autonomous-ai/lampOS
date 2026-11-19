@@ -1304,7 +1304,7 @@ pub fn nudge_in(statuses: &[serde_json::Value]) -> bool {
 /// claim) is never read as one. Up to three words name it ("the water
 /// nudge", "your stand-up nudges"). Structure only: the lamp calls these
 /// hints nudges in its own skills.
-const NUDGE_RUNS: [(&str, Claim); 6] = [
+const NUDGE_RUNS: [(&str, Claim); 7] = [
     // "I've turned off the water nudge for today."
     (
         "i've|i turned|switched off ?the|your|those|that|these * nudge|nudges",
@@ -1322,7 +1322,14 @@ const NUDGE_RUNS: [(&str, Claim); 6] = [
     ),
     // "The water nudge is off for today.", "Your nudges are snoozed."
     (
-        "the|your|those|that|these * nudge|nudges is|are|has|have off|snoozed|stopped|paused|been",
+        "the|your|those|that|these * nudge|nudges is|are off|snoozed|stopped|paused",
+        Claim::NudgeOff,
+    ),
+    // "Your nudges have been snoozed.", "The water nudge has been turned
+    // off.": "been" only with the stop after it, so "Your water nudges have
+    // been coming every half hour." is no claim (Twelve's HOLD on #7917).
+    (
+        "the|your|those|that|these * nudge|nudges has|have been off|snoozed|stopped|paused|turned|switched",
         Claim::NudgeOff,
     ),
     // "Water nudge off for today.", "Water nudges snoozed."
@@ -5197,6 +5204,8 @@ pub(crate) mod tests {
             "Your nudges are snoozed until tomorrow.",
             "Got it, no more water nudges today.",
             "Water nudge off for today.",
+            "Your nudges have been snoozed until tomorrow.",
+            "The water nudge has been turned off.",
         ] {
             assert_eq!(kind(reply), Some(Claim::NudgeOff), "{reply}");
         }
@@ -5205,6 +5214,8 @@ pub(crate) mod tests {
             "The water nudge comes after about half an hour at the desk.",
             "I can snooze the water nudge until tomorrow if you like.",
             "I've cancelled your water reminder.",
+            "Your water nudges have been coming about every half hour.",
+            "The stand-up nudge has been on since this morning.",
             "Sure.",
         ] {
             assert_ne!(kind(reply), Some(Claim::NudgeOff), "{reply}");
