@@ -2438,9 +2438,15 @@ they made or added (even from a file), kept to turn back on ... Never
 remove for this, even one that starts only when they say its words. Call it
 at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
 `remove` nói "delete
-or remove a skill for good, never to turn one off, pause or stop it". Lời
-gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
-thành gỡ. **Tắt là làm ngay** (các dòng thử của #7562 trên lamp-9adf,
+or remove a skill for good, never to turn one off, pause, stop or change it
+(no change yet: say so)". Lời gọi mang một yêu cầu tắt được đọc trước việc
+gỡ, nên tắt không bao giờ thành gỡ. **Đổi không bao giờ là gỡ** (#7975,
+lamp-9adf, 19/11: "change rain check to seven thirty" bị gọi thành một
+lệnh gỡ, và kỹ năng mất): chưa có kỹ năng đã tạo nào đổi được bằng giọng
+nói, nên mô hình được dặn rằng đổi không phải là gỡ và hãy nói là chưa
+làm được, còn kỹ năng giữ nguyên; một câu là xin đổi hay xin gỡ là do mô
+hình phán đoán (quy tắc 13/11). Test:
+`a_change_is_never_a_remove_and_is_said_cannot_yet`. **Tắt là làm ngay** (các dòng thử của #7562 trên lamp-9adf,
 18/11, đường thứ hai, DeepSeek: "Lamp, turn off my space facts skill."
 được đáp "Do you want it off? If yes, tell me…", "nothing running to
 switch off" với một kỹ năng chỉ chạy khi nói đúng câu của nó, và "Remove
