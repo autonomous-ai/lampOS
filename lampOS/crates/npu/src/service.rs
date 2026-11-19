@@ -5,8 +5,8 @@
 //! play all of them.
 use crate::{
     engine::{Backend, LoadError, Net},
-    head::{self, PoseHead},
-    image,
+    head::{self, Found, PoseHead},
+    image::{self, Region},
     model::{Kept, ModelManifest, Source, Store},
 };
 use lamp_msgs::HeatLevel;
@@ -24,6 +24,9 @@ pub const POSE: &str = "pose";
 pub const MOST_JPEG_BYTES: usize = 512 * 1024;
 /// A person scored under this is no person: the answer's `pose` is null.
 pub const LEAST_SCORE: f32 = 0.2;
+/// A client's crop around the person it last showed is kept this long:
+/// a frame later than that is looked at whole.
+pub const TRACK_FOR: Duration = Duration::from_millis(1500);
 /// How long `preparing` tells a client to wait before it asks again.
 pub const PREPARING_RETRY: Duration = Duration::from_secs(2);
 
@@ -131,6 +134,14 @@ enum Model {
     Unsupported(String),
 }
 
+/// Where a client's person was last seen, for the next frame's crop.
+struct Track {
+    region: Region,
+    width: usize,
+    height: usize,
+    at: Instant,
+}
+
 struct Loaded {
     net: Box<dyn Net>,
     head: Box<dyn PoseHead>,
@@ -156,6 +167,9 @@ pub struct Service {
     /// The one net: a run holds this lock, so runs go one at a time.
     net: Mutex<Option<Loaded>>,
     asked: Mutex<(HashMap<String, Instant>, Option<Instant>)>,
+    /// Each client's crop: forgotten after [`TRACK_FOR`], when the lamp is
+    /// private and when the model is let go. Taken after `net`.
+    tracks: Mutex<HashMap<String, Track>>,
 }
 
 impl Service {
@@ -177,6 +191,7 @@ impl Service {
             model: Mutex::new(Model::Unknown),
             net: Mutex::new(None),
             asked: Mutex::new((HashMap::new(), None)),
+            tracks: Mutex::new(HashMap::new()),
         })
     }
 
@@ -363,7 +378,7 @@ impl Service {
         let started = Instant::now();
         let first = conditions();
         if first.private {
-            return Err(private());
+            return Err(self.private());
         }
         if jpeg.is_empty() || jpeg.len() > MOST_JPEG_BYTES {
             return Err(Refused::new(
@@ -413,40 +428,40 @@ impl Service {
         let input = loaded.net.input();
         let decode_at = Instant::now();
         let picture = image::decode(jpeg).map_err(|why| Refused::new("bad_request", why, None))?;
-        let (frame, fit) = image::fit(&picture, input);
+        let (width, height) = (picture.width, picture.height);
+        let region = self
+            .tracked(client, width, height, now)
+            .unwrap_or_else(|| Region::whole(width, height, input));
+        let frame = image::crop(&picture, region, input);
         let decoded_at = Instant::now();
         let (outputs, run) = loaded
             .net
             .run(&frame)
             .map_err(|why| Refused::new("unavailable", why, Some(PREPARING_RETRY)))?;
         let ran_at = Instant::now();
-        let found = loaded
+        let mut found = loaded
             .head
             .decode(&outputs, input)
             .map_err(|why| Refused::new("unavailable", why, None))?;
+        // In the picture's pixels, as they are: the crop is made of them.
+        for k in &mut found.keypoints {
+            (k.x, k.y) = region.back(input, width, height, k.x, k.y);
+        }
+        let next = loaded.head.next(&found, width, height);
+        self.track(client, next, width, height, now);
         let model_id = loaded.manifest.id.clone();
         drop(net);
         if conditions().private {
-            return Err(private());
+            return Err(self.private());
         }
         let ms = |from: Instant, to: Instant| round2((to - from).as_secs_f64() * 1e3);
-        let pose = (found.score >= LEAST_SCORE).then(|| {
-            let keypoints: Vec<Value> = found
-                .keypoints
-                .iter()
-                .map(|k| {
-                    let (x, y) = fit.back(k.x, k.y);
-                    json!({"x": round2(f64::from(x)), "y": round2(f64::from(y)), "score": round3(k.score)})
-                })
-                .collect();
-            json!({"score": round3(found.score), "keypoints": keypoints})
-        });
+        let pose = (found.score >= LEAST_SCORE).then(|| answer(&found, width, height));
         let done = Instant::now();
         Ok(json!({
             "ok": true,
             "pose": pose,
-            "width": picture.width,
-            "height": picture.height,
+            "width": width,
+            "height": height,
             "model": model_id,
             "ms": {
                 "decode": ms(decode_at, decoded_at),
@@ -469,8 +484,47 @@ impl Service {
                 self.config.idle.as_secs()
             );
             *net = None;
+            self.tracks.lock().expect("tracks").clear();
         }
         net.is_some()
+    }
+
+    /// `client`'s crop for a picture this size, if still fresh.
+    fn tracked(&self, client: &str, width: usize, height: usize, now: Instant) -> Option<Region> {
+        let tracks = self.tracks.lock().expect("tracks");
+        let track = tracks.get(client)?;
+        (track.width == width
+            && track.height == height
+            && now.saturating_duration_since(track.at) < TRACK_FOR)
+            .then_some(track.region)
+    }
+
+    /// Keeps `client`'s next crop, or forgets it for the whole picture.
+    fn track(&self, client: &str, next: Option<Region>, width: usize, height: usize, now: Instant) {
+        let mut tracks = self.tracks.lock().expect("tracks");
+        tracks.retain(|_, track| now.saturating_duration_since(track.at) < TRACK_FOR);
+        match next {
+            Some(region) => {
+                tracks.insert(
+                    client.to_owned(),
+                    Track {
+                        region,
+                        width,
+                        height,
+                        at: now,
+                    },
+                );
+            }
+            None => {
+                tracks.remove(client);
+            }
+        }
+    }
+
+    /// Refuses as private, and forgets where anyone was.
+    fn private(&self) -> Refused {
+        self.tracks.lock().expect("tracks").clear();
+        Refused::new("private", "the lamp is private", None)
     }
 
     /// What the service has, for `status`.
@@ -503,8 +557,18 @@ impl Service {
     }
 }
 
-fn private() -> Refused {
-    Refused::new("private", "the lamp is private", None)
+/// The answer's `pose`: keypoints kept on the picture.
+fn answer(found: &Found, width: usize, height: usize) -> Value {
+    let keypoints: Vec<Value> = found
+        .keypoints
+        .iter()
+        .map(|k| {
+            let x = k.x.clamp(0.0, width as f32);
+            let y = k.y.clamp(0.0, height as f32);
+            json!({"x": round2(f64::from(x)), "y": round2(f64::from(y)), "score": round3(k.score)})
+        })
+        .collect();
+    json!({"score": round3(found.score), "keypoints": keypoints})
 }
 
 fn round2(value: f64) -> f64 {
