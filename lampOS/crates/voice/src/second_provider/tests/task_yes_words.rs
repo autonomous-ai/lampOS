@@ -27,17 +27,23 @@ fn booth() -> TaskAsks {
 /// begun in written request 0, and the lamp's words of it (`said`, none
 /// yet when `None`) kept as played. The wait's id.
 fn said_back_unasked(said: Option<&str>) -> String {
+    said_back_unasked_as(booth(), said)
+}
+
+/// [`said_back_unasked`] for the skill `task`.
+fn said_back_unasked_as(task: TaskAsks, said: Option<&str>) -> String {
     yes::clear_for_test();
     task_yes::set_on_here(Some(true));
     let mut kept = None;
+    let name = task.name.clone();
     let note = task_yes::asked_aloud(
-        "photo-booth",
+        &name,
         task_yes::Here {
             quiet_hours: false,
             owner_sees_alone: true,
             asked_by_voice: false,
         },
-        |_| Ok(Some(booth())),
+        |_| Ok(Some(task.clone())),
         |file| {
             kept = Some(file.clone());
             Ok(())

@@ -19,7 +19,7 @@ pub mod weather;
 
 pub use chat::{
     Chat, ChatEvent, ChatStream, Declare, Force, Forced, GEMINI_REASONING, MOST_CALLS, Message,
-    Narrow, ToolCall, cache_counts,
+    Narrow, Told, ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};

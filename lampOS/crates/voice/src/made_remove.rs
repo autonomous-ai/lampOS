@@ -293,6 +293,10 @@ fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
 /// The forced approval round of a skill's task's wait is told them
 /// (`skill_write_yes::approve_force`, #7634), so the model can name
 /// another skill the line names.
+// A test build reads the skills on the lamp from its seam
+// (`skill_write_yes::set_installed_here`), never the folders, so it calls
+// this nowhere.
+#[cfg_attr(test, allow(dead_code))]
 pub(crate) fn names_on(keeping: &Keeping) -> Vec<String> {
     let made = made(keeping);
     let mut names: Vec<String> = made.iter().map(|(name, _)| name.clone()).collect();
