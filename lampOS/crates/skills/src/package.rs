@@ -3176,10 +3176,13 @@ pub fn peer_asker() -> Option<Asker> {
     None
 }
 
-/// [`asked`]'s `forget_counts`: both files deleted, or why not.
-fn forget_counts(state: &Path, made: &Path) -> Result<String, String> {
-    crate::usage::forget(state).map_err(|error| format!("the runs counted: {error}"))?;
-    lamp_voice::made_counts::forget(made)
+/// [`asked`]'s `forget_counts`: both files deleted, or why not; both locks
+/// waited for within one `lock_wait` in all, so the answer comes while
+/// `lamp-cloud` still waits for it.
+fn forget_counts(state: &Path, made: &Path, lock_wait: Duration) -> Result<String, String> {
+    let until = Instant::now() + lock_wait;
+    crate::usage::forget(state, lock_wait).map_err(|error| format!("the runs counted: {error}"))?;
+    lamp_voice::made_counts::forget(made, until.saturating_duration_since(Instant::now()))
         .map_err(|error| format!("the made skills counted: {error}"))?;
     Ok("the skills' counts are deleted".to_owned())
 }
@@ -3386,7 +3389,7 @@ pub fn asked(
                 }
             }
             // The person's no to reports: the skills' counts deleted.
-            _ if only("forget_counts").is_some() => forget_counts(state, made),
+            _ if only("forget_counts").is_some() => forget_counts(state, made, lock_wait),
             // The owner's yes to the camera's picture, given or taken back.
             _ if only("camera").or(only("camera_off")).is_some() => {
                 match (only("camera"), only("camera_off")) {
@@ -3656,6 +3659,49 @@ mod tests {
         assert!(done, "{answer}");
         assert!(answer.contains("\"done\""), "{answer}");
         assert!(!runs.exists() && !counts.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The daily journal, `daily.json` in the same state folder, holds the
+    /// folder's lock for as long as `lamp-skills` runs: the manage helper
+    /// still answers a no at once and deletes the run totals, never left
+    /// waiting until systemd kills it at 60 s.
+    #[test]
+    fn forget_counts_answers_while_the_daily_journal_is_open() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("forget-journal-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (skills, made, state) = (root.join("skills"), root.join("made"), root.join("state"));
+        for dir in [&skills, &made, &state] {
+            fs::create_dir_all(dir).unwrap();
+        }
+        fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+        let runs = state.join(crate::usage::RUNS_FILE);
+        fs::write(&runs, r#"{"version":1,"core":4}"#).unwrap();
+        let journal = crate::daily::Journal::open(state.join("daily.json")).unwrap();
+        let (told, heard) = std::sync::mpsc::channel();
+        let (skills_at, made_at, state_at) = (skills.clone(), made.clone(), state.clone());
+        std::thread::spawn(move || {
+            let mut answer = Vec::new();
+            let done = asked(
+                &skills_at,
+                &made_at,
+                &state_at,
+                Duration::from_secs(1),
+                None,
+                None,
+                &b"{\"forget_counts\": {}}\n"[..],
+                &mut answer,
+            );
+            let _ = told.send((done.ok(), String::from_utf8(answer).unwrap()));
+        });
+        let (done, answer) = heard
+            .recv_timeout(Duration::from_secs(6))
+            .expect("the manage helper waits for the journal's folder lock");
+        assert_eq!(done, Some(true), "{answer}");
+        assert!(answer.contains("\"done\""), "{answer}");
+        assert!(!runs.exists());
+        drop(journal);
         let _ = fs::remove_dir_all(&root);
     }
 

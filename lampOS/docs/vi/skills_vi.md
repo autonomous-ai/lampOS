@@ -4397,8 +4397,12 @@ giờ có tên, lời hay tệp của một kỹ năng.
   ghép đẩy lên, hoặc khác. Nguồn được xác định lúc nạp; mỗi lần chạy chỉ cộng
   một vào một biến nguyên tử, không khóa và không ghi tệp. Một luồng riêng
   cộng phần đã đếm vào `DIR/runs.json` tối đa mỗi phút một lần (ghi trọn bên
-  cạnh rồi chuyển đè, 0600, giữ khóa trên `DIR`), nên khởi động lại mất tối
-  đa một phút số đếm. Tệp là tổng cộng dồn: `{"version": 1, "core", "store",
+  cạnh rồi chuyển đè, 0600, giữ khóa `DIR/.runs.lock`, một tệp 0600 do
+  `lamp-skills` tạo lúc khởi động; không bao giờ khóa chính `DIR`, vì sổ
+  hằng ngày `DIR/daily.json` giữ khóa đó suốt thời gian `lamp-skills` chạy),
+  nên khởi động lại mất tối đa một phút số đếm. Một lần ghi chờ khóa tối đa
+  4 giây (`package::ASKED_LOCK_WAIT`), nếu không thì đếm lại các lần chạy đó
+  ở lần ghi sau. Tệp là tổng cộng dồn: `{"version": 1, "core", "store",
   "made_voice", "made_app", "made_unknown", "pushed", "other", "store_ids"}`,
   bảng của Store theo SHA-256, tối đa 256 mục; không có SHA-256 của kỹ năng
   tự tạo. Tệp không đọc được thì bắt đầu lại. Kiểm thử: `usage::tests`.
@@ -4434,10 +4438,15 @@ giờ có tên, lời hay tệp của một kỹ năng.
   đổi múi giờ về phía tây qua nửa đêm thì số đếm được dồn sang ngày sau.
 - **Khi người dùng nói không** với báo cáo, `lamp-cloud` nhờ trình quản lý
   (`{"forget_counts": {}}`, của root, sở hữu cả hai tệp) xóa `runs.json` và
-  `counts.json`, mỗi tệp dưới khóa của bên ghi nó (`usage::forget`,
-  `made_counts::forget`); hỏi lại mỗi 10 giây cho đến khi xong. Số đếm còn
+  `counts.json`, mỗi tệp dưới khóa của bên ghi nó (`usage::forget` với
+  `.runs.lock`, chưa có tệp khóa thì xóa không cần khóa;
+  `made_counts::forget` với `.counts.lock`), chờ cả hai khóa tổng cộng tối đa
+  4 giây (`ASKED_LOCK_WAIT`, dưới 5 giây chờ của `lamp-cloud`), quá thì từ
+  chối (`WouldBlock`) và không xóa gì, không bao giờ chờ đến khi systemd giết
+  trình quản lý; hỏi lại mỗi 10 giây cho đến khi xong. Số đếm còn
   trong bộ nhớ chưa ghi (tối đa một phút) bắt đầu tệp mới. Kiểm thử:
-  `package::tests::forget_counts_deletes_both_counts`.
+  `package::tests::forget_counts_deletes_both_counts`,
+  `package::tests::forget_counts_answers_while_the_daily_journal_is_open`.
 
 
 ## Thêm kỹ năng từ một tệp (`LAMP_SKILL_UPLOAD=on`, bật trong sản phẩm)
