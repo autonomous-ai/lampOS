@@ -27695,7 +27695,17 @@ mod tests {
                 "I think the oven is still on, by the way.",
                 signs(vec![(12_900_000, 0.999)]),
             );
-            let second = heeding.heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()));
+            // Four words: since #7891 (fault 1) a line of one or two words,
+            // not a question, with no name in its words ("Yes.") is never
+            // answered on a name heard only in the sound, whatever this
+            // switch, so the control needs a longer one
+            // (`a_short_line_after_a_hearing_in_the_line_before_is_held_either_way`).
+            let second = heeding.heed_signs(
+                2,
+                (13_100_000, 13_600_000),
+                "Yes, go ahead please.",
+                signs(Vec::new()),
+            );
             assert_eq!(second.is_some(), stays, "the second line, stays {stays}");
             if stays {
                 assert!(
@@ -27710,6 +27720,64 @@ mod tests {
                     "the third line"
                 );
             }
+        }
+    }
+
+    /// #7891 (fault 1), V2's case 1: the lamp's own question open, the
+    /// person's bare "Yes." with the name heard in the room's sound at its
+    /// start is answered, `LAMP_NAME_SECOND_SIGN` on or off, in a
+    /// conversation's window or out of it, a quiet room or a busy one: an
+    /// answer to the lamp is never a short line dropped as meeting talk.
+    #[test]
+    fn a_bare_yes_to_the_lamps_own_question_keeps_a_name_heard_in_the_sound() {
+        use crate::room_told::Room;
+        for on in [false, true] {
+            for going_on in [false, true] {
+                for room in [Room::Quiet, Room::Busy] {
+                    let signs = super::Signs {
+                        lamp_asked: true,
+                        ..room_name_signs(room, going_on, None, false, vec![(10_200_000, 0.97)])
+                    };
+                    assert_eq!(
+                        room_name_heeding(on).judge(7, (10_000_000, 10_600_000), "Yes.", signs),
+                        None,
+                        "second sign {on}, going on {going_on}, {room:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// #7891 (fault 1), V2's cases 2 and 3: "Yes." after a line whose 0.999
+    /// hearing came at its end (12.9 s of 10 s to 13 s) is held in a busy
+    /// room with `LAMP_NAME_STAYS_IN_ITS_LINE` on or off: on, the hearing
+    /// stays with its line; off, it reaches "Yes." at its start, but a line
+    /// of one or two words, not a question, with no name in its words, is
+    /// not answered on a name heard only in the sound. It is case 2, not an
+    /// answer to the lamp: a busy room, no conversation going on, and the
+    /// lamp asked nothing (`lamp_asked` false), so the line before was
+    /// someone's remark to the room, not the lamp's question.
+    #[test]
+    fn a_short_line_after_a_hearing_in_the_line_before_is_held_either_way() {
+        use crate::room_told::Room;
+        let signs = |names| room_name_signs(Room::Busy, false, None, false, names);
+        for stays in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if stays {
+                heeding.keeping_the_name_in_its_line();
+            }
+            heeding.heed_signs(
+                1,
+                (10_000_000, 13_000_000),
+                "I think the oven is still on, by the way.",
+                signs(vec![(12_900_000, 0.999)]),
+            );
+            assert!(
+                heeding
+                    .heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()))
+                    .is_some(),
+                "stays {stays}"
+            );
         }
     }
 
