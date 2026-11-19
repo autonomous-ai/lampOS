@@ -1304,7 +1304,7 @@ pub fn nudge_in(statuses: &[serde_json::Value]) -> bool {
 /// claim) is never read as one. Up to three words name it ("the water
 /// nudge", "your stand-up nudges"). Structure only: the lamp calls these
 /// hints nudges in its own skills.
-const NUDGE_RUNS: [(&str, Claim); 7] = [
+const NUDGE_RUNS: [(&str, Claim); 8] = [
     // "I've turned off the water nudge for today."
     (
         "i've|i turned|switched off ?the|your|those|that|these * nudge|nudges",
@@ -1320,9 +1320,11 @@ const NUDGE_RUNS: [(&str, Claim); 7] = [
         "i've|i turned|switched ?the|your|those|that|these * nudge|nudges off",
         Claim::NudgeOff,
     ),
-    // "The water nudge is off for today.", "Your nudges are snoozed."
+    // "The water nudge is off for today.", "Your nudges are snoozed.",
+    // "Water nudges are off now.", "All the nudges are off." (Jarvis's
+    // lamp-06c1 lines, 19 Nov 19:11 and 19:18: no determiner, or "all").
     (
-        "the|your|those|that|these * nudge|nudges is|are off|snoozed|stopped|paused",
+        "* nudge|nudges is|are off|snoozed|stopped|paused",
         Claim::NudgeOff,
     ),
     // "Your nudges have been snoozed.", "The water nudge has been turned
@@ -1336,14 +1338,22 @@ const NUDGE_RUNS: [(&str, Claim); 7] = [
     ("* nudge|nudges off|snoozed|stopped|paused", Claim::NudgeOff),
     // "No more water nudges today."
     ("no more * nudge|nudges", Claim::NudgeOff),
+    // "Good — no water nudge for a while." (Jarvis's 19:22 line, after "I
+    // just had water"): "no … nudge" with how long after it, never "no" alone.
+    ("no * nudge|nudges for|until|today|tonight", Claim::NudgeOff),
 ];
 
 /// Whether `text` (already [`normalised`]) opens, bare or after one of
 /// [`LEAD_INS`], with a wellbeing nudge said stopped, snoozed or turned off
 /// ([`NUDGE_RUNS`], #7878). As [`claim`] says it.
 pub fn nudge_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
-    runs_claim(&NUDGE_RUNS, text, ended, true, false, &[])
+    runs_claim(&NUDGE_RUNS, text, ended, true, false, &NUDGE_LEADS)
 }
+
+/// The words a nudge's claim may also open after, with a mark ("Good — no
+/// water nudge for a while.", Jarvis's lamp-06c1 line, 19 Nov 19:22): the
+/// nudge runs only, beside [`LEAD_INS`].
+const NUDGE_LEADS: [&str; 3] = ["good", "great", "nice"];
 
 fn ran_in(statuses: &[serde_json::Value], tools: &[&str]) -> bool {
     statuses.iter().any(|status| {
@@ -5205,6 +5215,9 @@ pub(crate) mod tests {
             "Got it, no more water nudges today.",
             "Water nudge off for today.",
             "Your nudges have been snoozed until tomorrow.",
+            "Water nudges are off now. The rest stay as they are.",
+            "All the nudges are off \u{2014} none until you turn them back on.",
+            "Good \u{2014} no water nudge for a while.",
             "The water nudge has been turned off.",
         ] {
             assert_eq!(kind(reply), Some(Claim::NudgeOff), "{reply}");
