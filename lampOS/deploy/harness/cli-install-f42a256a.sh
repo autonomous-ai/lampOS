@@ -19,18 +19,19 @@
 # Login and start are deliberately separate: login saves a native SSO session, while start launches the
 # adapter from that session. The running daemon auto-updates itself thereafter (polls the same manifest).
 # There is no system Node prerequisite. The CLI is plain JS (no native binary, no code-signing) and it runs on a
-# checksum-verified Node this installer puts in ~/.harness/runtime — the same runtime Desktop Harness
-# manages, shared on purpose so one cli.js is never run by two different Nodes. Your own Node and nvm
-# are neither required nor touched.
+# checksum-verified Node this installer puts in ~/.harness/runtime (on Linux, in the XDG state folder: see
+# harness_roots) — the same runtime Desktop Harness manages, shared on purpose so one cli.js is never run
+# by two different Nodes. Your own Node and nvm are neither required nor touched.
 #
 # What the CLI RUNS is a short list — tmux (its only terminal backend), `ps`, and on a Linux desktop
 # the clipboard helper for the active display — and step 1 checks exactly that list. Everything else
-# here (Homebrew, apt, curl/tar/sed/awk/sha256sum) is only a way of obtaining one of those or of
-# downloading a runtime, and is looked at only when the thing it obtains is missing: a Mac with tmux
-# never hears about Homebrew, and the download tools are checked only when something is downloaded.
-# On a Mac without tmux, Homebrew is used if it is already there; otherwise tmux comes the way Node
-# does — a checksum-verified MANAGED build from our manifest into ~/.harness/runtime, no compiler,
-# no package manager and no password (see cli/scripts/build-managed-tmux.sh).
+# here (a Homebrew prefix, apt, curl/tar/sed/awk/sha256sum) is only a way of obtaining one of those or
+# of downloading a runtime, and is looked at only when the thing it obtains is missing: a Mac with tmux
+# on PATH never hears about Homebrew, and the download tools are checked only when something is
+# downloaded. On a Mac without tmux on PATH, a tmux Homebrew already installed is used from its
+# prefix's bin, and Homebrew itself is never run; otherwise tmux comes the way Node does — a
+# checksum-verified MANAGED build from our manifest into ~/.harness/runtime, no compiler, no package
+# manager and no password (see cli/scripts/build-managed-tmux.sh).
 # Desktop mode (`--desktop`) trusts the app's own host pre-flight and skips step 1; host mode
 # (`--host`) is the app handing step 1 to a real terminal for its password prompts and stops after it.
 # The runtime's absolute path is baked into the launcher, so a Finder launch — where PATH is
@@ -79,15 +80,47 @@ GRID_METADATA_URL="${HARNESS_GRID_METADATA_URL:-https://storage.googleapis.com/s
 # Published by release-tui.yml: hn, the native terminal client, one static binary per platform.
 TUI_METADATA_URL="${HARNESS_TUI_MANIFEST_URL:-https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/tui/metadata.json}"
 HARNESS_KEY="${HARNESS_KEY:-cli}"
-CLI_DIR="$HOME/.harness/cli"
-RUNTIME_DIR="$HOME/.harness/runtime"
+# The two folders Harness keeps its files in, by the rule every Harness program follows
+# (cli/src/config/harnessHome.ts). On Linux, the XDG data and state folders; while only ~/.harness
+# exists, ~/.harness, which the daemon moves at its next start. Elsewhere ~/.harness. The data root's
+# marker (.harness-root) is the one switch: it is there only once that move is done, or after a fresh
+# install, so a folder something else made there switches nothing.
+harness_roots() {
+  HARNESS_DATA_ROOT="$HOME/.harness"
+  HARNESS_STATE_ROOT="$HOME/.harness"
+  [ "$(uname -s)" = Linux ] || return 0
+  # Only an absolute path counts, as the XDG spec says. A run of / is squeezed to one and a trailing
+  # one dropped, so the paths written into the launcher and current-node are spelled as the CLI's own
+  # join spells them.
+  case "${XDG_DATA_HOME:-}" in
+    /*) _xdg_data="$(printf '%s' "$XDG_DATA_HOME" | tr -s /)"; _xdg_data="${_xdg_data%/}/harness" ;;
+    *)  _xdg_data="$HOME/.local/share/harness" ;;
+  esac
+  case "${XDG_STATE_HOME:-}" in
+    /*) _xdg_state="$(printf '%s' "$XDG_STATE_HOME" | tr -s /)"; _xdg_state="${_xdg_state%/}/harness" ;;
+    *)  _xdg_state="$HOME/.local/state/harness" ;;
+  esac
+  if [ -f "$_xdg_data/.harness-root" ] || [ ! -e "$HOME/.harness" ]; then
+    HARNESS_DATA_ROOT="$_xdg_data"
+    HARNESS_STATE_ROOT="$_xdg_state"
+  fi
+}
+harness_roots
+# A fresh install on the XDG roots marks its data root Harness's, so a ~/.harness something old makes
+# later never takes the computer back. One on ~/.harness, or marked already, has nothing to mark.
+mark_data_root() {
+  [ "$HARNESS_DATA_ROOT" != "$HOME/.harness" ] && [ ! -f "$HARNESS_DATA_ROOT/.harness-root" ] || return 0
+  (umask 077 && mkdir -p "$HARNESS_DATA_ROOT" && printf '1\n' > "$HARNESS_DATA_ROOT/.harness-root")
+}
+CLI_DIR="$HARNESS_DATA_ROOT/cli"
+RUNTIME_DIR="$HARNESS_STATE_ROOT/runtime"
 CURRENT_NODE_FILE="$RUNTIME_DIR/current-node"
 CURRENT_TMUX_FILE="$RUNTIME_DIR/current-tmux"
 CURRENT_GRID_FILE="$RUNTIME_DIR/current-grid"
 BIN_DIR="$HOME/.local/bin"
 LAUNCHER="$BIN_DIR/harness"
 # Where `harness tui` looks for hn's binary (cli/src/tui/index.ts), and the `hn` command.
-TUI_BIN="$HOME/.harness/bin/harness-tui"
+TUI_BIN="$HARNESS_DATA_ROOT/bin/harness-tui"
 HN_LAUNCHER="$BIN_DIR/hn"
 
 # The PATH of the terminal this runs in, before the steps below put ~/.local/bin on the installer's
@@ -100,7 +133,7 @@ ORIGINAL_PATH="$PATH"
 # window opens on OpenCode there, so step 4b downloads it, as the desktop app does during its setup
 # (desktop/lib/bootstrap/agent_prefetch.dart `alreadyHasAnAgent`, the same places).
 no_agent_yet() {
-  for path in "$HOME/.harness/cli" "$HOME/.claude" "$HOME/.codex" "$HOME/.opencode/bin/opencode" \
+  for path in "$CLI_DIR" "$HOME/.claude" "$HOME/.codex" "$HOME/.opencode/bin/opencode" \
       "$HOME/.bun/bin/opencode" "$HOME/.config/opencode" "$HOME/.local/share/opencode"; do
     [ -e "$path" ] && return 1
   done
@@ -206,7 +239,7 @@ case "$(basename "${SHELL:-/bin/sh}")" in
 esac
 }
 
-# The managed grid for this computer: download, verify, unpack under ~/.harness/runtime and record it
+# The managed grid for this computer: download, verify, unpack under $RUNTIME_DIR and record it
 # in current-grid (what the daemon reads, like current-node). Returns non-zero, having said why,
 # instead of exiting: the caller decides that a missing grid is not a failed install — the harness
 # works without one, and the daemon fetches it on its next start. Laid down READ-ONLY, the bin
@@ -250,7 +283,7 @@ install_hn() {
     return 1
   fi
   chmod 755 "$tui_staging"
-  if ! "$tui_staging" --version >/dev/null 2>&1; then
+  if ! "$tui_staging" --version </dev/null >/dev/null 2>&1; then
     echo "  ✗ hn does not run on this computer." >&2
     rm -f "$tui_staging"
     return 1
@@ -311,7 +344,7 @@ install_managed_grid() {
   fi
   chmod 555 "$grid_target/bin/grid" "$grid_target/bin" 2>/dev/null || true
   # Its update check off, as the daemon keeps it: this binary is the pin, not grid's to replace.
-  if ! GRID_NO_UPDATE_CHECK=1 "$grid_target/bin/grid" --version >/dev/null 2>&1; then
+  if ! GRID_NO_UPDATE_CHECK=1 "$grid_target/bin/grid" --version </dev/null >/dev/null 2>&1; then
     echo "  ✗ The managed grid does not run on this computer: $grid_target/bin/grid" >&2
     return 1
   fi
@@ -331,11 +364,14 @@ require_command() {
   }
 }
 
+# Every program this script starts that might read its stdin gets /dev/null: under `curl … | sh -s` the
+# script is sh's stdin, and on 2026-11-17 `brew` read part of it, so the install stopped without a word.
+# sudo asks for a password on the tty, not on stdin.
 apt_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
-    apt-get "$@"
+    apt-get "$@" </dev/null
   elif command -v sudo >/dev/null 2>&1; then
-    sudo apt-get "$@"
+    sudo apt-get "$@" </dev/null
   else
     echo "✗ Installing system packages needs root access, but sudo is unavailable." >&2
     return 1
@@ -352,7 +388,7 @@ install_with_apt() {
 }
 
 tmux_runs() {
-  command -v tmux >/dev/null 2>&1 && tmux -V >/dev/null 2>&1
+  command -v tmux >/dev/null 2>&1 && tmux -V </dev/null >/dev/null 2>&1
 }
 
 # The managed tmux for this Mac: download, verify, unpack under ~/.harness/runtime, record it in
@@ -413,7 +449,7 @@ install_managed_tmux() {
     rm -rf "$tmux_staging"
     trap - EXIT INT TERM
   fi
-  "$tmux_target/bin/tmux" -V >/dev/null 2>&1 || {
+  "$tmux_target/bin/tmux" -V </dev/null >/dev/null 2>&1 || {
     echo "✗ The managed tmux does not run on this computer: $tmux_target/bin/tmux" >&2
     exit 22
   }
@@ -431,29 +467,17 @@ case "$(uname -s)" in
     if tmux_runs; then
       : # tmux runs. How it got here is nobody's business, and nothing else is looked at.
     else
-      # A Homebrew installed for a different shell is still installed — and if it is here at all,
-      # its tmux is preferred: it is what the owner already maintains. The prefixes are overridable
-      # so a test (or an unusual install) can say where, or that there is none.
-      if ! command -v brew >/dev/null 2>&1; then
-        for brew_prefix in ${HARNESS_HOMEBREW_PREFIXES:-/opt/homebrew /usr/local}; do
-          if [ -x "$brew_prefix/bin/brew" ]; then
-            eval "$("$brew_prefix/bin/brew" shellenv 2>/dev/null || true)"
-            break
-          fi
-        done
-      fi
-      if command -v brew >/dev/null 2>&1; then
-        echo "▸ Installing tmux via Homebrew"
-        # --force-bottle: use Homebrew's prebuilt bottle if there is one, and fail FAST if there is
-        # not, rather than dragging the person into a from-source build. Homebrew stopped shipping
-        # Intel (x86_64) bottles in 2025, so on an Intel Mac `brew install tmux` would otherwise
-        # compile tmux + its deps and demand the Command Line Tools — the exact slow, password-and-
-        # compiler path the managed build exists to avoid. When no bottle is available this returns
-        # non-zero and the managed download below takes over.
-        brew install --force-bottle tmux || echo "▸ No Homebrew tmux bottle for this Mac; using the managed build instead."
-      fi
-      # No Homebrew, or a Homebrew that could not (no bottle): the managed build. Nothing to compile,
-      # nothing to ask a password for — the same checksum-verified download Node gets in step 2.
+      # Homebrew is never run: on 2026-11-17 `brew install tmux` updated Homebrew, ran its cleanup and
+      # replaced openssl on a new user's Mac. A tmux Homebrew already installed is still used, found in
+      # its prefix's bin, which a Finder launch's PATH lacks; the prefixes are overridable so a test
+      # (or an unusual install) can say where, or that there is none.
+      for brew_prefix in ${HARNESS_HOMEBREW_PREFIXES:-/opt/homebrew /usr/local}; do
+        [ -x "$brew_prefix/bin/tmux" ] || continue
+        export PATH="$brew_prefix/bin:$PATH"
+        if tmux_runs; then break; fi
+      done
+      # No Homebrew tmux that runs: the managed build. Nothing to compile, nothing to ask a password
+      # for — the same checksum-verified download Node gets in step 2.
       tmux_runs || install_managed_tmux
     fi
     ;;
@@ -517,7 +541,7 @@ tmux_runs || {
   echo "✗ tmux is required but did not pass verification." >&2
   exit 22
 }
-echo "✓ tmux ready ($(tmux -V))"
+echo "✓ tmux ready ($(tmux -V </dev/null))"
 if [ "$INSTALL_MODE" = "host" ]; then
   ensure_path_rc
   echo "✓ Host requirements ready."
@@ -528,10 +552,10 @@ else
 fi
 
 # 2. Resolve the Node that will run the CLI (and this installer's own JSON parse + sha256 verify in
-#    step 3). The CLI runs on the MANAGED runtime under ~/.harness/runtime, not on whatever Node the
+#    step 3). The CLI runs on the MANAGED runtime under $RUNTIME_DIR, not on whatever Node the
 #    computer happens to have:
 #      1. $HARNESS_NODE_BINARY — Desktop Harness handing over the runtime it just validated.
-#      2. ~/.harness/runtime/current-node — the managed runtime, if it is already here.
+#      2. $RUNTIME_DIR/current-node — the managed runtime, if it is already here.
 #      3. otherwise, download it.
 #    A Node on PATH is used only as a last resort, on a platform we publish no runtime for.
 #
@@ -539,13 +563,13 @@ fi
 #    driven from the desktop app and from a terminal must be ONE cli.js on ONE Node, and a `node`
 #    that PATH resolves is none of stable, shared, or ours — it moves with nvm, it differs between a
 #    Finder launch and a Terminal launch, and it can be upgraded out from under a running daemon.
-#    Nothing outside ~/.harness is read or changed either way; the user's own Node is left alone.
+#    Nothing outside Harness's own folders is read or changed either way; the user's own Node is left alone.
 #
 #    Everything in this step must run in plain POSIX sh: there is no Node yet to lean on.
 
 # Prints the major version of $1, or nothing when it cannot be run.
 node_major() {
-  "$1" -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || true
+  "$1" -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' </dev/null 2>/dev/null || true
 }
 
 node_is_usable() {
@@ -566,7 +590,7 @@ if [ -n "$NODE_BIN" ]; then
     exit 1
   fi
   if ! node_is_usable "$NODE_BIN"; then
-    echo "✗ HARNESS_NODE_BINARY is older than Node 22: $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null || echo unknown))" >&2
+    echo "✗ HARNESS_NODE_BINARY is older than Node 22: $NODE_BIN ($("$NODE_BIN" -v </dev/null 2>/dev/null || echo unknown))" >&2
     exit 1
   fi
 fi
@@ -578,7 +602,7 @@ if [ -z "$NODE_BIN" ] && [ -r "$CURRENT_NODE_FILE" ]; then
     "$RUNTIME_DIR"/*)
       if node_is_usable "$managed_node"; then
         NODE_BIN="$managed_node"
-        echo "▸ Using the managed Node runtime already installed ($("$NODE_BIN" -v))"
+        echo "▸ Using the managed Node runtime already installed ($("$NODE_BIN" -v </dev/null))"
       fi
       ;;
   esac
@@ -711,10 +735,11 @@ fi
 # 3. Fetch manifest, download + sha256-verify cli.js & notify.mjs, install them + the launcher (all in
 #    Node so it works identically on macOS/Linux without shasum/sha256sum差异).
 echo "▸ Installing harness from $METADATA_URL"
-HARNESS_METADATA_URL="$METADATA_URL" HARNESS_KEY="$HARNESS_KEY" HARNESS_NODE_BINARY="$NODE_BIN" "$NODE_BIN" <<'HARNESSJS'
+mark_data_root
+HARNESS_METADATA_URL="$METADATA_URL" HARNESS_KEY="$HARNESS_KEY" HARNESS_NODE_BINARY="$NODE_BIN" HARNESS_CLI_DIR="$CLI_DIR" "$NODE_BIN" <<'HARNESSJS'
 const fs = require('fs'), os = require('os'), path = require('path'), crypto = require('crypto')
 const META = process.env.HARNESS_METADATA_URL, KEY = process.env.HARNESS_KEY, NODE = process.env.HARNESS_NODE_BINARY
-const dir = path.join(os.homedir(), '.harness', 'cli')
+const dir = process.env.HARNESS_CLI_DIR
 const bin = path.join(os.homedir(), '.local', 'bin')
 ;(async () => {
   const res = await fetch(META)
@@ -767,7 +792,7 @@ if [ "$INSTALL_MODE" != "host" ]; then
     echo "▸ Installing the managed grid into $RUNTIME_DIR"
     install_managed_grid || echo "  · grid will be set up the first time a grid feature is used"
   fi
-  "$NODE_BIN" "$HOME/.harness/cli/cli.js" dsh builtins || echo "  · Core harnesses will be prepared on the next start"
+  "$NODE_BIN" "$CLI_DIR/cli.js" dsh builtins </dev/null || echo "  · Core harnesses will be prepared on the next start"
 fi
 
 # 3c. hn's binary (the standalone install; Desktop's CLI fetches it on the first `hn`).
@@ -790,9 +815,9 @@ ensure_path_rc
 if [ "$INSTALL_MODE" = "standalone" ] && [ "$NEW_COMPUTER" = 1 ] \
     && { [ -t 1 ] || [ "${HARNESS_INSTALL_ATTENDED:-}" = 1 ]; }; then
   # The mark hn's first start takes (tui/src/first_run.rs): OpenCode with a task typed, not a shell.
-  mkdir -p "$HOME/.harness/tui" && : > "$HOME/.harness/tui/first-run" || true
+  mkdir -p "$HARNESS_DATA_ROOT/tui" && : > "$HARNESS_DATA_ROOT/tui/first-run" || true
   echo "▸ Downloading OpenCode, the free coding agent hn starts with"
-  ( curl -fsSL --connect-timeout 20 https://opencode.ai/install | bash -s -- --no-modify-path ) >/dev/null 2>&1 &
+  ( curl -fsSL --connect-timeout 20 https://opencode.ai/install | bash -s -- --no-modify-path ) </dev/null >/dev/null 2>&1 &
   download=$!
   waited=0
   while kill -0 "$download" 2>/dev/null && [ "$waited" -lt 180 ]; do sleep 1; waited=$((waited + 1)); done
@@ -802,7 +827,7 @@ if [ "$INSTALL_MODE" = "standalone" ] && [ "$NEW_COMPUTER" = 1 ] \
     # Run once, `--version` only, as the desktop does: macOS checks a new binary on its first run
     # (3.9 s against 0.4 s after, fresh VM, 2026-10-09), which would be hn's first pane's. Never
     # longer than 20 s.
-    "$HOME/.opencode/bin/opencode" --version >/dev/null 2>&1 &
+    "$HOME/.opencode/bin/opencode" --version </dev/null >/dev/null 2>&1 &
     warm=$!
     ( sleep 20; kill "$warm" 2>/dev/null ) >/dev/null 2>&1 &
     watchdog=$!
@@ -816,10 +841,10 @@ fi
 
 # 5. Final verification. Use the launcher by absolute path because this process cannot update its
 #    parent shell's PATH. Installation never authenticates or starts the adapter implicitly.
-"$NODE_BIN" --version >/dev/null 2>&1 || { echo "✗ Managed Node verification failed." >&2; exit 30; }
-"$LAUNCHER" version >/dev/null 2>&1 || { echo "✗ Harness CLI verification failed." >&2; exit 31; }
+"$NODE_BIN" --version </dev/null >/dev/null 2>&1 || { echo "✗ Managed Node verification failed." >&2; exit 30; }
+"$LAUNCHER" version </dev/null >/dev/null 2>&1 || { echo "✗ Harness CLI verification failed." >&2; exit 31; }
 if [ "$INSTALL_MODE" = "standalone" ]; then
-  tmux -V >/dev/null 2>&1 || { echo "✗ tmux verification failed." >&2; exit 32; }
+  tmux -V </dev/null >/dev/null 2>&1 || { echo "✗ tmux verification failed." >&2; exit 32; }
 fi
 
 # The wordmark, as the sign the install is done. `printf '%s\n'` on purpose: the art holds
@@ -840,7 +865,7 @@ print_logo() {
 # CLI — the app takes the person through sign-in itself, so it gets the one line and not the guide.
 # One line of it: `harness version` prints the version alone today, and a notice it might add
 # tomorrow must not land inside this sentence.
-installed_version="$("$LAUNCHER" version 2>/dev/null | head -n 1 || true)"
+installed_version="$("$LAUNCHER" version </dev/null 2>/dev/null | head -n 1 || true)"
 
 # An agent that installed Harness (Claude Code, Codex, any that sets AI_AGENT) reads what to run next and what only
 # the person can do, in the shape every agent command ends with (docs/design/2026-10-15-agent-experience.md). Its
@@ -865,7 +890,7 @@ if [ "$INSTALL_MODE" = "desktop" ]; then
 else
   print_logo
   echo "  ✓ harness${installed_version:+ $installed_version} installed."
-  hn_version="$("$TUI_BIN" --version 2>/dev/null | head -n 1 | cut -d' ' -f1-2 || true)"
+  hn_version="$("$TUI_BIN" --version </dev/null 2>/dev/null | head -n 1 | cut -d' ' -f1-2 || true)"
   if [ -n "$hn_version" ]; then echo "  ✓ ${hn_version} installed."; fi
   echo ""
   # An agent reads from the top: what is for it comes first, then the person's guide.
