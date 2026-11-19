@@ -288,6 +288,8 @@ impl Days {
         // FULL alone can lose the most recent commit on power failure here.
         db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA synchronous=EXTRA; PRAGMA fullfsync=ON; PRAGMA secure_delete=ON; PRAGMA temp_store=MEMORY;")?;
         db.execute_batch(include_str!("days.sql"))?;
+        // The store's own id, for the account's history (#7771).
+        crate::history_store::ensure_store_id(&db)?;
         crate::service_records::migrate(&mut db)?;
         let set_aside = kept_aside(&options.dir)?;
         let mut this = Self {

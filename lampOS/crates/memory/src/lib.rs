@@ -11,6 +11,7 @@ pub mod days_protocol;
 pub mod forgot;
 pub mod health;
 pub mod health_counts;
+pub mod history_store;
 pub mod nightly;
 pub mod protocol;
 pub mod search;

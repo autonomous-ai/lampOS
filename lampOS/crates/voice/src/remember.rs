@@ -11090,19 +11090,22 @@ impl DaysClient {
                 {
                     crate::service_records::unsent(person);
                 }
-                // Nothing unsent goes to the account's history after a
-                // forget (`LAMP_HISTORY_SEND`, #7771): let go now, and again
-                // once the writer let finish what it had in hand.
-                crate::history_send::forgot();
+                // Nothing is posted to the account's history until the
+                // memory answers the forget (`LAMP_HISTORY_SEND`, #7771):
+                // what it removed is then never posted.
+                crate::history_send::forgetting(person);
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
                         .saturating_sub(started.elapsed())
                         .min(FORGET_SETTLE),
                 );
-                crate::history_send::forgot();
             }
+            let forgetting = matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING);
             if deadline.checked_sub(started.elapsed()).is_none() {
+                if forgetting {
+                    crate::history_send::forget_answered(person, false, None);
+                }
                 return settled((gone(), false));
             }
             // In what is left of the call's time, a resend without a
@@ -11117,6 +11120,13 @@ impl DaysClient {
                     })
                 },
             );
+            if forgetting {
+                crate::history_send::forget_answered(
+                    person,
+                    call.name == FORGET_EVERYTHING,
+                    answer.as_ref(),
+                );
+            }
             let Some(answer) = answer else {
                 return lost((gone(), false));
             };
@@ -14745,8 +14755,10 @@ fn days_writer(
                         .and_then(|mut context| context.inhibit(Stopped::SourceGone));
                     say(said);
                     // Lines made before the stop are not written after it,
-                    // as after a forget said here, nor sent unsent.
-                    crate::history_send::forgot();
+                    // as after a forget said here; their and the room's
+                    // unsent turns wait for the next start, when the memory
+                    // no longer holds what went.
+                    crate::history_send::forget_answered(person.as_deref(), false, None);
                     hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                     end(&mut conversation);
                     hand_ons.done.fetch_add(1, Ordering::AcqRel);
@@ -14761,13 +14773,15 @@ fn days_writer(
                 if let Some(id) = id {
                     // What the memory wrote, under its own id, to the
                     // account's history with `LAMP_HISTORY_SEND` (#7771):
-                    // queued, never waited on.
+                    // queued, never waited on. A reply in a request a
+                    // linked service's read answered in goes as the
+                    // thread's placeholder, never the read.
                     crate::history_send::offered(
                         conversation.person.as_deref(),
                         id,
                         at_unix_ms,
-                        &heard,
-                        &said,
+                        (&heard, &said),
+                        crate::services::after_read(request) || said == crate::thread::PRIVATE_SAID,
                     );
                     if conversation.full() {
                         let mut piece = conversation.close_piece();
@@ -15317,7 +15331,7 @@ pub(crate) use tests::event_memory;
 
 /// The Days writer run over a fake memory, for `history_send`'s tests.
 #[cfg(test)]
-pub(crate) use tests::write_for_history_test;
+pub(crate) use tests::{forget_for_history_test, go_on_for_history_test, write_for_history_test};
 
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
@@ -26581,24 +26595,30 @@ mod tests {
     }
 
     /// The Days writer on this thread over a fake memory, given `lines`
-    /// (whose scope, what was heard): the memory writes a line heard as
-    /// "kept …" with id 17 and refuses any other; then a session close.
-    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
-        let (socket, served) = memory(
-            "history-send",
-            lines.len() + 1,
-            |request| match request["op"].as_str() {
-                Some("append_linked")
-                    if request["heard"]
-                        .as_str()
-                        .is_some_and(|h| h.starts_with("kept")) =>
-                {
-                    json!({"ok":true,"id":17})
+    /// (whose scope, what was heard), as requests 1, 2, ...: the memory
+    /// writes a line heard as "kept N …" with id N ("kept …": 17), answers
+    /// one heard as "gone …" as a forgotten source's, and refuses any other;
+    /// then a session close, and the writer ends (its conversation with it).
+    /// `requests`: the memory requests this makes.
+    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)], requests: usize) {
+        let (socket, served) = memory("history-send", requests, |request| {
+            let heard = request["heard"].as_str().unwrap_or("");
+            match request["op"].as_str() {
+                Some("append_linked") if heard.starts_with("kept") => {
+                    let id = heard
+                        .split(' ')
+                        .nth(1)
+                        .and_then(|n| n.parse::<u64>().ok())
+                        .unwrap_or(17);
+                    json!({"ok":true,"id":id})
+                }
+                Some("append_linked") if heard.starts_with("gone") => {
+                    json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
                 }
                 Some("append_linked") => json!({"ok":false,"error":"full"}),
                 _ => json!({"ok":true}),
-            },
-        );
+            }
+        });
         let (send, receive) = sync_channel(lines.len() + 2);
         let now = Instant::now();
         for (n, (person, heard)) in lines.iter().enumerate() {
@@ -26631,6 +26651,63 @@ mod tests {
         );
         served.join().unwrap();
         let _ = std::fs::remove_file(socket);
+    }
+
+    /// `person`'s keep then their bare "forget that", through the voice's
+    /// tools with a fake memory: the forget removes the keep (id 5) and
+    /// names the exchanges it removed, `{"<person>":[17]}` (the forget
+    /// half's answer, #7935). Whether the account's history held its sends
+    /// while the memory answered the forget is
+    /// [`crate::history_send::HELD_AT_FORGET`].
+    pub(crate) fn forget_for_history_test(person: &'static str) {
+        fn answer(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("remember") => json!({"ok":true,"id":5}),
+                Some("forget") => {
+                    crate::history_send::probe_forget();
+                    let person = request["person"].as_str().unwrap_or("everyone");
+                    json!({"ok":true,"removed":1,"exchanges":{person:[17]}})
+                }
+                _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+            }
+        }
+        let (socket, served) = memory("history-forget", 2, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        client.forget_just_kept.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(person))
+        };
+        let keep = call(REMEMBER, json!({"text": "my umbrella is in the car"}));
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Lamp, forget that."),
+            Some(person),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        assert!(run(&keep).1);
+        let (told, answered) = run(&bare);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        served.join().unwrap();
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The room's conversation of exchanges 5 and 6 goes on as `to`'s,
+    /// with `moved` (old id, new id), as the writer's adopt does.
+    pub(crate) fn go_on_for_history_test(to: &str, moved: &[(u64, u64)]) {
+        let mut conversation = Conversation {
+            sources: vec![5, 6],
+            ..Conversation::default()
+        };
+        go_on_as(
+            &mut conversation,
+            to,
+            moved,
+            &Mutex::new(DaysContext::default()),
+            &Mutex::new(Current::default()),
+        );
     }
 
     pub(super) fn memory(

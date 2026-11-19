@@ -431,8 +431,10 @@ fn off_the_store_is_unchanged() {
         .into_iter()
         .filter(|row| !row.starts_with("tastes"))
         .collect();
+    // Each store has its own random id (`history_store::STORE_KEY`, #7771).
     let without_text = |rows: &[String]| -> Vec<String> {
         rows.iter()
+            .filter(|row| !row.starts_with("settings: history_store_id,"))
             .map(|row| {
                 row.replace("I love coffee.", "line 0")
                     .replace("Tôi ghét sầu riêng.", "line 1")

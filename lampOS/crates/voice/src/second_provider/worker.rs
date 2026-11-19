@@ -2512,7 +2512,11 @@ pub fn serve(
     if let Some(socket) = &tools.memory {
         // Each turn the memory keeps, sent to the account's history with
         // LAMP_HISTORY_SEND=on (#7771), with the relay's key, the lamp's own.
-        crate::history_send::start_from_environment(&config.llm_base_url, config.llm_key.expose());
+        crate::history_send::start_from_environment(
+            &config.llm_base_url,
+            config.llm_key.expose(),
+            socket,
+        );
         // As the Live route starts it: each known person's memory apart.
         crate::remember::start(
             socket.clone(),

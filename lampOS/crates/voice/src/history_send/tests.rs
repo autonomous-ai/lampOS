@@ -8,6 +8,15 @@ const QUICK: Waits = Waits {
     first: Duration::from_millis(5),
     longest: Duration::from_millis(20),
 };
+/// The store's id the fake memory tells, and two known people.
+const STORE: &str = "0a1b2c3d";
+const A: &str = "p-0123456789abcdef";
+const B: &str = "p-fedcba9876543210";
+
+/// The id the queue sends for `scope`'s exchange `id` in [`STORE`].
+fn id(scope: &str, exchange: u64) -> String {
+    turn_id(STORE, scope, exchange)
+}
 
 /// A post that answers from `answers` in turn (the last one again once
 /// they run out) and hands each body it was given to the receiver.
@@ -23,6 +32,39 @@ fn recording(answers: Vec<Answer>) -> (Post, mpsc::Receiver<Value>) {
         }
     });
     (post, told)
+}
+
+/// A fake memory: `store` and `issued` for `store`, and each scope's
+/// exchanges (id, words) for `exchanges_after`, paged by its `limit`.
+fn memory(store: &str, issued: Value, kept: Vec<(&str, u64, &str)>) -> Ask {
+    let store = store.to_owned();
+    let kept: Vec<(String, u64, String)> = kept
+        .into_iter()
+        .map(|(scope, id, words)| (scope.to_owned(), id, words.to_owned()))
+        .collect();
+    Box::new(move |line: &Value| match line["op"].as_str() {
+        Some("store") => Some(json!({"ok":true,"store":store,"issued":issued})),
+        Some("exchanges_after") => {
+            let scope = line["person"].as_str().unwrap_or(ROOM_SCOPE);
+            let after = line["after"].as_u64().unwrap();
+            let limit = line["limit"].as_u64().unwrap() as usize;
+            let all: Vec<Value> = kept
+                .iter()
+                .filter(|(s, id, _)| s == scope && *id > after)
+                .map(|(_, id, words)| json!({"id":id,"at_unix_ms":1_000 + id,"heard":words,"said":"said"}))
+                .collect();
+            let more = all.len() > limit;
+            Some(
+                json!({"ok":true,"exchanges":all.into_iter().take(limit).collect::<Vec<_>>(),"more":more}),
+            )
+        }
+        _ => None,
+    })
+}
+
+/// A memory that tells [`STORE`] and holds nothing to catch up on.
+fn fresh() -> Ask {
+    memory(STORE, json!({}), vec![])
 }
 
 fn ids(body: &Value) -> Vec<String> {
@@ -44,6 +86,50 @@ fn none_within(told: &mpsc::Receiver<Value>, wait: Duration) {
     }
 }
 
+/// What waits to be sent, and what is held, as `<scope>:<id>`.
+fn queued(sender: &Sender) -> (Vec<String>, Vec<String>) {
+    let queue = locked(&sender.shared);
+    let named = |pendings: &VecDeque<Pending>| {
+        pendings
+            .iter()
+            .map(|pending| format!("{}:{}", pending.scope, pending.exchange))
+            .collect()
+    };
+    (named(&queue.ready), named(&queue.held))
+}
+
+fn offer(sender: &Sender, person: Option<&str>, exchange: u64) {
+    sender.offer(person, exchange, 1_000 + exchange, ("h", "s"), false);
+}
+
+/// A scratch folder for a marks file.
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("lamp-history-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// The marks file, read back, once it says `mark` for `scope`.
+fn marks_once(path: &Path, scope: &str, mark: u64) -> Value {
+    let started = Instant::now();
+    loop {
+        if let Some(value) = std::fs::read(path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            && value["marks"][scope] == mark
+        {
+            return value;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            std::fs::read_to_string(path)
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
 #[test]
 fn the_switch_is_exactly_on() {
     assert!(on_from(Some("on")));
@@ -60,19 +146,8 @@ fn the_switch_is_exactly_on() {
 }
 
 #[test]
-fn a_turns_id_is_the_memorys_exchange_id_in_its_scope() {
-    assert_eq!(
-        turn_id(Some("p-0123456789abcdef"), 42),
-        "p-0123456789abcdef:42"
-    );
-    assert_eq!(turn_id(None, 7), "everyone:7");
-    let longest = turn_id(Some(&"a".repeat(32)), u64::MAX);
-    assert!(longest.len() <= 64, "{}", longest.len());
-}
-
-#[test]
 fn a_time_is_the_stores_utc() {
-    // 2026-11-18T11:40:02Z.
+    // 2025-11-18T11:40:02Z.
     assert_eq!(utc(1_763_466_002_123), "2025-11-18T11:40:02Z");
     assert_eq!(utc(0), "1970-01-01T00:00:00Z");
 }
@@ -105,37 +180,84 @@ fn the_stores_answers_are_read() {
     assert_eq!(answer_of(200, b"not json"), Answer::Again);
 }
 
-/// The first leg the task names: a failed call is tried again with the
-/// same ids, never new ones.
+/// Ruling 2: the id is `<store>:<scope>:<exchange id>`, the one helper a
+/// forget names (`lamp_msgs::history::turn_id`), the room's scope
+/// `everyone`, moved lines under their new person and id.
+#[test]
+fn a_saves_id_is_the_store_the_scope_and_the_memorys_exchange_id() {
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    offer(&sender, Some(A), 42);
+    assert_eq!(ids(&next(&told)), [format!("{STORE}:{A}:42")]);
+    offer(&sender, None, 3);
+    offer(&sender, None, 4);
+    sender.moved(B, &[(4, 12)]);
+    assert_eq!(
+        ids(&next(&told)),
+        [lamp_msgs::history::turn_id(STORE, B, 12)]
+    );
+    sender.settled(&[3]);
+    assert_eq!(ids(&next(&told)), [format!("{STORE}:everyone:3")]);
+}
+
+/// Nothing is posted before the memory told its store's id: it is asked
+/// again until it answers.
+#[test]
+fn nothing_is_posted_before_the_store_is_known() {
+    let (post, told) = recording(vec![Answer::Saved]);
+    let asked = Arc::new(Mutex::new(0u32));
+    let counted = Arc::clone(&asked);
+    let mut inner = fresh();
+    let ask: Ask = Box::new(move |line: &Value| {
+        let mut asked = counted.lock().unwrap();
+        *asked += 1;
+        (*asked > 3).then(|| inner(line)).flatten()
+    });
+    let sender = Sender::new();
+    offer(&sender, Some(A), 1);
+    sender.spawn(post, ask, None, QUICK).unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 1)]);
+    assert!(*asked.lock().unwrap() >= 4);
+}
+
+/// A failed call is tried again with the same ids, never new ones.
 #[test]
 fn a_retry_sends_the_same_ids() {
     let (post, told) = recording(vec![Answer::Again, Answer::Again, Answer::Saved]);
     let sender = Sender::new();
-    sender.offer(Some("p-a"), 3, 1_000, "what time is it", "Ten past nine.");
-    sender.offer(Some("p-a"), 4, 2_000, "thanks", "Any time.");
-    sender.spawn(post, QUICK).unwrap();
+    sender.offer(
+        Some(A),
+        3,
+        1_000,
+        ("what time is it", "Ten past nine."),
+        false,
+    );
+    sender.offer(Some(A), 4, 2_000, ("thanks", "Any time."), false);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
     let first = next(&told);
     let second = next(&told);
     let third = next(&told);
-    assert_eq!(ids(&first), ["p-a:3", "p-a:4"]);
+    assert_eq!(ids(&first), [id(A, 3), id(A, 4)]);
     assert_eq!(first, second);
     assert_eq!(second, third);
     none_within(&told, Duration::from_millis(100));
     assert_eq!(sender.let_go(), 0);
 }
 
-/// A batch that never goes through is let go after its tries, counted.
+/// A batch never saved in its tries waits for the next start, counted.
 #[test]
-fn a_batch_is_let_go_after_its_tries() {
+fn a_batch_not_saved_in_its_tries_waits_for_the_next_start() {
     let (post, told) = recording(vec![Answer::Again]);
     let sender = Sender::new();
-    sender.offer(Some("p-a"), 1, 1_000, "h", "s");
-    sender.spawn(post, QUICK).unwrap();
+    offer(&sender, Some(A), 1);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
     for _ in 0..TRIES {
-        assert_eq!(ids(&next(&told)), ["p-a:1"]);
+        assert_eq!(ids(&next(&told)), [id(A, 1)]);
     }
     none_within(&told, Duration::from_millis(150));
     assert_eq!(sender.let_go(), 1);
+    assert_eq!(locked(&sender.shared).deferred.get(A), Some(&1));
 }
 
 /// The store's switch off, or a refusal, is never tried again.
@@ -144,31 +266,31 @@ fn off_and_refused_are_not_tried_again() {
     for answer in [Answer::Off, Answer::Refused(400)] {
         let (post, told) = recording(vec![answer]);
         let sender = Sender::new();
-        sender.offer(Some("p-a"), 1, 1_000, "h", "s");
-        sender.spawn(post, QUICK).unwrap();
+        offer(&sender, Some(A), 1);
+        sender.spawn(post, fresh(), None, QUICK).unwrap();
         next(&told);
         none_within(&told, Duration::from_millis(100));
     }
 }
 
-/// The caps: 45 turns go as 20, 20 and 5, in order, and a text over 8 KB
+/// The caps: 46 turns go as 20, 20 and 6, in order, and a text over 8 KB
 /// is cut at a character's end.
 #[test]
 fn the_caps_split_a_batch() {
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     for n in 1..=45 {
-        sender.offer(Some("p-a"), n, 1_000 + n, "h", "s");
+        offer(&sender, Some(A), n);
     }
     // 8,191 bytes of `a` then a 3-byte character: the cut leaves it out.
     let long = format!("{}{}", "a".repeat(TEXT_MOST - 1), "ệ".repeat(10));
-    sender.offer(Some("p-a"), 46, 2_000, &long, "s");
-    sender.spawn(post, QUICK).unwrap();
+    sender.offer(Some(A), 46, 2_000, (&long, "s"), false);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
     let batches: Vec<Value> = (0..3).map(|_| next(&told)).collect();
     let sizes: Vec<usize> = batches.iter().map(|body| ids(body).len()).collect();
     assert_eq!(sizes, [20, 20, 6]);
     let all: Vec<String> = batches.iter().flat_map(ids).collect();
-    let expected: Vec<String> = (1..=46).map(|n| format!("p-a:{n}")).collect();
+    let expected: Vec<String> = (1..=46).map(|n| id(A, n)).collect();
     assert_eq!(all, expected);
     let heard = batches[2]["turns"][5]["heard"].as_str().unwrap();
     assert!(heard.len() <= TEXT_MOST, "{}", heard.len());
@@ -179,22 +301,47 @@ fn the_caps_split_a_batch() {
 }
 
 /// The turn as the store takes it: id, time, person (empty for the room),
-/// heard and said.
+/// heard and said; a reply after a linked read goes as the placeholder.
 #[test]
 fn a_turn_is_sent_in_the_stores_shape() {
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     sender.offer(
-        Some("p-a"),
+        Some(A),
         9,
         1_763_466_002_000,
-        "how are you",
-        "Bright, thanks.",
+        ("how are you", "Bright, thanks."),
+        false,
     );
-    sender.spawn(post, QUICK).unwrap();
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
     assert_eq!(
         next(&told),
-        json!({"turns":[{"id":"p-a:9","at":"2025-11-18T11:40:02Z","person":"p-a","heard":"how are you","said":"Bright, thanks."}]})
+        json!({"turns":[{"id":id(A, 9),"at":"2025-11-18T11:40:02Z","person":A,"heard":"how are you","said":"Bright, thanks."}]})
+    );
+    sender.offer(
+        Some(A),
+        10,
+        1_000,
+        ("read my mail", "Ann wrote: the key is 4512."),
+        true,
+    );
+    let body = next(&told);
+    assert_eq!(body["turns"][0]["said"], crate::thread::PRIVATE_SAID);
+    assert!(!body.to_string().contains("4512"), "{body}");
+}
+
+/// A scope no forget can reach (not a known person's `p-` id) is never
+/// sent, nor is a move to one.
+#[test]
+fn only_scopes_a_forget_reaches_are_sent() {
+    let sender = Sender::new();
+    offer(&sender, Some("guest"), 1);
+    offer(&sender, Some(A), 2);
+    offer(&sender, None, 3);
+    sender.moved("guest", &[(3, 9)]);
+    assert_eq!(
+        queued(&sender),
+        (vec![format!("{A}:2")], vec!["everyone:3".to_owned()])
     );
 }
 
@@ -204,61 +351,283 @@ fn a_turn_is_sent_in_the_stores_shape() {
 fn room_turns_wait_for_their_conversation_and_follow_a_move() {
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
-    sender.spawn(post, QUICK).unwrap();
-    sender.offer(None, 5, 1_000, "hi lamp", "Hello.");
-    sender.offer(None, 6, 2_000, "it's me", "Hi again.");
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    offer(&sender, None, 5);
+    offer(&sender, None, 6);
     none_within(&told, Duration::from_millis(100));
-    sender.moved("p-a", &[(5, 12), (40, 41)]);
+    sender.moved(A, &[(5, 12), (40, 41)]);
     let moved = next(&told);
-    assert_eq!(moved["turns"][0]["id"], "p-a:12");
-    assert_eq!(moved["turns"][0]["person"], "p-a");
-    assert_eq!(moved["turns"].as_array().unwrap().len(), 1);
+    assert_eq!(ids(&moved), [id(A, 12)]);
+    assert_eq!(moved["turns"][0]["person"], A);
     // An end naming none of the held lines sends none.
     sender.settled(&[99]);
     none_within(&told, Duration::from_millis(50));
     sender.settled(&[6]);
     let settled = next(&told);
-    assert_eq!(settled["turns"][0]["id"], "everyone:6");
+    assert_eq!(ids(&settled), [id(ROOM_SCOPE, 6)]);
     assert_eq!(settled["turns"][0]["person"], "");
     none_within(&told, Duration::from_millis(50));
 }
 
-/// A forget lets go of what is unsent and stops a batch's next try.
+/// Twelve's HOLD 3: a forget lets go of the ids it removed only; with none
+/// named, the forgetting person's and the room's wait for the next start;
+/// other people's unsent turns are never let go.
 #[test]
-fn a_forget_lets_go_of_what_is_unsent() {
-    let (post, told) = recording(vec![Answer::Again]);
+fn a_forget_lets_go_of_its_own_ids_never_other_peoples() {
     let sender = Sender::new();
-    sender.offer(Some("p-a"), 1, 1_000, "h", "s");
-    sender.offer(None, 2, 1_000, "room", "s");
-    let slow = Waits {
-        first: Duration::from_millis(300),
-        longest: Duration::from_millis(300),
-    };
-    sender.spawn(post, slow).unwrap();
-    assert_eq!(ids(&next(&told)), ["p-a:1"]);
-    sender.forgot();
-    // Neither the batch's next try nor the held room line.
-    none_within(&told, Duration::from_millis(500));
-    sender.settled(&[2]);
-    none_within(&told, Duration::from_millis(100));
-    assert_eq!(sender.let_go(), 2);
-    // A turn after the forget is sent.
-    sender.offer(Some("p-a"), 3, 3_000, "h", "s");
-    assert_eq!(ids(&next(&told)), ["p-a:3"]);
+    for (person, n) in [(Some(A), 1), (Some(A), 2), (Some(B), 3), (None, 4)] {
+        offer(&sender, person, n);
+    }
+    sender.forgetting(Some(A));
+    sender.forget_answered(
+        Some(A),
+        false,
+        Some(&json!({"ok":true,"removed":1,"exchanges":{A:[1]}})),
+    );
+    assert_eq!(
+        queued(&sender),
+        (
+            vec![format!("{A}:2"), format!("{B}:3")],
+            vec!["everyone:4".to_owned()]
+        )
+    );
+    assert!(locked(&sender.shared).is_forgotten(A, 1));
+    // A forget that names no ids (a memory before #7935's answer).
+    sender.forgetting(Some(A));
+    sender.forget_answered(Some(A), false, Some(&json!({"ok":true,"removed":1})));
+    assert_eq!(queued(&sender), (vec![format!("{B}:3")], vec![]));
+    assert_eq!(locked(&sender.shared).deferred.get(A), Some(&2));
+    // Forget everything: all of theirs offered so far is forgotten.
+    offer(&sender, Some(A), 5);
+    sender.forgetting(Some(B));
+    sender.forget_answered(Some(B), true, Some(&json!({"ok":true})));
+    assert_eq!(queued(&sender), (vec![format!("{A}:5")], vec![]));
+    assert!(locked(&sender.shared).is_forgotten(B, 3));
+    assert!(!locked(&sender.shared).is_forgotten(B, 4));
+    assert!(locked(&sender.shared).paused_until.is_none());
 }
 
-/// A full queue lets the oldest go, counted, and never blocks.
+/// Ruling 1 and Twelve's HOLD 4: a forget holds every post, the first
+/// included, until the memory answers; what it removed is never posted.
 #[test]
-fn a_full_queue_lets_the_oldest_go() {
+fn a_forget_holds_the_first_post_and_what_it_removed_never_goes() {
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    sender.forgetting(Some(A));
+    offer(&sender, Some(A), 1);
+    offer(&sender, Some(A), 2);
+    none_within(&told, Duration::from_millis(150));
+    sender.forget_answered(
+        Some(A),
+        false,
+        Some(&json!({"ok":true,"exchanges":{A:[1]}})),
+    );
+    assert_eq!(ids(&next(&told)), [id(A, 2)]);
+    // An id queued for deletion by its full id is never posted, though the
+    // memory hands it again (a catch-up).
+    sender.deleting(&[id(A, 7)]);
+    offer(&sender, Some(A), 7);
+    offer(&sender, Some(A), 8);
+    assert_eq!(ids(&next(&told)), [id(A, 8)]);
+    none_within(&told, Duration::from_millis(50));
+}
+
+/// Ruling 1's test: a forget while a save is in flight leaves the turn
+/// gone, lamp side: the call under way fails, and its next try leaves the
+/// forgotten turn out (one the store took is the server's tombstone's).
+#[test]
+fn a_forget_during_an_in_flight_save_leaves_the_turn_gone() {
+    let (tell, told) = mpsc::channel();
+    let (go, gate) = mpsc::channel::<Answer>();
+    let post: Post = Box::new(move |body: &Value| {
+        let _ = tell.send(body.clone());
+        gate.recv_timeout(Duration::from_secs(5))
+            .unwrap_or(Answer::Saved)
+    });
+    let sender = Sender::new();
+    offer(&sender, Some(A), 1);
+    offer(&sender, Some(A), 2);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 1), id(A, 2)]);
+    // The call is in flight: the forget is said and answered.
+    sender.forgetting(Some(A));
+    sender.forget_answered(
+        Some(A),
+        false,
+        Some(&json!({"ok":true,"exchanges":{A:[1]}})),
+    );
+    go.send(Answer::Again).unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 2)]);
+    go.send(Answer::Saved).unwrap();
+    none_within(&told, Duration::from_millis(100));
+}
+
+/// A forget whose memory never answers holds sends at most [`FORGET_HOLD`];
+/// then the forgetting person's and the room's wait for the next start.
+#[test]
+fn a_forget_with_no_answer_lets_its_scope_wait_for_the_next_start() {
+    let sender = Sender::new();
+    offer(&sender, Some(A), 1);
+    offer(&sender, Some(B), 2);
+    sender.forgetting(Some(A));
+    let mut queue = locked(&sender.shared);
+    let later = Instant::now() + FORGET_HOLD + Duration::from_millis(1);
+    assert!(!held_by_forget(&mut queue, later));
+    drop(queue);
+    assert_eq!(queued(&sender), (vec![format!("{B}:2")], vec![]));
+}
+
+/// A full queue lets the oldest wait for the next start, counted, and
+/// never blocks.
+#[test]
+fn a_full_queue_lets_the_oldest_wait() {
     let sender = Sender::new();
     for n in 1..=(READY_MOST as u64 + 5) {
-        sender.offer(Some("p-a"), n, n, "h", "s");
+        offer(&sender, Some(A), n);
     }
     assert_eq!(sender.let_go(), 5);
     for n in 1..=(HELD_MOST as u64 + 3) {
-        sender.offer(None, n, n, "h", "s");
+        offer(&sender, None, n);
     }
     assert_eq!(sender.let_go(), 8);
+    let queue = locked(&sender.shared);
+    assert_eq!(queue.deferred.get(A), Some(&1));
+    assert_eq!(queue.deferred.get(ROOM_SCOPE), Some(&1));
+}
+
+/// A scope's mark is the highest id taken with nothing unsent below it.
+#[test]
+fn a_mark_never_passes_an_unsent_turn() {
+    let mut queue = Queue::default();
+    queue.acked.insert(A.into(), 5);
+    assert_eq!(queue.mark(A), Some(5));
+    queue.outstanding.entry(A.into()).or_default().insert(3);
+    assert_eq!(queue.mark(A), Some(2));
+    // A lower one waits for the next start: the mark stays below it.
+    queue.deferred.insert(A.into(), 2);
+    assert_eq!(queue.mark(A), Some(1));
+    queue.outstanding.clear();
+    assert_eq!(queue.mark(A), Some(1));
+    queue.marks.insert(A.into(), 4);
+    assert_eq!(queue.mark(A), Some(4));
+    assert_eq!(queue.mark(B), None);
+}
+
+/// Ruling 4's test: a restart with unsent turns sends them after, from
+/// the memory, under the same ids; the marks file holds ids only, 0600.
+#[test]
+fn a_restart_with_unsent_turns_sends_them_after() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = scratch("restart");
+    let marks = dir.join("history-marks.json");
+    // The first run: the store took exchange 1, never 2 and 3.
+    {
+        let (post, told) = recording(vec![Answer::Saved, Answer::Again]);
+        let sender = Sender::new();
+        sender
+            .spawn(
+                post,
+                memory(STORE, json!({A:0}), vec![]),
+                Some(marks.clone()),
+                QUICK,
+            )
+            .unwrap();
+        marks_once(&marks, A, 0);
+        sender.offer(Some(A), 1, 1_001, ("first words", "s"), false);
+        assert_eq!(ids(&next(&told)), [id(A, 1)]);
+        marks_once(&marks, A, 1);
+        sender.offer(Some(A), 2, 1_002, ("second words", "s"), false);
+        sender.offer(Some(A), 3, 1_003, ("third words", "s"), false);
+        for _ in 0..TRIES {
+            assert_eq!(ids(&next(&told)), [id(A, 2), id(A, 3)]);
+        }
+        none_within(&told, Duration::from_millis(100));
+    }
+    let written = marks_once(&marks, A, 1);
+    assert_eq!(written, json!({"store":STORE,"marks":{A:1}}));
+    let mode = std::fs::metadata(&marks).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
+    // The restart: the memory still holds 2 and 3 (and its newer 4).
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender
+        .spawn(
+            post,
+            memory(
+                STORE,
+                json!({A:4, B:0}),
+                vec![
+                    (A, 1, "first words"),
+                    (A, 2, "second words"),
+                    (A, 3, "third words"),
+                    (A, 4, "fourth words"),
+                ],
+            ),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    let body = next(&told);
+    assert_eq!(ids(&body), [id(A, 2), id(A, 3), id(A, 4)]);
+    assert_eq!(body["turns"][0]["heard"], "second words");
+    marks_once(&marks, A, 4);
+    // New turns go on after the catch-up.
+    offer(&sender, Some(A), 5);
+    assert_eq!(ids(&next(&told)), [id(A, 5)]);
+    marks_once(&marks, A, 5);
+    let text = std::fs::read_to_string(&marks).unwrap();
+    assert!(!text.contains("words"), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A store unlike the marks' (a reset, or the first start) sends nothing
+/// from before: the marks start at what the memory holds now.
+#[test]
+fn a_new_store_sends_nothing_from_before() {
+    let dir = scratch("new-store");
+    let marks = dir.join("history-marks.json");
+    write_marks(&marks, "11111111", &BTreeMap::from([(A.to_owned(), 2)])).unwrap();
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender
+        .spawn(
+            post,
+            memory(STORE, json!({A:9}), vec![(A, 3, "old"), (A, 9, "old")]),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    assert_eq!(
+        marks_once(&marks, A, 9),
+        json!({"store":STORE,"marks":{A:9}})
+    );
+    none_within(&told, Duration::from_millis(100));
+    offer(&sender, Some(A), 10);
+    assert_eq!(ids(&next(&told)), [id(A, 10)]);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A forgotten id is left out of the catch-up too.
+#[test]
+fn the_catch_up_leaves_out_what_was_forgotten() {
+    let dir = scratch("catch-up-forgotten");
+    let marks = dir.join("history-marks.json");
+    write_marks(&marks, STORE, &BTreeMap::from([(A.to_owned(), 0)])).unwrap();
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender.deleting(&[id(A, 1)]);
+    sender
+        .spawn(
+            post,
+            memory(STORE, json!({A:2}), vec![(A, 1, "gone"), (A, 2, "kept")]),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 2)]);
+    marks_once(&marks, A, 2);
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 /// A plain local store that takes the connection and answers after
@@ -325,6 +694,7 @@ fn only_the_lamps_cloud_api_is_sent_to() {
     ] {
         assert_eq!(url(base).as_deref(), Some(SAVE), "{base:?}");
     }
+    let nowhere = Path::new("/nonexistent/lamp-history");
     for base in [
         "https://api.deepseek.com",
         "https://openrouter.ai/api/v1",
@@ -334,44 +704,32 @@ fn only_the_lamps_cloud_api_is_sent_to() {
         "",
     ] {
         assert_eq!(url(base), None, "{base:?}");
-        assert!(start_from(Some("on"), base, "k").is_none(), "{base:?}");
+        assert!(
+            start_from(Some("on"), base, "k", nowhere, nowhere).is_none(),
+            "{base:?}"
+        );
     }
 }
 
-/// The id leg (the first builder's HOLD on #7935): the save's id for an
-/// exchange is the one Friday's forget sends for it, `<scope>:<id>` with the
-/// room's scope `everyone` (`history_forget::turn_id`, whose tests read a
-/// forget of the room's exchange 3 as `everyone:3`).
-#[test]
-fn a_saves_id_is_the_one_a_forget_sends() {
-    let forget_sends = |scope: &str, id: u64| format!("{scope}:{id}");
-    assert_eq!(turn_id(None, 3), "everyone:3");
-    assert_eq!(turn_id(None, 3), forget_sends("everyone", 3));
-    assert_eq!(turn_id(Some("p-0a1b"), 12), forget_sends("p-0a1b", 12));
-    // And what the queue sends is that id, moved lines included.
-    let (post, told) = recording(vec![Answer::Saved]);
-    let sender = Sender::new();
-    sender.spawn(post, QUICK).unwrap();
-    sender.offer(None, 3, 1_000, "h", "s");
-    sender.offer(None, 4, 1_000, "h", "s");
-    sender.moved("p-0a1b", &[(4, 12)]);
-    assert_eq!(ids(&next(&told)), [forget_sends("p-0a1b", 12)]);
-    sender.settled(&[3]);
-    assert_eq!(ids(&next(&told)), [forget_sends("everyone", 3)]);
-}
-
-/// The second leg: with the switch anything but `on`, nothing starts and
-/// nothing reaches the store.
+/// With the switch anything but `on`, nothing starts and nothing reaches
+/// the store.
 #[test]
 fn nothing_is_sent_when_the_switch_is_off() {
     let (base, told) = slow_store(Duration::ZERO);
+    let nowhere = Path::new("/nonexistent/lamp-history");
     for value in [None, Some("off"), Some("ON"), Some("")] {
-        assert!(start_at(value, local(&base), "k").is_none(), "{value:?}");
+        assert!(
+            start_at(value, local(&base), "k", fresh(), None).is_none(),
+            "{value:?}"
+        );
         let relay = "https://campaign-api.autonomous.ai/api/v1/ai";
-        assert!(start_from(value, relay, "k").is_none(), "{value:?}");
+        assert!(
+            start_from(value, relay, "k", nowhere, nowhere).is_none(),
+            "{value:?}"
+        );
     }
     // Nor does the voice's own path, never started, send a thing.
-    offered(Some("p-a"), 1, 1_000, "h", "s");
+    offered(Some(A), 1, 1_000, ("h", "s"), false);
     settled(&[1]);
     assert!(told.recv_timeout(Duration::from_millis(200)).is_err());
 }
@@ -381,8 +739,9 @@ fn nothing_is_sent_when_the_switch_is_off() {
 #[test]
 fn the_call_goes_to_the_lamps_cloud_api_with_its_key() {
     let (base, told) = slow_store(Duration::ZERO);
-    let sender = start_at(Some("on"), local(&base), " lamp-key \n").expect("started");
-    sender.offer(Some("p-a"), 2, 1_000, "h", "s");
+    let sender =
+        start_at(Some("on"), local(&base), " lamp-key \n", fresh(), None).expect("started");
+    offer(&sender, Some(A), 2);
     let (head, body) = told.recv_timeout(Duration::from_secs(5)).expect("a call");
     assert!(
         head.starts_with("POST /api/v1/ai/history/turns HTTP/1.1"),
@@ -397,25 +756,25 @@ fn the_call_goes_to_the_lamps_cloud_api_with_its_key() {
         !head.to_ascii_lowercase().contains("authorization"),
         "{head}"
     );
-    assert_eq!(ids(&body), ["p-a:2"]);
-    assert!(start_at(Some("on"), local(&base), "  ").is_none());
-    assert!(start_at(Some("on"), None, "k").is_none());
+    assert_eq!(ids(&body), [id(A, 2)]);
+    assert!(start_at(Some("on"), local(&base), "  ", fresh(), None).is_none());
+    assert!(start_at(Some("on"), None, "k", fresh(), None).is_none());
 }
 
-/// The third leg: a store that takes 2 s to answer never delays the turn.
-/// Every offer returns at once while a call hangs; measured, not assumed.
+/// A store that takes 2 s to answer never delays the turn: every offer
+/// returns at once while a call hangs; measured, not assumed.
 #[test]
 fn the_reply_is_not_delayed_by_a_slow_server() {
     let (base, told) = slow_store(Duration::from_secs(2));
-    let sender = start_at(Some("on"), local(&base), "k").expect("started");
-    sender.offer(Some("p-a"), 1, 1_000, "h", "s");
+    let sender = start_at(Some("on"), local(&base), "k", fresh(), None).expect("started");
+    offer(&sender, Some(A), 1);
     // The first call is in, and hangs for 2 s.
     told.recv_timeout(Duration::from_secs(5)).expect("a call");
     let mut slowest = Duration::ZERO;
     let started = Instant::now();
     for n in 2..=101 {
         let one = Instant::now();
-        sender.offer(Some("p-a"), n, 1_000 + n, "h", "s");
+        offer(&sender, Some(A), n);
         slowest = slowest.max(one.elapsed());
     }
     let all = started.elapsed();
@@ -424,21 +783,124 @@ fn the_reply_is_not_delayed_by_a_slow_server() {
     assert!(all < Duration::from_millis(100), "{all:?}");
 }
 
+/// `sender` as this thread's for `act`, the voice's hooks included.
+fn as_the_voices<R>(sender: &Sender, act: impl FnOnce() -> R) -> R {
+    TEST_SENDER.with(|test| *test.borrow_mut() = Some(sender.clone()));
+    let result = act();
+    TEST_SENDER.with(|test| *test.borrow_mut() = None);
+    result
+}
+
 /// The memory's writer hands on exactly what the memory wrote, under the
 /// memory's own id, and only once it answered with one.
 #[test]
 fn the_writer_offers_what_the_memory_wrote_under_its_id() {
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
-    sender.spawn(post, QUICK).unwrap();
-    TEST_SENDER.with(|test| *test.borrow_mut() = Some(sender.clone()));
-    crate::remember::write_for_history_test(&[
-        (Some("p-a"), "kept by the memory"),
-        (Some("p-a"), "refused by the memory"),
-    ]);
-    TEST_SENDER.with(|test| *test.borrow_mut() = None);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    as_the_voices(&sender, || {
+        crate::remember::write_for_history_test(
+            &[
+                (Some(A), "kept by the memory"),
+                (Some(A), "refused by the memory"),
+            ],
+            3,
+        );
+    });
     let body = next(&told);
-    assert_eq!(ids(&body), ["p-a:17"]);
+    assert_eq!(ids(&body), [id(A, 17)]);
     assert_eq!(body["turns"][0]["heard"], "kept by the memory");
     none_within(&told, Duration::from_millis(100));
+}
+
+/// Ruling 3, through the writer: a turn in a request a linked service's
+/// read (mail, calendar) answered in is saved with the thread's
+/// placeholder, never what was read.
+#[test]
+fn a_linked_reads_turn_is_saved_as_the_placeholder() {
+    let sender = Sender::new();
+    crate::services::read_answered_for_test(1);
+    as_the_voices(&sender, || {
+        crate::remember::write_for_history_test(
+            &[(Some(A), "kept 8 read my mail"), (Some(A), "kept 9 thanks")],
+            3,
+        );
+    });
+    let queue = locked(&sender.shared);
+    let saids: Vec<(u64, &str)> = queue
+        .ready
+        .iter()
+        .map(|pending| (pending.exchange, pending.said.as_str()))
+        .collect();
+    assert_eq!(
+        saids,
+        [(8, crate::thread::PRIVATE_SAID), (9, "answer")],
+        "{saids:?}"
+    );
+}
+
+/// The writer's end of a room conversation (`end`) sends its held lines
+/// as the room's.
+#[test]
+fn the_writer_sends_a_rooms_line_when_its_conversation_ends() {
+    let sender = Sender::new();
+    as_the_voices(&sender, || {
+        crate::remember::write_for_history_test(&[(None, "kept 4 hello lamp")], 2);
+    });
+    assert_eq!(queued(&sender), (vec!["everyone:4".to_owned()], vec![]));
+}
+
+/// The writer's move of the room's conversation to a known person
+/// (`go_on_as`) sends its held lines as theirs, under their new ids.
+#[test]
+fn the_writers_move_sends_the_room_lines_as_the_persons() {
+    let sender = Sender::new();
+    offer(&sender, None, 5);
+    offer(&sender, None, 6);
+    as_the_voices(&sender, || {
+        crate::remember::go_on_for_history_test(A, &[(5, 12), (6, 13)]);
+    });
+    assert_eq!(
+        queued(&sender),
+        (vec![format!("{A}:12"), format!("{A}:13")], vec![])
+    );
+}
+
+/// A forget said on the lamp, through the voice's tools: sends are held
+/// while the memory answers it, and the exchanges it names removed are
+/// let go and kept as forgotten; the rest go on.
+#[test]
+fn a_forget_said_on_the_lamp_holds_and_lets_go_of_what_it_removed() {
+    let sender = Sender::new();
+    offer(&sender, Some(A), 17);
+    offer(&sender, Some(A), 18);
+    offer(&sender, Some(B), 19);
+    *FORGET_PROBE.lock().unwrap() = Some(sender.clone());
+    HELD_AT_FORGET.store(false, std::sync::atomic::Ordering::SeqCst);
+    as_the_voices(&sender, || crate::remember::forget_for_history_test(A));
+    *FORGET_PROBE.lock().unwrap() = None;
+    assert!(HELD_AT_FORGET.load(std::sync::atomic::Ordering::SeqCst));
+    assert_eq!(
+        queued(&sender),
+        (vec![format!("{A}:18"), format!("{B}:19")], vec![])
+    );
+    let queue = locked(&sender.shared);
+    assert!(queue.is_forgotten(A, 17));
+    assert!(queue.paused_until.is_none());
+}
+
+/// A source forgotten outside this voice, seen by the writer: the
+/// person's and the room's unsent turns wait for the next start, when the
+/// memory no longer holds what went; another person's go on.
+#[test]
+fn a_source_forgotten_elsewhere_lets_its_scope_wait() {
+    let sender = Sender::new();
+    offer(&sender, Some(A), 3);
+    offer(&sender, Some(B), 1);
+    offer(&sender, None, 4);
+    as_the_voices(&sender, || {
+        crate::remember::write_for_history_test(&[(Some(A), "gone with its source")], 2);
+    });
+    assert_eq!(queued(&sender), (vec![format!("{B}:1")], vec![]));
+    assert_eq!(sender.let_go(), 2);
 }
