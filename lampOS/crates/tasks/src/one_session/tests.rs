@@ -3395,27 +3395,26 @@ fn a_turn_with_steady_progress_is_kept() {
 }
 
 /// #7906 sign 4b: a turn that reached OpenClaw, then `running` with its
-/// record unmoved for 3 min and the model's answer never come (a user row
-/// or a tool's result last), is stuck; at 2 min 59 s it is not yet.
+/// record unmoved for 3 min and the model's answer never begun (the user's
+/// row last), is stuck; at 2 min 59 s it is not yet.
 #[test]
 fn a_working_turn_unchanged_for_3_min_is_stuck() {
     let t0 = Instant::now();
     let at = |s: u64| t0 + Duration::from_secs(s);
-    for last in ["user", "toolResult"] {
-        let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
-        assert_eq!(
-            watch.look(Some(&record(9, "running", last)), true, at(20)),
-            None
-        );
-        assert_eq!(
-            watch.look(Some(&record(9, "running", last)), true, at(199)),
-            None
-        );
-        assert!(matches!(
-            watch.look(Some(&record(9, "running", last)), true, at(200)),
-            Some(KeptGone::NotMoving(why)) if why.contains("did not move for 180 s")
-        ));
-    }
+    let last = "user";
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    assert_eq!(
+        watch.look(Some(&record(9, "running", last)), true, at(20)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(9, "running", last)), true, at(199)),
+        None
+    );
+    assert!(matches!(
+        watch.look(Some(&record(9, "running", last)), true, at(200)),
+        Some(KeptGone::NotMoving(why)) if why.contains("did not move for 180 s")
+    ));
     // A refused hand-over waiting on such a turn.
     let mut refused = TurnWatch::refused(t0, TURN_STALL);
     assert_eq!(
@@ -3772,4 +3771,89 @@ fn a_close_refused_for_a_missing_conversation_still_leads_to_a_fresh_session() {
     assert!(!one.drop_if_due(&fake), "no close tried again");
     one.open_if_due(&fake, &place());
     assert_eq!(one.agent(), Some(agent_of(3)), "{:?}", fake.calls());
+}
+
+/// #7906 sign 4b after a tool's result: the Gateway writes the assistant's
+/// row only once a whole message is done, so a make writing a long
+/// SKILL.md shows `toolResult` last and no move for minutes. Not stuck at
+/// 300 s (nor at 3 min); stuck at 600 s (`TOOL_RESULT_STALL`).
+#[test]
+fn a_make_after_a_tool_result_is_not_replaced_at_300_s_only_at_600_s() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    assert_eq!(
+        watch.look(Some(&record(9, "running", "toolResult")), true, at(20)),
+        None
+    );
+    for s in [200, 300, 400, 619] {
+        assert_eq!(
+            watch.look(Some(&record(9, "running", "toolResult")), true, at(s)),
+            None,
+            "{s} s"
+        );
+    }
+    assert!(matches!(
+        watch.look(Some(&record(9, "running", "toolResult")), true, at(620)),
+        Some(KeptGone::NotMoving(why)) if why.contains("did not move for 600 s")
+    ));
+}
+
+/// #7906: only `killed`, `failed` or `timeout` are a dead session under an
+/// open turn; `done`, none or an unknown status never are.
+#[test]
+fn only_a_killed_failed_or_timed_out_session_is_dead_but_working() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    for status in [Some("done"), None, Some("paused")] {
+        let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+        let row = |seq| TurnRecord {
+            session: "w1".into(),
+            seq,
+            status: status.map(str::to_owned),
+            last_role: Some("assistant".into()),
+        };
+        assert_eq!(watch.look(Some(&row(8)), true, at(10)), None);
+        assert_eq!(watch.look(Some(&row(8)), true, at(100)), None, "{status:?}");
+    }
+    for status in ["killed", "failed", "timeout"] {
+        let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+        assert_eq!(
+            watch.look(Some(&record(8, status, "assistant")), true, at(10)),
+            None
+        );
+        assert_eq!(
+            watch.look(Some(&record(8, status, "assistant")), true, at(25)),
+            Some(KeptGone::DeadButWorking(status.into()))
+        );
+    }
+}
+
+/// #7906: a resume that comes back with a new agent id is still the same
+/// kept session (keyed by name and token): it dies again and is replaced
+/// fresh, and the resume counted, so the third reopen in a row backs off.
+#[test]
+fn a_revive_is_keyed_by_the_kept_session_and_counts_toward_the_backoff() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
+    assert!(one.revive_or_replace(&fake, MACHINE, &agent_of(1), "a test", true));
+    assert!(one.lock().next_open.is_none(), "the first: at once");
+    // Resumed under a new id.
+    one.open_if_due(&fake, &place());
+    let agent = one.agent().unwrap();
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{agent}")]);
+    assert!(
+        !one.revive_or_replace(&fake, MACHINE, &agent, "a test", true),
+        "the same kept session: never a second resume"
+    );
+    assert!(one.lock().next_open.is_none(), "(a) then (b): not slowed");
+    one.open_if_due(&fake, &place());
+    let agent = one.agent().unwrap();
+    one.replace_kept(&fake, MACHINE, &agent, "a test");
+    assert!(
+        one.lock().next_open.is_some(),
+        "the revive counted: the third reopen in a row backs off"
+    );
 }

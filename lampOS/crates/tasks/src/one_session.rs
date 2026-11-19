@@ -288,19 +288,29 @@ pub fn near_context_limit(size: Option<SessionSize>, tokens: u64, make: bool) ->
 /// gets it, so no exec of this turn can be live.
 pub const TURN_START_WITHIN: Duration = Duration::from_secs(60);
 /// #7906 sign 4b: a turn open (`working`), its session `running`, and the
-/// record's highest `seq` unmoved this long, with its last row a message
-/// the model has not answered (`user`, or a `toolResult`). A last row of
-/// the assistant's (a tool call still running, a long exec) is never cut
-/// here: lamp-tasks can't see the exec's process, so it is left to the
-/// run's deadline.
+/// record's highest `seq` unmoved this long, with its last row the
+/// `user`'s: the model never began its answer. A last row of the
+/// assistant's (a tool call still running, a long exec) is never cut here:
+/// lamp-tasks can't see the exec's process, so it is left to the run's
+/// deadline.
 pub const TURN_STALL: Duration = Duration::from_secs(180);
-/// #7906: a turn open while its session's status is no longer `running`
-/// (`killed`, `failed`, `timeout`) this long: dead, though Harness still
-/// says working (its own close needs two 1 s reads).
+/// #7906 sign 4b after a tool's result (`toolResult` last): the Gateway
+/// writes the assistant's row only once a whole message is done, so a long
+/// tool-call write (a make's SKILL.md), a slow model or long thinking shows
+/// no move for minutes. Only this long unmoved is stuck.
+pub const TOOL_RESULT_STALL: Duration = Duration::from_secs(600);
+/// The session statuses that say its run ended badly ([`DEAD_WORKING`]);
+/// `done`, none or any other is never taken as dead.
+pub const DEAD_STATUSES: &[&str] = &["killed", "failed", "timeout"];
+/// #7906: a turn open while its session's status is one of
+/// [`DEAD_STATUSES`] this long: dead, though Harness still says working
+/// (its own close needs two 1 s reads).
 pub const DEAD_WORKING: Duration = Duration::from_secs(15);
 /// How often a kept turn's record is read while its end is waited for:
 /// beside `harness wait`, never in a healthy turn's way.
 pub const TURN_WATCH: Duration = Duration::from_secs(5);
+/// How often the turn's watcher looks at its run's cancel between reads.
+const CANCEL_LOOK: Duration = Duration::from_millis(100);
 
 /// #7906 signs 3 and 4: why the kept session is gone, or as good as gone,
 /// though Harness still lists it. It is replaced the one way every stuck
@@ -348,6 +358,8 @@ pub struct TurnWatch {
     base: Option<(String, i64)>,
     start_within: Option<Duration>,
     stall: Duration,
+    /// [`TOOL_RESULT_STALL`], shorter in tests.
+    tool_stall: Duration,
     dead_within: Duration,
     last: Option<(String, i64)>,
     changed: Instant,
@@ -368,6 +380,7 @@ impl TurnWatch {
             base,
             start_within: Some(start_within),
             stall,
+            tool_stall: TOOL_RESULT_STALL.max(stall),
             dead_within: DEAD_WORKING,
             last: None,
             changed: since,
@@ -384,6 +397,12 @@ impl TurnWatch {
             started: true,
             ..Self::taken(since, None, Duration::ZERO, stall)
         }
+    }
+
+    /// [`TOOL_RESULT_STALL`], shorter in tests.
+    pub fn tool_stall(mut self, stall: Duration) -> Self {
+        self.tool_stall = stall;
+        self
     }
 
     /// [`DEAD_WORKING`], shorter in tests.
@@ -420,9 +439,13 @@ impl TurnWatch {
             )));
         }
         let running = record.status.as_deref() == Some("running");
+        let dead = record
+            .status
+            .as_deref()
+            .is_some_and(|status| DEAD_STATUSES.contains(&status));
         // Only once the turn reached OpenClaw: until then the status is
         // the last turn's, and 4a's bound is the one that applies.
-        match (&record.status, working && !running && self.started) {
+        match (&record.status, working && dead && self.started) {
             (Some(status), true) => {
                 let since = *self.not_running.get_or_insert(now);
                 if now.saturating_duration_since(since) >= self.dead_within {
@@ -432,8 +455,12 @@ impl TurnWatch {
             _ => self.not_running = None,
         }
         let still = now.saturating_duration_since(self.changed);
-        let unanswered = matches!(record.last_role.as_deref(), Some("user" | "toolResult"));
-        (working && running && unanswered && still >= self.stall).then(|| {
+        let stall = match record.last_role.as_deref() {
+            Some("user") => Some(self.stall),
+            Some("toolResult") => Some(self.tool_stall),
+            _ => None,
+        };
+        (working && running && stall.is_some_and(|stall| still >= stall)).then(|| {
             KeptGone::NotMoving(format!(
                 "its turn did not move for {} s, the model's answer never came",
                 still.as_secs()
@@ -854,6 +881,8 @@ pub struct OneSession {
     turn_watch: (Duration, Duration, Duration),
     /// [`DEAD_WORKING`]; shorter in tests.
     dead_working: Duration,
+    /// [`TOOL_RESULT_STALL`]; shorter in tests.
+    tool_stall: Duration,
 }
 
 /// What a stuck session's replacement calls with why, for the journal and
@@ -1213,6 +1242,7 @@ impl OneSession {
             openclaw_db: None,
             turn_watch: (TURN_WATCH, TURN_START_WITHIN, TURN_STALL),
             dead_working: DEAD_WORKING,
+            tool_stall: TOOL_RESULT_STALL,
         }
     }
 
@@ -1226,6 +1256,8 @@ impl OneSession {
     ) -> Self {
         self.turn_watch = (every, start_within, stall);
         self.dead_working = stall.min(DEAD_WORKING);
+        // As 600 s is to 180 s.
+        self.tool_stall = stall.saturating_mul(10) / 3;
         self
     }
 
@@ -2880,25 +2912,35 @@ impl OneSession {
             }
         }
         self.gone(agent, why);
-        let in_row = {
+        self.count_replaced();
+        if let Some(replaced) = &self.on_replaced {
+            replaced(why);
+        }
+    }
+
+    /// One more stuck session reopened in a row ([`REPLACE_MOST`]): from
+    /// the second, the next open waits its backoff.
+    /// A revive (ladder (a)) counts too, and moves the bound one on, so
+    /// the ladder's plain (a) then (b) is not slowed, but no reopen,
+    /// whatever id it comes back with, goes on with no backoff.
+    fn count_replaced(&self) {
+        let (in_row, most) = {
             let mut inner = self.lock();
             inner.replaced_in_row = inner.replaced_in_row.saturating_add(1);
-            inner.replaced_in_row
+            let most = REPLACE_MOST + u32::from(inner.revived.is_some());
+            (inner.replaced_in_row, most)
         };
-        // From the replacements in a row, not `failed_opens`, which the
-        // next `ensure` that answers resets: 5 s, doubled, at most 300 s.
-        if in_row >= REPLACE_MOST {
+        // From the reopens in a row, not `failed_opens`, which the next
+        // `ensure` that answers resets: 5 s, doubled, at most 300 s.
+        if in_row >= most {
             let after = OPEN_RETRY_FIRST
-                .saturating_mul(1 << (in_row - REPLACE_MOST).min(16))
+                .saturating_mul(1 << (in_row - most).min(16))
                 .min(OPEN_RETRY_MOST);
             self.lock().next_open = Some(Instant::now() + after);
             eprintln!(
                 "tasks: one session: {in_row} stuck sessions in a row; the next open in {} s",
                 after.as_secs()
             );
-        }
-        if let Some(replaced) = &self.on_replaced {
-            replaced(why);
         }
     }
 
@@ -2924,9 +2966,14 @@ impl OneSession {
         why: &str,
         died: bool,
     ) -> bool {
+        // Keyed by the kept session's name and token, never its agent id:
+        // a resume that comes back with a new id is the same session.
+        let key = self
+            .kept_now(agent)
+            .map(|(name, token)| format!("{name}:{}", token.display()));
         let revive = died
-            && self.kept_now(agent).is_some()
-            && self.lock().revived.as_deref() != Some(agent)
+            && key.is_some()
+            && self.lock().revived != key
             && harness.session_held(&self.kept_session_key(agent)) != Some(false);
         if !revive {
             self.replace_kept(harness, machine, agent, why);
@@ -2936,8 +2983,11 @@ impl OneSession {
             "tasks: one session: {} died ({why}); OpenClaw still holds its conversation, so a plain resume first (#7906)",
             short(agent)
         );
-        self.lock().revived = Some(agent.to_owned());
+        self.lock().revived = key;
         self.gone(agent, why);
+        // A resume counts toward the replacements in a row too, so no
+        // reopen loops with no backoff.
+        self.count_replaced();
         true
     }
 
@@ -3150,8 +3200,7 @@ impl OneSession {
 
 /// #7906's told line: said once to the asker of a task whose stuck session
 /// was replaced and that was done again in the new one ([`Turn::restarted`]).
-pub const RESTARTED_LINE: &str =
-    "The agent got stuck, so I restarted it and did your request again.";
+pub const RESTARTED_LINE: &str = "The agent got stuck, so I restarted it and did your request.";
 
 /// The pane held by one run's turn; let go when dropped, and the next in
 /// the queue goes.
@@ -3543,7 +3592,9 @@ impl Turn<'_> {
         // The first look one `every` after the first refusal.
         let (watch, next) = refused.get_or_insert_with(|| {
             (
-                TurnWatch::refused(now, stall).dead_within(self.one.dead_within()),
+                TurnWatch::refused(now, stall)
+                    .tool_stall(self.one.tool_stall)
+                    .dead_within(self.one.dead_within()),
                 now + every,
             )
         });
@@ -3730,7 +3781,9 @@ impl Turn<'_> {
             .and_then(|pane| pane.handed.clone());
         let (since, base) = handed.unwrap_or_else(|| (Instant::now(), None));
         let watch = Mutex::new(
-            TurnWatch::taken(since, base, start_within, stall).dead_within(self.one.dead_within()),
+            TurnWatch::taken(since, base, start_within, stall)
+                .tool_stall(self.one.tool_stall)
+                .dead_within(self.one.dead_within()),
         );
         loop {
             if cancel.load(Ordering::Acquire) {
@@ -3904,13 +3957,28 @@ impl Turn<'_> {
             return Ok(harness.wait_kept(name, token, input, cancel));
         };
         let cut = AtomicBool::new(false);
-        let done = AtomicBool::new(false);
+        // The wait's end, told to the watcher at once.
+        let done = (Mutex::new(false), Condvar::new());
         let verdict = Mutex::new(None);
         let waited = std::thread::scope(|scope| {
             let (cut, done, verdict) = (&cut, &done, &verdict);
             scope.spawn(move || {
                 let mut next = Instant::now() + every;
-                while !done.load(Ordering::Acquire) {
+                loop {
+                    {
+                        // Asleep until the next read, the wait's end, or a
+                        // look at `cancel` (an atomic, with no wake of its
+                        // own) every [`CANCEL_LOOK`].
+                        let ended = done.0.lock().unwrap_or_else(|e| e.into_inner());
+                        let left = next.saturating_duration_since(Instant::now());
+                        let (ended, _) = done
+                            .1
+                            .wait_timeout_while(ended, left.min(CANCEL_LOOK), |ended| !*ended)
+                            .unwrap_or_else(|e| e.into_inner());
+                        if *ended {
+                            return;
+                        }
+                    }
                     if cancel.load(Ordering::Acquire) {
                         cut.store(true, Ordering::Release);
                         return;
@@ -3931,13 +3999,18 @@ impl Turn<'_> {
                             return;
                         }
                     }
-                    std::thread::sleep(Duration::from_millis(10));
                 }
             });
             let waited = harness.wait_kept(name, token, input, cut);
-            done.store(true, Ordering::Release);
+            *done.0.lock().unwrap_or_else(|e| e.into_inner()) = true;
+            done.1.notify_all();
             waited
         });
+        // A turn that ended idle keeps its answer, even with a verdict
+        // made at the same moment: never a just-finished turn replaced.
+        if matches!(&waited, Ok(Some(state)) if state == "idle") {
+            return Ok(waited);
+        }
         match verdict
             .into_inner()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

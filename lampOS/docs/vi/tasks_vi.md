@@ -2565,10 +2565,17 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     `wait` của lượt (`TURN_WATCH`, `harness::openclaw_turn_at`, cùng key):
     bản ghi không vượt quá chỗ lúc giao sau 60 s kể từ `taken` của Harness
     (`TURN_START_WITHIN`, 4a); phiên đang `running` mà `seq` cao nhất không
-    đổi trong 3 phút và dòng cuối là `user` hoặc `toolResult` mà model chưa
-    trả lời (`TURN_STALL`, 4b, cũng chặn một lần giao bị `NOT_IDLE`); hoặc
-    lượt còn mở trong khi trạng thái phiên là `killed`, `failed` hay
-    `timeout` suốt 15 s (`DEAD_WORKING`). Một tool call chưa có kết quả
+    đổi trong 3 phút và dòng cuối là của `user`, model chưa hề bắt đầu trả
+    lời (`TURN_STALL`, 4b, cũng chặn một lần giao bị `NOT_IDLE`), hoặc không
+    đổi trong 10 phút khi dòng cuối là `toolResult` (`TOOL_RESULT_STALL`:
+    Gateway chỉ ghi dòng của assistant khi cả tin nhắn đã xong, nên một lần
+    make viết SKILL.md dài, model chậm hay suy nghĩ lâu đều không thấy thay
+    đổi trong nhiều phút); hoặc lượt còn mở trong khi trạng thái phiên là
+    `killed`, `failed` hay `timeout` (`DEAD_STATUSES`; không bao giờ là
+    `done`, rỗng hay trạng thái khác) suốt 15 s (`DEAD_WORKING`). Lượt đã
+    kết thúc idle giữ câu trả lời của nó dù có kết luận cùng lúc. Luồng theo
+    dõi ngủ tới lần đọc kế tiếp hoặc khi lệnh wait xong, và xem lệnh huỷ của
+    lần chạy mỗi 100 ms. Một tool call chưa có kết quả
     (một exec dài) không bao giờ bị cắt mà để cho hạn chót của lần chạy;
     số tool của `show`, `lastActive` của `ps` hay chữ trên pane không bao
     giờ được dùng cho việc này.
@@ -2614,7 +2621,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   - **(b)** Chết lại sau lần resume đó, hội thoại mà OpenClaw không còn
     giữ, chính lần close khi hết hạn của ta, hoặc vẫn `starting`: một hội
     thoại mới (`replace_kept`, rồi `ensure --fresh`, cùng tên và token).
-  - **(c)** Từ lần thay thứ hai liên tiếp, áp dụng backoff ở trên.
+  - **(c)** Từ lần thay thứ hai liên tiếp, áp dụng backoff ở trên. Resume
+    chỉ một lần cho mỗi phiên được giữ (theo tên và token, không theo agent
+    id, nên phiên quay lại với id mới vẫn là phiên đó) cho tới khi có một
+    lượt được trả lời, và được tính là một lần mở lại liên tiếp: sau nó,
+    backoff bắt đầu từ lần mở lại thứ ba, nên (a) rồi (b) không bị chậm mà
+    không có gì lặp mà không có backoff.
 
   Một lần chạy kỹ năng mà phiên chết ngay trong lượt của nó (`wait` đọc
   một shell trơn là idle), hoặc lượt đã giao không chạy tiếp (dấu hiệu 4,
@@ -2635,7 +2647,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   bậc (a) của thang) trong khi việc của nó đang chờ lúc giao hoặc đang
   chạy, rồi việc chạy tiếp ở phiên mới, có `Turn::restarted`; câu trả lời
   của nó được báo kèm `RESTARTED_LINE` ("The agent got stuck, so I
-  restarted it and did your request again.") một lần ở phía trước, qua
+  restarted it and did your request.") một lần ở phía trước, qua
   đúng đường đã dùng để báo câu trả lời. Mỗi việc một câu, dù thay bao
   nhiêu lần. Lần chạy bị bỏ (đã chạy một tool, hoặc chết lần thứ hai) chỉ
   được báo câu thất bại của chính nó. Một lần thay khi không có việc nào
