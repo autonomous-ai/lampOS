@@ -655,6 +655,20 @@ cancels every command still waiting. An ask is sent once, never again after a
 reconnect: with the broker away it is answered `away`. `ok` to a command means
 it was handed to the desk, not that the desk moved: read `state` after.
 
+## The attachments contract (#7659)
+
+A photo or a text the owner sent from the app (`LAMP_ATTACHMENTS=on`, off
+unless set). The type lives in `src/attachments.rs`; `attachments_topics()`
+and `declaration_of()` find its topic.
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `AttachRef` | `attachments/arrived` | event | none / 120 s | Where an attachment from the app is, never its bytes: `path` (`/run/lampos-attachments/<id>` on a lamp), `id` (16 lowercase hex, its SHA-256's start), `kind` (`photo` or `text`), `mime` (`image/jpeg`; `text/plain` or `text/markdown`), `bytes` (at most 184 KiB for a photo, 64 KiB for a text) and `sent_at` (Unix ms, 0 if unsaid). Published by `lamp-cloud` ([cloud.md](cloud.md), "A photo or a text from the app"); the second route's worker takes it only from `cloud` and only in that folder ([second-voice.md](second-voice.md), "A photo from the app") |
+
+`check()` holds the id to 16 lowercase hex, the path to an absolute one
+ending in the id, the mime to the kind's, and the size to 1 byte up to the
+kind's bound. The 120 s is the window the owner's next line carries it in.
+
 ## The reports contract
 
 Added by Jarvis on 2026-10-19 (#1683). The types live in `src/reports.rs`

@@ -2954,6 +2954,46 @@ order is kept. A written turn is the same from the chat on.
   while the line is coming, AwaitingResponse before any answer audio,
   Responding after.
 
+### A photo from the app (`LAMP_ATTACHMENTS`, #7659)
+
+Off unless `LAMP_ATTACHMENTS=on` (the coordinator passes it to the second
+route's worker alone, `process::second_route_worker_environment`). Slice 1
+of #7659, with the first builder's rulings of 18 Nov 10:24
+(`crate::attachments`). `lamp-cloud` keeps what the owner sent from the
+app in `/run/lampos-attachments` and says where on `attachments/arrived`
+(cloud.md, "A photo or a text from the app"); the worker listens on the
+bus with the switch on.
+
+- **What it does:** the next spoken line that may have it, within 120 s of
+  its arrival, carries the photo once: its first round's question is
+  `Message::user_seeing` with the person's words and a note that the photo
+  came from the app on their phone, not the camera, and that it is spoken
+  of only if they ask. A later round, a later line, or the thread and its
+  history never carry it. A chat begun on the early words is let go for
+  that line, so round 1 has the photo. If the chat refuses the picture,
+  round 1 is asked again with the words alone.
+- **Whose line (ruling (a)):** the owner's own line, their kept face alone
+  in view (`person::may_tell`, judged on the line's lease and the faces in
+  view, the owner as `known_faces::owner_now` finds them). An owner with no
+  kept face: a line of the conversation that was already open when it
+  arrived (a line within `thread::GOING_ON_FOR` before it, and none of that
+  gap since), with one face in view and no known person. A guest's line,
+  two faces, nobody in view, a line with no lease, or a model that takes no
+  picture get nothing, not even the note.
+- **On arrival** nothing is said. The glance toward the owner (Change 1) is
+  not built yet.
+- **Let go:** when the microphone's privacy lease (`voice/privacy`) closes
+  (not permitted, read muted, or not renewed for 2 s), on `forget` or
+  `forget_everything` (`remember`), and 30 min after the conversation's
+  last line (or after its arrival, with no line since). The file is
+  removed; a reboot empties the folder.
+- **Never a face source and never kept:** the picture goes in that one
+  model call only, as a look's does. The journal says the attachment's id,
+  kind, bytes and the request it went with, never what it shows.
+- **Not yet:** a text attachment is never carried (`read_attachment`), nor
+  is a photo after its first line or on the Live route
+  (`look_at_attachment`); both come with slice 2.
+
 ### The lamp's day (`LAMP_VOICE_DAY_SHED`, #7664)
 
 A lamp's day allowance should last its owner's day, so near its end the

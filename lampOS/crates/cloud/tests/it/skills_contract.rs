@@ -89,6 +89,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         devices: None,
         apps: None,
         upload: None,
+        attachments: None,
         shutdown: None,
         harness_sign_in: None,
     }

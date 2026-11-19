@@ -5900,6 +5900,8 @@ fn run_for_guarded(
             // Nothing heard or saved before it follows anyone
             // (`LAMP_MEMORY_FOLLOWS_FACE`), whatever the forget's outcome.
             crate::follows_face::forgot();
+            // Nor a photo from the app (`LAMP_ATTACHMENTS`, #7659).
+            crate::attachments::forget();
             // A timed-out removal can still commit. Invalidate the local
             // recap without waiting on its mutex in this tool's deadline.
             FORGET_THREAD.store(true, Ordering::Release);

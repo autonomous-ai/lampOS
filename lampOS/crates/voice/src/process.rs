@@ -3070,6 +3070,8 @@ fn second_route_worker_environment(
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").
         crate::light_told::ENVIRONMENT,
+        // A photo from the owner's app carried to their next line (#7659).
+        crate::attachments::ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -3378,6 +3380,7 @@ mod tests {
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
+            crate::attachments::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -4377,6 +4380,7 @@ mod tests {
                     crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                     crate::known_faces::AT_DESK_ENVIRONMENT,
+                    crate::attachments::ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -4637,6 +4641,7 @@ mod tests {
                     "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_APP_TRIGGERS=on",
+                    "LAMP_ATTACHMENTS=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
