@@ -2323,8 +2323,7 @@ câu nó thay, nên khi bật mọi công tắc vẫn nằm trong 1.024 byte c�
 kết, ở đúng 1.024), tham số `turn_off` nói "turn off, pause or stop a skill
 they made or added (by voice, in the app or from a file), which keeps it to
 turn back on ... Never remove for this. Even one that starts only when they
-say its words is turned off this way. Call it at once. Ask nothing
-first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
+say its words. Call it at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
 `remove` nói "delete
 or remove a skill for good, never to turn one off, pause or stop it". Lời
 gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
@@ -4888,9 +4887,8 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   remove it." và, với "remove it", "Which one…?"). Mô tả của `make_skill`
   kết thúc bằng "Make or remove at once, never asking first, even of one
   they have: your line gives the undo." (`make_no_asks::AT_ONCE_TOLD`);
-  tham số `remove` thêm "Call it at once, never asking first or for a yes;
-  ask which only when two skills they made fit the words alike, never of
-  "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
+  tham số `remove` thêm "Call it at once, never asking first; ask which
+  only when two skills they made fit the words alike, never of "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
   `make_no_asks::UNDO_RESTORE_TOLD`. Với mọi công
   tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
   các tham số trong 4.096 byte.
