@@ -5723,6 +5723,26 @@ mod tests {
         );
     }
 
+    /// #7698, with #7891's meeting cut-ins in mind: a word one letter from
+    /// "Lamp" only stops being someone's name; it never calls the lamp.
+    /// "Camp, what's next?" with no face seen and no name heard is held as
+    /// any line nobody said to the lamp, never answered, in either room.
+    #[test]
+    fn a_spelling_one_letter_from_lamp_does_not_call_the_lamp() {
+        let heard = "Camp, what's next?";
+        assert!(!called(heard));
+        assert!(!called_by_name_on(heard, true));
+        assert_eq!(
+            judged_run(false, Room::Quiet, &[(heard, false)])[0],
+            Verdict::Hold(NOT_SPOKEN_TO)
+        );
+        let busy = judged_run(false, Room::Busy, &[(heard, false)])[0];
+        assert!(
+            matches!(busy, Verdict::Hold(why) if why != TO_ANOTHER),
+            "{busy:?}"
+        );
+    }
+
     /// #4710: on lamp-3e83 on 2 Nov a tester's "Lamp, …" was written
     /// "One, …" (and "Wang, …"), held as said to someone it calls by name,
     /// and her retries and a bare "Hello?" held as that someone's replies.
