@@ -1837,6 +1837,95 @@ pub(crate) fn audio_answering_weather(
     })
 }
 
+/// The model's `start_app` (#7415): told to the app the manifest's own
+/// trigger belongs to, and answered whether it took it. Blocking up to the
+/// hold, so off the runtime's thread.
+async fn app_start_answer(
+    start: &crate::app_triggers::AppStart,
+    request: u64,
+    args: &serde_json::Value,
+) -> serde_json::Value {
+    let (apps, args) = (start.0.clone(), args.clone());
+    tokio::task::spawn_blocking(move || {
+        crate::app_triggers::start_app_answer(&*apps, request, &args)
+    })
+    .await
+    .unwrap_or_else(|_| crate::tools::unavailable())
+}
+
+/// [`answering_weather`], for `start_app`, with the apps' bus on.
+pub(crate) fn answering_app_start(
+    runner: ToolRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> ToolRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args| {
+        if name != crate::app_triggers::START_APP {
+            return runner(request, heard, name, args);
+        }
+        let start = start.clone();
+        Box::pin(async move { app_start_answer(&start, request, &args).await })
+    })
+}
+
+/// [`answering_app_start`] for the runner with the admitted request's memory
+/// authority: the call needs none.
+pub(crate) fn scoped_answering_app_start(
+    runner: crate::second_provider::ScopedToolRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> crate::second_provider::ScopedToolRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args, scope| {
+        if name != crate::app_triggers::START_APP {
+            return runner(request, heard, name, args, scope);
+        }
+        let start = start.clone();
+        Box::pin(async move { app_start_answer(&start, request, &args).await })
+    })
+}
+
+/// [`answering_app_start`] for a spoken request's private audio runner: the
+/// call offers no audio.
+pub(crate) fn audio_answering_app_start(
+    runner: super::RequestedAudioRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> super::RequestedAudioRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |context, call, scope| {
+        if call.name != crate::app_triggers::START_APP {
+            return runner(context, call, scope);
+        }
+        let start = start.clone();
+        Box::pin(async move {
+            crate::tools::ToolAnswer::plain(
+                app_start_answer(&start, context.request, &call.args).await,
+            )
+        })
+    })
+}
+
+/// Spoken turns are offered `start_app` with the apps running now: asked at
+/// each chat request, so an app that stops is never offered, and none is
+/// offered with no app running (#7415).
+fn with_app_start(
+    declare: crate::second_provider::net::Declare,
+    apps: Arc<dyn crate::app_triggers::Apps>,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || {
+        let mut tools = declare();
+        if let Some(start) = crate::app_triggers::start_app_tool(&apps.running()) {
+            tools.push(start);
+        }
+        tools
+    })
+}
+
 /// [`answered_here`] with the weather's call too when it is on: a lookup,
 /// never the lamp's action, so the Policy never holds it.
 pub(crate) fn answered_here_with_weather(
@@ -2647,6 +2736,21 @@ pub fn serve(
     // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
+    // The apps running offer their triggers to the model as one function
+    // (`LAMP_APP_TRIGGERS`, #7415): the model judges whether a line means
+    // one, in any language; a bare trigger never reaches it.
+    let app_taker = crate::app_triggers::on()
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(crate::app_triggers::AppTaker::start)
+        })
+        .flatten();
+    let spoken_declare = match &app_taker {
+        Some(taker) => with_app_start(spoken_declare, taker.clone()),
+        None => spoken_declare,
+    };
     let spoken_declare = if they_apply {
         while_they_apply(spoken_declare)
     } else {
@@ -3406,20 +3510,32 @@ pub fn serve(
     let remember_speaker = tools.remember_speaker;
     // The weather's call is answered before any of these, as the search's
     // is inside them, with LAMP_SECOND_WEATHER=on.
+    let app_start = app_taker
+        .clone()
+        .map(|taker| crate::app_triggers::AppStart(taker));
     let audio_runner = tools.requested_audio.then(|| {
-        audio_answering_weather(
-            requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
-            weather.clone(),
+        audio_answering_app_start(
+            audio_answering_weather(
+                requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
+                weather.clone(),
+            ),
+            app_start.clone(),
         )
     });
-    let runner = answering_weather(
-        tool_runner(tools, search.clone(), early.clone(), policed),
-        weather.clone(),
+    let runner = answering_app_start(
+        answering_weather(
+            tool_runner(tools, search.clone(), early.clone(), policed),
+            weather.clone(),
+        ),
+        app_start.clone(),
     );
     // The same calls with the admitted request's memory authority (#1794).
-    let scoped_runner = scoped_answering_weather(
-        scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
-        weather,
+    let scoped_runner = scoped_answering_app_start(
+        scoped_answering_weather(
+            scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
+            weather,
+        ),
+        app_start,
     );
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
@@ -4260,11 +4376,11 @@ pub fn serve(
     // A line that is a whole trigger of a running app is taken by that app
     // (#7415 piece 6, LAMP_APP_TRIGGERS, off).
     if crate::app_triggers::on() {
-        match files
-            .bus_root
-            .as_deref()
-            .and_then(crate::app_triggers::line_taker)
-        {
+        match app_taker
+            .clone()
+            .map(|taker| -> crate::second_provider::AppLine {
+                Arc::new(move |request, line| taker.take_line(request, line))
+            }) {
             Some(take) => {
                 eprintln!(
                     "lamp-voice second: a final line that is a running app's trigger is told to it and ends there when it takes it ({})",
@@ -32305,6 +32421,35 @@ mod tests {
         for word in ["remember", "keep", "forget"] {
             assert!(!super::QUIET_WITH_CALL_NOTE.contains(word), "{word}");
         }
+    }
+
+    /// #7415: `start_app` is asked for at each chat request from the apps
+    /// running then: none with no app, and an app that stops is never
+    /// offered again.
+    #[test]
+    fn start_app_is_offered_while_an_app_runs_and_never_after_it_stops() {
+        struct Running(Mutex<Vec<lamp_msgs::AppsTriggers>>);
+        impl crate::app_triggers::Apps for Running {
+            fn running(&self) -> Vec<lamp_msgs::AppsTriggers> {
+                self.0.lock().unwrap().clone()
+            }
+            fn take(&self, _: u64, _: &str, _: &str) -> bool {
+                false
+            }
+        }
+        let apps = Arc::new(Running(Mutex::new(Vec::new())));
+        let declare = super::with_app_start(Arc::new(Vec::new), apps.clone());
+        let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
+        };
+        assert!(names(declare()).is_empty(), "no app, no function");
+        *apps.0.lock().unwrap() = vec![lamp_msgs::AppsTriggers {
+            app: "english-practice".into(),
+            triggers: vec!["start english practice".into()],
+        }];
+        assert_eq!(names(declare()), [crate::app_triggers::START_APP]);
+        apps.0.lock().unwrap().clear();
+        assert!(names(declare()).is_empty(), "the app stopped");
     }
 
     #[test]

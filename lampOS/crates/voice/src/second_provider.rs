@@ -16372,6 +16372,9 @@ enum Stop {
     /// said. It ends as a silent turn; the Policy, which held it, is told
     /// no other verdict.
     Held,
+    /// `start_app`: an app took the line and speaks for itself. Nothing more
+    /// is said; the line was for the lamp, so it is no decline.
+    Taken,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -20688,7 +20691,30 @@ async fn answer(
                 // A voice make's waiting line is said in this turn as the
                 // agent begins ([`said_while_made`], #6749).
                 let made_call = call.name == crate::made_skill::MAKE;
+                // `start_app` is refused, nothing sent, for a line let in
+                // only as the conversation going on (another person's or the
+                // TV's words must not start the owner's app, as the fast
+                // path refuses it) and while the lamp waits on an answer (a
+                // yes to a held forget or rename or a task must not start an
+                // app): the same two checks as the fast path's. The model
+                // is told so and answers (Heron on #7996).
+                let app_start_blocked = call.name == crate::app_triggers::START_APP
+                    && (shared
+                        .conversation_alone
+                        .as_ref()
+                        .and_then(|note| note(request))
+                        == Some(worker::CONVERSATION_ALONE)
+                        || lamp_awaits_an_answer(shared, request));
                 let answering = async {
+                    if app_start_blocked {
+                        eprintln!(
+                            "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, or an answer is awaited ({})",
+                            crate::app_triggers::ENVIRONMENT
+                        );
+                        return crate::tools::ToolAnswer::plain(serde_json::json!({
+                            "error": "not now: nothing was started"
+                        }));
+                    }
                     match (&shared.requested_audio, spoken) {
                         (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                             let context = lamp_msgs::RequestedAudioContext {
@@ -20790,6 +20816,16 @@ async fn answer(
                 let mut answer = said_while_made(&mut queue, request, made_call, answering).await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // An app the model started (`start_app`, #7415) took the
+                // line and speaks for itself: the request ends here as the
+                // fast path's does, with no further round and no words.
+                if call.name == crate::app_triggers::START_APP && answer.told["started"] == true {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends here ({})",
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    return Err(Stop::Taken);
                 }
                 // A skill turned off, its function asked for on a heard line
                 // (`LAMP_MADE_SKILL_OFF_SAID`; the first builder, 18:41 on 18
@@ -21736,7 +21772,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held | Stop::Taken) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
