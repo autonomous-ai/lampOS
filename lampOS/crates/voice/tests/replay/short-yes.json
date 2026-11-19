@@ -47,4 +47,217 @@
     "S 4.78 2 0.1 8.5 10.6 y y yes thinking"
   ]
 }
+,
+{
+  "case": "7422c-R1-1-r1",
+  "source": "out-7422c-1118-0916 journal-R1-1 request 1, eyes-R1-1-name.txt; row-7422c R1: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    3.66,
+    5.66
+  ],
+  "words": 5,
+  "expect": "answered",
+  "eyes": [
+    "S 3.28 1 0.0 -1.6 -1.2 y y unknown listening",
+    "S 3.53 1 0.0 -1.8 3.8 y y unknown listening",
+    "S 3.79 1 0.1 -7.1 -0.1 y y unknown listening",
+    "S 4.04 1 0.1 -6.3 2.8 y y unknown listening",
+    "S 4.29 1 0.1 -2.9 5.3 y y unknown listening",
+    "S 4.55 1 0.1 -1.0 7.3 y y unknown listening",
+    "S 4.80 1 0.1 -1.2 8.1 y y no listening",
+    "S 5.05 1 0.1 -1.6 7.6 y y no listening",
+    "S 5.30 1 0.1 2.3 2.6 y y no listening",
+    "S 5.56 1 0.0 5.5 -1.4 y - unknown thinking",
+    "S 5.81 1 0.0 -2.3 0.7 y - unknown thinking",
+    "S 6.06 1 0.0 -2.3 0.7 y - unknown thinking"
+  ]
+}
+,
+{
+  "case": "7422c-R2-1-r6",
+  "source": "out-7422c-1118-0916 journal-R2-1 request 6, eyes-R2-1-name.txt; row-7422c R2: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    4.59,
+    6.99
+  ],
+  "words": 6,
+  "expect": "answered",
+  "eyes": [
+    "S 4.34 1 0.0 -3.4 -8.5 y n unknown listening",
+    "S 4.59 1 0.0 -1.5 -11.5 y n unknown listening",
+    "S 4.85 1 0.0 -1.0 -11.8 y n unknown listening",
+    "S 5.10 1 0.0 0.0 -8.1 y n unknown listening",
+    "S 5.35 1 0.0 0.0 -8.1 y n unknown listening",
+    "S 5.60 1 0.0 3.4 -11.2 y y unknown listening",
+    "S 5.86 1 0.0 -1.7 -9.4 y y unknown listening",
+    "S 6.11 1 0.0 -1.7 -9.4 y y unknown listening",
+    "S 6.36 1 0.0 0.8 3.6 y y unknown listening",
+    "S 6.61 1 0.0 0.8 3.6 y y unknown listening"
+  ]
+}
+,
+{
+  "case": "7422c-R3-1-r10",
+  "source": "out-7422c-1118-0916 journal-R3-1 request 10, eyes-R3-1-name.txt; row-7422c R3: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    5.71,
+    8.12
+  ],
+  "words": 6,
+  "expect": "answered",
+  "eyes": [
+    "S 5.44 1 0.0 -9.4 -4.6 y n yes listening",
+    "S 5.69 1 0.0 -9.4 -4.6 y n yes listening",
+    "S 5.94 1 0.0 -6.9 -3.2 y n yes listening",
+    "S 6.20 1 0.0 -9.4 -4.0 y n yes listening",
+    "S 6.45 1 0.0 -9.4 -5.3 y n yes listening",
+    "S 6.70 1 0.0 -11.9 -5.3 y n yes listening",
+    "S 6.95 1 0.0 -11.7 -5.8 y y yes listening"
+  ]
+}
+,
+{
+  "case": "7422f-R1-1-r1",
+  "source": "out-7422f-1118-1636 journal-R1-1 request 1, eyes-R1-1-name.txt, eyes-R1-1-yes.txt; row-7422f R1: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    4.57,
+    7.77
+  ],
+  "words": 8,
+  "expect": "answered",
+  "eyes": [
+    "S 4.18 1 0.0 5.4 11.6 y y unknown listening",
+    "S 4.43 1 0.0 1.5 6.8 y y yes listening",
+    "S 4.68 1 0.0 1.5 6.8 y y yes listening",
+    "S 4.93 1 0.0 -0.9 6.7 y y yes listening",
+    "S 5.20 1 0.0 4.0 6.9 y y yes listening",
+    "S 5.45 1 0.0 0.3 4.9 y y yes listening",
+    "S 5.70 1 0.0 -1.5 -0.0 y y yes listening",
+    "S 5.95 1 0.0 -1.5 -0.0 y y yes listening",
+    "S 6.21 1 0.0 1.6 5.9 y y yes listening",
+    "S 6.46 1 0.0 -1.8 -0.2 y n yes listening"
+  ]
+}
+,
+{
+  "case": "7422f-R1-1-r4",
+  "source": "out-7422f-1118-1636 journal-R1-1 request 4, eyes-R1-1-name.txt, eyes-R1-1-yes.txt; row-7422f R1: a short line inside the lamp's rename question, no eyes sample through it (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    41.94,
+    42.74
+  ],
+  "words": 2,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
+,
+{
+  "case": "7422f-R1-1-r5",
+  "source": "out-7422f-1118-1636 journal-R1-1 request 5, eyes-R1-1-name.txt, eyes-R1-1-yes.txt; row-7422f R1: a short line inside the lamp's rename question, no eyes sample through it (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    48.45,
+    49.25
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
+,
+{
+  "case": "7422f-R2-1-r1",
+  "source": "out-7422f-1118-1636 journal-R2-1 request 1, eyes-R2-1-name.txt; row-7422f R2: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    1.56,
+    3.56
+  ],
+  "words": 5,
+  "expect": "answered",
+  "eyes": [
+    "S 1.14 1 0.0 11.8 2.4 y n yes resting",
+    "S 1.39 1 0.0 -0.6 -1.1 y n yes listening",
+    "S 1.64 1 0.0 -3.4 0.3 y n yes listening",
+    "S 1.90 1 0.1 5.1 3.4 y n yes listening",
+    "S 2.15 1 0.1 5.1 3.4 y n yes listening",
+    "S 2.40 1 0.0 7.0 4.4 y n unknown listening",
+    "S 2.65 1 0.0 4.8 2.9 y n unknown listening",
+    "S 2.91 1 0.1 -6.0 0.3 y y unknown listening",
+    "S 3.17 1 0.1 -7.4 -1.0 y y unknown listening",
+    "S 3.42 1 0.1 -7.4 -1.0 y y unknown thinking",
+    "S 3.67 1 0.1 -2.9 -1.6 y y unknown thinking",
+    "S 3.93 1 0.0 -3.1 -1.5 y y unknown thinking"
+  ]
+}
+,
+{
+  "case": "7422f-R2-1-r2",
+  "source": "out-7422f-1118-1636 journal-R2-1 request 2, eyes-R2-1-name.txt; row-7422f R2: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    4.29,
+    5.49
+  ],
+  "words": 3,
+  "expect": "answered",
+  "eyes": [
+    "S 3.93 1 0.0 -3.1 -1.5 y y unknown thinking",
+    "S 4.18 1 0.0 -1.2 -1.1 y y yes thinking",
+    "S 4.44 1 0.1 -7.8 -1.5 y y yes thinking",
+    "S 4.69 1 0.1 -7.8 -1.5 y y yes listening",
+    "S 4.94 1 0.0 -3.3 3.5 y y yes listening",
+    "S 5.19 1 0.1 -9.1 4.7 y n yes listening",
+    "S 5.45 1 0.0 -3.4 -7.2 y n yes thinking",
+    "S 5.70 1 0.0 -3.6 0.9 y n unknown thinking",
+    "S 5.95 1 0.0 -8.4 -0.1 y n unknown thinking"
+  ]
+}
+,
+{
+  "case": "7422f-R2-2-r2",
+  "source": "out-7422f-1118-1636 journal-R2-2 request 2, eyes-R2-2-name.txt, eyes-R2-2-yes.txt; row-7422f R2: the name line, the face seen (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    4.54,
+    7.74
+  ],
+  "words": 8,
+  "expect": "answered",
+  "eyes": [
+    "S 4.05 1 0.0 -0.2 4.2 y n yes listening",
+    "S 4.31 1 0.0 -2.8 4.0 y n yes listening",
+    "S 4.57 1 0.0 -2.8 4.0 y n yes listening",
+    "S 4.82 1 0.0 3.5 4.4 y n unknown listening",
+    "S 5.07 1 0.0 -1.1 3.7 y n unknown listening",
+    "S 5.32 1 0.0 -0.8 4.6 y n unknown listening",
+    "S 5.57 1 0.0 -0.8 4.6 y n unknown listening",
+    "S 5.83 1 0.0 2.2 3.5 y n unknown listening",
+    "S 6.08 1 0.0 -2.7 0.0 y n unknown listening",
+    "S 6.33 1 0.0 3.4 -1.0 y n unknown listening"
+  ]
+}
+,
+{
+  "case": "7422f-R2-2-r4",
+  "source": "out-7422f-1118-1636 journal-R2-2 request 4, eyes-R2-2-name.txt, eyes-R2-2-yes.txt; row-7422f R2: a short line inside the lamp's rename question, no eyes sample through it (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    27.25,
+    28.05
+  ],
+  "words": 1,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
+,
+{
+  "case": "7422f-R2-2-r5",
+  "source": "out-7422f-1118-1636 journal-R2-2 request 5, eyes-R2-2-name.txt, eyes-R2-2-yes.txt; row-7422f R2: a short line inside the lamp's rename question, no eyes sample through it (LAMP_SAID_TO_ME on, a counter-case)",
+  "line_s": [
+    38.9,
+    40.5
+  ],
+  "words": 4,
+  "going_on": true,
+  "expect": "answered",
+  "eyes": []
+}
 ]

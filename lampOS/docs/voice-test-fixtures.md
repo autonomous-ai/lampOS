@@ -727,6 +727,9 @@ worker does (`Heeding::not_said_to_me`): the eyes' looks into a
 worker builds its own line through `with_eyes` too, so the replay runs the
 product's reads, not a copy), then `said_to_me::judge` inside
 `said_to_me::awaiting_yes`. Run it with `cargo test -p lamp-voice --lib replay`.
+It holds 38 cases: `said-to-me.json` 12 (#7442's rows, head down and facing),
+`short-yes.json` 14 (rows 7422c and 7422f, #7964), `read-back-yes.json` 10 and
+`bare-yes-out-of-window.json` 2 (#7698).
 
 A case carries no words and no names:
 
