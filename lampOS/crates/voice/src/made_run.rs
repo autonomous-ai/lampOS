@@ -908,7 +908,10 @@ mod tests {
                 wait: std::time::Duration::from_millis(1),
             }),
         );
-        assert!(told["error"].as_str().unwrap().contains("turned off"), "{told}");
+        assert!(
+            told["error"].as_str().unwrap().contains("turned off"),
+            "{told}"
+        );
         let now = std::time::Instant::now();
         assert_eq!(crate::made_turn::offered_note(7_905_031, now), None);
         assert_eq!(crate::made_turn::offered_note(7_905_034, now), None);
