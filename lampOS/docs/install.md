@@ -2444,7 +2444,27 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      removed, `openclaw.json` stays byte for byte, and the install fails
      with error `config` and OpenClaw's words ("... OpenClaw's own config
      check refused it: ..."), so the gateway is not restarted onto it. With
-     no `openclaw-ns` there the block is written unchecked, said.
+     no `openclaw-ns` there the block is written unchecked, said. The
+     install sets only the block's own keys (`mode`, `bind`, `port`,
+     `auth.mode`, `auth.token`), keeping any other key in it or beside it.
+   - **The `gateway` block, each round (#7868):** a reset whose cut was
+     not taken removes `openclaw.json` (docs/setup.md), and a lamp with
+     OpenClaw recorded as installed runs no install, so nothing else would
+     write the block again. So each round with the switch on and OpenClaw
+     there (as it checks the gateway's unit, #7879) reads the block: as
+     the install writes it, nothing runs. Missing or different, it is
+     written again by the install's own code (`gateway_block`, then
+     `gateway_config`), through the same OpenClaw check, then
+     `systemctl try-restart -- lamp-openclaw-gateway.service` restarts a
+     running gateway on it (one not running is started by the round's
+     usual start). One journal line, with no value of the config:
+     "...openclaw.json's gateway block was not as lamp-update writes it:
+     written again, checked by OpenClaw, and the gateway restarted if it
+     ran". Refused, `openclaw.json` stays byte for byte, nothing is
+     restarted, and the line says "... not written again, the gateway not
+     restarted: <OpenClaw's words, masked>"; the next round tries again.
+     No install or one-shot runs for it, and no switch of its own: it only
+     keeps what the install writes.
    - **From a pinned lockfile, inside the namespace:** the tree is never
      resolved freely. The build carries `crates/update/openclaw/package.json`
      (`openclaw` at 2026.11.2 exactly) and its `package-lock.json` (made
@@ -2657,7 +2677,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      byte. lamp-update never writes OpenClaw's shared
      `openclaw.json` for a skill's run and never changes `tools.exec` (lamp-tasks does, #7245): its
      one write of that file is the install's own `gateway` block (the
-     gateway's token, above), with any switch.
+     gateway's token, above), with any switch, written again by a round
+     when missing or different (#7868, above).
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.

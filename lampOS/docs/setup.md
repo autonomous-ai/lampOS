@@ -328,8 +328,9 @@ lamp-setup reset-now`). That unit, in this order:
    outlives it. The journal says "lamp-setup: reset: ... removed: its cut
    was not taken: <why>" (the check's words, never a value). The reset
    goes on, so the lamp still comes back into setup, and lamp-update's
-   next install writes the `gateway` block again into a config that has
-   none. (lamp-update's own check at an install keeps the old file on a
+   next round writes the `gateway` block again into a config that has
+   none, with OpenClaw installed and no install run (docs/install.md,
+   "The `gateway` block, each round", #7868). (lamp-update's own check at an install keeps the old file on a
    refusal: an update has no person's data to wipe.) With no
    `openclaw-ns` there (OpenClaw not installed) the cut is written
    unchecked, said. The lamp's `gateway-token` is kept as it is:
