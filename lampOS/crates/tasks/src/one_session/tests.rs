@@ -57,6 +57,8 @@ struct Fake {
     /// As a real Harness: a kept session closed is resumed by name and
     /// token, unless `--fresh` (#7906, lamp-52e6).
     closed_resumes: Mutex<bool>,
+    /// What `session_held` says; none: can't be read.
+    held: Mutex<Option<bool>>,
     /// The state `ensure` answers; none: idle.
     ensure_state: Mutex<Option<String>>,
 }
@@ -327,6 +329,10 @@ impl PaneHarness for Fake {
             *self.kept.lock().unwrap() = None;
         }
         Ok(())
+    }
+    fn session_held(&self, agent: &str) -> Option<bool> {
+        self.call(format!("held {agent}"));
+        *self.held.lock().unwrap()
     }
 }
 
@@ -2646,6 +2652,7 @@ fn a_plain_shell_pane_is_closed_and_a_new_one_takes_the_task() {
 fn a_healthy_kept_session_stays_kept_with_no_fresh_start() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
+    *fake.held.lock().unwrap() = Some(true);
     one.open_if_due(&fake, &place());
     one_turn(&one, &fake, "task-1");
     drop(one);
@@ -2660,4 +2667,32 @@ fn a_healthy_kept_session_stays_kept_with_no_fresh_start() {
     assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
     assert_eq!(fake.count("close-kept"), 0);
     assert_eq!(fake.count("ensure"), 2);
+}
+
+/// #7906, the owner's rule: no resume of a dead id. A kept record whose
+/// OpenClaw conversation the Gateway no longer holds (deleted under
+/// lamp-tasks) is forgotten before `ensure`, which is `--fresh`: Harness
+/// would resume it with no Gateway check.
+#[test]
+fn a_kept_session_the_gateway_no_longer_holds_is_never_ensured_as_it_was() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    *fake.held.lock().unwrap() = Some(false);
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    let ensures: Vec<String> = fake
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("ensure"))
+        .collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ]
+    );
+    assert_eq!(again.agent(), Some(agent_of(2)));
 }
