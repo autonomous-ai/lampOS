@@ -1,0 +1,163 @@
+//! A keep claimed in a reply's later sentence (#7878: on lamp-e82d at
+//! 14432, 19 Nov 09:52, "Actually, I moved my car. It's on Level B1, spot 7
+//! now." got no call and "Got it — your car is on Level B1, spot 7 now. That
+//! replaces wherever it was before.": its opening claims nothing, so it was
+//! said, and nothing was kept). With `LAMP_KEEP_CLAIM_WHOLE`
+//! ([`Engine::checking_keep_claims_whole`]), on a line about the person the
+//! reply is held to its round's end and judged whole: a claim with no
+//! `remember` is asked again once with [`crate::remember::KEEP_CLAIMED_UNKEPT`],
+//! then said as [`crate::remember::NOT_KEPT_LINE`]. A plain restatement is
+//! said as it is, a question isn't held, and off nothing changes.
+use super::*;
+use crate::remember::{KEEP_CLAIMED_UNKEPT, NOT_KEPT_LINE, REMEMBER};
+
+/// One turn as it went.
+#[derive(Debug, Default)]
+struct Went {
+    /// What was said, as `said:` labels.
+    said: Vec<String>,
+    /// The functions called, by name.
+    called: Vec<String>,
+    /// How many chat rounds were asked.
+    rounds: usize,
+    /// Whether a round was told the keep-claim note.
+    noted: bool,
+}
+
+fn went(heard: &str, whole: bool, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(rounds.into()),
+        ..Script::default()
+    });
+    let called: Arc<Mutex<Vec<String>>> = Arc::default();
+    let seen = called.clone();
+    let tools: ToolRunner = Arc::new(move |_, _, name, _| {
+        seen.lock().unwrap().push(name.to_owned());
+        Box::pin(async move { json!({"ok": true, "remembered": true}) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .checking_keep_claims_whole(whole);
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let asked = script.asked.lock().unwrap();
+    Went {
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
+        called: called.lock().unwrap().clone(),
+        rounds: asked.len(),
+        noted: asked.iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(KEEP_CLAIMED_UNKEPT))
+        }),
+    }
+}
+
+fn saying(words: &str) -> Vec<net::Result<ChatEvent>> {
+    vec![text(words), Ok(ChatEvent::Done)]
+}
+
+/// The model's `remember` call.
+fn remembering() -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            REMEMBER,
+            json!({"text": "Their car is on Level B1, spot 7."}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// Whether anything said claims the keep.
+fn claimed(went: &Went) -> bool {
+    went.said
+        .iter()
+        .any(|said| said.to_lowercase().contains("replaces"))
+}
+
+const HEARD: &str = "Actually, I moved my car. It's on Level B1, spot 7 now.";
+const E82D: &str =
+    "Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before.";
+
+/// e82d's 09:52 turn, twice with no call: nothing of it is said, the round
+/// is asked again once with the note, then said not kept.
+#[test]
+fn a_keep_claimed_in_a_later_sentence_with_no_call_is_said_not_kept() {
+    let went = went(HEARD, true, vec![saying(E82D), saying(E82D)]);
+    assert!(!claimed(&went), "{went:?}");
+    assert!(went.noted, "{went:?}");
+    assert_eq!(went.rounds, 2, "{went:?}");
+    assert_eq!(went.said, [format!("said:{NOT_KEPT_LINE}")], "{went:?}");
+    assert!(went.called.is_empty(), "{went:?}");
+}
+
+/// Asked again, the model calls `remember`: its reply after the call is
+/// said, and the first claim never was.
+#[test]
+fn asked_again_the_keep_is_made_and_its_reply_said() {
+    let went = went(
+        HEARD,
+        true,
+        vec![
+            saying(E82D),
+            remembering(),
+            saying("Got it, your car is on Level B1, spot 7 now. That replaces where it was."),
+        ],
+    );
+    assert!(went.noted, "{went:?}");
+    assert_eq!(went.called, [REMEMBER], "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("spot 7")),
+        "{went:?}"
+    );
+}
+
+/// A plain restatement with no claim is said as it is, with no note.
+#[test]
+fn a_restatement_with_no_claim_is_said_as_it_is() {
+    let reply = "Your car is on Level B1, spot 7 now. Good to know where to look.";
+    let went = went(HEARD, true, vec![saying(reply)]);
+    assert!(!went.noted, "{went:?}");
+    assert_eq!(went.rounds, 1, "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("spot 7")),
+        "{went:?}"
+    );
+}
+
+/// A question about the person isn't held whole: its answer is said as
+/// before (an opening that claims nothing is let go at once).
+#[test]
+fn a_question_about_the_person_is_not_held() {
+    let went = went("Where did I park my car?", true, vec![saying(E82D)]);
+    assert!(!went.noted, "{went:?}");
+    assert_eq!(went.rounds, 1, "{went:?}");
+    assert!(claimed(&went), "{went:?}");
+}
+
+/// Off (`LAMP_KEEP_CLAIM_WHOLE` unset): e82d's reply is said as before,
+/// the fault itself, so the switch is what changes it.
+#[test]
+fn off_the_reply_is_said_as_before() {
+    let went = went(HEARD, false, vec![saying(E82D)]);
+    assert!(!went.noted, "{went:?}");
+    assert!(claimed(&went), "{went:?}");
+}

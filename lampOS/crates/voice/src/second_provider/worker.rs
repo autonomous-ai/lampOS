@@ -4491,6 +4491,15 @@ pub fn serve(
         );
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
+    // A keep claimed anywhere in a reply to a line about the person, read
+    // whole (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878).
+    let keep_whole = crate::remember::whole_on();
+    if keep_whole {
+        eprintln!(
+            "lamp-voice second: a reply to a line about the person is held whole until a remember runs, and a keep or replace said in any sentence with none is asked again, then said not kept (LAMP_KEEP_CLAIM_WHOLE)"
+        );
+    }
+    engine = engine.checking_keep_claims_whole(keep_whole);
     // A made skill said removed, turned off or on in the lamp's own result
     // words, untrue and with no `make_skill` that did it, is held the same
     // way (`LAMP_SKILL_CLAIM_CHECKED=on`, #7683), with a voice make offered:
