@@ -1344,7 +1344,16 @@ sau:
      cắt theo giới hạn của tên, trước khi tên đã có lấy tên trống, bên
      dưới. Khi không đặt tên, hoặc tên không thành tên kỹ năng được (không
      bắt đầu bằng chữ cái, hoặc có chữ mà tên kỹ năng không có, "tỷ giá"),
-     tên của bên tạo giữ nguyên như trước. Các khóa của schema được sắp
+     tên của bên tạo giữ nguyên như trước. Câu trả lời của agent được giữ
+     rất lâu sau khi lượt nói đã kết thúc cũng giữ tên đó: lần tạo và lần
+     giữ chạy trên cùng một luồng giữ tên. Mô hình tạo kỹ năng và agent
+     (cùng một system prompt, `make_skill_local::NAMED_TOLD`), và mô hình
+     chọn tên cho một việc (`make_no_cannot`), cũng được dặn đặt tên kỹ
+     năng như yêu cầu đặt, cho lần gọi bỏ trống `given_name` nhưng vẫn giữ
+     tên trong lời (ROW của #7926 trên lamp-9adf: "make a skill called rain
+     check" bị giữ thành `morning-rain-check`); mỗi lần tạo ghi vào journal
+     lần gọi có đặt tên hay không (`a make with a name its person gave
+     (given_name)` hoặc `a make with no given_name`). Các khóa của schema được sắp
      xếp, nên `given_name` được stream trước trong mọi lần gọi có nó, kể cả
      lệnh xóa: một `given_name` đứng đầu không quyết định gì
      (`make_skill_local::new_make_argument` trả `None`), và các lần gọi
@@ -1358,7 +1367,9 @@ sau:
      `the_undo_makes_the_first_ask_under_the_name_given_in_it`,
      `a_task_only_asked_for_takes_the_name_the_person_gave`,
      `a_make_whose_first_argument_is_its_given_name_is_opened`,
-     `a_given_name_without_a_request_opens_no_make`.
+     `a_given_name_without_a_request_opens_no_make`,
+     `an_agent_make_kept_after_its_turn_ended_keeps_the_given_name`,
+     `a_name_in_the_requests_words_is_the_makers_to_keep_too`.
    - **Tên đã có thì lấy tên trống** (chủ đèn, 11/11: khôi phục cài đặt gốc
      giữ lại kỹ năng của đèn, trong đó có welcome-back, bedtime-morning,
      light-out, sip-of-water, nên kỹ năng mô hình đặt tên welcome-back lần
