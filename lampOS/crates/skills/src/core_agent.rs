@@ -22,14 +22,15 @@
 //!   and the skill loads as it is, with one journal line why. A core skill
 //!   carries a `do.task` only so (`crate::task::origin_refuses` is not
 //!   asked: its brief is compiled into this program, not a script from
-//!   elsewhere). The owner's yes, lamp-control's one-run token, the day's
-//!   bounds and one run at a time hold as for every `do.task`.
+//!   elsewhere). Its task is pre-approved ([`pre_approved`]): no yes is
+//!   ever asked, and lamp-control mints its one-run token with no grant.
+//!   The day's bounds and one run at a time hold as for every `do.task`.
 //! - **The fallback, never late** ([`FALLBACK_WITHIN`], [`awaited`]): the
 //!   run's say waits for the agent's line at most 10 s from the fire, on
 //!   the run's own thread (never the trigger's); the line comes, it is said
 //!   as exact words in the say's place ([`with_line`]), with the look, the
 //!   light and the move as the say brings them. Not within 10 s, or the
-//!   agent down, not reached, refused, waiting for the yes, or answering
+//!   agent down, not reached, refused, or answering
 //!   `-`, nothing, or more than one short line ([`heard`]), the skill's own
 //!   say is said at once, as with the switch off. A line that comes after
 //!   is dropped, never said late, and a failed run says nothing of its own.
@@ -303,6 +304,30 @@ pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
 
+/// Whether the folder `dir` is a pilot's, named as its folder, with its
+/// variant exactly the lamp's own ([`variant`]), whatever the switch: its
+/// task is then pre-approved (the first builder, 19 Nov 08:57: "They're
+/// ours and have no grants"), so no yes is ever asked for it, aloud or of
+/// lamp-control, which mints its one-run token with no grant. Anything
+/// else, and the owner's yes holds as for every `do.task`.
+pub fn pre_approved(dir: &Path) -> bool {
+    let Some(pilot) = dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(pilot)
+    else {
+        return false;
+    };
+    let file = dir.join("skill.toml");
+    if !fs::symlink_metadata(&file).is_ok_and(|meta| meta.is_file()) {
+        return false;
+    }
+    fs::read_to_string(&file)
+        .ok()
+        .and_then(|text| toml::from_str::<toml::Table>(&text).ok())
+        .is_some_and(|table| matches!(variant(pilot, dir, &table), Ok(Some(_))))
+}
+
 /// The pilot `name`'s `skill.toml` as `table` with its variant in `dir`
 /// ([`OVERLAY`]) standing in for `grants`, `do` and `present.do`: none with
 /// the switch off, for a skill not a pilot, or with no variant; why not,
@@ -313,9 +338,15 @@ pub fn overlaid(
     dir: &Path,
     table: &toml::Table,
 ) -> Result<Option<toml::Table>, String> {
-    let Some(pilot) = pilot(name).filter(|pilot| on(pilot.group)) else {
-        return Ok(None);
-    };
+    match pilot(name).filter(|pilot| on(pilot.group)) {
+        Some(pilot) => variant(pilot, dir, table),
+        None => Ok(None),
+    }
+}
+
+/// [`overlaid`] for `pilot`, whatever the switch.
+fn variant(pilot: &Pilot, dir: &Path, table: &toml::Table) -> Result<Option<toml::Table>, String> {
+    let name = pilot.name;
     let text = match fs::read_to_string(dir.join(OVERLAY)) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
