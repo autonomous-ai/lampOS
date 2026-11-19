@@ -1782,7 +1782,16 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   characters is cut at a word's end with "…" (`made_skill::task_said`).
   The first sentence ends at `.`, `!` or `?` with a space and no
   lower-case word after it, never at an abbreviation ("e.g.", "a.m.",
-  "Dr."), or at a CJK full stop. The full words stay in the skill and are used for the run. The bounds
+  "Dr."), or at a CJK full stop. The full words stay in the skill and are used for the run.
+  Only a skill made on this lamp from the owner's own ask (the manage
+  helper's `task_asks` says `"made_here": true`: the lamp's own model's,
+  or one only asked for by voice) is read back short. Every other skill,
+  from the Store, an upload or the app's push, is read back with its whole
+  task words, as before #7874, and its author's `summary` is never heard,
+  so a short line never hides what the rest of a long task does (Twelve's
+  HOLD on #7969). A long outside task still installs; its yes just hears
+  all of it. An answer that doesn't say `made_here` reads the whole words
+  (`skill_task_yes::said_for_yes`). The bounds
   are one for every skill, however it comes (`Skill::made_refuses`):
   `lamp-skills pack`, an install (a Store skill too) and the app's push all
   refuse a longer task or summary, and the refusal its author sees says "a
@@ -5983,7 +5992,7 @@ back ("reading your gmail", "sending with your gmail, each send only on
 your yes"); the lamp's own trigger;
 exactly one `[[do]]` step `task = { task = "...", run = "scripts/main.py" }`,
 its words in full (at most 1,000 characters, with an optional `summary` of
-at most 120 read back for the yes) saying plainly what to read and tell,
+at most 120 read back for the yes, made here) saying plainly what to read and tell,
 or what to send and to whom; and a `scripts/main.py` that only prints a
 line. The brief says " Or a task, as above." in place of the read, write
 and code lines (`made_skill::brief_for`). Such a make is checked, said back
@@ -6393,13 +6402,16 @@ the same code for both writers.
       microphone, and a skill can't listen, to keep the room private."
     - Nothing named, or a grant there isn't (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
-    - A request longer than the words read back (`make_no_cannot::task_cut`)
-      whose model's `task:` line left out what it names twice (`too_long`,
-      `make_no_cannot::task_kept`): "I can't make that one yet: it's too
-      long for me to read back to you whole, so ask for it in fewer words."
-      A task only asked for has its `scripts/SKILL.md` carry exactly the
-      words read back and agreed to, never more of the request (El's P1 on
-      #7261).
+    - A request longer than a task's words may be, 1,000 characters and
+      1,500 bytes (`make_no_cannot::task_cut`), whose model's `task:` line
+      left out what it names twice (`too_long`, `make_no_cannot::task_kept`):
+      "I can't make that one yet: it's too long for one skill's task, so ask
+      for it in fewer words." Never a request cut short: its `skill.toml`
+      and `scripts/SKILL.md` carry the whole task, never more of the
+      request (El's P1 on #7261), and that is what runs. Made here from the
+      owner's own ask, its yes hears the short form (its first sentence,
+      #7874); a skill not made here hears its whole words (Twelve's HOLD on
+      #7969).
     The journal names only the reason's class, never the person's words.
     The internet and services switches are the lamp's own, in no app
     setting, so no line sends the person to the app for them.

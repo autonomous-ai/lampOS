@@ -262,10 +262,10 @@ pub enum Uncovered {
     Missing(String),
     /// No time and no moment named for it to run.
     NoWhen,
-    /// A request longer than its read-back ([`task_cut`]) whose model's
+    /// A request longer than a task's words may be ([`task_cut`],
+    /// `made_skill::MOST_TASK_CHARS` and `MOST_TASK_BYTES`) whose model's
     /// own words for it ([`task_kept`]) left out what it names twice: the
-    /// agent is told only what the person heard, never the request cut
-    /// short (El's P1 on #7261).
+    /// agent is never handed the request cut short (El's P1 on #7261).
     TooLong,
 }
 
@@ -329,8 +329,8 @@ impl Uncovered {
             ),
             Self::NoWhen => no_when(),
             Self::TooLong => format!(
-                "{CANT_MAKE_YET} it's too long for me to read back to you whole, so ask for it in \
-                 fewer words."
+                "{CANT_MAKE_YET} it's too long for one skill's task, so ask for it in fewer \
+                 words."
             ),
         }
     }
@@ -1722,8 +1722,8 @@ mod tests {
             ),
             (
                 Uncovered::TooLong,
-                "I can't make that one yet: it's too long for me to read back to you whole, so \
-                 ask for it in fewer words.",
+                "I can't make that one yet: it's too long for one skill's task, so ask for it \
+                 in fewer words.",
             ),
         ] {
             assert_eq!(uncovered.line(), said, "{}", uncovered.class());
