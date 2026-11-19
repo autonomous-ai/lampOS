@@ -1163,13 +1163,15 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
 #[test]
 fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
-    const KEPT: [(&str, &str); 11] = [
+    const KEPT: [(&str, &str); 10] = [
         // The Store apps (#7415, piece C): nothing is installed while
         // LAMP_STORE_APPS is off, which it is in the product. The wipe of
         // every app's code, data and marks is the apps' own piece 8 (the
         // reset plan's Migrate), owed before the switch goes on anywhere
-        // but a test lamp.
-        ("/opt/lampOS/apps", "apps, off: their wipe is piece 8"),
+        // but a test lamp. `/opt/lampOS/apps` (the apps' code, root's) is
+        // no tmpfiles line any more (#7920: the apps' units make it with
+        // `ExecStartPre=+`, as they do the two `/var/lib` folders below), so
+        // this scan does not see it: piece 8 names it in the plan itself.
         ("/var/lib/lampapp-", "app data, off: piece 8"),
         ("/var/lib/lampapp-%i", "app data, off: piece 8"),
         (

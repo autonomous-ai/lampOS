@@ -2043,4 +2043,39 @@ mod tests {
         );
         assert!(unit.contains("ReadOnlyPaths=-/etc/lampOS/update"));
     }
+
+    /// #7920: a round's `systemd-tmpfiles --create` of the product's `lampos.conf` runs inside
+    /// `lamp-update-apply.service`, and that unit is the one already on the lamp (the round asks
+    /// the apply before it writes the build's units). A tmpfiles line whose path the unit's
+    /// `ReadWritePaths` do not cover fails the switch of every lamp, so every line must be
+    /// covered by the unit as it ships.
+    #[test]
+    fn the_apply_unit_can_write_every_path_the_products_tmpfiles_make() {
+        let unit = include_str!("../../../deploy/product/lamp-update-apply.service");
+        let tmpfiles = include_str!("../../../deploy/product/lampos.conf");
+        let writes: Vec<&str> = unit
+            .lines()
+            .find_map(|line| line.strip_prefix("ReadWritePaths="))
+            .unwrap()
+            .split_whitespace()
+            .map(|at| at.trim_start_matches('-'))
+            .collect();
+        let mut seen = 0;
+        for line in tmpfiles
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        {
+            let mut fields = line.split_whitespace();
+            let (kind, path) = (fields.next().unwrap(), fields.next().unwrap());
+            seen += 1;
+            assert!(
+                writes
+                    .iter()
+                    .any(|at| path == *at || path.starts_with(&format!("{at}/"))),
+                "{kind} {path}: lamp-update-apply.service cannot write it ({writes:?}); the round's tmpfiles step fails and the switch is put back"
+            );
+        }
+        assert!(seen > 10, "{seen} tmpfiles lines read");
+    }
 }

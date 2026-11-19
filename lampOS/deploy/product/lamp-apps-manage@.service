@@ -13,6 +13,10 @@ Type=simple
 User=root
 Group=root
 Slice=lampos-parts.slice
+# The apps' folders (#7415, #7920): made here, unsandboxed ("+"), and not by the product's tmpfiles, whose
+# switch-time run is inside lamp-update-apply.service and cannot write them on a lamp that already has it.
+ExecStartPre=+/usr/bin/install -d -m 0755 -o root -g root /opt/lampOS/apps /var/lib/lampos-apps-state
+ExecStartPre=+/usr/bin/install -d -m 0700 -o lampos -g lampos /var/lib/lampos-apps-staging
 ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage asked
 StandardInput=socket
 StandardOutput=socket
