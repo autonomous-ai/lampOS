@@ -87,6 +87,18 @@ fn usage_of(line: &str) -> Option<Option<Value>> {
     Some(Some(Value::Object(usage)))
 }
 
+/// A lamp-side TSV's rows (`time\tprompt\tcached\tnot_cached\tcompletion`)
+/// in UTC day `day`, and the line numbers of the rows refused.
+pub fn tsv_replayed(_tsv: &str, _day: u64) -> (Day, Vec<usize>) {
+    (Day::default(), Vec::new())
+}
+
+/// Which part of UTC day `day` a lamp-side window from `from` (RFC 3339)
+/// covers.
+pub fn window_told(_from: &str, _day: u64) -> Option<String> {
+    None
+}
+
 /// `YYYY-MM-DD` as days since 1970.
 pub fn day_named(date: &str) -> Option<u64> {
     u64::try_from(days_of(date)?).ok()
@@ -255,6 +267,107 @@ mod tests {
         assert_eq!(counted.all().uncounted, 1);
         let printed = format!(
             "{}\n{}",
+            told(&counted),
+            serde_json::to_string(&counted).unwrap()
+        );
+        for word in ["oat", "milk", "Jay", "buy"] {
+            assert!(!printed.contains(word), "{printed}");
+        }
+    }
+
+    /// A lamp-side TSV row with a chat answer's tokens.
+    fn row(at: &str, prompt: u64, cached: u64, completion: u64) -> String {
+        format!(
+            "{at}\t{prompt}\t{cached}\t{}\t{completion}",
+            prompt - cached
+        )
+    }
+
+    const HEADER: &str = "time\tprompt\tcached\tnot_cached\tcompletion";
+
+    /// TSV rows go into the UTC day of their time, counted as the live
+    /// tally counts the same usage.
+    #[test]
+    fn tsv_rows_on_both_sides_of_utc_midnight_are_in_their_days() {
+        let day = day_named("2026-11-19").unwrap();
+        let tsv = [
+            HEADER.to_owned(),
+            row("2026-11-19T06:59:59+0700", 15887, 14976, 26),
+            row("2026-11-19T07:00:00+0700", 17222, 15872, 24),
+            row("2026-11-19T08:30:05+0700", 15883, 14976, 23),
+        ]
+        .join("\n");
+        let (counted, refused) = tsv_replayed(&tsv, day);
+        assert!(refused.is_empty(), "{refused:?}");
+        assert_eq!(
+            counted,
+            Day {
+                day,
+                ..live(&[(17222, 15872, 24), (15883, 14976, 23)])
+            }
+        );
+        let (before, _) = tsv_replayed(&tsv, day - 1);
+        assert_eq!(before.all(), live(&[(15887, 14976, 26)]).all());
+    }
+
+    /// A row whose prompt is not its cached and not cached tokens together,
+    /// or that is not five numbers after a time, is refused by its line
+    /// number and not counted.
+    #[test]
+    fn a_tsv_row_whose_prompt_is_not_its_parts_is_refused() {
+        let day = day_named("2026-11-19").unwrap();
+        let tsv = [
+            HEADER.to_owned(),
+            row("2026-11-19T08:30:05+0700", 100, 60, 1),
+            "2026-11-19T08:30:07+0700\t100\t60\t41\t1".to_owned(),
+            "2026-11-19T08:30:08+0700\t100\t60\t40".to_owned(),
+            row("2026-11-19T08:30:09+0700", 200, 0, 2),
+        ]
+        .join("\n");
+        let (counted, refused) = tsv_replayed(&tsv, day);
+        assert_eq!(refused, [3, 4]);
+        assert_eq!(counted.all(), live(&[(100, 60, 1), (200, 0, 2)]).all());
+    }
+
+    /// `--from` says which part of the UTC day the lamp-side window covers.
+    #[test]
+    fn the_from_window_is_reported() {
+        let day = day_named("2026-11-19").unwrap();
+        assert_eq!(
+            window_told("2026-11-19T08:30:00+07:00", day).as_deref(),
+            Some("from 01:30:00 UTC on")
+        );
+        assert_eq!(
+            window_told("2026-11-19T01:30:00Z", day).as_deref(),
+            Some("from 01:30:00 UTC on")
+        );
+        assert_eq!(
+            window_told("2026-11-19T06:00:00+07:00", day).as_deref(),
+            Some("the whole day")
+        );
+        assert_eq!(
+            window_told("2026-11-20T07:00:00+07:00", day).as_deref(),
+            Some("none of the day")
+        );
+        assert_eq!(window_told("yesterday morning", day), None);
+    }
+
+    /// Words in a TSV, in its header or in a row, are never printed: a row
+    /// with words is refused by its line number alone.
+    #[test]
+    fn tsv_words_are_never_printed() {
+        let day = day_named("2026-11-19").unwrap();
+        let tsv = [
+            HEADER.to_owned(),
+            row("2026-11-19T08:30:05+0700", 10, 0, 1),
+            "2026-11-19T08:30:06+0700\tbuy oat milk for Jay\t0\t0\t0".to_owned(),
+        ]
+        .join("\n");
+        let (counted, refused) = tsv_replayed(&tsv, day);
+        assert_eq!(counted.all().answers, 1);
+        assert_eq!(refused, [3]);
+        let printed = format!(
+            "{}\n{}\n{refused:?}",
             told(&counted),
             serde_json::to_string(&counted).unwrap()
         );
