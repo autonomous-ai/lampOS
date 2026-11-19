@@ -511,6 +511,14 @@ pub enum Took {
 /// gateway coming up) took 26-34 s on lamp-c0a4; a later one takes a few
 /// seconds, so the longer hold costs nothing there.
 pub const REPLY_KEPT_HELD: Duration = Duration::from_secs(60);
+/// #8001: the first kept reply of a hand-over is held this long. A refusal
+/// then (`ENGINE_NOT_READY`, nothing typed) is looked at at once for a
+/// frozen engine (its TUI stopped, or `working` with its Gateway record
+/// still); with neither sign, the reply is tried again with the rest of
+/// [`REPLY_KEPT_HELD`], so a slow but healthy hand-over waits as long as
+/// before. Healthy kept hand-overs on lamp-c0a4 (stable, 20 Nov): 8.4 s
+/// at first use, then 3.0-4.0 s.
+pub const REPLY_KEPT_FIRST_HELD: Duration = Duration::from_secs(10);
 /// How long an acknowledged `harness reply` is given: past
 /// [`REPLY_KEPT_HELD`], so Harness answers `TIMEOUT` itself first.
 pub const REPLY_KEPT_TIMEOUT: Duration = Duration::from_secs(75);
@@ -2405,6 +2413,13 @@ impl Cli {
     /// to be waited after, never typed again; `cancelled: true` typed
     /// nothing; one that says neither may have been typed.
     pub fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
+        self.reply_kept_held(name, token, words, REPLY_KEPT_HELD)
+    }
+
+    /// [`Cli::reply_kept`] with Harness's hold `held` (`--timeout <s>s`,
+    /// whole seconds, at least 1): [`REPLY_KEPT_FIRST_HELD`] for a
+    /// hand-over's first try (#8001), the rest of [`REPLY_KEPT_HELD`] after.
+    pub fn reply_kept_held(&self, name: &str, token: &Path, words: &str, held: Duration) -> Took {
         if !self::token(name, 64) {
             return Took::NotSent("invalid_name".into());
         }
@@ -2426,12 +2441,15 @@ impl Cli {
                 "--program-token-file".into(),
                 token.into(),
                 "--timeout".into(),
-                format!("{}s", REPLY_KEPT_HELD.as_secs()).into(),
+                format!("{}s", held.as_secs().max(1)).into(),
                 "--json".into(),
                 "--".into(),
                 words.as_ref().into(),
             ],
-            REPLY_KEPT_TIMEOUT.max(self.config.launch_timeout),
+            // Past Harness's own hold, as [`REPLY_KEPT_TIMEOUT`] is past
+            // [`REPLY_KEPT_HELD`].
+            (held + REPLY_KEPT_TIMEOUT.saturating_sub(REPLY_KEPT_HELD))
+                .max(self.config.launch_timeout),
         );
         match reply {
             Ok(reply) if reply.success => match taken_input(&reply.stdout) {
@@ -3319,6 +3337,13 @@ impl Cli {
         openclaw_turn_at(&openclaw_record_path(Path::new(state)), key)
             .ok()
             .flatten()
+    }
+
+    /// #8001 signal T: whether the kept session's OpenClaw TUI process
+    /// is stopped ([`openclaw_tui_stopped`]); `None` when it is not found
+    /// exactly once.
+    pub fn openclaw_tui_stopped(&self, agent: &str, key: &str) -> Option<bool> {
+        openclaw_tui_stopped(Path::new("/proc"), agent, key)
     }
 
     /// Whether the Gateway's own record says the prompt of `agent_id`'s
@@ -6848,6 +6873,160 @@ fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
     })
 }
 
+/// `/proc/<pid>/cmdline`'s bytes as its arguments: NUL-separated, empty
+/// ones (OpenClaw's retitle pads with NULs) and non-UTF-8 ones left out.
+fn cmdline_args(cmdline: &[u8]) -> Vec<&str> {
+    cmdline
+        .split(|byte| *byte == 0)
+        .filter(|arg| !arg.is_empty())
+        .filter_map(|arg| std::str::from_utf8(arg).ok())
+        .collect()
+}
+
+/// #8001 signal T: whether `cmdline` may be an OpenClaw TUI process
+/// itself. On lamp-c0a4 (20 Nov) the node process OpenClaw runs as
+/// retitles itself to just `openclaw` (NUL-padded); an older shape kept
+/// its whole argv (`openclaw ... tui ...`, `openclaw` in its first three
+/// arguments). The pane's shell above it names `openclaw` only past its
+/// third argument, so it is never one.
+pub fn openclaw_tui_process(cmdline: &[u8]) -> bool {
+    let args = cmdline_args(cmdline);
+    args == ["openclaw"]
+        || (args.iter().take(3).any(|arg| arg.contains("openclaw")) && args.contains(&"tui"))
+}
+
+/// #8001 signal T: whether `cmdline` (the TUI's own, or one of its
+/// ancestors') starts OpenClaw's TUI on the kept session of Harness's
+/// agent `agent`, whose OpenClaw session key is `key`. On lamp-c0a4 (20
+/// Nov) the pane's shell is `/bin/sh -ic '. <launch>.sh' harness-engine
+/// <cwd> /usr/local/bin/openclaw tui agent:main:harness-<agentId>`: an
+/// argument `tui`, and the session as a positional argument equal to
+/// `key`, ending `:harness-<agent>`, or `harness-<agent>`. The older
+/// `--session V` (or `--session=V`) form is taken too, V matched the same
+/// way or `key` ending `:V`.
+pub fn openclaw_tui_cmdline(cmdline: &[u8], agent: &str, key: &str) -> bool {
+    let args = cmdline_args(cmdline);
+    if !args.contains(&"tui") {
+        return false;
+    }
+    let ours = |arg: &str| {
+        !arg.is_empty()
+            && (arg == key
+                || (!agent.is_empty()
+                    && (arg == format!("harness-{agent}")
+                        || arg.ends_with(&format!(":harness-{agent}")))))
+    };
+    let session = args.iter().enumerate().find_map(|(at, arg)| {
+        if *arg == "--session" {
+            args.get(at + 1).copied()
+        } else {
+            arg.strip_prefix("--session=")
+        }
+    });
+    if let Some(session) = session.filter(|session| !session.is_empty()) {
+        return ours(session) || key.ends_with(&format!(":{session}"));
+    }
+    args.iter().any(|arg| ours(arg))
+}
+
+/// The state letter of `/proc/<pid>/stat`'s text: the field after the
+/// command's closing parenthesis (`T`: stopped by a signal).
+pub fn proc_stat_state(stat: &str) -> Option<char> {
+    stat.rsplit_once(')')?.1.trim_start().chars().next()
+}
+
+/// The parent pid in `/proc/<pid>/stat`'s text (its fourth field).
+pub fn proc_stat_parent(stat: &str) -> Option<u32> {
+    stat.rsplit_once(')')?
+        .1
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()
+}
+
+/// How many ancestors of a TUI process are read for its session: on
+/// lamp-c0a4 the pane's shell is its grandparent (`sh` > `nsenter` > the
+/// node TUI), under `tmux`.
+const TUI_ANCESTORS: usize = 3;
+
+/// #8001 signal T: under `proc` (`/proc`), the one OpenClaw TUI process
+/// ([`openclaw_tui_process`]) of this process's own user (lamp-tasks'
+/// service user, which Harness and the TUIs it starts run as) whose own
+/// cmdline or one of its [`TUI_ANCESTORS`] ancestors' (by `stat`'s parent
+/// pid) starts the kept session ([`openclaw_tui_cmdline`]): `Some(true)`
+/// when that bottom process's state is `T` (stopped), `Some(false)` when
+/// not; `None` when none or more than one matches (journaled once), or it
+/// can't be read. One pass over `proc`, no process started.
+pub fn openclaw_tui_stopped(proc: &Path, agent: &str, key: &str) -> Option<bool> {
+    use std::os::unix::fs::MetadataExt;
+    let mine = std::fs::metadata(proc.join("self")).ok()?.uid();
+    let mut found: Vec<(String, Vec<String>)> = Vec::new();
+    for entry in std::fs::read_dir(proc).ok()?.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name
+            .to_str()
+            .filter(|pid| pid.bytes().all(|b| b.is_ascii_digit()))
+        else {
+            continue;
+        };
+        let dir = proc.join(pid);
+        if std::fs::metadata(&dir).map(|meta| meta.uid()).ok() != Some(mine) {
+            continue;
+        }
+        let Ok(cmdline) = std::fs::read(dir.join("cmdline")) else {
+            continue;
+        };
+        if !openclaw_tui_process(&cmdline) {
+            continue;
+        }
+        // Itself, then up to TUI_ANCESTORS ancestors.
+        let mut at = pid.to_owned();
+        let mut chain = Vec::new();
+        let mut matched = false;
+        for _ in 0..=TUI_ANCESTORS {
+            let Ok(cmdline) = std::fs::read(proc.join(&at).join("cmdline")) else {
+                break;
+            };
+            if openclaw_tui_cmdline(&cmdline, agent, key) {
+                matched = true;
+                break;
+            }
+            let Some(parent) = std::fs::read_to_string(proc.join(&at).join("stat"))
+                .ok()
+                .and_then(|stat| proc_stat_parent(&stat))
+                .filter(|parent| *parent > 1)
+            else {
+                break;
+            };
+            at = parent.to_string();
+            chain.push(at.clone());
+        }
+        if matched {
+            found.push((pid.to_owned(), chain));
+        }
+    }
+    // A match that is another's ancestor is not the TUI itself.
+    let bottom: Vec<&String> = found
+        .iter()
+        .filter(|(pid, _)| !found.iter().any(|(_, chain)| chain.contains(pid)))
+        .map(|(pid, _)| pid)
+        .collect();
+    if bottom.len() > 1 {
+        // Once a process: the shape is from lamp-c0a4, 20 Nov.
+        static TOLD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !TOLD.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            eprintln!(
+                "tasks: one session: TUI pid not unique ({} matches); stopped check off",
+                bottom.len()
+            );
+        }
+        return None;
+    }
+    let stat = std::fs::read_to_string(proc.join(bottom.first()?).join("stat")).ok()?;
+    proc_stat_state(&stat).map(|state| state == 'T')
+}
+
 #[cfg(test)]
 mod ensured_tests {
     use super::*;
@@ -7630,4 +7809,158 @@ pub fn iso_unix_ms(text: &str) -> Option<u64> {
     let of_era_days = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
     let days = (era * 146_097 + of_era_days).checked_sub(719_468)?;
     Some(((days * 24 + hour) * 60 + minute) * 60_000 + second * 1_000 + millis)
+}
+
+#[cfg(test)]
+mod tui_tests {
+    use super::*;
+
+    const AGENT: &str = "0123abcd-1111-4111-8111-111111111111";
+    const KEY: &str = "agent:main:harness-0123abcd-1111-4111-8111-111111111111";
+
+    fn cmd(args: &[&str]) -> Vec<u8> {
+        let mut bytes = args.join("\0").into_bytes();
+        bytes.push(0);
+        bytes
+    }
+
+    /// lamp-c0a4's pane shell, the session positional.
+    fn shell(key: &str) -> Vec<String> {
+        [
+            "/bin/sh",
+            "-ic",
+            ". '/var/lib/lampos-tasks/.harness/cli/data/launch/u.sh'",
+            "harness-engine",
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session",
+            "/usr/local/bin/openclaw",
+            "tui",
+            key,
+        ]
+        .map(str::to_owned)
+        .to_vec()
+    }
+
+    /// #8001 signal T: the kept session is matched by its positional key
+    /// (lamp-c0a4's pane shell) or by the older `--session`; another
+    /// session's, another verb or no session never is.
+    #[test]
+    fn the_kept_sessions_tui_is_matched_by_its_session() {
+        let args = shell(KEY);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        assert!(openclaw_tui_cmdline(&cmd(&args), AGENT, KEY));
+        // The key ends `:harness-<agent>` though the record names another.
+        assert!(openclaw_tui_cmdline(&cmd(&args), AGENT, "agent:main:other"));
+        let session = format!("harness-{AGENT}");
+        assert!(openclaw_tui_cmdline(
+            &cmd(&["openclaw", "tui", "--session", &session]),
+            AGENT,
+            KEY
+        ));
+        assert!(openclaw_tui_cmdline(
+            &cmd(&[
+                "node",
+                "/x/openclaw.mjs",
+                "tui",
+                &format!("--session={session}")
+            ]),
+            AGENT,
+            KEY
+        ));
+        assert!(openclaw_tui_cmdline(
+            &cmd(&["openclaw", "tui", "--session", "kept-x"]),
+            "other",
+            "agent:main:kept-x"
+        ));
+        let other = shell("agent:main:harness-99999999-1111-4111-8111-111111111111");
+        let other: Vec<&str> = other.iter().map(String::as_str).collect();
+        assert!(!openclaw_tui_cmdline(&cmd(&other), AGENT, KEY));
+        assert!(!openclaw_tui_cmdline(
+            &cmd(&["openclaw", "gateway", KEY]),
+            AGENT,
+            KEY
+        ));
+        assert!(!openclaw_tui_cmdline(
+            &cmd(&["openclaw", "tui"]),
+            AGENT,
+            KEY
+        ));
+        assert!(!openclaw_tui_cmdline(b"", AGENT, KEY));
+        // The TUI itself: retitled, NUL-padded; the shell never is one.
+        assert!(openclaw_tui_process(b"openclaw\0\0\0\0\0\0"));
+        assert!(openclaw_tui_process(&cmd(&[
+            "openclaw",
+            "tui",
+            "--session",
+            "x"
+        ])));
+        assert!(!openclaw_tui_process(&cmd(&args)));
+        assert!(!openclaw_tui_process(&cmd(&["openclaw-gateway"])));
+    }
+
+    #[test]
+    fn the_stat_state_and_parent_are_read_past_the_command() {
+        assert_eq!(proc_stat_state("42 (node) T 1 42"), Some('T'));
+        assert_eq!(proc_stat_state("42 (a) b) S 7 42"), Some('S'));
+        assert_eq!(proc_stat_parent("42 (a) b) S 7 42"), Some(7));
+        assert_eq!(proc_stat_state("42 node"), None);
+    }
+
+    fn pid(proc: &Path, pid: u32, parent: u32, cmdline: &[u8], state: char) {
+        let dir = proc.join(pid.to_string());
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("cmdline"), cmdline).unwrap();
+        std::fs::write(dir.join("stat"), format!("{pid} (node) {state} {parent} 1")).unwrap();
+    }
+
+    /// lamp-c0a4's tree: `tmux` > the pane's `sh` (the positional key) >
+    /// `nsenter` > the node TUI retitled `openclaw`. Its state is read
+    /// from the bottom process; none or two: unknown, never stuck.
+    #[test]
+    fn a_stopped_tui_is_found_by_its_shell_ancestor() {
+        let dir = tempfile::tempdir().unwrap();
+        let proc = dir.path();
+        std::fs::create_dir(proc.join("self")).unwrap();
+        let tree = |at: u32, key: &str, state: char| {
+            let args = shell(key);
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            pid(proc, at, 2, &cmd(&["tmux", "new-session", "-d"]), 'S');
+            pid(proc, at + 1, at, &cmd(&args), 'S');
+            pid(
+                proc,
+                at + 2,
+                at + 1,
+                &cmd(&["/usr/bin/nsenter", "--user=/proc/9/ns/user", "--"]),
+                'S',
+            );
+            pid(proc, at + 3, at + 2, b"openclaw\0\0\0\0\0\0\0\0", state);
+        };
+        pid(proc, 5, 2, &cmd(&["openclaw", "gateway"]), 'S');
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), None);
+        // Another session's TUI only.
+        tree(
+            20,
+            "agent:main:harness-99999999-1111-4111-8111-111111111111",
+            'T',
+        );
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), None);
+        tree(10, KEY, 'T');
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), Some(true));
+        tree(10, KEY, 'S');
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), Some(false));
+        // The older shape, its own argv naming the session: two now.
+        let session = format!("harness-{AGENT}");
+        pid(
+            proc,
+            30,
+            2,
+            &cmd(&["openclaw", "tui", "--session", &session]),
+            'T',
+        );
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), None);
+        std::fs::remove_dir_all(proc.join("10")).unwrap();
+        std::fs::remove_dir_all(proc.join("11")).unwrap();
+        std::fs::remove_dir_all(proc.join("12")).unwrap();
+        std::fs::remove_dir_all(proc.join("13")).unwrap();
+        assert_eq!(openclaw_tui_stopped(proc, AGENT, KEY), Some(true));
+    }
 }
