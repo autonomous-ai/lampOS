@@ -1,0 +1,16 @@
+[package]
+name = "lamp-checked-replace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# A settings file replaced whole, checked by its own program before the rename
+# (#7108, #7868): lamp-tasks', lamp-update's and lamp-setup's writers of
+# OpenClaw's openclaw.json share it, so none of them writes around the check.
+[dependencies]
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
+getrandom = "0.4"
+
+[lints]
+workspace = true
