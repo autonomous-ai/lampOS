@@ -20679,6 +20679,65 @@ fn an_energy_level_turns_faster_and_waits_for_the_lamp_to_settle() {
     assert!(fastest(&said_late) <= 6);
 }
 
+/// #7749: `LEVEL_PATIENCE` is 2 s. A held look 480 counts round from 1 s
+/// at 100 counts a second (above 1, under level 2's 425), level 2 sent at
+/// 1.2 s: the old level is kept until 2 s after the send, while the head
+/// still turns, and level 2 is taken by one step after.
+#[test]
+fn a_new_energy_level_waits_level_patience_for_a_head_turning_under_its_pace() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut yaw = Vec::new();
+    let limits = Limits {
+        yaw: 500.0,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 100,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let send = Duration::from_millis(1_200);
+    let patience = Duration::from_secs(2);
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            Asked {
+                held: true,
+                aim: (now >= Duration::from_secs(1)).then_some([-480.0, 0.0]),
+                energy: if now >= send { 2 } else { 1 },
+                ..Asked::default()
+            }
+        },
+        |glimpse| yaw.push((seen.get(), glimpse.goals[2])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 2)
+        .map(|(at, _)| *at - send);
+    assert!(
+        taken.is_some_and(|after| (patience..=patience + TICK).contains(&after)),
+        "taken {taken:?} after the send"
+    );
+    // Still turning when it was taken: the head was never still for it.
+    assert!(
+        Duration::from_secs(1) + landed(&yaw) > send + taken.unwrap(),
+        "landed {:?}",
+        landed(&yaw)
+    );
+}
+
 /// `LAMP_BODY_ENERGY` (#6893): off, a step of the follower is the one it
 /// always was, to the bit; on, its acceleration changes by at most `JERK`
 /// times `acceleration` a second, and it still arrives and settles.
