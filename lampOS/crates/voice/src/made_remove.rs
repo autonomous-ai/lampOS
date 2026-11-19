@@ -937,6 +937,38 @@ pub(crate) mod tests {
         crate::made_skill::set_writes_here(None);
     }
 
+    /// #7975 (lamp-9adf, 19 Nov: "change rain check to seven thirty"
+    /// removed it): a change never removes. The remove's parameter, as the
+    /// product's unit has it (`LAMP_MADE_SKILL_OFF_SAID`, `LAMP_MAKE_NO_ASKS`
+    /// on), tells the model it is never for a change, and that no change
+    /// can be made yet, to say so: the skill is left as it is. Within the
+    /// link's bounds with every switch on.
+    #[test]
+    fn a_change_is_never_a_remove_and_is_said_cannot_yet() {
+        crate::made_skill::set_off_said_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        crate::made_skill::set_writes_here(Some(true));
+        crate::made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        let tool = crate::make_skill_local::tool();
+        let parameters = tool.parameters.unwrap();
+        let remove = parameters["properties"][REMOVE]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            remove.contains("never to turn one off, pause, stop or change it"),
+            "{remove}"
+        );
+        assert!(remove.contains("(no change yet: say so)"), "{remove}");
+        assert!(parameters.to_string().len() <= 4_096);
+        assert!(tool.description.len() <= 1_024);
+        crate::skill_task_yes::set_on_here(None);
+        crate::made_skill::set_scripts_here(None);
+        crate::made_skill::set_writes_here(None);
+        crate::make_no_asks::set_here(None);
+        crate::made_skill::set_off_said_here(None);
+    }
+
     /// The question said whole, the owner's yes in a later line removes
     /// moon-fact through the manage helper's own remove and drops it from
     /// the made skills; evening-dim stays.

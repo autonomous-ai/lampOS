@@ -1116,10 +1116,13 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     });
     // A skill the person made or added turned off and back on by voice
     // (#7445, #7594, [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`):
-    // never a remove, which is then told as for good alone.
+    // never a remove, which is then told as for good alone. Nor is a
+    // change (#7975, lamp-9adf, 19 Nov: "change rain check to seven
+    // thirty" removed it): no made skill is changed by voice yet, so the
+    // model says so and the skill is left as it is.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
-            "Only when they ask to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, alone."
+            "Only when they ask to delete or remove a skill for good, never to turn one off, pause, stop or change it (no change yet: say so): its name as they said it, alone."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
