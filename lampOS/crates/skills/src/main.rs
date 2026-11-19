@@ -7266,7 +7266,7 @@ mod tests {
         for owners in [true, false] {
             assert!(mark_voice_asked(
                 "mail-check",
-                &[task.clone()],
+                std::slice::from_ref(&task),
                 true,
                 true,
                 owners,
