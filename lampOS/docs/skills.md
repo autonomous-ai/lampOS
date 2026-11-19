@@ -5587,15 +5587,61 @@ added (even from a file), kept to turn back on ... Never remove for this,
 even one that starts only when they say its words. Call it at once. Ask
 nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
-remove a skill for good, never to turn one off, pause, stop or change it
-(no change yet: say so)". A call that carries a turn-off is read before
-the remove, so a turn-off never becomes a remove. **A change never
-removes** (#7975, lamp-9adf, 19 Nov: "change rain check to seven thirty"
-was called as a remove, and the skill went): no made skill is changed by
-voice yet, so the model is told a change is no remove and to say it
-can't be done yet, and the skill is left as it is; whether a line asks a
-change or a removal is the model's to judge (the 13 Nov rule). Test:
-`a_change_is_never_a_remove_and_is_said_cannot_yet`. **A turn off acts at once** (#7562's rows on lamp-9adf,
+remove a skill for good, never to turn one off, pause, stop or change it".
+A call that carries a turn-off is read before the remove, so a turn-off
+never becomes a remove. **A change never removes** (#7975, lamp-9adf, 19
+Nov: "change rain check to seven thirty" was called as a remove, and the
+skill went), and **a change changes the skill in place** (#8008, lamp-9adf,
+20 Nov 01:30 and 01:33: each change was made as a new skill,
+`morning-umbrella-reminder-2` and `-3`, and three fired; the first
+builder's ruling, 01:38). `make_skill`'s `change` ("To change a skill they
+made: its name, with request as the change. Never a new one or a remove.
+Unsure which: ask.") names the skill as heard, given with `request`, the
+change in their words; whether a line asks a change is the model's to
+judge (the 13 Nov rule), and `crate::made_change` does the rest:
+- **Which skill**: the person's made skill found by that name as a remove
+  finds one (`made_remove::found`). Several as near, or none by that name
+  while they made some, makes nothing: the model asks which in one short
+  question naming them (at most four). One they didn't make, or anyone
+  but the owner's ask, changes nothing.
+- **Re-made in place**: the make is asked for the old skill's said-back
+  description with the change after it, the change winning
+  (`merged_request`); the making model writes the merge. The skill kept is
+  given the old one's name, never `name-2` or the model's own name
+  (`made_skill::ChangeAs`, read by `free_name` and the agent task's keep),
+  and its index entry says which it changes (`changes`). It goes on as
+  any make does (`LAMP_MAKE_NO_ASKS`' at once, a clash, a yes for one that
+  sends); the manage helper puts it in the old one's folder, so its on/off
+  state (lamp-skills' `off` file, by name) is kept. Once it is on
+  (`put_on_within`), the old entry is taken out of the index and kept
+  under the new one's `old`, with `replaced_at_ms` and `was_off`, its
+  package with it (`made_skill::packages_named`): one skill. Never a second
+  skill, never a remove. Its make's own "remove it" record is dropped.
+  Made and not on, nothing of it is kept and the old one stays: "I
+  couldn't change NAME: WHY. It stays as it was."
+- **Told once**: "Changed NAME. Say 'put it back' to undo." (with "It
+  stays off." for one that was off).
+- **Put it back, for a week** (the shape of #7765's remake, so both share
+  one undo): `make_skill`'s `undo`, when the change is the latest thing
+  done (`latest_changed`, after every record `make_no_asks` keeps), "last"
+  or the skill's name, puts the old version back on in place by its
+  SHA-256 (`made_change::put_back`, the owner's ask only) and deletes the
+  new one's package: "Your old NAME is back." A put-on that fails leaves
+  the new one on. After 7 days (`UNDO_FOR`) the old package is deleted
+  (`drop_old`, at `make_no_asks`' hourly purge and at each change); the
+  owner's "forget everything" clears it with `make_no_asks`' keep, and a
+  remove takes it with the skill.
+
+To keep `make_skill`'s parameters within 4,096 bytes with every switch on,
+`choice` says "replace the others", and `answer` and `named` lose their
+last sentence (the defaults and the one-skill rule, both held in code).
+Tests: `a_change_is_never_a_remove`, and in `made_change`'s
+`a_change_remakes_the_named_skill_in_place_never_a_second`,
+`a_change_keeps_off_and_put_it_back_restores_the_old_version`,
+`a_changed_skills_old_version_goes_after_a_week`,
+`a_change_never_removes_and_asks_which_when_unsure`,
+`a_new_make_with_no_change_is_unchanged` and
+`the_tool_takes_a_change_within_the_bound`. **A turn off acts at once** (#7562's rows on lamp-9adf,
 18 Nov, second route, DeepSeek: "Lamp, turn off my space facts skill."
 was answered "Do you want it off? If yes, tell me…", "nothing running to
 switch off" for a skill started only by its words, and "Remove space

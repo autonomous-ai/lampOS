@@ -2438,15 +2438,60 @@ they made or added (even from a file), kept to turn back on ... Never
 remove for this, even one that starts only when they say its words. Call it
 at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
 `remove` nói "delete
-or remove a skill for good, never to turn one off, pause, stop or change it
-(no change yet: say so)". Lời gọi mang một yêu cầu tắt được đọc trước việc
-gỡ, nên tắt không bao giờ thành gỡ. **Đổi không bao giờ là gỡ** (#7975,
-lamp-9adf, 19/11: "change rain check to seven thirty" bị gọi thành một
-lệnh gỡ, và kỹ năng mất): chưa có kỹ năng đã tạo nào đổi được bằng giọng
-nói, nên mô hình được dặn rằng đổi không phải là gỡ và hãy nói là chưa
-làm được, còn kỹ năng giữ nguyên; một câu là xin đổi hay xin gỡ là do mô
-hình phán đoán (quy tắc 13/11). Test:
-`a_change_is_never_a_remove_and_is_said_cannot_yet`. **Tắt là làm ngay** (các dòng thử của #7562 trên lamp-9adf,
+or remove a skill for good, never to turn one off, pause, stop or change it".
+Lời gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
+thành gỡ. **Đổi không bao giờ là gỡ** (#7975, lamp-9adf, 19/11: "change
+rain check to seven thirty" bị gọi thành một lệnh gỡ, và kỹ năng mất), và
+**đổi là đổi chính kỹ năng đó, tại chỗ** (#8008, lamp-9adf, 20/11 01:30 và
+01:33: mỗi lần đổi lại tạo một kỹ năng mới, `morning-umbrella-reminder-2`
+và `-3`, và cả ba cùng chạy; phán quyết của first builder lúc 01:38). Tham
+số `change` của `make_skill` ("To change a skill they made: its name, with
+request as the change. Never a new one or a remove. Unsure which: ask.")
+nêu tên kỹ năng như đã nghe, đi cùng `request` là điều cần đổi theo lời
+người dùng; một câu có phải là xin đổi hay không là do mô hình phán đoán
+(quy tắc 13/11), phần còn lại do `crate::made_change` làm:
+- **Kỹ năng nào**: kỹ năng người dùng đã tạo được tìm theo tên đó như lệnh
+  gỡ tìm (`made_remove::found`). Nhiều kỹ năng gần như nhau, hoặc không có
+  kỹ năng nào tên đó trong khi họ đã tạo vài kỹ năng, thì không tạo gì: mô
+  hình hỏi lại một câu ngắn là kỹ năng nào, nêu tên chúng (tối đa bốn). Một
+  kỹ năng họ không tạo, hoặc yêu cầu không phải của chủ đèn, không đổi gì.
+- **Tạo lại tại chỗ**: lệnh tạo được giao phần mô tả đã đọc lại của kỹ
+  năng cũ kèm điều cần đổi phía sau, điều đổi thắng (`merged_request`); mô
+  hình tạo kỹ năng viết phần gộp. Kỹ năng được giữ mang đúng tên kỹ năng
+  cũ, không bao giờ `name-2` hay tên mô hình tự đặt (`made_skill::ChangeAs`,
+  được `free_name` và phần giữ tác vụ agent đọc), và mục chỉ mục của nó ghi
+  nó đổi kỹ năng nào (`changes`). Nó được bật như mọi lần tạo
+  (`LAMP_MAKE_NO_ASKS` bật ngay, xung đột, lời đồng ý cho kỹ năng có gửi
+  đi); manage helper đặt nó vào đúng thư mục của kỹ năng cũ, nên trạng thái
+  bật/tắt (tệp `off` của lamp-skills, theo tên) được giữ. Khi nó đã bật
+  (`put_on_within`), mục cũ được bỏ khỏi chỉ mục và giữ dưới `old` của mục
+  mới, kèm `replaced_at_ms` và `was_off`, cùng gói của nó
+  (`made_skill::packages_named`): chỉ một kỹ năng. Không bao giờ thêm kỹ
+  năng thứ hai, không bao giờ gỡ. Bản ghi "remove it" của lần tạo đó bị bỏ.
+  Tạo được mà không bật được thì không giữ gì của nó và kỹ năng cũ giữ
+  nguyên: "I couldn't change NAME: WHY. It stays as it was."
+- **Nói một lần**: "Changed NAME. Say 'put it back' to undo." (thêm "It
+  stays off." với kỹ năng đang tắt).
+- **Put it back, trong một tuần** (cùng dạng với lần tạo lại của #7765, để
+  hai bên dùng chung một kiểu hoàn tác): `undo` của `make_skill`, khi lần
+  đổi là việc mới nhất đã làm (`latest_changed`, sau mọi bản ghi
+  `make_no_asks` giữ), "last" hoặc tên kỹ năng, bật lại bản cũ tại chỗ theo
+  SHA-256 của nó (`made_change::put_back`, chỉ chủ đèn) và xoá gói của bản
+  mới: "Your old NAME is back." Bật thất bại thì bản mới vẫn bật. Sau 7
+  ngày (`UNDO_FOR`) gói cũ bị xoá (`drop_old`, ở lần dọn hằng giờ của
+  `make_no_asks` và ở mỗi lần đổi); "forget everything" của chủ đèn xoá nó
+  cùng phần giữ của `make_no_asks`, và lệnh gỡ mang nó đi cùng kỹ năng.
+
+Để tham số của `make_skill` nằm trong 4.096 byte khi bật mọi công tắc,
+`choice` nói "replace the others", còn `answer` và `named` bỏ câu cuối (giá
+trị mặc định và quy tắc một kỹ năng, cả hai đều do mã giữ). Test:
+`a_change_is_never_a_remove`, và trong `made_change`:
+`a_change_remakes_the_named_skill_in_place_never_a_second`,
+`a_change_keeps_off_and_put_it_back_restores_the_old_version`,
+`a_changed_skills_old_version_goes_after_a_week`,
+`a_change_never_removes_and_asks_which_when_unsure`,
+`a_new_make_with_no_change_is_unchanged` và
+`the_tool_takes_a_change_within_the_bound`. **Tắt là làm ngay** (các dòng thử của #7562 trên lamp-9adf,
 18/11, đường thứ hai, DeepSeek: "Lamp, turn off my space facts skill."
 được đáp "Do you want it off? If yes, tell me…", "nothing running to
 switch off" với một kỹ năng chỉ chạy khi nói đúng câu của nó, và "Remove
