@@ -3305,10 +3305,12 @@ cả hai người viết.
   trong 10 phút 30 giây của agent (`MAKE_WITHIN`, hơn của lamp-tasks 30
   giây, `TASKS_MARGIN`). Giọng nói vẫn cho câu trả lời qua toàn bộ kiểm tra của nó; câu
   bị từ chối được gửi lại kèm lời của kiểm tra (`REPAIR_MARK`) tối đa thêm
-  2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thêm một câu trả
-  lời vẫn vừa thời gian của agent (nên với hướng dẫn, mà một lần chạy đã
-  viết nháp, kiểm tra và sửa hai lần, lần sửa của giọng nói hiếm khi bắt
-  đầu), và câu vẫn bị từ chối được nói là không tạo được,
+  2 lần (`GUIDED_MOST_REPAIRS`), mỗi lần chỉ bắt đầu khi thời gian của
+  agent còn ít nhất 2 phút (`make_skill_local::REPAIR_AT_LEAST`, #7874: đòi
+  còn đủ thời gian cho cả một câu trả lời 10 phút thì lần sửa chỉ bắt đầu
+  khi câu trả lời đầu đến trong 30 giây, mà OpenClaw mất 34-40 giây) và
+  được cho không quá thời gian còn lại, nên 10 phút 30 giây của lần tạo vẫn
+  giữ; và câu vẫn bị từ chối được nói là không tạo được,
   như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
   `process::second_route_worker_environment` chuyển cho), và với MAKE IT

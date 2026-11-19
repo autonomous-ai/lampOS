@@ -3788,8 +3788,9 @@ fn agent_side(
 /// A make DeepSeek didn't make (`deepseek`), handed to the lamp's agent
 /// `agent`, called `engine` (`LAMP_MAKE_SKILL_AGENT`): the same system
 /// prompt and `brief`, its answer through the same checks (`kept`) and
-/// with repairs of its own, each begun only while one more answer fits
-/// the agent's [`crate::make_skill_agent::MAKE_WITHIN`]. With no answer
+/// with repairs of its own, each begun only while at least
+/// [`REPAIR_AT_LEAST`] of the agent's [`crate::make_skill_agent::MAKE_WITHIN`]
+/// is left and given no more than what is left. With no answer
 /// from it at first (none within its 90 s, its run busy or failed, no make
 /// run, or no agent after all), DeepSeek's failure stands, as without the
 /// switch, said as the agent's but for no make run ([`agent_side`]); a
@@ -3896,8 +3897,17 @@ fn handed_to_agent(
         request,
         " by the agent",
         agent.most_repairs(),
-        || began.elapsed() + agent.within <= agent.make_within,
-        |repair| kept(write(&repair)),
+        || agent.make_within.saturating_sub(began.elapsed()) >= REPAIR_AT_LEAST,
+        |repair| {
+            // Each repair's write is given no more than what is left of the
+            // agent's make time, so the make's own bound holds.
+            let left = agent.make_within.saturating_sub(began.elapsed());
+            let within = crate::make_skill_agent::Agent {
+                within: agent.within.min(left),
+                ..agent.clone()
+            };
+            kept(write_by(&within, &repair))
+        },
     );
     match &made {
         Ok(_) => eprintln!("lamp-voice: a skill made here: made by the agent ({engine})"),
@@ -3920,6 +3930,16 @@ fn handed_to_agent(
         made => made,
     }
 }
+
+/// The least of the agent's make time ([`crate::make_skill_agent::MAKE_WITHIN`])
+/// left for one more repair by the agent, that repair given no more than
+/// what is left (#7874). With the guide, one write may take its whole
+/// [`crate::make_skill_agent::GUIDED_WRITE_WITHIN`] (10 min) of a 10 min
+/// 30 s make, so asking for a whole write's time left let a repair run
+/// only when the first answer came within 30 s, and OpenClaw's takes
+/// 34-40 s: its repairs never ran. Two minutes is about three of its
+/// answers, enough for a repair to be written and checked.
+const REPAIR_AT_LEAST: Duration = Duration::from_secs(120);
 
 /// The least of the agent's make time ([`crate::make_skill_agent::MAKE_WITHIN`])
 /// left for [`cannot_asked_again`]'s one more round.
@@ -7444,6 +7464,41 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7874: a guided make's first answer refused with 35 s gone (the
+    /// clock: a `make_within` 35 s short of [`crate::make_skill_agent::MAKE_WITHIN`]
+    /// at once is the same time left) is repaired, though one more write
+    /// may take its whole [`crate::make_skill_agent::GUIDED_WRITE_WITHIN`];
+    /// with under [`REPAIR_AT_LEAST`] left, no repair is asked.
+    #[test]
+    fn a_guided_make_refused_at_35_s_is_repaired_and_none_with_under_its_floor_left() {
+        let cases = [
+            (
+                "35s",
+                crate::make_skill_agent::MAKE_WITHIN - Duration::from_secs(35),
+                2,
+            ),
+            ("late", REPAIR_AT_LEAST - Duration::from_secs(1), 1),
+        ];
+        for (name, make_within, rounds) in cases {
+            let (root, keeping) = keeping(&format!("agent-guided-repair-{name}"));
+            let tasks = agent_answering(vec![Some(faces()), Some(good())]);
+            let (url, served) = service(vec![(200, faces())]);
+            let agent = crate::make_skill_agent::Agent {
+                within: crate::make_skill_agent::GUIDED_WRITE_WITHIN,
+                make_within,
+                ..tasks.guided()
+            };
+            let told = made_by(&keeping, url, Some(&agent), NOW);
+            assert_eq!(served.join().unwrap(), 1, "{name}");
+            assert_eq!(tasks.hand_overs(), rounds, "{name}: {told}");
+            match rounds {
+                2 => assert_eq!(told["made"], "evening-dim", "{name}: {told}"),
+                _ => assert!(told.get("made").is_none(), "{name}: {told}"),
+            }
+            let _ = std::fs::remove_dir_all(&root);
+        }
     }
 
     /// The first builder's guard on #6643: when lamp-tasks can't run the
