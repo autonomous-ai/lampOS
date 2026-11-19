@@ -2859,7 +2859,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   written and are always taken out: OpenClaw refuses `mode` beside either
   (exit 78, the gateway down), and today's stable lamp-tasks, the rollback
   target, inserts `mode: "ask"` and removes nothing else, so only a
-  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). The skill-start launcher's allow-list entry ("One exec approval",
+  `mode`-alone file survives a rollback (#7245, seen on lamp-c0a4). A lamp
+  updated from an older build with `security`/`ask` in `tools.exec`, with or
+  without a `mode` beside them (the file the gateway exits 78 on), gets
+  `mode` alone at the next lamp-tasks start, a person's own exec keys (such as `askFallback`) kept; a
+  file with `mode` alone already is left unwritten (#7859). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 
