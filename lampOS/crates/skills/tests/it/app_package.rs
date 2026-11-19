@@ -649,3 +649,35 @@ fn a_path_longer_than_the_most_is_refused_without_echoing_it() {
     assert!(why.contains("1024"), "{why}");
     assert!(why.len() < 200, "{}", why.len());
 }
+
+/// `npu` names the lamp's NPU ops an app uses (#7415), each riding its
+/// grant (`pose`, the camera's), so the lamp fetches the model at install.
+#[test]
+fn an_apps_npu_ops_are_the_lamps_and_ride_their_grant() {
+    let package = changed(|manifest, _| {
+        manifest["grants"] = json!(["speak", "hear", "light", "body", "sound", "skills", "camera"]);
+        manifest["npu"] = json!(["pose"]);
+    })
+    .unwrap();
+    assert_eq!(package.manifest.npu, ["pose"]);
+    // Left out, none; and an empty list is not written back.
+    assert!(read(&good()).unwrap().manifest.npu.is_empty());
+    refused(
+        changed(|manifest, _| manifest["npu"] = json!(["pose"])),
+        "needs the \"camera\" grant",
+    );
+    refused(
+        changed(|manifest, _| {
+            manifest["grants"] = json!(["speak", "hear", "camera"]);
+            manifest["npu"] = json!(["faces"]);
+        }),
+        "is not one of the lamp's",
+    );
+    refused(
+        changed(|manifest, _| {
+            manifest["grants"] = json!(["speak", "hear", "camera"]);
+            manifest["npu"] = json!(["pose", "pose"]);
+        }),
+        "twice",
+    );
+}

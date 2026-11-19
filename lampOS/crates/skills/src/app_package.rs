@@ -46,6 +46,10 @@ pub const GRANTS: [&str; 14] = [
     "notes",
     "speech",
 ];
+/// The lamp's NPU ops an app may name in `npu` (#7415): the lamp fetches
+/// each op's model when such an app is installed (`lamp-npu`), not at its
+/// first ask. An op rides an existing grant: `pose` the camera's.
+pub const NPU_OPS: [(&str, &str); 1] = [("pose", "camera")];
 /// The longest a phrase or trigger may be, and the fewest letters it holds.
 pub const PHRASE_BYTES: usize = 64;
 pub const PHRASE_LETTERS: usize = 8;
@@ -74,6 +78,10 @@ pub struct AppManifest {
     pub net: bool,
     #[serde(default)]
     pub logs: bool,
+    /// The lamp's NPU ops it uses ([`NPU_OPS`]), so their models are
+    /// fetched at its install. Optional, and left out when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub npu: Vec<String>,
     #[serde(default)]
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
@@ -376,6 +384,23 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
         }
         if !grants.insert(grant.as_str()) {
             return Err(format!("{MANIFEST}: grant {grant:?} twice"));
+        }
+    }
+    let mut ops = BTreeSet::new();
+    for op in &manifest.npu {
+        let Some((_, grant)) = NPU_OPS.iter().find(|(known, _)| known == op) else {
+            return Err(format!(
+                "{MANIFEST}: npu op {op:?} is not one of the lamp's: {}",
+                NPU_OPS.map(|(op, _)| op).join(", ")
+            ));
+        };
+        if !ops.insert(op.as_str()) {
+            return Err(format!("{MANIFEST}: npu op {op:?} twice"));
+        }
+        if !grants.contains(grant) {
+            return Err(format!(
+                "{MANIFEST}: npu op {op:?} needs the {grant:?} grant"
+            ));
         }
     }
     phrases_ok("phrases", &manifest.phrases, MOST_PHRASES)?;
