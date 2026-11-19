@@ -3993,3 +3993,126 @@ fn a_revive_is_keyed_by_the_kept_session_and_counts_toward_the_backoff() {
         "the revive counted: the third reopen in a row backs off"
     );
 }
+
+/// #7906 sign 5, seen on lamp-c0a4 (19 Nov): the kept session's OpenClaw
+/// process frozen, `show` still `idle`, each `harness reply` refused
+/// `ENGINE_NOT_READY` after Harness's own wait. Two refusals in a row,
+/// with no turn answered between, over the bound: gone or stuck. The
+/// ladder's plain resume finds the same frozen process (`live`, refused
+/// again), so the next refusal is `--fresh`, never another resume, and
+/// the waiting task is typed into the new session and answered.
+#[test]
+fn a_kept_session_refusing_engine_not_ready_twice_is_replaced_and_the_task_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    one_turn(&one, &fake, "task-0");
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 3));
+    // Past its first words' window (1 s here).
+    thread::sleep(Duration::from_millis(1100));
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    // The first refusal took the whole of this send's bound, as Harness's
+    // ~62 s wait takes a spoken task's 5 s: not typed, not a sign yet.
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", Instant::now(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    assert_eq!(fake.count("ensure"), 1);
+    thread::sleep(Duration::from_millis(1100));
+    // The second: a plain resume (the same frozen one), refused once more,
+    // then `--fresh`, and the task typed there.
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {}),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert!(turn.restarted(), "told once");
+    assert_eq!(one.agent(), Some(agent_of(2)));
+    let calls = fake.calls();
+    let ensures: Vec<&String> = calls.iter().filter(|c| c.starts_with("ensure")).collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ],
+        "{calls:?}"
+    );
+    assert_eq!(fake.count("close-kept"), 1, "{calls:?}");
+}
+
+/// #7906 sign 5 never fires on one `ENGINE_NOT_READY`: a kept session
+/// past its first words refused once, then taking the reply, is kept.
+#[test]
+fn a_single_engine_not_ready_on_a_kept_session_does_not_replace_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-0");
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", Instant::now(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    thread::sleep(Duration::from_millis(1100));
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {}),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert!(!turn.restarted());
+    drop(turn);
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(fake.count("close-kept"), 0);
+    assert_eq!(fake.count("ensure"), 1);
+    // Taken: the count starts again, so one more refusal later is not a
+    // second in a row.
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(fake.count("close-kept"), 0);
+}
+
+/// #7906 sign 5: a refusal whose task was given up at its run's end, then
+/// a long quiet gap (past twice the bound, 2 s here), then one more
+/// refusal: not two in a row, so a healthy session is kept.
+#[test]
+fn an_old_engine_not_ready_never_joins_one_after_a_long_gap() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-0");
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", Instant::now(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    thread::sleep(Duration::from_millis(2300));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(fake.count("close-kept"), 0);
+    assert_eq!(fake.count("ensure"), 1);
+}
