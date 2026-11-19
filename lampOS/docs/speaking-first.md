@@ -763,7 +763,17 @@ network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
 the lamp is unplugged after a shutdown) and played; at most 64 lines and
-20 s each are kept, a line past 20 s is played but not kept. A line written
+20 s each are kept, a line past 20 s is played but not kept. An exact line
+(`"exact": true`: a task's told answer, a read's lines, lamp-control's `say`,
+the app's voice preview) is rendered now and never kept
+(`TtsCache::render_once`, `render_once_in`); one past about 10 s of speech
+(`tts_cache::MOST_PIECE_CHARS`, 150 characters: half of what plays in the
+cap's 20 s, `MOST_FRAMES`, at about 15 characters a second) is rendered in
+pieces (`tts_cache::pieces`, #7892), cut at its sentence ends, then its
+clause ends (`,` `;` `:`), then between its words, every word kept in its
+order, and played as one line. Each piece keeps the 20 s cap, which is not
+raised for any line: before, a line past it (an agent's long answer) was
+refused whole and never said. A line written
 to a full cache first makes room (#4883): the oldest files go, never one of
 the owner's current fixed lines (those the voice warms at start, under this
 voice, model and language), so lines left by an earlier voice or language
