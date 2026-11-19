@@ -1111,7 +1111,7 @@ pub(crate) mod tests {
                 tasks: self.dir.path().to_path_buf(),
                 say: None,
                 within: Duration::from_millis(1_500),
-                make_within: Duration::from_secs(10),
+                make_within: MAKE_WITHIN,
                 guide: false,
                 one_path: false,
                 repairs_if_untaken: false,
