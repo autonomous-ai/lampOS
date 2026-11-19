@@ -249,7 +249,10 @@ line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 On both routes, a set-off word of three letters or more one letter from
 "Lamp" (a Levenshtein distance of 1 once repeated letters are taken once:
 "Lap", "Lamps", "Clamp", "Laam", "Limp", "Ramp";
-`attention::near_the_lamps_name`) is never someone else's name (#7698). On
+`attention::near_the_lamps_name`) is never someone else's name (#7698).
+"Lam" and a letter other than "p" ("Lama", "Lamy") is not taken so: it
+stays a person's name, said to someone else (the Reviewer-lead's P2 on
+#7999; "Lam" alone was already a stand-in for the lamp's name). On
 lamp-06c1 on 18 Nov (14072) the owner's "Lamp, what's my name?" and "Lamp,
 did you keep that?", seen speaking with their own face, came back so and
 were held six times as said to someone it calls by name. Such a word is
