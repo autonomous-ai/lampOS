@@ -3408,7 +3408,7 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
     );
     assert_eq!(
         *fake.calls.borrow(),
-        ["list-units", "stop", "skills", "agents", "sync", "sync"]
+        ["list-units", "stop", "agents", "skills", "sync", "sync"]
     );
     assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
 }
