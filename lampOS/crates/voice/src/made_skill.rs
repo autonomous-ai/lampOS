@@ -1449,6 +1449,16 @@ const MOST_SCRIPT_PATH_BYTES: usize = 64;
 /// The most of a `task` step's own words, said back whole.
 pub const MOST_TASK_CHARS: usize = 120;
 
+/// Whether a `task` step's words are one plain sentence, read back whole
+/// to the owner for their yes: not empty, at most [`MOST_TASK_CHARS`]
+/// characters, and no control or format character ([`is_format`]). The
+/// same check `lamp-skills pack` holds a made skill to (#7874).
+pub fn task_words_plain(words: &str) -> bool {
+    !words.trim().is_empty()
+        && words.chars().count() <= MOST_TASK_CHARS
+        && words.chars().all(|c| !c.is_control() && !is_format(c))
+}
+
 /// The folder a made skill's light shows are kept in (#7245, `show =
 /// "NAME"` and `shows/NAME.toml`, lamp-skills' #1679 format), inside its
 /// own: only with [`ASKS_ENVIRONMENT`] on, since lamp-skills plays a show
@@ -2861,7 +2871,7 @@ const SAY_NOT_TEXT: &str = "what it would say isn't its exact words; try saying 
 /// A Unicode format character (general category Cf): zero-width marks,
 /// bidirectional controls and the like (U+200B, U+202E), which
 /// [`char::is_control`] doesn't cover (App Only's P2b on #6062).
-pub(crate) fn is_format(c: char) -> bool {
+pub fn is_format(c: char) -> bool {
     matches!(
         c as u32,
         0x00AD
@@ -5165,10 +5175,7 @@ fn code_held(
         ));
     }
     let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
-    let plain = !words.trim().is_empty()
-        && words.chars().count() <= MOST_TASK_CHARS
-        && words.chars().all(|c| !c.is_control() && !is_format(c));
-    if !plain {
+    if !task_words_plain(words) {
         return Err(scripts_not_held(
             "a task's words, empty, too long or not plain",
         ));
@@ -6446,10 +6453,7 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     // `do.task` is read back.
     let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
-    (!words.is_empty()
-        && words.chars().count() <= MOST_TASK_CHARS
-        && words.chars().all(|c| !c.is_control() && !is_format(c)))
-    .then(|| {
+    task_words_plain(words).then(|| {
         if agents {
             format!("hands one task to the lamp's agent: “{words}”")
         } else {

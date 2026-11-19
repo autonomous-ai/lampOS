@@ -1089,7 +1089,10 @@ sau:
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
-   cài. Một kỹ năng làm nhiều hơn những gì nó khai báo bị từ chối ở đó.
+   cài. Một kỹ năng làm nhiều hơn những gì nó khai báo bị từ chối ở đó,
+   và một `do.task` có lời rỗng, dài hơn 120 ký tự hay không thuần (ký tự
+   điều khiển hay định dạng) cũng vậy, đúng luật của giọng nói
+   (`made_skill::task_words_plain`, #7874).
    - **Sửa tối đa ba lần** (#2813 phần 2; ba lần từ chủ đèn, 10/11: "tự
      chạy lại cho đến khi được"). Khi bước kiểm tra từ chối một câu trả
      lời, nó được gửi lại cho mô hình trước khi nói gì: bản hướng dẫn cũ,
