@@ -1,7 +1,6 @@
 use super::*;
 use crate::{Step, load_with, replay_skill, run_tests, task};
 use std::path::PathBuf;
-use std::time::Instant;
 
 fn skills_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
@@ -147,7 +146,6 @@ fn the_pilots_by_group_their_briefs_byte_for_byte() {
             assert!(!task.task.contains(['"', '\\', '`']), "{}", pilot.name);
         }
     }
-    assert_eq!(FALLBACK_WITHIN, Duration::from_secs(10));
 }
 
 /// With the switch on, the trigger, the guards and the timing are the core
@@ -398,23 +396,17 @@ fn answer(text: &str) -> String {
     serde_json::json!({"ok": true, "id": 7, "answer": text}).to_string()
 }
 
-/// The agent's line in time is said in the say's place, as exact words at
-/// the say's priority; the look and the light stay, and the fallback keeps
-/// every call as it is.
+/// The agent's line is said in the say's place, as exact words at the
+/// say's priority; the look and the light stay.
 #[test]
-fn the_agents_line_in_time_is_said_in_the_says_place() {
+fn the_agents_line_is_said_in_the_says_place() {
     let calls = vec![
         Call::Gaze { face: None },
         Call::Say("They have sat a while. Suggest a sip of water.".into()),
     ];
-    let (to, from) = mpsc::channel();
     let heard = heard(task::told(&answer("Time for a sip of water?")));
     assert_eq!(heard, Heard::Line("Time for a sip of water?".into()));
-    to.send(heard).unwrap();
-    let said = awaited(from, Duration::from_millis(500));
-    assert_eq!(said, Said::Agent("Time for a sip of water?".into()));
-    assert!(!said.journal().contains("sip"), "never the agent's words");
-    let made = with_line(calls.clone(), &said);
+    let made = with_line(calls.clone(), "Time for a sip of water?");
     assert_eq!(made[0], calls[0]);
     let Call::Words(words) = &made[1] else {
         panic!("{made:?}");
@@ -422,38 +414,12 @@ fn the_agents_line_in_time_is_said_in_the_says_place() {
     assert_eq!(words.words, "Time for a sip of water?");
     assert!(words.exact);
     assert_eq!(words.priority, SAY_PRIORITY);
-    let fallback = Said::Fallback(NOT_RUN.into());
-    assert_eq!(with_line(calls.clone(), &fallback), calls);
 }
 
-/// A slow run: its line not come within 10 s of the fire, the skill's own
-/// is said at once, never later; a line after it is dropped.
+/// The agent down, offline, not reached, refused, answering `-`, nothing
+/// or more than one short line: no line is kept.
 #[test]
-fn a_slow_agent_past_10_s_says_the_skills_own_line_at_once() {
-    let (to, from) = mpsc::channel();
-    let began = Instant::now();
-    let late = std::thread::spawn(move || {
-        std::thread::sleep(FALLBACK_WITHIN + Duration::from_millis(400));
-        to.send(Heard::Line("Have some water!".into()))
-    });
-    let said = awaited(from, FALLBACK_WITHIN);
-    let waited = began.elapsed();
-    assert!(matches!(said, Said::Fallback(_)), "{said:?}");
-    assert!(said.journal().contains("within 10 s"), "{}", said.journal());
-    assert!(waited >= FALLBACK_WITHIN, "{waited:?}");
-    assert!(
-        waited < FALLBACK_WITHIN + Duration::from_millis(300),
-        "{waited:?}"
-    );
-    // The late line finds no say waiting: never said.
-    assert!(late.join().unwrap().is_err());
-}
-
-/// The agent down, offline, not reached, refused or waiting for the yes:
-/// its run ends with no line (its sender gone, or nothing), and the skill's
-/// own is said at once, not after 10 s.
-#[test]
-fn the_agent_down_says_the_skills_own_line_at_once() {
+fn no_line_is_kept_of_a_failed_or_unfit_answer() {
     for refused in [
         r#"{"ok":false,"error":"busy","message":"another skill's run"}"#,
         r#"{"ok":false,"error":"refused","message":"Harness didn't start the run (harness_not_running)"}"#,
@@ -461,49 +427,23 @@ fn the_agent_down_says_the_skills_own_line_at_once() {
     ] {
         assert_eq!(heard(task::told(refused)), Heard::Nothing(NOTHING_TO_SAY));
     }
-    let began = Instant::now();
-    let (to, from) = mpsc::channel::<Heard>();
-    drop(to);
-    let said = awaited(from, FALLBACK_WITHIN);
-    assert_eq!(said, Said::Fallback(NOT_RUN.into()));
-    let (to, from) = mpsc::channel();
-    to.send(heard(None)).unwrap();
-    assert_eq!(
-        awaited(from, FALLBACK_WITHIN),
-        Said::Fallback(NOTHING_TO_SAY.into())
-    );
-    assert!(began.elapsed() < Duration::from_secs(1));
-}
-
-/// The agent answering `-`, nothing to say: the skill's own line at once.
-#[test]
-fn a_dash_says_the_skills_own_line_at_once() {
+    assert_eq!(heard(None), Heard::Nothing(NOTHING_TO_SAY));
     for dash in ["-", " - ", "--", "-\n"] {
-        let (to, from) = mpsc::channel();
-        to.send(heard(task::told(&answer(dash)))).unwrap();
         assert_eq!(
-            awaited(from, FALLBACK_WITHIN),
-            Said::Fallback(NOTHING_TO_SAY.into()),
+            heard(task::told(&answer(dash))),
+            Heard::Nothing(NOTHING_TO_SAY),
             "{dash:?}"
         );
     }
-}
-
-/// An empty answer, or none at all: the skill's own line at once; and an
-/// answer longer than one short line is never said either.
-#[test]
-fn an_empty_answer_says_the_skills_own_line_at_once() {
     for empty in [
         answer(""),
         answer("   "),
         answer("**"),
         r#"{"ok":true,"id":7}"#.to_owned(),
     ] {
-        let (to, from) = mpsc::channel();
-        to.send(heard(task::told(&empty))).unwrap();
         assert_eq!(
-            awaited(from, FALLBACK_WITHIN),
-            Said::Fallback(NOTHING_TO_SAY.into()),
+            heard(task::told(&empty)),
+            Heard::Nothing(NOTHING_TO_SAY),
             "{empty}"
         );
     }

@@ -26,17 +26,16 @@
 //!   elsewhere). Its task is pre-approved ([`pre_approved`]): no yes is
 //!   ever asked, and lamp-control mints its one-run token with no grant.
 //!   The day's bounds and one run at a time hold as for every `do.task`.
-//! - **The fallback, never late** ([`FALLBACK_WITHIN`], [`awaited`]): the
-//!   run's say waits for the agent's line at most 10 s from the fire, on
-//!   the run's own thread (never the trigger's); the line comes, it is said
-//!   as exact words in the say's place ([`with_line`]), with the look, the
-//!   light and the move as the say brings them. Not within 10 s, or the
-//!   agent down, not reached, refused, or answering
-//!   `-`, nothing, or more than one short line ([`heard`]), the skill's own
-//!   say is said at once, as with the switch off. A line that comes after
-//!   is dropped, never said late, and a failed run says nothing of its own.
+//! - **Worded ahead, never waited for** (`crate::worded_ahead`, the first
+//!   builder's yes of 19 Nov 10:45): a fire's task is never handed over at
+//!   the fire. lamp-skills hands it over in idle time instead, and keeps
+//!   the agent's line, checked ([`heard`]: never `-`, nothing, or more
+//!   than one short line). A fire says the oldest fresh one at once as
+//!   exact words in the say's place ([`with_line`]), with the look, the
+//!   light and the move as the say brings them; with none, the skill's own
+//!   say at once, as with the switch off.
 use crate::{Call, SAY_EXPIRES_MS, SAY_PRIORITY, Words};
-use std::{fs, path::Path, sync::mpsc, time::Duration};
+use std::{fs, path::Path};
 
 /// The switch, in lamp-skills and its manage helper: `on` for every
 /// [`Group`], or the groups' names with commas between (`pilot,nudges`).
@@ -85,10 +84,6 @@ pub const OVERLAY: &str = "agent.toml";
 /// Its task's script: the run-time brief, as a voice make's
 /// (`lamp_voice::make_no_cannot::RUN`).
 pub const RUN: &str = lamp_voice::make_no_cannot::RUN;
-
-/// The longest a fire's say waits for the agent's line before the skill's
-/// own is said: the first builder's 10 s (05:42).
-pub const FALLBACK_WITHIN: Duration = Duration::from_secs(10);
 
 /// Where a pilot's task is said to come from in the owner's yes.
 pub const FROM: &str = "the lamp itself";
@@ -459,10 +454,11 @@ fn task_beside(
     Ok(steps.clone())
 }
 
-/// What became of a fire's run, as its say waits for it ([`awaited`]).
+/// What became of a run's line, as lamp-skills keeps it
+/// (`crate::worded_ahead::checked`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Heard {
-    /// The agent's one short line, to say in the say's place.
+    /// The agent's one short line, to keep for a fire's say.
     Line(String),
     /// Nothing to say of the agent's: why, for the journal.
     Nothing(&'static str),
@@ -472,8 +468,6 @@ pub enum Heard {
 pub const NOTHING_TO_SAY: &str = "its agent had nothing to say (- or an empty answer)";
 /// The agent's line longer than one short line.
 pub const TOO_LONG: &str = "its agent's answer was more than one short line";
-/// The run not handed over, refused or failed.
-pub const NOT_RUN: &str = "its agent's run didn't run or didn't end well";
 
 /// The agent's line in its told sentences (`crate::task::told` of
 /// lamp-tasks' answer): one short line of at most
@@ -497,59 +491,16 @@ pub fn heard(told: Option<Vec<String>>) -> Heard {
     Heard::Line(line)
 }
 
-/// What a fire says, once [`awaited`].
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Said {
-    /// The agent's line, in time.
-    Agent(String),
-    /// The skill's own say: why.
-    Fallback(String),
-}
-
-impl Said {
-    /// The journal's words, never the agent's.
-    pub fn journal(&self) -> String {
-        match self {
-            Self::Agent(line) => format!(
-                "its line through the lamp's agent: said its agent's line ({} characters)",
-                line.chars().count()
-            ),
-            Self::Fallback(why) => {
-                format!("its line through the lamp's agent: said its own line at once: {why}")
-            }
-        }
-    }
-}
-
-/// What the fire says: the agent's line if it comes on `from` within
-/// `within` of the fire (the product's [`FALLBACK_WITHIN`]), the skill's own
-/// at once otherwise: past `within`, the run gone without a word (its
-/// sender dropped: down, not reached, refused), or [`Heard::Nothing`]. The
-/// receiver is dropped with it, so a line after it is never said.
-pub fn awaited(from: mpsc::Receiver<Heard>, within: Duration) -> Said {
-    match from.recv_timeout(within) {
-        Ok(Heard::Line(line)) => Said::Agent(line),
-        Ok(Heard::Nothing(why)) => Said::Fallback(why.into()),
-        Err(mpsc::RecvTimeoutError::Timeout) => Said::Fallback(format!(
-            "its agent's line didn't come within {} s",
-            within.as_secs_f32()
-        )),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Said::Fallback(NOT_RUN.into()),
-    }
-}
-
-/// Whether `call` is a fire's say, which waits for the agent's line.
+/// Whether `call` is a fire's say, which a kept line stands in for.
 pub fn is_line(call: &Call) -> bool {
     matches!(call, Call::Say(_) | Call::Words(_))
 }
 
-/// `calls` as `said` has them: with the agent's line, the say is it, as
-/// exact words at the say's own priority (the look, the light and the move
-/// still made as the voice begins it); with the fallback, as they are.
-pub fn with_line(calls: Vec<Call>, said: &Said) -> Vec<Call> {
-    let Said::Agent(line) = said else {
-        return calls;
-    };
+/// `calls` with the agent's `line` as the say, as exact words at the say's
+/// own priority (the look, the light and the move still made as the voice
+/// begins it).
+pub fn with_line(calls: Vec<Call>, line: &str) -> Vec<Call> {
+    let line = line.to_owned();
     calls
         .into_iter()
         .map(|call| match call {
