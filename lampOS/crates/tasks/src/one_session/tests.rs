@@ -3717,7 +3717,9 @@ fn a_replacement_with_no_task_waiting_has_no_told_line() {
     let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
     again.open_if_due(&fake, &place());
     assert_eq!(again.agent(), Some(agent_of(2)));
-    let turn = again.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    let turn = again
+        .enter("task-1", Kind::Skill, far(), &|| false)
+        .unwrap();
     assert!(matches!(
         turn.send(&fake, &place(), "Run.", far(), &|| false),
         Sent::Typed(_)

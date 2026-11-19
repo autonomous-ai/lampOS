@@ -856,8 +856,8 @@ pub struct OneSession {
     dead_working: Duration,
 }
 
-/// What a stuck session's replacement calls with why (#7906's C: the
-/// person's one told line is #7895's, not built here).
+/// What a stuck session's replacement calls with why, for the journal and
+/// tests; the person's told line is [`Turn::restarted`]'s (#7906).
 pub type Replaced = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Why a run can't have the pane.
@@ -1233,8 +1233,8 @@ impl OneSession {
         self.dead_working
     }
 
-    /// `replaced` called with why each time a stuck session is replaced:
-    /// the hook for #7895's one told line to the person.
+    /// `replaced` called with why each time a stuck session is replaced
+    /// (the person's told line is [`Turn::restarted`]'s, per task).
     pub fn with_on_replaced(mut self, replaced: Replaced) -> Self {
         self.on_replaced = Some(replaced);
         self
@@ -3068,9 +3068,11 @@ impl OneSession {
         if !self.kept_is_program() || engine != EngineKind::Openclaw.argument() {
             return None;
         }
-        let unprompted = self.lock().pane.as_ref().is_some_and(|pane| {
-            pane.agent == agent && pane.checked_at_open && pane.turns == 0
-        });
+        let unprompted = self
+            .lock()
+            .pane
+            .as_ref()
+            .is_some_and(|pane| pane.agent == agent && pane.checked_at_open && pane.turns == 0);
         if unprompted {
             return None;
         }
@@ -3085,7 +3087,8 @@ impl OneSession {
     /// `None` with no such record, one made new in this open before its
     /// first turn, or a record that can't be read.
     pub fn kept_gone_before_ensure(&self, harness: &dyn PaneHarness) -> Option<KeptGone> {
-        matches!(self.kept_held(harness), Some((_, Some(false)))).then_some(KeptGone::GatewaySession)
+        matches!(self.kept_held(harness), Some((_, Some(false))))
+            .then_some(KeptGone::GatewaySession)
     }
 
     /// #7906 sign 4: a reader of the Gateway's record of the kept session

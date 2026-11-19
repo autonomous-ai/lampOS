@@ -2458,21 +2458,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   nhân đôi, `OPEN_RETRY_FIRST`; 60 s nhân đôi cho `ENGINE_NOT_READY`) không
   đổi. Kết thúc của
   lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
-  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất). Phiên OpenClaw được
-  giữ bị coi là đã mất (đóng `--now`, buông, và việc được giao cho phiên
-  ensure lại, hoặc thất bại) khi bản ghi của chính OpenClaw
-  (`openclaw-agent.sqlite`, chỉ đọc, không chạy CLI) không còn giữ
-  `agent:main:harness-<id>` trước lúc giao việc (#7906 dấu hiệu 3), hoặc,
-  đọc mỗi 5 s song song với lệnh wait của lượt (`TURN_WATCH`), khi bản ghi
-  không vượt quá chỗ lúc giao sau 60 s kể từ `taken` của Harness
-  (`TURN_START_WITHIN`, dấu hiệu 4a), khi phiên đang `running` mà `seq` cao
-  nhất không đổi trong 3 phút và dòng cuối là `user` hoặc `toolResult` mà
-  model chưa trả lời (`TURN_STALL`, dấu hiệu 4b, cũng chặn một lần giao bị
-  `NOT_IDLE`), hoặc khi lượt còn mở trong khi trạng thái phiên là
-  `killed`, `failed` hay `timeout` suốt 15 s (`DEAD_WORKING`); một tool
-  call chưa có kết quả (một exec dài) không bao giờ bị cắt mà để cho hạn
-  chót của lượt chạy, và số tool của `show`, `lastActive` của `ps` hay chữ
-  trên pane không bao giờ được dùng cho việc này.
+  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất). Phiên được giữ đã mất
+  hoặc bị kẹt thì được thay như bên dưới (#7906, dấu hiệu 1-4).
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là
@@ -2552,7 +2539,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   resume một phiên đã đóng mà không kiểm tra Gateway. Bản ghi được đọc
   (`openclaw_holds_key`, chỉ đọc) đúng theo session key của chính bản ghi
   (`engineSession`), không bao giờ theo `agent:main:harness-<agent id>`;
-  bản ghi không đọc được là chưa rõ, không bao giờ là đã mất. Hai dấu hiệu
+  bản ghi không đọc được là chưa rõ, không bao giờ là đã mất. Bốn dấu hiệu
   được xử lý:
   - **Dấu hiệu 1, vẫn `starting`.** Khi mở mà tìm thấy phiên (`live` hoặc
     `resumed`, không bao giờ `new`), lamp-tasks gọi một lần `show`. Nếu
@@ -2568,9 +2555,26 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   - **Dấu hiệu 2, một shell trơn.** `show` ghi agent là `Terminal` (engine
     đã thoát, và `wait` đọc nó là idle), hoặc Harness không còn phiên đó.
     Không bao giờ gõ vào, nhận lại hay lấy câu trả lời từ shell đó.
+  - **Dấu hiệu 3, Gateway không còn giữ phiên.** Trước `ensure` (bản ghi
+    được giữ) và trước lúc giao việc cho phiên được giữ, bản ghi của chính
+    OpenClaw (`openclaw_holds_key`, cùng cách đọc đúng key như trên, không
+    chạy CLI) cho biết nó không còn giữ hội thoại của phiên. Phiên mà lần
+    mở đã đọc là còn giữ, hoặc do `ensure` tạo mới, không bị đọc lại trước
+    lượt đầu tiên: mỗi lần mở chỉ đọc một lần.
+  - **Dấu hiệu 4, một lượt không chạy tiếp.** Đọc mỗi 5 s song song với
+    `wait` của lượt (`TURN_WATCH`, `harness::openclaw_turn_at`, cùng key):
+    bản ghi không vượt quá chỗ lúc giao sau 60 s kể từ `taken` của Harness
+    (`TURN_START_WITHIN`, 4a); phiên đang `running` mà `seq` cao nhất không
+    đổi trong 3 phút và dòng cuối là `user` hoặc `toolResult` mà model chưa
+    trả lời (`TURN_STALL`, 4b, cũng chặn một lần giao bị `NOT_IDLE`); hoặc
+    lượt còn mở trong khi trạng thái phiên là `killed`, `failed` hay
+    `timeout` suốt 15 s (`DEAD_WORKING`). Một tool call chưa có kết quả
+    (một exec dài) không bao giờ bị cắt mà để cho hạn chót của lần chạy;
+    số tool của `show`, `lastActive` của `ps` hay chữ trên pane không bao
+    giờ được dùng cho việc này.
 
   Dấu hiệu nào cũng gọi `OneSession::replace_kept`, đường duy nhất cho mọi
-  dấu hiệu. Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
+  dấu hiệu (dấu hiệu 3 và 4 qua `OneSession::kept_gone`). Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
   phiên. Lần mở tiếp theo là `ensure --fresh` (pane của `harness new` thì
   là một `new` thường), và việc đang chờ, hoặc việc tiếp theo, chạy tiếp ở
   đó. Close lỗi được thử lại `--now` ở lần nhìn sau và giữ token. Số lần
@@ -2592,8 +2596,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   mỗi 5 s trong 120 s của lần mở, và reply bị từ chối của một việc được
   thử lại trong giới hạn của chính nó: cả hai đều không phải dấu hiệu. Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
   Trường hợp xấu nhất từ lúc kẹt tới phiên mới là khoảng 120 s cộng một lần
-  `ensure`. `OneSession::with_on_replaced` là hook cho câu báo duy nhất tới
-  người dùng của #7895, chưa nối ở đây. Journal: `<id> is gone or stuck
+  `ensure`. Journal: `<id> is gone or stuck
   (<why>); closed, forgotten and replaced with a fresh session (#7906)`.
 - **Cách mở lại nhẹ nhất trước, và không mất việc (#7906, quy tắc của
   chủ đèn).** `OneSession::revive_or_replace` là một thang:
@@ -2608,7 +2611,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   - **(c)** Từ lần thay thứ hai liên tiếp, áp dụng backoff ở trên.
 
   Một lần chạy kỹ năng mà phiên chết ngay trong lượt của nó (`wait` đọc
-  một shell trơn là idle), trong khi `show` chưa đếm được tool nào chạy,
+  một shell trơn là idle), hoặc lượt đã giao không chạy tiếp (dấu hiệu 4,
+  thay ngay không resume: resume thường sẽ gặp lại đúng lượt bị kẹt), trong khi `show` chưa đếm được tool nào chạy,
   được đưa lại một lần: lời của nó được gõ lại vào phiên vừa mở lại. Lượt
   của nó vẫn giữ hàng đợi, nên các việc phía sau giữ nguyên thứ tự, và
   token của lần chạy được giữ. Lượt đã chạy một tool thì không bao giờ
@@ -2619,9 +2623,20 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   đưa lại hai lần. Journal: `<id> died (<why>); OpenClaw still holds its
   conversation, so a plain resume first (#7906)`, và `<task>: its session
   died (<why>); its words typed again once into the reopened one (#7906)`.
-  Câu báo tới người dùng khi thay phiên chưa nối ở đây:
-  `with_on_replaced` vẫn chỉ ghi journal, và câu báo đó thuộc đường của
-  #7895 và #7919.
+
+  **Báo một lần (quy tắc của chủ đèn: "không bao giờ kẹt mà người dùng
+  không biết").** Một lần chạy kỹ năng mà phiên bị thay (hoặc được resume,
+  bậc (a) của thang) trong khi việc của nó đang chờ lúc giao hoặc đang
+  chạy, rồi việc chạy tiếp ở phiên mới, có `Turn::restarted`; câu trả lời
+  của nó được báo kèm `RESTARTED_LINE` ("The agent got stuck, so I
+  restarted it and did your request again.") một lần ở phía trước, qua
+  đúng đường đã dùng để báo câu trả lời. Mỗi việc một câu, dù thay bao
+  nhiêu lần. Lần chạy bị bỏ (đã chạy một tool, hoặc chết lần thứ hai) chỉ
+  được báo câu thất bại của chính nó. Một lần thay khi không có việc nào
+  chờ (lần mở của luồng one-session, một lần make khởi động nền) không báo
+  gì. Việc nói không có câu này: nó chỉ được báo lỗi
+  `one_session_not_started` của #7919 qua Task news, không bao giờ cả hai.
+  Câu này được nghe cùng câu trả lời, không phải ngay lúc thay phiên.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 

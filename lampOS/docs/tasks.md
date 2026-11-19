@@ -5114,20 +5114,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   its own. The opens' own backoff (5 s doubled, `OPEN_RETRY_FIRST`; 60 s
   doubled for `ENGINE_NOT_READY`) is unchanged. The turn's end is `harness wait lamp-one-openclaw --after
   <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone). A
-  kept OpenClaw session is seen as gone (closed `--now`, let go, and the
-  task handed to the session ensured again, or failed) when OpenClaw's own
-  record (`openclaw-agent.sqlite`, read only, no CLI start) no longer holds
-  `agent:main:harness-<id>` before a task is handed to it (#7906 sign 3),
-  or, read every 5 s beside the turn's wait (`TURN_WATCH`), when the
-  record is not past the hand-over 60 s after Harness's `taken`
-  (`TURN_START_WITHIN`, sign 4a), when the session is `running` with its
-  highest `seq` unmoved for 3 min and its last row a `user` or
-  `toolResult` the model never answered (`TURN_STALL`, sign 4b, which also
-  bounds a `NOT_IDLE` hand-over), or when the turn is open while the
-  session's status is `killed`, `failed` or `timeout` for 15 s
-  (`DEAD_WORKING`); a tool call still unanswered (a long exec) is never
-  cut and is left to the run's deadline, and `show`'s tools, `ps`'s
-  `lastActive` and pane text are never read for it.
+  kept session gone or stuck is replaced as below (#7906, signs 1-4).
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
@@ -5202,7 +5189,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   (`openclaw_holds_key`, read only) by the record's own session key
   (`engineSession`) exactly, never by `agent:main:harness-<agent id>`; a
   record that can't be read is unknown, never gone.
-  Two signs are acted on:
+  Four signs are acted on:
   - **Sign 1, still `starting`.** At an open that found a session (`live`
     or `resumed`, never `new`), one `show` is made. If `show` itself reads
     `starting` 120 s (`OPEN_IDLE_WITHIN`) from the open's start, it is
@@ -5217,9 +5204,26 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   - **Sign 2, a plain shell.** `show` names the agent `Terminal` (its
     engine exited, and `wait` reads it idle), or Harness no longer has the
     session. The shell is never typed into, adopted or answered from.
+  - **Sign 3, the Gateway no longer holds it.** Before `ensure` (the kept
+    record) and before a task is handed to the kept session, OpenClaw's own
+    record (`openclaw_holds_key`, the same exact-key read as above, no CLI
+    start) says it no longer holds the session's conversation. A session
+    whose open already read it held, or that `ensure` made new, is not read
+    again before its first turn: one read per open.
+  - **Sign 4, a turn not moving.** Read every 5 s beside the turn's
+    `wait` (`TURN_WATCH`, `harness::openclaw_turn_at`, the same key): the
+    record not past the hand-over 60 s after Harness's `taken`
+    (`TURN_START_WITHIN`, 4a); the session `running` with its highest
+    `seq` unmoved for 3 min and its last row a `user` or `toolResult` the
+    model never answered (`TURN_STALL`, 4b, which also bounds a `NOT_IDLE`
+    hand-over); or the turn open while the session's status is `killed`,
+    `failed` or `timeout` for 15 s (`DEAD_WORKING`). A tool call still
+    unanswered (a long exec) is never cut and is left to the run's
+    deadline; `show`'s tools, `ps`'s `lastActive` and pane text are never
+    read for it.
 
-  Either sign calls `OneSession::replace_kept`, the one path for every
-  sign. It does a `close --now`, `sessions.delete` and the record removed,
+  Every sign calls `OneSession::replace_kept`, the one path for every
+  sign (signs 3 and 4 through `OneSession::kept_gone`). It does a `close --now`, `sessions.delete` and the record removed,
   then lets the session go. The next open is `ensure --fresh` (a pane of
   `harness new` gets a plain `new`), and the waiting task, or the next
   one, goes on there. A failed close is tried `--now` again at the next
@@ -5242,8 +5246,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   again every 5 s within the open's 120 s, and a task's refused reply is
   tried again within its own bound: neither is a sign. A healthy session costs one `show` per open and nothing
   per turn. The worst case from a jam to a fresh session is about 120 s
-  plus one `ensure`. `OneSession::with_on_replaced` is the hook for
-  #7895's one told line to the person, not wired here. Journal: `<id> is
+  plus one `ensure`. Journal: `<id> is
   gone or stuck (<why>); closed, forgotten and replaced with a fresh
   session (#7906)`.
 - **The lightest reopen first, and the task not lost (#7906, the
@@ -5260,7 +5263,9 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   - **(c)** From the second replacement in a row, the backoff above.
 
   A skill run whose session dies under its turn (`wait` reads a plain
-  shell idle) while `show` counts no tool run yet is put back once: its
+  shell idle), or whose handed-over turn is not moving (sign 4, replaced
+  at once with no resume: a plain resume would find the same stuck turn),
+  while `show` counts no tool run yet is put back once: its
   words are typed again into the reopened session. Its turn still holds
   the queue, so the tasks behind it keep their order, and its run's token
   is kept. A turn that had already run a tool is never replayed. It ends
@@ -5270,9 +5275,21 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   so there is no double put-back. Journal: `<id> died (<why>); OpenClaw
   still holds its conversation, so a plain resume first (#7906)`, and
   `<task>: its session died (<why>); its words typed again once into the
-  reopened one (#7906)`. The person's line for a replacement is not wired
-  here: `with_on_replaced` stays journal-only, and the told line is
-  #7895's and #7919's path.
+  reopened one (#7906)`.
+
+  **Told once (the owner's "never stuck without the person knowing").**
+  A skill run whose session was replaced (or resumed, ladder (a)) while
+  its task waited at the hand-over or was in flight, and that then went on
+  in the new session, has `Turn::restarted`; its answer is told with
+  `RESTARTED_LINE` ("The agent got stuck, so I restarted it and did your
+  request again.") once in front of it, on the path its answer is told by
+  already. One line per task however many replacements. A run given up (a
+  tool had run, or a second death) is told its own failed line only. A
+  replacement with no task waiting (the one-session thread's open, a
+  background make start) tells nothing. A spoken task gets no such line:
+  it is told only #7919's `one_session_not_started` failure through Task
+  news, never both. The line is heard with the answer, not at the moment
+  of the replacement.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
