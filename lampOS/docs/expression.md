@@ -654,7 +654,11 @@ a claim that the whole planner is ready without its required inputs.
 in `Timing`, which has no bus and takes its clock from the caller; the
 coordinator looks at itself once each pass of its loop and hands that over.
 `clock_id` is the kernel's boot identity, `session_id` the service's
-`INVOCATION_ID`, and `request` is the turn's own number.
+`INVOCATION_ID` for the first publishers the process makes and that with `-1`,
+`-2`... for each later one (a mute ends the conversation and the next makes
+them again, every sequence counting from 1; under the old session Expression
+refused them as "duplicate or out of order" until the voice restarted, #7955),
+and `request` is the turn's own number.
 This is First's existing legacy publisher. It also publishes
 `VoiceProgress` and `VoiceSound` (`ExpressionOut::on`).
 
