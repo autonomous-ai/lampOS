@@ -4176,15 +4176,14 @@ after a take-over, but now for every turn:
   (`KEEP_CLAIMED_UNKEPT`); alone, the model is told once and asked again,
   and a second such reply, or one in the last round, is said as
   `NOT_KEPT_LINE` ("I didn't keep that. Tell me again and I'll remember
-  it."). With `LAMP_KEEP_CLAIM_WHOLE=on` (#7878, off unless set), a reply on a
-  spoken turn that isn't a question, whose first sentence opens with an
-  acknowledgement ("Got it —", "Okay,"), is held for up to three
-  sentences (`remember::WHOLE_MOST_SENTENCES`), or to the round's end once
-  a keep or replace is said in any of them (`remember::claims_a_change`:
-  "That replaces wherever it was before.", "I've updated that."). With no
-  call at all in the round, that is a claim on this same path; beside any
-  call, its words are that call's. Every other reply streams as before
-  (switches.md). Not held after any call of the same request but a `recall` ran
+  it."). With `LAMP_KEEP_CLAIM_WHOLE=on` (#7878, off unless set), while no
+  `remember` of the turn has run, a reply whose opening claims no keep is
+  said sentence by sentence (`remember::unclaimed_sentences`), and a later
+  sentence that says a keep or replace done (`remember::claims_a_change`:
+  "That replaces wherever it was before.") is held, with the rest, to the
+  round's end. With no call at all in the round it is a claim on this same
+  path; beside any call, its words are that call's. First audio waits only
+  for the first sentence to end (switches.md). Not held after any call of the same request but a `recall` ran
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
   reviewer-lead's P2 on #3628). A cut answer's finished rounds carried into
