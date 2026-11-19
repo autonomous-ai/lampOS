@@ -1242,6 +1242,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    lampOS is installed on (it refuses without `/var/lib/lampos-update`),
    with no Harness at `/usr/local/bin/harness`, these steps, in order:
    `id -u lampos`; `/var/lib/lampos-tasks` made `lampos`'s own (0700);
+   `/var/lib/lampos-tasks/.harness` made by `lampos` (`runuser -u lampos --
+   mkdir -p -m 0700`, #7906: a fresh lamp's installer otherwise picks the
+   XDG folders);
    Harness's installer as `lampos` with `HOME=/var/lib/lampos-tasks`,
    `XDG_RUNTIME_DIR`, `ADAPTER_DATA_DIR` (#7906), `PATH=/usr/local/bin:/usr/bin:/bin` and
    `SHELL=/bin/sh`: `curl -fsSL --proto =https --tlsv1.2
@@ -1556,8 +1559,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          had."; it is journaled whether `harness version` says the older
          one again, and the kept copy is removed only when it does. A copy
          not kept installs nothing (also `upgrade`). Either
-         way the launcher is pinned again (with the hold on) and lamp-tasks
-         started again. A failed move is tried again by a round with
+         way the launcher is pinned again (with the hold on),
+         `ADAPTER_DATA_DIR` put in a `harness-hold.env` already there (held
+         or not, #7906; tasks.md, "Harness's home kept in `~/.harness`"),
+         as after a first install, and lamp-tasks started again. A failed move is tried again by a round with
          another pin at once, or with the same pin after 24 h
          (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
          Harness is then missing, the next round installs it as on a lamp
