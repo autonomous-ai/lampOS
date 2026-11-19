@@ -2973,7 +2973,8 @@ Hermes. Với công tắc `on` trong lamp-voice, lamp-tasks và lamp-control (c�
 - **Quên hay dừng thì bỏ.** Một lần quên (`services::forget_waiting`) hay một
   lời dừng bỏ câu trả lời đang chờ (`agent_asks::forget`).
 
-Yêu cầu khó (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](../switches.md)) đi cùng
+Yêu cầu khó (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](../switches.md), bật
+trong `lamp-voice.service` và `lamp-tasks.service` của sản phẩm từ 19/11) đi cùng
 đường, không quyền dịch vụ và không token, chỉ cho dòng của chính chủ đèn.
 Trên một đèn mặc định là OpenClaw, lượt đó là một lượt trong chính Gateway
 của chủ đèn, không phải một home mới: nó giữ workspace, bộ nhớ và các phiên

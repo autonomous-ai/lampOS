@@ -3941,7 +3941,8 @@ Hermes pick while lamp-tasks' read of the lamp's default
 whatever `LAMP_SKILL_DEFAULT_AGENT` says) names another agent is refused
 `not_ready`. A
 failed pick (a default agent that takes no run) is `run_failed`. With no
-grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`, on Hermes on
+grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on` (on in the
+product's `lamp-tasks.service` and `lamp-voice.service` since 19 Nov), on Hermes on
 the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
 lamp's local ports included until the net runner lands; lamp-voice sends it
 only for the owner's own line); with one service's `<code>-read` grant (a

@@ -2905,7 +2905,8 @@ grace before the fixed line; then the say service's next free moment.
 These are expected numbers, not measured on a lamp.
 
 Lines heard by the voice's own ask for the lamp's agent that is not a
-service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md)) take the
+service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md), on in the
+product's `lamp-voice.service` and `lamp-tasks.service` since 19 Nov) take the
 same path with no grant and no token, only for the owner's own line (as a
 `service_read` is held, `services::owner_of`). On an OpenClaw default,
 that run is one turn in the owner's own Gateway, not a fresh home: it

@@ -53,6 +53,10 @@ Environment=LAMP_SKILL_WRITE_AGENT=on
 # lamp's default agent when its wrapper is lamp-update's one run path for it, else it is refused in words; set alike in
 # lamp-update (its unit and /etc/lampOS/update.env), and only with LAMP_SKILL_TASKS on. On in the product (13 Nov).
 Environment=LAMP_SKILL_DEFAULT_AGENT=on
+# A live spoken ask with no grant from lamp-voice's make socket (`voice_ask`, the owner's ruling, 17 Nov; the first
+# builder's DEFAULT-ON, #7814), run on the lamp's default agent, at most 120 s, answering only, sending or buying
+# nothing. The same line in lamp-voice. Off: such a line is refused `off`.
+Environment=LAMP_HARD_ASKS_TO_AGENT=on
 # The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
 # lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under

@@ -1290,7 +1290,8 @@ lần tạo với `"one_path":true` (`skill_make::MakeGateway`,
   Hermes: một lựa chọn Hermes bị từ chối `not_ready`. Lựa chọn thất bại là
   `run_failed`.
 
-Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on`, trên
+Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on` (bật
+trong `lamp-tasks.service` và `lamp-voice.service` của sản phẩm từ 19/11), trên
 Hermes bằng runner của lần tạo (mạng như `LAMP_MAKE_AGENT_NET` nói); với một
 quyền `<code>-read` của một dịch vụ (chỉ đọc: `-write` hay quyền thứ hai bị
 từ chối `bad_request`) chỉ với `LAMP_SERVICES_TO_AGENT=on` và
