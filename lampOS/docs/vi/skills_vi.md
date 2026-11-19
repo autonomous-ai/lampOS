@@ -2849,21 +2849,45 @@ chạy được cấp khóa, một lần chạy `net` không có đường chạ
 điều agent được bảo ghi vào `answer.md` trong thư mục riêng của nó (lần
 chạy runner của Harness khởi động không có Harness không giữ câu trả lời
 nào, nên không bao giờ được bảo rằng câu trả lời của nó sẽ được nói; lần
-chạy ghi cố định không bao giờ nói), và `lamp-skills` nói nó cho chủ
-ngay khi lượt chạy kết thúc (`service_read::tell`, #7894), mỗi câu một
+chạy ghi cố định không bao giờ nói), và `lamp-skills` nói nó mỗi câu một
 dòng bằng lời chính xác, theo thứ tự (không bao giờ là một lượt cho mô
-hình, nên nội dung thư không bao giờ là chỉ dẫn), không qua cổng của lần
-đọc: không cần chủ đèn một mình hay ổn định, không chờ hết giọng nói một
-phút, không giờ yên lặng hay `[quiet]`, không chờ 60 phút rồi bỏ (trên
-lamp-52e6, 19/11 09:52, câu trả lời của một lần kiểm thư chờ "not alone"
-và "a voice heard" trong khi người hỏi đang ở cạnh đèn). Một dòng chỉ bị
-giữ khi đèn không nói được (`service_read::held`: công tắc riêng tư hoặc
-micro tắt, đang ngủ, hoặc tạm dừng), và được nói ngay khi nói được, dòng
-sau lại bị giữ nếu đèn đóng giữa chừng; và trong lúc lượt đọc của kỹ năng
-khác đang nói các dòng của nó (lượt đọc duy nhất của đèn, lấy mà không chờ
-khoảng một phút sau một lượt đọc), không bao giờ chen giữa. Nó trả lượt
-khi kết thúc, nên lượt đọc theo lịch vẫn chờ một phút sau nó; một `do.read`
-theo lịch vẫn giữ nguyên cổng của nó ([services_vi.md](services_vi.md)). Các câu
+hình, nên nội dung thư không bao giờ là chỉ dẫn), tùy câu trả lời đó đáp
+lời ai (`service_read::tell_answer`, `Asker`; #7894, quyết định của V2 lúc
+12:47 và của first builder lúc 10:02 trên #7874 và 11:42 trên #7894):
+- **Chủ đèn vừa hỏi bằng giọng nói** (được đánh dấu là hỏi bằng giọng nói,
+  sẵn sàng trong vòng năm phút sau lời hỏi, `asked_now`; là lời của chính
+  chủ, `task::take_asked_by_owner`): nói ngay khi lượt chạy kết thúc,
+  không qua cổng của lần đọc: không cần chủ đèn một mình hay ổn định,
+  không chờ hết giọng nói một phút, không giờ yên lặng hay `[quiet]`, không
+  chờ 60 phút rồi bỏ (trên lamp-52e6, 19/11 09:52, câu trả lời của một lần
+  kiểm thư chờ "not alone" và "a voice heard" trong khi người hỏi đang ở
+  cạnh đèn). Khi `LAMP_PRIVATE_ROOM` bật (như trong sản phẩm), ai hỏi cũng
+  là chủ. Khi tắt, một lần chạy ngay là của chủ (giọng nói chỉ chạy ngay
+  cho đúng lời của chủ, `owner_hears` của `made_run`: phạm vi người gọi tên
+  chủ, thấy chủ nói một mình), còn lời gọi công cụ của skill do mô hình gọi
+  thì không được biết là của chủ. Một dòng chỉ bị giữ khi đèn không nói
+  được (`service_read::held`: công tắc riêng tư hoặc micro tắt, đang ngủ,
+  hoặc tạm dừng), và được nói ngay khi nói được, dòng sau lại bị giữ nếu
+  đèn đóng giữa chừng; và trong lúc lượt đọc của kỹ năng khác đang nói các
+  dòng của nó (lượt đọc duy nhất của đèn, lấy mà không chờ khoảng một phút
+  sau một lượt đọc), không bao giờ chen giữa. Nó trả lượt khi kết thúc, nên
+  lượt đọc theo lịch vẫn chờ một phút sau nó.
+- **Người khác vừa hỏi** (khách, hoặc không ai được gọi tên): nói ngay
+  "I'll tell you when it's just you." (`service_read::NOT_JUST_YOU`), chỉ
+  bị giữ như trên, rồi câu trả lời chờ sau cổng của lần đọc như dưới; nhật
+  ký ghi `short line told 1, then: <outcome>`. Khách nói "daily brief" ở
+  bàn của chủ không bao giờ nghe thư của chủ.
+- **Không ai hỏi** (lần chạy theo giờ hay trigger, hoặc sẵn sàng sau năm
+  phút kể từ lời hỏi): sau cổng của lần đọc như trước #7894 (chỉ khuôn mặt
+  đã biết của chủ trong tầm nhìn và ổn định 5 giây, không có giọng nói
+  trong một phút, không riêng tư, không tạm dừng, không trong giờ yên lặng
+  của đèn hay `[quiet]` riêng của skill (`task::TaskStep::quiet`), chờ tối
+  đa 60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của đèn, cổng
+  được xét lại trước mỗi dòng, có người đến thì dừng với "I'll tell you
+  the rest later."
+
+Một `do.read` theo lịch vẫn giữ nguyên cổng của nó, kể cả giờ yên lặng
+([services_vi.md](services_vi.md)). Các câu
 là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
 vụ nói, tất cả tối đa khoảng 400 ký tự (`task::MOST_TOLD_CHARS`, người xây
 dựng đầu tiên trên #7591: một người trả lời bằng một hai câu) và 10 câu, cắt
@@ -2885,13 +2909,13 @@ carries N bytes of its agent's answer`, hoặc `no agent's answer`; #7180).
 Khi bắt đầu chờ mà cổng đang đóng, dù là một lần đọc hay tin tức của lần
 chạy thất bại, nhật ký ghi kèm lý do (`skill:<name>: waits for its gate: quiet
 hours`, `Room::waits`), để câu bị giữ trong giờ yên lặng vẫn để lại
-một dòng (#7180), và câu trả lời tìm thấy bị giữ ghi `private`, `paused`
+một dòng (#7180), và câu trả lời cho chủ bị giữ ghi `private`, `paused`
 hoặc `another read under way` một lần mỗi dòng; cả hai đều lên `skills/tasks`
 là `held` kèm cùng lý do, rồi `told` hoặc `dropped` khi kết thúc
 (`service_read::held_news`, `answer_news`; #7873, cho lamp-peek); mỗi lần lý do đó đổi trong lúc chờ, nhật ký ghi thêm một
 lần, tối đa một dòng mỗi giây (`service_read::SAY_WHY_EVERY`), không bao giờ
 ghi ở mỗi lần nhìn, để một lần chờ kéo dài cho thấy điều kiện nào đang giữ
-(lamp-9adf, 17 Nov). Kết thúc vẫn được ghi như trước (`told N`; tin tức thì
+(lamp-9adf, 17 Nov). Kết thúc vẫn được ghi như trước (`told N`, hoặc
 `skipped: <why>`); trong lúc chờ nó được giữ trong
 `task-telling.json` của thư mục state (tên skill và lúc bắt đầu chờ, không
 bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-skills khởi động
@@ -2915,8 +2939,9 @@ câu trả lời có (`told_when_asked::quiet_holds`), nên khi chờ chủ đè
 không bao giờ tự nói lúc một giờ sáng. Mọi phần khác của cổng vẫn giữ: chủ
 đèn trong khung hình và một mình, không có giọng nói trong một phút, không
 riêng tư hay tạm dừng, lượt đọc duy nhất của đèn, và âm lượng ban đêm. Từ
-#7894 việc bỏ giờ yên lặng chỉ còn tác dụng với tin tức của lần chạy thất
-bại: điều agent tìm thấy không có giờ yên lặng nào để bỏ.
+#7894 lời hỏi ngay của chủ không còn cổng cho điều agent tìm thấy, nên việc
+bỏ giờ yên lặng có tác dụng với lời hỏi của người khác và với tin tức của
+lần chạy thất bại.
 Nhật ký ghi rõ: `what its agent found: told in quiet hours too, its owner
 asked by voice N s before (LAMP_TOLD_WHEN_ASKED)`, hoặc `its quiet holds,
 ready N s after its owner's ask, past five minutes`. Cùng công tắc đó cho
@@ -5326,7 +5351,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lần chạy của trigger, câu sẵn sàng muộn hơn, hoặc câu giọng nói không nói
   như câu trả lời (`not said in the asking conversation (<why>), so as
   news: …`) chờ sau cổng của lần đọc (chủ đèn một mình, lượt đọc duy nhất
-  của đèn; câu trả lời tìm thấy không còn cổng này từ #7894, dưới) và được nói một lần, lần tới chủ đèn được thấy
+  của đèn; dưới, #7894) và được nói một lần, lần tới chủ đèn được thấy
   trong vòng 30 phút (`NEWS_WAIT`), nếu không thì bỏ (`skipped: <why>`);
   vào giờ yên lặng thì bỏ ngay (`skipped: quiet hours`), không bao giờ giữ
   qua giờ yên lặng. Lần chạy ngay được yêu cầu bằng giọng nói mà câu trả
@@ -5341,7 +5366,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bitcoin price skill." có câu trả lời của agent được giữ rồi bị giờ yên
   lặng giữ lại không nói. Câu trả lời trong cuộc trò chuyện đã yêu cầu
   (`answers`) chỉ dành cho câu thất bại; điều agent tìm thấy được nói ngay,
-  không qua cổng của lần đọc (#7894, dưới). Trước đây câu chờ tới một giờ để có đúng
+  không qua cổng của lần đọc, khi chủ vừa hỏi (#7894, dưới). Trước đây câu chờ tới một giờ để có đúng
   một khuôn mặt và không có giọng nói, và trên lamp-9adf (17/11, 21:11) sau
   "Fig facts is running now." không có gì nữa. Các câu: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được
