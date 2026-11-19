@@ -1733,7 +1733,11 @@ fn made_no_asks(
             Ok(first) => first,
             Err(why) => return Some(words_refused(keeping, made, &why)),
         };
-        let others: Vec<String> = crate::made_clash::found(keeping, made)
+        // Only a skill doing the same thing is replaced (#7938: on
+        // lamp-9adf a daily brief at 08:00 replaced a good morning, a good
+        // morning 3 and a water reminder, each on the lamp's clock at its
+        // own time and lighting); one that only clashes goes on beside it.
+        let others: Vec<String> = crate::made_clash::same_found(keeping, made)
             .into_iter()
             .map(|clash| clash.name)
             .filter(|name| !words.iter().any(|(skill, _)| skill == name))

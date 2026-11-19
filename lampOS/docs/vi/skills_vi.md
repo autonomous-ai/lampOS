@@ -4294,8 +4294,22 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   (`LAMP_MAKE_NO_CANNOT`) được bật ngay và vẫn đọc lại tác vụ trước lần chạy
   đầu.
 - **Trùng thì thay thế, khi chủ đèn yêu cầu.** Một lần tạo bằng giọng nói
-  không có code, trùng với kỹ năng trên đèn (`made_clash::found`), được bật
-  trước; bật không được thì không đổi gì khác. Sau đó, chỉ khi chính chủ đèn
+  không có code, trùng với kỹ năng trên đèn làm cùng một việc
+  (`made_clash::same_found`), được bật trước; bật không được thì không đổi
+  gì khác. Cùng một việc được xét theo cấu trúc, không so từ ngữ
+  (`made_clash::same_thing`, #7938): đúng các trigger đó, mỗi trigger cùng
+  điều kiện và cùng khung giờ (`during`, `days`, giờ trong ngày và các
+  ngày có thể chạy), và cùng các loại bước `[[do]]` (`say`, `light`,
+  `body`, …; không tính `after`, `on` và `if_choice`). Chỉ chung một topic,
+  một nguồn giờ, một từ hay một đầu ra thì không bao giờ làm hai kỹ năng
+  thành một: trên lamp-9adf, một daily brief lúc 08:00 đã thay good
+  morning, good morning 3 và water reminder, mỗi kỹ năng chạy theo đồng hồ
+  của đèn ở giờ riêng và đều bật đèn. Kỹ năng trùng nhưng làm việc khác
+  vẫn bật bên cạnh, và lần tạo được nói như lần tạo thường. Test
+  (`make_no_asks/tests.rs`):
+  `a_make_beside_unrelated_skills_replaces_none_of_them`,
+  `a_make_that_duplicates_one_replaces_only_that_one`. Sau đó, chỉ khi
+  chính chủ đèn
   yêu cầu (như lần tạo code, `services::owners_yes_of`; P1 của Twelve trên
   #7783), từng kỹ năng trùng đang bật (đọc tệp `off` của lamp-skills; kỹ
   năng đã tắt thì để nguyên, và không đọc được tệp thì không thay thế gì)
