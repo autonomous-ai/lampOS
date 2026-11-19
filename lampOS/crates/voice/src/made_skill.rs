@@ -10404,13 +10404,38 @@ pub(crate) fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
 /// The kept skill on the lamp whose name is `asked` ([`name_asked`]), to
 /// read it back (`make_skill_local::read_back`); none when no skill kept
 /// here and put on has that name.
+/// The name as written first ([`names_written`]), so a skill named
+/// `my-day` is found by `my-day` or "my day" even though [`name_asked`]
+/// drops the "my" (#7874).
 pub fn kept_on_named(directory: &Path, asked: &str) -> Option<Made> {
-    let asked = name_asked(asked);
-    index(directory)
+    let on: Vec<Value> = index(directory)
         .into_iter()
         .filter(|entry| entry["on"] == true)
-        .find(|entry| entry["name"].as_str() == Some(asked.as_str()))
+        .collect();
+    let named = |name: &str| {
+        on.iter()
+            .find(|entry| entry["name"].as_str() == Some(name))
+            .cloned()
+    };
+    names_written(asked)
+        .iter()
+        .find_map(|name| named(name))
+        .or_else(|| named(&name_asked(asked)))
         .and_then(|entry| made_of(directory, &entry))
+}
+
+/// A name as written ([`name_written`]), then without a "skill" after it
+/// ("My Day skill" is `my-day-skill`, then `my-day`): the exact names a
+/// kept skill is looked up by before [`name_asked`] drops a "my" (#7874).
+pub fn names_written(asked: &str) -> Vec<String> {
+    let written = name_written(asked);
+    let mut names = vec![written.clone()];
+    if let Some(cut) = written.strip_suffix("-skill")
+        && !cut.is_empty()
+    {
+        names.push(cut.to_owned());
+    }
+    names
 }
 
 /// The names of the kept skills on the lamp.
@@ -10420,6 +10445,18 @@ pub fn kept_on_names(directory: &Path) -> Vec<String> {
         .filter(|entry| entry["on"] == true)
         .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
         .collect()
+}
+
+/// A name as written, lower case, each run of anything but a letter or a
+/// digit one dash, nothing dropped ("my Day" is `my-day`): what
+/// [`name_asked`] gives before it drops a "my" or a "skill".
+pub fn name_written(asked: &str) -> String {
+    asked
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// A skill's name as the person or the model gives it, as a kept skill's
@@ -11261,6 +11298,27 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7874: a kept, on skill named `my-day` is found by its name as
+    /// written and by "my day", never looked up as `day`; `desk-check`
+    /// asked as "my desk check skill" is still found.
+    #[test]
+    fn kept_on_named_finds_a_name_starting_with_my() {
+        let (root, keeping) = crate::make_skill_local::tests::keeping("kept-my-day");
+        crate::made_remove::tests::made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (asked, name) in [
+            ("my-day", "my-day"),
+            ("my day", "my-day"),
+            ("My Day skill", "my-day"),
+            ("my desk check skill", "desk-check"),
+            ("desk-check", "desk-check"),
+        ] {
+            let found = kept_on_named(&keeping.directory, asked).map(|made| made.name);
+            assert_eq!(found.as_deref(), Some(name), "{asked}");
+        }
+        assert!(kept_on_named(&keeping.directory, "day").is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
     /// 18:10) is caught; a reminder the person asked to be told, or words

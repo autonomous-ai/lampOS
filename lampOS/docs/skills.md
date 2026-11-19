@@ -5314,6 +5314,10 @@ model is told changes: no words of the line are read. Then, in code
   three" is `good_morning_3`, "alarm twenty" `alarm_20`; none when two or
   more are, as "good morning" beside `good_morning_1` to `_3`. A name
   normalisation only, never a meaning; off, both as before.
+  A made skill found is looked up on the lamp by its name as written
+  first, nothing dropped (`made_skill::kept_on_named`,
+  `made_skill::name_written`), then without "my" or "skill", so one named
+  `my-day` is run, turned off and on, and read back as "my day" (#7874).
 - **None near: theirs offered to call again** (#7562's row on lamp-9adf,
   18 Nov 01:3x: "turn my bitcoin price skill back on" found nothing near
   btc price, and the model, told of no other, called it the lamp's own

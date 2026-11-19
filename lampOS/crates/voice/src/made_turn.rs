@@ -797,6 +797,31 @@ mod tests {
         true
     }
 
+    /// #7874 on c0a4: a made skill named `my-day` is turned off and on by
+    /// voice, never "isn't on the lamp"; `desk-check` asked as "my desk
+    /// check skill" still turns.
+    #[test]
+    fn a_made_skill_named_my_something_turns() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("turn-my-day");
+        made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (heard, name) in [
+            ("my day", "my-day"),
+            ("my-day", "my-day"),
+            ("my desk check skill", "desk-check"),
+        ] {
+            for off in [true, false] {
+                let mut helper = Vec::new();
+                let told = asked(ask(heard, off), &keeping, owner, |name, off| {
+                    helper.push((name.to_owned(), off));
+                    Ok(())
+                });
+                assert_eq!(helper, [(name.to_owned(), off)], "{heard}: {told}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     fn names(keeping: &Keeping) -> Vec<String> {
         made_skill::entries(&keeping.directory)
             .iter()
