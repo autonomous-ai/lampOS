@@ -9455,24 +9455,30 @@ reset still ask. On (`crate::make_no_asks`):
   the second began 0.76 s after the first ended and cut it short before
   any of its answer, the join refused them for want of a voice check or a
   face seen speaking both, and the second line, asked alone, turned an
-  older skill, time for tea, off). On the second route, a line that began
-  within the join's 3 s (`JOIN_WITHIN`) of words cut short just before it,
-  none of their answer heard, not joined to it and not told apart from
-  it (the lamp's name alone and words carried through a held line aside;
-  never when the join's verdict was two voices by their prints or two
-  faces seen speaking them, `Joined::told_apart`), has every `make_skill`
-  call that acts on a skill (a make, `turn_off`, `turn_on`, `remove`,
-  `undo` or `run`) in the first chat round that makes one not run: each
-  is told those words (`make_no_asks::split_told`), so `[turn_off, make]`
-  in one round runs neither. The model judges whether the line goes on
-  with them (`make_no_asks::SPLIT_NEXT`): if so the two are one ask, all
-  of it done with both lines' words, a skill made with the whole ask as
-  its request, and no skill turned off, on, removed, undone or run for
-  words that only describe it; "If it is its own ask, make the call again
-  as it was." The calls of any later round run: one held round per line,
-  never a list of words. A line with nothing cut just before it, one past
-  the 3 s, one joined, or one told apart, is as before, with no extra
-  round or wait; the hold costs one model round only on such a line.
+  older skill, time for tea, off; and on 20 Nov, 01:01, "Lamp, make a
+  skill called tea reminder: every afternoon at three, remind me to drink
+  a cup of green tea." came as three lines, the last asked alone, its
+  first call `list_reminders`, and the make was lost). On the second
+  route, a line that began within the join's 3 s (`JOIN_WITHIN`) of words
+  cut short just before it, none of their answer heard, not joined to it
+  and not told apart from it (the lamp's name alone, words carried through
+  a held line, and words told first as another person's cut in their
+  pause's grace aside; never when the join's verdict was two voices by
+  their prints or two faces seen speaking them, `Joined::told_apart`), is
+  told those words beside its own in its first chat round
+  (`make_no_asks::split_note`), whatever the model calls first. A chain
+  counts: when the cut line had itself been told words cut short just
+  before it, those come first, oldest first, each link within the 3 s and
+  the whole within the chain's 20 s (`CHAIN_MOST_FOR`). The model judges
+  whether the line goes on with them (`make_no_asks::SPLIT_NEXT`): if so
+  they are one ask, all of it done with every line's words, a skill made
+  with the whole ask as its request, and no skill turned off, on, removed,
+  undone or run for words that only describe it; "If it is its own ask,
+  answer it as it was said." Its calls run as they come, never a list of
+  words. A line with nothing cut just before it, one past the 3 s, one
+  joined, or one told apart, is as before, with no note, no extra round
+  and no wait; a split line is told in the round it is asked anyway, so it
+  costs no extra model round either, only the note's words.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.

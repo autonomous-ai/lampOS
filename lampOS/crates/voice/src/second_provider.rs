@@ -2147,11 +2147,11 @@ struct Shared {
     /// (`LAMP_CUT_ASK_ANSWERED`): still set when [`answer`] returns, its
     /// answer only declined, and they are answered in its place.
     declined_in_place: Mutex<Option<u64>>,
-    /// The words cut short just before a spoken line, none of their answer
-    /// heard and not joined to it, the line begun within [`JOIN_WITHIN`]
-    /// of their end (#7976, with `LAMP_MAKE_NO_ASKS`): its first
-    /// `make_skill` call that acts on a skill, and every other one of that
-    /// round, is told them in place of its answer ([`split_held`]).
+    /// The words cut short just before the last spoken line, none of their
+    /// answer heard and not joined to it, the line begun within
+    /// [`JOIN_WITHIN`] of their end (#7976, with `LAMP_MAKE_NO_ASKS`): told
+    /// beside its words in its first chat round, and kept so a line that
+    /// cuts it short in turn is told them too ([`keep_split_before`]).
     split_before: Mutex<Option<SplitBefore>>,
     /// The words cut short and the line that cut them, by request, when
     /// the join's verdict told the two apart: two faces seen speaking them,
@@ -12751,14 +12751,6 @@ async fn spoken(
         }
         None => (text, None, vec![own]),
     };
-    // Words cut short just before it and not joined (#7976): its first
-    // make_skill call that acts on a skill is told them. One lock, no I/O.
-    keep_split_before(
-        &shared,
-        request,
-        &marks,
-        carried.as_ref().filter(|_| !the_name_refused),
-    );
     // Words not joined, a person's ask, kept while this line is answered:
     // answered in its place if its answer only declines
     // (`LAMP_CUT_ASK_ANSWERED`, #5961). Never the name, nor words said to a
@@ -12795,6 +12787,15 @@ async fn spoken(
         );
     }
     let cut_told = cut_in_the_grace.is_some();
+    // Words cut short just before it and not joined (#7976): told beside
+    // its words in its first round, whatever the model calls first, never
+    // words told above as another person's. One lock, no I/O.
+    let split = keep_split_before(
+        &shared,
+        request,
+        &marks,
+        carried.as_ref().filter(|_| !the_name_refused && !cut_told),
+    );
     let earlier_parts: Vec<Part> = kept_earlier
         .into_iter()
         .chain(
@@ -13221,6 +13222,7 @@ async fn spoken(
     let mut notes: Vec<String> = stopped
         .into_iter()
         .chain(earlier)
+        .chain(split)
         .chain(pushed)
         .chain(misheard)
         .chain(staff)
@@ -14582,82 +14584,85 @@ async fn said_by_the_name(
 }
 
 /// Words cut short just before spoken line `request`, not joined to it
-/// ([`Shared::split_before`], #7976): those words, how long after their
-/// end the line began, and the chat round whose calls were held for them.
-#[derive(Debug)]
+/// ([`Shared::split_before`], #7976): their parts, oldest first, with any
+/// told the line they came from in turn, and how long after their end the
+/// line began.
+#[derive(Clone)]
 struct SplitBefore {
     request: u64,
-    words: String,
+    parts: Vec<Part>,
     gap: Duration,
-    held_round: Option<usize>,
 }
 
-/// Keeps for spoken line `request` the words `carried` it cut short
+/// The note for spoken line `request` of the words `carried` it cut short
 /// and was not joined to, when they were that line's own and the line just
 /// before it, `request` begun within [`JOIN_WITHIN`] of their end, and they
-/// were more than the lamp's name: a split line, whose first half is not
-/// in the model's words (#7976). Only when nothing told the two lines
-/// apart: words a voice print or two speaking faces showed another
-/// person's ([`Shared::cut_told_apart`]) are never held for. Anything
-/// else, or the switch off, keeps none.
-fn keep_split_before(shared: &Shared, request: u64, marks: &Marks, carried: Option<&Carried>) {
+/// were more than the lamp's name: a split line, whose first part is not
+/// in the model's words (#7976). Told beside its words in its first chat
+/// round, so the model judges whether they are one ask whatever it calls
+/// first. A chain counts: when the cut line was itself told words cut
+/// short just before it, those come first, oldest first, each link within
+/// the join's window and the whole within [`CHAIN_MOST_FOR`]. Only when
+/// nothing told the two lines apart: words a voice print or two speaking
+/// faces showed another person's ([`Shared::cut_told_apart`]) are never
+/// told. Anything else, or the switch off, tells none and keeps none.
+fn keep_split_before(
+    shared: &Shared,
+    request: u64,
+    marks: &Marks,
+    carried: Option<&Carried>,
+) -> Option<String> {
     let apart = shared
         .cut_told_apart
         .lock()
         .ok()
         .and_then(|mut apart| apart.take());
+    let Ok(mut kept) = shared.split_before.lock() else {
+        return None;
+    };
+    let before = kept.take();
+    let now = (shared.clock)();
     let split = carried
         .filter(|carried| carried.said_by == carried.request)
         .filter(|carried| apart != Some((carried.request, request)))
         .filter(|_| crate::make_no_asks::on())
         .and_then(|carried| {
             let (_, gap) = marks.after_end.filter(|(of, _)| *of == carried.request)?;
-            let words = carried.text();
+            let mut parts: Vec<Part> = before
+                .filter(|before| before.request == carried.request)
+                .map(|before| before.parts)
+                .unwrap_or_default();
+            parts.retain(|part| now.saturating_duration_since(part.at) <= CHAIN_MOST_FOR);
+            parts.extend(carried.parts.iter().cloned());
+            let words = words_of(&parts);
             (gap <= JOIN_WITHIN
                 && words.chars().any(char::is_alphanumeric)
                 && !name_alone(&words)
                 && !crate::attention::only_the_name(&words))
             .then_some(SplitBefore {
                 request,
-                words,
+                parts,
                 gap,
-                held_round: None,
             })
         });
-    if let Ok(mut kept) = shared.split_before.lock() {
-        *kept = split;
-    }
-}
-
-/// What `request`'s `call` in chat round `round` is told in place of its
-/// answer, never run: each `make_skill` call that acts on a skill in the
-/// first round that made one, when the line went on from words cut short
-/// just before it ([`keep_split_before`]). So `[turn_off, make]` in one
-/// round runs neither, never a half ask made beside the held one (Heron's
-/// P2 on #7990). One round a line: told those words, the model judges
-/// whether the two are one ask, and the calls it makes after run (#7976).
-fn split_held(
-    shared: &Shared,
-    (request, round): (u64, usize),
-    call: &net::ToolCall,
-) -> Option<Value> {
-    if call.name != crate::made_skill::MAKE
-        || !crate::make_no_asks::on()
-        || !crate::make_no_asks::acts_on_a_skill(&call.args)
-    {
-        return None;
-    }
-    let mut kept = shared.split_before.lock().ok()?;
-    let split = kept.as_mut().filter(|split| {
-        split.request == request && split.held_round.is_none_or(|held| held == round)
-    })?;
-    split.held_round = Some(round);
+    kept.clone_from(&split);
+    drop(kept);
+    let split = split?;
+    let said: Vec<&str> = split
+        .parts
+        .iter()
+        .map(|part| part.text.trim())
+        .filter(|text| !text.is_empty())
+        .collect();
     eprintln!(
-        "lamp-voice second: request {request} chat round {round}: its make_skill call is not run: it began {} ms after words cut short just before it, not joined to it ({} words); the model is told them, to judge whether the two are one ask (#7976)",
-        split.gap.as_millis(),
-        split.words.split_whitespace().count()
+        "lamp-voice second: request {request}: told the words cut short just before it, not joined to it ({} line(s), {} words; it began {} ms after them): the model judges whether they are one ask (#7976)",
+        said.len(),
+        said.iter()
+            .map(|text| text.split_whitespace().count())
+            .sum::<usize>(),
+        split.gap.as_millis()
     );
-    Some(crate::make_no_asks::split_told(&split.words, split.gap))
+    Some(crate::make_no_asks::split_note(&said, split.gap))
 }
 
 /// `text`, the words of `request`, let out or held (`let_out`), and
@@ -23342,14 +23347,6 @@ async fn answer(
                     ask_once_forget(shared, request, heard, &heard_words, call, scope.as_ref())
                         .await
                 {
-                    messages.push(Message::tool(call.id.clone(), told.to_string()));
-                    continue;
-                }
-                // A line that went on from words cut short just before it,
-                // not joined (#7976): its calls acting on a skill in the
-                // first round with one are told them, never run; the model
-                // judges.
-                if heard && let Some(told) = split_held(shared, (request, round), call) {
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
