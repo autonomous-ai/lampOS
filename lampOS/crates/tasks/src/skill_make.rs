@@ -166,6 +166,12 @@ pub struct MakeLine {
     /// without it, [`MOST_WITHIN`] as before.
     #[serde(default)]
     pub may_run_on: bool,
+    /// #7224, fault 5: the voice make's own id, the same on every hand-over
+    /// of that make (its repairs too, and the make again after a restart of
+    /// its route): what its outcome is kept by when the voice is gone
+    /// ([`KeptOutcomes`]). Without it nothing is kept, as before.
+    #[serde(default)]
+    pub make_id: Option<String>,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -258,6 +264,9 @@ impl MakeLine {
         }
         // The switches are for the guide's check alone: without the guide
         // the run is told to run nothing.
+        if make.make_id.as_deref().is_some_and(|id| !is_make_id(id)) {
+            return Err(("bad_request", "make_id is not a make's id".into()));
+        }
         if make.switches.is_some() && !make.guide {
             return Err((
                 "bad_request",
@@ -270,6 +279,18 @@ impl MakeLine {
     pub fn within(&self) -> Duration {
         Duration::from_millis(self.within_ms)
     }
+}
+
+/// The most bytes of a make's id.
+pub const MOST_MAKE_ID_BYTES: usize = 64;
+
+/// Whether `id` is a make's id: 1 to [`MOST_MAKE_ID_BYTES`] ASCII letters,
+/// digits, `-` or `_`.
+pub fn is_make_id(id: &str) -> bool {
+    (1..=MOST_MAKE_ID_BYTES).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// The run's words: where the rules are and the one file to write.
@@ -2034,9 +2055,10 @@ impl MakeHandOvers {
             write_answer(stream, &answered);
             return;
         }
-        // The make's rules, as the voice asks it again after a restart of
-        // its route (#7224, fault 5): what an outcome is kept by.
-        let rules = rules_of(&line);
+        // The voice make's own id, the same on its repairs and when it is
+        // asked again after a restart of its route (#7224, fault 5): what
+        // its outcome is kept by. Never the rules, which a repair changes.
+        let id = make_id_of(&line);
         if running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
@@ -2044,15 +2066,15 @@ impl MakeHandOvers {
             // The same make asked again while it is made: its voice was
             // restarted and asks it once more. It waits for the one being
             // made and takes its outcome, never a second run.
-            if let Some(rules) = rules.as_deref()
-                && kept.is_running(rules)
+            if let Some(id) = id.as_deref()
+                && kept.is_running(id)
             {
                 eprintln!(
                     "[lamp-tasks] skill make: the make being made is asked again (its voice was restarted): its outcome is waited for"
                 );
                 write_answer(stream, &json!({"ok": true, "started": true}));
-                match kept.wait_taken(rules, running, JOIN_WAIT, JOIN_TICK) {
-                    Some(answered) => give(stream, kept, rules, answered),
+                match kept.wait_taken(id, running, JOIN_WAIT, JOIN_TICK) {
+                    Some(answered) => give(stream, kept, id, answered),
                     None => {
                         let _ = try_write_answer(stream, &refusal("no_answer", NO_ANSWER));
                     }
@@ -2066,17 +2088,17 @@ impl MakeHandOvers {
         let place = Place(running);
         // An outcome kept for a voice that was gone as it came: given now,
         // once, with no run of its own.
-        if let Some(rules) = rules.as_deref()
-            && let Some(answered) = kept.take(rules, std::time::Instant::now())
+        if let Some(id) = id.as_deref()
+            && let Some(answered) = kept.take(id, std::time::Instant::now())
         {
             drop(place);
             eprintln!(
                 "[lamp-tasks] skill make: a make's outcome kept while its voice was gone is given now"
             );
-            give(stream, kept, rules, answered);
+            give(stream, kept, id, answered);
             return;
         }
-        kept.set_running(rules.clone());
+        kept.set_running(id.clone());
         let answered = answer_with(
             &line,
             true,
@@ -2090,8 +2112,8 @@ impl MakeHandOvers {
         eprintln!("{}", journal_line(&answered));
         // Kept, if its voice is gone, before the place is let go: the same
         // make asked again waits for that ([`KeptOutcomes::wait_taken`]).
-        match rules.as_deref() {
-            Some(rules) => give(stream, kept, rules, answered),
+        match id.as_deref() {
+            Some(id) => give(stream, kept, id, answered),
             None => write_answer(stream, &answered),
         }
         kept.set_running(None);
@@ -2109,26 +2131,30 @@ pub const KEPT_FOR: Duration = Duration::from_secs(30 * 60);
 /// The most outcomes kept at once; the oldest goes first.
 pub const MOST_KEPT: usize = 4;
 
-/// The `rules` of a make's line, if it has them: what a kept outcome is
-/// matched by. Never journaled.
-fn rules_of(line: &[u8]) -> Option<String> {
+/// The `make_id` of a make's line, if it has a well-formed one: what a
+/// kept outcome is matched by.
+fn make_id_of(line: &[u8]) -> Option<String> {
     let value: Value = serde_json::from_slice(line).ok()?;
     if value["op"] != "skill_make" {
         return None;
     }
-    value["rules"].as_str().map(str::to_owned)
+    value["make_id"]
+        .as_str()
+        .filter(|id| is_make_id(id))
+        .map(str::to_owned)
 }
 
-/// `answered` written to the voice, or kept by its `rules` when the voice
-/// is gone (a route restarted in its pid, #7224 fault 5: `Broken pipe`),
-/// for the same make asked again.
-fn give(stream: &UnixStream, kept: &KeptOutcomes, rules: &str, answered: Value) {
+/// `answered` written to the voice, or kept by its make's `id` when the
+/// voice is gone (a route restarted in its pid, #7224 fault 5: `Broken
+/// pipe`), for the same make asked again. A refusal is kept too: the make
+/// asked again is told it, as it would have been.
+fn give(stream: &UnixStream, kept: &KeptOutcomes, id: &str, answered: Value) {
     if let Err(error) = try_write_answer(stream, &answered) {
         eprintln!(
             "[lamp-tasks] skill make: the voice was gone as its outcome came ({error}): kept for the same make asked again, at most {} min",
             KEPT_FOR.as_secs() / 60
         );
-        kept.keep(rules.to_owned(), answered, std::time::Instant::now());
+        kept.keep(id.to_owned(), answered, std::time::Instant::now());
     }
 }
 
@@ -2141,13 +2167,13 @@ fn try_write_answer(mut stream: &UnixStream, answer: &Value) -> std::io::Result<
 }
 
 /// The outcomes of makes whose voice was gone as they came, in lamp-tasks'
-/// memory only (never on disk), each with its rules: given once to the
+/// memory only (never on disk), each by its make's id: given once to the
 /// same make asked again within [`KEPT_FOR`], at most [`MOST_KEPT`]; and
-/// the rules of the make being made.
+/// the id of the make being made.
 #[derive(Default)]
 pub struct KeptOutcomes(std::sync::Mutex<KeptState>);
 
-/// A kept outcome: its make's rules, the outcome and when it came.
+/// A kept outcome: its make's id, the outcome and when it came.
 type Kept = (String, Value, std::time::Instant);
 
 #[derive(Default)]
@@ -2163,35 +2189,35 @@ impl KeptOutcomes {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// The rules of the make being made now; none once it ended.
-    pub fn set_running(&self, rules: Option<String>) {
-        self.state().running = rules;
+    /// The id of the make being made now; none once it ended.
+    pub fn set_running(&self, id: Option<String>) {
+        self.state().running = id;
     }
 
-    /// Whether the make being made has `rules`.
-    pub fn is_running(&self, rules: &str) -> bool {
-        self.state().running.as_deref() == Some(rules)
+    /// Whether the make being made has `id`.
+    pub fn is_running(&self, id: &str) -> bool {
+        self.state().running.as_deref() == Some(id)
     }
 
-    /// `answered` kept for `rules` at `now`: one per rules, the newest
+    /// `answered` kept for `id` at `now`: one per id, the newest
     /// [`MOST_KEPT`].
-    pub fn keep(&self, rules: String, answered: Value, now: std::time::Instant) {
+    pub fn keep(&self, id: String, answered: Value, now: std::time::Instant) {
         let mut state = self.state();
-        state.kept.retain(|(kept, ..)| *kept != rules);
-        state.kept.push_back((rules, answered, now));
+        state.kept.retain(|(kept, ..)| *kept != id);
+        state.kept.push_back((id, answered, now));
         while state.kept.len() > MOST_KEPT {
             state.kept.pop_front();
         }
     }
 
-    /// The outcome kept for `rules`, taken: given once. Any kept past
+    /// The outcome kept for `id`, taken: given once. Any kept past
     /// [`KEPT_FOR`] at `now` is dropped first.
-    pub fn take(&self, rules: &str, now: std::time::Instant) -> Option<Value> {
+    pub fn take(&self, id: &str, now: std::time::Instant) -> Option<Value> {
         let mut state = self.state();
         state
             .kept
             .retain(|(.., at)| now.saturating_duration_since(*at) <= KEPT_FOR);
-        let at = state.kept.iter().position(|(kept, ..)| kept == rules)?;
+        let at = state.kept.iter().position(|(kept, ..)| kept == id)?;
         state.kept.remove(at).map(|(_, answered, _)| answered)
     }
 
@@ -2205,24 +2231,24 @@ impl KeptOutcomes {
         self.len() == 0
     }
 
-    /// The outcome of the make being made with `rules`, waited for while it
+    /// The outcome of the make being made with `id`, waited for while it
     /// is made (`running`), at most `within`, looked at every `tick`:
     /// taken once it is kept, none if it never is.
     fn wait_taken(
         &self,
-        rules: &str,
+        id: &str,
         running: &AtomicBool,
         within: Duration,
         tick: Duration,
     ) -> Option<Value> {
         let began = std::time::Instant::now();
         loop {
-            if let Some(answered) = self.take(rules, std::time::Instant::now()) {
+            if let Some(answered) = self.take(id, std::time::Instant::now()) {
                 return Some(answered);
             }
-            let made = !running.load(Ordering::Acquire) || !self.is_running(rules);
+            let made = !running.load(Ordering::Acquire) || !self.is_running(id);
             if made || began.elapsed() >= within {
-                return self.take(rules, std::time::Instant::now());
+                return self.take(id, std::time::Instant::now());
             }
             std::thread::sleep(tick);
         }
@@ -3579,12 +3605,20 @@ mod tests {
     }
 
     /// The make's line sent on a new connection, its lines read back.
-    fn asked(socket: &Path, rules: &str) -> std::io::Lines<BufReader<UnixStream>> {
+    fn asked(
+        socket: &Path,
+        rules: &str,
+        id: Option<&str>,
+    ) -> std::io::Lines<BufReader<UnixStream>> {
         let mut stream = UnixStream::connect(socket).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(20)))
             .unwrap();
-        stream.write_all(&line(rules, 2_000)).unwrap();
+        let mut sent: Value = serde_json::from_slice(&line(rules, 2_000)).unwrap();
+        if let Some(id) = id {
+            sent["make_id"] = json!(id);
+        }
+        stream.write_all(sent.to_string().as_bytes()).unwrap();
         stream.write_all(b"\n").unwrap();
         BufReader::new(stream).lines()
     }
@@ -3601,10 +3635,12 @@ mod tests {
         }
     }
 
-    /// #7224, fault 5: the voice's route restarts during a make, so its
-    /// connection is gone as the outcome comes (`Broken pipe`). The outcome
-    /// is kept, and the same make asked again after the restart is given
-    /// it at once, with no second run; then it is gone, given once.
+    /// #7224, fault 5: the voice's route restarts during a make's second
+    /// repair round, so its connection is gone as the outcome comes
+    /// (`Broken pipe`). The outcome is kept by the make's id, and the make
+    /// asked again after the restart, from its first brief (other rules),
+    /// is given the repair's outcome at once, with no busy line and no
+    /// second run; then it is gone, given once.
     #[test]
     fn a_route_restarted_during_a_make_gets_its_outcome_once() {
         let dir = tempfile::Builder::new()
@@ -3613,7 +3649,7 @@ mod tests {
             .tempdir()
             .unwrap();
         let (socket, go, runs, stop, handle) = gated_socket(dir.path());
-        let mut first = asked(&socket, "R");
+        let mut first = asked(&socket, "R REPAIR 2", Some("7-1700000000000"));
         assert_eq!(next(&mut first), json!({"ok": true, "started": true}));
         // The route restarts: its end of the make is gone.
         drop(first);
@@ -3626,7 +3662,7 @@ mod tests {
                 && !dir.path().join("work").read_dir().unwrap().any(|_| true)
         });
         std::thread::sleep(Duration::from_millis(100));
-        let mut again = asked(&socket, "R");
+        let mut again = asked(&socket, "R", Some("7-1700000000000"));
         // Asked while the first was still letting go, it waited for it:
         // its started line, then the same kept outcome.
         let mut given = next(&mut again);
@@ -3637,7 +3673,7 @@ mod tests {
         assert_eq!(runs.load(Ordering::Acquire), 1, "no second run");
         drop(again);
         // Given once: the same make asked a third time is made anew.
-        let mut third = asked(&socket, "R");
+        let mut third = asked(&socket, "R", Some("7-1700000000000"));
         assert_eq!(next(&mut third), json!({"ok": true, "started": true}));
         assert_eq!(next(&mut third), json!({"ok": true, "answer": "A"}));
         assert_eq!(runs.load(Ordering::Acquire), 2);
@@ -3645,9 +3681,10 @@ mod tests {
         handle.join().unwrap();
     }
 
-    /// The restarted route asks the same make while it is still made: it
-    /// waits for that one's outcome, never refused busy, never run twice.
-    /// Another make meanwhile is still refused busy.
+    /// The restarted route asks the same make (its id) while it is still
+    /// made, a repair round with other rules: it waits for that one's
+    /// outcome, not refused busy, not run twice. Another make meanwhile is
+    /// still refused busy.
     #[test]
     fn the_same_make_asked_again_while_made_waits_for_it() {
         let dir = tempfile::Builder::new()
@@ -3656,13 +3693,17 @@ mod tests {
             .tempdir()
             .unwrap();
         let (socket, go, runs, stop, handle) = gated_socket(dir.path());
-        let mut first = asked(&socket, "R");
+        let mut first = asked(&socket, "R REPAIR 2", Some("m1"));
         assert_eq!(next(&mut first), json!({"ok": true, "started": true}));
         drop(first);
-        let mut other = asked(&socket, "OTHER");
+        // Another make, and a make with no id, are still refused busy.
+        let mut other = asked(&socket, "R", Some("m2"));
         assert_eq!(next(&mut other)["error"], "busy");
         drop(other);
-        let mut again = asked(&socket, "R");
+        let mut bare = asked(&socket, "R REPAIR 2", None);
+        assert_eq!(next(&mut bare)["error"], "busy");
+        drop(bare);
+        let mut again = asked(&socket, "R", Some("m1"));
         assert_eq!(next(&mut again), json!({"ok": true, "started": true}));
         go.store(true, Ordering::Release);
         assert_eq!(next(&mut again), json!({"ok": true, "answer": "A"}));
@@ -3671,7 +3712,44 @@ mod tests {
         handle.join().unwrap();
     }
 
-    /// A kept outcome is given once, only to its own rules, and dropped
+    /// A make with no id (the app's MAKE IT, an older voice) keeps nothing
+    /// when its voice is gone: the next is made anew, as before. A make's
+    /// id is checked whole.
+    #[test]
+    fn a_make_with_no_id_keeps_nothing() {
+        let dir = tempfile::Builder::new()
+            .prefix("tmn-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let (socket, go, runs, stop, handle) = gated_socket(dir.path());
+        let mut first = asked(&socket, "R", None);
+        assert_eq!(next(&mut first), json!({"ok": true, "started": true}));
+        drop(first);
+        go.store(true, Ordering::Release);
+        until(|| {
+            runs.load(Ordering::Acquire) == 1
+                && !dir.path().join("work").read_dir().unwrap().any(|_| true)
+        });
+        std::thread::sleep(Duration::from_millis(100));
+        let mut again = asked(&socket, "R", None);
+        let mut given = next(&mut again);
+        if given["error"] == "busy" {
+            std::thread::sleep(Duration::from_millis(200));
+            again = asked(&socket, "R", None);
+            given = next(&mut again);
+        }
+        assert_eq!(given, json!({"ok": true, "started": true}));
+        assert_eq!(next(&mut again), json!({"ok": true, "answer": "A"}));
+        assert_eq!(runs.load(Ordering::Acquire), 2);
+        let mut bad = asked(&socket, "R", Some("../x"));
+        assert_eq!(next(&mut bad)["error"], "bad_request");
+        assert!(is_make_id("7-1700000000000") && !is_make_id("") && !is_make_id(&"a".repeat(65)));
+        stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+    }
+
+    /// A kept outcome is given once, only to its own id, and dropped
     /// past [`KEPT_FOR`]; at most [`MOST_KEPT`] are kept, the oldest going.
     #[test]
     fn kept_outcomes_are_given_once_and_expire() {

@@ -1013,11 +1013,14 @@ agent (`lamp_tasks::skill_make`).
   giữa chừng để lại (`skill_make::sweep`).
 - **Voice đã mất khi kết quả đến** (#7224, lỗi 5): khi ghi kết quả của một
   lần tạo thất bại (tuyến khởi động lại, `Broken pipe`), kết quả được giữ chỉ
-  trong bộ nhớ của lamp-tasks, theo rules của lần tạo, tối đa 4 trong 30 phút
-  (`KeptOutcomes`), và trao một lần cho cùng lần tạo được hỏi lại, ngay lập
-  tức, không chạy lại; cùng lần tạo được hỏi khi vẫn đang tạo sẽ chờ kết quả
-  của lần đó, không bao giờ bị từ chối `busy`. Kết quả voice đã nhận thì không
-  bao giờ được giữ. Xem skills_vi.md, "Một lần tạo vẫn còn sau khi tuyến khởi
+  trong bộ nhớ của lamp-tasks, theo `make_id` của dòng (id riêng của lần tạo
+  bằng giọng nói, giống nhau ở các lần sửa; dòng không có id thì không giữ gì),
+  tối đa 4 trong 30 phút (`KeptOutcomes`), và trao một lần cho cùng lần tạo
+  được hỏi lại, ngay lập tức, không chạy lại, kể cả lời từ chối; cùng lần tạo
+  được hỏi khi vẫn đang tạo (kể cả một lần sửa) sẽ chờ kết quả của lần đó,
+  không bị từ chối `busy`. Kết quả voice đã nhận thì không bao giờ được giữ.
+  `make_id` gồm 1 đến 64 chữ cái ASCII, chữ số, `-` hoặc `_` (`is_make_id`),
+  nếu không thì `bad_request`. Xem skills_vi.md, "Một lần tạo vẫn còn sau khi tuyến khởi
   động lại".
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
