@@ -604,6 +604,15 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
     walk_agents(root, true, &mut Vec::new())
 }
 
+/// [`forget_agents`], with `check` run on the new `openclaw.json` before
+/// it is renamed into place (#7868).
+pub fn forget_agents_checked(
+    root: &Path,
+    _check: &mut dyn FnMut(&Path) -> Result<(), String>,
+) -> io::Result<usize> {
+    forget_agents(root)
+}
+
 /// What [`forget_agents`] would do under `root`, one step an entry, with
 /// nothing changed (`lamp-setup forget-agents --dry-run`): the same walk and
 /// the same decisions, only not acted on, so the listing cannot drift from
