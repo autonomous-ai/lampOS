@@ -52,6 +52,20 @@ from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal, move_why
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
 
+# The fake's pose (`pose`): one person standing in a 640x480 picture, the 17
+# COCO keypoints in COCO order, as lamp-npu answers whatever model it runs.
+FAKE_POSE = {
+    "score": 0.87,
+    "keypoints": [
+        {"x": x, "y": y, "score": 0.9}
+        for x, y in (
+            (320.0, 100.0), (330.0, 90.0), (310.0, 90.0), (340.0, 95.0), (300.0, 95.0),
+            (360.0, 160.0), (280.0, 160.0), (380.0, 230.0), (260.0, 230.0), (390.0, 300.0), (250.0, 300.0),
+            (345.0, 300.0), (295.0, 300.0), (350.0, 380.0), (290.0, 380.0), (352.0, 460.0), (288.0, 460.0),
+        )
+    ],
+}
+
 # The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
 # 320 samples, mono, 16 kHz, S16LE.
 AUDIO_RATE = 16_000
@@ -669,6 +683,11 @@ class FakeLamp:
         # The picture `camera.snapshot` and a stream's frames carry: the
         # smallest whole JPEG unless a test sets a real one (`fake.picture = jpeg`).
         self.picture: bytes = FAKE_JPEG
+        # What `pose` answers for any JPEG: the person (None for nobody), the
+        # picture's size and the model, unless a test sets its own.
+        self.pose: dict | None = FAKE_POSE
+        self.pose_size: tuple[int, int] = (640, 480)
+        self.pose_model = "fake-movenet"
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
@@ -1377,6 +1396,7 @@ class FakeLamp:
             "sound": ["speak"],
             "camera.snapshot": ["camera"],
             "camera.stream": ["camera"],
+            "pose": ["camera"],
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
@@ -1926,6 +1946,27 @@ class FakeLamp:
                     block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
                 )
                 self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
+        elif op == "pose":
+            # As lamp-control's pose: a JPEG of the computer's own, never
+            # while private; the fake runs no model and answers `self.pose`.
+            # `refuse_next("pose", "preparing", ..., 2000)` and the like stand
+            # for the lamp's NPU states.
+            try:
+                picture = base64.b64decode(request.get("jpeg", ""), validate=True)
+            except ValueError:
+                picture = b""
+            if self.state["lamp"]["private"]:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "private", "the lamp is private")
+            elif not picture.startswith(b"\xff\xd8"):
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "bad_request", "jpeg: not a JPEG")
+            else:
+                width, height = self.pose_size
+                await self._ok(
+                    ws, id_, pose=self.pose, width=width, height=height, model=self.pose_model,
+                    ms={"decode": 0.0, "npu": 0.0, "post": 0.0, "total": 0.0},
+                )
         elif op == "speaker.stream":
             await self._speaker_stream(ws, client, id_, request)
         else:

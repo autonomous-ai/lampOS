@@ -45,5 +45,16 @@ without it, the calls are refused, or the `camera` grant can't be given.
   a stream ends with `camera.ended` ("the ring is not showing the camera's
   mark") and a snapshot is refused the same way. Handle it; don't retry in a
   loop.
+- **A pose (in development: unit tests only, not yet on a lamp, last
+  verified 2026-11-19):** Python `await lamp.pose(jpeg)`, JS
+  `await lamp.pose(jpeg)` (a Buffer), sends a JPEG of your own (a frame you
+  have, at most 45 KiB: a 640x480 frame at ordinary quality fits) to the
+  lamp's NPU and returns `pose` (`score` and the 17 COCO `keypoints`, each
+  `x`, `y` in your picture's pixels and `score`; null with no person),
+  `width`, `height`, `model` and `ms`. The same `camera` grant, the same
+  local-only and private rules. Off unless the lamp's `LAMP_NPU` switch is
+  on (`off`); `preparing` with `retry_ms` while the lamp fetches its model on
+  first use; `unavailable` with no model or no NPU; `rate` (15 a second, 5
+  warm, 1 hot) and `busy`, each with `retry_ms`. lamp-mcp has no pose tool.
 - **The microphone** comes the same way, with its own grant:
   [api.md](api.md#the-microphone).

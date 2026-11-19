@@ -30,6 +30,16 @@ const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
 // The fake's camera picture: the smallest whole JPEG (start and end markers).
 export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+// The fake's pose (`pose`): one person standing in a 640x480 picture, the 17
+// COCO keypoints in COCO order, as lamp-npu answers whatever model it runs.
+export const FAKE_POSE = Object.freeze({
+  score: 0.87,
+  keypoints: [
+    [320, 100], [330, 90], [310, 90], [340, 95], [300, 95],
+    [360, 160], [280, 160], [380, 230], [260, 230], [390, 300], [250, 300],
+    [345, 300], [295, 300], [350, 380], [290, 380], [352, 460], [288, 460],
+  ].map(([x, y]) => ({ x, y, score: 0.9 })),
+});
 
 // The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
 // 320 samples, mono, 16 kHz, S16LE.
@@ -512,6 +522,11 @@ export class FakeLamp {
     // The picture `camera.snapshot` and a stream's frames carry: the smallest whole JPEG
     // unless a test sets a real one (`fake.picture = buffer`).
     this.picture = FAKE_JPEG;
+    // What `pose` answers for any JPEG: the person (null for nobody), the
+    // picture's size and the model, unless a test sets its own.
+    this.pose = FAKE_POSE;
+    this.poseSize = [640, 480];
+    this.poseModel = 'fake-movenet';
     // Each connection whose head follows the hand (`look` at `hand`) and its
     // lease, until its stop, another look, or the lease ends; and the last
     // hand said.
@@ -1146,7 +1161,7 @@ export class FakeLamp {
     // A turn speaks and hears what is said to the lamp.
     return {
       express: ['body', 'light'], light: ['light'],
-      'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
+      'camera.snapshot': ['camera'], 'camera.stream': ['camera'], pose: ['camera'],
       'microphone.stream': ['microphone'], 'speaker.stream': ['speaker'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
@@ -1390,6 +1405,17 @@ export class FakeLamp {
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
         ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0, fps_now: null }));
         return undefined;
+      case 'pose': {
+        // As lamp-control's pose: a JPEG of the computer's own, never while
+        // private; the fake runs no model and answers `this.pose`.
+        // `refuseNext('pose', 'preparing', ..., 2000)` and the like stand for
+        // the lamp's NPU states.
+        if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'the lamp is private');
+        const picture = typeof request.jpeg === 'string' && /^[A-Za-z0-9+/=]+$/.test(request.jpeg) ? Buffer.from(request.jpeg, 'base64') : Buffer.alloc(0);
+        if (picture.length < 2 || picture[0] !== 0xff || picture[1] !== 0xd8) return this.refuse(ws, id, 'bad_request', 'jpeg: not a JPEG');
+        const [width, height] = this.poseSize;
+        return this.ok(ws, id, { pose: this.pose, width, height, model: this.poseModel, ms: { decode: 0, npu: 0, post: 0, total: 0 } });
+      }
       case 'microphone.stream':
         // As lamp-control's microphone.rs: on again replaces it, off ends it
         // with no event, and none while the lamp is private.
