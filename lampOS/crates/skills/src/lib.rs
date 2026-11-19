@@ -13908,6 +13908,11 @@ mod tests {
         let from =
             || package::task_asks(&root, Some(&dev), "pushed-booth").unwrap()["from"].clone();
         assert_eq!(from(), "your computer");
+        // A push is read back whole (Twelve's HOLD on #7969).
+        assert_eq!(
+            package::task_asks(&root, Some(&dev), "pushed-booth").unwrap()["made_here"],
+            false
+        );
         std::fs::write(folder.join(PUSHED_FROM), r#"{"computer":"desk-mac"}"#).unwrap();
         assert_eq!(from(), "your computer desk-mac");
         // A pushed-from file naming nobody is as none.
