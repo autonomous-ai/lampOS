@@ -87,9 +87,16 @@ const MOST_HELD: usize = 7_200;
 /// it reads off the bus in, the voice's speaker handoff takes it out in
 /// [`CHUNK`]s ([`crate::coordinator`]'s sound path). Closed, what is left
 /// plays out and ends with one chunk faded to nothing.
-#[derive(Debug, Default)]
+///
+/// A long exact line's pieces (#7892, [`crate::say::tts_cache::Pieces`])
+/// come through a feed of their own size ([`Feed::for_line`]): its
+/// renderer puts each piece in as it is rendered, at most one ahead of what
+/// plays, and stops once the line is let go ([`Feed::abandon`]).
+#[derive(Debug)]
 pub struct Feed {
     state: Mutex<Held>,
+    /// The most sound held: [`MOST_HELD`] for a stream.
+    most: usize,
 }
 
 #[derive(Debug, Default)]
@@ -101,6 +108,10 @@ struct Held {
     dropped: u64,
     /// Gaps the speaker reported in this stream's sound.
     underruns: u64,
+    /// Nobody plays it any more: its line was cut, refused or let go.
+    abandoned: bool,
+    /// Closed before all its sound came: a piece of a line not rendered.
+    short: bool,
 }
 
 /// A feed is its own: two are equal only if they are the same one.
@@ -114,7 +125,16 @@ impl Eq for Feed {}
 
 impl Feed {
     pub fn new() -> Arc<Self> {
-        Arc::default()
+        Self::for_line(MOST_HELD)
+    }
+
+    /// A feed that holds up to `most` samples: a long exact line's, whose
+    /// renderer keeps it to the piece playing and the next one.
+    pub fn for_line(most: usize) -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::default(),
+            most,
+        })
     }
 
     fn held(&self) -> std::sync::MutexGuard<'_, Held> {
@@ -126,7 +146,7 @@ impl Feed {
     /// Sound read off the bus; what does not fit is dropped and counted.
     pub fn push(&self, block: &[i16]) {
         let mut held = self.held();
-        let room = MOST_HELD.saturating_sub(held.samples.len());
+        let room = self.most.saturating_sub(held.samples.len());
         held.samples.extend(&block[..block.len().min(room)]);
         held.dropped += block.len().saturating_sub(room) as u64;
     }
@@ -134,6 +154,34 @@ impl Feed {
     /// No more sound comes: what is held plays out.
     pub fn close(&self) {
         self.held().closed = true;
+    }
+
+    /// No more sound comes, though some was owed: what is held plays out,
+    /// and the line is not said whole ([`Feed::short`]).
+    pub fn close_short(&self) {
+        let mut held = self.held();
+        held.closed = true;
+        held.short = true;
+    }
+
+    /// Whether it was closed before all its sound came.
+    pub fn short(&self) -> bool {
+        self.held().short
+    }
+
+    /// Nobody plays it any more: its renderer stops.
+    pub fn abandon(&self) {
+        self.held().abandoned = true;
+    }
+
+    /// Whether nobody plays it any more.
+    pub fn abandoned(&self) -> bool {
+        self.held().abandoned
+    }
+
+    /// The samples held now, not yet taken.
+    pub fn held_samples(&self) -> usize {
+        self.held().samples.len()
     }
 
     /// Whether a chunk may go to the speaker now: a whole one is held (the
