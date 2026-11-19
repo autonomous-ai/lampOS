@@ -1815,7 +1815,14 @@ fn made_no_asks(
     if !crate::make_no_asks::on() || !crate::make_no_asks::keeps_no_yes(made) {
         return None;
     }
-    let replaces = made_in != 0 && !made.uses.code && !made.uses.agent_task;
+    // A change replaces only the skill it changes, in place, never another
+    // (`crate::made_change`, Twelve's P2 2 on #8008: its near twins were
+    // turned off with no word): its words that would start another are
+    // refused with why, as anyone else's make's are.
+    let replaces = made_in != 0
+        && !made.uses.code
+        && !made.uses.agent_task
+        && made_skill::change_as().is_none();
     // Its words would start skills the person made, kept for this
     // (`made_skill::asks_taken_sparing`, #7828's fix 3): replaced below on
     // the owner's ask, as a trigger clash is; anyone else's make, or one

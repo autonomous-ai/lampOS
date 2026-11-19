@@ -108,22 +108,34 @@ fn made_first(keeping: &Keeping) -> String {
 /// The change `LATER` of evening-dim, with `off` the skills turned off:
 /// what the model is told, what the helper was asked, and the chat's body.
 fn change_later(keeping: &Keeping, off: &BTreeSet<String>) -> (Value, Vec<Value>, String) {
-    let (url, sent) = service_sent(vec![(200, later())]);
+    change_to(keeping, later(), 1, off, (LATER, "at half past ten"))
+}
+
+/// [`change_later`] with the making model's `answer`, made `at` ms after
+/// the first make, from the line `heard` asking the change `words`.
+fn change_to(
+    keeping: &Keeping,
+    answer: String,
+    at: u64,
+    off: &BTreeSet<String>,
+    (heard, words): (&str, &str),
+) -> (Value, Vec<Value>, String) {
+    let (url, sent) = service_sent(vec![(200, answer)]);
     let asked = helper(&keeping.manage, 1);
     let told = changed(
         keeping,
         "evening dim",
-        "at half past ten",
+        words,
         || true,
         Some(off),
         |words| {
             make_with(
                 4,
-                Some(LATER),
+                Some(heard),
                 words,
                 keeping,
                 chat_at(url),
-                NOW + 1,
+                NOW + at,
                 || None,
             )
         },
@@ -230,11 +242,12 @@ fn a_change_keeps_off_and_put_it_back_restores_the_old_version() {
         Some("evening-dim")
     );
     let putting = helper(&keeping.manage, 1);
-    let back = put_back(&keeping, "evening-dim", || true, now);
-    assert_eq!(back["on"], true, "{back}");
+    let back = put_back(&keeping, "evening-dim", || true, Some(&off), now);
+    // Twelve's P3 on #8008: off, it is told off.
+    assert_eq!(back["on"], false, "{back}");
     assert_eq!(
         quoted(back["next"].as_str().unwrap()),
-        "Your old evening dim is back."
+        "Your old evening dim is back. It stays off."
     );
     assert_eq!(
         putting.join().unwrap(),
@@ -420,4 +433,178 @@ fn the_tool_takes_a_change_within_the_bound() {
     crate::made_skill::set_writes_here(None);
     crate::make_no_asks::set_here(None);
     crate::made_skill::set_off_said_here(None);
+}
+
+/// Twelve's P2 1 on #8008: a guest's change hears none of the owner's
+/// skills named, whether two are as near or none has the name: the
+/// owner's ask is read first.
+#[test]
+fn a_guests_change_names_no_skill() {
+    crate::made_skill::set_off_said_here(Some(true));
+    let (root, keeping) = keeping("guest");
+    crate::made_remove::tests::made_here(
+        &keeping,
+        &[("good-morning-1", true), ("good-morning-2", true)],
+    );
+    let never = |_: &str| -> Value { panic!("made") };
+    let off = BTreeSet::new();
+    for asked in ["good morning", "rain check"] {
+        let told = changed(&keeping, asked, "at 7:30", || false, Some(&off), never, NOW);
+        assert_eq!(told["error"], NOT_OWNER, "{asked}: {told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(!next.contains("good morning"), "{asked}: {next}");
+    }
+    // The owner is asked which, by name.
+    let told = changed(
+        &keeping,
+        "good morning",
+        "at 7:30",
+        || true,
+        Some(&off),
+        never,
+        NOW,
+    );
+    let next = told["next"].as_str().unwrap();
+    assert!(next.contains("good morning 1 or good morning 2"), "{next}");
+    crate::made_skill::set_off_said_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Twelve's P2 2 on #8008: with `LAMP_MAKE_NO_ASKS` on, a change never
+/// turns off another skill, even a near twin doing the same thing (the
+/// row's `-2` beside the one changed): only the changed one is put on.
+#[test]
+fn a_change_never_turns_off_a_twin() {
+    switches(true);
+    let (root, keeping) = keeping("twin");
+    crate::make_no_asks::set_state_here(Some(root.join("state")));
+    made_first(&keeping);
+    // evening-dim-2 on the lamp, doing what the change will do.
+    let toml = later();
+    let toml = toml
+        .split_once("```skill.toml\n")
+        .and_then(|(_, rest)| rest.split_once("```"))
+        .unwrap()
+        .0
+        .to_owned();
+    let twin = keeping.installed.join("evening-dim-2");
+    fs::create_dir_all(&twin).unwrap();
+    fs::write(twin.join("skill.toml"), toml).unwrap();
+    let (told, asked, _) = change_later(&keeping, &BTreeSet::new());
+    let _ = take_said_line();
+    assert_eq!(told["changed"], "evening-dim", "{told}");
+    assert!(told.get("replaced").is_none(), "{told}");
+    assert!(told.get("not_off").is_none(), "{told}");
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+    assert!(twin.is_dir());
+    crate::make_no_asks::set_state_here(None);
+    switches(false);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Twelve's P2 3 on #8008: a second change within the week keeps only the
+/// latest old version; the first one's package goes, so "forget
+/// everything" leaves no package but the skill's own.
+#[test]
+fn two_changes_then_forget_everything_leave_no_old_package() {
+    switches(true);
+    let (root, keeping) = keeping("two-changes");
+    made_first(&keeping);
+    change_later(&keeping, &BTreeSet::new());
+    let latest = later().replace(
+        "during = { from = \"22:30\", to = \"23:00\" }",
+        "during = { from = \"23:00\", to = \"23:30\" }",
+    );
+    let (told, _, _) = change_to(
+        &keeping,
+        latest,
+        2,
+        &BTreeSet::new(),
+        ("change evening dim to eleven", "at eleven"),
+    );
+    let _ = take_said_line();
+    assert_eq!(told["changed"], "evening-dim", "{told}");
+    let packages = || -> Vec<String> {
+        let mut found: Vec<String> = fs::read_dir(&keeping.directory)
+            .unwrap()
+            .flatten()
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name.ends_with(".tar"))
+            .collect();
+        found.sort();
+        found
+    };
+    let named = || -> Vec<String> {
+        let mut named: Vec<String> = made_skill::entries(&keeping.directory)
+            .iter()
+            .flat_map(|entry| {
+                made_skill::packages_named(entry)
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        named.sort();
+        named.dedup();
+        named
+    };
+    // The latest old version and the skill's own, nothing else.
+    assert_eq!(packages(), named());
+    assert_eq!(packages().len(), 2, "{:?}", packages());
+    assert!(crate::make_no_asks::clear(&keeping.directory).unwrap());
+    let own = made_skill::entries(&keeping.directory)[0]["package"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(packages(), [own]);
+    switches(false);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Twelve's P3 on #8008: with `LAMP_MAKE_NO_ASKS` off, a change that
+/// clashes keeps its clash's question and the made one waiting for it.
+#[test]
+fn a_change_that_clashes_keeps_its_question() {
+    let (root, keeping) = keeping("clash");
+    made_first(&keeping);
+    let twin = keeping.installed.join("rest-glow");
+    fs::create_dir_all(&twin).unwrap();
+    fs::write(
+        twin.join("skill.toml"),
+        "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\ntopic = \"voice/state\"\n\
+         field = \"state\"\nequals = \"resting\"\ncooldown = \"1h\"\n\n[[do]]\nlight = { colour \
+         = \"blue\" }\n",
+    )
+    .unwrap();
+    let (url, served) = service(vec![(200, later())]);
+    let off = BTreeSet::new();
+    let told = changed(
+        &keeping,
+        "evening dim",
+        "at half past ten",
+        || true,
+        Some(&off),
+        |words| {
+            make_with(
+                4,
+                Some(LATER),
+                words,
+                &keeping,
+                chat_at(url),
+                NOW + 1,
+                || None,
+            )
+        },
+        crate::app_make::now_unix_ms(),
+    );
+    assert_eq!(served.join().unwrap(), 1);
+    let _ = take_said_line();
+    assert!(told[crate::made_clash::CLASH_ID].is_string(), "{told}");
+    assert!(
+        made_skill::entries(&keeping.directory)
+            .iter()
+            .any(|entry| entry["on"] != true && entry["name"] == "evening-dim"),
+        "the made one waits for the choice"
+    );
+    let _ = fs::remove_dir_all(&root);
 }
