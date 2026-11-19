@@ -1212,7 +1212,11 @@ pub fn stands_on<'a>(
                 .count();
             makes > queued_makes_in(statuses) && stands(kind, reply, read, calls)
         }
-        Claim::NudgeOff => nudge_in(statuses),
+        // A true state told, asked as a question ("Is the water nudge still
+        // off?"), stands as `SkillOff`'s does; otherwise a stop that ran in
+        // the turn backs it, never a turn back on (Twelve's P2 and P3 on
+        // #7917).
+        Claim::NudgeOff => read || nudge_stopped(calls, statuses),
         _ => stands(kind, reply, read, calls),
     }
 }
@@ -1289,6 +1293,18 @@ pub fn nudge_tool(name: &str, args: &serde_json::Value) -> Option<&'static str> 
         name
     };
     (named == NUDGE_TOOL).then_some(NUDGE_TOOL)
+}
+
+/// Whether the turn stopped a wellbeing nudge: a [`NUDGE_TOOL`] call that
+/// isn't `how: "on"` among `calls`, and one that ran ([`nudge_in`]).
+fn nudge_stopped<'a>(
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+    statuses: &[serde_json::Value],
+) -> bool {
+    nudge_in(statuses)
+        && calls
+            .into_iter()
+            .any(|(name, args)| nudge_tool(name, args).is_some() && args["how"] != "on")
 }
 
 /// Whether a [`NUDGE_TOOL`] ran in the turn, by the outcomes the turn keeps
@@ -5256,13 +5272,31 @@ pub(crate) mod tests {
         let refused = [status(NUDGE_TOOL, serde_json::json!({"error": true}))];
         let other = [status("other_call", serde_json::json!({"ok": true}))];
         let reply = "I've turned off the water nudge for today.";
-        let stands = |statuses: &[serde_json::Value]| {
-            stands_on(Claim::NudgeOff, reply, false, std::iter::empty(), statuses)
+        let off = serde_json::json!({"how": "off"});
+        let on = serde_json::json!({"how": "on"});
+        let stands = |args: &serde_json::Value, statuses: &[serde_json::Value]| {
+            stands_on(
+                Claim::NudgeOff,
+                reply,
+                false,
+                [(NUDGE_TOOL, args)],
+                statuses,
+            )
         };
-        assert!(stands(&ran));
-        assert!(!stands(&refused));
-        assert!(!stands(&other));
-        assert!(!stands(&[]));
+        assert!(stands(&off, &ran));
+        assert!(!stands(&off, &refused));
+        assert!(!stands(&off, &other));
+        assert!(!stands(&off, &[]));
+        // A turn back on backs no claim of off (Twelve's P3 on #7917).
+        assert!(!stands(&on, &ran));
+        // Asked as a question, a true state stands with no call (his P2).
+        assert!(stands_on(
+            Claim::NudgeOff,
+            reply,
+            true,
+            std::iter::empty(),
+            &[]
+        ));
         assert!(!Claim::NudgeOff.made_by(NUDGE_TOOL));
         assert_eq!(
             nudge_tool(NUDGE_TOOL, &serde_json::Value::Null),
