@@ -3673,7 +3673,11 @@ as a Harness task with the agent's own tools
   at once with no run of its own, a refusal too; the same make asked while it
   is still made (a repair round too) waits for that one's outcome, not refused
   `busy`. An outcome the voice took is never kept. `make_id` is 1 to 64 ASCII
-  letters, digits, `-` or `_` (`is_make_id`), else `bad_request`. See skills.md, "A make survives a restart of its route".
+  letters, digits, `-` or `_` (`is_make_id`), else `bad_request`. An older
+  lamp-tasks refuses a line with `make_id` (`MakeLine` takes no unknown
+  field); lamp-voice and lamp-tasks are parts of one build and switch in the
+  same lamp-update round (a round needs every part's file, updates.md), so
+  a voice that sends it always meets a lamp-tasks that takes it. See skills.md, "A make survives a restart of its route".
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
   (`MakeLine::parse`): no other field but `guide` and `switches`, the
   rules (the system prompt and the brief) at most 48 KiB with no NUL,

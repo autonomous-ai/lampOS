@@ -28,10 +28,13 @@
 //! next route's worker starts, and the file removed ([`left_at`]): each
 //! make younger than [`RESUMED_WITHIN`] is made again with no turn, as a
 //! make that waited its turn is (`LAMP_MAKE_QUEUE`'s `run_queued`), its line
-//! said through the say service once it answers. Its first hand-over asks
-//! lamp-tasks the same make by its id: lamp-tasks gives it the outcome it
-//! kept, a refusal too, or waits for the one still being made, with no run
-//! of its own. One kept nowhere (lamp-tasks restarted too) is made anew.
+//! said at most once through the say service once it answers. Its first
+//! hand-over asks lamp-tasks the same make by its id: lamp-tasks gives it
+//! the outcome it kept, a refusal too, or waits for the one still being
+//! made, with no run of its own. One kept nowhere (lamp-tasks restarted
+//! too) is made anew. A restart after lamp-tasks' answer was read and
+//! before the voice put the skill on loses that make: never asked twice,
+//! at the cost of being told at most once, not always.
 //! The person's "forget everything" drops their makes written here
 //! ([`forget_person`]); lamp-tasks' kept outcome, in its memory only, lasts
 //! at most its 30 minutes.
@@ -125,7 +128,7 @@ fn write(path: &Path, makes: &[InFlight]) {
 /// A make written down while it is made: taken out when dropped.
 pub struct Held {
     path: PathBuf,
-    request: u64,
+    id: String,
 }
 
 impl Drop for Held {
@@ -134,7 +137,7 @@ impl Drop for Held {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut makes = read(&self.path);
-        makes.retain(|make| make.request != self.request);
+        makes.retain(|make| make.id() != self.id);
         write(&self.path, &makes);
     }
 }
@@ -146,15 +149,15 @@ pub fn begin_at(path: &Path, make: InFlight) -> Held {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut makes = read(path);
-    let request = make.request;
-    makes.retain(|kept| kept.request != request);
+    let id = make.id();
+    makes.retain(|kept| kept.id() != id);
     makes.push(make);
     let over = makes.len().saturating_sub(MOST);
     makes.drain(..over);
     write(path, &makes);
     Held {
         path: path.to_owned(),
-        request,
+        id,
     }
 }
 
@@ -166,6 +169,23 @@ std::thread_local! {
     static HELD: RefCell<Option<Held>> = const { RefCell::new(None) };
 }
 
+/// The voice makes on their threads now, by id, with who asked: what a
+/// "forget everything" also reaches between two hand-overs.
+static ON_AIR: Mutex<Vec<(String, Option<String>)>> = Mutex::new(Vec::new());
+/// The ids a "forget everything" dropped: never written down again, the
+/// newest [`MOST_FORGOTTEN`].
+static FORGOTTEN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// The most forgotten ids remembered.
+const MOST_FORGOTTEN: usize = 16;
+
+fn locked<T>(kept: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn forgotten(id: &str) -> bool {
+    locked(&FORGOTTEN).iter().any(|kept| kept == id)
+}
+
 /// The voice make on this thread, until dropped (a panic too): nothing
 /// held once it is.
 pub struct OnThisThread(());
@@ -174,7 +194,10 @@ impl Drop for OnThisThread {
     fn drop(&mut self) {
         let held = HELD.with(|held| held.borrow_mut().take());
         drop(held);
-        ON_THREAD.with(|on| on.borrow_mut().take());
+        if let Some((_, make)) = ON_THREAD.with(|on| on.borrow_mut().take()) {
+            let id = make.id();
+            locked(&ON_AIR).retain(|(kept, _)| *kept != id);
+        }
     }
 }
 
@@ -188,17 +211,26 @@ pub fn on_this_thread(make: Option<InFlight>) -> OnThisThread {
 pub fn on_this_thread_at(path: &Path, make: Option<InFlight>) -> OnThisThread {
     let held = HELD.with(|held| held.borrow_mut().take());
     drop(held);
+    if let Some(make) = &make {
+        let mut on_air = locked(&ON_AIR);
+        on_air.retain(|(kept, _)| *kept != make.id());
+        on_air.push((make.id(), make.asker.speaker.clone()));
+    }
     ON_THREAD.with(|on| *on.borrow_mut() = make.map(|make| (path.to_owned(), make)));
     OnThisThread(())
 }
 
 /// A hand-over of this thread's voice make to lamp-tasks begins: it is
-/// written down, and its id given for the line. None for a make with no
+/// written down (never again once its asker's "forget everything" dropped
+/// it), and its id given for the line. None for a make with no
 /// [`on_this_thread`].
 pub fn handed_over() -> Option<String> {
     let (path, make) = ON_THREAD.with(|on| on.borrow().clone())?;
     let id = make.id();
     answered();
+    if forgotten(&id) {
+        return Some(id);
+    }
     let held = begin_at(&path, make);
     HELD.with(|kept| *kept.borrow_mut() = Some(held));
     Some(id)
@@ -212,14 +244,38 @@ pub fn answered() {
 }
 
 /// The makes written down at `path` that `person` asked for, dropped (the
-/// person's "forget everything"): never made again after a restart.
+/// person's "forget everything"), and those of theirs still on a thread
+/// never written down again ([`handed_over`]): never made again after a
+/// restart. How many were written down.
 pub fn forget_person(path: &Path, person: &str) -> usize {
     let _writing = WRITING
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut makes = read(path);
+    let theirs = |speaker: Option<&str>| speaker == Some(person);
+    let mut ids: Vec<String> = makes
+        .iter()
+        .filter(|make| theirs(make.asker.speaker.as_deref()))
+        .map(InFlight::id)
+        .collect();
+    ids.extend(
+        locked(&ON_AIR)
+            .iter()
+            .filter(|(_, speaker)| theirs(speaker.as_deref()))
+            .map(|(id, _)| id.clone()),
+    );
+    {
+        let mut forgotten = locked(&FORGOTTEN);
+        for id in ids {
+            if !forgotten.contains(&id) {
+                forgotten.push(id);
+            }
+        }
+        let over = forgotten.len().saturating_sub(MOST_FORGOTTEN);
+        forgotten.drain(..over);
+    }
     let before = makes.len();
-    makes.retain(|make| make.asker.speaker.as_deref() != Some(person));
+    makes.retain(|make| !theirs(make.asker.speaker.as_deref()));
     let dropped = before - makes.len();
     if dropped > 0 {
         write(path, &makes);
@@ -388,11 +444,46 @@ mod tests {
     fn forget_everything_drops_the_persons_makes() {
         let dir = Dir::new("forget");
         let path = dir.path().join("make-in-flight.json");
-        std::mem::forget(begin_at(&path, make(7, 1_000)));
-        let mut other = make(8, 1_100);
+        // A speaker and ids of this test alone: the makes on threads and
+        // the ids forgotten are shared by the process.
+        let mut theirs = make(70, 1_000);
+        theirs.asker.speaker = Some("Lee".into());
+        std::mem::forget(begin_at(&path, theirs));
+        let mut other = make(71, 1_100);
         other.asker.speaker = Some("Sam".into());
         std::mem::forget(begin_at(&path, other.clone()));
-        assert_eq!(forget_person(&path, "Alex"), 1);
+        assert_eq!(forget_person(&path, "Lee"), 1);
         assert_eq!(left_at(&path, 2_000), vec![other]);
+    }
+
+    /// A make of theirs still on its thread, between two hand-overs, as
+    /// they say "forget everything": its next hand-over (a repair) keeps
+    /// its id but never writes it down again.
+    #[test]
+    fn a_forgotten_make_is_never_written_down_again() {
+        let dir = Dir::new("forgotten");
+        let path = dir.path().join("make-in-flight.json");
+        let mut theirs = make(11, 5_000);
+        theirs.asker.speaker = Some("Kim".into());
+        let _on = on_this_thread_at(&path, Some(theirs));
+        assert_eq!(handed_over().as_deref(), Some("11-5000"));
+        answered();
+        assert!(!path.exists());
+        assert_eq!(forget_person(&path, "Kim"), 0);
+        assert_eq!(handed_over().as_deref(), Some("11-5000"));
+        assert!(!path.exists(), "never written back");
+    }
+
+    /// Entries are keyed by the make's id: a new worker's request 7 never
+    /// takes out an old worker's request 7.
+    #[test]
+    fn entries_are_keyed_by_the_makes_id() {
+        let dir = Dir::new("keyed");
+        let path = dir.path().join("make-in-flight.json");
+        std::mem::forget(begin_at(&path, make(7, 1_000)));
+        let newer = begin_at(&path, make(7, 1_500));
+        assert_eq!(read(&path).len(), 2);
+        drop(newer);
+        assert_eq!(read(&path), vec![make(7, 1_000)]);
     }
 }

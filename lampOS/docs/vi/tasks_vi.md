@@ -1020,7 +1020,10 @@ agent (`lamp_tasks::skill_make`).
   được hỏi khi vẫn đang tạo (kể cả một lần sửa) sẽ chờ kết quả của lần đó,
   không bị từ chối `busy`. Kết quả voice đã nhận thì không bao giờ được giữ.
   `make_id` gồm 1 đến 64 chữ cái ASCII, chữ số, `-` hoặc `_` (`is_make_id`),
-  nếu không thì `bad_request`. Xem skills_vi.md, "Một lần tạo vẫn còn sau khi tuyến khởi
+  nếu không thì `bad_request`. lamp-tasks cũ từ chối dòng có `make_id`
+  (`MakeLine` không nhận trường lạ); lamp-voice và lamp-tasks là các phần của
+  cùng một build và chuyển trong cùng một vòng lamp-update (một vòng cần tệp
+  của mọi phần, updates.md), nên voice gửi nó luôn gặp lamp-tasks nhận nó. Xem skills_vi.md, "Một lần tạo vẫn còn sau khi tuyến khởi
   động lại".
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
