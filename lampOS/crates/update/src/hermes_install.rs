@@ -1408,6 +1408,35 @@ pub fn carry_out_for(
             }
             Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),
         },
+        // #7879: the same cgroup freeze (writing 1 again is nothing), with
+        // the heat's own lines.
+        Act::Pause => match systemd.freeze_harness_unit() {
+            Ok(()) => {
+                say(&format!(
+                    "{name}'s install pauses while the board is hot (board/heat)"
+                ));
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not frozen: {refused}")),
+        },
+        Act::Resume => match systemd.thaw_harness_unit() {
+            Ok(()) => {
+                // Heat pauses only OpenClaw's turn: a pause that ends as the
+                // turn passes to Hermes says so, never "no longer hot"
+                // (Heron's P3 on #7942).
+                if name == crate::openclaw_install::TURN.name {
+                    say(&format!(
+                        "{name}'s install goes on: the board is no longer hot and the voice is quiet"
+                    ));
+                } else {
+                    say(&format!(
+                        "the pause for a hot board ends: the turn passed to {name}'s install, which heat does not pause"
+                    ));
+                }
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),
+        },
         Act::Stop { error, why } => (*error, why.clone()),
     };
     let _ = systemd.thaw_harness_unit();
