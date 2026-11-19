@@ -598,6 +598,25 @@ or another voice, keeps it the room's. Risk, accepted by the lamp-memory
 owner: **a silent guest sitting by hears the person's thread on a carried
 line** (its exchanges and running summary, never their saved memory).
 
+**Their own covered face** (`LAMP_CONVERSATION_CARRIES_OWN_TRACK=on`, off by
+default, C63(b)): on lamp-06c1 on 18 Nov (request 111) the owner put a hand
+over their face mid-conversation. Their print fell under the eyes' hold's bar,
+so the eyes let the name go while the box kept its id, and the one face at the
+desk read as "another face in view": "What do you remember about my food?" was
+the room's. With this switch, a line no face was seen speaking is still carried
+in their conversation going on when **the only face in view is the same
+unbroken eyes track as the face last named as them, alone in view**
+(`SpeakingFaces::own_track_alone`): the pair the voice last read from the
+eyes' known file names them and was read within 45 s; from that naming through
+the line's end every look is of the same boot and counts no face but that
+track (an empty look is no other face), the track is seen at least every
+1.5 s (the eyes' own life of a passing id) and in a look of the line, and a
+lost id the eyes say a new one follows is that new one. It acts on both carry
+paths (a line of theirs, and a line admitted as the room's). A second face,
+another face alone, a gap over 1.5 s, or the eyes starting again keeps the
+line the room's; everything else of the carry stands. It is for the carry
+only: it names no face, moves no known file and runs no forget or yes.
+
 **The room's lines of the same conversation** (`LAMP_CONVERSATION_ROOM_LINES_TOLD=on`,
 #4339): a line still split off to the room's thread was unknown to the
 person's next turn (lamp-3e83, 30 Oct: a web search answered in the room's
