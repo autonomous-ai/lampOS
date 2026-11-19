@@ -670,3 +670,33 @@ async fn earlier_words_told_first_are_kept_as_the_rooms() {
     assert_eq!(scopes.len(), 1, "{scopes:?}");
     assert!(scopes[0].1.is_some(), "{scopes:?}");
 }
+
+/// Twelve's P3 on #7990: words cut short in their pause's grace and told
+/// first as another person's (`LAMP_ENDPOINT_PAUSE_JOIN`) are not told
+/// again as a split line's (`LAMP_MAKE_NO_ASKS`, #7976), even when nothing
+/// told the two lines apart.
+#[tokio::test(start_paused = true)]
+async fn words_told_first_in_the_grace_are_not_told_again_as_a_split() {
+    crate::make_no_asks::set_here(Some(true));
+    let run = lines_in_the_grace(
+        &[FIRST, SECOND],
+        vec![answered(), vec![text(SECOND_ANSWER), Ok(ChatEvent::Done)]],
+        Arc::new(|_, _| {
+            Joined::Not("no voice check, and no one face was seen speaking both".to_owned())
+        }),
+        |engine| engine,
+    )
+    .await;
+    crate::make_no_asks::set_here(None);
+    let last = run.asked.last().unwrap();
+    assert!(
+        last.contains(&Message::system(crate::pause_join::earlier_line(FIRST))),
+        "told first: {last:?}"
+    );
+    assert!(
+        !last.iter().any(|message| message
+            .words()
+            .is_some_and(|words| words.contains(crate::make_no_asks::SPLIT_NEXT))),
+        "never told again as a split: {last:?}"
+    );
+}

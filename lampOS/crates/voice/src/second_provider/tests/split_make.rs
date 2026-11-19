@@ -50,13 +50,33 @@ async fn split_lines(
     verdict: Joined,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> (Vec<(String, Value)>, Vec<Vec<Message>>) {
+    let cut_rounds = CUT_ANSWERS[..lines.len() - 1]
+        .iter()
+        .map(|answer| vec![vec![text(answer), Ok(ChatEvent::Done)]])
+        .collect();
+    split_chain(on, lines, gaps_ms, verdict, cut_rounds, rounds, |engine| {
+        engine
+    })
+    .await
+}
+
+/// As [`split_lines`], each cut line's rounds `cut_rounds` (each line's
+/// last round its [`CUT_ANSWERS`] text, never heard), and the engine
+/// given its other parts by `setup`.
+async fn split_chain(
+    on: bool,
+    lines: &[&'static str],
+    gaps_ms: &[u64],
+    verdict: Joined,
+    cut_rounds: Vec<Vec<Vec<net::Result<ChatEvent>>>>,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+    setup: impl FnOnce(Engine) -> Engine,
+) -> (Vec<(String, Value)>, Vec<Vec<Message>>) {
     assert_eq!(gaps_ms.len() + 1, lines.len());
+    assert_eq!(cut_rounds.len() + 1, lines.len());
     assert!(lines.len() <= CUT_ANSWERS.len() + 1);
     crate::make_no_asks::set_here(Some(on));
-    let mut chats: Vec<Vec<net::Result<ChatEvent>>> = CUT_ANSWERS[..lines.len() - 1]
-        .iter()
-        .map(|answer| vec![text(answer), Ok(ChatEvent::Done)])
-        .collect();
+    let mut chats: Vec<Vec<net::Result<ChatEvent>>> = cut_rounds.into_iter().flatten().collect();
     chats.extend(rounds);
     let script = Arc::new(Script {
         heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
@@ -71,7 +91,7 @@ async fn split_lines(
     });
     let now = Arc::new(Mutex::new(Instant::now()));
     let clock = now.clone();
-    let mut engine = Engine::with_clock(
+    let engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| Told {
             text: "SYSTEM".to_owned(),
@@ -83,6 +103,7 @@ async fn split_lines(
     )
     .announcing(false)
     .joining_cut_words(Arc::new(move |_, _| verdict.clone()));
+    let mut engine = setup(engine);
     let mut releases = Vec::new();
     for (at, answer) in CUT_ANSWERS[..lines.len() - 1].iter().enumerate() {
         let request = at as u64 + 1;
@@ -379,4 +400,170 @@ fn the_note_tells_every_part_oldest_first() {
     );
     assert!(note.contains("820 ms"), "{note}");
     assert!(note.ends_with(crate::make_no_asks::SPLIT_NEXT), "{note}");
+}
+
+/// A call run, and the person whose scope it ran in (none: the room's).
+type RanIn = (String, Option<String>);
+
+/// Heron's and Twelve's P2 on #7990: in the dark nothing tells whether one
+/// person said both lines, so the cut words may be another person's. The
+/// split line's `remember` runs in the room's scope, never the person's
+/// in view; the same line past the join's window keeps theirs. On the real
+/// clock: the face cache's sightings are.
+#[tokio::test]
+async fn a_split_line_keeps_in_the_rooms_scope() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let remember = || {
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "k1",
+                    crate::remember::REMEMBER,
+                    json!({"fact": "likes green tea"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+        ]
+    };
+    let run = |gap_ms: u64| async move {
+        let path =
+            std::env::temp_dir().join(format!("split-make-scope-{}-{gap_ms}", std::process::id()));
+        std::fs::write(&path, "Maya").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        let scopes: Arc<Mutex<Vec<RanIn>>> = Arc::default();
+        let ran = scopes.clone();
+        let runner: ScopedToolRunner = Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
+            let person = lease
+                .scope()
+                .and_then(|scope| scope.person())
+                .map(str::to_owned);
+            ran.lock().unwrap().push((name, person));
+            Box::pin(async { json!({"ok": true}) })
+        });
+        let (_, asked) = split_chain(
+            true,
+            &[FIRST, "remember I like green tea."],
+            &[gap_ms],
+            nothing_to_tell(),
+            vec![vec![vec![text(CUT_ANSWERS[0]), Ok(ChatEvent::Done)]]],
+            remember(),
+            move |engine| {
+                let mut engine = engine.with_memory_scope(
+                    lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                    cache.clone(),
+                    runner,
+                    None,
+                );
+                engine.memory_camera(true, 1);
+                cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+                engine
+            },
+        )
+        .await;
+        std::fs::remove_file(&path).unwrap();
+        let scopes = scopes.lock().unwrap().clone();
+        (asked, scopes)
+    };
+    let (asked, scopes) = run(760).await;
+    assert!(split_told(&last_line_notes(&asked, 2)[0]).is_some());
+    assert_eq!(
+        scopes,
+        [(crate::remember::REMEMBER.to_owned(), None)],
+        "a split line keeps as the room's"
+    );
+    let (asked, scopes) = run(4_000).await;
+    assert!(split_told(&last_line_notes(&asked, 2)[0]).is_none());
+    assert_eq!(scopes.len(), 1, "{scopes:?}");
+    assert!(
+        scopes[0].1.is_some(),
+        "past the window, the person's: {scopes:?}"
+    );
+}
+
+/// Twelve's P2 on #7990: the middle line of three, told the first, acts on
+/// both, before any of its answer is heard; the last, cutting it short, is
+/// told neither as not answered, so it is never done twice. (A make_skill
+/// call says the lamp's opening, so its answer is heard and nothing of it
+/// is carried; a call with no opening, here a reminder, is kept in its
+/// rounds.)
+#[tokio::test]
+async fn a_cut_line_that_already_ran_a_call_is_not_told_again() {
+    const MIDDLE: &str = "every afternoon at three";
+    const LAST: &str = "remind me to drink a cup of green tea.";
+    let (ran, asked) = split_chain(
+        true,
+        &[FIRST, MIDDLE, LAST],
+        &[700, 900],
+        nothing_to_tell(),
+        vec![
+            vec![vec![text(CUT_ANSWERS[0]), Ok(ChatEvent::Done)]],
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "m1",
+                        "add_reminder",
+                        json!({ "what": "drink green tea", "when": "15:00" }),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text(CUT_ANSWERS[1]), Ok(ChatEvent::Done)],
+            ],
+        ],
+        vec![vec![text("Made tea reminder."), Ok(ChatEvent::Done)]],
+        |engine| engine,
+    )
+    .await;
+    assert_eq!(ran.len(), 1, "done once: {ran:?}");
+    assert_eq!(ran[0].0, "add_reminder");
+    // The middle line was told the first; the last is told nothing.
+    assert!(split_told(&last_line_notes(&asked, 2)[0]).is_some());
+    let notes = last_line_notes(&asked, 4);
+    assert!(split_told(&notes[0]).is_none(), "{notes:?}");
+}
+
+/// Twelve's P3 on #7990: only the cut line's own told parts come first,
+/// and only those begun within the chain's 20 s.
+#[test]
+fn a_chain_keeps_only_the_cut_lines_own_parts_within_its_time() {
+    let at = Instant::now();
+    let carried = Carried::own(2, "every afternoon at three".to_owned(), at, 2);
+    let part = |at| Part {
+        request: 1,
+        text: FIRST.to_owned(),
+        at,
+        lines: 1,
+    };
+    let before = |request, at| {
+        Some(SplitBefore {
+            request,
+            parts: vec![part(at)],
+            gap: Duration::from_millis(700),
+        })
+    };
+    let words = |parts: Vec<Part>| words_of(&parts);
+    let soon = at + Duration::from_secs(2);
+    assert_eq!(
+        words(split_parts(before(2, at), &carried, soon)),
+        format!("{FIRST} every afternoon at three")
+    );
+    assert_eq!(
+        words(split_parts(before(5, at), &carried, soon)),
+        "every afternoon at three",
+        "another line's told parts are never this one's"
+    );
+    assert_eq!(
+        words(split_parts(
+            before(2, at),
+            &carried,
+            at + CHAIN_MOST_FOR + Duration::from_secs(1)
+        )),
+        "every afternoon at three",
+        "past the chain's 20 s"
+    );
+    assert_eq!(
+        words(split_parts(None, &carried, soon)),
+        "every afternoon at three"
+    );
 }

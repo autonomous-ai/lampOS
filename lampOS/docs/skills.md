@@ -9200,7 +9200,14 @@ reset still ask. On (`crate::make_no_asks`):
   words. A line with nothing cut just before it, one past the 3 s, one
   joined, or one told apart, is as before, with no note, no extra round
   and no wait; a split line is told in the round it is asked anyway, so it
-  costs no extra model round either, only the note's words.
+  costs no extra model round either, only the note's words. But a chat
+  begun early on a split line's early words is dropped (the note goes
+  beside the words, `Prepared::misfit`), so that line waits for its first
+  round from its final words. Nothing showed one person said them all,
+  so a split line's keep is the room's (`narrow_to_room`), as words told
+  first are. A cut line whose chat rounds already ran a call is not told,
+  nor any words told it before: it acted on them. Words kept for a chain
+  go at a stop, a privacy close or a mute.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
