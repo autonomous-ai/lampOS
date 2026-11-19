@@ -640,6 +640,11 @@ mod tests {
         assert_eq!(holding.step_for(Some(a3), false, 5 * S + 250_000), hold);
         assert_eq!(holding.step_for(None, false, 6 * S), Some(Say::LetGo));
         assert_eq!(holding.step_for(Some(a1), false, 7 * S), hold);
+        // The same client straight after, its lease taken again (Twelve's
+        // P3 on #7923): another lease, let go first.
+        assert_eq!(holding.step_for(Some(a3), false, 8 * S), Some(Say::LetGo));
+        assert_eq!(holding.step_for(Some(a3), false, 8 * S + 250_000), hold);
+        assert_eq!(holding.holder(), Some(a3));
     }
 
     /// A motion's source names the lease its client holds, as the hold

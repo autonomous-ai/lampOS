@@ -19298,6 +19298,40 @@ fn a_lease_taken_again_by_the_same_client_ends_the_first_ones_move() {
     assert!(seen[after..].iter().all(|step| step.1.is_none()));
 }
 
+/// #7513 (Twelve's P3 on #7923): a hold handed straight to another lease,
+/// with no let-go between and no new move, ends the old lease's move.
+#[test]
+fn a_hold_naming_another_lease_ends_the_old_ones_move() {
+    let ms = Duration::from_millis;
+    let asks = vec![(
+        ms(8_000),
+        &crate::clips::STRETCHING,
+        Priority::Skill,
+        Some("control:c_1~l_1"),
+    )];
+    let (_, fates, seen) = lease_run(
+        asks,
+        ms(30_000),
+        move |now| {
+            Some(if now < ms(9_200) {
+                "control:c_1~l_1"
+            } else {
+                "control:c_2~l_2"
+            })
+        },
+        14,
+    );
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it plays"),
+            ("stretching", crate::moves::ENDED_BY_LEASE),
+        ]
+    );
+    let after = seen.iter().position(|step| step.0 >= ms(9_400)).unwrap();
+    assert!(seen[after..].iter().all(|step| step.1.is_none()));
+}
+
 /// #7513 (Twelve's HOLD on #7923): on a hand-over, the new holder's move
 /// sent before the body is told of its hold (the old one still taken) is
 /// never the old lease's: the old one's move ends with its lease, the new
