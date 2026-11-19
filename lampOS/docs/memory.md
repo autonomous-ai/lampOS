@@ -236,20 +236,32 @@ forget removes on the lamp is deleted from the conversation history the
 account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
 - **What memory says:** with `--memory-days`, the answer to `forget`,
   `forget_last`, `forget_all`, `forget_said` and `exchanges_forget` names the
-  exchanges it removed, by scope and id: `"exchanges":{"p-…":[4,6],
-  "everyone":[3]}`. Ids only, never words. A known person's `forget_all`
+  exchanges it removed, by scope, each by its turn id on the account:
+  `"exchanges":{"p-…":["0a1b2c3d.p-…:4","0a1b2c3d.p-…:6"],
+  "everyone":["0a1b2c3d.everyone:3"]}`. Ids only, never words. A known person's `forget_all`
   leaves their own out (the voice deletes that person's whole history), so
   it names only the room's lines it took with them; the room's own
-  `forget_all` names its ids. Every removed id is told: at most 400 in the
+  `forget_all` names its ids. Every removed id is told: at most 100 in the
   answer, which then says `"exchanges_more":true`, and the rest paged by
-  `{"op":"forgot_exchanges"}` (1,500 a page, `"more"` while some remain;
+  `{"op":"forgot_exchanges"}` (900 a page, `"more"` while some remain;
   kept in RAM until the next forget). Nothing removed, no field. The legacy
   store names none.
+- **The turn id** is `<epoch>.<scope>:<id>`, made only by
+  `lamp_msgs::history_turn_id`. The epoch is the store's own, 8 hex
+  characters in its `settings` (`history_epoch`, in the 0600 database),
+  minted when the store is made (or first opened by a build with epochs)
+  and again by a forget everything of every person (`forget_all` with
+  `"person":null`). A reset makes a new store, so a new epoch. Exchange ids
+  start again at 1 in a new store; the epoch keeps a turn id given after a
+  wipe from ever naming a turn deleted before it (the account keeps the ids
+  it deleted). What a wipe removed is told under the old epoch.
+  `{"op":"history_epoch"}` answers `{"ok":true,"epoch":…}`, for the turn's
+  save to make the same id.
 - **What the voice queues** (the second route's worker, `history_forget`):
   for a known person's forget everything, `{"all":true,"person":<their p-
-  id>}`; for every other forget, `{"ids":[…]}` of the exchanges named, each
-  turn id `<scope>:<id>` (`history_forget::turn_id`, which the turn's save
-  mints the same way). The person key is memory's own scope id: a known
+  id>}`; for every other forget, `{"ids":[…]}` of the turn ids named, as
+  memory told them (one not of that form, or of another scope, is let
+  go). The person key is memory's own scope id: a known
   person's `p-` id, `""` for the room's. A forget never deletes more of the
   account's history than the lamp forgot: a whole-history delete is a known
   person's forget everything only, and never sent without a person. Only

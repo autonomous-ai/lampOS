@@ -217,14 +217,17 @@ pub struct Days {
     /// when, so a record asked before it that was sent to one of them is
     /// refused. Never on disk, held as [`Self::records_forgot_about`] is.
     pub(crate) records_forgot_addresses: std::collections::VecDeque<(String, Vec<String>, u64)>,
-    /// The exchanges the last forget removed, each by its scope and id
-    /// (#7771): the voice asks the account's history to delete the same
-    /// turns. Never on disk; taken by the request's answer
-    /// ([`Self::take_forgot`]).
-    forgot: Vec<(String, u64)>,
+    /// The exchanges the last forget removed, each by its scope, id and
+    /// turn id on the account (#7771): the voice asks the account's history
+    /// to delete the same turns. Never on disk; taken by the request's
+    /// answer ([`Self::take_forgot`]).
+    forgot: Vec<Forgot>,
     /// What the last forget's answer had no room for, paged by
     /// `forgot_exchanges` ([`Self::forgot_page`]). Never on disk.
-    forgot_rest: std::collections::VecDeque<(String, u64)>,
+    forgot_rest: std::collections::VecDeque<Forgot>,
+    /// This store's epoch for the account's history ids
+    /// ([`lamp_msgs::history_turn_id`], #7771), kept in `settings`.
+    epoch: String,
     _held: File,
 }
 
@@ -299,10 +302,12 @@ impl Days {
             records_forgot_addresses: std::collections::VecDeque::new(),
             forgot: Vec::new(),
             forgot_rest: std::collections::VecDeque::new(),
+            epoch: String::new(),
             taste_rules: false,
             _held: held,
         };
         this.import()?;
+        this.epoch = history_epoch(&mut this.db)?;
         this.clean_legacy()?;
         this.maintain(now)?;
         Ok(this)
@@ -1451,7 +1456,7 @@ impl Days {
         let gone = doomed_exchanges(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
-        self.forgot.extend(gone);
+        self.told(gone);
         Ok(count)
     }
     /// The room's lines `speaker` said (#2849, the voice's
@@ -1500,7 +1505,7 @@ impl Days {
         let gone = doomed_exchanges(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
-        self.forgot.extend(gone);
+        self.told(gone);
         self.forget_set_aside()?;
         Ok(count)
     }
@@ -1534,27 +1539,55 @@ impl Days {
         let mut gone = Vec::new();
         let count = empty(&tx, person, &mut gone)?;
         crate::service_records::mark_forgot(&tx, person, self.now)?;
+        // Everyone's forget everything wipes the store whole: a new epoch,
+        // so no id given after it names a turn of before (#7771). What it
+        // removed is told under the old.
+        let epoch = if person.is_none() {
+            Some(mint_history_epoch(&tx)?)
+        } else {
+            None
+        };
         tx.commit()?;
-        self.forgot.extend(gone);
+        self.told(gone);
+        if let Some(epoch) = epoch {
+            self.epoch = epoch;
+        }
         self.forget_set_aside()?;
         Ok(count)
     }
 
+    /// `gone` (scope and id) taken for the answer, each with its turn id
+    /// under this store's epoch now.
+    fn told(&mut self, gone: Vec<(String, u64)>) {
+        let epoch = &self.epoch;
+        self.forgot
+            .extend(gone.into_iter().map(|(scope, id)| Forgot {
+                turn: lamp_msgs::history_turn_id(epoch, &scope, id),
+                scope,
+                id,
+            }));
+    }
+
+    /// This store's epoch for the account's history ids (#7771).
+    pub fn history_epoch(&self) -> &str {
+        &self.epoch
+    }
+
     /// The exchanges the forgets since the last call removed, by scope and
     /// id, and none kept after (#7771).
-    pub fn take_forgot(&mut self) -> Vec<(String, u64)> {
+    pub fn take_forgot(&mut self) -> Vec<Forgot> {
         std::mem::take(&mut self.forgot)
     }
 
     /// The ids a forget's answer had no room for, kept for paging in place
     /// of any earlier forget's.
-    pub fn keep_forgot_rest(&mut self, rest: Vec<(String, u64)>) {
+    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) {
         self.forgot_rest = rest.into();
     }
 
     /// The next `most` of what [`Self::keep_forgot_rest`] kept, and
     /// whether more remain.
-    pub fn forgot_page(&mut self, most: usize) -> (Vec<(String, u64)>, bool) {
+    pub fn forgot_page(&mut self, most: usize) -> (Vec<Forgot>, bool) {
         let take = self.forgot_rest.len().min(most);
         let page = self.forgot_rest.drain(..take).collect();
         (page, !self.forgot_rest.is_empty())
@@ -3878,6 +3911,52 @@ fn talk_fitted(text: &str, room: usize) -> Option<String> {
     }
     Some(lines.join("\n"))
 }
+/// An exchange a forget removed (#7771): its scope and id, and its turn id
+/// on the account ([`lamp_msgs::history_turn_id`]) under the epoch it was
+/// given in.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Forgot {
+    pub scope: String,
+    pub id: u64,
+    pub turn: String,
+}
+
+/// The settings key of the store's epoch (#7771).
+const HISTORY_EPOCH: &str = "history_epoch";
+
+/// The store's epoch, minted when there is none: a new store, or one made
+/// before epochs (no turn was saved under it: both of #7771's switches
+/// were off).
+fn history_epoch(db: &mut Connection) -> Result<String> {
+    let kept: Option<u32> = db
+        .query_row(
+            "SELECT value FROM settings WHERE key=?1",
+            [HISTORY_EPOCH],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(kept) = kept {
+        return Ok(format!("{kept:08x}"));
+    }
+    let tx = db.transaction()?;
+    let epoch = mint_history_epoch(&tx)?;
+    tx.commit()?;
+    Ok(epoch)
+}
+
+/// A new random epoch, kept in place of the old in the caller's
+/// transaction.
+fn mint_history_epoch(tx: &Transaction<'_>) -> Result<String> {
+    let mut bytes = [0u8; 4];
+    io::Read::read_exact(&mut File::open("/dev/urandom")?, &mut bytes)?;
+    let epoch = u32::from_be_bytes(bytes);
+    tx.execute(
+        "INSERT OR REPLACE INTO settings(key,value) VALUES(?1,?2)",
+        params![HISTORY_EPOCH, epoch],
+    )?;
+    Ok(format!("{epoch:08x}"))
+}
+
 /// The exchanges among what is doomed, each by its scope and id, read
 /// before [`erase`] (#7771).
 fn doomed_exchanges(tx: &Transaction<'_>) -> Result<Vec<(String, u64)>> {

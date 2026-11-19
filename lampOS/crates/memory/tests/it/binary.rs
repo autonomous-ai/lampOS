@@ -507,9 +507,14 @@ fn opted_in_memory_migrates_and_forgets_linked_facts_across_sigkill_restarts() {
     assert_eq!(status["people"][0]["kept"], 1);
     // The fact, the exchange it came from and the one linked to it; the
     // answer names the two exchanges for the account's history (#7771).
+    let epoch = ask(&socket, json!({"op":"history_epoch"}))["epoch"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let turn = |id| lamp_msgs::history_turn_id(&epoch, "everyone", id);
     assert_eq!(
         ask(&socket, json!({"op":"forget","id":fact})),
-        json!({"ok":true,"removed":3,"exchanges":{"everyone":[source, linked]}})
+        json!({"ok":true,"removed":3,"exchanges":{"everyone":[turn(source), turn(linked)]}})
     );
     assert!(ids(ask(&socket, json!({"op":"search","query":"heliotrope"}))).is_empty());
     let cleared = ask(
