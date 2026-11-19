@@ -2483,6 +2483,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      ran". Refused, `openclaw.json` stays byte for byte, nothing is
      restarted, and the line says "... not written again, the gateway not
      restarted: <OpenClaw's words, masked>"; the next round asks again.
+     The one-shot's check joins the running gateway (above), and a gateway
+     just (re)started may not be there to join yet: only that refusal (the
+     wrapper's "is not running in its own namespaces", or "'node': No such
+     file or directory") is tried again, after 5, 10, 20, 40 s and then 60
+     s four times, 5 min 15 s at most (`lamp_checked_replace::GATEWAY_WAITS`,
+     lamp-tasks' schedule since #7268), each wait one line
+     "...openclaw.json's gateway block waits for OpenClaw's gateway to check
+     it; tried again in N s"; past the last it is refused as above. A
+     refusal of the text is never tried again.
      No switch of its own: it only keeps what the install writes.
    - **From a pinned lockfile, inside the namespace:** the tree is never
      resolved freely. The build carries `crates/update/openclaw/package.json`
