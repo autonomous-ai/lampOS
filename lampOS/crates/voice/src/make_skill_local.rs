@@ -1560,6 +1560,12 @@ fn make_with_by(
             made_skill::forget_unput(&keeping.directory, &made.sha256);
         }
         MADE_LINE.with(|kept| kept.replace(None));
+        // Let run on first (Heron's HOLD on #7774): it settles here, and
+        // its `making` mark goes untold, so no later make hears "still
+        // making" and nothing is told of it when its time would run out.
+        if run_on && let Some(directory) = crate::long_make::settle(made_in) {
+            crate::long_make::dropped(&directory, crate::app_make::now_unix_ms().max(now_unix_ms));
+        }
         eprintln!(
             "lamp-voice: a skill made here was declined while it was made: not put on, not kept, nothing said"
         );
@@ -12280,6 +12286,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(made_with_of(&keeping, "deepseek-draft").is_none());
         net_make_here(None);
         made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// A voice make of `request` (the voice's request), judged a quick
     /// reaction, its DeepSeek draft `deepseek-draft` not kept and so handed
     /// to the agent (someone at the desk), the agent answering each make with `answer` after the voice let it
@@ -12573,6 +12582,75 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         crate::long_make::after_start(&keeping.directory, NOW + 70_000);
         told_once(6_811_231, crate::long_make::NotFinished::Restart);
         crate::long_make::settle(6_811_230);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's HOLD on #7774: a make let run on, then declined while it
+    /// was made ("never mind", through its making note), keeps nothing and
+    /// leaves no `making` mark: a new make is never told the lamp is still
+    /// making it, and nothing is told of it later, not even when its 10
+    /// minutes would have run out.
+    #[test]
+    fn a_make_let_run_on_then_declined_leaves_no_mark_and_is_never_told() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-declined");
+        let request = 6_811_260;
+        made_skill::set_reactions_here(Some(true));
+        let directory = keeping.directory.clone();
+        let answer = guarded_sip();
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(move |_: &str| {
+                assert!(crate::long_make::let_go(request, NOW + 65_000));
+                // The person's no comes after the turn let it go.
+                let id = ASKS
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|ask| ask.directory == directory && ask.made.is_none())
+                    .map(|ask| ask.id)
+                    .unwrap();
+                let answered =
+                    making_answered(&format!("{MAKING_ID}{id}"), request + 1, Some("no"));
+                assert!(matches!(answered, Making::Told(_)), "{answered:?}");
+                Some(answer.clone())
+            }),
+        );
+        let (url, served) = service(vec![
+            judgement(true),
+            (200, route_answer("not = [toml", "deepseek-draft")),
+        ]);
+        crate::make_skill_agent::set_made_for(request);
+        let told = make_with_by(
+            request,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent().running_on(true)),
+        );
+        crate::make_skill_agent::set_made_for(0);
+        assert_eq!(served.join().unwrap(), 2);
+        made_skill::set_reactions_here(None);
+        assert_eq!(told["dropped"], true, "{told}");
+        assert!(!any_on(&keeping.directory));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        assert!(!crate::long_make::is_let_go(request));
+        // A new make, or "is it ready?", hears no "still making".
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 70_000),
+            None
+        );
+        assert!(crate::long_make::still_making(&keeping.directory, NOW + 70_000).is_none());
+        // Nothing told of it, now or once its time would have run out.
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        assert_eq!(tells.next(std::time::Instant::now(), NOW + 80_000), None);
+        let later = NOW + 12 * 60_000;
+        assert_eq!(crate::long_make::read(&keeping.directory, later), None);
+        assert_eq!(tells.next(std::time::Instant::now(), later), None);
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }

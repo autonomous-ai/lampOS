@@ -10,7 +10,8 @@
 //! - **It runs on** in lamp-tasks, up to [`MAKE_WITHIN`] (10 minutes), for
 //!   a make marked "may run on" alone (`"may_run_on":true` on its line,
 //!   `lamp_tasks::skill_make::RUN_ON_MOST_WITHIN`); every other make keeps
-//!   120 s. One at a time: a second make ask while one runs is told
+//!   lamp-tasks' `MOST_WITHIN`, also 10 minutes since #7245, its voice turn
+//!   waiting for it. One at a time: a second make ask while one runs is told
 //!   [`still_making_line`], nothing made. Each make's news keeps a mark of
 //!   its own in [`FILE`] ([`marks`]), so a later make never takes an untold
 //!   one's place; past [`MOST_MARKS`] untold, the oldest is left to the
@@ -610,6 +611,23 @@ fn settled_in(directory: &Path, made: Result<(&str, &str), bool>, now_ms: u64) {
         None => marks.push(outcome),
     }
     write_all(directory, &marks);
+}
+
+/// A long make let run on was declined while it was made (Heron's HOLD on
+/// #7774): its `making` mark goes at `now_ms`, nothing told of it, every
+/// other make's mark kept. Its package goes as a declined make's does.
+pub fn dropped(directory: &Path, now_ms: u64) {
+    crate::made_skill::index_locked(directory, || {
+        let mut marks = marks(directory, now_ms);
+        let before = marks.len();
+        marks.retain(|state| !matches!(state, State::Making { .. }));
+        if marks.len() != before {
+            eprintln!(
+                "lamp-voice: a long make was declined while it ran on: its mark goes, untold"
+            );
+            write_all(directory, &marks);
+        }
+    });
 }
 
 /// What a make ask is told in `directory` at `now_ms` while a long make
