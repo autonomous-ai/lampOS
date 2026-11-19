@@ -143,10 +143,7 @@ pub fn validate(argv: &[String], env: &[(&str, &str)], within: Duration) -> Resu
     let said = said
         .recv_timeout(Duration::from_secs(2))
         .unwrap_or_default();
-    let said: String = said
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    let said: String = redact(&said.split_whitespace().collect::<Vec<_>>().join(" "))
         .chars()
         .take(400)
         .collect();
@@ -161,6 +158,80 @@ pub fn validate(argv: &[String], env: &[(&str, &str)], within: Duration) -> Resu
             within.as_secs()
         )),
     }
+}
+
+/// `said` with every value it quotes from a config masked as `***`
+/// (Seventh's P3 on #7872: OpenClaw's words go to the journal): a quoted
+/// value after a name holding `token`, `key`, `secret` or `password`
+/// (`"token":"…"`, `apiKey: '…'`), any value after such a name and `=`
+/// (`secret=…`), and any run of 24 or more letters, digits, `-` or `_` (a
+/// token's shape). What it says of the config's shape stays.
+pub fn redact(said: &str) -> String {
+    const SECRET: [&str; 4] = ["token", "key", "secret", "password"];
+    let word = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+    let chars: Vec<char> = said.chars().collect();
+    let len = chars.len();
+    let mut out = String::with_capacity(said.len());
+    let mut i = 0;
+    while i < len {
+        if !word(chars[i]) {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < len && word(chars[i]) {
+            i += 1;
+        }
+        if i - start >= 24 {
+            out.push_str("***");
+            continue;
+        }
+        out.extend(&chars[start..i]);
+        let name = chars[start..i].iter().collect::<String>().to_lowercase();
+        if !SECRET.into_iter().any(|secret| name.contains(secret)) {
+            continue;
+        }
+        // The name's closing quote, spaces, then `:` or `=`, spaces.
+        let mut j = i;
+        if j < len && (chars[j] == '"' || chars[j] == '\'') {
+            j += 1;
+        }
+        while j < len && chars[j] == ' ' {
+            j += 1;
+        }
+        let Some(&sep) = chars.get(j).filter(|&&c| c == ':' || c == '=') else {
+            continue;
+        };
+        j += 1;
+        while j < len && chars[j] == ' ' {
+            j += 1;
+        }
+        match chars.get(j) {
+            Some(&quote) if quote == '"' || quote == '\'' => {
+                out.extend(&chars[i..j]);
+                out.push(quote);
+                out.push_str("***");
+                // An unclosed quote masks the rest.
+                i = match chars[j + 1..].iter().position(|&c| c == quote) {
+                    Some(at) => {
+                        out.push(quote);
+                        j + 1 + at + 1
+                    }
+                    None => len,
+                };
+            }
+            Some(_) if sep == '=' => {
+                out.extend(&chars[i..j]);
+                out.push_str("***");
+                i = (j..len)
+                    .find(|&at| chars[at].is_whitespace() || ",;}])\"'".contains(chars[at]))
+                    .unwrap_or(len);
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 #[cfg(test)]
