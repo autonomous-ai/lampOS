@@ -4,7 +4,9 @@
 //!   `{"ok":true,"pose":{"score","keypoints":[{"x","y","score"}…17]}|null,
 //!   "width","height","model","ms":{"decode","npu","post","total"}}`, or
 //!   `{"ok":false,"code","why","retry_ms"?}` with `code` one of `private`,
-//!   `rate`, `busy`, `preparing`, `unavailable`, `bad_request`.
+//!   `rate`, `busy`, `preparing`, `unavailable`, `bad_request`. Past
+//!   [`MOST_AT_ONCE`] askers at once, the answer is `busy` before the line
+//!   is read.
 //! - `{"op":"status"}` → what the service has (`Service::status`).
 //!
 //! The socket is in the service's own runtime folder (0700, `lampos`'s), so
@@ -28,10 +30,17 @@ use std::{
 /// The longest line read: a JPEG of `MOST_JPEG_BYTES` in base64, and its
 /// fields.
 pub const MOST_LINE_BYTES: u64 = (crate::service::MOST_JPEG_BYTES as u64 * 4).div_ceil(3) + 1024;
-/// How long one asker has to send its line and read its answer.
+/// How long one asker has to send its whole line, from its connection
+/// (one deadline for the request, not each read: Heron's P3 on #7972), and
+/// the longest a write of its answer may wait.
 pub const WAIT: Duration = Duration::from_secs(5);
-/// The most askers served at once; past that one is closed unanswered.
+/// The most askers served at once; past that one is answered `busy` at
+/// once and closed.
 pub const MOST_AT_ONCE: usize = 8;
+/// How long a `busy` answer tells the asker to wait.
+pub const BUSY_RETRY: Duration = Duration::from_millis(100);
+/// The most askers being told `busy` at once; past that one is closed.
+const MOST_TOLD_BUSY: usize = 8;
 /// The longest client name taken.
 const MOST_CLIENT: usize = 64;
 
@@ -113,35 +122,106 @@ pub fn apps_tick(service: &Arc<Service>, apps: &Path, now: Instant) -> bool {
 }
 
 /// Serves `listener` until the process ends: each asker on a thread of its
-/// own, at most [`MOST_AT_ONCE`].
+/// own, at most [`MOST_AT_ONCE`]; past that each is answered `busy`.
 pub fn serve(
     listener: UnixListener,
     service: Arc<Service>,
     conditions: Arc<dyn Fn() -> Conditions + Send + Sync>,
 ) {
+    serve_within(listener, service, conditions, WAIT);
+}
+
+/// [`serve`], with `wait` for [`WAIT`].
+pub fn serve_within(
+    listener: UnixListener,
+    service: Arc<Service>,
+    conditions: Arc<dyn Fn() -> Conditions + Send + Sync>,
+    wait: Duration,
+) {
     let at_once = Arc::new(AtomicUsize::new(0));
+    let told_busy = Arc::new(AtomicUsize::new(0));
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
         if at_once.fetch_add(1, Ordering::SeqCst) >= MOST_AT_ONCE {
             at_once.fetch_sub(1, Ordering::SeqCst);
+            if told_busy.fetch_add(1, Ordering::SeqCst) >= MOST_TOLD_BUSY {
+                told_busy.fetch_sub(1, Ordering::SeqCst);
+                continue;
+            }
+            let told_busy = told_busy.clone();
+            std::thread::spawn(move || {
+                busy(stream, wait);
+                told_busy.fetch_sub(1, Ordering::SeqCst);
+            });
             continue;
         }
         let (service, conditions, at_once) = (service.clone(), conditions.clone(), at_once.clone());
         std::thread::spawn(move || {
-            one(stream, &service, conditions.as_ref());
+            one(stream, &service, conditions.as_ref(), wait);
             at_once.fetch_sub(1, Ordering::SeqCst);
         });
     }
 }
 
-fn one(stream: UnixStream, service: &Arc<Service>, conditions: &dyn Fn() -> Conditions) {
-    let _ = stream.set_read_timeout(Some(WAIT));
-    let _ = stream.set_write_timeout(Some(WAIT));
-    let Ok(mut writer) = stream.try_clone() else {
+/// The answer past [`MOST_AT_ONCE`].
+pub fn busy_answer() -> Value {
+    json!({
+        "ok": false,
+        "code": "busy",
+        "why": "the NPU service is answering as many asks as it takes",
+        "retry_ms": BUSY_RETRY.as_millis() as u64,
+    })
+}
+
+/// Tells an asker past the limit `busy` before its line is read, then
+/// reads and drops the line, so its own write is never cut short and it
+/// reads the answer (Heron's P3 on #7972: it was closed unanswered).
+fn busy(stream: UnixStream, wait: Duration) {
+    let _ = stream.set_write_timeout(Some(wait));
+    let mut writer = &stream;
+    if writeln!(writer, "{}", busy_answer()).is_err() {
         return;
-    };
+    }
     let mut line = String::new();
-    if BufReader::new(stream.take(MOST_LINE_BYTES))
+    let _ = BufReader::new(Within::new(&stream, wait).take(MOST_LINE_BYTES)).read_line(&mut line);
+}
+
+/// A stream read until one deadline, however its bytes come.
+struct Within<'a> {
+    stream: &'a UnixStream,
+    until: Instant,
+}
+
+impl<'a> Within<'a> {
+    fn new(stream: &'a UnixStream, wait: Duration) -> Self {
+        Self {
+            stream,
+            until: Instant::now() + wait,
+        }
+    }
+}
+
+impl Read for Within<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(std::io::ErrorKind::TimedOut.into());
+        }
+        self.stream.set_read_timeout(Some(left))?;
+        let mut stream = self.stream;
+        stream.read(buf)
+    }
+}
+
+fn one(
+    stream: UnixStream,
+    service: &Arc<Service>,
+    conditions: &dyn Fn() -> Conditions,
+    wait: Duration,
+) {
+    let _ = stream.set_write_timeout(Some(wait));
+    let mut line = String::new();
+    if BufReader::new(Within::new(&stream, wait).take(MOST_LINE_BYTES))
         .read_line(&mut line)
         .is_err()
         || !line.ends_with('\n')
@@ -149,5 +229,6 @@ fn one(stream: UnixStream, service: &Arc<Service>, conditions: &dyn Fn() -> Cond
         return;
     }
     let reply = answer(service, line.trim_end(), Instant::now(), conditions);
+    let mut writer = &stream;
     let _ = writeln!(writer, "{reply}");
 }

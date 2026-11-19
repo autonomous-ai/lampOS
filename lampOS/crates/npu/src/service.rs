@@ -4,24 +4,29 @@
 //! in, and its NPU, its Store and its threads are given to it, so the tests
 //! play all of them.
 use crate::{
-    engine::{Backend, LoadError, Net},
+    engine::{Backend, Input, LoadError, Net},
     head::{self, Found, PoseHead},
     image::{self, Region},
-    model::{Kept, ModelManifest, Source, Store},
+    model::{Kept, ModelManifest, Offered, Source, Store},
 };
 use lamp_msgs::HeatLevel;
 use lamp_update::fetch::Channel;
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
 /// The op this build answers.
 pub const POSE: &str = "pose";
-/// The largest JPEG taken, in bytes.
-pub const MOST_JPEG_BYTES: usize = 512 * 1024;
+/// The largest JPEG taken, in bytes: 150 KiB, the same as lamp-control's
+/// `protocol::POSE_JPEG_MAX_BYTES` (200 KiB of base64), so the two say one
+/// bound (Heron's P3 on #7972).
+pub const MOST_JPEG_BYTES: usize = 150 * 1024;
 /// A person scored under this is no person: the answer's `pose` is null.
 pub const LEAST_SCORE: f32 = 0.2;
 /// A client's crop around the person it last showed is kept this long:
@@ -29,6 +34,13 @@ pub const LEAST_SCORE: f32 = 0.2;
 pub const TRACK_FOR: Duration = Duration::from_millis(1500);
 /// How long `preparing` tells a client to wait before it asks again.
 pub const PREPARING_RETRY: Duration = Duration::from_secs(2);
+/// A run of the NPU longer than this has hung (one takes about 3 ms): the
+/// watchdog ends the process so systemd starts it again (Heron's P2 6 on
+/// #7972), as a hung run holds the net's lock and every ask behind it.
+pub const RUN_DEADLINE: Duration = Duration::from_secs(5);
+/// How often a kept model is checked against the Store's, so a newer one
+/// (another SHA-256) reaches a lamp that already keeps one.
+pub const REFRESH_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// What the service is set to.
 #[derive(Clone, Debug)]
@@ -46,6 +58,10 @@ pub struct Config {
     /// The first wait after a failed fetch, doubled each time up to `most_retry`.
     pub first_retry: Duration,
     pub most_retry: Duration,
+    /// [`RUN_DEADLINE`].
+    pub run_deadline: Duration,
+    /// [`REFRESH_EVERY`].
+    pub refresh: Duration,
 }
 
 impl Config {
@@ -69,6 +85,8 @@ impl Config {
             ],
             first_retry: Duration::from_secs(30),
             most_retry: Duration::from_secs(30 * 60),
+            run_deadline: RUN_DEADLINE,
+            refresh: REFRESH_EVERY,
         }
     }
 }
@@ -170,6 +188,12 @@ pub struct Service {
     /// Each client's crop: forgotten after [`TRACK_FOR`], when the lamp is
     /// private and when the model is let go. Taken after `net`.
     tracks: Mutex<HashMap<String, Track>>,
+    /// When the NPU's run under way started, by the real clock: what the
+    /// watchdog reads ([`Service::hung`]).
+    running: Mutex<Option<Instant>>,
+    /// Whether an update check is under way, and when the next is due.
+    updating: AtomicBool,
+    next_refresh: Mutex<Option<Instant>>,
 }
 
 impl Service {
@@ -192,6 +216,9 @@ impl Service {
             net: Mutex::new(None),
             asked: Mutex::new((HashMap::new(), None)),
             tracks: Mutex::new(HashMap::new()),
+            running: Mutex::new(None),
+            updating: AtomicBool::new(false),
+            next_refresh: Mutex::new(None),
         })
     }
 
@@ -292,13 +319,25 @@ impl Service {
         ))
     }
 
-    /// One fetch, on its own thread; `wait` is what a failure waits.
+    /// One fetch, on its own thread; `wait` is what a failure waits. A
+    /// model the NPU refused before is looked at by its manifest alone and
+    /// never fetched again: only one of another SHA-256 is.
     fn fetch(&self, source: &Source, wait: Duration) {
         let fetched = (|| {
             let keys = (self.keys)()?;
             let mut channel = (self.channels)()?;
-            self.store
-                .fetch(channel.as_mut(), source, &keys, POSE, &self.config.board)
+            let offered =
+                self.store
+                    .offered(channel.as_mut(), source, &keys, POSE, &self.config.board)?;
+            self.not_refused(&offered)?;
+            let file = self.store.fetch_file(
+                channel.as_mut(),
+                source,
+                POSE,
+                &self.config.board,
+                &offered,
+            )?;
+            self.store.keep(POSE, &offered, &file)
         })();
         let mut model = self.model.lock().expect("model");
         *model = match fetched {
@@ -307,6 +346,9 @@ impl Service {
                     "[lamp-npu] model {} ({}) kept",
                     kept.manifest.id, kept.manifest.licence
                 );
+                // Just fetched: the Store's next look is a whole wait away.
+                *self.next_refresh.lock().expect("next_refresh") =
+                    Some(Instant::now() + self.config.refresh);
                 Model::Kept(kept)
             }
             Err(why) => {
@@ -323,9 +365,108 @@ impl Service {
         };
     }
 
+    /// `Err` when the Store still offers the model the NPU refused.
+    fn not_refused(&self, offered: &Offered) -> Result<(), String> {
+        if self.store.refused(POSE).as_deref() == Some(offered.manifest.sha256.as_str()) {
+            return Err(format!(
+                "the NPU refused model {} (sha256 {}): waiting for another from the Store",
+                offered.manifest.id,
+                &offered.manifest.sha256[..12]
+            ));
+        }
+        Ok(())
+    }
+
+    /// Checks the kept model against the Store's, at most each
+    /// [`Config::refresh`]: a model of another SHA-256 (a newer version, a
+    /// re-conversion) is fetched off the asker's thread and swapped in, and
+    /// the loaded one let go, so the next ask loads the new one. Whether a
+    /// check was started.
+    pub fn refresh(self: &Arc<Self>, now: Instant) -> bool {
+        let Some(source) = self.config.source.clone() else {
+            return false;
+        };
+        let kept = match &*self.model.lock().expect("model") {
+            Model::Kept(kept) => kept.clone(),
+            _ => return false,
+        };
+        {
+            let mut next = self.next_refresh.lock().expect("next_refresh");
+            if next.is_some_and(|at| now < at) {
+                return false;
+            }
+            if self.updating.swap(true, Ordering::SeqCst) {
+                return false;
+            }
+            *next = Some(now + self.config.refresh);
+        }
+        let service = self.clone();
+        (self.spawn)(Box::new(move || service.update(&source, &kept)));
+        true
+    }
+
+    /// One update check, on its own thread.
+    fn update(&self, source: &Source, kept: &Kept) {
+        let found = (|| -> Result<Option<(Offered, Vec<u8>)>, String> {
+            let keys = (self.keys)()?;
+            let mut channel = (self.channels)()?;
+            let offered =
+                self.store
+                    .offered(channel.as_mut(), source, &keys, POSE, &self.config.board)?;
+            if offered.manifest == kept.manifest || self.not_refused(&offered).is_err() {
+                return Ok(None);
+            }
+            let file = self.store.fetch_file(
+                channel.as_mut(),
+                source,
+                POSE,
+                &self.config.board,
+                &offered,
+            )?;
+            Ok(Some((offered, file)))
+        })();
+        match found {
+            Ok(None) => {}
+            Err(why) => eprintln!("[lamp-npu] update check failed: {why}"),
+            Ok(Some((offered, file))) => {
+                // Swapped under the net's lock, so no load reads the folder
+                // while it is renamed; only if the kept model is still the
+                // one this check started from.
+                let mut net = self.net.lock().expect("net");
+                let mut model = self.model.lock().expect("model");
+                if matches!(&*model, Model::Kept(now) if now == kept) {
+                    match self.store.keep(POSE, &offered, &file) {
+                        Ok(new) => {
+                            eprintln!(
+                                "[lamp-npu] model {} updated to {} ({})",
+                                kept.manifest.id, new.manifest.id, new.manifest.licence
+                            );
+                            *model = Model::Kept(new);
+                            *net = None;
+                            self.tracks.lock().expect("tracks").clear();
+                        }
+                        Err(why) => eprintln!("[lamp-npu] update not kept: {why}"),
+                    }
+                }
+            }
+        }
+        self.updating.store(false, Ordering::SeqCst);
+    }
+
+    /// How long the NPU's run under way has taken, once past the deadline:
+    /// the watchdog's cue to end the process.
+    pub fn hung(&self, now: Instant) -> Option<Duration> {
+        let started = (*self.running.lock().expect("running"))?;
+        let taken = now.saturating_duration_since(started);
+        (taken >= self.config.run_deadline).then_some(taken)
+    }
+
     /// A model that failed at its load: let go and, but for no NPU at
-    /// all, fetched again after a wait.
-    fn failed(&self, now: Instant, error: LoadError) -> Refused {
+    /// all, marked as refused by its SHA-256, so the next fetch reads only
+    /// the Store's manifest and takes a model of another SHA-256 alone
+    /// (Heron's P2 4 on #7972: the same 2-10 MB were fetched and written
+    /// every 30 s, for ever).
+    fn failed(&self, now: Instant, error: LoadError, sha256: &str) -> Refused {
         let mut model = self.model.lock().expect("model");
         match error {
             LoadError::Unsupported(why) => {
@@ -333,7 +474,9 @@ impl Service {
                 Refused::new("unavailable", why, None)
             }
             LoadError::Failed(why) => {
+                eprintln!("[lamp-npu] the NPU refused the model: {why}");
                 self.store.remove(POSE);
+                self.store.mark_refused(POSE, sha256);
                 *model = Model::Unavailable {
                     why: why.clone(),
                     retry_at: now + self.config.first_retry,
@@ -389,6 +532,28 @@ impl Service {
         }
         self.admit(client, first.heat, now)?;
         let kept = self.prepare(now)?;
+        // Decoded and cropped before the net's lock, so a slow picture never
+        // holds the NPU from the others (Heron's P2 5 on #7972). The crop
+        // needs the model's input: the loaded one's, read briefly; at a
+        // first load (or a model swapped meanwhile) it is cropped again
+        // under the lock.
+        let decode_at = Instant::now();
+        let picture = image::decode(jpeg).map_err(|why| Refused::new("bad_request", why, None))?;
+        let (width, height) = (picture.width, picture.height);
+        let cropped = |input: Input| {
+            let region = self
+                .tracked(client, width, height, now)
+                .unwrap_or_else(|| Region::whole(width, height, input));
+            (input, region, image::crop(&picture, region, input))
+        };
+        let known = self
+            .net
+            .lock()
+            .expect("net")
+            .as_ref()
+            .map(|loaded| loaded.net.input());
+        let mut made = known.map(cropped);
+        let mut decode_ms = decode_at.elapsed();
         let mut net = self.net.lock().expect("net");
         if net.is_none() {
             // Checked again as it is loaded: never a file changed since.
@@ -401,10 +566,13 @@ impl Service {
                 // Removed by the check: never run, fetched again later.
                 Err(why) => return Err(self.lost(now, why)),
             };
+            let sha256 = checked.manifest.sha256.clone();
             let Some(head) = head::named(&checked.manifest.head) else {
+                drop(net);
                 return Err(self.failed(
                     now,
                     LoadError::Failed(format!("head {:?}", checked.manifest.head)),
+                    &sha256,
                 ));
             };
             match self.backend.load(&checked.path) {
@@ -419,25 +587,27 @@ impl Service {
                 }
                 Err(error) => {
                     drop(net);
-                    return Err(self.failed(now, error));
+                    return Err(self.failed(now, error, &sha256));
                 }
             }
         }
         let loaded = net.as_mut().expect("loaded above");
         loaded.used = now;
         let input = loaded.net.input();
-        let decode_at = Instant::now();
-        let picture = image::decode(jpeg).map_err(|why| Refused::new("bad_request", why, None))?;
-        let (width, height) = (picture.width, picture.height);
-        let region = self
-            .tracked(client, width, height, now)
-            .unwrap_or_else(|| Region::whole(width, height, input));
-        let frame = image::crop(&picture, region, input);
-        let decoded_at = Instant::now();
-        let (outputs, run) = loaded
-            .net
-            .run(&frame)
-            .map_err(|why| Refused::new("unavailable", why, Some(PREPARING_RETRY)))?;
+        let (region, frame) = match made.take() {
+            Some((was, region, frame)) if was == input => (region, frame),
+            _ => {
+                let again = Instant::now();
+                let (_, region, frame) = cropped(input);
+                decode_ms += again.elapsed();
+                (region, frame)
+            }
+        };
+        *self.running.lock().expect("running") = Some(Instant::now());
+        let run = loaded.net.run(&frame);
+        *self.running.lock().expect("running") = None;
+        let (outputs, run) =
+            run.map_err(|why| Refused::new("unavailable", why, Some(PREPARING_RETRY)))?;
         let ran_at = Instant::now();
         let mut found = loaded
             .head
@@ -464,7 +634,7 @@ impl Service {
             "height": height,
             "model": model_id,
             "ms": {
-                "decode": ms(decode_at, decoded_at),
+                "decode": round2(decode_ms.as_secs_f64() * 1e3),
                 "npu": round2(run.npu + run.input),
                 "post": ms(ran_at, done),
                 "total": ms(started, done),
