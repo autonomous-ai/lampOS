@@ -2357,6 +2357,11 @@ fn owner<C: Clock>(
                         && let Some(wanted) = later.from_machines
                     {
                         machines_answered = true;
+                        // Settled by this answer, looked at at once, not at
+                        // the next look a minute later (#7988).
+                        if starting_since.is_some() {
+                            targets_due = Instant::now();
+                        }
                         let said = match read {
                             Ok(listed) => {
                                 let chosen = if engines_on {
@@ -2582,6 +2587,12 @@ fn owner<C: Clock>(
                                     not_among_said = false;
                                 }
                                 found.sign_in_read(sign_in);
+                                // Settled by this answer (signed out, or no
+                                // machines to wait for), looked at at once,
+                                // not a minute later (#7988).
+                                if starting_since.is_some() {
+                                    targets_due = Instant::now();
+                                }
                             }
                             // Kept as it was: one failed read says nothing
                             // about the account; failing for
