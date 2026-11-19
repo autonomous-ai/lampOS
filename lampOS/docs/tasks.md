@@ -2845,7 +2845,24 @@ them) (`crates/tasks/src/openclaw_config.rs`):
     this by its messaging channel. A Harness turn on the gateway comes in
     on OpenClaw's own `webchat` channel. Other channels are kept;
   - `agents.defaults.elevatedDefault`: `"full"`;
-  - `agents.defaults.sandbox.mode`: `"off"`.
+  - `agents.defaults.sandbox.mode`: `"off"`;
+  - `tools.deny`: `ask_user`, `secrets` and `suggest_task` added (#7906),
+    a person's own entries kept, matched without regard to case as
+    OpenClaw does. These are the tools that, when the model calls them,
+    show a prompt in the OpenClaw pane and wait for a person: `ask_user`'s
+    choice (up to 900 s by default), `secrets`' masked credential prompt,
+    and `suggest_task`'s offer in a Gateway-backed TUI (OpenClaw 2026.11.2
+    docs `tools/ask-user.md`, `tools/secrets.md`,
+    `gateway/config-tools/tool-policy.md`). Harness reads such a pane as
+    `needs-input`, and the one-session thread then ends the task and
+    deletes the kept conversation. Denying them only takes tools away:
+    without `ask_user` the agent goes on with its best judgment, as it does
+    after OpenClaw's own `no_answer`. Exec needs nothing more: with
+    `mode: "full"` and no `security`/`ask` in the host approvals document
+    (lamp-update only adds allow-list entries there), OpenClaw resolves the
+    host side to `full`/`off` too, so no command asks. With the switch
+    `off`, these three are taken out of `tools.deny` again, and the list
+    with it when nothing else is in it.
 
   The merge runs at every lamp-tasks start, so a lamp that has the old file
   gets these keys on its next start or update. Its model, workspace,
