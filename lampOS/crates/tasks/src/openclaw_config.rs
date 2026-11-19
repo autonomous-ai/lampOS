@@ -1027,6 +1027,63 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), given);
     }
 
+    /// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+    /// by another writer just now.
+    fn folder_lock_held(folder: &Path) -> bool {
+        use rustix::fs::{FlockOperation, Mode, OFlags};
+        let dir = rustix::fs::open(
+            folder,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .unwrap();
+        match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => false,
+            Err(rustix::io::Errno::WOULDBLOCK) => true,
+            Err(error) => panic!("flock: {error}"),
+        }
+    }
+
+    /// Seventh's P2 on #7872: `openclaw.json` has two read-merge-check-rename
+    /// writers (this one and lamp-update's `gateway` block), and a rename
+    /// landing inside the other's check drops the other's block. So the
+    /// state folder's lock is held from before the read until after the
+    /// rename, through OpenClaw's own check (seconds), and let go after.
+    #[test]
+    fn the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        fs::write(state.join(CONFIG_FILE), INSTALLED).unwrap();
+        let inside = dir.path().join("inside");
+        let release = dir.path().join("release");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n: > {inside}\nwhile [ ! -e {release} ]; do :; done\nexit 0\n",
+                inside = inside.display(),
+                release = release.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        let writing = std::thread::spawn({
+            let (state, wrapper) = (state.clone(), wrapper.clone());
+            move || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &wrapper)
+        });
+        let began = std::time::Instant::now();
+        while !inside.exists() {
+            assert!(began.elapsed() < Duration::from_secs(30), "no check ran");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let held = folder_lock_held(&state);
+        fs::write(&release, "").unwrap();
+        assert!(writing.join().unwrap().unwrap());
+        assert!(held, "the state folder was not locked through the check");
+        assert!(!folder_lock_held(&state), "the lock outlived the write");
+    }
+
     /// #7268's HOLD at 950bb215dd: lamp-tasks can start before OpenClaw's
     /// gateway (at a boot, or an update that restarts both), and the
     /// check fails closed with no gateway. So the write is tried again
