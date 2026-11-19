@@ -10777,6 +10777,24 @@ async fn spoken(
         && !name_waits
         && name_of.is_none()
         && !name_at_start(&text);
+    // Nor one lamp-name heard the name in at its own bar (`--least`), its
+    // words come back as another word: it shows it was said to the lamp,
+    // and the rule judges it as any line, where a line of one or two words,
+    // not a question, with nothing written for the name, is still not
+    // answered on the hearing alone (#7918). On lamp-52e6 on 19 Nov
+    // "Lamp?", heard at 0.917, was held so (#7891).
+    let heard_at = shared
+        .name_in_line
+        .as_ref()
+        .filter(|_| marked)
+        .and_then(|best| best(said.lock().map_or((0, 0), |said| *said)))
+        .filter(|score| *score >= crate::called::LEAST_SCORE);
+    if let Some(score) = heard_at {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound, but lamp-name heard the name in it at {score:.3}: judged as a line (#7891)"
+        );
+    }
+    let marked = marked && heard_at.is_none();
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
