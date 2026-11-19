@@ -328,6 +328,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 RUN_WAITING,
                 skill_secrets::NAMES_CALL,
                 run_calls::CALL,
+                health::FORGET_CALL,
             ]
             .contains(name)
         })
@@ -418,8 +419,9 @@ pub struct Services<H, M> {
 }
 
 /// What a made skill's or a skill run's read of a local service (Apple
-/// Health) is told, after its name: only the owner's own voice reads it.
-pub const LOCAL_OWNER_ONLY: &str = "is read only by the owner's own voice, never by a skill";
+/// Health) is told, after its name: only the owner at the lamp hears it,
+/// their known face seen saying the line (the voice's gate).
+pub const LOCAL_OWNER_ONLY: &str = "is read only to its owner at the lamp, never by a skill";
 
 /// What a write to a local service (Apple Health) is told, after its name.
 pub const LOCAL_NEVER_WRITTEN: &str = "is read only: the lamp never writes to it";
@@ -1216,6 +1218,24 @@ impl<H: Http, M: Mail> Services<H, M> {
                             .answer(&skill_secrets::Ask::List(skill.to_owned()))
                             .0
                             .map_err(str::to_owned),
+                    }
+                }
+                // The voice's own: the owner's "forget everything" removes
+                // Apple Health's kept summary too (the first builder's P3
+                // on #7900). Never offered to a model, never a skill's.
+                health::FORGET_CALL if asker == Asker::Owner => {
+                    match self.store.remove(health::CODE) {
+                        Ok(()) => {
+                            eprintln!(
+                                "lamp-services: {}: removed with the owner's everything",
+                                health::CODE
+                            );
+                            Ok(json!({"forgotten": true}))
+                        }
+                        Err(error) => Err(format!(
+                            "Apple Health's summary could not be removed: {}",
+                            error.kind()
+                        )),
                     }
                 }
                 // A made skill's write is `lamp-skills`' alone.
@@ -2088,7 +2108,8 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     /// A read of a local service (Apple Health), from its kept file alone:
-    /// the owner's voice's only, never a made skill's or a skill's run,
+    /// the voice's only (said to the owner's known face seen saying the
+    /// line), never a made skill's or a skill's run,
     /// and with its switch off it is a service the lamp can't link.
     fn local_read(
         &self,
@@ -2103,11 +2124,26 @@ impl<H: Http, M: Mail> Services<H, M> {
         if asker != Asker::Owner {
             return Err((Stage::Link, format!("{} {LOCAL_OWNER_ONLY}", service.name)));
         }
-        let kept = self
+        let now = crate::now_secs();
+        let mut kept = self
             .store
             .load_local(service.code)
             .and_then(|record| health::Kept::from_record(&record));
-        reads::local_read(service.code, args, kept.as_ref(), crate::now_secs()).map_err(|why| {
+        // Days past the 14 kept are dropped from the file at each read too,
+        // not only left unread (the first builder's P3 on #7900).
+        if let Some(kept) = kept.as_mut()
+            && health::prune(&mut kept.summary, now)
+        {
+            let record = health::Kept::record(&kept.summary, kept.stored_at);
+            if let Err(error) = self.store.keep_local(service.code, &record) {
+                eprintln!(
+                    "lamp-services: {}: its older days could not be dropped: {}",
+                    service.code,
+                    error.kind()
+                );
+            }
+        }
+        reads::local_read(service.code, args, kept.as_ref(), now).map_err(|why| {
             let stage = if why == health::NO_DATA {
                 Stage::Link
             } else {
@@ -2685,7 +2721,7 @@ fn why_said(stage: Stage, why: &str) -> &'static str {
     match stage {
         Stage::Link if why == reads::GMAIL_APP_NO_READS => "refused: a send-only link",
         Stage::Link if why == health::NO_DATA => "refused: no data kept",
-        Stage::Link if why.ends_with(LOCAL_OWNER_ONLY) => "refused: the owner's voice alone",
+        Stage::Link if why.ends_with(LOCAL_OWNER_ONLY) => "refused: its owner at the lamp alone",
         Stage::Link if why.ends_with(NOT_LINKED) => "refused: not linked",
         Stage::Link if has("has expired") => "refused: its link has expired",
         Stage::Link if has(CANT_LINK) => "refused: a service the lamp can't link",
@@ -3203,7 +3239,7 @@ mod tests {
     }
 
     /// With `LAMP_APPLE_HEALTH=on`, the app's summary is kept with no token
-    /// and read by the owner's voice from the lamp alone; the journal says
+    /// and read by the voice from the lamp alone; the journal says
     /// how many days, never a value; a remove and a wipe take it; a made
     /// skill, a skill's run and a write never reach it.
     #[test]
@@ -3336,6 +3372,58 @@ mod tests {
         );
         run(off.admin(r#"{"op":"remove","code":"apple_health"}"#));
         assert!(!dir.path().join("s/apple_health.json").exists());
+    }
+
+    /// The owner's "forget everything" removes the kept summary through the
+    /// voice's own call, never a skill's; a read drops days past the 14
+    /// kept from the file (the first builder's P3s on #7900).
+    #[test]
+    fn apple_health_is_forgotten_and_pruned() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true)
+            .with_apple_health(true)
+            .with_skill_reads(true);
+        let file = dir.path().join("s/apple_health.json");
+        let now = crate::now_secs();
+        let today = jiff::Timestamp::from_second(now)
+            .unwrap()
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .date();
+        let old = today.checked_sub(jiff::Span::new().days(20)).unwrap();
+        let summary: health::Summary = serde_json::from_value(json!({
+            "as_of": jiff::Timestamp::from_second(now).unwrap().to_string(), "tz": "UTC",
+            "days": [{"date": old.to_string(), "steps": 1}, {"date": today.to_string(), "steps": 2}]
+        }))
+        .unwrap();
+        services
+            .store
+            .keep_local(health::CODE, &health::Kept::record(&summary, now))
+            .unwrap();
+        assert!(
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .contains(&old.to_string())
+        );
+        let steps = run(services.tool(&read_line(
+            json!({"service": "apple_health", "what": "steps"}),
+        )));
+        assert_eq!(steps["result"]["quoted"][0]["steps"], 2, "{steps}");
+        let kept = std::fs::read_to_string(&file).unwrap();
+        assert!(!kept.contains(&old.to_string()), "{kept}");
+        assert_eq!(fs_mode(&file), 0o600);
+        // A skill can't forget it; the voice's call does.
+        let forget = json!({"op": "call", "name": health::FORGET_CALL}).to_string();
+        let skill = run(services.skill_tool(&forget));
+        assert_eq!(skill["ok"], false, "{skill}");
+        assert!(file.exists());
+        let ran = run(services.run_tool(&run_line(health::FORGET_CALL, json!({}))));
+        assert!(ran["error"].is_string(), "{ran}");
+        assert!(file.exists());
+        let forgot = run(services.tool(&forget));
+        assert_eq!(forgot, json!({"ok": true, "result": {"forgotten": true}}));
+        assert!(!file.exists());
+        // Again, with nothing kept: still done.
+        assert_eq!(run(services.tool(&forget))["ok"], true);
     }
 
     #[test]

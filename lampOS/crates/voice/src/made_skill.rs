@@ -1314,7 +1314,7 @@ pub(crate) fn set_agent_services_here(on: Option<bool>) {
 /// catalog code (the first builder's ruling on #6432): its grants are
 /// `<code>-read` and `<code>-write`, as `lamp_control::protocol::SERVICE_CODES`
 /// names them (the same list; lamp-tasks' grant check follows it).
-pub const SERVICE_GRANT_CODES: [&str; 15] = [
+pub const SERVICE_GRANT_CODES: [&str; 14] = [
     "gmail",
     "google_calendar",
     "google_drive",
@@ -1329,7 +1329,6 @@ pub const SERVICE_GRANT_CODES: [&str; 15] = [
     "hubspot",
     "amplitude",
     "notion",
-    "apple_health",
 ];
 
 /// A service task's grant (`gmail-read`, `github-write`): its service's
@@ -11608,8 +11607,11 @@ light = { dim = 1 }
     /// first, in the catalog's order.
     #[test]
     fn the_service_grant_codes_are_the_catalogs() {
+        // A local service (Apple Health) is no grant: the owner's voice
+        // alone reads it.
         let codes: Vec<&str> = lamp_services::catalog::SERVICES
             .iter()
+            .filter(|service| !service.local)
             .map(|service| service.code)
             .collect();
         let firsts: Vec<&str> = codes

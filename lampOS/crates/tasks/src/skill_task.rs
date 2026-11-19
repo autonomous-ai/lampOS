@@ -240,7 +240,6 @@ pub const SERVICE_GRANTS: &[&str] = &[
     "hubspot",
     "amplitude",
     "notion",
-    "apple_health",
 ];
 /// The switch for the task grant [`NET_GRANT`] (`on` exactly; off unless
 /// set; on in the product units that read it, #7200): with it, a run whose grants name `net` reaches
@@ -5768,7 +5767,7 @@ mod tests {
             &runner,
         );
         assert_eq!(answer, json!({"ok": true, "id": 5}));
-        assert_eq!(MOST_GRANTS, 12 + 2 * 15 + 1);
+        assert_eq!(MOST_GRANTS, 12 + 2 * 14 + 1);
     }
 
     /// Every service in lamp-services' catalog has its grants here, a
@@ -5790,7 +5789,9 @@ mod tests {
         assert!(codes.len() >= 10, "the catalog's codes were not found");
         let listed: std::collections::BTreeSet<&str> = SERVICE_GRANTS.iter().copied().collect();
         assert_eq!(listed.len(), SERVICE_GRANTS.len(), "a service listed twice");
-        codes.retain(|code| !code.is_empty());
+        // Apple Health, the one local service, is no grant: the owner's
+        // voice alone reads it (the first builder's P3 on #7900).
+        codes.retain(|code| !code.is_empty() && *code != "apple_health");
         assert_eq!(codes, listed);
     }
 

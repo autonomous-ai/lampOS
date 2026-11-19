@@ -47,8 +47,10 @@ pub struct Service {
     /// and its reads and writes are tools sorted by `mcp.rs`.
     pub mcp: Option<&'static str>,
     /// A service whose data the phone app pushes to the lamp and the lamp
-    /// keeps itself (`store::Store::keep_local`): no token, no host, no
-    /// network. Its reads answer from the kept file (`reads::local_read`)
+    /// keeps itself (`store::Store::keep_local`): no token and no host, so
+    /// lamp-services never fetches it from the network. Its reads answer
+    /// from the kept file (`reads::local_read`), and the voice reads the
+    /// answer aloud through Lamp's voice services (its speech service)
     /// and it is never written. Apple Health's alone, with
     /// `LAMP_APPLE_HEALTH=on` (`crate::health`).
     pub local: bool,
@@ -325,7 +327,8 @@ pub const SERVICES: &[Service] = &[
     },
     // The phone app's daily Apple Health summaries (`health.summary` in
     // lamp-cloud, `crate::health`): no sign-in and no host, kept on the
-    // lamp and read from there alone. Listed and read only with
+    // lamp and read from there alone, then read aloud through Lamp's voice
+    // services in fixed words (`health::said`). Listed and read only with
     // `LAMP_APPLE_HEALTH=on`; never written.
     Service {
         code: "apple_health",

@@ -645,3 +645,28 @@ fn the_ten_november_session_ends_cancelled_and_no_result() {
     assert_eq!(held[1].detail["title"], "Hamburger party");
     assert!(held.iter().all(|record| record.status != Status::Done));
 }
+
+/// The first builder's P3 on #7900: an Apple Health read, answered, failed
+/// or refused, is never a record, so none outlives a disconnect.
+#[test]
+fn an_apple_health_read_is_never_a_record() {
+    fresh();
+    for service in ["apple_health", "Apple Health"] {
+        let args = json!({"service": service, "what": "sleep"});
+        read(
+            OWNER,
+            &args,
+            &json!({"source": "Apple Health", "quoted": [{"date": "2026-11-18", "asleep_min": 412}]}),
+        );
+        read(OWNER, &args, &json!({"error": "no data"}));
+        ended(
+            Some(OWNER),
+            READ,
+            &args,
+            Status::Refused,
+            "not theirs",
+            true,
+        );
+    }
+    assert!(held().is_empty(), "{:?}", held());
+}

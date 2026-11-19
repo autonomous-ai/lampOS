@@ -79,7 +79,7 @@ pub enum Part {
 /// folded to its first, [`SERVICE_CODES_FOLDED`]): their grants are
 /// `<code>-read` and `<code>-write` (#6432). One list, which lamp-tasks'
 /// grant check follows; a test holds it to lamp-services' catalog.
-pub const SERVICE_CODES: [&str; 15] = [
+pub const SERVICE_CODES: [&str; 14] = [
     "gmail",
     "google_calendar",
     "google_drive",
@@ -94,9 +94,6 @@ pub const SERVICE_CODES: [&str; 15] = [
     "hubspot",
     "amplitude",
     "notion",
-    // Read by the owner's own voice alone: lamp-services refuses a skill
-    // run's read of it whatever its grant.
-    "apple_health",
 ];
 
 /// A service's second catalog code, and the code its grant names: a Gmail
@@ -2013,7 +2010,12 @@ mod tests {
     #[test]
     fn service_grants_are_the_catalogs_codes_read_and_write() {
         let mut folded: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
-        for service in lamp_services::catalog::SERVICES {
+        // A local service (Apple Health) is read by the owner's voice
+        // alone and is no grant (the first builder's P3 on #7900).
+        for service in lamp_services::catalog::SERVICES
+            .iter()
+            .filter(|service| !service.local)
+        {
             folded.insert(
                 service_grant_code(service.code)
                     .unwrap_or_else(|| panic!("{} has no grant", service.code)),

@@ -316,7 +316,7 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 | `notion` | Notion | `mcp.notion.com` | as Slack | as Slack |
-| `apple_health` | Apple Health (with `LAMP_APPLE_HEALTH=on`) | none: local, no token, never the network | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, from the kept summary ("Apple Health", below) | none |
+| `apple_health` | Apple Health (with `LAMP_APPLE_HEALTH=on`) | none: local, no token, nothing fetched from the network; its answers are read aloud through Lamp's voice services | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, from the kept summary ("Apple Health", below) | none |
 
 Calendar has no `calendars` read: its link holds only `calendar.events`
 (#5385), and Google lists calendars only with a calendar or calendarlist
@@ -3038,12 +3038,17 @@ kind and its status) or a `Debug`.
 ## Apple Health (`LAMP_APPLE_HEALTH`, on in the product)
 
 The phone app reads HealthKit and pushes daily summaries to the lamp; the
-owner's voice answers "how did I sleep", "steps today" or "my runs this
-week" from them through `service_read`, under the same owner gate as every
-other read ("Who can use them", above). There is no sign-in, no token and
-no host: the catalog row `apple_health` is `local` (`catalog.rs`), and the
-lamp never reaches the network for it. The rules are one copy,
-`crates/services/src/health.rs`, read by `lamp-cloud` and `lamp-services`.
+voice answers "how did I sleep", "steps today" or "my runs this week" from
+them through `service_read`, only when the eyes see the owner's own known
+face saying the line ("Who hears it", below), a gate of its own, stricter
+than every other read's. There is no sign-in, no token and no host: the
+catalog row `apple_health` is `local` (`catalog.rs`), and `lamp-services`
+never fetches it from the network. The answer itself is read aloud through
+Lamp's voice services: the lamp builds its exact words and the speech
+service (ElevenLabs in the product) renders them; no chat model is given a
+value ("What is said", below). The rules are one copy,
+`crates/services/src/health.rs`, read by `lamp-cloud`, `lamp-services` and
+the voice.
 
 **On in the product: `LAMP_APPLE_HEALTH=on`**, off unless set, in both `lamp-cloud.service` (beside
 `LAMP_CLOUD=on` and `LAMP_SERVICES=on`) and `lamp-services.service`; both
@@ -3073,7 +3078,9 @@ Checked strictly, first by `lamp-cloud` and again by `lamp-services`
   no more than a day after the lamp's clock. `tz`: an IANA zone's name, at
   most 64 characters of letters, digits, `/`, `_`, `+` and `-`.
 - `days`: 1 to 14 (`DAYS_MOST`), each `date` (`YYYY-MM-DD`, a real day)
-  once; kept oldest first. Every other day field is optional, and `null` is
+  once; kept oldest first. A day before the 14 ending today (in `tz`) is
+  dropped, not refused, at each push, and dropped from the file at each
+  read too (`health::prune`), so no day is kept past 14. Every other day field is optional, and `null` is
   the same as absent: `steps` 0 to 200,000, `active_kcal` 0 to 20,000,
   `resting_hr` 20 to 250, `sleep_min` 0 to 1,440 (the night that ended on
   `date`), `sleep_start` and `sleep_end` `HH:MM` (00:00 to 23:59), all whole
@@ -3114,7 +3121,8 @@ doesn't know the zone).
 | `week` | none | Each day kept of the 7 ending today, and `week`: the days shared, workouts, steps' total and daily average, the nightly sleep and resting heart rate averages over the days that have them; nights in bed are `in_bed` and averaged apart (`in_bed_nightly_average`), never mixed with measured sleep |
 
 Every answer is quoted data from Apple Health with the summary's `as_of`
-and `tz` and a `note`, so the voice says "as of 7:30 this morning". A day or
+and `tz` and a `note`, from which the lamp's fixed words say "as of 7:30
+am" ("What is said", below). A day or
 a value the phone didn't send is never guessed: the answer has nothing
 quoted, `"found": "none"` and a note saying what is missing. With no summary
 kept the read is refused, "Apple Health has no data on this lamp yet…"; a
@@ -3134,23 +3142,91 @@ named, so its "what, by service: …" list is told on `what`'s own
 description instead; with the switch off the description, and `what`, are
 as before, and none of this is in `tools.json`.
 
-**Who reads it.** The owner's voice alone: a made skill's read is refused at
-the door (`spoken::not_readable`, "read only by the owner's own voice"),
-and so is a skill's run, whatever its grant (`apple_health-read` is a code in
-`SERVICE_CODES`, refused by `lamp-services`); it is never written ("Apple
-Health is read only: the lamp never writes to it"), and the agent's MCP
-server never lists it.
+**Who hears it** (the first builder's P1 on #7900). A read is said only
+when the eyes see **the owner's known face** (the face kept at setup,
+`known_faces::owner_now`) saying the line (`LAMP_EYES_SPEAKING`'s
+`seen_saying_owner`, never a face confirmed by voice alone, and no other
+face seen speaking through it), whatever `LAMP_PRIVATE_ROOM` says: health
+is more sensitive than mail or a calendar, so the private room's "whoever
+speaks is the owner" doesn't cover it, and a lamp with no face enrolled has
+no owner to say it to (no "the-owner" fallback). Anyone else, a line not
+heard at the lamp, or no face enrolled hears one plain line, "I keep health
+details for the person they belong to." ("Mình chỉ nói thông tin sức khỏe
+với đúng người sở hữu chúng."), and nothing is read: the voice never asks
+`lamp-services` (`lamp_voice::services::health_read`, before every other
+gate of a read, the agent's hand-off among them). On the Live route, whose
+model speaks every answer, a read is "I can't read Apple Health on this
+voice." and nothing is read. Whether the private room should cover health
+is the lead's to ask the owner; until then this gate stands.
+
+A made skill's read is refused at the door (`spoken::not_readable`, "read
+only to its owner at the lamp, never by a skill"), and so is a skill's run
+(`LOCAL_OWNER_ONLY`); `apple_health-read` and `apple_health-write` are no
+grant a skill can declare (`SERVICE_CODES`, `SERVICE_GRANTS` and
+`SERVICE_GRANT_CODES` leave it out, and the control schema's
+`service_grant` with them); it is never written ("Apple Health is read
+only: the lamp never writes to it"), and the agent's MCP server never lists
+it (`mcp_server::granted` skips a local service whatever a grant says).
+
+**What is said** (the first builder's P2 on #7900). On the second route the
+voice gives the chat model no value: `lamp_services::health::said` builds
+the answer's exact words from the read's answer, in English or, for a
+Vietnamese owner (`LAMP_LANGUAGE_FILE`), Vietnamese, and the read's result
+carries them alone (`lamp_says_exactly`). The round says them as they are
+(`Queue::push_shown_as`, no tags or rewrites) and ends there, with no
+second round; beside other calls the next round is told only "Lamp has said
+this Apple Health answer aloud itself, in fixed words. Don't repeat it, add
+to it, or guess any health value." The words, for each read:
+
+- `sleep`: "Apple Health, as of 7:30 am: you slept 6 hours and 52 minutes
+  last night, from 11:48 pm to 6:40 am." ("you were in bed for …" for a
+  night in bed); "Theo Apple Health lúc 7 giờ 30, đêm qua bạn ngủ 6 tiếng
+  52 phút, từ 23 giờ 48 đến 6 giờ 40." ("… bạn nằm trên giường …").
+- `steps`: "… you have 8,421 steps so far today." or "… you walked 8,421
+  steps yesterday."; with `days`, "… you walked 31,421 steps over the last 7
+  days, about 7,855 a day." and, when some days are missing, "Only 4 of
+  those days were shared."; "… hôm nay đến giờ bạn đã đi 8421 bước.", "… 7
+  ngày qua bạn đi tổng cộng 31421 bước, khoảng 7855 bước mỗi ngày."
+- `heart`: "… your resting heart rate today was 58 beats a minute."; "…
+  nhịp tim lúc nghỉ hôm nay của bạn là 58 nhịp mỗi phút."
+- `workouts`: "… your latest workout was running today for 32 minutes, 5.1
+  kilometres."; with `days`, "… you did 2 workouts in the last 7 days: …;
+  and …" (at most 3 named, then "N more"); "… 7 ngày qua bạn có 1 buổi tập:
+  chạy bộ hôm nay trong 32 phút, 5,1 ki-lô-mét."
+- `week`: "… over the last 7 days you walked 8,421 steps, about 8,421 a
+  day; slept about 6 hours and 52 minutes a night; had a resting heart rate
+  around 58 beats a minute; and did 1 workout."; "… 7 ngày qua bạn đi 8421
+  bước, khoảng 8421 bước mỗi ngày; ngủ khoảng 6 tiếng 52 phút mỗi đêm; nhịp
+  tim lúc nghỉ trung bình 58 nhịp mỗi phút; và có 1 buổi tập."
+- Nothing for it: "Your phone hasn't shared any steps for that with Lamp."
+  ("Điện thoại chưa chia sẻ số bước nào cho lúc đó với Lamp."); none kept:
+  "Lamp has no Apple Health data yet. You can share it from the Lamp app on
+  your phone."; stale: "The Apple Health data on Lamp is more than two days
+  old, so I won't read it. Opening the Lamp app on your phone shares it
+  again."; any other failure: "I couldn't read Apple Health just now."
+
+The as-of time is said in the owner's zone: "as of 7:30 am", "as of
+yesterday at 9:10 pm". These words are rendered by the speech service, so
+the values do leave the lamp for it, read aloud through Lamp's voice
+services; the chat model (DeepSeek in the product) never sees them.
 
 **Privacy.** No health value is in a journal line, a reply's error or a
 `Debug` (`Summary`'s shows its number of days): `lamp-services` says
 "health.summary stored, N days", `lamp-cloud` the kind and its status, and a
-read's line "the voice's service_read of apple_health steps: found 1".
-Service records (`LAMP_SERVICE_RECORDS`) keep of a read's items only a
-title, sender, date, link, id and a short text excerpt
-(`service_records::found`); an Apple Health item names its day by `date`
-and carries no other field of those, so a read's record keeps its kind, its
-`date` or `days` asked and the dates found, never a number (the safer path:
-no numbers kept, rather than numbers kept masked).
+read's line "the voice's service_read of apple_health steps: found 1"; the
+voice says whether the owner's face was seen and that the words were fixed,
+never them. The lamp's spoken line is kept as "[an Apple Health read]" in
+the thread, a later turn's history and the session records' transcript
+(`/var/lib/lampOS/voice/sessions/*/metadata/events-*.jsonl`), never its
+words (`services::HEALTH_SHOWN`). No service record (`LAMP_SERVICE_RECORDS`)
+is kept of an Apple Health read at all, answered, failed or refused, so
+none outlives a disconnect. A brief read (`services::brief`, someone else
+maybe in view on another service's read) cuts a read's `week` totals with
+its items. The owner's "forget everything about me" removes
+`apple_health.json` too, through `lamp-services`' own call
+`apple_health_forget` on the tools socket (the voice's alone, never a
+model's, a made skill's or a run's), on the same mark and rule as their
+voice print; the answer says `"apple_health": "forgotten too"`.
 
 ## The voice's three functions
 
@@ -3614,7 +3690,20 @@ link, gone with a remove, the app's `null` and a wipe; each read with its
 `as_of`, a missing night or day said missing, none kept and a stale summary
 giving no value; a made skill, a skill's run and a write refused; the switch
 off in both programs (nothing kept, listed, read or offered, the disconnect
-still taken).
+still taken); a day past the 14 dropped at a push and from the file at a
+read; the voice's call `apple_health_forget` removing the file, a skill's or
+a run's refused; each read's fixed words in English and Vietnamese
+(`health::tests::each_read_is_said_in_fixed_words`); `mcp_server::granted`
+never listing it. The voice (`services::tests`, `service_records::tests`,
+`second_provider::tests::health_said`, `made_skill::tests`): a read said only
+to the owner's known face seen saying it, the private room on and no face
+enrolled told the plain line with `lamp-services` never asked; the seen
+read's fixed words, the model told none of them and no round 2, beside
+another call round 2 told only that it was said; the transcript
+"[an Apple Health read]"; a brief read's `week` cut; no service record; the
+owner's "forget everything" asking `apple_health_forget`, anyone else's
+not; and Apple Health in no grant list (`lamp-control`'s and `lamp-tasks`'
+catalog tests skip the local service).
 
 `cargo test -p lamp-services`: the store root-only (0700/0600) and written
 whole, a code never a path, remove and wipe; no secret in a `Debug` or a

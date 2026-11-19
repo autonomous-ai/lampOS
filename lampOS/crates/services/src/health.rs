@@ -1,23 +1,30 @@
 //! Apple Health (`apple_health`): the phone app reads HealthKit and pushes
 //! daily summaries to the lamp (`health.summary` in lamp-cloud), with no
-//! sign-in, no token and no network. One copy of the rules, read by
+//! sign-in, no token, and nothing fetched from the network. One copy of the rules, read by
 //! lamp-cloud, which checks the app's request before handing it on, and by
 //! this program, which checks it again and keeps it
 //! (`store::Store::keep_local`, `/var/lib/lampos-services/apple_health.json`,
 //! root's, 0600) until a remove, a sign-out or a reset wipes it.
 //!
-//! The owner's voice reads it with `service_read` (`reads::local_read`),
-//! answered from the kept file alone. Each answer carries the summary's
-//! `as_of`; a summary older than [`STALE_AFTER_S`] gives no values, only
-//! that it is out of date. Nothing here invents a value: a day or a field
-//! the phone did not send is said to be missing.
+//! The owner reads it with `service_read` (`reads::local_read`), answered
+//! from the kept file alone, and only when the eyes see the owner's own
+//! known face saying the line (`lamp_voice::services::health_read`): the
+//! voice says the answer in the fixed words [`said`] builds here, in English
+//! or Vietnamese, and no chat model is given a value. Those words are read
+//! aloud through Lamp's voice services (its speech service renders them).
+//! Each answer carries the summary's `as_of`; a summary older than
+//! [`STALE_AFTER_S`] gives no values, only that it is out of date. Nothing
+//! here invents a value: a day or a field the phone did not send is said to
+//! be missing. A day older than [`DAYS_MOST`] days is dropped at each push
+//! and each read ([`prune`]).
 //!
 //! Health values are in no journal line, error or `Debug` ([`Summary`]'s
 //! shows the number of days alone), and a read's items name a day only by
 //! `date`, so the voice's service record of a read keeps the date and none
 //! of the numbers (`lamp_voice::service_records::found` keeps an item's
 //! title, sender, date, link, id and text, none of which an item here has).
-//! A made skill or a skill's run never reads it (`serve.rs`).
+//! A made skill or a skill's run never reads it (`serve.rs`), and it is
+//! no grant a skill can declare.
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::{fmt, ops::RangeInclusive};
@@ -27,6 +34,9 @@ pub const CODE: &str = "apple_health";
 /// The switch, read by lamp-cloud (the kind) and this program (the
 /// service listed, kept and read): off unless `on`.
 pub const ENVIRONMENT: &str = "LAMP_APPLE_HEALTH";
+/// The voice's own call on the tools socket, never a model's or a skill's:
+/// the owner's "forget everything" removes the kept summary.
+pub const FORGET_CALL: &str = "apple_health_forget";
 /// The app's kind on lamp-cloud's channel.
 pub const KIND: &str = "health.summary";
 /// The most bytes the app's `data` may take, as compact JSON.
@@ -399,21 +409,41 @@ pub fn fit(data: &Value, now: i64) -> Result<Summary, String> {
     if days.windows(2).any(|pair| pair[0].date == pair[1].date) {
         return Err("data.days names one date twice".into());
     }
-    Ok(Summary {
+    let mut summary = Summary {
         as_of: as_of.to_owned(),
         tz: tz.to_owned(),
         days,
-    })
+    };
+    // Older days are dropped, not refused: the phone may send a day the
+    // lamp has stopped keeping.
+    prune(&mut summary, now);
+    Ok(summary)
+}
+
+/// `summary` with every day before the [`DAYS_MOST`] days ending today (in
+/// the owner's zone, at `now`) dropped: at each push ([`fit`]) and each read
+/// (`serve.rs`, which keeps the file without them). Whether any went.
+pub fn prune(summary: &mut Summary, now: i64) -> bool {
+    let first = first_of(today(summary, now), DAYS_MOST as u32);
+    let before = summary.days.len();
+    summary
+        .days
+        .retain(|day| date_of(&day.date).is_some_and(|date| date >= first));
+    summary.days.len() != before
 }
 
 /// The owner's zone: the summary's `tz`, else the offset its `as_of` has.
 fn zone(summary: &Summary) -> jiff::tz::TimeZone {
-    if let Ok(zone) = jiff::tz::TimeZone::get(&summary.tz) {
+    zone_of(&summary.tz, &summary.as_of)
+}
+
+/// The zone `tz` names, else the offset `as_of` has, else UTC.
+fn zone_of(tz: &str, as_of: &str) -> jiff::tz::TimeZone {
+    if let Ok(zone) = jiff::tz::TimeZone::get(tz) {
         return zone;
     }
-    let offset = summary
-        .as_of
-        .get(summary.as_of.len().saturating_sub(6)..)
+    let offset = as_of
+        .get(as_of.len().saturating_sub(6)..)
         .filter(|tail| tail.starts_with(['+', '-']) && clock_ok(&tail[1..]))
         .map_or(0, |tail| {
             let minutes =
@@ -743,7 +773,9 @@ pub fn workouts(name: &str, summary: &Summary, args: &Value, now: i64) -> Result
             all.len()
         )
     });
-    Ok(framed(name, summary, all, note))
+    let mut answer = framed(name, summary, all, note);
+    answer["workouts_found"] = json!(found);
+    Ok(answer)
 }
 
 /// `week`: each of the 7 days ending today the phone shared, and their
@@ -814,10 +846,12 @@ pub fn week(name: &str, summary: &Summary, now: i64) -> Result<Value, String> {
     }
     if let Some(asleep) = average(sleep) {
         totals["asleep_nightly_average"] = json!(duration(asleep as u32));
+        totals["asleep_nightly_average_min"] = json!(asleep);
     }
     let any_in_bed = !in_bed.is_empty();
     if let Some(in_bed) = average(in_bed) {
         totals["in_bed_nightly_average"] = json!(duration(in_bed as u32));
+        totals["in_bed_nightly_average_min"] = json!(in_bed);
     }
     if let Some(hr) = average(hr) {
         totals["resting_heart_rate_average_bpm"] = json!(hr);
@@ -828,6 +862,507 @@ pub fn week(name: &str, summary: &Summary, now: i64) -> Result<Value, String> {
     let mut answer = framed(name, summary, items, note);
     answer["week"] = totals;
     Ok(answer)
+}
+
+/// The language a health answer is said in ([`said`]): the owner's, English
+/// for any the lamp has no health words for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spoken {
+    English,
+    Vietnamese,
+}
+
+impl Spoken {
+    fn pick(self, english: &'static str, vietnamese: &'static str) -> &'static str {
+        match self {
+            Self::English => english,
+            Self::Vietnamese => vietnamese,
+        }
+    }
+}
+
+/// What the voice says, in place of any read, when the line is not the
+/// owner's known face seen saying it, or no face is enrolled: nothing of
+/// the summary is read (the first builder's P1 on #7900).
+pub fn not_yours(spoken: Spoken) -> &'static str {
+    spoken.pick(
+        "I keep health details for the person they belong to.",
+        "Mình chỉ nói thông tin sức khỏe với đúng người sở hữu chúng.",
+    )
+}
+
+/// What the voice says of a health read on a route that can't say fixed
+/// words without a model (the Live route): nothing is read.
+pub fn not_on_this_voice(spoken: Spoken) -> &'static str {
+    spoken.pick(
+        "I can't read Apple Health on this voice.",
+        "Mình không đọc được Apple Health bằng giọng này.",
+    )
+}
+
+/// A whole number as said: `8,421` in English, `8421` in Vietnamese.
+fn number(n: u64, spoken: Spoken) -> String {
+    let digits = n.to_string();
+    if spoken == Spoken::Vietnamese {
+        return digits;
+    }
+    let mut out = String::new();
+    for (at, digit) in digits.chars().enumerate() {
+        if at > 0 && (digits.len() - at).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(digit);
+    }
+    out
+}
+
+/// `minutes` as said: `6 hours and 52 minutes`, `6 tiếng 52 phút`.
+fn spoken_duration(minutes: u64, spoken: Spoken) -> String {
+    let (h, m) = (minutes / 60, minutes % 60);
+    match spoken {
+        Spoken::English => {
+            let hours = format!("{h} hour{}", if h == 1 { "" } else { "s" });
+            let mins = format!("{m} minute{}", if m == 1 { "" } else { "s" });
+            match (h, m) {
+                (0, _) => mins,
+                (_, 0) => hours,
+                _ => format!("{hours} and {mins}"),
+            }
+        }
+        Spoken::Vietnamese => match (h, m) {
+            (0, _) => format!("{m} phút"),
+            (_, 0) => format!("{h} tiếng"),
+            _ => format!("{h} tiếng {m} phút"),
+        },
+    }
+}
+
+/// `HH:MM` as said: `11:48 pm`, `7 am`; `23 giờ 48`, `7 giờ`.
+fn spoken_clock(text: &str, spoken: Spoken) -> Option<String> {
+    if !clock_ok(text) {
+        return None;
+    }
+    let hour: u32 = text[..2].parse().ok()?;
+    let minute: u32 = text[3..].parse().ok()?;
+    Some(match spoken {
+        Spoken::English => {
+            let half = if hour < 12 { "am" } else { "pm" };
+            let twelve = match hour % 12 {
+                0 => 12,
+                h => h,
+            };
+            if minute == 0 {
+                format!("{twelve} {half}")
+            } else {
+                format!("{twelve}:{minute:02} {half}")
+            }
+        }
+        Spoken::Vietnamese if minute == 0 => format!("{hour} giờ"),
+        Spoken::Vietnamese => format!("{hour} giờ {minute:02}"),
+    })
+}
+
+const MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+/// A date as said: `November 16`, `ngày 16 tháng 11`.
+fn spoken_date(date: jiff::civil::Date, spoken: Spoken) -> String {
+    let month = usize::try_from(date.month()).unwrap_or(1).clamp(1, 12);
+    match spoken {
+        Spoken::English => format!("{} {}", MONTHS[month - 1], date.day()),
+        Spoken::Vietnamese => format!("ngày {} tháng {month}", date.day()),
+    }
+}
+
+/// A day as said beside `today`: `today`, `yesterday`, `on November 16`.
+fn spoken_day(text: &str, today: jiff::civil::Date, spoken: Spoken) -> String {
+    let Some(date) = date_of(text) else {
+        return spoken.pick("that day", "hôm đó").to_owned();
+    };
+    if date == today {
+        spoken.pick("today", "hôm nay").to_owned()
+    } else if today.yesterday().ok() == Some(date) {
+        spoken.pick("yesterday", "hôm qua").to_owned()
+    } else {
+        match spoken {
+            Spoken::English => format!("on {}", spoken_date(date, spoken)),
+            Spoken::Vietnamese => spoken_date(date, spoken),
+        }
+    }
+}
+
+/// The night that ended on `text`, as said beside `today`.
+fn spoken_night(text: &str, today: jiff::civil::Date, spoken: Spoken) -> String {
+    let Some(date) = date_of(text) else {
+        return spoken.pick("that night", "đêm đó").to_owned();
+    };
+    if date == today {
+        spoken.pick("last night", "đêm qua").to_owned()
+    } else if today.yesterday().ok() == Some(date) {
+        spoken
+            .pick("the night before last", "đêm hôm kia")
+            .to_owned()
+    } else {
+        match spoken {
+            Spoken::English => format!("the night ending {}", spoken_date(date, spoken)),
+            Spoken::Vietnamese => format!("đêm kết thúc {}", spoken_date(date, spoken)),
+        }
+    }
+}
+
+/// When the phone shared it (`as_of`), as said beside `today`, in `zone`:
+/// `as of 7:30 am`, `as of yesterday at 9:10 pm`; `lúc 7 giờ 30`.
+fn spoken_as_of(
+    as_of: &str,
+    zone: &jiff::tz::TimeZone,
+    today: jiff::civil::Date,
+    spoken: Spoken,
+) -> Option<String> {
+    let at = as_of
+        .parse::<jiff::Timestamp>()
+        .ok()?
+        .to_zoned(zone.clone());
+    let clock = spoken_clock(&format!("{:02}:{:02}", at.hour(), at.minute()), spoken)?;
+    let date = at.date();
+    Some(match spoken {
+        Spoken::English if date == today => format!("as of {clock}"),
+        Spoken::English if today.yesterday().ok() == Some(date) => {
+            format!("as of yesterday at {clock}")
+        }
+        Spoken::English => format!("as of {} at {clock}", spoken_date(date, spoken)),
+        Spoken::Vietnamese if date == today => format!("lúc {clock}"),
+        Spoken::Vietnamese if today.yesterday().ok() == Some(date) => {
+            format!("lúc {clock} hôm qua")
+        }
+        Spoken::Vietnamese => format!("lúc {clock} {}", spoken_date(date, spoken)),
+    })
+}
+
+/// A workout's kind as said: `running`, `strength training`; in Vietnamese
+/// the common ones in Vietnamese, any other in its own words.
+fn spoken_kind(kind: &str, spoken: Spoken) -> String {
+    let english = kind.replace('_', " ");
+    if spoken == Spoken::English {
+        return english;
+    }
+    match kind {
+        "running" => "chạy bộ",
+        "walking" => "đi bộ",
+        "cycling" => "đạp xe",
+        "swimming" => "bơi",
+        "hiking" => "leo núi",
+        "yoga" => "yoga",
+        "dance" | "cardio_dance" | "social_dance" => "nhảy",
+        "traditional_strength_training" | "functional_strength_training" => "tập tạ",
+        "high_intensity_interval_training" => "tập HIIT",
+        "elliptical" => "tập máy elip",
+        "rowing" => "chèo thuyền",
+        "badminton" => "cầu lông",
+        "tennis" => "quần vợt",
+        "soccer" => "bóng đá",
+        "basketball" => "bóng rổ",
+        _ => return english,
+    }
+    .to_owned()
+}
+
+/// One workout item ([`workouts`]) as said.
+fn spoken_workout(item: &Value, today: jiff::civil::Date, spoken: Spoken) -> String {
+    let kind = spoken_kind(item["type"].as_str().unwrap_or("workout"), spoken);
+    let day = spoken_day(item["date"].as_str().unwrap_or_default(), today, spoken);
+    let mut said = format!("{kind} {day}");
+    if let Some(min) = item["minutes"].as_u64() {
+        said.push_str(&match spoken {
+            Spoken::English => format!(" for {}", spoken_duration(min, spoken)),
+            Spoken::Vietnamese => format!(" trong {}", spoken_duration(min, spoken)),
+        });
+    }
+    if let Some(km) = item["km"].as_f64() {
+        let km = format!("{km:.1}");
+        let km = km.strip_suffix(".0").unwrap_or(&km).to_owned();
+        said.push_str(&match spoken {
+            Spoken::English => format!(", {km} kilometres"),
+            Spoken::Vietnamese => format!(", {} ki-lô-mét", km.replace('.', ",")),
+        });
+    }
+    said
+}
+
+/// `parts` joined as a list is said: `a; b; and c`, `a; b; và c`.
+fn listed(parts: &[String], spoken: Spoken) -> String {
+    match parts {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{}; {} {last}", rest.join("; "), spoken.pick("and", "và")),
+    }
+}
+
+/// The most workouts said by name; any more are counted.
+const WORKOUTS_SAID: usize = 3;
+
+/// The exact words the voice says for a health read: built here from the
+/// read's answer `told` (or its `{"error"}`) for `what` with `args`, at
+/// `now`, in `spoken`, with no model asked. Every value said is one the
+/// phone shared; a day, field or summary missing is said to be missing.
+pub fn said(what: &str, args: &Value, told: &Value, now: i64, spoken: Spoken) -> String {
+    if let Some(error) = told.get("error").and_then(Value::as_str) {
+        return if error == NO_DATA {
+            spoken
+                .pick(
+                    "Lamp has no Apple Health data yet. You can share it from the Lamp app on your phone.",
+                    "Lamp chưa có dữ liệu Apple Health. Bạn có thể chia sẻ từ ứng dụng Lamp trên điện thoại.",
+                )
+                .to_owned()
+        } else {
+            spoken
+                .pick(
+                    "I couldn't read Apple Health just now.",
+                    "Lúc này mình chưa đọc được Apple Health.",
+                )
+                .to_owned()
+        };
+    }
+    if told["stale"] == true {
+        return spoken
+            .pick(
+                "The Apple Health data on Lamp is more than two days old, so I won't read it. Opening the Lamp app on your phone shares it again.",
+                "Dữ liệu Apple Health trên Lamp đã cũ hơn hai ngày nên mình không đọc. Mở ứng dụng Lamp trên điện thoại để chia sẻ lại nhé.",
+            )
+            .to_owned();
+    }
+    let as_of = told["as_of"].as_str().unwrap_or_default();
+    let zone = zone_of(told["tz"].as_str().unwrap_or_default(), as_of);
+    let today = jiff::Timestamp::from_second(now)
+        .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
+        .to_zoned(zone.clone())
+        .date();
+    let items = told["quoted"].as_array().cloned().unwrap_or_default();
+    let none = || {
+        let kind = match what {
+            "sleep" => spoken.pick("sleep", "dữ liệu giấc ngủ"),
+            "steps" => spoken.pick("steps", "số bước"),
+            "heart" => spoken.pick("resting heart rate", "nhịp tim lúc nghỉ"),
+            "workouts" => spoken.pick("workouts", "buổi tập"),
+            _ => {
+                return spoken
+                    .pick(
+                        "Your phone hasn't shared anything from the last 7 days with Lamp.",
+                        "Điện thoại chưa chia sẻ gì trong 7 ngày qua với Lamp.",
+                    )
+                    .to_owned();
+            }
+        };
+        match spoken {
+            Spoken::English => format!("Your phone hasn't shared any {kind} for that with Lamp."),
+            Spoken::Vietnamese => {
+                format!("Điện thoại chưa chia sẻ {kind} nào cho lúc đó với Lamp.")
+            }
+        }
+    };
+    if items.is_empty() {
+        return none();
+    }
+    let Some(when) = spoken_as_of(as_of, &zone, today, spoken) else {
+        return none();
+    };
+    let first = &items[0];
+    let n = |value: &Value| value.as_u64().map(|n| number(n, spoken));
+    let body = match what {
+        "sleep" => {
+            let in_bed = first.get("in_bed_min").is_some();
+            let Some(minutes) = first["asleep_min"]
+                .as_u64()
+                .or(first["in_bed_min"].as_u64())
+            else {
+                return none();
+            };
+            let night = spoken_night(first["date"].as_str().unwrap_or_default(), today, spoken);
+            let length = spoken_duration(minutes, spoken);
+            let from_to = match (
+                first["fell_asleep"]
+                    .as_str()
+                    .and_then(|at| spoken_clock(at, spoken)),
+                first["woke"]
+                    .as_str()
+                    .and_then(|at| spoken_clock(at, spoken)),
+            ) {
+                (Some(from), Some(to)) => match spoken {
+                    Spoken::English => format!(", from {from} to {to}"),
+                    Spoken::Vietnamese => format!(", từ {from} đến {to}"),
+                },
+                _ => String::new(),
+            };
+            match (spoken, in_bed) {
+                (Spoken::English, false) => format!("you slept {length} {night}{from_to}"),
+                (Spoken::English, true) => {
+                    format!("you were in bed for {length} {night}{from_to}")
+                }
+                (Spoken::Vietnamese, false) => format!("{night} bạn ngủ {length}{from_to}"),
+                (Spoken::Vietnamese, true) => {
+                    format!("{night} bạn nằm trên giường {length}{from_to}")
+                }
+            }
+        }
+        "steps" if first.get("steps_total").is_some() => {
+            let (Some(total), Some(average), Some(asked)) = (
+                n(&first["steps_total"]),
+                n(&first["steps_daily_average"]),
+                first["days_asked"].as_u64(),
+            ) else {
+                return none();
+            };
+            let with = first["days_with_steps"].as_u64().unwrap_or(asked);
+            let mut said = match spoken {
+                Spoken::English => format!(
+                    "you walked {total} steps over the last {asked} days, about {average} a day"
+                ),
+                Spoken::Vietnamese => format!(
+                    "{asked} ngày qua bạn đi tổng cộng {total} bước, khoảng {average} bước mỗi ngày"
+                ),
+            };
+            if with < asked {
+                said.push_str(&match spoken {
+                    Spoken::English => format!(". Only {with} of those days were shared"),
+                    Spoken::Vietnamese => {
+                        format!(". Chỉ có {with} ngày trong số đó được chia sẻ")
+                    }
+                });
+            }
+            said
+        }
+        "steps" => {
+            let Some(steps) = n(&first["steps"]) else {
+                return none();
+            };
+            let date = first["date"].as_str().unwrap_or_default();
+            let day = spoken_day(date, today, spoken);
+            let is_today = date_of(date) == Some(today);
+            match (spoken, is_today) {
+                (Spoken::English, true) => format!("you have {steps} steps so far today"),
+                (Spoken::English, false) => format!("you walked {steps} steps {day}"),
+                (Spoken::Vietnamese, true) => {
+                    format!("hôm nay đến giờ bạn đã đi {steps} bước")
+                }
+                (Spoken::Vietnamese, false) => format!("{day} bạn đi {steps} bước"),
+            }
+        }
+        "heart" => {
+            let Some(bpm) = n(&first["resting_heart_rate_bpm"]) else {
+                return none();
+            };
+            let day = spoken_day(first["date"].as_str().unwrap_or_default(), today, spoken);
+            match spoken {
+                Spoken::English => {
+                    format!("your resting heart rate {day} was {bpm} beats a minute")
+                }
+                Spoken::Vietnamese => {
+                    format!("nhịp tim lúc nghỉ {day} của bạn là {bpm} nhịp mỗi phút")
+                }
+            }
+        }
+        "workouts" => {
+            let found = told["workouts_found"]
+                .as_u64()
+                .unwrap_or(items.len() as u64);
+            let mut parts: Vec<String> = items
+                .iter()
+                .take(WORKOUTS_SAID)
+                .map(|item| spoken_workout(item, today, spoken))
+                .collect();
+            let more = found.saturating_sub(parts.len() as u64);
+            if more > 0 {
+                parts.push(match spoken {
+                    Spoken::English => format!("{more} more"),
+                    Spoken::Vietnamese => format!("{more} buổi khác"),
+                });
+            }
+            match (spoken, asked_days(args).ok().flatten()) {
+                (Spoken::English, None) => {
+                    format!("your latest workout was {}", parts.join("; "))
+                }
+                (Spoken::Vietnamese, None) => {
+                    format!("buổi tập gần nhất của bạn là {}", parts.join("; "))
+                }
+                (Spoken::English, Some(days)) => format!(
+                    "you did {found} workout{} in the last {days} days: {}",
+                    if found == 1 { "" } else { "s" },
+                    listed(&parts, spoken)
+                ),
+                (Spoken::Vietnamese, Some(days)) => format!(
+                    "{days} ngày qua bạn có {found} buổi tập: {}",
+                    listed(&parts, spoken)
+                ),
+            }
+        }
+        "week" => {
+            let week = &told["week"];
+            let mut parts = Vec::new();
+            if let (Some(total), Some(average)) =
+                (n(&week["steps_total"]), n(&week["steps_daily_average"]))
+            {
+                parts.push(match spoken {
+                    Spoken::English => format!("you walked {total} steps, about {average} a day"),
+                    Spoken::Vietnamese => {
+                        format!("bạn đi {total} bước, khoảng {average} bước mỗi ngày")
+                    }
+                });
+            }
+            if let Some(asleep) = week["asleep_nightly_average_min"].as_u64() {
+                let length = spoken_duration(asleep, spoken);
+                parts.push(match spoken {
+                    Spoken::English => format!("slept about {length} a night"),
+                    Spoken::Vietnamese => format!("ngủ khoảng {length} mỗi đêm"),
+                });
+            }
+            if let Some(in_bed) = week["in_bed_nightly_average_min"].as_u64() {
+                let length = spoken_duration(in_bed, spoken);
+                parts.push(match spoken {
+                    Spoken::English => format!("spent about {length} in bed a night"),
+                    Spoken::Vietnamese => format!("nằm trên giường khoảng {length} mỗi đêm"),
+                });
+            }
+            if let Some(bpm) = n(&week["resting_heart_rate_average_bpm"]) {
+                parts.push(match spoken {
+                    Spoken::English => {
+                        format!("had a resting heart rate around {bpm} beats a minute")
+                    }
+                    Spoken::Vietnamese => {
+                        format!("nhịp tim lúc nghỉ trung bình {bpm} nhịp mỗi phút")
+                    }
+                });
+            }
+            let workouts = week["workouts"].as_u64().unwrap_or(0);
+            parts.push(match (spoken, workouts) {
+                (Spoken::English, 0) => "did no workouts".to_owned(),
+                (Spoken::English, 1) => "did 1 workout".to_owned(),
+                (Spoken::English, w) => format!("did {w} workouts"),
+                (Spoken::Vietnamese, 0) => "không có buổi tập nào".to_owned(),
+                (Spoken::Vietnamese, w) => format!("có {w} buổi tập"),
+            });
+            let said = listed(&parts, spoken);
+            match spoken {
+                Spoken::English => format!("over the last 7 days {said}"),
+                Spoken::Vietnamese => format!("7 ngày qua {said}"),
+            }
+        }
+        _ => return none(),
+    };
+    match spoken {
+        Spoken::English => format!("Apple Health, {when}: {body}."),
+        Spoken::Vietnamese => format!("Theo Apple Health {when}, {body}."),
+    }
 }
 
 #[cfg(test)]
@@ -904,6 +1439,150 @@ pub(crate) mod tests {
         assert_eq!(answer["week"]["asleep_nightly_average"], "7 h");
         assert_eq!(answer["week"]["in_bed_nightly_average"], "8 h");
         assert!(answer["note"].as_str().unwrap().contains("time in bed"));
+    }
+
+    /// A day older than the 14 ending today is dropped at a push, not
+    /// refused, and again at a read ([`prune`]): never kept on.
+    #[test]
+    fn days_older_than_fourteen_are_dropped() {
+        let mut data = contract();
+        data["days"] = json!([
+            {"date": "2026-11-04", "steps": 1},
+            {"date": "2026-11-05", "steps": 2},
+            {"date": "2026-11-18", "steps": 3}
+        ]);
+        let summary = fit(&data, AS_OF).unwrap();
+        let dates: Vec<&str> = summary.days.iter().map(|day| day.date.as_str()).collect();
+        assert_eq!(dates, ["2026-11-05", "2026-11-18"]);
+        // Kept, then read two days on: the 5th is past the 14 days now.
+        let mut kept = summary.clone();
+        assert!(prune(&mut kept, AS_OF + 2 * 86_400));
+        assert_eq!(kept.days.len(), 1);
+        assert!(!prune(&mut kept, AS_OF + 2 * 86_400));
+    }
+
+    /// The fixed words for each read, in English and Vietnamese: every
+    /// value the phone's, nothing a model wrote.
+    #[test]
+    fn each_read_is_said_in_fixed_words() {
+        let summary = fit(&contract(), AS_OF).unwrap();
+        let now = AS_OF + 600;
+        let say = |what: &str, args: Value, spoken: Spoken| {
+            let told = match what {
+                "sleep" => sleep(CODE, &summary, &args, now),
+                "steps" => steps(CODE, &summary, &args, now),
+                "heart" => heart(CODE, &summary, &args, now),
+                "workouts" => workouts(CODE, &summary, &args, now),
+                _ => week(CODE, &summary, now),
+            }
+            .unwrap();
+            said(what, &args, &told, now, spoken)
+        };
+        use Spoken::{English, Vietnamese};
+        assert_eq!(
+            say("sleep", json!({}), English),
+            "Apple Health, as of 7:30 am: you slept 6 hours and 52 minutes last night, from 11:48 pm to 6:40 am."
+        );
+        assert_eq!(
+            say("sleep", json!({}), Vietnamese),
+            "Theo Apple Health lúc 7 giờ 30, đêm qua bạn ngủ 6 tiếng 52 phút, từ 23 giờ 48 đến 6 giờ 40."
+        );
+        assert_eq!(
+            say("steps", json!({}), English),
+            "Apple Health, as of 7:30 am: you have 8,421 steps so far today."
+        );
+        assert_eq!(
+            say("steps", json!({}), Vietnamese),
+            "Theo Apple Health lúc 7 giờ 30, hôm nay đến giờ bạn đã đi 8421 bước."
+        );
+        assert_eq!(
+            say("steps", json!({"days": 7}), English),
+            "Apple Health, as of 7:30 am: you walked 8,421 steps over the last 7 days, about 8,421 a day. Only 1 of those days were shared."
+        );
+        assert_eq!(
+            say("heart", json!({}), English),
+            "Apple Health, as of 7:30 am: your resting heart rate today was 58 beats a minute."
+        );
+        assert_eq!(
+            say("heart", json!({}), Vietnamese),
+            "Theo Apple Health lúc 7 giờ 30, nhịp tim lúc nghỉ hôm nay của bạn là 58 nhịp mỗi phút."
+        );
+        assert_eq!(
+            say("workouts", json!({}), English),
+            "Apple Health, as of 7:30 am: your latest workout was running today for 32 minutes, 5.1 kilometres."
+        );
+        assert_eq!(
+            say("workouts", json!({"days": 7}), Vietnamese),
+            "Theo Apple Health lúc 7 giờ 30, 7 ngày qua bạn có 1 buổi tập: chạy bộ hôm nay trong 32 phút, 5,1 ki-lô-mét."
+        );
+        assert_eq!(
+            say("week", json!({}), English),
+            "Apple Health, as of 7:30 am: over the last 7 days you walked 8,421 steps, about 8,421 a day; slept about 6 hours and 52 minutes a night; had a resting heart rate around 58 beats a minute; and did 1 workout."
+        );
+        assert_eq!(
+            say("week", json!({}), Vietnamese),
+            "Theo Apple Health lúc 7 giờ 30, 7 ngày qua bạn đi 8421 bước, khoảng 8421 bước mỗi ngày; ngủ khoảng 6 tiếng 52 phút mỗi đêm; nhịp tim lúc nghỉ trung bình 58 nhịp mỗi phút; và có 1 buổi tập."
+        );
+        // Nothing for the day asked, nothing kept, out of date, or a
+        // refused read: plain words, no value.
+        assert_eq!(
+            say("steps", json!({"date": "2026-11-10"}), English),
+            "Your phone hasn't shared any steps for that with Lamp."
+        );
+        let no_data = json!({"error": NO_DATA});
+        assert!(
+            said("sleep", &json!({}), &no_data, now, English)
+                .starts_with("Lamp has no Apple Health data yet.")
+        );
+        let stale = usable(
+            CODE,
+            Some(&Kept {
+                connector: CODE.into(),
+                stored_at: 0,
+                summary: summary.clone(),
+            }),
+            AS_OF + STALE_AFTER_S + 1,
+        )
+        .unwrap()
+        .unwrap_err();
+        let old = said(
+            "sleep",
+            &json!({}),
+            &stale,
+            AS_OF + STALE_AFTER_S + 1,
+            Vietnamese,
+        );
+        assert!(
+            old.starts_with("Dữ liệu Apple Health trên Lamp đã cũ"),
+            "{old}"
+        );
+        assert_eq!(
+            said("sleep", &json!({}), &json!({"error": "x"}), now, English),
+            "I couldn't read Apple Health just now."
+        );
+        // A summary shared yesterday says so.
+        let next_day = AS_OF + 20 * 3_600;
+        let told = steps(CODE, &summary, &json!({"date": "2026-11-18"}), next_day).unwrap();
+        assert_eq!(
+            said("steps", &json!({}), &told, next_day, English),
+            "Apple Health, as of yesterday at 7:30 am: you walked 8,421 steps yesterday."
+        );
+    }
+
+    /// The plain lines say no value.
+    #[test]
+    fn the_plain_lines_say_nothing_of_the_summary() {
+        assert_eq!(
+            not_yours(Spoken::English),
+            "I keep health details for the person they belong to."
+        );
+        for line in [
+            not_yours(Spoken::Vietnamese),
+            not_on_this_voice(Spoken::English),
+            not_on_this_voice(Spoken::Vietnamese),
+        ] {
+            assert!(!line.chars().any(|c| c.is_ascii_digit()), "{line}");
+        }
     }
 
     #[test]
@@ -1238,7 +1917,8 @@ pub(crate) mod tests {
             week["week"],
             json!({"period": "2026-11-12 to 2026-11-18", "days_shared": 4, "workouts": 2,
                 "steps_total": 31_421, "steps_daily_average": 7_855,
-                "asleep_nightly_average": "7 h 7 min", "resting_heart_rate_average_bpm": 58})
+                "asleep_nightly_average": "7 h 7 min", "asleep_nightly_average_min": 427,
+                "resting_heart_rate_average_bpm": 58})
         );
         assert!(week.to_string().len() < crate::reads::RESULT_MOST);
     }

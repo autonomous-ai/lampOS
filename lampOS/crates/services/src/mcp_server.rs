@@ -177,7 +177,7 @@ pub fn tools_list() -> Value {
 }
 
 /// The services a `hello`'s grants name: `<code>-read` and `<code>-write`
-/// folded by code, in the order first named.
+/// folded by code, in the order first named; never a local service.
 pub fn granted(hello: &Value) -> Value {
     let mut services: Vec<(String, bool, bool)> = Vec::new();
     for grant in hello["grants"].as_array().into_iter().flatten() {
@@ -191,7 +191,9 @@ pub fn granted(hello: &Value) -> Value {
         } else {
             continue;
         };
-        if crate::catalog::service(code).is_none() {
+        // A local service (Apple Health) is said only to its owner at the lamp
+        // and is never a run's: never listed, whatever a grant says.
+        if crate::catalog::service(code).is_none_or(|service| service.local) {
             continue;
         }
         match services.iter_mut().find(|(known, _, _)| known == code) {
@@ -578,6 +580,19 @@ mod tests {
         .unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         assert!(control.ops.lock().unwrap().is_empty());
+    }
+
+    /// Apple Health is never a run's to list, whatever its hello's grants
+    /// say (the first builder's P3 on #7900; docs/services.md, "Apple
+    /// Health": "never lists it").
+    #[test]
+    fn granted_never_lists_apple_health() {
+        let hello = json!({"skill": "s", "grants": [
+            "apple_health-read", "apple_health-write", "gmail-read"]});
+        assert_eq!(
+            granted(&hello)["granted"],
+            json!([{"service": "gmail", "name": "Gmail", "read": true, "write": false}])
+        );
     }
 
     #[test]

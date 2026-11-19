@@ -1304,6 +1304,11 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
 }
 
 pub fn route(settings: &Settings, name: &str) -> Route {
+    // lamp-services' folder, kept for the owner's "forget everything",
+    // whose route is the memory's (`services::health_forget_with_everything`).
+    if let Some(folder) = &settings.services {
+        crate::services::keep_folder(folder);
+    }
     // The Autonomous app's two volume calls on the executive's socket
     // (`lamp-cloud`, #1396) are never the model's: one it names anyway is
     // run by nobody, so it never sets the volume (the reviewer on #1418).
@@ -2639,6 +2644,14 @@ fn run_call_with_scope(
             let (told, answered) = match lease {
                 Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
                     crate::just_made::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
+            // And Apple Health's kept summary in lamp-services, on the same
+            // mark and rule (the first builder's P3 on #7900).
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::services::health_forget_with_everything((told, answered), lease)
                 }
                 _ => (told, answered),
             };

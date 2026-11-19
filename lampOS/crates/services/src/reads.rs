@@ -342,7 +342,8 @@ pub const WHATS: &[(&str, &str)] = &[
     ),
     ("ahrefs", "get {path, params}"),
     ("facebook", "page, posts {count}"),
-    // Answered from the summary the phone pushed, never the network
+    // Answered from the summary the phone pushed, never fetched from the
+    // network; read aloud through Lamp's voice services
     // ([`local_read`]); listed only with `LAMP_APPLE_HEALTH=on`.
     (
         "apple_health",
@@ -486,7 +487,9 @@ fn mail_id<'a>(args: &'a Value, what: &str, entry: &Entry) -> Result<&'a str, St
 
 /// A read of a local service (`catalog::Service::local`), answered from
 /// what the lamp keeps (`kept`, the store's file, `None` with none), at
-/// `now`: never the network, and never a value the phone didn't send.
+/// `now`: never fetched from the network, and never a value the phone
+/// didn't send. The voice reads the answer aloud through Lamp's voice
+/// services, in fixed words (`health::said`).
 /// Apple Health's reads ([`crate::health`]): `sleep {date}` (the night that
 /// ended on that day, by default the latest), `steps {date, days}` (a day's,
 /// today by default, or the total of the days ending today), `heart {date}`
