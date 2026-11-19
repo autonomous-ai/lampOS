@@ -32,10 +32,12 @@ Terminal 2 in `connected to lamp-fake with [...]` và trạng thái đèn; termi
 
 ## Dùng đèn thật
 
-Lấy mã ghép đôi 8 chữ số kèm pin của đèn (64 ký tự hex), hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Trong ứng dụng, bật quyền truy cập cho nhà phát triển, mở đèn và chọn *Add a developer computer*. Nếu ứng dụng của bạn chưa có cài đặt này, người giữ đèn có thể tạo mã: chạy `lamp-control code --grants body,light,speak` bằng quyền root trên đèn, lệnh in ra mã và pin. Rồi:
+Lấy mã ghép đôi 8 chữ số, hiệu lực 5 phút, với ba quyền `light`, `speak`, `body`. Trong ứng dụng, bật quyền truy cập cho nhà phát triển, mở đèn và chọn *Add a developer computer*. Nếu ứng dụng của bạn chưa có cài đặt này, người giữ đèn có thể tạo mã: chạy `lamp-control code --grants body,light,speak` bằng quyền root trên đèn, lệnh in ra mã và pin. Rồi:
 
 ```sh
-lamp pair 12345678 --pin <64 ký tự của pin>
+lamp pair 12345678          # tự tìm đèn trên mạng này
 lamp hello
 python first_light.py
 ```
+
+Nếu có nhiều đèn trả lời, thêm `--host lamp-xxxx.local` (hoặc địa chỉ IP của đèn). Máy tin chứng chỉ đèn đưa ra lúc ghép đôi, như ssh với một máy chủ mới, và mọi lần kết nối sau phải đúng chứng chỉ đó.

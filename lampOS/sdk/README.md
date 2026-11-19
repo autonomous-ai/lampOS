@@ -79,7 +79,7 @@ and quiet hours are off.
 | 2 | `play`; a look at a face or a name | `play` of a pushed skill's recorded move works from build 12171 (on lamp-75c9 at 12226, 12 Nov 2026: the GUIDE's "`play` a recorded move by name" row); on 11913 and before it is refused, "not routed yet: waits for client packages". `look` at `face` ends `dropped`, "this lamp's gaze is not measured, so it cannot look at a face" (shown on stable 12587, lamp-75c9, 13 Nov 2026: the product's `lamp-body.service` has no `--gaze`); it turns toward a face only on a lamp with a measured `--gaze`, where it can still end "no face in view"; `look` at `name` is refused, "not in this release: look at who said the lamp's name (the lamp has no sound direction)". `joints` for `roll`, `shoulder` and `elbow` works (the body's pose, only while the lamp stands; shown on 12226; 11048 and older refuse them, "not routed yet") | `play` a pushed skill's recorded move by name, or send your own frames of all 5 joints as `move`; look at `ahead` or an angle; or a built-in `gesture` |
 | 3 | Letting the base go limp, a holder's pose | Only in lamp-body's own lease socket; lamp-control sends neither, so no SDK call reaches them | None from a computer yet |
 | 3a | A motion's end (`wait=True`) | Works from stable 11716 (the GUIDE's "Knowing when a motion ended" row): the wait ends at the body's `done` (hello's `limits.motion_done`, #5835). On 11450 and older, `gesture`, `move` and `express` answer `{"to":"body"}` and no `done` follows: a wait returns when the lamp takes the motion | On 11450 and older, treat the answer as "taken" and watch `body.state` for where the joints are |
-| 4 | Finding the lamp by mDNS | Nothing on the lamp announces `_lampos._tcp`, so `lamp find` finds nothing, and `lamp pair` without `--host` finds nothing | Pass the lamp's address: `--host lamp-xxxx.local` (the lamp's own name) or its IP address. After pairing the address is kept |
+| 4 | Finding the lamp by mDNS | Nothing on the lamp announces `_lampos._tcp`, so `lamp find` finds nothing. `lamp pair CODE` without `--host` still finds a lamp with developer access on through `_autonomous._tcp` (the lamp image's avahi record, `lamp-xxxx`) and port 7731 answering | If it finds several or none, pass the lamp's address: `--host lamp-xxxx.local` (the lamp's own name) or its IP address. After pairing the address is kept |
 | 5 | Event times | `at` is UTC, written `…Z` (`2026-11-09T06:30:01Z`), on every build, not the lamp's local time with an offset | Turn it into local time on your side |
 
 **On older stables** (10824 and before): a motion asked while another plays was
@@ -113,12 +113,8 @@ once per computer".
    computer's connection.
 2. **Get a code.** The owner chooses to add a developer computer and ticks
    what it may do (the grants: `body`, `light`, `speak`, `look`, `hear`,
-   `sound`, `skills`, `air`, `device`: not `camera`, `microphone` or `notes`, which the app does not offer; see the GUIDE's "Granting camera, microphone and notes today"). The lamp says the first 8 characters of its pin
-   aloud, and the app shows the same 8 for the owner to confirm they match:
-   that is how you know the app is talking to the lamp in front of you. Only
-   after that does the app show the 8-digit code and the lamp's full pin (64
-   hex characters). If the lamp couldn't say its pin, the app cancels the
-   code; ask for a new one. The code lasts 5 minutes, and a new one voids the
+   `sound`, `skills`, `air`, `device`: not `camera`, `microphone` or `notes`, which the app does not offer; see the GUIDE's "Granting camera, microphone and notes today"). The app shows the 8-digit code and the command to copy,
+   `lamp pair 12345678` (older apps also show the lamp's 64-hex pin, for `--pin`). The code lasts 5 minutes, and a new one voids the
    old one.
 3. **Install the SDK** on your computer, from a checkout of this repository:
 
@@ -128,16 +124,22 @@ once per computer".
    pip install ./lampOS/sdk/python
    ```
 
-4. **Pair**, on the same network as the lamp, with its address (gap 4):
+4. **Pair**, on the same network as the lamp (gap 4):
 
    ```sh
-   lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local   # or --host 192.168.1.23
+   lamp pair 12345678                                       # finds the lamp by mDNS
+   lamp pair 12345678 --host lamp-xxxx.local --pin 3f9a…    # fallback: its address (or IP) and pin
    lamp hello                                               # connects, shows the grants
    ```
 
-   The SDK checks the lamp's certificate against the pin after the TLS and
-   WebSocket handshakes and before any protocol frame or pairing proof, so
-   the code's proof never goes to another host. With the lamp's pairing cue
+   Several lamps answering: it stops (exit 2), listing them; say which with
+   `--host`. Without `--pin`, the certificate the lamp shows at pairing is
+   trusted and its pin kept (trust on first use, as ssh does): the first
+   connection is trusted, so pair on your own network; pass `--pin` for the
+   strict check, before any protocol frame or pairing proof, so the code's
+   proof never goes to another host. Every later connection must show the
+   same certificate, else `WrongLamp`: re-pair with a new code if the lamp
+   was reset. With the lamp's pairing cue
    on (`LAMP_CONTROL_PAIR_CUE`), the ring glows once the first time a computer
    pairs; otherwise it shows nothing. The pairing is kept in `~/.config/lampos/`;
    later connections need no code.
@@ -187,7 +189,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Pair a computer, connect | `pair`, `hello` | `pair`, `connect` | (paired at start) | done; no mDNS announcement on any build, so pair with `--host` | Nine | 75c9, 9 Nov, stable 10824's binaries, by blue: paired through a code with `--host lamp-75c9.local`, `hello` |
+| Pair a computer, connect | `pair`, `hello` | `pair`, `connect` | (paired at start) | done; no `_lampos._tcp` announcement on any build, so `lamp pair CODE` finds the lamp by `_autonomous._tcp`, else `--host` | Nine | 75c9, 9 Nov, stable 10824's binaries, by blue: paired through a code with `--host lamp-75c9.local`, `hello` |
 | Who is there (never who) | `get presence` | `get("presence")` | `lamp_state`, `lamp://state/presence` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): `{count: 0, near: 0.0, facing: false}` with nobody in view |
 | The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | 75c9, 9 Nov, stock 10824, nine's SDK run (Python): the person's light read (`blue`, level 1, off) with `shows` |
 | The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet: on 75c9 (10824) `mood` answered `null`, no mood state on the bus then |

@@ -69,9 +69,8 @@ The pairing steps use the app's developer access setting and its *Add a develope
 | Python 3.10 or later; SDK 0.2.0 | `sdk/python/pyproject.toml:6-10` |
 | Not on PyPI or npm; install from a checkout | `sdk/python/README.md:21-28`, `sdk/js/README.md:22-28` (`sdk/README.md` says `pip install lampos`, which the two READMEs contradict; the page follows the READMEs) |
 | `lamp fake`, its `LAMPOS_HOME`, every grant | `sdk/python/README.md:30-57` |
-| `lamp pair CODE --pin PIN`; pin checked first; kept in `~/.config/lampos/` | `sdk/python/README.md:59-72` |
-| The code comes with the pin and a 5-minute expiry | `docs/control.md:297-300`, `docs/develop.md:259-261` |
-| The lamp says the first 8 characters of the pin aloud | `docs/cloud.md`, "The developer door" (`control.code`, the spoken pin check) |
+| `lamp pair CODE`; mDNS finds the lamp, `--host` when several answer; the certificate is trusted at pairing and checked on every later connect; kept in `~/.config/lampos/` | `sdk/python/README.md`, pairing; the owner's decision on #7415 (no pin, no host, no spoken check in the app) |
+| The code is 8 digits with a 5-minute expiry | `docs/control.md`, "Pairing, once per computer", `docs/develop.md`, "Pair once" |
 | The owner turns developer access on in the app (`control.set`), then the app asks the lamp for a code (`control.code`) with the lamp's pin; the keeper's `lamp-control code --grants body,light,speak` makes the same code | `docs/cloud.md:155`, `:1955`, `:2145`, `docs/control.md:236`, `:297-300`. The app's own screens are in `ecm-sds-mobile` and were not read; `docs/develop.md:259-262` still calls the *Add a developer computer* screen pending |
 | lamp-control is installed and enabled on every lamp and runs only with `LAMP_CONTROL=on`, which the app's developer setting writes as a drop-in | `deploy/product/lamp-control.service:1-8`, `docs/switches.md:578`, `docs/control.md`, "Running the door" (PR #4526) |
 | The owner can revoke at any time | `docs/cloud.md` (`control.revoke`), `docs/develop.md:276` |

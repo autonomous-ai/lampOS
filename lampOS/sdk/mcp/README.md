@@ -6,7 +6,7 @@ pairing `lamp pair` made. The protocol is [docs/control.md](https://github.com/a
 
 ```sh
 pip install ./sdk/python ./sdk/mcp   # from lampOS/ in a checkout of the lamp-voice branch: neither is on PyPI
-lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local  # once, with the code and the lamp's pin the app shows
+lamp pair 12345678                   # once, with the code the app shows (else add --host lamp-xxxx.local --pin PIN)
 claude mcp add lamp -- lamp-mcp
 ```
 
@@ -18,7 +18,7 @@ and what to do ([more](../README.md#on-a-customer-lamp-today)):
 - **Play and a look at a face:** `lamp_play` is refused, "not routed yet: waits for client packages" (from the next build it plays a move recorded in a pushed skill's `moves/`), and so is `lamp_look` at `face` or `name`, "not in this release". Send a recorded move as `lamp_move`; look at `ahead` or an angle.
 - **A motion's end:** `lamp_gesture` and `lamp_move` return when the lamp takes the motion, not when it ends (the next build ends it at the body's `done`, where hello's `limits` say `motion_done`).
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
-- **No mDNS:** `lamp pair` without `--host` finds nothing. Give `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the pairing keeps it.
+- **Finding the lamp:** `lamp pair CODE` finds a lamp with developer access on by mDNS (`_autonomous._tcp`, which every lamp announces). If it finds none or several, give `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the pairing keeps it.
 - **Event times are UTC:** an event's `at` ends in `Z`. Convert to local time yourself.
 
 In 11450: skill push (`lamp_skill_push`, `lamp_skills`, `lamp_skill_remove`, with the `skills` grant, from 11091), `lamp_joints` for `roll`, `shoulder` and `elbow` (the lamp must be standing), a head tap and pet as `touch` events, and a new motion that replaces the one playing instead of being refused `busy`. A `lamp_look` on a resting lamp ends `finished` or `clamped` with where the head stopped.

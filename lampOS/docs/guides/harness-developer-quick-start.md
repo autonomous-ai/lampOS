@@ -105,17 +105,17 @@ Why it is written this way:
 
 ## 4. Point it at your real lamp
 
-1. **Get a pairing code.** The code comes with the lamp's pin (64 hex characters) and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod). In the Autonomous app, turn developer access on, open your lamp and choose *Add a developer computer*. The lamp also says the first 8 characters of the pin aloud, and they must match what the app shows.
+1. **Get a pairing code.** The code is 8 digits and lasts 5 minutes. For this example tick three grants: `light` (the light), `speak` (the voice) and `body` (the nod). In the Autonomous app, turn developer access on, open your lamp and choose *Add a developer computer*.
    If your app has no developer access setting yet, the lamp's keeper can make the code instead: as root on the lamp, `lamp-control code --grants body,light,speak` prints the code and the pin.
 2. **On your computer**, with the environment active and no `LAMPOS_HOME` set:
 
 ```sh
-lamp pair 12345678 --pin <the 64 characters of the pin>
+lamp pair 12345678          # finds the lamp on this network
 lamp hello                 # connects and shows the grants
 python first_light.py      # now it runs against your lamp
 ```
 
-The SDK checks the lamp's certificate against the pin before it sends anything, so the code never reaches another machine. Pairing is kept in `~/.config/lampos/`. The owner can revoke a computer at any time, which closes its connections at once.
+If several lamps answer, add `--host lamp-xxxx.local` (or the lamp's IP address). The computer trusts the lamp's certificate at pairing, as ssh does a new host, and every later connection must show the same one. Pairing is kept in `~/.config/lampos/`. The owner can revoke a computer at any time, which closes its connections at once.
 
 ## Where next
 

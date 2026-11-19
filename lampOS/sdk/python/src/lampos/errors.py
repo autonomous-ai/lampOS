@@ -8,7 +8,7 @@ from . import schema
 # What a developer can do about each code, said with the error (`what_to_do`)
 # and in both READMEs; the JS SDK has the same words (errors.js).
 WHAT_TO_DO: dict[str, str] = {
-    "unpaired": "Pair again with a new code from the owner's app (`lamp pair CODE --pin PIN`): this computer isn't paired, was revoked, or its key no longer matches.",
+    "unpaired": "Pair again with a new code from the owner's app (`lamp pair CODE`): this computer isn't paired, was revoked, or its key no longer matches.",
     "no_hello": "Say hello first: `Lamp.connect()` does; with `request()` alone, send `hello` before anything else.",
     "no_grant": "Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello.",
     "no_lease": "Hold a `body` lease first (Python `lamp.lease(\"body\")`, JS `lamp.withLease(['body'], ...)`); `joints` names it.",

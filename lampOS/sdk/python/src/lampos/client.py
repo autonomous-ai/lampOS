@@ -125,8 +125,12 @@ def _no_answer(host: str, port: int, error: BaseException) -> str:
     return line
 
 
-async def _open(host: str, port: int, pin: str) -> ClientConnection:
-    if not is_pin(pin):
+async def _open(host: str, port: int, pin: str | None, *, kept: bool = False) -> ClientConnection:
+    """The lamp's WebSocket, its certificate checked against `pin` before any
+    frame is sent. `pin=None` is trust on first use, for pairing only: the
+    certificate is taken as it is and its pin read with `_pin_seen`. `kept`:
+    `pin` is the one kept at pairing, so a mismatch says to pair again."""
+    if pin is not None and not is_pin(pin):
         raise WrongLamp("no pin to check the lamp by: the 64 hex the owner's app shows with the code")
     try:
         ws = await ws_connect(
@@ -145,11 +149,24 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
         ) from error
     except (OSError, asyncio.TimeoutError) as error:
         raise Unreachable(_no_answer(host, port, error)) from error
-    seen = pin_of(ws.transport.get_extra_info("ssl_object").getpeercert(binary_form=True))
+    if pin is None:
+        return ws
+    seen = _pin_seen(ws)
     if seen != pin:
         await ws.close()
+        if kept:
+            raise WrongLamp(
+                f"the lamp at {host} shows another key than the one this computer paired with "
+                f"({seen[:16]}..., not {pin[:16]}...): re-pair if you reset the lamp (`lamp pair CODE` with a new "
+                "code from the app); if you didn't, something else answers at its address"
+            )
         raise WrongLamp(f"the certificate at {host} is not the lamp's: {seen[:16]}..., not {pin[:16]}...")
     return ws
+
+
+def _pin_seen(ws: ClientConnection) -> str:
+    """The pin of the certificate this connection's lamp showed."""
+    return pin_of(ws.transport.get_extra_info("ssl_object").getpeercert(binary_form=True))
 
 
 # lamp-control's control socket for a skill's run: the same WebSocket door over a unix socket, no TLS, no pairing,
@@ -695,23 +712,28 @@ class Lamp:
         code: str,
         host: str,
         *,
-        pin: str,
+        pin: str | None = None,
         port: int = schema.PORT,
         name: str | None = None,
         keyring: Keyring | None = None,
     ) -> Pairing:
         """Pair this computer with the lamp at `host`, with the owner's
-        one-time code and the pin the app shows with it (the certificate's
-        full SHA-256, 64 hex). The certificate is checked against the pin
-        before any frame is sent (only the TLS handshake and the WebSocket's
-        upgrade request go first), so the code's proof never reaches another
-        host; there is no pairing without a pin."""
+        one-time code. With `pin` (the certificate's full SHA-256, 64 hex),
+        the certificate is checked against it before any frame is sent (only
+        the TLS handshake and the WebSocket's upgrade request go first), so
+        the code's proof never reaches another host. Without it, trust on
+        first use: the certificate the lamp shows now is taken, its pin goes
+        into the proof and is kept with the pairing, and every later connect
+        refuses another one (`WrongLamp`), ssh-style."""
         keyring = keyring or Keyring()
         code = code.replace(" ", "")
-        pin = pin.replace(" ", "").replace(":", "").lower()
+        if pin is not None:
+            pin = pin.replace(" ", "").replace(":", "").lower()
         if not (len(code) == 8 and code.isdigit()):
             raise LampError("the code is the 8 digits the app shows", code="bad_request")
         ws = await _open(host, port, pin)
+        if pin is None:
+            pin = _pin_seen(ws)
         try:
             welcome = await _welcome(ws)
             key = keyring.public()
@@ -771,7 +793,7 @@ class Lamp:
                 raise NotPaired("no pairing here for that lamp: run `lamp pair` first")
             ws = await _open_local(local)
         else:
-            ws = await _open(host or pairing.host, pairing.port, pairing.fp)
+            ws = await _open(host or pairing.host, pairing.port, pairing.fp, kept=True)
         try:
             welcome = await _welcome(ws)
             if local is not None:

@@ -87,12 +87,14 @@ function agentSocket() {
 
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
-// frame is sent.
+// frame is sent. `pin` null is trust on first use, for pairing only: the
+// certificate is taken as it is, and `seen` is its pin. `kept`: `pin` is the one
+// kept at pairing, so a mismatch says to pair again.
 // With `socketPath`: a unix socket, no TLS and no pin. The agent socket's own check (the kernel's word on
 // who connects) is what lets this program in; the control socket's is its owner check and the run's token.
-function open(host, port, pin, socketPath) {
+function open(host, port, pin, socketPath, { kept = false } = {}) {
   return new Promise((resolve, reject) => {
-    if (!socketPath && !isPin(pin)) {
+    if (!socketPath && pin !== null && !isPin(pin)) {
       reject(new WrongLamp("no pin to check the lamp by: the 64 hex the owner's app shows with the code"));
       return;
     }
@@ -109,9 +111,11 @@ function open(host, port, pin, socketPath) {
     ws.on('upgrade', (response) => {
       if (socketPath) return;
       seen = pinOf(response.socket.getPeerCertificate(true).raw);
-      if (seen !== pin) {
+      if (pin !== null && seen !== pin) {
         ws.terminate();
-        reject(new WrongLamp(`the certificate at ${host} is not the lamp's: ${seen.slice(0, 16)}..., not ${pin.slice(0, 16)}...`));
+        reject(new WrongLamp(kept
+          ? `the lamp at ${host} shows another key than the one this computer paired with (${seen.slice(0, 16)}..., not ${pin.slice(0, 16)}...): re-pair if you reset the lamp (\`lamp pair CODE\` with a new code from the app); if you didn't, something else answers at its address`
+          : `the certificate at ${host} is not the lamp's: ${seen.slice(0, 16)}..., not ${pin.slice(0, 16)}...`));
       }
     });
     ws.on('message', (data) => {
@@ -528,16 +532,20 @@ export class Lamp {
     });
   }
 
-  // Pair this computer with the lamp at `host`, with the owner's one-time code
-  // and the pin the app shows with it (the certificate's full SHA-256, 64 hex).
-  // The certificate is checked against the pin before any frame is sent (only
-  // the TLS handshake and the WebSocket's upgrade request go first), so the
-  // code's proof never reaches another host; there is no pairing without a pin.
+  // Pair this computer with the lamp at `host`, with the owner's one-time code.
+  // With `pin` (the certificate's full SHA-256, 64 hex) the certificate is
+  // checked against it before any frame is sent (only the TLS handshake and the
+  // WebSocket's upgrade request go first), so the code's proof never reaches
+  // another host. Without it, trust on first use: the certificate the lamp shows
+  // now is taken, its pin goes into the proof and is kept with the pairing, and
+  // every later connect refuses another one (`WrongLamp`), ssh-style.
   static async pair(code, host, { pin, port = schema.PORT, name, keyring = new Keyring() } = {}) {
-    pin = String(pin ?? '').replaceAll(' ', '').replaceAll(':', '').toLowerCase();
+    pin = pin == null ? null : String(pin).replaceAll(' ', '').replaceAll(':', '').toLowerCase();
     code = String(code).replaceAll(' ', '');
     if (!/^\d{8}$/.test(code)) throw new LampError('the code is the 8 digits the app shows or the lamp says', { code: 'bad_request' });
-    const { ws, welcome, next } = await open(host, port, pin);
+    const opened = await open(host, port, pin);
+    const { ws, welcome, next } = opened;
+    pin ??= opened.seen;
     let reply;
     try {
       const key = keyring.public();
@@ -618,7 +626,7 @@ export class Lamp {
     if (!pairing && !local) throw new NotPaired('no pairing here for that lamp: run `lamp pair` first');
     const { ws, welcome, next, frames } = local
       ? await open(null, null, null, local)
-      : await open(host ?? pairing.host, pairing.port, pairing.fp);
+      : await open(host ?? pairing.host, pairing.port, pairing.fp, undefined, { kept: true });
     let reply;
     try {
       // On the agent socket the peer check has already said who this is: a

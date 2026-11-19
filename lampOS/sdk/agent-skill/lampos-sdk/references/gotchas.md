@@ -16,10 +16,11 @@ replaces the one playing (from 11048), a motion's end with `wait=True` (from
 
 1. **Limp and pose** (letting the arm go limp, holding a pose) can't be
    reached from a computer.
-2. **No mDNS.** No lamp announces itself: `lamp find` finds nothing, and
-   `lamp pair` without `--host` finds nothing. Pair with
-   `--host lamp-xxxx.local` (the lamp's host name) or its IP address. The
-   pairing keeps the address, so later connects need nothing.
+2. **`lamp find` finds nothing.** No lamp announces `_lampos._tcp` yet, but
+   `lamp pair CODE` finds a lamp with developer access on by `_autonomous._tcp`.
+   With several or none it stops: pair with `--host lamp-xxxx.local` (the
+   lamp's host name) or its IP address. The pairing keeps the address, so
+   later connects need nothing.
 3. **Event times are UTC.** `at` ends in `Z` (`2026-10-27T08:40:01Z`).
    Convert to local time yourself.
 4. **A look at a face** was refused, "not in this release", on 11091 and older.

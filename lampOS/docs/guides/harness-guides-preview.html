@@ -91,10 +91,10 @@ lamp state: {'lamp': {'talking': False, 'paused': False, 'private': False, 'asle
     <p>Ran against the fake lamp, not a real one.</p>
 
     <h2>Your real lamp</h2>
-<pre>lamp pair 12345678 --pin &lt;the 64 characters of the pin&gt;
+<pre>lamp pair 12345678
 lamp hello
 python first_light.py</pre>
-    <p>The SDK checks the lamp's certificate against the pin before it sends anything.</p>
+    <p>The SDK finds the lamp on this network; add <code>--host lamp-xxxx.local</code> if several answer. It trusts the lamp's certificate at pairing and checks it on every later connect.</p>
   </section>
 </main>
 <script>

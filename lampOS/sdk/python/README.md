@@ -14,7 +14,7 @@ and what to do ([more](../README.md#on-a-customer-lamp-today)):
 - **Play and a look at a face:** `play` is refused, "not routed yet: waits for client packages", and so is `look` at `face` or `name`, "not in this release". Send a recorded move as `move`; look at `ahead` or an angle.
 - **A motion's end:** `wait=True` on `gesture`, `move` and `express` returns when the lamp takes the motion, not when it ends (the next build ends it at the body's `done`).
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
-- **No mDNS:** `lamp find` finds nothing. Pair with `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the address is kept for later connects.
+- **Finding the lamp:** `lamp find` finds nothing (no lamp announces `_lampos._tcp` yet), but `lamp pair CODE` finds a lamp with developer access on through the `_autonomous._tcp` record every lamp announces. If it doesn't, give `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the address is kept for later connects.
 - **Event times are UTC:** `at` ends in `Z`. Convert to local time yourself:
   `datetime.fromisoformat(event["at"].replace("Z", "+00:00")).astimezone()`. Key a "today" by your own
   clock (`datetime.date.today()`), not by `at`'s date: UTC's day turns over at 08:00 in Shenzhen.
@@ -36,12 +36,12 @@ branch (the default branch, `main`, has no SDK):
 ```sh
 git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git && cd lampOS
 python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
-pip install ./lampOS/sdk/python             # or -e, to work on it; '.[find]' to find lamps by mDNS
+pip install ./lampOS/sdk/python             # or -e, to work on it
 ```
 
 Without a clone: `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"`.
 `pip install lampos` from PyPI fails: install from the checkout or that line.
-`[find]` finds no lamp yet: none announces itself on stable 11450.
+`zeroconf` (mDNS) comes with it; the empty `[find]` extra is kept so old install lines still work.
 
 ## Try it with the fake lamp (no lamp needed)
 
@@ -76,21 +76,35 @@ The fake takes what stable 10824 refused: a skill push, and a motion asked while
 ## Pair with a real lamp
 
 ```sh
-lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local   # the code and the lamp's pin (64 hex), both shown in the app
+lamp pair 12345678                                       # the code the app shows
+lamp pair 12345678 --host lamp-xxxx.local --pin 3f9a…    # fallback: the lamp's address and its pin (64 hex, in the app)
 ```
 
-No lamp announces itself by mDNS yet (stable 11450), so give `--host`: the
-lamp's host name, `lamp-xxxx.local`, or its IP address. Without it, `lamp
-pair` finds no lamp. The address is kept with the pairing, so
+Without `--host`, mDNS finds the lamp: the SDK browses `_lampos._tcp` (no
+lamp announces it yet) and `_autonomous._tcp` (every lamp's own record,
+named `lamp-xxxx`), and keeps the lamps whose port 7731 takes a TCP
+connection, which it does only while developer access is on (nothing is
+sent). One lamp: it pairs, by the address mDNS resolved, and keeps the host
+name (`lamp-xxxx.local`). Several: it stops, listing them, `lamp: 2 lamps
+answered: lamp-one (lamp-one.local), lamp-two (lamp-two.local); say which
+with --host`. None: it says so and asks for `--host lamp-xxxx.local` (or the
+IP address). With `--pin` and no `--host`, only a lamp whose mDNS `fp` starts
+the pin is picked. The address is kept with the pairing, so
 `Lamp.connect()` needs nothing more; if it changes, pass `host=`.
 
-The lamp's certificate is checked against the pin before any frame is sent
-(only the TLS handshake and the WebSocket's upgrade request, which carry no
-secret, go first), so the code's proof never reaches another host, and the pin is inside the
-proof too. There is no pairing without it. The pairing is kept in
+Without `--pin`, the certificate the lamp shows at pairing is trusted (as
+ssh does on first use): its full SHA-256 goes into the proof and is kept in
+`lamps.json`. So the first connection is trusted: pair on your own network,
+or pass `--pin` for the strict check. With `--pin`, the certificate is checked against
+it before any frame is sent (only the TLS handshake and the WebSocket's
+upgrade request, which carry no secret, go first), so the code's proof never
+reaches another host. Either way every later connection must show the same
+certificate, else `WrongLamp` ("the lamp at HOST shows another key than the
+one this computer paired with (...): re-pair if you reset the lamp (`lamp
+pair CODE` with a new code from the app); if you didn't, something else
+answers at its address"). The pairing is kept in
 `~/.config/lampos/` (or `$LAMPOS_HOME`, which is made private too, so point it at a folder of its own): the folder is yours alone (0700),
-the key and `lamps.json` 0600, and the pin is checked again on every
-connection.
+the key and `lamps.json` 0600.
 
 ## Program it
 
@@ -252,7 +266,7 @@ test it.
 
 **An app installed from the Store** (#7415) connects with `await Lamp.connect_app()`: the socket is the one `LAMP_APP_SOCKET` names in the app's own environment (default `/run/lampos-apps/apps.sock`), there is no pairing, key or token (the lamp knows the app by its cgroup), and the grants are the installed manifest's, never the app's word; `lamp.app` and `lamp.app_version` are its name and version. `await lamp.listen_for([...], handler)` replaces its phrases whole (each told only as `phrase.heard`, never what was said); the manifest's own triggers arrive unasked as `app.trigger` (`lamp.on("app.trigger", ...)`, with a `turn` to `await lamp.took(turn)`); `await lamp.settings()` and the event `app.settings` carry the owner's values; `await lamp.panel(title, lines)` sets the panel, one a minute. When the owner stops, removes or updates the app, its connection closes with the reason (`lamp.close_reason`), no event first. The fake lamp serves all of it with `FakeLamp(app=True, app_name=..., app_grants=..., app_settings=...)` and `fake.app_path`, and `fake.hear_phrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.set_app_setting(**changed)` and `fake.stop_app(why)`.
 
-**Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
+**Dependencies** (`websockets`, `cryptography`, `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses
 it pins them. `cryptography` is loaded only where a key is made or used (a
 pairing), so `import lampos` and `Lamp.local(token)` need only `websockets`:
@@ -476,7 +490,7 @@ fake refuses `joints` naming `roll`, `shoulder` or `elbow` with
 
 | call | parameters | returns |
 |---|---|---|
-| `await Lamp.pair(code, host, *, pin, port=7731, name=None, keyring=None)` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: where the key and pairings are kept, default `Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | a `Pairing` (`lamp`, `client`, `grants`, …) |
+| `await Lamp.pair(code, host, *, pin=None, port=7731, name=None, keyring=None)` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex; without it the certificate shown at pairing is trusted and kept. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: where the key and pairings are kept, default `Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | a `Pairing` (`lamp`, `client`, `grants`, …) |
 | `await Lamp.keep_connected(setup, lamp=None, *, host=None, keyring=None, pauses=(1, 2, 5, 10))` | `setup(lamp)`: called (and awaited) on each new connection. `pauses`: seconds before connecting again, longer while the lamp can't be reached | never returns; raises `NotPaired`, `WrongLamp`, a hello's or subscription's refusal, or what `setup` raised. "When the lamp restarts" |
 | `await Lamp.connect(lamp=None, *, host=None, keyring=None)` | `lamp`: a paired lamp's id, or the only one paired. `host`: an address to use instead of the kept one | a `Lamp`, after hello. Also `async with await Lamp.connect() as lamp:` |
 | `await Lamp.connect_app(*, path=None)` | `path`: the app's socket, default `LAMP_APP_SOCKET` (DRAFT, #7415) | a `Lamp` as the installed app, with the manifest's grants; `no_app_socket` with no path and no variable. See "An app installed from the Store". |
@@ -487,7 +501,7 @@ fake refuses `joints` naming `roll`, `shoulder` or `elbow` with
 | `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms` (a light's longest `for_ms`, 30000), `lease_max_ms` (the longest one lease take or renewal asks for, 600000), `say_max_bytes` (the longest say's text in UTF-8 bytes, 900) and `quiet_hours` (`{from, to}`, or `off`, the default). There is no ceiling on renewing a lease, and a say is counted in bytes (older lamps also sent `take_max_ms` and `say_max_chars`). By default the rates are off: `rates: "off"`, and only the `refused` and `phrases` windows (a lamp run with `--rates default` gives every class). The fake lamp sends the same as a lamp with its rates off |
 | `await lamp.close()` | | lets go of every lease, then closes |
 | `await lamp.wait_closed()` | | returns when the connection ends, and raises a subscription's refusal nobody awaited |
-| `await find(seconds=3.0)` (`lampos.discovery`) | `seconds`: how long to listen for mDNS | the lamps on this network (`id`, `name`, `host`, `port`, `fp`). Needs `pip install './lampOS/sdk/python[find]'`. Finds none today: no lamp announces itself (stable 11450) |
+| `await find(seconds=3.0)`, `await pairable(seconds=3.0, *, probe=1.5)` (`lampos.discovery`) | `seconds`: how long to listen for mDNS. `probe`: how long to wait for port 7731 | `find`: the lamps announcing `_lampos._tcp` (`id`, `name`, `host`, `port`, `fp`, `address`, the resolved IP); finds none today, as no lamp announces it (stable 11450). `pairable`: the lamps on `_lampos._tcp` or `_autonomous._tcp` whose port 7731 takes a TCP connection (developer access on), what `lamp pair` without `--host` picks from |
 
 ### Events and state
 
@@ -574,7 +588,7 @@ line below for its code (`lampos.errors.WHAT_TO_DO`):
 
 | code | what to do |
 |---|---|
-| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE --pin PIN`): this computer isn't paired, was revoked, or its key no longer matches. |
+| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE`): this computer isn't paired, was revoked, or its key no longer matches. |
 | `no_hello` | Say hello first: `Lamp.connect()` does; with `request()` alone, send `hello` before anything else. |
 | `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
 | `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
@@ -605,8 +619,8 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 
 | command | options |
 |---|---|
-| `lamp find` | none: lamps on this network by mDNS (needs `[find]`). Finds none today: no lamp announces itself (stable 11450) |
-| `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, `lamp-xxxx.local` or an IP; give it, as no lamp announces itself by mDNS yet (stable 11450). `--port`: 7731. `--name`: this computer's name in the app |
+| `lamp find` | none: lamps on this network by `_lampos._tcp`. Finds none today: no lamp announces it (stable 11450) |
+| `lamp pair CODE [--host HOST] [--pin PIN] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--host`: the address, `lamp-xxxx.local` or an IP; without it, the one lamp with developer access on that mDNS finds (several or none: it stops, exit 2). `--pin`: the 64-hex pin the app shows; without it, the certificate shown at pairing is trusted and kept. `--port`: 7731. `--name`: this computer's name in the app |
 | `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 | `lamp speaker FILE [LAMP_ID] [--rate 16000]` | `FILE`: a WAV of 16-bit mono PCM at 16000 or 24000 Hz, or `-` for raw mono S16LE on stdin at `--rate` (16000 or 24000, default 16000); played in real time through the lamp's speaker (`speaker` grant) |

@@ -370,12 +370,17 @@ listens until the owner turns developer access on in the app. Script skills
 
 **Finding the lamp:** planned: mDNS `_lampos._tcp`, with TXT `id`, `name`,
 `v=1` and `fp`: the first 16 hex characters of the SHA-256 of the lamp's
-certificate. The SDKs look for it, but nothing on the lamp announces it yet,
-on any build: `lamp find` finds nothing, and pairing needs the lamp's address,
-`--host <lamp>.local` (the lamp's own host name, such as `lamp-75c9.local`)
-or its IP address. The SDKs keep the address with the pairing, so later
-connects need nothing. The certificate is self-signed, made per lamp on its
-first start, and the client pins it at pairing.
+certificate. Nothing on the lamp announces it yet, on any build, so
+`lamp find` finds nothing. `lamp pair` without `--host` browses
+`_lampos._tcp` and `_autonomous._tcp`, which the lamp image's avahi already
+announces (instance `lamp-xxxx`), and keeps only lamps whose port 7731
+accepts a TCP connection (only while developer access is on; the probe sends
+nothing). It connects by the address mDNS resolved and keeps the host name
+`lamp-xxxx.local` with the pairing. One lamp: it pairs. Several: it names
+them and asks for `--host`. None: it says so and asks for `--host
+lamp-xxxx.local` or the IP address. With `--host` it uses that address.
+Later connects need nothing. The certificate is self-signed, made per lamp
+on its first start, and the client pins it at pairing.
 
 **Frames:** UTF-8 JSON, one message per text frame. The lamp's first frame
 on every connection is a welcome, carrying a nonce of 32 random bytes made for
@@ -417,16 +422,22 @@ no state, a blank credential or a state that names no installed build, `build` i
 
 ### Pairing, once per computer
 
-1. **In the app**, the owner chooses *Add a developer computer* and ticks
-   the grants. The app asks the lamp for a one-time code and shows it as a QR
-   code and as 8 digits **with the pin of the lamp's certificate** (its full
-   SHA-256, 64 hex), the lamp's id and the expiry (5 min). A new code voids
-   the old one.
-2. **`lamp pair`** (in the SDKs) connects to the lamp at `--host` (mDNS
-   would find it without, but no lamp announces it yet: "Finding the lamp"), and
-   **checks the certificate against the app's pin before it sends any
-   frame**: only the TLS handshake and the WebSocket's upgrade request, which
-   carry no secret, go before it. An SDK that can't check it must not pair. Then it sends the
+1. **In the app**, the owner turns developer access on, chooses *Add a
+   developer computer* and ticks the grants. The app asks the lamp for a
+   one-time code and shows the 8 digits, the expiry (5 min) and the command
+   to copy, `lamp pair 12345678`: no pin, no host and no spoken check (the
+   owner's decision on #7415). A new code voids the old one. The lamp's
+   answer still carries the pin of its certificate (its full SHA-256, 64
+   hex); `lamp-control code` prints it.
+2. **`lamp pair`** (in the SDKs) finds the lamp ("Finding the lamp") or
+   connects to it at `--host`. **With `--pin`**, it checks the certificate
+   against the pin before it sends any frame: only the TLS handshake and the
+   WebSocket's upgrade request, which carry no secret, go before it.
+   **Without `--pin`**, it trusts on first use, as ssh does a new host: it
+   takes the certificate the lamp shows, puts its pin in the proof and keeps
+   it, and every later connect must show the same certificate, checked before
+   any frame, or stops with `wrong_lamp` ("re-pair if you reset the lamp").
+   Then it sends the
    computer's new Ed25519 public key with a proof it holds the code:
    ```json
    {"id":1,"op":"pair","name":"Dev's laptop","key":"<32 bytes, base64>","proof":"<32 bytes, base64>"}
@@ -454,17 +465,22 @@ no state, a blank credential or a state that names no installed build, `build` i
    to the pulse's least level would flash the whole ring), while a computer
    holds the light, or while the ring shows another light. There is no nod and
    no sound.
-4. **No pairing without the app's pin.** A code alone, said aloud or typed
-   without its pin, can't pair (the spoken-code fallback is dropped, below).
+4. **No pairing without a pin in the proof.** The proof always covers the
+   certificate's pin, the client's from `--pin` or the one it was shown;
+   the lamp verifies the same proof as before (the spoken-code fallback is
+   dropped, below).
 
 **The attacker pairing is built against** (the Reviewer-lead's and
 Fourteen's P2 on #3736): a host on the home network that answers the
 computer's first connection as `<lamp>.local` before the real lamp does. An
 8-digit code can be searched offline from one `pair` frame in seconds, so
-the frame must never reach such a host. The pin from the app, checked before
-`pair`, keeps it from being sent there; the pin inside the proof makes a
-proof relayed through a host in the middle fail at the real lamp, even from
-a client that forgot to check. On the lamp, 300 tries in a code's 5 minutes
+the frame must never reach such a host. A pin given with `--pin`, checked
+before `pair`, keeps it from being sent there; the pin inside the proof
+(unchanged) makes a proof relayed through a host in the middle fail at
+the real lamp, even from a client that forgot to check. Pairing without a
+pin, the app's path, is trust on first use: it guarantees only that later
+connections reach the same lamp as the first, not that the first was the
+lamp. A pin, or a PAKE later, is what guarantees the first. On the lamp, 300 tries in a code's 5 minutes
 against 10^8 codes leaves online guessing out of reach.
 
 ### Hello, every connection
@@ -1516,8 +1532,9 @@ codes (`control.code`); the SDKs (`sdk/python`, `sdk/js`) and `lamp-mcp`
 (`sdk/mcp`), installed from a checkout, not published to PyPI or npm.
 
 Still to come:
-- the mDNS announcement (`_lampos._tcp`), so `lamp find` and `lamp pair`
-  without `--host` find a lamp;
+- the mDNS announcement (`_lampos._tcp`), so `lamp find` finds a lamp
+  (`lamp pair` already finds one by `_autonomous._tcp`);
+- a check that the first connection is the lamp without a pin (a PAKE);
 - skill push on customer lamps (`--manage-socket` in the product unit);
 - `joints` for `roll`, `shoulder` and `elbow`, `play`, and the microphone's
   sound;

@@ -91,12 +91,10 @@ The owner's steps in our app, today:
    grants in the app's `LampControlGrant`, "the camera and the microphone are never
    offered from the app"; the current TestFlight, 2.5.2, is the same). See "Granting
    camera, microphone and notes today" below.
-4. **Check it is the right lamp.** The lamp says the first 8 characters of its
-   security pin aloud, and the app shows the same 8 for the owner to confirm
-   they match. Only then does the app show a one-time code (8 digits, 5
-   minutes) and the lamp's full pin (64 hex characters). If the lamp couldn't
-   say its pin, the app cancels the code; ask for a new one.
-5. **Pair** the computer with that code and pin (section 3). The lamp gives a
+4. **Get the code.** The app shows a one-time code (8 digits, 5 minutes) and
+   the command to copy, `lamp pair 12345678`. Older apps also show the lamp's
+   pin (64 hex); pass it with `--pin` for the strict check.
+5. **Pair** the computer with that code (section 3). The lamp gives a
    small nod. The owner can take the body back, or remove the computer, from
    the app at any time; removing it closes its connections at once.
 
@@ -161,18 +159,28 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake                 # terminal 1
 LAMPOS_HOME=/tmp/lampos-try python examples/greet.py  # terminal 2, from lampOS/sdk/python
 ```
 
-**Pair with a real lamp**, on its network, with the code and pin from the
-app. The lamp doesn't announce itself on the network yet, so give its address:
+**Pair with a real lamp**, on its network, with the code from the app:
 
 ```sh
-lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local   # or its IP address
+lamp pair 12345678                                       # finds the lamp by mDNS
+lamp pair 12345678 --host lamp-xxxx.local --pin 3f9a…    # fallback: its address (or IP) and pin
 lamp hello                                               # connects, shows the grants
 ```
 
-The SDK checks the lamp's certificate against the pin after the TLS and
-WebSocket handshakes and before any protocol frame, so a pairing never goes
-to another host. The pairing is kept in `~/.config/lampos/`; later
-connections need no code.
+Without `--host`, the SDK browses mDNS (`_lampos._tcp`, which no lamp
+announces yet, and `_autonomous._tcp`, which every lamp does, named
+`lamp-xxxx`) and keeps the lamps whose port 7731 takes a TCP connection
+(only while developer access is on; nothing is sent). One lamp: it pairs and
+keeps its host name. Several: it stops (exit 2), listing them; say which with
+`--host`. None: it asks for `--host`.
+
+Without `--pin`, the certificate the lamp shows at pairing is trusted and its
+pin kept, as ssh does on first use: the first connection is trusted, so pair
+on your own network; pass `--pin` for the strict check (before any protocol
+frame, so a pairing never goes to another host). Every later connection must
+show the same certificate, else `WrongLamp`: re-pair (`lamp pair CODE` with a
+new code) if the lamp was reset. The pairing is kept in `~/.config/lampos/`;
+later connections need no code.
 
 **Say hello:**
 
@@ -232,7 +240,7 @@ refusals in the lamp's own words, and its status.
 
 | Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
 |---|---|---|---|---|---|---|---|---|
-| `Lamp.pair(code, host, pin=...)`; CLI `lamp pair CODE --pin PIN --host HOST` | `Lamp.pair(code, host, { pin })` | — (pair with the CLI first; `lamp-mcp` uses the pairing kept) | Op `pair`: checks the lamp's certificate against the app's pin before any frame, then sends this computer's new key with a proof of the code | the grants the owner ticks in the app | code: 8 digits, 5 min, one at a time; `name` 1–64 chars; one pairing try a second; at most 16 computers a lamp | `{client, grants}`; Python returns a `Pairing` and keeps it | `unpaired` "no pairing code is out: ask for one in the app"; `unpaired` "the proof does not hold for the code out"; `unpaired` "this lamp keeps as many computers as it can"; `rate` "one pairing try a second"; SDK: "the code is the 8 digits the app shows"; Python SDK: `unreachable` "no answer from HOST:PORT (the system's reason): check the lamp's address, ..." | works today (9 Nov 2026). No mDNS on customer lamps: pass `--host` (the lamp's `.local` name or IP) |
+| `Lamp.pair(code, host, pin=None)`; CLI `lamp pair CODE` (fallback `--host HOST --pin PIN`) | `Lamp.pair(code, host, { pin })`, `pin` optional | — (pair with the CLI first; `lamp-mcp` uses the pairing kept) | Op `pair`: with a pin, checks the lamp's certificate against it before any frame (without, trusts the one shown and keeps its pin), then sends this computer's new key with a proof of the code | the grants the owner ticks in the app | code: 8 digits, 5 min, one at a time; `name` 1–64 chars; one pairing try a second; at most 16 computers a lamp | `{client, grants}`; Python returns a `Pairing` and keeps it | `unpaired` "no pairing code is out: ask for one in the app"; `unpaired` "the proof does not hold for the code out"; `unpaired` "this lamp keeps as many computers as it can"; `rate` "one pairing try a second"; SDK: "the code is the 8 digits the app shows"; Python SDK: `unreachable` "no answer from HOST:PORT (the system's reason): check the lamp's address, ..." | works today (9 Nov 2026). Without `--host`, found by mDNS (`_autonomous._tcp`, port 7731 answering); with several or none, pass `--host` (the lamp's `.local` name or IP) |
 | `await Lamp.connect(lamp=None, host=None)` | `await Lamp.connect(lamp, { host })` | started by running `lamp-mcp` (`--lamp`, `--client`) | Opens the connection, reads the `welcome`, sends op `hello` signed with this computer's key | — | one `hello` a connection; closed after 2 min with nothing sent (the SDKs ping every 20 s); at most 4 connections from one address, 32 in all | a `Lamp` with `info` (id, name, `v`), `grants`, `limits` | `unpaired` "not paired, or the signature does not hold" (the connection closes); `bad_request` "hello once a connection"; `unpaired` "this computer's pairing was revoked"; SDK: "no pairing here for that lamp: run `lamp pair` first" | works today (9 Nov 2026) |
 | `lamp.limits`, `lamp.ring_pixels` | `lamp.limits`, `lamp.ringPixels` | — | What the lamp holds this computer to, read from `hello` | — | — | `rates` (`"off"` by default) or each class's `{most, within_ms}`; `hold_max_ms` 30000; `lease_max_ms` 600000; `say_max_bytes` 900; `quiet_hours` (`"off"` by default); `sounds`; `ring.pixels` (32) | — | works today (9 Nov 2026) |
 | `lamp.language` | `lamp.language` | — | The owner's language, read from `hello`'s `lamp` (never in the `welcome`, which any connection gets before it is known), so a program's own lines can follow it: `en`, `vi`, `ja`, `zh` or `ko`; `en` from a lamp that says none (one from before this) | — | — | `"en"`, `"vi"`, `"ja"`, `"zh"` or `"ko"` | works today (11 Nov 2026, lamp-75c9 on 11913, tag `lampos-lamp-voice-11913` 86ae3fdae6; #6261): read as `en`, the owner's; again on 12226 (12 Nov 2026, 16:25) |
@@ -399,7 +407,7 @@ Every refusal is `{"code": "…", "why": "…"}`, with `retry_ms` on `rate` (and
 
 | Code | What to do |
 |---|---|
-| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE --pin PIN`): this computer isn't paired, was revoked, or its key no longer matches. |
+| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE`): this computer isn't paired, was revoked, or its key no longer matches. |
 | `no_hello` | Say hello first: `Lamp.connect()` does; with `request()` alone, send `hello` before anything else. |
 | `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
 | `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
@@ -535,7 +543,7 @@ SDK and the pairing that `lamp pair` made. Reference: `sdk/mcp/README.md`
 
 ```sh
 pip install ./lampOS/sdk/python ./lampOS/sdk/mcp
-lamp pair <code> --pin <pin> --host <lamp address>   # once
+lamp pair <code>                                     # once (fallback: --host <lamp address> --pin <pin>)
 claude mcp add lamp -- lamp-mcp                       # or any MCP client
 # An MCP client often starts it without your environment: --home PATH names the folder `lamp pair` used (mcp/README.md)
 ```
@@ -815,7 +823,7 @@ await lamp.on("touch", lambda event: print(event["kind"], event.get("where")))
 You don't need this to use the SDKs; it's for anyone writing their own client or reading a debug log (`LAMPOS_LOG=debug` in either SDK prints every frame, `->` sent and `<-` received).
 
 - **Where:** `wss://<lamp>.local:7731/v1`, WebSocket over TLS 1.3. Nothing listens until the owner turns developer access on in the app. Only the lamp's own network may connect.
-- **Finding the lamp:** planned, nothing on the lamp announces it yet: mDNS `_lampos._tcp`, TXT `id`, `name`, `v=1` and `fp` (the first 16 hex characters of the SHA-256 of the lamp's certificate). The certificate is the lamp's own, self-signed; the client pins its full SHA-256 at pairing (the pin the app shows).
+- **Finding the lamp:** mDNS `_lampos._tcp`, TXT `id`, `name`, `v=1` and `fp` (the first 16 hex characters of the SHA-256 of the lamp's certificate), is planned: nothing on the lamp announces it yet. Today the SDKs also browse `_autonomous._tcp`, which the lamp image's avahi announces (instance `lamp-xxxx`), and keep the lamps whose port 7731 accepts a TCP connection. The certificate is the lamp's own, self-signed; the client pins its full SHA-256 at pairing (the pin the app shows, or, without one, the certificate shown at pairing).
 - **Frames:** UTF-8 JSON, one message per text frame.
   - The lamp's first frame on each connection is a `welcome` with a nonce, which pairing's proof and hello's signature cover, and the lamp's `id`, `name`, `v` and the owner's `language` (`en`, `vi`, `ja`, `zh` or `ko`, read from the lamp's setup at each connection; a lamp from before this sends none).
   - **Request:** `{"id": 7, "op": "...", ...}`; `id` is the client's whole number.
@@ -924,7 +932,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 
 | What | Status | Notes |
 |---|---|---|
-| Pair, connect, limits | works today (9 Nov 2026) | code + pin from the app; `--host` needed (no network announcement yet) |
+| Pair, connect, limits | works today (9 Nov 2026) | code from the app; found by `_autonomous._tcp` without `--host`; pin optional (trust on first use without it) |
 | State (`get`) | works today (9 Nov 2026) | |
 | Light: named colours, any RGB, each of 32 pixels | works today (9 Nov 2026) | each taken in 7 to 41 ms |
 | Say word for word | works today (9 Nov 2026) | up to 900 bytes a line |
@@ -976,7 +984,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Look at a face | in development: the lamp refuses it today, as designed, on stable 12587 (13 Nov 2026, lamp-75c9, installed binaries, nothing staged, lamp-control 33e5bae8aef0…, lamp-body 51001d1b615a…; the lead's run `ten-faces`, 14:44-14:45): the code is in that build (`crates/control/src/parts.rs`: `look` at `face` is taken and goes to the body), but the product's `lamp-body.service` runs with `--gaze-socket` and `--gaze-reach 480,120` and no `--gaze`, so the body has no measured gaze | on lamp-75c9 a paired Python SDK with the `look` and `body` grants, under a body lease, asked `look` at `face` with `wait`: the answer was `done`, `how: dropped`, "this lamp's gaze is not measured, so it cannot look at a face", and lamp-body's journal said the same (14:45:05, "a holder's look answered {look:refused,…}"); the yaw stayed at 2025 counts and the pitch went 1789 to 1758 (31 counts; the run does not show whether that was the lamp's own idle). It is not a face look that worked: the head did not turn toward a face. `--gaze` is measured on a lamp with a face and the camera (`docs/install.md`) and the product unit gives none; `docs/install.md` has one for lamp-4ace and one for lamp-52e6, none for lamp-75c9, so no run with a gaze was made. On 11091 and older the same ask is refused "not in this release"; on the tip only `look` at `name` is still refused that way, "not in this release: look at who said the lamp's name (the lamp has no sound direction)". With a measured `--gaze` a taken face look can still end refused "no face in view" (the body, `lamp-body.rs`) or "another look is still under way" (`crates/body/src/lease.rs`) |
 | Look at who said the lamp's name | in development | the lamp has no sound direction |
 | The faster camera stream | works today (13 Nov 2026, lamp-75c9 on stable 12587 (lamp-update check 09:11, 13 Nov 2026), lamp-control 33e5bae8aef0…, installed binaries, nothing staged, lamp-eyes 282714eb70fa…; #6280; `LAMP_EYES_FAST_STREAM=on` is in the product's `lamp-eyes.service` and the lamp said `fast: true` each time); merged on lamp-voice, in build 12104 (tag `lampos-lamp-voice-12104` 75cd3763bf; the commit eb9a694461; #6280) | on lamp-75c9 at 09:39 to 09:41, one paired Python SDK over Wi-Fi with the `camera` grant, 20 s a stream: asked 25 a second at 640x480, 336 frames in 19.4 s reached it, **about 17 a second** (the usual gap 41 ms, about 24 a second while frames flow; p90 gap 86 ms, longest 330 ms); asked 30 at 640x480, 16.6 a second, no more than asking 25; asked 25 at 1280x720, 15.7 a second (frames about 98 kB against 45 kB at 640x480). The lamp's own `fps_now` said 20.7 to 21.4, so about 16 to 17 a second reached the SDK over Wi-Fi while the lamp counted about 21 (the old "about 21 reach the SDK" was the test lamp's, 10 Nov). lamp-control used 3.4% of one core idle and 4.4 to 5.7% streaming (/proc); lamp-eyes' 31 to 35% did not change beyond its idle spread. The first frame came 357 to 389 ms after the ask. The first builder's yes (11 Nov 00:43 and 12:11) turned it on, with the socket open only to lamp-control and a stream's end stopping its writer (`switches.md`, the unit's comment). **Not shown:** whether the missing frames are lost on the lamp or on the Wi-Fi (one network, no wired run, no client on the lamp), a second computer, a run longer than 20 s, a person in view |
-| The lamp announcing itself on the network | planned | then `--host` isn't needed |
+| The lamp announcing itself on the network (`_lampos._tcp`) | planned | then `lamp find` lists it, and `--pin` without `--host` picks it by `fp` |
 | The edition connector in the app (4 screens) | planned | |
 | The SDK in its own repository, the schema versioned there | planned | no date; package names stay `lampos` and `lamp-mcp` |
 
