@@ -9008,8 +9008,15 @@ fn said_of(table: &toml::Table) -> Option<String> {
 /// `lamp-skills pack`, and kept as a made skill is, said back as
 /// [`Said::said_back`]. Called by [`keep_asked`] once it has looked for one
 /// kept already.
-fn keep_said(said: &Said, files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+fn keep_said(
+    said: &Said,
+    files: &Files,
+    from: &str,
+    keeping: &Keeping,
+    named: Option<&str>,
+) -> Result<Made, Refused> {
     let (name, marked) = card(&files.card, &said.description(), Maker::of(from))?;
+    let (name, marked) = named_as_given(name, marked, named, MOST_WRITTEN_NAME_BYTES);
     // Its function's name within lamp-skills' 48 bytes, as a written one's.
     if name.len() > MOST_WRITTEN_NAME_BYTES
         || !name.starts_with(|first: char| first.is_ascii_lowercase())
@@ -9489,6 +9496,11 @@ pub struct Asked<'a> {
     /// The engine whose answer this is ([`MadeWith`]), written on the card
     /// and in the index with [`reactions_on`] alone.
     pub made_with: MadeWith,
+    /// The name the person gave the skill as they asked for it ("called
+    /// evening rate", #7911), as the voice's model read it from their
+    /// words: the made skill's name ([`given_name`]), whoever wrote it.
+    /// `None` when they gave none: the maker's own name stands.
+    pub named: Option<&'a str>,
 }
 
 /// [`keep`], with the person's request: the times of day it named
@@ -9532,7 +9544,7 @@ pub fn keep_asked(
     if said_on()
         && let Some(said) = said_asked(&files.toml)?
     {
-        return keep_said(&said, &files, from, keeping);
+        return keep_said(&said, &files, from, keeping, request.named);
     }
     // A getting up's wait, which [`tidied`] takes out: said with what it
     // does, never dropped without a word (App Only's P2 on #6249).
@@ -9630,6 +9642,7 @@ pub fn keep_asked(
         made_with: reactions_on().then_some(request.made_with),
         from,
         keeping,
+        named: request.named,
     };
     let made = ending.checked_and_kept(&files.toml, &[]);
     // Loosened ([`LOOSE_ENVIRONMENT`]): what the check refused is left out
@@ -9664,6 +9677,8 @@ struct Ending<'a> {
     made_with: Option<MadeWith>,
     from: &'a str,
     keeping: &'a Keeping,
+    /// The name the person gave it ([`Asked::named`]).
+    named: Option<&'a str>,
 }
 
 impl Ending<'_> {
@@ -9678,6 +9693,7 @@ impl Ending<'_> {
             made_with,
             from,
             keeping,
+            named,
         } = *self;
         let (version, uses) = capped(toml)?;
         // Said only once the check has passed: its lines, which name the
@@ -9716,6 +9732,8 @@ impl Ending<'_> {
             limits,
             made_with,
         )?;
+        // The name the person gave it, whoever wrote it (#7911).
+        let (name, marked) = named_as_given(name, marked, named, MOST_NAME_BYTES);
         // A name a skill on the lamp has already (a factory reset keeps the
         // lamp's own, welcome-back among them): the first free one, or "you
         // already have that skill" for the person's own of the same words.
@@ -10973,6 +10991,51 @@ pub fn name_asked(asked: &str) -> String {
         words = rest;
     }
     words.join("-")
+}
+
+/// A name the person gave a skill as they asked for it (#7911: "make a
+/// skill called evening rate" was kept as the model's
+/// `nightly-dollar-rate`, and "change evening rate" then found none),
+/// written as a kept skill's name is ([`name_asked`]) and cut to at most
+/// `most` bytes. `None` when it gives no skill's name (no letter first,
+/// or letters a skill's name can't have): the maker's own name stands.
+pub fn given_name(said: &str, most: usize) -> Option<String> {
+    let name = name_asked(said);
+    let name = cut_bytes(&name, most).trim_end_matches('-');
+    (name.starts_with(|first: char| first.is_ascii_lowercase())
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'))
+    .then(|| name.to_owned())
+}
+
+/// A made skill's `name` and its marked card, with the name the person
+/// gave (`given`, [`given_name`]) in its place when they gave one: the
+/// maker's own name only when they gave none (#7911). A clash with a
+/// skill on the lamp is [`free_name`]'s after this, as before.
+fn named_as_given(
+    name: String,
+    marked: String,
+    given: Option<&str>,
+    most: usize,
+) -> (String, String) {
+    let Some(said) = given else {
+        return (name, marked);
+    };
+    match given_name(said, most) {
+        Some(given) if given != name => {
+            eprintln!(
+                "lamp-voice: a made skill takes the name its person gave: {given}, not {name}"
+            );
+            let marked = renamed_card(&marked, &given);
+            (given, marked)
+        }
+        Some(_) => (name, marked),
+        None => {
+            eprintln!("lamp-voice: a made skill's given name is no skill's name: {name} stands");
+            (name, marked)
+        }
+    }
 }
 
 /// A written name (`lamp-test-email-2`, as [`name_asked`] writes one) with
@@ -17083,6 +17146,75 @@ light = { colour = "green", level = 3, for = "20s" }
             renamed_card(card, "welcome-back-2"),
             "---\nname: welcome-back-2\ndescription: \"d\"\nmade: here\n---\nname: body\n"
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7911 (lamp-9adf, 19 Nov 12:46): "make a skill called evening rate"
+    /// was kept as the model's `nightly-dollar-rate`, and "change evening
+    /// rate" then found none. A name the person gave is the made skill's,
+    /// written as a kept skill's name is, on its card too; one taken gets
+    /// the first free number, as before; with none given, or one that
+    /// gives no skill's name, the model's own name stands.
+    #[test]
+    fn a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-given-name");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/SKILL.md\" > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let card = CARD.replace("name: evening-dim", "name: nightly-dollar-rate");
+        let made = |named: Option<&str>, from: &str| {
+            let asked = Asked {
+                request: "dim the light a shade at 10 pm",
+                named,
+                ..Asked::default()
+            };
+            let made = keep_asked(&answer(TOML, &card), false, from, &keeping, &asked).unwrap();
+            let packed = fs::read_to_string(&made.package).unwrap();
+            (made.name, packed)
+        };
+        let (name, packed) = made(Some("Evening rate"), "local:given:1");
+        assert_eq!(name, "evening-rate");
+        assert!(packed.contains("\nname: evening-rate\n"), "{packed}");
+        assert!(!packed.contains("nightly-dollar-rate"), "{packed}");
+        // "my … skill" around it, as a kept skill's name is asked for (one
+        // kept and not on gives way to the newer one, as before).
+        assert_eq!(
+            made(Some("my evening rate skill"), "local:given:2").0,
+            "evening-rate"
+        );
+        // Taken on the lamp: the first free one, as before.
+        installed_skill(
+            &keeping.installed,
+            "evening-glow",
+            false,
+            "kind = \"core\"\n",
+        );
+        assert_eq!(
+            made(Some("evening glow"), "local:given:3").0,
+            "evening-glow-2"
+        );
+        // None given, or words that give no skill's name: the model's.
+        assert_eq!(made(None, "local:given:4").0, "nightly-dollar-rate");
+        assert_eq!(made(Some(" ?! "), "local:given:5").0, "nightly-dollar-rate");
+        assert_eq!(
+            given_name("Evening rate", 64).as_deref(),
+            Some("evening-rate")
+        );
+        assert_eq!(given_name("skill two", 64).as_deref(), Some("skill-two"));
+        assert_eq!(given_name("tỷ giá", 64), None);
+        assert_eq!(given_name("9 pm rate", 64), None);
+        assert_eq!(given_name(&"long ".repeat(20), 40).unwrap().len(), 39);
         let _ = fs::remove_dir_all(&dir);
     }
 

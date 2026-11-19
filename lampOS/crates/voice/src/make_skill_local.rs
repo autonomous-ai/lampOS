@@ -885,6 +885,13 @@ fn own_accounts_now() -> Vec<(String, String)> {
 /// own argument alone, with none.
 pub const REQUEST: &str = "request";
 
+/// The `make_skill` argument for the name the person gave a new skill
+/// as they asked for it (#7911): read from their words by the voice's
+/// model, which judges what they said, and made the skill's name in code
+/// whoever writes it, DeepSeek or the lamp's agent
+/// ([`made_skill::given_name`]).
+pub const GIVEN_NAME: &str = "given_name";
+
 /// Whether a `make_skill` call's whole `args` ask for a new skill: they
 /// name its [`REQUEST`], as a streamed call whose first argument is
 /// [`REQUEST`] does (`ChatEvent::Argued`). Neither weighs its words or
@@ -1053,6 +1060,10 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             "request": {
                 "type": "string",
                 "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn. Never call it for an ask they take back in the same line."
+            },
+            GIVEN_NAME: {
+                "type": "string",
+                "description": "The new skill's name, if they give one (\"called evening rate\"), as said; else left out."
             }
         },
         "required": []
@@ -3317,10 +3328,12 @@ fn made_and_journaled_by(
         .with(std::cell::RefCell::take)
         .unwrap_or_else(|| heard.map(str::to_owned));
     let judge_ask = |question: &str| judged(Arc::clone(&chat), question.to_owned());
+    let given = GIVEN.with(std::cell::RefCell::take);
     let asked = made_skill::Asked {
         request,
         own: own_accounts_now(),
         heard,
+        named: given.as_deref(),
         judge: own_line
             .as_deref()
             .filter(|_| made_skill::unrelated_on())
@@ -4428,6 +4441,29 @@ fn judge_once(
 }
 
 thread_local! {
+    /// The name the person gave the skill, as the voice's model read it
+    /// ([`GIVEN_NAME`], [`GivenName`]), for the make on this thread.
+    static GIVEN: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The name the person gave a voice make ([`GIVEN_NAME`]), held while it
+/// runs, then cleared, so no later make on this thread takes it.
+struct GivenName;
+
+impl GivenName {
+    fn set(name: Option<String>) -> Self {
+        GIVEN.with(|given| given.replace(name));
+        Self
+    }
+}
+
+impl Drop for GivenName {
+    fn drop(&mut self) {
+        GIVEN.with(|given| given.replace(None));
+    }
+}
+
+thread_local! {
     /// The person's own line for the voice's make on this thread
     /// ([`OwnLine`]): `Some(None)` when it isn't known.
     static OWN_LINE: std::cell::RefCell<Option<Option<String>>> =
@@ -4855,6 +4891,17 @@ pub fn answer(
             }));
         });
     }
+    // The name the person gave it (#7911): the made skill's, whoever
+    // writes it. Never an undo's, which makes the first ask again.
+    let _given = GivenName::set(
+        undone
+            .is_none()
+            .then(|| call.args[GIVEN_NAME].as_str())
+            .flatten()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned),
+    );
     let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
@@ -7266,6 +7313,7 @@ light = { dim = 1 }
             heard: Some(WRITE_EXAMPLE_ASKED),
             judge: None,
             made_with: made_skill::MadeWith::DeepSeek,
+            named: None,
         };
         let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
         assert_eq!(made.uses.writes, ["gmail"]);
@@ -7759,6 +7807,48 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7911 (lamp-9adf, 19 Nov 12:46): "make a skill called evening rate"
+    /// was kept as `nightly-dollar-rate`. The name the voice's model reads
+    /// from the ask (`given_name`) is the made skill's, as the person said
+    /// it, whether DeepSeek's answer is kept or the agent's; with none
+    /// given, the make's own name stands, on both paths.
+    #[test]
+    fn a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent() {
+        let nightly =
+            |answer: String| answer.replace("name: evening-dim", "name: nightly-dollar-rate");
+        for (case, given, made) in [
+            ("given", Some("evening rate"), "evening-rate"),
+            ("none", None, "nightly-dollar-rate"),
+        ] {
+            // DeepSeek's answer kept, no agent on the lamp; then DeepSeek's
+            // refused and the agent's kept.
+            for by_agent in [false, true] {
+                let (root, kept_in) = keeping(&format!("given-name-{case}-{by_agent}"));
+                let tasks = agent_answering(vec![Some(nightly(good()))]);
+                let first = if by_agent { faces() } else { nightly(good()) };
+                let (url, served) = service(vec![(200, first)]);
+                let agent = tasks.agent();
+                let _given = GivenName::set(given.map(str::to_owned));
+                let told = made_by(&kept_in, url, by_agent.then_some(&agent), NOW);
+                assert_eq!(told["made"], made, "{case} {by_agent}: {told}");
+                assert_eq!(
+                    (served.join().unwrap(), tasks.hand_overs()),
+                    (1, usize::from(by_agent)),
+                    "{case} {by_agent}"
+                );
+                let _ = std::fs::remove_dir_all(&root);
+            }
+        }
+        // The voice's model is asked for it, and only for a new make.
+        let parameters = parameters(false, false);
+        let told = parameters["properties"][GIVEN_NAME]["description"]
+            .as_str()
+            .unwrap();
+        assert!(told.contains("called"), "{told}");
+        assert!(told.contains("else left out"), "{told}");
+        assert_eq!(parameters["required"], json!([]));
     }
 
     /// The rules of each make handed to the agent, and whether each asked
