@@ -24,6 +24,18 @@ fn the_short_line_rule(asked: Arc<AtomicUsize>) -> Heed {
 /// lamp-name's best hearing in it `best`: whether it was answered, and
 /// whether the rule was asked.
 async fn heard_with(heard: &str, best: Option<f32>) -> (bool, bool) {
+    heard_near_the_lamp(heard, best, false, None).await
+}
+
+/// [`heard_with`] for a line begun over the lamp's voice (`over`), or
+/// `ended_ago_us` after the lamp's words played to their end.
+async fn heard_near_the_lamp(
+    heard: &str,
+    best: Option<f32>,
+    over: bool,
+    ended_ago_us: Option<u64>,
+) -> (bool, bool) {
+    const BEGAN_US: u64 = 100_000_000;
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
@@ -36,8 +48,20 @@ async fn heard_with(heard: &str, best: Option<f32>) -> (bool, bool) {
         .checking_sounds(true)
         .heeding(the_short_line_rule(ruled.clone()))
         .knowing_the_name_in_a_line(Arc::new(move |_: (u64, u64)| best));
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
+    if let Some(ago) = ended_ago_us {
+        engine
+            .shared
+            .said_until_us
+            .store(BEGAN_US - ago, Ordering::Relaxed);
+    }
+    engine.submit(if over { start_over(1) } else { start(1) });
+    engine.submit(ProviderInput::Audio {
+        request: 1,
+        privacy_generation: 1,
+        sequence: 1,
+        read_completed_at_us: BEGAN_US,
+        samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+    });
     engine.submit(ProviderInput::End {
         request: 1,
         privacy_generation: 1,
@@ -99,4 +123,35 @@ async fn a_short_sound_without_a_hearing_at_the_bar_is_held_as_before() {
             );
         }
     }
+}
+
+/// The Reviewer-lead's P2 on #7994: in the product lamp-name runs without
+/// `--not-while-speaking`, and on lamp-4ace it heard the lamp's own reply
+/// at 0.990. A short sound begun over the lamp's voice, or within the echo
+/// tail after its words ([`own_echo::TAIL_US`]), may be that reply heard
+/// back: held as before, the rule never asked, however high the hearing.
+/// Begun past the tail, request 12's "Lump?" at 0.917 is still answered.
+#[tokio::test(start_paused = true)]
+async fn a_short_sound_heard_by_lamp_name_over_the_lamps_voice_or_its_tail_stays_held() {
+    for heard in ["Lump?", "Lamb."] {
+        for score in [0.917, 0.990] {
+            assert_eq!(
+                heard_near_the_lamp(heard, Some(score), true, None).await,
+                (false, false),
+                "{heard} at {score} over the lamp's voice"
+            );
+            for ago in [300_000, crate::second_provider::own_echo::TAIL_US] {
+                assert_eq!(
+                    heard_near_the_lamp(heard, Some(score), false, Some(ago)).await,
+                    (false, false),
+                    "{heard} at {score}, {ago} us after the lamp's words"
+                );
+            }
+        }
+    }
+    assert_eq!(
+        heard_near_the_lamp("Lump?", Some(0.917), false, Some(3_000_000)).await,
+        (true, true),
+        "Lump? at 0.917, 3 s after the lamp's words"
+    );
 }
