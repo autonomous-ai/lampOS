@@ -98,6 +98,7 @@ pub mod going_on_same_one;
 pub mod hand_controls;
 pub mod head_qualification;
 pub mod health_told;
+pub mod history_send;
 pub(crate) mod holding_answer;
 pub mod just_made;
 pub mod keep_at_once;

@@ -1108,6 +1108,51 @@ most 2,000 a person, the one changed longest ago going first past it. An
 older memory answers `unknown_op`, so the voice sends them only with its
 switch on.
 
+## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, off)
+
+The product owner's decision of 18 Nov: a person's conversations with the lamp
+are kept on our server too. With `LAMP_HISTORY_SEND=on` (the second route only,
+passed to that worker alone) the voice saves each exchange the Days memory wrote
+to the account's history store (Backend3, 19 Nov):
+`POST <base>/history/turns` with the lamp's key in `x-api-key`, the body
+`{"turns":[{"id","at","person","heard","said"}]}`.
+
+- **What is sent:** only an exchange `append_linked` answered with its id: the
+  line as heard, the lamp's reply, when (`at`, UTC), and whose scope it is in.
+  `person` is the known person's memory id, or empty for the room's. No audio,
+  picture, kept thing, observation or rule. What the memory keeps out is never
+  written and so never sent: a keep or forget turn, a carried line, one held by
+  a face's gap, one made before a forget, one whose source was forgotten.
+- **The id** is the memory's own exchange id in its scope (`history_send::turn_id`):
+  `p-0123456789abcdef:12`, or `everyone:7` for the room's. It is the id a
+  forget names when it deletes (`LAMP_HISTORY_FORGET`), so no ledger is kept.
+  The memory never gives an id twice in a scope, and the store takes a resend of
+  an id as a no-op, so a retry is safe.
+- **The room's lines wait** for their conversation's end: with
+  `LAMP_MEMORY_FOLLOWS_FACE` a room line may move to the caller's scope under a
+  new id (`adopt`) until then. A moved line is sent as its person's under its new
+  id; the rest go as the room's when the conversation ends. A line held 30
+  minutes is let go unsent.
+- **A forget** said on the lamp lets go of every turn not yet saved, and a batch
+  waiting for its next try is not tried again.
+- **Where:** only the lamp's own cloud API, the relay host the route's
+  `llm_base_url` names (`https://campaign-api.autonomous.ai/api/v1/ai`, with or
+  without `/v1`; `history_send::url`). With a direct provider's base, plain
+  HTTP or another host, nothing starts and nothing is sent.
+- **Never on the turn's path:** the memory's writer thread, already off the
+  reply, hands each turn over under a short lock with no I/O. A thread of its
+  own sends them in order, at most 20 a call, each text cut to 8 KB at a
+  character's end; a failed call (no answer, 408, 429 or 5xx) is tried again with
+  the same ids, 6 tries in all, the wait doubling from 2 s to 60 s. A 2xx
+  `{"enabled":false}` (the store's switch off) or another refusal is not tried
+  again. At most 200 turns wait (the oldest let go past it) and 64 room lines
+  are held. RAM only: what is unsent at a restart is not sent. The journal has
+  counts only, never a word, an id or a key.
+- **Off in every unit:** by the first builder's ruling on #7935, the save goes
+  on in the product only after the forget half (`LAMP_HISTORY_FORGET`) is on,
+  with its row. The setup sentence the issue first asked for was dropped by the
+  product owner (18 Nov): the notice is in the privacy policy.
+
 ## Storage and migration
 
 `<dir>/memory-days.sqlite3` holds raw exchanges, explicit kept facts,

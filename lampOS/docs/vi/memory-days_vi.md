@@ -857,6 +857,54 @@ bị quên: không hết hạn, tidy hay nightly không đọc bảng này; `for
 người, liên hệ thay đổi lâu nhất bị bỏ trước khi vượt quá. Memory cũ trả
 `unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật.
 
+## Lịch sử trên tài khoản (`LAMP_HISTORY_SEND` của voice, #7771, tắt)
+
+Quyết định của chủ sản phẩm ngày 18/11: các cuộc trò chuyện của một người với
+lamp cũng được giữ trên máy chủ của chúng ta. Với `LAMP_HISTORY_SEND=on` (chỉ
+tuyến thứ hai, chỉ truyền cho worker đó), voice lưu mỗi lượt trao đổi mà bộ nhớ
+Days đã ghi vào kho lịch sử của tài khoản (Backend3, 19/11):
+`POST <base>/history/turns` với khóa của lamp trong `x-api-key`, thân
+`{"turns":[{"id","at","person","heard","said"}]}`.
+
+- **Gửi gì:** chỉ một lượt mà `append_linked` đã trả lời kèm id: câu nghe được,
+  câu trả lời của lamp, lúc nào (`at`, UTC), và nó thuộc phạm vi của ai.
+  `person` là id bộ nhớ của người đã biết, hoặc rỗng cho phòng. Không có âm
+  thanh, hình ảnh, điều đã giữ, quan sát hay quy tắc. Những gì bộ nhớ không ghi
+  thì không bao giờ được gửi: lượt giữ hay quên, câu được mang theo, câu bị giữ
+  vì khoảng trống của khuôn mặt, câu làm trước một lệnh quên, câu có nguồn đã bị
+  quên.
+- **Id** là id lượt trao đổi của chính bộ nhớ trong phạm vi của nó
+  (`history_send::turn_id`): `p-0123456789abcdef:12`, hoặc `everyone:7` cho
+  phòng. Đó là id mà một lệnh quên nêu khi xóa (`LAMP_HISTORY_FORGET`), nên không
+  cần sổ ghi riêng. Bộ nhớ không bao giờ cấp một id hai lần trong một phạm vi, và
+  kho coi việc gửi lại một id là không làm gì, nên thử lại luôn an toàn.
+- **Câu của phòng chờ** đến khi cuộc trò chuyện kết thúc: với
+  `LAMP_MEMORY_FOLLOWS_FACE`, một câu của phòng có thể chuyển sang phạm vi của
+  người gọi với id mới (`adopt`) cho đến lúc đó. Câu đã chuyển được gửi là của
+  người đó với id mới; phần còn lại được gửi là của phòng khi cuộc trò chuyện kết
+  thúc. Câu bị giữ 30 phút thì bỏ, không gửi.
+- **Một lệnh quên** nói trên lamp bỏ mọi lượt chưa lưu, và một lô đang chờ thử
+  lại sẽ không được thử lại.
+- **Gửi đến đâu:** chỉ API đám mây của chính lamp, máy chủ relay mà
+  `llm_base_url` của tuyến nêu (`https://campaign-api.autonomous.ai/api/v1/ai`,
+  có hoặc không có `/v1`; `history_send::url`). Với base của một nhà cung cấp
+  trực tiếp, HTTP thường hay máy chủ khác, không có gì khởi động và không có gì
+  được gửi.
+- **Không bao giờ nằm trên đường của lượt nói:** luồng ghi của bộ nhớ, vốn đã
+  tách khỏi câu trả lời, trao mỗi lượt dưới một khóa ngắn, không I/O. Một luồng
+  riêng gửi chúng theo thứ tự, tối đa 20 lượt mỗi lần gọi, mỗi đoạn chữ cắt còn
+  8 KB ở cuối một ký tự; một lần gọi lỗi (không trả lời, 408, 429 hay 5xx) được
+  thử lại với cùng các id, tổng cộng 6 lần, thời gian chờ gấp đôi từ 2 giây đến
+  60 giây. Một 2xx `{"enabled":false}` (công tắc của kho tắt) hay một lời từ chối
+  khác thì không thử lại. Tối đa 200 lượt chờ (quá thì bỏ lượt cũ nhất) và 64 câu
+  của phòng được giữ. Chỉ trong RAM: những gì chưa gửi khi khởi động lại thì
+  không gửi. Nhật ký chỉ có số đếm, không bao giờ có lời, id hay khóa.
+- **Tắt trong mọi unit:** theo phán quyết của người xây dựng đầu tiên trên
+  #7935, phần lưu chỉ bật trong sản phẩm sau khi phần quên
+  (`LAMP_HISTORY_FORGET`) đã bật, cùng hàng kiểm tra của nó. Câu thông báo trong
+  phần cài đặt mà issue ban đầu yêu cầu đã được chủ sản phẩm bỏ (18/11): thông
+  báo nằm trong chính sách quyền riêng tư.
+
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 
 Với `role:true` trong `session_open` (công tắc `LAMP_MEMORY_ROLE` của voice,

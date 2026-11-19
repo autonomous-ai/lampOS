@@ -1515,6 +1515,10 @@ fn worker_command(
             role,
             var(crate::did_history::ENVIRONMENT).as_deref(),
         ))
+        .envs(history_send_worker_environment(
+            role,
+            var(crate::history_send::ENVIRONMENT).as_deref(),
+        ))
         .envs(did_ring_worker_environment(
             role,
             var(crate::did_ring::ENVIRONMENT).as_deref(),
@@ -2615,6 +2619,17 @@ fn did_keep_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::did_history::ENVIRONMENT, "on"))
+}
+
+// Each turn the memory keeps sent to the account's history
+// (`history_send::ENVIRONMENT`, #7771): the exact `on`, to the second route,
+// whose memory writer hands the turns on.
+fn history_send_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::history_send::ENVIRONMENT, "on"))
 }
 
 // The ring's own faces told on `lamp/did` (#7757, `did_ring::ENVIRONMENT`):
@@ -4009,6 +4024,13 @@ mod tests {
                         "LAMP_DID_KEEP",
                         ["second"].as_slice(),
                     ),
+                    // Each kept turn sent to the account's history: the
+                    // second route alone (#7771).
+                    (
+                        history_send_worker_environment,
+                        "LAMP_HISTORY_SEND",
+                        ["second"].as_slice(),
+                    ),
                     // The ring's own faces told on lamp/did: the ring and
                     // privacy workers (#7757).
                     (
@@ -4338,6 +4360,7 @@ mod tests {
                     crate::told_when_asked::ENVIRONMENT,
                     crate::agent_tasks::NAMED_AGENT_TAKES_LINE_ENVIRONMENT,
                     crate::did_history::ENVIRONMENT,
+                    crate::history_send::ENVIRONMENT,
                     crate::did_ring::ENVIRONMENT,
                     crate::app_triggers::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
@@ -4689,6 +4712,7 @@ mod tests {
                     "LAMP_HISTORY_FORGET=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_HISTORY_SAID_ONCE=on",
+                    "LAMP_HISTORY_SEND=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_CLAIM_WHOLE=on",
