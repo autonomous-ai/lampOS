@@ -275,6 +275,76 @@ async fn a_cut_make_that_clashes_tells_its_clash() {
     }
 }
 
+/// #7936's ROW on lamp-9adf at 09ede55c76 (19 Nov 20:43): "make it seven
+/// thirty instead" changed request 6's make under way, the remake failed,
+/// and its line went back through request 6's cut turn, where the change's
+/// own line read as the person going on: nothing was said. A remake was
+/// told "you'll hear when it's ready", so its failure is said once, the
+/// person gone on or not.
+#[tokio::test]
+async fn a_change_mid_make_whose_remake_fails_is_said_after_the_cut() {
+    let (go, wait) = mpsc::channel::<()>();
+    let (say, said) = mpsc::channel::<String>();
+    let (root, keeping) = keeping("cut-remake-failed");
+    let (url, served) = service(vec![(200, good()), (200, CANNOT.to_owned())]);
+    let running = made_running(
+        6,
+        move || {
+            let _ = wait.recv();
+            let directory = keeping.directory.clone();
+            let chat = chat_at(url);
+            let changed = std::sync::Arc::new(std::sync::OnceLock::new());
+            let once = changed.clone();
+            let told = crate::make_skill_local::make_with(
+                6,
+                Some(REQUEST),
+                REQUEST,
+                &keeping,
+                move || {
+                    // Request 7's change, while the model writes the first.
+                    if once.get().is_none() {
+                        let _ = once.set(crate::make_skill_local::tests::owner_changes(
+                            &directory,
+                            7,
+                            "make it ten thirty instead",
+                        ));
+                    }
+                    chat()
+                },
+                NOW,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), 2, "made again with the change");
+            assert!(told["error"].is_string(), "the remake failed: {told}");
+            let _ = std::fs::remove_dir_all(&root);
+            // A cut turn's lapsed scope, as on the lamp.
+            ToolAnswer::plain(crate::tools::unavailable())
+        },
+        move |line| {
+            say.send(line).unwrap();
+        },
+        // Request 7, the change itself, was answered.
+        |_| true,
+    );
+    drop(running);
+    go.send(()).unwrap();
+    let line = tokio::task::spawn_blocking(move || {
+        let line = said.recv_timeout(Duration::from_secs(30));
+        let again = said.recv_timeout(Duration::from_millis(300));
+        (line, again)
+    })
+    .await
+    .unwrap();
+    assert!(
+        line.0
+            .as_deref()
+            .is_ok_and(|line| line.starts_with("I couldn't make")),
+        "{:?}",
+        line.0
+    );
+    assert!(line.1.is_err(), "said once: {:?}", line.1);
+}
+
 /// Only a line heard with words and answered is the person going on: the
 /// second route marks it ([`crate::make_skill_local::person_went_on`]),
 /// for a later request only.

@@ -6588,9 +6588,13 @@ fn made_on_this_thread<F: FnOnce() + Send + 'static>(
     crate::make_skill_agent::set_made_for(request);
     // Nothing an earlier call left on this thread is taken as this one's.
     let _ = crate::make_skill_local::take_said_outcome();
+    let _ = crate::make_skill_local::take_changed_here();
     let answer = work();
     crate::make_skill_agent::set_made_for(0);
     let made = crate::make_skill_local::take_said_outcome();
+    // Changed while it was made (#7912): the change's own line is no going
+    // on from it, and its person was told they'll hear when it's ready.
+    let changed = crate::make_skill_local::take_changed_here();
     let queued = given.is_none();
     let answer = match given {
         Some(given) => match given.send(answer) {
@@ -6628,7 +6632,11 @@ fn made_on_this_thread<F: FnOnce() + Send + 'static>(
     // Failed, and the person went on since (lamp-9adf, 17 Nov 18:10: a
     // make cut by the next ask failed 88 s later, and "I couldn't make
     // that" was said in a later, unrelated turn): nothing is said.
-    if outcome == Outcome::Failed && went_on(request) {
+    // A make changed while it was made is said whatever followed (#7936's
+    // ROW on lamp-9adf at 09ede55c76: request 7's "make it seven thirty
+    // instead" read as going on from request 6, and its failed remake was
+    // never said).
+    if outcome == Outcome::Failed && !changed && went_on(request) {
         eprintln!(
             "lamp-voice second: request {request}: its turn was cut while make_skill ran, and it kept nothing; the person went on with a line of their own: nothing is said"
         );

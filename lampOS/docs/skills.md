@@ -4806,7 +4806,12 @@ gone ([switches.md](switches.md)). What happens:
     unclear ask with `LAMP_MAKE_NO_ASKS`) says why, "I couldn't make it
     with your change: …", whatever the person said since, as a queued
     make's failure is; one dropped by their later no says nothing
-    (`run_remade_with`). A make done and on is told
+    (`run_remade_with`). A make changed under way whose turn was then cut
+    says its line through the say service too, a failure as well, whatever
+    the person said since: the change's own line is no going on from it
+    (`make_skill_local::take_changed_here`; #7936's ROW on lamp-9adf at
+    09ede55c76, "make it seven thirty instead", its remake's failure never
+    said). A make done and on is told
     its change is a new make of it, the whole ask with the change. A line
     about something else leaves the make alone. "change" on a wait that is
     no voice make's (a skill's task, a remove, a record let go) reads as
@@ -4817,6 +4822,7 @@ gone ([switches.md](switches.md)). What happens:
     `a_face_only_line_never_changes_the_askers_make`,
     `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
     `make_queue_runs::a_remake_that_fails_says_its_line`,
+    `made_line::a_change_mid_make_whose_remake_fails_is_said_after_the_cut`,
     `a_change_to_a_wait_of_no_make_reads_as_unclear`,
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
