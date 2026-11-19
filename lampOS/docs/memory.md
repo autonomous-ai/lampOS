@@ -928,11 +928,41 @@ in a later session" or "another person" (`second_provider::not_theirs`, ids
 never said; Thirteen's row on #5627, a yes 42 s after the hold read as
 another person's). A yes in time from no one known on the line (no face in
 view, an unknown face, a line carried in their conversation going on) is
-dropped and kept, and, as for an unseen yes, the model is told once that it
+dropped and kept, and, as for an unseen yes, the model is told that it
 did not count, that nothing was forgotten and it is still kept, and that it
 may ask them once to say it facing the lamp (`remember::unknown_yes_told`,
 #7454: on lamp-06c1 the model was told nothing and could say it was
-forgotten). If the line is no longer theirs when
+forgotten). The same note is told for every held forget whose yes is
+dropped as too late, from no one known or as theirs in a later session:
+a one-face forget's next line after its 30 s, a held forget that is not
+one-face, and a face forget held through their spelling (#7478). A yes
+dropped as another known person's is told only that it was not theirs to
+give and nothing was forgotten, with nothing of what was held, since the
+yes is not the person's it belongs to (`remember::not_theirs_told`); a
+late yes is judged by whose it is too, so a late yes from another person
+is told that note. **On a one-face forget's line, and on the spelling a
+face forget was held through, any line takes the hold, so these notes (and
+an unseen yes's) are told only when the model's round on that line calls
+the held forget, naming nothing else**: the same door as `Taken::Agrees`
+(`second_provider::told_on_forget`, `Taken::OnForget`, the Reviewer-lead's
+P2 on #7490). The note is that call's answer and the call runs nothing. A
+line the model answers with no `forget` ("Good morning." an hour later,
+another person's unrelated line, a question from someone unknown within
+the 30 s) is told nothing, and the hold is gone as before. A held forget
+that is not one-face still needs a plain yes first, and its note is told
+before round 1. A dropped spelling is told as a spelling, never as a yes
+(`remember::THAT_SPELLING`), and a late line from no one known names
+neither the kind of thing held nor its call (`remember::unknown_late_told`;
+the P3s on #7490). On a spelling, too late is judged before whose it is,
+as on a one-face line. A held keep's dropped yes is not told. **A hold has
+a clock of its own:** past its window (30 s one-face, `HELD_FORGET_FOR`
+60 s otherwise) plus `remember::HELD_FORGET_GRACE` (15 s), the next line
+lets it go silently, journaled with its call name and the seconds only:
+nothing runs, the thing stays kept, nothing is told, and the line goes as a
+plain line. So "forget my bike lock code" an hour after an unanswered
+question is a new ask, held and asked or run as any forget, never a late
+yes (the first builder on #7490). Only a line within the window plus the
+grace can be told one of the notes above. If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
 (`remember::AGREED_FORGET_NOT_NOW`, Thirteen's P3). A no, any other line,

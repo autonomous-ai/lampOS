@@ -114,6 +114,13 @@ pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs when
 pub const NOT_ASKED_TO_FORGET_EVERYTHING: &str = "Nothing was forgotten: they asked to forget one thing, not everything about them. Use forget for that thing, or ask which thing they mean; do not call forget_everything for these words.";
 /// How long a forget held for a person's yes waits for it.
 pub const HELD_FORGET_FOR: std::time::Duration = std::time::Duration::from_secs(60);
+/// How long past its window ([`HELD_FORGET_FOR`], or
+/// [`ONE_FACE_FORGET_YES_FOR`] for a one-face forget) a held forget still
+/// takes the next line, as a late answer the model may be told did not
+/// count. Past it the hold is let go silently and the line is a plain line,
+/// so an ask an hour later is a new ask, never a late yes (the first
+/// builder on #7490).
+pub const HELD_FORGET_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
 /// What the model is told of a forget run on the person's yes in the turn
 /// it is asked again: it ran already.
 pub const HELD_FORGET_RAN: &str =
@@ -225,16 +232,49 @@ pub fn unseen_yes_told(name: &str) -> String {
 /// spoken was dropped, the model told nothing, and it could answer "Done,
 /// I've forgotten it."): as [`unseen_yes_told`], the yes did not count,
 /// nothing was forgotten and it is still kept, and they may say it facing
-/// the lamp.
+/// the lamp. Every held forget's yes dropped as too late or as theirs in a
+/// later session is told this too (#7478).
 pub fn unknown_yes_told(name: &str) -> String {
+    unknown_told(name, THAT_YES)
+}
+
+/// What a dropped answer is called in its note: a yes, or the spelling a
+/// face forget was held through (the P3 on #7490: a spelling is no yes).
+pub const THAT_YES: &str = "that yes";
+/// See [`THAT_YES`].
+pub const THAT_SPELLING: &str = "that spelling";
+
+/// [`unknown_yes_told`] for the dropped answer `said` ([`THAT_YES`],
+/// [`THAT_SPELLING`]).
+pub fn unknown_told(name: &str, said: &str) -> String {
     let (what, example) = forget_told_what(name);
     format!(
-        "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+        "(For you to know: {said} did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+    )
+}
+
+/// What the model is told when a held forget's answer `said` comes too late
+/// from no one known on the line (the P3 on #7490): as [`unknown_told`],
+/// but naming neither the kind of thing held nor its call, since nothing
+/// says the line is the person's it belongs to.
+pub fn unknown_late_told(said: &str) -> String {
+    format!(
+        "(For you to know: {said} did not count, so nothing was forgotten and it is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"Yes, forget that.\" Do not explain why, do not say what was asked about, and do not run it now.)"
+    )
+}
+
+/// What the model is told when a held forget's yes is dropped as another
+/// known person's (#7478): it was not theirs to give and nothing was
+/// forgotten. It never says what was held, since the yes is not the
+/// person's it belongs to.
+pub fn not_theirs_told(said: &str) -> String {
+    format!(
+        "(For you to know: {said} was not theirs to give, so nothing was forgotten. Do not say anything was forgotten, do not say what was asked about, and do not run it now.)"
     )
 }
 
 /// What a dropped yes's forget `name` keeps, and an example of saying it
-/// ([`unseen_yes_told`], [`unknown_yes_told`]).
+/// ([`unseen_yes_told`], [`unknown_told`]).
 fn forget_told_what(name: &str) -> (&'static str, &'static str) {
     match name {
         crate::known_faces::FORGET => ("their face", "Yes, forget my face."),

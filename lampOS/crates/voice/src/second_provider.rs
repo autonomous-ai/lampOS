@@ -15261,6 +15261,15 @@ type HeldAsker = (u64, String);
 /// [`not_theirs`]'s reason for a line no one is known on.
 const NO_ONE_KNOWN: &str = "not the same person: no one known on the line";
 
+/// [`not_theirs`]'s reason for the same person in a later session.
+const LATER_SESSION: &str = "not the same person: theirs, in a later session";
+
+/// [`not_theirs`]'s reason for another known person.
+const ANOTHER_PERSON: &str = "not the same person: another person";
+
+/// A held yes's reason for coming past its time.
+const TOO_LATE: &str = "too late";
+
 /// Why a yes is not the held call's person's, as the journal says it, or
 /// none when it is: no known person on the line (none admitted, a gap, a
 /// cold face cache), the same person in a later session, or another
@@ -15271,14 +15280,13 @@ fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str
     match line {
         Some(line) if line == held => None,
         None => Some(NO_ONE_KNOWN),
-        Some((_, person)) if *person == held.1 => {
-            Some("not the same person: theirs, in a later session")
-        }
-        Some(_) => Some("not the same person: another person"),
+        Some((_, person)) if *person == held.1 => Some(LATER_SESSION),
+        Some(_) => Some(ANOTHER_PERSON),
     }
 }
 
-/// A one-face yes's lateness, then its person ([`not_theirs`]): a late yes
+/// A one-face yes's (or a held spelling's) lateness, then its person
+/// ([`not_theirs`]): a late yes
 /// reads as late, whoever the line is theirs by by then (Thirteen's row on
 /// #5627, 42 s after the hold, journaled as "not the same person").
 fn late_or_not_theirs(
@@ -15287,7 +15295,7 @@ fn late_or_not_theirs(
     held: &HeldAsker,
 ) -> Option<&'static str> {
     if late {
-        Some("too late")
+        Some(TOO_LATE)
     } else {
         not_theirs(line, held)
     }
@@ -15296,7 +15304,7 @@ fn late_or_not_theirs(
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
     /// Nothing held, or dropped: nothing runs and nothing is told (but see
-    /// [`Taken::Unseen`] and [`Taken::Unknown`]).
+    /// [`Taken::Unseen`], [`Taken::Unknown`] and [`Taken::NotTheirs`]).
     Nothing,
     /// Their yes runs exactly this call, with a carried keep's heard line
     /// ([`HeldForget::line`]), and whether it is a one-face line's named
@@ -15306,8 +15314,9 @@ enum Taken {
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
     Unseen(String),
-    /// A one-face forget's plain yes in time on a line no one is known on
-    /// (no face, an unknown face, a carried line): dropped, it is kept, and
+    /// A held forget's plain yes on a line no one is known on (no face, an
+    /// unknown face, a carried line; #7454), too late or theirs in a later
+    /// session (#7478): dropped, it is kept, and
     /// the model is told the yes did not count and that they may say it
     /// facing the lamp ([`crate::remember::unknown_yes_told`], #7454).
     Unknown(String),
@@ -15320,10 +15329,89 @@ enum Taken {
     /// else, runs exactly this call ([`agreed_forget_call`]); no such call
     /// runs nothing and it is kept.
     Agrees(net::ToolCall),
+    /// A held forget's yes from another known person, dropped: the model is
+    /// told it was not theirs to give and nothing was forgotten, naming
+    /// nothing of what was held ([`crate::remember::not_theirs_told`],
+    /// #7478).
+    NotTheirs,
+    /// A held one-face forget's line dropped (not seen saying it, from no
+    /// one known, too late, theirs in a later session or another person's),
+    /// or a spelling a face forget was held through dropped (#7478): nothing
+    /// runs, and the note is told only if the model's round on this line
+    /// calls that forget, by [`Taken::Agrees`]'s door (#7971), as the
+    /// call's answer; a line it answers with no such call is told nothing
+    /// (the Reviewer-lead's P2 on #7490: an hour-late "good morning" was
+    /// told to ask about the old forget again).
+    OnForget(net::ToolCall, String),
     /// A held keep's answer that was neither a yes nor a no
     /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
     /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
     AskAgain,
+}
+
+/// What a held forget `name` dropped for `why` tells the model (#7478): a
+/// yes too late, from no one known or theirs in a later session is told
+/// that nothing was forgotten and it is still kept
+/// ([`crate::remember::unknown_yes_told`]); another known person's yes, on
+/// `line` (a late one judged by whose it is too), only that it was not
+/// theirs to give, naming nothing of what was held
+/// ([`crate::remember::not_theirs_told`]). Any other drop (no yes, a
+/// turn the lamp wrote) and a held keep's are told nothing.
+fn dropped_yes(name: String, why: &str, line: Option<&HeldAsker>, held: &HeldAsker) -> Taken {
+    if name == crate::remember::REMEMBER {
+        return Taken::Nothing;
+    }
+    if why == ANOTHER_PERSON || (why == TOO_LATE && not_theirs(line, held) == Some(ANOTHER_PERSON))
+    {
+        return Taken::NotTheirs;
+    }
+    match why {
+        TOO_LATE | NO_ONE_KNOWN | LATER_SESSION => Taken::Unknown(name),
+        _ => Taken::Nothing,
+    }
+}
+
+/// [`dropped_yes`] on a held one-face forget's line, or on the spelling
+/// (`spelling`) a face forget was held through: [`Taken::OnForget`] with
+/// its note, told only if the model's round calls that forget. A spelling
+/// is told as one, never as a yes, and a late line from no one known names
+/// neither the kind of thing held nor its call
+/// ([`crate::remember::unknown_late_told`]; the P3s on #7490).
+fn dropped_on_forget(
+    call: net::ToolCall,
+    why: &str,
+    line: Option<&HeldAsker>,
+    held: &HeldAsker,
+    spelling: bool,
+) -> Taken {
+    let said = if spelling {
+        crate::remember::THAT_SPELLING
+    } else {
+        crate::remember::THAT_YES
+    };
+    let note = match dropped_yes(call.name.clone(), why, line, held) {
+        Taken::NotTheirs => crate::remember::not_theirs_told(said),
+        Taken::Unknown(_) if why == TOO_LATE && line.is_none() => {
+            crate::remember::unknown_late_told(said)
+        }
+        Taken::Unknown(name) => crate::remember::unknown_told(&name, said),
+        _ => return Taken::Nothing,
+    };
+    Taken::OnForget(call, note)
+}
+
+impl Taken {
+    /// What the model is told of this, if anything ([`answer`]).
+    fn told(&self) -> Option<String> {
+        match self {
+            Taken::Unseen(name) => Some(crate::remember::unseen_yes_told(name)),
+            Taken::Unknown(name) => Some(crate::remember::unknown_yes_told(name)),
+            Taken::NotTheirs => Some(crate::remember::not_theirs_told(crate::remember::THAT_YES)),
+            Taken::AskAgain => Some(crate::remember::KEEP_ASKED_AGAIN.to_owned()),
+            // Told only on the model's forget call ([`told_on_forget`]).
+            Taken::Nothing | Taken::Runs(..) | Taken::Agrees(_) | Taken::OnForget(..) => None,
+        }
+    }
 }
 
 /// The held forget request `request` runs, if any. Every turn takes the
@@ -15481,27 +15569,53 @@ fn take_held_forget(
     let Some(held) = hold.held.take() else {
         return Taken::Nothing;
     };
+    // A hold past its window and a grace (`remember::HELD_FORGET_GRACE`) is
+    // let go silently: nothing runs, the thing stays kept, nothing is told,
+    // and this line goes as a plain line, so a new ask long after is never
+    // a late yes (the first builder on #7490).
+    let window = if held.one_face {
+        crate::remember::ONE_FACE_FORGET_YES_FOR
+    } else {
+        crate::remember::HELD_FORGET_FOR
+    };
+    if now.saturating_duration_since(held.at) > window + crate::remember::HELD_FORGET_GRACE {
+        eprintln!(
+            "lamp-voice second: request {request}: let go a held forget ({}, held in request {}): past its {} s and {} s of grace; this line is a plain line",
+            held.call.name,
+            held.request,
+            window.as_secs(),
+            crate::remember::HELD_FORGET_GRACE.as_secs()
+        );
+        return Taken::Nothing;
+    }
     // A face forget whose turn asked them to spell their name
     // (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7): their next turn, the
     // spelling, carries it once, running nothing; that turn's answer is
     // then judged as the held turn's was ([`settle_held_forget`]).
     if held.spelling {
+        // Too late is judged first, as on a one-face line: any line takes
+        // the hold, and a late one from no one known names nothing held
+        // ([`dropped_on_forget`]).
         let dropped = if !heard {
             Some("a turn the lamp wrote")
         } else if held.request >= request {
             Some("not a later turn")
-        } else if let Some(why) = not_theirs(asker, &held.asker) {
-            Some(why)
-        } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
-            Some("too late")
         } else {
-            None
+            late_or_not_theirs(
+                now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR,
+                asker,
+                &held.asker,
+            )
         };
         match dropped {
-            Some(why) => eprintln!(
-                "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
-                held.call.name, held.request
-            ),
+            Some(why) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
+                    held.call.name, held.request
+                );
+                // Told only if this line's round calls that forget (#7490).
+                return dropped_on_forget(held.call, why, asker, &held.asker, true);
+            }
             None => {
                 eprintln!(
                     "lamp-voice second: request {request}: carried a held forget ({}, held in request {}) through their spelling (LAMP_NAMES_RECORD_TOLD)",
@@ -15547,7 +15661,9 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): their face was not seen saying the yes, outside the private room (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
                 held.request
             );
-            return Taken::Unseen(held.call.name);
+            // Told only if this line's round calls that forget (#7490).
+            let note = crate::remember::unseen_yes_told(&held.call.name);
+            return Taken::OnForget(held.call, note);
         };
         return match dropped {
             Some(why) => {
@@ -15555,13 +15671,11 @@ fn take_held_forget(
                     "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): {why}; it is kept",
                     held.request
                 );
-                // A yes from no one known is told, as an unseen one is: the
-                // model must not say it is forgotten (#7454).
-                if why == NO_ONE_KNOWN {
-                    Taken::Unknown(held.call.name)
-                } else {
-                    Taken::Nothing
-                }
+                // A line from no one known (#7454), too late or another
+                // person's (#7478) is told, so the model never says it is
+                // forgotten, but only if this line's round calls that
+                // forget (#7490): any other line is told nothing.
+                dropped_on_forget(held.call, why, line_person, &held.asker, false)
             }
             None => {
                 eprintln!(
@@ -15628,7 +15742,7 @@ fn take_held_forget(
     } else if let Some(why) = not_theirs(asker, &held.asker) {
         Some(why)
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
-        Some("too late")
+        Some(TOO_LATE)
     } else if held.call.name == crate::remember::REMEMBER && shared.forget_sight.is_none() {
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
@@ -15664,7 +15778,8 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
                 held.call.name, held.request
             );
-            Taken::Nothing
+            // A yes too late or not theirs is told (#7478).
+            dropped_yes(held.call.name, why, asker, &held.asker)
         }
         None => {
             if keep_by_face {
@@ -16271,6 +16386,37 @@ fn agree_held_forget(
         _ => eprintln!(
             "lamp-voice second: request {request} chat round {round}: dropped a held one-face forget: no forget on this line agrees to it; it is kept"
         ),
+    }
+}
+
+/// [`Taken::OnForget`] on this round's `calls`: the id of the first call to
+/// the dropped forget `held` that agrees to it ([`agreed_forget_call`], the
+/// door of [`Taken::Agrees`], #7971), answered with the note and never run;
+/// with none, nothing is told (the Reviewer-lead's P2 on #7490).
+fn told_on_forget(
+    request: u64,
+    round: usize,
+    said: &str,
+    held: &net::ToolCall,
+    calls: &[net::ToolCall],
+) -> Option<String> {
+    let call = calls
+        .iter()
+        .find(|call| call.name == held.name && agreed_forget_call(held, &call.args, said));
+    match call {
+        Some(call) => {
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: {} not run: the held forget was dropped on this line; the model is told nothing was forgotten",
+                call.name
+            );
+            Some(call.id.clone())
+        }
+        None => {
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: the held forget dropped on this line: no forget on it agrees, nothing told"
+            );
+            None
+        }
     }
 }
 
@@ -17266,6 +17412,9 @@ async fn answer(
     // A one-face forget whose yes is the model's to judge on this line
     // ([`Taken::Agrees`]): run by its `forget` call, naming nothing else.
     let mut held_forget_agreed = None;
+    // A one-face or spelling forget dropped on this line, and its note, told
+    // only on the model's call to that forget ([`Taken::OnForget`]).
+    let mut held_forget_dropped = None;
     let (mut held_forget_runs, unseen_yes) = match take_held_forget(
         shared,
         request,
@@ -17296,9 +17445,13 @@ async fn answer(
             held_forget_agreed = Some(call);
             (None, None)
         }
-        Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
-        Taken::Unknown(name) => (None, Some(crate::remember::unknown_yes_told(&name))),
-        Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
+        Taken::OnForget(call, note) => {
+            held_forget_dropped = Some((call, note));
+            (None, None)
+        }
+        told @ (Taken::Unseen(_) | Taken::Unknown(_) | Taken::NotTheirs | Taken::AskAgain) => {
+            (None, told.told())
+        }
     };
     let (mut held_save_runs, held_save_dropped, face_to_ask) =
         match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
@@ -20667,6 +20820,13 @@ async fn answer(
                     scope.as_ref(),
                 );
             }
+            // A held forget dropped on this line (#7478): its note is the
+            // answer to the model's call to that forget, by the same door,
+            // and that call runs nothing; with no such call nothing is told
+            // ([`Taken::OnForget`], the Reviewer-lead's P2 on #7490).
+            let dropped_told = held_forget_dropped.take().and_then(|(held, note)| {
+                told_on_forget(request, round, &heard_words, &held, &calls).map(|id| (id, note))
+            });
             // A skill's call answered with `"look": true`, by its name, with
             // its arguments and its note for the picture
             // (`LAMP_SECOND_SKILL_LOOK`).
@@ -20713,6 +20873,10 @@ async fn answer(
             for (call_index, ((call, held), policed)) in
                 calls.iter().zip(held_by_rule).zip(policed).enumerate()
             {
+                if let Some((_, note)) = dropped_told.as_ref().filter(|(id, _)| *id == call.id) {
+                    messages.push(Message::tool(call.id.clone(), note.clone()));
+                    continue;
+                }
                 if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",

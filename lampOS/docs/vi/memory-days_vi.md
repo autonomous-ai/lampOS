@@ -1394,10 +1394,42 @@ ghi id; hàng của Thirteen trên #5627, một lời «có» 42 giây sau khi g
 là của người khác). Một lời «có» kịp lúc mà không ai được nhận ra trên câu
 (không có mặt trong khung, một khuôn mặt lạ, một câu được mang theo trong cuộc
 trò chuyện đang diễn ra của họ) bị bỏ và điều ấy vẫn được giữ; như với lời
-«có» không thấy miệng, mô hình được báo một lần rằng lời ấy không tính, không
+«có» không thấy miệng, mô hình được báo rằng lời ấy không tính, không
 gì bị quên và điều ấy vẫn được giữ, và nó có thể hỏi họ một lần nói lại khi
 nhìn vào đèn (`remember::unknown_yes_told`, #7454: trên lamp-06c1 mô hình
-không được báo gì và có thể nói là đã quên). Bất kỳ lời «không», «giữ», «khoan»,
+không được báo gì và có thể nói là đã quên). Cùng lời báo ấy được nói cho mọi lệnh
+quên đang giữ mà lời «có» bị bỏ vì quá muộn, vì không ai được nhận ra hoặc vì
+là của họ ở phiên sau: câu kế tiếp của một lệnh quên một khuôn mặt sau 30 giây,
+một lệnh quên đang giữ không phải một khuôn mặt, và một lệnh quên khuôn mặt được
+giữ qua lần đánh vần của họ (#7478). Một lời «có» bị bỏ vì là của một người quen
+khác chỉ được báo rằng lời ấy không phải của họ để đồng ý và không gì bị quên,
+không nói gì về điều đang giữ, vì lời «có» không phải của người sở hữu nó
+(`remember::not_theirs_told`); một lời «có» muộn cũng được xét là của ai, nên
+lời «có» muộn của người khác được báo lời ấy. **Trên câu của một lệnh quên một
+khuôn mặt, và trên lần đánh vần mà một lệnh quên khuôn mặt được giữ qua, câu nào
+cũng lấy lệnh giữ, nên các lời báo này (và lời báo của một lời «có» không thấy
+miệng) chỉ được nói khi lượt của mô hình trên câu ấy gọi lệnh quên đang giữ,
+không nêu thứ gì khác**: cùng cửa với `Taken::Agrees`
+(`second_provider::told_on_forget`, `Taken::OnForget`, P2 của Reviewer-lead
+trên #7490). Lời báo là câu trả lời cho lệnh gọi ấy và lệnh gọi không chạy gì.
+Câu mà mô hình trả lời không có `forget` («Chào buổi sáng.» một giờ sau, một
+câu không liên quan của người khác, một câu hỏi của người lạ trong 30 giây)
+không được báo gì, và lệnh giữ mất như trước. Một lệnh quên đang giữ không
+phải một khuôn mặt vẫn cần một lời «có» rõ ràng trước, và lời báo của nó được
+nói trước vòng 1. Một lần đánh vần bị bỏ được báo là lần đánh vần, không bao giờ
+là lời «có» (`remember::THAT_SPELLING`), và một câu muộn của người không ai
+nhận ra không nêu loại điều đang giữ hay lệnh gọi của nó
+(`remember::unknown_late_told`; các P3 trên #7490). Với lần đánh vần, quá muộn
+cũng được xét trước là của ai, như trên câu một khuôn mặt. Lời «có» bị bỏ của
+một lệnh giữ thì không được báo. **Lệnh giữ có đồng hồ riêng:** quá thời hạn
+của nó (30 giây với một khuôn mặt, `HELD_FORGET_FOR` 60 giây với loại khác)
+cộng `remember::HELD_FORGET_GRACE` (15 giây), câu kế tiếp bỏ nó một cách lặng
+lẽ, journal chỉ ghi tên lệnh gọi và số giây: không gì chạy, điều ấy vẫn được
+giữ, không báo gì, và câu ấy đi như một câu thường. Nên «quên mã khóa xe đạp
+của tôi» một giờ sau một câu hỏi không được trả lời là một yêu cầu mới, được
+giữ và hỏi hoặc chạy như mọi lệnh quên, không bao giờ là một lời «có» muộn
+(người xây dựng đầu tiên trên #7490). Chỉ câu trong thời hạn cộng thời gian ân
+hạn ấy mới có thể được báo một trong các lời báo trên. Bất kỳ lời «không», «giữ», «khoan»,
 «đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
 không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
 và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi
