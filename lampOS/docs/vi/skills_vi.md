@@ -2314,6 +2314,10 @@ thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
   hàm trở lên như vậy, như "good morning" bên cạnh `good_morning_1` đến
   `_3`. Chỉ là chuẩn hóa tên, không bao giờ là nghĩa; khi tắt công tắc, cả
   hai như trước.
+  Kỹ năng tự tạo đã tìm thấy được tra trên đèn theo đúng tên viết trước,
+  không bỏ gì (`made_skill::kept_on_named`, `made_skill::name_written`),
+  rồi mới bỏ "my" hay "skill", nên kỹ năng tên `my-day` được chạy, tắt, bật
+  và đọc lại khi nói "my day" (#7874).
 - **Không có cái nào gần: đưa ra kỹ năng của họ để gọi lại** (dòng thử
   của #7562 trên lamp-9adf, 18/11 lúc 01:3x: "turn my bitcoin price skill
   back on" không tìm thấy gì gần btc price, và mô hình, không được cho biết
