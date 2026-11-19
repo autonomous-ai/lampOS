@@ -1321,6 +1321,25 @@ sau:
      `next` trong câu trả lời `make_skill` của giọng nói mang cùng câu dễ
      hiểu đó. Test: `a_failed_make_is_told_in_plain_words`,
      `a_cut_after_its_repairs_is_told_as_the_refusal`.
+   - **Tên người dùng đặt là tên của kỹ năng** (#7911, lamp-9adf, 19/11:
+     "make a skill called evening rate" bị giữ với tên mô hình đặt
+     `nightly-dollar-rate`, rồi "change evening rate" không tìm thấy và tạo
+     kỹ năng thứ hai). `make_skill` nhận `given_name`
+     (`make_skill_local::GIVEN_NAME`): tên người dùng đặt cho kỹ năng mới
+     khi nhờ tạo, bằng bất kỳ lời nào ("called evening rate", "name it
+     evening rate"), đúng từng chữ, bỏ trống khi họ không đặt tên. Mô hình
+     của giọng nói tự hiểu lời họ; không có danh sách từ nào. Sau đó code
+     lấy nó làm tên kỹ năng dù ai viết kỹ năng, DeepSeek hay agent của đèn
+     (cả hai câu trả lời đều qua `made_skill::keep_asked`): viết như tên
+     kỹ năng đang giữ (`made_skill::given_name`, `made_skill::name_asked`:
+     `evening-rate`), cắt theo giới hạn của tên, và thay tên của bên tạo
+     trên thẻ (`named_as_given`), trước khi tên đã có lấy tên trống, bên
+     dưới. Khi không đặt tên, hoặc tên không thành tên kỹ năng được (không
+     bắt đầu bằng chữ cái, hoặc có chữ mà tên kỹ năng không có, "tỷ giá"),
+     tên của bên tạo giữ nguyên như trước. Lệnh hoàn tác không bao giờ lấy
+     tên này. Test:
+     `a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models`,
+     `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`.
    - **Tên đã có thì lấy tên trống** (chủ đèn, 11/11: khôi phục cài đặt gốc
      giữ lại kỹ năng của đèn, trong đó có welcome-back, bedtime-morning,
      light-out, sip-of-water, nên kỹ năng mô hình đặt tên welcome-back lần
