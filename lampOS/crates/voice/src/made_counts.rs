@@ -48,7 +48,7 @@ use std::{
 /// The totals, beside the made skills' index.
 pub const FILE: &str = "counts.json";
 /// What every writer of [`FILE`] holds across its read and write.
-const LOCK: &str = ".counts.lock";
+pub const LOCK: &str = ".counts.lock";
 /// The most often a process adds its refused asks to [`FILE`].
 pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
 /// The SHA-256s remembered for each count, the newest: more than the made
