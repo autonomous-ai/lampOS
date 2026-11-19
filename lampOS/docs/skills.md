@@ -4760,8 +4760,14 @@ gone ([switches.md](switches.md)). What happens:
     "Alright, I won't make it." and nothing was made). Both notes (the
     make under way's, and a voice make's code waiting for its yes) tell
     the model that a line that changes the skill or adds to it (a number,
-    its name, another step) is `answer: "change"` with `change`, what they
-    changed said whole, and that a change is never a no: only a line that
+    its name, another step) is `answer: "change"` with `request`, the
+    whole ask as it is now with their change in it, merged by the model
+    (#7936's ROW on lamp-9adf, 20 Nov 01:15: "every thirty minutes…", then
+    "make it forty five minutes", was made again from the first ask with
+    the model's words of the change after it, and both DeepSeek and the
+    agent kept `cooldown = "30m"`; the change has no argument of its own,
+    as the tool's JSON is held to `lamp_gemini::MAX_TOOL_JSON_BYTES`), and
+    that a change is never a no: only a line that
     means stop declines it. Whether a line is a change, a no or about
     something else is the model's judgment, never a word list; code
     applies it (`make_skill_local::making_changed`). A change counts only
@@ -4783,8 +4789,12 @@ gone ([switches.md](switches.md)). What happens:
     "changed" and then "too long". Under way, the change is held for the
     make: at its last look (`OneAsk::settled`) the skill written first is
     let go as a declined one is (`forget_unput`, never said) and the ask
-    made again, in the same make, with the first request whole and the
-    change after it, said to win where the two differ, and the change's
+    made again, in the same make, from the model's `request` (never the
+    first wording; with none given, from the first request whole), the
+    change's heard line after it as the person's latest word, which wins
+    over any earlier wording wherever they differ
+    (`make_skill_local::LATEST_WORD_WINS`; how they differ is the maker's
+    to read, never code's), and the change's
     heard line after the first (a write is held to both); a later no or
     change still finds it under way. The change's turn is told it is taken
     (`"changed": true`, `CHANGED_NEXT`), never that it won't be made. A
@@ -4817,6 +4827,8 @@ gone ([switches.md](switches.md)). What happens:
     no voice make's (a skill's task, a remove, a record let go) reads as
     unclear, never as a no. Tests:
     `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_while_made_is_remade_from_the_whole_ask_the_latest_word_winning`,
+    `a_remake_is_made_from_the_merged_ask_the_latest_word_said_to_win`,
     `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
     `a_change_counts_only_from_its_asker_or_the_owner`,
     `a_face_only_line_never_changes_the_askers_make`,
