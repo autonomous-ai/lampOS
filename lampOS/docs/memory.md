@@ -2019,8 +2019,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     of a heard word. A `remember` its own round doubts is not run, and the
     model is told nothing is kept, to tell them so in a few words with no
     question ("I didn't catch that well enough to keep it.",
-    `doubted::NOT_CAUGHT_LINE`), never to ask ("did you say …?", "say it
-    again") and never to say it was kept (`doubted::NOT_KEPT_NO_ASK`): the
+    `doubted::NOT_CAUGHT_LINE`) and end the reply there, never to ask
+    ("did you say …?", to say it again, spell it or say more: the 06c1 ROW
+    at `ac50913437` heard "… could you spell or say it again?" after the
+    line) and never to say it was kept (`doubted::NOT_KEPT_NO_ASK`): the
     person must hear it wasn't kept, so they can say it again (Twelve's P1
     on #7966). A keep the round right after it doubts is forgotten by its
     id, with `LAMP_MEMORY_DOUBT_UNDOES`, and never held for a yes, so the
