@@ -1800,11 +1800,18 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     from a start or a sign-in until the first targets look has settled
     (the targets file read and the sign-in answered; signed in, the
     machines answered too; at most 180 s, `STARTING_AT_MOST`), the
-    `targets` answer says `"lamp":"starting"`. A hand-over then refused as
+    `targets` answer says `"lamp":"starting"`. The answer that settles it
+    (the sign-in's, or signed in the machines') makes the targets be
+    looked at at once, so it ends within seconds of the start, not at the
+    next look a minute later (#7988: lamp-52e6 said starting for 60 s
+    after a restart whose machines changed nothing). The targets file kept
+    from before is read at the first look, so its targets, the lamp's own
+    among them, take hand-overs all along. A hand-over then refused as
     no target is told "I'm still getting ready. Give me a minute and ask me
     again." (`Missing::Starting`), not that it needs setting up; after
     that, as before. Tests:
-    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`
+    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`,
+    `a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look`
     and the installing test above.
   - **Hermes' home.** Hermes keeps its settings in
     `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,

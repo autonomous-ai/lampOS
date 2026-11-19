@@ -2819,11 +2819,18 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `serve --set-up-later`, từ lúc khởi động hoặc đăng nhập đến khi lần xem
   targets đầu tiên ổn định (đã đọc file targets và có trả lời đăng nhập;
   đã đăng nhập thì các máy cũng đã trả lời; tối đa 180 s,
-  `STARTING_AT_MOST`), câu trả lời `targets` có `"lamp":"starting"`, và một
+  `STARTING_AT_MOST`), câu trả lời `targets` có `"lamp":"starting"`. Câu
+  trả lời làm nó ổn định (của đăng nhập, hay khi đã đăng nhập thì của các
+  máy) khiến targets được xem lại ngay, nên nó hết trong vài giây sau khi
+  khởi động, không phải ở lần xem kế tiếp một phút sau (#7988: lamp-52e6
+  nói starting 60 s sau một lần khởi động lại mà các máy không đổi gì).
+  File targets giữ từ trước được đọc ở lần xem đầu, nên các target của
+  nó, kể cả target của chính đèn, nhận việc giao suốt thời gian đó. Một
   lần giao bị từ chối vì không có target được nói cùng câu đó
   (`Missing::Starting`), không phải "chưa được cài đặt"; sau đó như cũ.
   Test: `task_news::tests::a_hand_over_to_a_lamp_still_getting_ready_is_told_so`,
-  `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`.
+  `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`,
+  `a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look`.
 - **Các engine của đèn, có nêu hay không, và lựa chọn trong app (#6492).**
   Không có gì trên đèn được dựng riêng cho từng engine: Harness có nhiều
   engine, Hermes và OpenClaw chỉ là hai trong số đó. Các engine của đèn là
