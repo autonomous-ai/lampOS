@@ -5,15 +5,24 @@
 //! more [`PoseHead`].
 //!
 //! - `movenet`: MoveNet SinglePose (Lightning 192x192, Thunder 256x256),
-//!   Apache-2.0. One output of 17 x `[y, x, score]`, normalised to the
-//!   frame; the person's score is the keypoints' mean.
+//!   Apache-2.0, converted for the NPU before its decode: four maps on a
+//!   G x G grid (48 for Lightning), channels last, in this order: the
+//!   person's centre (1), the keypoints' heat (17), their offsets in the
+//!   cell (34, `y, x` each) and their distance from the centre (34). They
+//!   are read as the model's own decode reads them (`mn.py`, the reference
+//!   the conversion was checked with); the person's score is the
+//!   keypoints' mean. The next frame is cropped around the person found
+//!   ([`PoseHead::next`], the MoveNet tutorial's crop).
 //! - `yolov8-pose`: YOLOv8-pose cut before its decode, as `npu/convert.sh`
 //!   cuts it (box 64 / class 1 / keypoints 51 at strides 8, 16 and 32, nine
 //!   outputs in that order). The most confident anchor is the person, as the
 //!   reference binding decodes it; one person is answered, so no
 //!   suppression of others is needed. Kept for comparison only: its weights
 //!   are AGPL-3.0 and no lamp is sent them (#7415).
-use crate::engine::{Input, Tensor};
+use crate::{
+    engine::{Input, Tensor},
+    image::Region,
+};
 
 /// The COCO keypoints, in their order.
 pub const KEYPOINTS: [&str; 17] = [
@@ -60,6 +69,12 @@ pub trait PoseHead: Send + Sync {
     /// The person in `outputs`, for a frame of `input`: keypoints in the
     /// frame's pixels. `Err` when the outputs are not this head's.
     fn decode(&self, outputs: &[Tensor], input: Input) -> Result<Found, String>;
+    /// Where to look for `found` in the next frame from the same client,
+    /// its keypoints in the picture's pixels (`width` x `height`); `None`,
+    /// the whole picture.
+    fn next(&self, _found: &Found, _width: usize, _height: usize) -> Option<Region> {
+        None
+    }
 }
 
 /// The head named `name`.
@@ -78,36 +93,146 @@ fn sigmoid(x: f32) -> f32 {
 /// MoveNet SinglePose.
 pub struct MoveNet;
 
+/// The decode's distance softening, the model's own.
+const MOVENET_EPS: f32 = 1.799_804_7;
+/// A keypoint scored over this is seen, for the crop.
+const SEEN: f32 = 0.2;
+/// The torso: shoulders and hips.
+const TORSO: [usize; 4] = [5, 6, 11, 12];
+
 impl PoseHead for MoveNet {
     fn name(&self) -> &'static str {
         "movenet"
     }
 
     fn decode(&self, outputs: &[Tensor], input: Input) -> Result<Found, String> {
-        let [out] = outputs else {
+        let [centre, heat, offset, regress] = outputs else {
             return Err(format!(
-                "a MoveNet model has one output, this one {}",
+                "a MoveNet model has four outputs, this one {}",
                 outputs.len()
             ));
         };
-        if out.len() != 17 * 3 {
+        let cells = centre.len();
+        let g = (cells as f64).sqrt().round() as usize;
+        if g == 0
+            || g * g != cells
+            || heat.len() != 17 * cells
+            || offset.len() != 34 * cells
+            || regress.len() != 34 * cells
+        {
             return Err(format!(
-                "a MoveNet output is 17 x 3 numbers, this one {}",
-                out.len()
+                "MoveNet's outputs are G x G maps of 1, 17, 34 and 34, these {}, {}, {} and {}",
+                centre.len(),
+                heat.len(),
+                offset.len(),
+                regress.len()
             ));
         }
+        let distance = |y: f32, x: f32, cy: f32, cx: f32| {
+            ((y - cy) * (y - cy) + (x - cx) * (x - cx)).sqrt() + MOVENET_EPS
+        };
+        // The person: the centre map weighed down by distance from the
+        // frame's middle. The first of equals, as the reference's argmax.
+        let middle = g as f32 / 2.0;
+        let mut best = (f32::MIN, 0);
+        for i in 0..cells {
+            let (y, x) = ((i / g) as f32, (i % g) as f32);
+            let weighed = centre.at(i) * distance(y, x, middle, middle);
+            if weighed > best.0 {
+                best = (weighed, i);
+            }
+        }
+        let (cy, cx) = (best.1 / g, best.1 % g);
         let mut keypoints = [Keypoint::default(); 17];
         for (k, keypoint) in keypoints.iter_mut().enumerate() {
-            let (y, x, score) = (out.at(k * 3), out.at(k * 3 + 1), out.at(k * 3 + 2));
+            // Where the centre says keypoint k is; the most heat near it.
+            let at = (cy * g + cx) * 34 + 2 * k;
+            let ry = cy as f32 + regress.at(at);
+            let rx = cx as f32 + regress.at(at + 1);
+            let mut most = (f32::MIN, 0);
+            for i in 0..cells {
+                let (y, x) = ((i / g) as f32, (i % g) as f32);
+                let weighed = heat.at(i * 17 + k) / distance(y, x, ry, rx);
+                if weighed > most.0 {
+                    most = (weighed, i);
+                }
+            }
+            let i = most.1;
+            let y = ((i / g) as f32 + offset.at(i * 34 + 2 * k)) / g as f32;
+            let x = ((i % g) as f32 + offset.at(i * 34 + 2 * k + 1)) / g as f32;
             *keypoint = Keypoint {
-                x: x.clamp(0.0, 1.0) * input.width as f32,
-                y: y.clamp(0.0, 1.0) * input.height as f32,
-                score: score.clamp(0.0, 1.0),
+                x: x * input.width as f32,
+                y: y * input.height as f32,
+                score: heat.at(i * 17 + k).clamp(0.0, 1.0),
             };
         }
         let score = keypoints.iter().map(|k| k.score).sum::<f32>() / 17.0;
         Ok(Found { score, keypoints })
     }
+
+    /// The MoveNet tutorial's `determine_crop_region`: a square on the
+    /// hips' middle, wide enough for the torso and every keypoint seen;
+    /// the whole picture when the torso is not seen or the square would be
+    /// wider than the picture.
+    fn next(&self, found: &Found, width: usize, height: usize) -> Option<Region> {
+        let k = &found.keypoints;
+        let seen = |i: usize| k[i].score > SEEN;
+        if !((seen(11) || seen(12)) && (seen(5) || seen(6))) {
+            return None;
+        }
+        let (cy, cx) = ((k[11].y + k[12].y) / 2.0, (k[11].x + k[12].x) / 2.0);
+        let reach = |p: &Keypoint| (cy - p.y).abs().max((cx - p.x).abs());
+        let torso = TORSO.iter().map(|&i| reach(&k[i])).fold(0.0, f32::max);
+        let body = (0..17)
+            .filter(|&i| seen(i))
+            .map(|i| reach(&k[i]))
+            .fold(0.0, f32::max);
+        let (w, h) = (width as f32, height as f32);
+        let half = (torso * 1.9)
+            .max(body * 1.2)
+            .min(cx.max(w - cx).max(cy).max(h - cy));
+        // Past the reference: a square under a pixel is no crop.
+        if !half.is_finite() || half < 1.0 || half > w.max(h) / 2.0 {
+            return None;
+        }
+        Some(Region {
+            y0: (cy - half) / h,
+            x0: (cx - half) / w,
+            y1: (cy + half) / h,
+            x1: (cx + half) / w,
+        })
+    }
+}
+
+/// MoveNet's four maps on a `g` x `g` grid for a person whose keypoints
+/// are `points` (`y, x, score`, normalised), centred mid-grid: what a fake
+/// NPU answers.
+pub fn movenet_maps(points: &[(f32, f32, f32); 17], g: usize) -> Vec<Tensor> {
+    let cells = g * g;
+    let (mut centre, mut heat) = (vec![0f32; cells], vec![0f32; cells * 17]);
+    let (mut offset, mut regress) = (vec![0f32; cells * 34], vec![0f32; cells * 34]);
+    let middle = (g / 2) * g + g / 2;
+    centre[middle] = 0.9;
+    for (k, (y, x, score)) in points.iter().enumerate() {
+        let (gy, gx) = (y * g as f32, x * g as f32);
+        let (ky, kx) = (
+            gy.floor().clamp(0.0, g as f32 - 1.0),
+            gx.floor().clamp(0.0, g as f32 - 1.0),
+        );
+        let i = ky as usize * g + kx as usize;
+        heat[i * 17 + k] = *score;
+        offset[i * 34 + 2 * k] = gy - ky;
+        offset[i * 34 + 2 * k + 1] = gx - kx;
+        regress[middle * 34 + 2 * k] = ky - (g / 2) as f32;
+        regress[middle * 34 + 2 * k + 1] = kx - (g / 2) as f32;
+    }
+    let map = |values: &[f32], channels: usize| Tensor::from_f32(vec![1, g, g, channels], values);
+    vec![
+        map(&centre, 1),
+        map(&heat, 17),
+        map(&offset, 34),
+        map(&regress, 34),
+    ]
 }
 
 /// YOLOv8-pose, cut before its decode.
@@ -203,6 +328,7 @@ pub fn yolov8_box(outputs: &[Tensor], input: Input, level: usize, i: usize) -> [
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::{Format, Quant};
 
     const SQUARE: Input = Input {
         width: 192,
@@ -210,26 +336,129 @@ mod tests {
         planar: false,
     };
 
-    /// MoveNet's output for keypoints at `(y, x)` normalised, each `score`.
-    pub fn movenet_output(points: &[(f32, f32, f32); 17]) -> Tensor {
-        let values: Vec<f32> = points.iter().flat_map(|(y, x, s)| [*y, *x, *s]).collect();
-        Tensor::from_f32(vec![1, 1, 17, 3], &values)
+    #[derive(serde::Deserialize)]
+    struct Map {
+        channels: usize,
+        scale: f32,
+        zero: i32,
+        fill: i8,
+        /// Cell-and-channel index, value; every other number is `fill`.
+        at: Vec<i32>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Heads {
+        maps: Vec<Map>,
+        keypoints: Vec<[f32; 3]>,
+    }
+
+    /// The NPU's int8 maps of two frames (the converter's simulation of
+    /// the lamp's model) and the keypoints the reference decode (`mn.py`)
+    /// reads from them, by `tests/fixtures/movenet/make.py`.
+    #[test]
+    fn movenet_reads_the_npus_maps_as_the_reference_does() {
+        let runs: Vec<Heads> =
+            serde_json::from_str(include_str!("../tests/fixtures/movenet/heads.json")).unwrap();
+        assert_eq!(runs.len(), 2);
+        for run in runs {
+            let outputs: Vec<Tensor> = run
+                .maps
+                .iter()
+                .map(|m| {
+                    let mut data = vec![m.fill as u8; 48 * 48 * m.channels];
+                    for pair in m.at.chunks(2) {
+                        data[pair[0] as usize] = pair[1] as i8 as u8;
+                    }
+                    Tensor {
+                        dims: vec![1, 48, 48, m.channels],
+                        format: Format::I8,
+                        quant: Quant::Affine {
+                            scale: m.scale,
+                            zero: m.zero,
+                        },
+                        data,
+                    }
+                })
+                .collect();
+            let found = MoveNet.decode(&outputs, SQUARE).unwrap();
+            for (k, [y, x, score]) in run.keypoints.iter().enumerate() {
+                let ours = found.keypoints[k];
+                assert!(
+                    (ours.y / 192.0 - y).abs() < 1e-4
+                        && (ours.x / 192.0 - x).abs() < 1e-4
+                        && (ours.score - score).abs() < 1e-4,
+                    "keypoint {k}: {ours:?}, the reference {y} {x} {score}"
+                );
+            }
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Track {
+        width: usize,
+        height: usize,
+        /// `x, y, score` in the picture's pixels.
+        keypoints: Vec<[f32; 3]>,
+        next: [f32; 4],
+    }
+
+    /// Keypoints found on two frames, and the crop the reference
+    /// (`mn.crop_region`) takes next; a frame without its shoulders seen
+    /// is looked at whole again.
+    #[test]
+    fn movenet_crops_the_next_frame_as_the_reference_does() {
+        let tracks: Vec<Track> =
+            serde_json::from_str(include_str!("../tests/fixtures/movenet/track.json")).unwrap();
+        for track in &tracks {
+            let mut keypoints = [Keypoint::default(); 17];
+            for (k, [x, y, score]) in track.keypoints.iter().enumerate() {
+                keypoints[k] = Keypoint {
+                    x: *x,
+                    y: *y,
+                    score: *score,
+                };
+            }
+            let found = Found {
+                score: 0.5,
+                keypoints,
+            };
+            let whole = Region::whole(track.width, track.height, SQUARE);
+            let region = MoveNet
+                .next(&found, track.width, track.height)
+                .unwrap_or(whole);
+            let ours = [region.y0, region.x0, region.y1, region.x1];
+            for (a, b) in ours.iter().zip(track.next) {
+                assert!(
+                    (a - b).abs() < 1e-4,
+                    "{ours:?}, the reference {:?}",
+                    track.next
+                );
+            }
+        }
+        let last = tracks.last().unwrap();
+        assert!(
+            MoveNet
+                .next(
+                    &Found {
+                        score: 0.5,
+                        keypoints: [Keypoint::default(); 17]
+                    },
+                    last.width,
+                    last.height
+                )
+                .is_none()
+        );
     }
 
     #[test]
-    fn movenet_reads_y_then_x_in_the_frames_pixels() {
+    fn movenet_maps_decode_to_their_points() {
         let mut points = [(0.5, 0.25, 0.8); 17];
         points[0] = (0.1, 0.9, 0.4);
-        let found = MoveNet.decode(&[movenet_output(&points)], SQUARE).unwrap();
-        assert_eq!(
-            found.keypoints[0],
-            Keypoint {
-                x: 0.9 * 192.0,
-                y: 0.1 * 192.0,
-                score: 0.4
-            }
-        );
-        assert_eq!(found.keypoints[5].x, 48.0);
+        let found = MoveNet.decode(&movenet_maps(&points, 48), SQUARE).unwrap();
+        let nose = found.keypoints[0];
+        assert!((nose.x - 0.9 * 192.0).abs() < 1e-3 && (nose.y - 0.1 * 192.0).abs() < 1e-3);
+        assert!((nose.score - 0.4).abs() < 1e-6);
+        assert!((found.keypoints[5].x - 48.0).abs() < 1e-3);
         assert!((found.score - (0.4 + 16.0 * 0.8) / 17.0).abs() < 1e-6);
     }
 
@@ -238,6 +467,9 @@ mod tests {
         let wrong = Tensor::from_f32(vec![1, 10], &[0.0; 10]);
         assert!(MoveNet.decode(&[wrong], SQUARE).is_err());
         assert!(MoveNet.decode(&[], SQUARE).is_err());
+        let mut maps = movenet_maps(&[(0.5, 0.5, 0.5); 17], 48);
+        maps.swap(1, 2);
+        assert!(MoveNet.decode(&maps, SQUARE).is_err());
     }
 
     /// Nine YOLOv8-pose maps for a 64x32 frame, all quiet but anchor `i`
