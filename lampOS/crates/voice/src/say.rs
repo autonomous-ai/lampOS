@@ -6446,6 +6446,116 @@ mod tests {
         }
     }
 
+    /// A long exact line of three sentences, each a piece of its own
+    /// (`tts_cache::pieces`): about 25 s together, past the 20 s a render
+    /// may give.
+    const THREE_PIECES: &str = "First, the lamp kept the room warm all evening and dimmed \
+        itself slowly while you read the long book by the window. \
+        Second, it listened for the kettle and the door, and it asked before it turned \
+        the speaker up past half. \
+        Third, it noted the weather at seven each morning and kept a short list of the \
+        day's small tasks for you.";
+
+    /// The pieces a test's speech cache was asked to render, in turn.
+    type RenderedPieces = Arc<std::sync::Mutex<Vec<String>>>;
+
+    /// A say service whose speech cache renders each piece at once, but the
+    /// second ("Second, ...") only once `release` is sent (or after 10 s),
+    /// and keeps every piece it was asked to render, in turn.
+    fn pieces_served(tag: &str) -> (PathBuf, PathBuf, Says, mpsc::Sender<()>, RenderedPieces) {
+        let dir = socket_dir(tag);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("say.sock");
+        let (release, held) = mpsc::channel::<()>();
+        let held = std::sync::Mutex::new(held);
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = Arc::clone(&asked);
+        let render: tts_cache::Render = Box::new(move |text: &str| {
+            seen.lock().unwrap().push(text.to_owned());
+            if text.starts_with("Second") {
+                let _ = held.lock().unwrap().recv_timeout(Duration::from_secs(10));
+            }
+            Ok(vec![1; 24_000])
+        });
+        let cache = tts_cache::TtsCache::new(dir.join("cache"), "Rachel", "m", "en", render);
+        let recordings = Recordings::none().with_cache(Some(Arc::new(cache)));
+        let says = Says::serve(&path, None, &dir, recordings).unwrap();
+        (dir, path, says, release, asked)
+    }
+
+    /// [`THREE_PIECES`] asked as exact words on `path`, on a thread of its own.
+    fn ask_three_pieces(path: &Path) -> thread::JoinHandle<String> {
+        let path = path.to_path_buf();
+        let line = format!(
+            "{}\n",
+            serde_json::json!({"skill":"fig-facts","text":THREE_PIECES,"exact":true,"expires_in_ms":60000})
+        );
+        thread::spawn(move || exchange(&path, &line))
+    }
+
+    /// The exact line taken by the voice within 2 s, if one came.
+    fn taken_within(says: &mut Says) -> Option<(Vec<i16>, Ticket)> {
+        for _ in 0..400 {
+            says.poll(0);
+            if let Some(one) = says.take_exact(0) {
+                return Some(one);
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        None
+    }
+
+    /// V2's 12:35 on #7897: a long exact line's first piece goes to the
+    /// voice to play as soon as it is rendered, not after every piece is:
+    /// the second still rendering, the voice has the line; and no piece
+    /// is rendered more than one ahead of what plays.
+    #[test]
+    fn a_long_exact_lines_first_piece_plays_before_the_next_is_rendered() {
+        let (dir, path, mut says, release, asked) = pieces_served("pc-first");
+        let client = ask_three_pieces(&path);
+        let taken = taken_within(&mut says);
+        let rendered = asked.lock().unwrap().clone();
+        let _ = release.send(());
+        let (_, ticket) =
+            taken.expect("the first piece reached the voice while the second rendered");
+        assert!(rendered[0].starts_with("First"), "{rendered:?}");
+        assert!(
+            !rendered.iter().any(|piece| piece.starts_with("Third")),
+            "rendered more than one piece ahead: {rendered:?}"
+        );
+        ticket.answer(Outcome::Spoken);
+        assert_eq!(
+            client.join().unwrap(),
+            format!("{}\n", Outcome::Spoken.line())
+        );
+        drop(says);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A long exact line cut after its first piece (the person spoke over
+    /// it, a stop) has no later piece played: the pieces after the one
+    /// rendering are never rendered, so none can be.
+    #[test]
+    fn a_long_exact_line_cut_after_its_first_piece_plays_no_later_piece() {
+        let (dir, path, mut says, release, asked) = pieces_served("pc-cut");
+        let client = ask_three_pieces(&path);
+        let taken = taken_within(&mut says);
+        let _ = release.send(());
+        let (_, ticket) =
+            taken.expect("the first piece reached the voice while the second rendered");
+        ticket.answer(Outcome::Dropped("user_interrupted".into()));
+        let answered = client.join().unwrap();
+        assert!(answered.contains("dropped"), "{answered}");
+        thread::sleep(Duration::from_millis(500));
+        let rendered = asked.lock().unwrap().clone();
+        assert!(
+            !rendered.iter().any(|piece| piece.starts_with("Third")),
+            "a piece after the cut was rendered: {rendered:?}"
+        );
+        drop(says);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #4209: an exact or cached line taken to play says what it was and
     /// who had it said, for `voice/line`.
     #[test]
