@@ -1295,6 +1295,10 @@ impl Door {
                 };
             }
             Op::Stop {} => {
+                // Its own body lease goes with it (#7513, the first
+                // builder's ruling): the body ends the move it sent and
+                // eases back to rest. Another client's is never touched.
+                self.leases.give_back(&client, Part::Body, now_us);
                 parts.stop(&client, now_us);
                 return ok(re, Value::Null);
             }

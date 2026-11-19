@@ -1692,6 +1692,11 @@ class FakeLamp:
                 self.speaker["task"].cancel()
                 self.speaker = None
             await self._ok(ws, id_)
+            # As lamp-control's session.rs (#7513): it gives its own body
+            # lease back, told once as `lost` `released`, so a move it sent ends.
+            for lease, held in list(self.leases.items()):
+                if held["ws"] is ws and "body" in held["parts"]:
+                    await self.lease_event(lease, "lost", "released")
         elif op == "play":
             # As lamp-control: one of this computer's pushed skills' moves,
             # sent as a `move` is (the body takes it; with motion_done a `done` follows).

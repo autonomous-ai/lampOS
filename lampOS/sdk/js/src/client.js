@@ -1159,13 +1159,13 @@ export class Lamp {
   // (`lamp.on('done', ...)`). A `stop` doesn't lift it. Needs hear.
   setListening(on) { return this.act('listen.set', { on }); }
   async stop() {
-    const reply = await this.act('stop', {});
+    // A stop ends what this client asked for; its lease goes too. Ended
+    // here before it is sent, so the lamp's `lost` `released` for the lease
+    // it gives back (#7513) never reads as the reason.
     const following = this.following;
-    if (following) {
-      // A stop ends what this client asked for; its lease goes too.
-      following.end('cut_short', 'stop');
-      await following.finish();
-    }
+    if (following) following.end('cut_short', 'stop');
+    const reply = await this.act('stop', {});
+    if (following) await following.finish();
     return reply;
   }
 

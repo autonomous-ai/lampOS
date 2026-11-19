@@ -2526,6 +2526,26 @@ with why and closed. Lines of JSON each way
 | `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
+**A move belongs to its lease** (#7513, the first builder's ruling: a
+STOP that lets a 10 s arm move play out is not a stop). A paired computer's
+move or gesture on the mood socket (`source` `control:…`, from
+`lamp-control`, which refuses any other client's body op while one holds the
+body) that plays, or waits, while a lease is taken (held, or suspended for a
+conversation: `body::Asked::leased`, `Lease::taken`) is that lease's. When
+the lease ends (`let_go`, its holder's connection closing, or lapsed), the
+move ends at once, `ended: its lease ended` on `body/gesture`
+(`moves::ENDED_BY_LEASE`), and eases back to rest from where it is, at the
+gesture's own step over `EASE_OUT` (0.7 s), as any gesture ended does: no
+snap and no fold. One still waiting is dropped as `dropped: its lease ended`.
+A suspended lease is still taken, so a conversation pauses or ends the move as
+before, never the lease. The lamp's own moves (a skill's, the voice's,
+Expression's, idle life) are no lease's and play on; a hand, privacy, pause,
+sleep and strain end any move as before. `lamp-control` lets a hold go before
+holding it for another client (`body_lease::Holding::step_for`), so a lease
+handed from one computer to another inside one check still ends the first
+one's move. Tests: `a_computers_move_ends_when_its_lease_ends_and_eases_back_to_rest`,
+`a_lease_ending_or_suspended_ends_no_move_of_the_lamps_own`.
+
 **A holder's look** (`lease::Looking`, the protocol's `look`): degrees become
 counts, 4,096 a turn, the base right with more and the head up with fewer
 (every measured `--gaze` yaw is positive; lamp-75c9's base turned away from a

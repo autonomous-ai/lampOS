@@ -127,7 +127,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `turn.start` | `prompt` (optional) | `say.sock` `{turn: "start"}`, with its prompt as `text` ("Turns and listening") | `speak`, `hear` | no |
 | `turn.end` | | `say.sock` `{turn: "end", id}`, the id of this computer's own turn | `speak` | no |
 | `listen.set` | `on` | `say.sock` `{listen}` on one connection the door holds for the computer | `hear` | no |
-| `stop` | | ends the client's own actions now (not its mute): gives its light back, ends its hand follow, and cancels each `say` of its own still waiting or playing (`{"cancel":true}` on the say socket connection that asked it; the voice lets a waiting one go and cuts a playing one, that turn alone), its `done` then `dropped`, "dropped: stopped by its asker". Never another computer's say, the person's turn or the voice's own words | none | no |
+| `stop` | | ends the client's own actions now (not its mute): gives its own `body` lease back (`Leases::give_back`, told once as `lost` `released`; #7513), so the body ends the move it sent and eases back to rest ([body.md](body.md), "A move belongs to its lease"), gives its light back, ends its hand follow, and cancels each `say` of its own still waiting or playing (`{"cancel":true}` on the say socket connection that asked it; the voice lets a waiting one go and cuts a playing one, that turn alone), its `done` then `dropped`, "dropped: stopped by its asker". Never another computer's say, the person's turn or the voice's own words | none | no |
 
 **Gestures** offered to programs: `nod`, `headshake`, `greeting`, `laugh`,
 `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`,

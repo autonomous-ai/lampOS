@@ -277,6 +277,25 @@ impl Leases {
         changes
     }
 
+    /// `client`'s own leases holding `part` given back, by its `stop`
+    /// (#7513): ended as released, each told once by the next
+    /// [`Leases::lapse`]; no other client's, and nothing taken. Whether
+    /// there was one.
+    pub fn give_back(&mut self, client: &str, part: Part, now_us: u64) -> bool {
+        self.expire(now_us);
+        let (gone, kept): (Vec<Lease>, Vec<Lease>) = self
+            .held
+            .drain(..)
+            .partition(|lease| lease.client == client && lease.parts.contains(&part));
+        self.held = kept;
+        let any = !gone.is_empty();
+        for lease in gone {
+            let change = self.ended_with(lease, LeaseWhy::Released);
+            self.pending.push(change);
+        }
+        any
+    }
+
     /// A client revoked, or its last connection closed: its leases end
     /// (`Revoked` is told; a closed connection has nobody to tell).
     pub fn client_gone(&mut self, client: &str, why: LeaseWhy, now_us: u64) -> Vec<Change> {
@@ -586,5 +605,29 @@ mod tests {
         assert_eq!(gone[0].lease, "l_2");
         assert_eq!(leases.holder(Part::Voice, 2 * S), None);
         assert_eq!(leases.holder(Part::Light, 2 * S), Some("c_2"));
+    }
+
+    /// #7513: a client's `stop` gives back its own body lease, told once as
+    /// released; another client's lease and its other parts' stand, and a
+    /// stop with no body lease takes and ends nothing.
+    #[test]
+    fn a_stop_gives_back_its_own_body_lease_only() {
+        let mut leases = Leases::new();
+        leases.take("c_1", &[Part::Body], 30_000, 0).unwrap();
+        leases.take("c_2", &[Part::Light], 30_000, 0).unwrap();
+        assert!(!leases.give_back("c_2", Part::Body, S));
+        assert!(leases.lapse(S).is_empty());
+        assert!(leases.give_back("c_1", Part::Body, S));
+        assert_eq!(leases.holder(Part::Body, S), None);
+        assert_eq!(leases.holder(Part::Light, S), Some("c_2"));
+        let told = leases.lapse(2 * S);
+        assert_eq!(told.len(), 1);
+        assert_eq!(
+            (told[0].client.as_str(), told[0].lease.as_str()),
+            ("c_1", "l_1")
+        );
+        assert_eq!(told[0].why, Some(LeaseWhy::Released));
+        assert!(leases.lapse(3 * S).is_empty());
+        assert!(!leases.give_back("c_1", Part::Body, 3 * S));
     }
 }

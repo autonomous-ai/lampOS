@@ -1138,10 +1138,12 @@ async fn a_hand_on_the_bus_is_told_and_a_look_at_it_has_the_body_follow() {
         line(&mut lines).await,
         r#"{"hold":{"for_ms":30000,"follow":"hand"}}"#
     );
-    // `stop` ends it, never rated as a look is (one motion a second).
+    // `stop` ends it, never rated as a look is (one motion a second), and
+    // gives its own body lease back with it (#7513): the hold is let go, so
+    // the body ends a move it sent and eases back to rest.
     let stopped = send(&mut socket, json!({"id": 6, "op": "stop"})).await;
     assert_eq!(stopped["ok"], true, "{stopped}");
-    assert_eq!(line(&mut lines).await, r#"{"hold":{"for_ms":30000}}"#);
+    assert_eq!(line(&mut lines).await, r#"{"let_go":true}"#);
 }
 
 /// `get` `body` follows the body as it moves (the local leader's run on

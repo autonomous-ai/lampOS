@@ -1413,7 +1413,13 @@ export class FakeLamp {
         // its microphone stream, with no event.
         this.stopFollowing(ws);
         this.stopListening(ws);
-        return this.ok(ws, id);
+        this.ok(ws, id);
+        // As lamp-control's session.rs (#7513): it gives its own body lease
+        // back, told once as `lost` `released`, so a move it sent ends.
+        for (const [lease, held] of [...this.leases]) {
+          if (held.ws === ws && held.parts.includes('body')) this.leaseEvent(lease, 'lost', 'released');
+        }
+        return undefined;
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its
         // move to the body (smaller below strength 0.5) and its light; with

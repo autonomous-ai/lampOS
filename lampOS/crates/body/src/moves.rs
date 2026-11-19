@@ -231,6 +231,14 @@ pub fn ended(by: Priority) -> &'static str {
 /// on the lamp as it played: an unprompted gesture gives way to a hand.
 pub const ENDED_BY_HAND: &str = "ended: by a hand";
 
+/// Why a paired computer's move playing ends when the lease it was sent
+/// under ends (#7513): let go, its holder gone, or lapsed. It eases back to
+/// rest from where it is, as any gesture ended does.
+pub const ENDED_BY_LEASE: &str = "ended: its lease ended";
+
+/// Why such a move still waiting to begin is dropped when its lease ends.
+pub const DROPPED_BY_LEASE: &str = "dropped: its lease ended";
+
 /// An asker's name as its datagram gave it (`skill:dance`), kept in place
 /// so the motor loop never allocates for it, to say who lost the body and
 /// to whom on `body/gesture` (#940). At most [`Source::MOST`] bytes and

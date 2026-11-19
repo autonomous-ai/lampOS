@@ -912,6 +912,15 @@ pub struct Asked {
     /// (`room/presence`, `crate::presence_in`, #7301). Only with
     /// `LAMP_BODY_PRESENCE=on`; taken only under [`Limits::presence`].
     pub present: bool,
+    /// lamp-control's lease is taken, held or suspended for a
+    /// conversation (`lamp_body::lease::Lease::taken`, #7513). A paired
+    /// computer's move playing while it is taken ([`crate::moves::from_control`])
+    /// is that lease's: when the lease ends (let go, its holder gone, or
+    /// lapsed), the move ends at once and eases back to rest
+    /// ([`crate::moves::ENDED_BY_LEASE`]). The lamp's own moves are no
+    /// lease's and play on. A suspended lease is still taken, so a
+    /// conversation pauses or ends a move as before, never this.
+    pub leased: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -945,6 +954,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
+        leased: false,
         aim: None,
         limp: false,
         unseat: false,
@@ -977,6 +987,7 @@ impl Asked {
         unplug: false,
         held_by_test: false,
         held: false,
+        leased: false,
         aim: None,
         limp: false,
         unseat: false,
@@ -5278,6 +5289,7 @@ pub(crate) fn run_looking(
         unplug: false,
         held_by_test: false,
         held: false,
+        leased: false,
         aim: None,
         limp: false,
         unseat: false,
@@ -6838,6 +6850,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         (Priority::Conversation, None),
     );
     let mut yielding = false;
+    // #7513: whether lamp-control's lease was taken at the last step, and
+    // the start of the paired computer's move playing (and of the one
+    // waiting) seen under it: that move is the lease's, and ends with it.
+    let mut leased_was = false;
+    let mut playing_leased: Option<Duration> = None;
+    let mut pending_leased: Option<Duration> = None;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
     let mut easing_out: Option<(u32, [f32; 5], [f32; 5])> = None;
@@ -7479,6 +7497,57 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 pending = None;
             }
         }
+        // #7513: a paired computer's move belongs to the lease it was sent
+        // under (lamp-control refuses any other client's body op while one
+        // holds it). Seen under a lease, it is marked; when the lease ends
+        // (let go, its holder gone, lapsed), it ends now and eases back to
+        // rest, and one still waiting is dropped. The lamp's own moves,
+        // a skill's and the voice's, are no lease's and play on; a hand,
+        // a conversation, privacy, sleep and strain end any as before.
+        let from_control = |by: &Option<Source>| {
+            by.as_ref()
+                .is_some_and(|by| crate::moves::from_control(by.as_str()))
+        };
+        if asked_now.leased {
+            if let Some((_, since)) = playing.filter(|_| from_control(&playing_by.1)) {
+                playing_leased = Some(since);
+            }
+            if let Some((_, since)) = pending.filter(|_| from_control(&pending_by.1)) {
+                pending_leased = Some(since);
+            }
+        } else if leased_was {
+            if let Some((old, since)) = playing
+                && playing_leased == Some(since)
+            {
+                gesture_fates.push_told(
+                    (old.name, crate::moves::ENDED_BY_LEASE),
+                    Told {
+                        source: playing_by.1,
+                        by: None,
+                    },
+                );
+                playing = None;
+                paused = None;
+                resumed = None;
+                yielding = true;
+                easing_out = Some((0, gesture_now, gesture_moved));
+            }
+            if let Some((old, since)) = pending
+                && pending_leased == Some(since)
+            {
+                gesture_fates.push_told(
+                    (old.name, crate::moves::DROPPED_BY_LEASE),
+                    Told {
+                        source: pending_by.1,
+                        by: None,
+                    },
+                );
+                pending = None;
+            }
+            playing_leased = None;
+            pending_leased = None;
+        }
+        leased_was = asked_now.leased;
         // A gesture asked of a folded lamp stands it up first, as any
         // mood but rest does (#1011); not a lamp that is stopping, held,
         // slumped or paused.
@@ -7969,6 +8038,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut began_woke = None;
         if let Some((clip, since)) = pending {
             if upright && !yielding {
+                // Waiting under the lease, it plays as the lease's.
+                playing_leased = (pending_leased == Some(since)).then_some(now);
                 playing = Some((clip, now));
                 playing_by = pending_by;
                 pending = None;

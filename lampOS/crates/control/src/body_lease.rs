@@ -296,9 +296,26 @@ pub struct Holding {
     asked_us: Option<u64>,
     /// Whether the last hold said to follow the hand.
     following: bool,
+    /// The client whose `body` lease the last hold was for.
+    for_client: Option<String>,
 }
 
 impl Holding {
+    /// [`Self::step`] for the client holding `body` now, if any. A hold
+    /// handed from one client to another inside one check is let go first
+    /// (#7513): the body then ends the old holder's move, as it does at any
+    /// lease's end, and the next check takes the hold for the new one.
+    pub fn step_for(&mut self, holder: Option<&str>, follow: bool, now_us: u64) -> Option<Say> {
+        let handed =
+            self.asked_us.is_some() && holder.is_some() && self.for_client.as_deref() != holder;
+        self.for_client = holder.map(str::to_owned);
+        if handed {
+            self.asked_us = None;
+            return Some(Say::LetGo);
+        }
+        self.step(holder.is_some(), follow, now_us)
+    }
+
     /// `wanted`: a computer holds the protocol's `body` lease now;
     /// `follow`: its `look` at `hand` stands.
     pub fn step(&mut self, wanted: bool, follow: bool, now_us: u64) -> Option<Say> {
@@ -457,7 +474,8 @@ pub async fn hold(
             }
         }
         let following = follows(&mut follower.lock().expect("follower"), holder.as_deref());
-        let Some(say) = holding.step(wanted, following, lamp_ipc::monotonic_us()) else {
+        let Some(say) = holding.step_for(holder.as_deref(), following, lamp_ipc::monotonic_us())
+        else {
             continue;
         };
         if writer.is_none() && matches!(say, Say::Hold { .. }) {
@@ -576,6 +594,26 @@ mod tests {
     use super::*;
 
     const S: u64 = 1_000_000;
+
+    /// #7513: the body's lease handed from one client to another inside
+    /// one check is let go first, so the body ends the old holder's move,
+    /// then held for the new one at the next check; the same client renews
+    /// as before.
+    #[test]
+    fn a_hold_handed_to_another_client_is_let_go_first() {
+        let hold = Some(Say::Hold { follow: false });
+        let mut holding = Holding::default();
+        assert_eq!(holding.step_for(Some("c_a"), false, S), hold);
+        assert_eq!(holding.step_for(Some("c_a"), false, 2 * S), None);
+        assert_eq!(
+            holding.step_for(Some("c_b"), false, 3 * S),
+            Some(Say::LetGo)
+        );
+        assert_eq!(holding.step_for(Some("c_b"), false, 3 * S + 250_000), hold);
+        assert_eq!(holding.step_for(Some("c_b"), false, 4 * S), None);
+        assert_eq!(holding.step_for(None, false, 5 * S), Some(Say::LetGo));
+        assert_eq!(holding.step_for(Some("c_a"), false, 6 * S), hold);
+    }
 
     #[test]
     fn held_while_wanted_renewed_and_let_go() {

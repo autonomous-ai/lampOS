@@ -44,6 +44,14 @@ và thoát với mã 0.
 - **Hành động:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. `look`, `move`, `play` và `joints` cần một
   lease.
+- **`stop`:** chấm dứt các hành động của chính máy khách, và trả lại lease
+  `body` của chính nó (`Leases::give_back`, báo một lần là `lost`
+  `released`; #7513). Một cử động thuộc về lease đã gửi nó: khi lease đó
+  kết thúc (`stop`, buông, kết nối đóng hay hết hạn), thân đèn dừng cử động
+  ngay và từ từ trở về tư thế nghỉ (`ended: its lease ended`), không giật,
+  không gập. Cử động riêng của đèn (kỹ năng, giọng nói, Expression) không
+  thuộc lease nào và vẫn chạy tiếp. Lease của máy khách khác không bao giờ
+  bị đụng tới.
 - **`say`:** lời được đọc đúng như gửi, qua dịch vụ giọng nói của đèn, phải
   dựng xong trọn câu trong 5 s với câu đến 120 ký tự, thêm 1 s cho mỗi 30 ký
   tự bắt đầu sau đó, tối đa 20 s; quá thời hạn thì bị từ chối
