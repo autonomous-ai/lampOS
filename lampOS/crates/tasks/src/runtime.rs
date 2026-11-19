@@ -7328,6 +7328,7 @@ mod tests {
                     tools: 0,
                 },
                 taken: !self.untaken.load(Ordering::Acquire),
+                shell: false,
             })
         }
         fn close_now(&self, _: &str, _: &str) -> Result<Closed, String> {

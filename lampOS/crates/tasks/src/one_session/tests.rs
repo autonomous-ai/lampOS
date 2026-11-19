@@ -52,6 +52,11 @@ struct Fake {
     takes: Mutex<VecDeque<Took>>,
     /// Inputs the kept session took.
     inputs: Mutex<u32>,
+    /// Panes `show` names "Terminal": their engine exited (#7906 sign 2).
+    shells: Mutex<Vec<String>>,
+    /// As a real Harness: a kept session closed is resumed by name and
+    /// token, unless `--fresh` (#7906, lamp-52e6).
+    closed_resumes: Mutex<bool>,
     /// The state `ensure` answers; none: idle.
     ensure_state: Mutex<Option<String>>,
 }
@@ -166,6 +171,12 @@ impl PaneHarness for Fake {
                 tools: 1,
             },
             taken,
+            shell: self
+                .shells
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|shell| shell == agent),
         })
     }
     fn close_now(&self, machine: &str, agent: &str) -> Result<Closed, String> {
@@ -246,6 +257,12 @@ impl PaneHarness for Fake {
     }
     fn reply_kept(&self, name: &str, _: &Path, words: &str) -> Took {
         self.call(format!("reply-kept {name}"));
+        let starting = self.kept.lock().unwrap().clone().is_some_and(|agent| {
+            self.states.lock().unwrap().get(&agent).map(String::as_str) == Some("starting")
+        });
+        if starting {
+            return Took::EngineNotReady;
+        }
         let took = self.takes.lock().unwrap().pop_front();
         let took = took.unwrap_or_else(|| {
             let mut inputs = self.inputs.lock().unwrap();
@@ -301,7 +318,14 @@ impl PaneHarness for Fake {
             *failing -= 1;
             return Err("busy".into());
         }
-        *self.kept.lock().unwrap() = None;
+        if *self.closed_resumes.lock().unwrap() {
+            // Kept by name; its engine gone ("No session found").
+            if let Some(agent) = self.kept.lock().unwrap().clone() {
+                self.gone.lock().unwrap().push(agent);
+            }
+        } else {
+            *self.kept.lock().unwrap() = None;
+        }
         Ok(())
     }
 }
@@ -2479,4 +2503,161 @@ fn a_spoken_task_whose_kept_session_is_ensured_within_the_bound_runs() {
             session: None
         })
     );
+}
+
+/// #7906, the lamp-52e6 jam: a make's deadline closed the kept session and
+/// deleted its OpenClaw conversation, but a real Harness's `ensure` finds
+/// a session by name and token and resumed it: its engine exited ("No
+/// session found"), a plain shell, for ever. The next task's `ensure` is
+/// `--fresh`, a new session, and the task runs; the deleted one is never
+/// resumed.
+#[test]
+fn a_deadline_deleted_kept_session_is_never_resumed_the_next_task_runs_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    *fake.closed_resumes.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    let turn = one.enter("make-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Make the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    // The deadline.
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(true), &|| {}),
+        Ended::Cancelled
+    );
+    drop(turn);
+    // The engine of the closed session is gone: resumed, it is a shell.
+    fake.shells.lock().unwrap().push(agent_of(1));
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    let ensures: Vec<String> = fake
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("ensure"))
+        .collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ],
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "a fresh session");
+    assert!(dir.path().join(TOKEN_FILE).exists(), "its token kept");
+}
+
+/// A kept session adopted after a restart whose `ensure` says it is
+/// `starting`, and stays so past the open's bound (#7906 sign 1): closed,
+/// forgotten and replaced with `--fresh`, and the task runs there.
+#[test]
+fn a_kept_session_stuck_starting_past_the_bound_is_replaced_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    *fake.ensure_state.lock().unwrap() = Some("starting".into());
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "starting".into());
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert!(
+        fake.calls()
+            .contains(&"close-kept lamp-one-openclaw --now".to_owned())
+    );
+    assert_eq!(
+        one_turn(&again, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+}
+
+/// A kept session that goes `starting` under a task, its replies refused
+/// `ENGINE_NOT_READY` (#7906 sign 1): past the bound, one `show`, replaced
+/// fresh, and the same task typed into the new one.
+#[test]
+fn a_kept_session_refusing_while_starting_is_replaced_and_the_task_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "starting".into());
+    let began = Instant::now();
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert!(began.elapsed() < Duration::from_secs(10));
+    assert_eq!(one.agent(), Some(agent_of(2)));
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+}
+
+/// A kept session found after a restart whose pane is a plain shell
+/// (#7906 sign 2, `show` names it "Terminal"): replaced fresh at the open.
+#[test]
+fn a_kept_session_found_a_plain_shell_is_replaced_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)));
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+}
+
+/// A pane of `harness new` that is a plain shell (#7906 sign 2), which
+/// `wait` reads idle: never typed into; closed, forgotten, a new pane.
+#[test]
+fn a_plain_shell_pane_is_closed_and_a_new_one_takes_the_task() {
+    let (one, fake) = (session(), Fake::default());
+    one.open_if_due(&fake, &place());
+    fake.shells.lock().unwrap().push(agent_of(1));
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(fake.count("new"), 2);
+    assert!(!fake.calls().contains(&format!("reply {}", agent_of(1))));
+    assert!(fake.calls().contains(&format!("close {}", agent_of(1))));
+    assert_eq!(one.agent(), Some(agent_of(2)));
+}
+
+/// A healthy kept session stays kept (#7906): after a restart it is found
+/// live and idle, one `show` at the open, never `--fresh`, never closed,
+/// and many turns later still the same one.
+#[test]
+fn a_healthy_kept_session_stays_kept_with_no_fresh_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-1");
+    drop(one);
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    for n in 2..=8 {
+        assert_eq!(
+            one_turn(&again, &fake, &format!("task-{n}")),
+            Ended::Answered(format!("answer to New task task-{n}:"))
+        );
+    }
+    assert_eq!(again.agent(), Some(agent_of(1)));
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    assert_eq!(fake.count("close-kept"), 0);
+    assert_eq!(fake.count("ensure"), 2);
 }
