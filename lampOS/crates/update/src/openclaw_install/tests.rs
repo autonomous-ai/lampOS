@@ -16,7 +16,20 @@ struct Fake {
     asked: Vec<&'static str>,
     /// Harness's one-shot's `ActiveState`, for the watch's acts.
     active: Option<&'static str>,
+    /// What `systemctl show` says of the gateway's loaded unit (#7879):
+    /// none, the unit as written, with the gateway stopped.
+    loaded: Option<&'static str>,
+    /// How many of the next reloads fail.
+    reloads_fail: usize,
+    /// How many times the gateway's loaded unit was shown.
+    shown: usize,
 }
+
+/// The gateway's unit loaded as written, the gateway stopped.
+const LOADED_AS_WRITTEN: &str = "DropInPaths=\n\
+    NeedDaemonReload=no\n\
+    CPUQuotaPerSecUSec=1s\n\
+    ActiveState=inactive\n";
 
 impl Systemd for Fake {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
@@ -56,6 +69,18 @@ impl Systemd for Fake {
     }
     fn reload(&mut self) -> Result<(), String> {
         self.asked.push("reload");
+        if self.reloads_fail > 0 {
+            self.reloads_fail -= 1;
+            return Err("Failed to reload daemon: Connection timed out".to_owned());
+        }
+        Ok(())
+    }
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        self.shown += 1;
+        Ok(self.loaded.unwrap_or(LOADED_AS_WRITTEN).to_owned())
+    }
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        self.asked.push("try-restart");
         Ok(())
     }
     fn restart(&mut self, _: &str) -> Result<(), String> {
@@ -2666,4 +2691,130 @@ fn gateway_waits_for_control_only_with_the_one_run_path() {
             }
         }
     }
+}
+
+/// A round of [`after_round`] with the switch on and the lines it said.
+fn round_said(lamp: &Lamp, systemd: &mut Fake) -> Vec<String> {
+    let runs = Runs::new(lamp);
+    let mut said = Vec::new();
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        sk(false),
+        systemd,
+        &mut runs.runner(),
+        1,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut |line: &str| said.push(line.to_owned()),
+    );
+    said
+}
+
+/// The lines naming the gateway's unit as not loaded as written.
+fn not_loaded(said: &[String]) -> Vec<&String> {
+    said.iter()
+        .filter(|line| line.contains("not loaded as written") || line.contains("drop-in"))
+        .collect()
+}
+
+/// #7879: a reload that failed after the unit was written is tried again
+/// by the next round, which finds the same bytes but a reload still owed.
+#[test]
+fn a_failed_reload_after_the_write_is_tried_again_next_round() {
+    let lamp = Lamp::new();
+    let owed =
+        "DropInPaths=\nNeedDaemonReload=yes\nCPUQuotaPerSecUSec=infinity\nActiveState=inactive\n";
+    let mut systemd = Fake {
+        loaded: Some(owed),
+        reloads_fail: 2,
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert!(
+        said.iter()
+            .any(|line| line.contains("systemd not reloaded"))
+    );
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+
+    let mut systemd = Fake {
+        loaded: Some(owed),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(
+        systemd.asked,
+        ["reload"],
+        "reloaded again; not running, so not restarted"
+    );
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(lines[0].contains("NeedDaemonReload"), "{}", lines[0]);
+}
+
+/// #7879: a drop-in at the gateway's unit is not lamp-update's: said, left
+/// as it is, and neither a reload nor a restart, which would not take it out.
+#[test]
+fn a_drop_in_at_the_gateway_is_said_and_left_as_it_is() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let folder = lamp.at("/etc/systemd/system/lamp-openclaw-gateway.service.d");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("cap.conf"), "[Service]\nCPUQuota=\n").unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=/etc/systemd/system/lamp-openclaw-gateway.service.d/cap.conf\n\
+             NeedDaemonReload=no\nCPUQuotaPerSecUSec=infinity\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(
+        lines[0].contains("drop-in") && lines[0].contains("cap.conf"),
+        "{}",
+        lines[0]
+    );
+    assert!(folder.join("cap.conf").exists(), "never deleted");
+}
+
+/// #7879: the CPU cap read back as `infinity` with the gateway running:
+/// systemd reloaded and the gateway try-restarted, so the cap applies.
+#[test]
+fn a_cap_read_back_as_infinity_reloads_and_restarts_a_running_gateway() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=infinity\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(systemd.asked, ["reload", "try-restart"]);
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(
+        lines[0].contains("CPU cap") && lines[0].contains("infinity"),
+        "{}",
+        lines[0]
+    );
+}
+
+/// #7879: the unit loaded as written: checked, and nothing else done.
+#[test]
+fn a_gateway_unit_loaded_as_written_is_left_alone() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=1s\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(systemd.shown, 1, "checked once");
+    assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
+    assert!(not_loaded(&said).is_empty(), "{said:?}");
 }

@@ -2488,6 +2488,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
      this build's yet; …", and leaves a working OpenClaw and its gateway
      as they are; the next round writes the unit and asks again (#7135).
+     After writing the unit or finding it as written, each round checks
+     what systemd loaded (#7879): `systemctl show -p
+     DropInPaths,NeedDaemonReload,CPUQuotaPerSecUSec,ActiveState`. A
+     reload still owed (`NeedDaemonReload=yes`, as after a `daemon-reload`
+     that failed, which the next round's same bytes never tried again) or
+     a CPU cap not read back as `1s` (`CPUQuota=100%`) reloads systemd
+     again and, with the gateway running, `systemctl try-restart`s it so
+     the cap applies, with one journal line naming the check. A drop-in
+     is not lamp-update's: one journal line names it, and it is left as it
+     is, with no reload or restart, as neither would take it out. Any
+     check still failing is found again by the next round. There is no
+     switch of its own: it only makes systemd run lamp-update's own unit
+     as its text says.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
