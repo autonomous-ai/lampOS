@@ -44,10 +44,19 @@
 //!   failed, is gone (`UNKNOWN_HARNESS`) or not running; Harness's daemon
 //!   was started again ([`OneSession::forget`]); the lamp's machine id or
 //!   its default engine changed. `offline`, `unknown`, `starting` and
-//!   `installing` are waited on. Reopened once for a turn; a second
-//!   failure sends that run the per-run way, journaled. A spoken task is
-//!   put back while the kept session is ensured again, at most
-//!   [`STARTING_RESUMES_MOST`] times; then it fails [`NOT_STARTED`] (#7895).
+//!   `installing` are waited on, but only for a bound (#7906). Reopened once
+//!   for a turn; a second failure sends that run the per-run way, journaled.
+//!   A spoken task is put back while the kept session is ensured again, at
+//!   most [`STARTING_RESUMES_MOST`] times; then it fails [`NOT_STARTED`]
+//!   (#7895).
+//! - **Gone or stuck: replaced, never resumed for ever (#7906).** A kept
+//!   session lamp-tasks closed itself (its token kept, its record gone) is
+//!   ensured `--fresh` next, since `ensure` finds it by name and token. A
+//!   session still `starting` 120 s from an open or a refused hand-over
+//!   (sign 1), or a plain shell or gone (sign 2), goes through
+//!   [`OneSession::replace_kept`]: closed `--now`, forgotten, its
+//!   conversation deleted, and a fresh one opened; bounded by
+//!   [`REPLACE_MOST`].
 //! - **No reply, no pane for tasks.** Harness takes a reply only with the
 //!   person's `programs-reply` setting on, off by default. A reply refused
 //!   `REPLY_OFF` sends that task, and every later one until lamp-tasks
@@ -213,6 +222,10 @@ pub fn rotation_due(engine: EngineKind, turns: u64, tokens: u64) -> bool {
         _ => turns >= ROTATE_TURNS || tokens >= ROTATE_TOKENS,
     }
 }
+/// Stuck sessions replaced in a row with no turn answered between, before
+/// the next open waits its backoff ([`OPEN_RETRY_FIRST`]).
+pub const REPLACE_MOST: u32 = 2;
+
 /// How often [`OneSession::keep_open`] looks again once the pane is open
 /// (each look asks the gateway): to see the default engine change.
 pub const KEEP_OPEN_WHILE_OPEN: Duration = Duration::from_secs(30);
@@ -508,6 +521,8 @@ struct Inner {
     /// `harness ensure` said the engine was not ready, in a row: the next
     /// open after [`NOT_READY_FIRST`], doubled up to [`NOT_READY_MOST`].
     not_ready_opens: u32,
+    /// Stuck sessions replaced in a row ([`REPLACE_MOST`]).
+    replaced_in_row: u32,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -566,7 +581,14 @@ pub struct OneSession {
     no_reply: AtomicBool,
     /// [`KEPT_SWITCH`] on: the kept session's token file ([`TOKEN_FILE`]).
     kept_token: Option<PathBuf>,
+    /// Called with why each time a stuck session is replaced
+    /// ([`OneSession::with_on_replaced`]).
+    on_replaced: Option<Replaced>,
 }
+
+/// What a stuck session's replacement calls with why (#7906's C: the
+/// person's one told line is #7895's, not built here).
+pub type Replaced = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Why a run can't have the pane.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -913,7 +935,15 @@ impl OneSession {
             spoken_bound: None,
             no_reply: AtomicBool::new(false),
             kept_token: None,
+            on_replaced: None,
         }
+    }
+
+    /// `replaced` called with why each time a stuck session is replaced:
+    /// the hook for #7895's one told line to the person.
+    pub fn with_on_replaced(mut self, replaced: Replaced) -> Self {
+        self.on_replaced = Some(replaced);
+        self
     }
 
     /// [`KEPT_SWITCH`] on: the pane is the lamp's kept session, its token
@@ -1965,7 +1995,7 @@ impl OneSession {
         ended: &dyn Fn() -> bool,
     ) -> Result<String, String> {
         if let Some(token) = self.kept_token(harness) {
-            return self.open_kept(harness, place, &token, until, ended);
+            return self.open_kept(harness, place, &token, until, ended, true);
         }
         let began = Instant::now();
         let kept = self.kept();
@@ -1981,6 +2011,8 @@ impl OneSession {
                 // Stuck on an ask no one holds (Heron's H1 on #7258):
                 // closed and deleted below, a new pane opened.
                 Ok(seen) if seen.seen.state == "needs-input" => None,
+                // #7906 sign 2: its engine exited, the pane a plain shell.
+                Ok(seen) if seen.shell => None,
                 Ok(seen) if !gone_state(&seen.seen.state) => Some(("adopted", seen.seen.state)),
                 Ok(_) | Err(_) => match harness.resume(&place.machine, &agent) {
                     Ok(state) if !gone_state(&state) => Some(("resumed", state)),
@@ -2149,8 +2181,15 @@ impl OneSession {
         token: &Path,
         until: Instant,
         ended: &dyn Fn() -> bool,
+        settle: bool,
     ) -> Result<String, String> {
         let began = Instant::now();
+        // #7906: a token with no kept record means lamp-tasks closed that
+        // kept session itself (a deadline, a cancel, an unanswered turn, a
+        // stuck sign) and deleted its OpenClaw conversation. `ensure` finds
+        // a session by its name and token, not by the forgotten id, so
+        // without `--fresh` it resumes that deleted conversation for ever.
+        let closed_by_us = token.exists() && !self.kept_is_program();
         if let Some((old, machine, engine)) = self.kept()
             && !self.kept_is_program()
         {
@@ -2174,7 +2213,7 @@ impl OneSession {
         if let Err(why) = token_file(token) {
             return Err(self.open_failed(&format!("its token file: {why}")));
         }
-        let fresh = self.lock().reopen_why.as_deref() == Some("its rotation");
+        let fresh = closed_by_us || self.lock().reopen_why.as_deref() == Some("its rotation");
         // At a rotation the old conversation's key, deleted once `--fresh`
         // made a new one (Harness's close keeps it in OpenClaw's store).
         let old = fresh
@@ -2234,6 +2273,18 @@ impl OneSession {
         self.keep(&agent, place);
         if ensured.result == "new" {
             self.first_words(harness, &name, token, until, ended);
+        } else if settle
+            && let Some(why) = self.settled(harness, place, &ensured, began, until, ended)
+        {
+            // #7906 signs 1-2 at an open: replaced once with a fresh one.
+            self.replace_kept(harness, &place.machine, &agent, &why);
+            {
+                let inner = self.lock();
+                if inner.next_open.is_some() || inner.drop_due.is_some() {
+                    return Err(format!("{why}; a fresh one is opened next"));
+                }
+            }
+            return self.open_kept(harness, place, token, until, ended, false);
         }
         let mut inner = self.lock();
         if let Some(why) = inner.reopen_why.take() {
@@ -2294,6 +2345,123 @@ impl OneSession {
                 }
             }
         }
+    }
+
+    /// #7906, a kept session `ensure` found (`live` or `resumed`) looked at
+    /// before any task is typed into it: why it is gone or stuck, if it is.
+    /// Sign 2, its pane a plain shell or gone; sign 1, still
+    /// `starting` past `open_idle_within` from the open's start. One `show`
+    /// for a healthy one, at
+    /// an open only, never per turn; `None` too once `until` or `ended`
+    /// comes first (no verdict).
+    fn settled(
+        &self,
+        harness: &dyn PaneHarness,
+        place: &Place,
+        ensured: &crate::harness::Ensured,
+        began: Instant,
+        until: Instant,
+        ended: &dyn Fn() -> bool,
+    ) -> Option<String> {
+        let agent = ensured.agent_id.as_str();
+        // From the open's start (`began`), as its own first-turn wait.
+        let bound = began + self.open_idle_within;
+        loop {
+            match self.pane_sign(harness, &place.machine, agent) {
+                Seen::Stuck(why) => return Some(why),
+                Seen::Starting => {}
+                Seen::Moving => return None,
+            }
+            if Instant::now() >= bound {
+                return Some(format!(
+                    "still starting after {} s",
+                    self.open_idle_within.as_secs()
+                ));
+            }
+            if ended() || Instant::now() >= until {
+                return None;
+            }
+            std::thread::sleep(self.look);
+        }
+    }
+
+    /// One `show` of the pane `agent` for #7906's signs 1 and 2.
+    fn pane_sign(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Seen {
+        match harness.observe(machine, agent) {
+            Err(code) if code == "gone" => Seen::Stuck("Harness no longer has it".into()),
+            Ok(seen) if seen.shell => {
+                Seen::Stuck("its engine exited; the pane is a plain shell".into())
+            }
+            Ok(seen) if gone_state(&seen.seen.state) => {
+                Seen::Stuck(format!("Harness says it is {}", seen.seen.state))
+            }
+            Ok(seen) if matches!(seen.seen.state.as_str(), "idle" | "working" | "needs-input") => {
+                Seen::Moving
+            }
+            // `starting`, `offline`, `unknown`, `installing`, or not read.
+            Ok(_) | Err(_) => Seen::Starting,
+        }
+    }
+
+    /// #7906: the pane `agent` is gone or stuck (`why`), the one path every
+    /// stuck sign takes. Closed `--now`,
+    /// its id forgotten in the state file and its OpenClaw conversation
+    /// deleted, and let go: the next open is a fresh one (the kept session
+    /// `ensure --fresh`, its token kept; a pane of `harness new`, a `new`),
+    /// never a resume of it. A close that fails is tried again `--now` at
+    /// the next look, as a cancelled turn's is. Past [`REPLACE_MOST`] in a
+    /// row with no turn answered, the next open waits its backoff.
+    pub fn replace_kept(&self, harness: &dyn PaneHarness, machine: &str, agent: &str, why: &str) {
+        eprintln!(
+            "tasks: one session: {} is gone or stuck ({why}); closed, forgotten and replaced with a fresh session (#7906)",
+            short(agent)
+        );
+        let engine = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| pane.agent == agent)
+            .map_or(EngineKind::Openclaw, |pane| pane.place.engine);
+        match self.kept_now(agent) {
+            Some((name, token)) => match harness.close_kept(&name, &token, true) {
+                Ok(()) => self.kept_closed(agent, engine),
+                Err(code) => {
+                    eprintln!(
+                        "tasks: one session: the stuck kept session {} not closed: {code}; tried again next",
+                        short(agent)
+                    );
+                    let mut inner = self.lock();
+                    inner.drop_due = Some(why.to_owned());
+                    inner.drop_now = true;
+                }
+            },
+            None => {
+                if let Err(code) = harness.close_now(machine, agent) {
+                    eprintln!("tasks: one session: {} not closed: {code}", short(agent));
+                }
+                self.closed_by_us(agent, engine, true);
+            }
+        }
+        self.gone(agent, why);
+        let in_row = {
+            let mut inner = self.lock();
+            inner.replaced_in_row = inner.replaced_in_row.saturating_add(1);
+            inner.replaced_in_row
+        };
+        if in_row > REPLACE_MOST {
+            eprintln!(
+                "tasks: one session: {}",
+                self.open_failed(&format!("{in_row} stuck sessions in a row"))
+            );
+        }
+        if let Some(replaced) = &self.on_replaced {
+            replaced(why);
+        }
+    }
+
+    /// A turn answered: stuck replacements no longer in a row.
+    fn answered(&self) {
+        self.lock().replaced_in_row = 0;
     }
 
     /// `harness ensure` said the engine is not ready: the next open after
@@ -2393,6 +2561,13 @@ pub struct Turn<'a> {
     opens: bool,
 }
 
+/// What one `show` says of a pane for #7906's signs.
+enum Seen {
+    Stuck(String),
+    Starting,
+    Moving,
+}
+
 /// How a turn ended.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Ended {
@@ -2425,6 +2600,11 @@ impl Turn<'_> {
         }
         let text = format!("{}\n{words}", header(&self.id));
         let mut reopened = false;
+        // #7906 sign 1: since when the pane has refused the words (busy,
+        // its engine not ready, not idle): past `open_idle_within`, one
+        // `show` says whether it is stuck, and a stuck one is replaced once.
+        let mut refused_since: Option<Instant> = None;
+        let mut replaced = false;
         loop {
             let agent = if self.opens {
                 self.one.ensure(harness, place, until, ended)
@@ -2457,6 +2637,15 @@ impl Turn<'_> {
                         if ended() || Instant::now() >= until {
                             return self
                                 .fallback("the kept session stayed busy until the run's end");
+                        }
+                        if self.stuck_while_refused(
+                            harness,
+                            place,
+                            &agent,
+                            &mut refused_since,
+                            &mut replaced,
+                        ) {
+                            continue;
                         }
                         std::thread::sleep(self.one.look);
                     }
@@ -2502,6 +2691,20 @@ impl Turn<'_> {
             }
             // Typed only into a pane idle with its last words taken.
             match harness.observe(&place.machine, &agent) {
+                // #7906 sign 2: `wait` reads a shell idle; never typed into.
+                Ok(seen) if seen.shell && !replaced => {
+                    replaced = true;
+                    self.one.replace_kept(
+                        harness,
+                        &place.machine,
+                        &agent,
+                        "its engine exited; the pane is a plain shell",
+                    );
+                    continue;
+                }
+                Ok(seen) if seen.shell => {
+                    return self.fallback("the new pane is a plain shell too");
+                }
                 Ok(seen) if seen.seen.state == "idle" && seen.taken => {}
                 Ok(seen) if gone_state(&seen.seen.state) && !reopened => {
                     reopened = true;
@@ -2522,6 +2725,15 @@ impl Turn<'_> {
                 Ok(_) | Err(_) => {
                     if ended() || Instant::now() >= until {
                         return self.fallback("the pane was not ready until the run's end");
+                    }
+                    if self.stuck_while_refused(
+                        harness,
+                        place,
+                        &agent,
+                        &mut refused_since,
+                        &mut replaced,
+                    ) {
+                        continue;
                     }
                     std::thread::sleep(self.one.look);
                     continue;
@@ -2574,6 +2786,38 @@ impl Turn<'_> {
                 }
             }
         }
+    }
+
+    /// #7906 sign 1 while the words are refused: once refused for
+    /// `open_idle_within`, one `show`; a pane gone, a plain shell or still
+    /// `starting` is replaced (once per send) and `true` is returned, so
+    /// the send opens a fresh one (or, for a spoken task, is put back for
+    /// the one-session thread to). A healthy busy pane costs no `show`
+    /// before then.
+    fn stuck_while_refused(
+        &self,
+        harness: &dyn PaneHarness,
+        place: &Place,
+        agent: &str,
+        refused_since: &mut Option<Instant>,
+        replaced: &mut bool,
+    ) -> bool {
+        let since = *refused_since.get_or_insert_with(Instant::now);
+        if *replaced || since.elapsed() < self.one.open_idle_within {
+            return false;
+        }
+        *refused_since = Some(Instant::now());
+        let why = match self.one.pane_sign(harness, &place.machine, agent) {
+            Seen::Moving => return false,
+            Seen::Stuck(why) => why,
+            Seen::Starting => format!(
+                "still starting after {} s",
+                self.one.open_idle_within.as_secs()
+            ),
+        };
+        *replaced = true;
+        self.one.replace_kept(harness, &place.machine, agent, &why);
+        true
     }
 
     /// A turn typed: counted toward the rotation, with the input the kept
@@ -2644,6 +2888,16 @@ impl Turn<'_> {
             match harness.wait_end(machine, &agent, cancel) {
                 Ok(None) => {}
                 Ok(Some(state)) if state == "idle" => match harness.observe(machine, &agent) {
+                    // #7906 sign 2: `wait` read a plain shell idle.
+                    Ok(PaneSeen { shell: true, .. }) => {
+                        before_close();
+                        return self.stuck(
+                            harness,
+                            machine,
+                            &agent,
+                            "its engine exited; the pane is a plain shell",
+                        );
+                    }
                     Ok(PaneSeen { seen, .. })
                         if seen.state == "idle"
                             && seen
@@ -2654,6 +2908,7 @@ impl Turn<'_> {
                         if let Some(pane) = self.one.lock().pane.as_mut() {
                             pane.tokens += tokens_in(&seen.answer);
                         }
+                        self.one.answered();
                         return Ended::Answered(seen.answer);
                     }
                     Ok(PaneSeen { seen, .. }) if gone_state(&seen.state) => {
@@ -2737,10 +2992,20 @@ impl Turn<'_> {
             match waited {
                 Ok(None) => {}
                 Ok(Some(state)) if state == "idle" => match harness.observe(machine, agent) {
+                    Ok(PaneSeen { shell: true, .. }) => {
+                        before_close();
+                        return self.stuck(
+                            harness,
+                            machine,
+                            agent,
+                            "its engine exited; the pane is a plain shell",
+                        );
+                    }
                     Ok(PaneSeen { seen, .. }) => {
                         if let Some(pane) = self.one.lock().pane.as_mut() {
                             pane.tokens += tokens_in(&seen.answer);
                         }
+                        self.one.answered();
                         return Ended::Answered(seen.answer);
                     }
                     Err(code) if code == "gone" => {
@@ -2783,6 +3048,16 @@ impl Turn<'_> {
                 }
             }
         }
+    }
+
+    /// #7906: the turn's session is gone or stuck: replaced
+    /// ([`OneSession::replace_kept`]), and the run fails with why. The queue
+    /// goes on into a fresh session.
+    fn stuck(&self, harness: &dyn PaneHarness, machine: &str, agent: &str, why: &str) -> Ended {
+        self.one.replace_kept(harness, machine, agent, why);
+        Ended::Failed(format!(
+            "the lamp's agent session was stuck ({why}), so it was replaced with a fresh one"
+        ))
     }
 
     fn rest(&self, cancel: &AtomicBool) {
