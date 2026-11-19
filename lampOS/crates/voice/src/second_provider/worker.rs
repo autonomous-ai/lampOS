@@ -10675,7 +10675,7 @@ impl Heeding {
             _ => false,
         };
         if several(&cut_faces) || several(&faces) || another {
-            return Joined::Not("two faces were seen speaking them".to_owned());
+            return Joined::Not(super::TWO_FACES_SPEAKING.to_owned());
         }
         // The prints for every rule, or with `LAMP_JOIN_SAME_VOICE` the
         // services' or the join's own (#8003).
@@ -10684,7 +10684,7 @@ impl Heeding {
             .and_then(|voices| voices.alike(cut, request));
         match likeness {
             Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
-                return Joined::Not(format!("two voices (cosine {likeness:.2})"));
+                return Joined::Not(format!("{} {likeness:.2})", super::TWO_VOICES));
             }
             Some(likeness) if likeness >= crate::same_voice::SAME_FROM => {
                 return Joined::Same(SAME_VOICE_JOINS);

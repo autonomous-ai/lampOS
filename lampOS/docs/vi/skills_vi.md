@@ -5454,19 +5454,24 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   thứ hai, được hỏi riêng, đã tắt một kỹ năng cũ, time for tea). Trên
   route thứ hai, một câu bắt đầu trong vòng 3 s của phần nối
   (`JOIN_WITHIN`) sau những lời bị cắt ngang ngay trước nó, chưa nghe được
-  câu trả lời nào và không được ghép vào nó (trừ riêng tên của đèn và lời
-  mang qua một câu bị giữ), thì lời gọi `make_skill` đầu tiên trong lượt
-  của nó mà tác động lên một kỹ năng (tạo, `turn_off`, `turn_on`, `remove`,
-  `undo` hoặc `run`) không được chạy: mô hình được cho biết những lời đó
-  (`make_no_asks::split_told`) và tự phán đoán câu này có nói tiếp những
-  lời đó không; nếu có thì hai câu là một yêu cầu, được tạo bằng một lời
-  gọi có request chứa cả hai, và không kỹ năng nào khác bị tắt, bật, xóa,
-  hoàn tác hay chạy vì nó (`make_no_asks::SPLIT_NEXT`). Chỉ khi chính câu
-  này yêu cầu việc đó thì mô hình mới gọi lại, và lời gọi đó được chạy:
-  mỗi câu chỉ được báo một lần, không bao giờ dùng danh sách từ. Câu không
-  có lời nào bị cắt ngay trước, câu sau quá 3 s, hoặc câu đã được ghép, vẫn
-  như trước, không thêm lượt hay thời gian chờ nào; lần báo chỉ tốn một
-  lượt mô hình, ở lời gọi như thế đầu tiên của một câu như vậy.
+  câu trả lời nào, không được ghép vào nó và không được phân biệt với nó
+  (trừ riêng tên của đèn và lời mang qua một câu bị giữ; không bao giờ khi
+  phán quyết của phần nối là hai giọng theo bản in giọng nói hay hai khuôn
+  mặt được thấy nói, `Joined::told_apart`), thì mọi lời gọi `make_skill`
+  tác động lên một kỹ năng (tạo, `turn_off`, `turn_on`, `remove`, `undo`
+  hoặc `run`) trong lượt chat đầu tiên có lời gọi như thế đều không được
+  chạy: mỗi lời gọi được cho biết những lời đó (`make_no_asks::split_told`),
+  nên `[turn_off, make]` trong cùng một lượt không chạy cái nào. Mô hình tự
+  phán đoán câu này có nói tiếp những lời đó không
+  (`make_no_asks::SPLIT_NEXT`): nếu có thì hai câu là một yêu cầu, làm đủ
+  mọi phần với lời của cả hai câu, kỹ năng được tạo với cả yêu cầu làm
+  request, và không kỹ năng nào bị tắt, bật, xóa, hoàn tác hay chạy vì
+  những lời chỉ mô tả yêu cầu đó; "If it is its own ask, make the call
+  again as it was." Lời gọi ở các lượt sau đều được chạy: mỗi câu chỉ giữ
+  một lượt, không bao giờ dùng danh sách từ. Câu không có lời nào bị cắt
+  ngay trước, câu sau quá 3 s, câu đã được ghép, hoặc câu đã được phân
+  biệt, vẫn như trước, không thêm lượt hay thời gian chờ nào; việc giữ chỉ
+  tốn một lượt mô hình, và chỉ ở câu như vậy.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.
