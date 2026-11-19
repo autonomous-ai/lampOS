@@ -844,7 +844,7 @@ fn said(
 /// needs it heard whole; so is a voice make's with code whose turn was cut
 /// (`skill_write_yes::said_by_the_say_service`, #7245), and a task for the
 /// lamp's agent's, ending on [`made_skill::RUNS_ONCE_AGREED`].
-fn say_note(line: &str) -> Option<String> {
+pub(crate) fn say_note(line: &str) -> Option<String> {
     let note = if line.starts_with(made_skill::NOT_MADE_HEAD) {
         made_skill::not_made_in_their_language(line)
     } else if line.ends_with(made_skill::RUNS_AFTER_YES.trim_start())

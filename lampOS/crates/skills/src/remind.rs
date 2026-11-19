@@ -425,6 +425,16 @@ mod tests {
             assert_eq!(plain_words(bad), None, "{bad:?}");
         }
         assert!(plain_words(&"ộ".repeat(MOST_WORDS_BYTES / 3)).is_some());
+        // The voice tells a reminder too long when it is made by the same
+        // bounds (#7977).
+        assert_eq!(
+            MOST_WORDS_CHARS,
+            lamp_voice::made_skill::MOST_REMIND_WORDS_CHARS
+        );
+        assert_eq!(
+            MOST_WORDS_BYTES,
+            lamp_voice::made_skill::MOST_REMIND_WORDS_BYTES
+        );
     }
 
     #[test]

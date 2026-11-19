@@ -3495,19 +3495,31 @@ gone ([switches.md](switches.md)). What happens:
      (`made_skill::MOST_SAY_TEXT_CHARS`; 120 before #7245, in one or two
      sentences, which came quickly in Vietnamese), as many sentences as
      fit: about 20 seconds of speech at the voice's ~15 characters a
-     second, the longest line the speech cache keeps, and 300 of the
-     longest Vietnamese letters (3 bytes) still within the say service's
-     900 bytes (`say::MOST_WORDS_BYTES`, a written turn's 1,024 less the
-     words that frame it). Longer is refused, never cut, and told as that
+     second, the longest line the speech cache keeps. Under it, bytes
+     (`made_skill::most_say_text_bytes`, about 730): what both routes carry
+     whole, the say service's 900 (`say::MOST_WORDS_BYTES`) and, on the
+     live route, a written turn's 1,024 (`lamp_gemini::wire::MAX_NOTE_BYTES`)
+     less the frame of a made say (`say::made_turn`). 300 Vietnamese letters
+     as written, about 1.4 bytes each, are about 410 bytes; only words dense
+     in three- or four-byte letters reach the bytes. Longer is refused, never cut, and told as that
      with the numbers (`made_skill::say_too_long`): "what it would say is
      too long, 340 characters, 40 more than the 300 a skill can say at
      once; try it in fewer words", the repair told the same with the
      bound in its hint ("at most 300 characters"), and the person, the
      repairs used up, hears it as it is (`plain_reason`), in their
-     language. Within the characters, words past the say service's 900
-     bytes (only four-byte letters, emoji and the like, get there) are
-     told so too, with the bytes. The say-back the person hears before it
-     goes on quotes the words whole, so a longer say makes a longer
+     language. Within the characters, words past the bytes are told so
+     too, with the bytes. A remind step's words are checked here as well,
+     by lamp-skills' bounds (120 characters, the schedule's 300 bytes,
+     `made_skill::remind_too_long`), and told the same way ("what its
+     reminder would say is too long, …"), never only refused when it is
+     packed. The description quotes the say whole; the spoken "I made"
+     line (`made_skill::on_line`) quotes as much of it as keeps that line's
+     note in the person's language within the say service's 900 bytes
+     (`made_skill::most_line_bytes`, `quote_cut_to_fit`: cut at a word,
+     ending on "…"; the skill itself says the words whole), so a long
+     Vietnamese say is never told in English or left unsaid (Heron's and
+     Twelve's P2 on #7977). The say-back the person hears before it
+     goes on quotes the words, so a longer say makes a longer
      say-back (up to about 12 seconds more speech than at 120 characters),
      and the run itself speaks that much longer; nothing waits on it
      before the say-back starts. With no
@@ -8024,10 +8036,16 @@ rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
    digits and `-`, at most 40 bytes (so its function's name fits
    lamp-skills' 48); `when` one line of at most 200 characters; the
    instructions plain text, new lines and tabs only, at most 2,000
-   characters (both bytes before #7245: no wire needs a byte bound, as
-   they go whole only into the note the model is told at the call, a plain
-   string lamp-skills never bounds; the name is ASCII, so its bytes are its
-   letters).
+   characters (both bytes before #7245; the name is ASCII, so its bytes
+   are its letters). Under the characters one byte bound: the two go whole
+   into the note the model is told at each call, `{"next": NOTE}`, which
+   the link carries back only within 4,096 bytes less `tools::sendable`'s
+   16 and `use_skill`'s note, so that answer is at most 3,700 bytes
+   (`MOST_WRITTEN_NOTE_BYTES`, as lamp-skills' `knowledge::TOLD_MOST_BYTES`);
+   words dense in three-byte letters past it are refused when written,
+   with the bytes ("when to use it and what the lamp should do are too
+   long together: …"), never kept as a skill every call would answer
+   `unavailable`.
    Empty, too long or not plain is refused in plain words, before anything
    is recorded. It is one of the app's asks (`app.json`, the same request
    id rules, one at a time with `make`), marked `"written": true`, and the

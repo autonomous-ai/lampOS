@@ -260,19 +260,31 @@ sau:
      tự (`made_skill::MOST_SAY_TEXT_CHARS`; trước #7245 là 120, trong một
      hoặc hai câu, mà tiếng Việt chạm tới rất nhanh), bao nhiêu câu cũng
      được trong giới hạn đó: khoảng 20 giây nói ở tốc độ ~15 ký tự mỗi giây
-     của giọng nói, câu dài nhất mà bộ nhớ đệm giọng nói giữ, và 300 chữ
-     tiếng Việt dài nhất (3 byte) vẫn nằm trong 900 byte của dịch vụ say
-     (`say::MOST_WORDS_BYTES`, 1.024 byte của một lượt viết trừ phần chữ
-     bao quanh). Dài hơn thì bị từ chối, không bao giờ bị cắt, và được nói
+     của giọng nói, câu dài nhất mà bộ nhớ đệm giọng nói giữ. Bên dưới là
+     giới hạn byte (`made_skill::most_say_text_bytes`, khoảng 730): mức cả
+     hai tuyến mang trọn vẹn, 900 byte của dịch vụ say
+     (`say::MOST_WORDS_BYTES`) và, trên tuyến live, 1.024 byte của một lượt
+     viết (`lamp_gemini::wire::MAX_NOTE_BYTES`) trừ phần khung của câu say
+     tự tạo (`say::made_turn`). 300 chữ tiếng Việt viết bình thường, khoảng
+     1,4 byte mỗi chữ, là khoảng 410 byte; chỉ lời dày đặc chữ ba hoặc bốn
+     byte mới chạm giới hạn byte. Dài hơn thì bị từ chối, không bao giờ bị cắt, và được nói
      rõ là quá dài kèm con số (`made_skill::say_too_long`): "what it would
      say is too long, 340 characters, 40 more than the 300 a skill can say
      at once; try it in fewer words"; lần sửa được báo y như vậy với giới
      hạn trong gợi ý ("at most 300 characters"), và khi hết lượt sửa người
      dùng nghe đúng lý do đó (`plain_reason`), bằng ngôn ngữ của họ. Trong
-     giới hạn ký tự mà vượt 900 byte của dịch vụ say (chỉ chữ bốn byte,
-     emoji và những thứ tương tự, mới tới được) cũng được nói rõ, kèm số
-     byte. Câu nói lại người dùng nghe trước khi kỹ năng bật trích nguyên
-     văn lời đó, nên say dài hơn thì câu nói lại dài hơn (tối đa khoảng 12
+     giới hạn ký tự mà vượt giới hạn byte cũng được nói rõ, kèm số byte.
+     Lời của bước remind cũng được kiểm tra ở đây, theo giới hạn của
+     lamp-skills (120 ký tự, 300 byte của lịch, `made_skill::remind_too_long`),
+     và được báo cùng cách ("what its reminder would say is too long, …"),
+     không chỉ bị từ chối lúc đóng gói. Phần mô tả trích nguyên văn câu say;
+     câu "I made" được nói ra (`made_skill::on_line`) trích nhiều nhất có
+     thể để ghi chú bằng ngôn ngữ của người dùng vẫn nằm trong 900 byte của
+     dịch vụ say (`made_skill::most_line_bytes`, `quote_cut_to_fit`: cắt ở
+     một từ, kết thúc bằng "…"; chính kỹ năng vẫn nói trọn lời), nên một
+     câu say tiếng Việt dài không bao giờ bị nói bằng tiếng Anh hay bị bỏ
+     qua (P2 của Heron và Twelve trên #7977). Câu nói lại người dùng nghe
+     trước khi kỹ năng bật trích lời đó, nên say dài hơn thì câu nói lại dài hơn (tối đa khoảng 12
      giây nói nhiều hơn so với 120 ký tự), và chính lần chạy cũng nói lâu
      hơn chừng ấy; không gì phải chờ nó trước khi câu nói lại bắt đầu. Không
      có dấu ngoặc kép, ngoặc «», ngoặc nhọn hay dấu backtick (không có
@@ -4370,10 +4382,16 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    (`Written::new`): tên bắt đầu bằng chữ thường, rồi chữ thường, số và
    `-`, tối đa 40 byte (để tên hàm vừa 48 byte của lamp-skills); `when` một
    dòng, tối đa 200 ký tự; hướng dẫn là văn bản thường, chỉ có xuống dòng
-   và tab, tối đa 2.000 ký tự (cả hai là byte trước #7245: không đường
-   truyền nào cần giới hạn byte, vì chúng chỉ đi nguyên vẹn vào ghi chú
-   cho mô hình lúc gọi, một chuỗi thường mà lamp-skills không giới hạn; tên
-   là ASCII, nên số byte bằng số chữ). Trống, quá dài hay không phải văn bản thường
+   và tab, tối đa 2.000 ký tự (cả hai là byte trước #7245; tên là ASCII,
+   nên số byte bằng số chữ). Bên dưới có một giới hạn byte: hai trường đi
+   nguyên vẹn vào ghi chú cho mô hình mỗi lần gọi, `{"next": NOTE}`, mà
+   đường truyền chỉ mang về trong 4.096 byte trừ 16 của `tools::sendable`
+   và ghi chú của `use_skill`, nên câu trả lời đó tối đa 3.700 byte
+   (`MOST_WRITTEN_NOTE_BYTES`, như `knowledge::TOLD_MOST_BYTES` của
+   lamp-skills); lời dày đặc chữ ba byte vượt mức đó bị từ chối ngay khi
+   viết, kèm số byte ("when to use it and what the lamp should do are too
+   long together: …"), không bao giờ được giữ thành một kỹ năng mà mọi
+   lần gọi đều trả lời `unavailable`. Trống, quá dài hay không phải văn bản thường
    thì bị từ chối bằng lời dễ hiểu, trước khi ghi lại bất cứ gì. Đây là
    một yêu cầu của ứng dụng (`app.json`, cùng quy tắc request id, mỗi lần
    một yêu cầu cùng `make`), có `"written": true`, và câu trả lời là

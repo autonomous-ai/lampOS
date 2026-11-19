@@ -2411,6 +2411,7 @@ pub fn plain_reason(why: &str) -> String {
         || crate::make_no_cannot::said_as_is(why)
         || why == UNRELATED
         || why.starts_with(SAY_TOO_LONG)
+        || why.starts_with(REMIND_TOO_LONG)
         || (crate::make_no_asks::on() && words_taken(why))
     {
         return why.to_owned();
@@ -3262,46 +3263,91 @@ const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool
 
 /// The most of a made skill's say text ([`say_text`]), in characters: about
 /// 20 seconds of speech at the voice's ~15 a second, the longest line the
-/// speech cache keeps (`say::tts_cache::MOST_FRAMES`), and 300 of the
-/// longest Vietnamese letters, three bytes each, still within the say
-/// service's [`crate::say::MOST_WORDS_BYTES`]. 120 from #6062 (10 Nov), set
-/// as one or two short sentences said back within [`MOST_PLAIN_CHARS`]; 300
-/// since #7245 (the owner, 19 Nov: 120 came quickly in Vietnamese, and a
-/// longer say was refused with a reason that never named its length). Said
-/// back whole, its own room beside what else the skill does
-/// ([`MOST_SAY_PLAIN_CHARS`]); past it, [`say_too_long`] tells by how much.
+/// speech cache keeps (`say::tts_cache::MOST_FRAMES`). 120 from #6062 (10
+/// Nov), set as one or two short sentences said back within
+/// [`MOST_PLAIN_CHARS`]; 300 since #7245 (the owner, 19 Nov: 120 came
+/// quickly in Vietnamese, and a longer say was refused with a reason that
+/// never named its length). Said back whole in the description, its own
+/// room beside what else the skill does ([`MOST_SAY_PLAIN_CHARS`]), and in
+/// the spoken "I made" line as much as fits ([`on_line`]); past it,
+/// [`say_too_long`] tells by how much. Under it, [`most_say_text_bytes`].
 pub const MOST_SAY_TEXT_CHARS: usize = 300;
-const _: () = assert!(MOST_SAY_TEXT_CHARS * 3 <= crate::say::MOST_WORDS_BYTES);
+
+/// The most bytes of a made skill's say text: what both routes carry
+/// whole, the say service's [`crate::say::MOST_WORDS_BYTES`] (900) and, on
+/// the live route, a written turn's `lamp_gemini::wire::MAX_NOTE_BYTES`
+/// (1,024) less the frame of a made say ([`crate::say::made_turn`]), about
+/// 730 (Heron's P3 on #7977). 300 Vietnamese letters as written, about 1.4
+/// bytes each, are about 410; only words dense in three- or four-byte
+/// letters get there, and they are told so with the bytes.
+pub fn most_say_text_bytes() -> usize {
+    crate::say::MOST_WORDS_BYTES
+        .min(lamp_gemini::wire::MAX_NOTE_BYTES - crate::say::made_turn("").len())
+}
 
 /// How [`say_too_long`]'s reason begins: said to the person as it is
 /// ([`plain_reason`]), with its numbers.
 const SAY_TOO_LONG: &str = "what it would say is too long, ";
 
-/// Why a say step's words are too long to say (#7245), or none: past
-/// [`MOST_SAY_TEXT_CHARS`] characters, with how many and how many over; or,
-/// within them, past the say service's [`crate::say::MOST_WORDS_BYTES`]
-/// bytes (only letters of four bytes, emoji and the like, get there), the
-/// one bound under the characters a wire needs. Never cut: the person's
-/// words are said whole or the skill isn't made.
-pub fn say_too_long(say: &toml::Value) -> Option<String> {
-    let text = say.as_table()?.get("text")?.as_str()?.trim();
+/// How [`remind_too_long`]'s reason begins, said as [`SAY_TOO_LONG`]'s is.
+const REMIND_TOO_LONG: &str = "what its reminder would say is too long, ";
+
+/// The most of a remind step's words, in characters and in bytes:
+/// lamp-skills' own (`lamp_skills::remind::MOST_WORDS_CHARS` and
+/// `MOST_WORDS_BYTES`, the schedule's 300 bytes; held equal by its test),
+/// checked here too so a reminder too long is told as that when it is
+/// made (Twelve's P3 on #7977), never only refused when lamp-skills packs it.
+pub const MOST_REMIND_WORDS_CHARS: usize = 120;
+pub const MOST_REMIND_WORDS_BYTES: usize = 300;
+
+/// `text`'s words past `most_chars` characters or `most_bytes` bytes, told
+/// with `head` and the numbers; none within both.
+fn too_long(head: &str, text: &str, most_chars: usize, most_bytes: usize) -> Option<String> {
     let chars = text.chars().count();
-    if chars > MOST_SAY_TEXT_CHARS {
+    if chars > most_chars {
         return Some(format!(
-            "{SAY_TOO_LONG}{chars} characters, {} more than the {MOST_SAY_TEXT_CHARS} a skill \
-             can say at once; try it in fewer words",
-            chars - MOST_SAY_TEXT_CHARS
+            "{head}{chars} characters, {} more than the {most_chars} a skill can say at once; \
+             try it in fewer words",
+            chars - most_chars
         ));
     }
     let bytes = text.len();
-    let most = crate::say::MOST_WORDS_BYTES;
-    (bytes > most).then(|| {
+    (bytes > most_bytes).then(|| {
         format!(
-            "{SAY_TOO_LONG}its {chars} characters take {bytes} bytes, {} more than the {most} \
+            "{head}its {chars} characters take {bytes} bytes, {} more than the {most_bytes} \
              the lamp can say at once; try it in fewer words or with fewer symbols",
-            bytes - most
+            bytes - most_bytes
         )
     })
+}
+
+/// Why a say step's words are too long to say (#7245), or none: past
+/// [`MOST_SAY_TEXT_CHARS`] characters, with how many and how many over; or,
+/// within them, past [`most_say_text_bytes`] (only words dense in letters
+/// of three or four bytes get there), the bound under the characters the
+/// wires need. Never cut: the person's words are said whole or the skill
+/// isn't made.
+pub fn say_too_long(say: &toml::Value) -> Option<String> {
+    let text = say.as_table()?.get("text")?.as_str()?.trim();
+    too_long(
+        SAY_TOO_LONG,
+        text,
+        MOST_SAY_TEXT_CHARS,
+        most_say_text_bytes(),
+    )
+}
+
+/// Why a remind step's words are too long (#7977), or none: past
+/// [`MOST_REMIND_WORDS_CHARS`] characters or [`MOST_REMIND_WORDS_BYTES`]
+/// bytes, as lamp-skills' `remind::plain_words` counts them, trimmed.
+pub fn remind_too_long(remind: &toml::Value) -> Option<String> {
+    let words = remind.as_table()?.get("words")?.as_str()?.trim();
+    too_long(
+        REMIND_TOO_LONG,
+        words,
+        MOST_REMIND_WORDS_CHARS,
+        MOST_REMIND_WORDS_BYTES,
+    )
 }
 
 /// The least cooldown of a made skill that speaks (#6062, the readers' P2a):
@@ -3356,7 +3402,7 @@ pub fn is_format(c: char) -> bool {
 
 /// A made skill's `say` step's words (#6062), as [`plainly`] says them: a
 /// table with `text` alone, a string of at most [`MOST_SAY_TEXT_CHARS`]
-/// characters and [`crate::say::MOST_WORDS_BYTES`] bytes, at least one
+/// characters and [`most_say_text_bytes`] bytes, at least one
 /// sentence (as many as fit since #7245: the characters bound how long it
 /// speaks), with no double quotes, braces or guillemets (so
 /// it reads back quoted, whole), no web address, and no control or format
@@ -3382,8 +3428,7 @@ pub fn say_text(say: &toml::Value) -> Option<String> {
     let web = ["://", "www.", "http"]
         .iter()
         .any(|mark| lower.contains(mark));
-    let within =
-        text.chars().count() <= MOST_SAY_TEXT_CHARS && text.len() <= crate::say::MOST_WORDS_BYTES;
+    let within = text.chars().count() <= MOST_SAY_TEXT_CHARS && text.len() <= most_say_text_bytes();
     (plain && !web && sentences >= 1 && within).then(|| text.to_owned())
 }
 
@@ -5532,6 +5577,12 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         // Words too long are told as that, with the numbers (#7245),
         // never as words that aren't exact.
         if let Some(why) = says.iter().find_map(|say| say_too_long(say)) {
+            return Err(Refused::new(why));
+        }
+        if let Some(why) = steps()
+            .filter_map(|step| step.get("remind"))
+            .find_map(remind_too_long)
+        {
             return Err(Refused::new(why));
         }
         if says.iter().any(|say| say_text(say).is_none()) {
@@ -8663,15 +8714,23 @@ pub const WRITTEN_TOOL_PREFIX: &str = "written_";
 pub const MOST_WRITTEN_NAME_BYTES: usize = 40;
 /// The most of "when to use it", one line, in characters (bytes until
 /// #7245, 19 Nov: a Vietnamese line was a third as long as an English
-/// one). No wire needs fewer: it goes whole only into the note the model
-/// is told at the call, and [`plainly`] says at most
-/// `MOST_SAID_WHEN_CHARS` of it.
+/// one). It goes whole into the note the model is told at the call
+/// ([`Written::note`], held to [`MOST_WRITTEN_NOTE_BYTES`] with the
+/// instructions), and [`plainly`] says at most `MOST_SAID_WHEN_CHARS` of
+/// it.
 pub const MOST_WHEN_CHARS: usize = 200;
 /// The most of what to do, a few lines, in characters (bytes until
 /// #7245), as the request is ([`MOST_REQUEST_CHARS`]): the note the model
-/// is told at each call, a plain string with no byte bound in lamp-skills,
-/// which also never cuts it.
+/// is told at each call, a plain string lamp-skills never cuts.
 pub const MOST_INSTRUCTIONS_CHARS: usize = 2_000;
+/// The most bytes of a written skill's call answer, `{"next": NOTE}` as
+/// JSON ([`Written::note`]): what the link carries back to the model
+/// (`lamp_gemini::MAX_TOOL_JSON_BYTES`, 4,096, less the 16
+/// `tools::sendable` keeps), with room for the note `use_skill` adds, as
+/// lamp-skills' `knowledge::TOLD_MOST_BYTES`. Past it every call would be
+/// answered `unavailable` (Heron's P2 on #7977), so it is refused when
+/// written, in plain words.
+pub const MOST_WRITTEN_NOTE_BYTES: usize = 3_700;
 /// The front matter line that marks a written skill's `SKILL.md`, beside
 /// `made: here`: the app shows it as written there, never as the Store's.
 pub const WRITTEN_MARK: &str = "written: app";
@@ -8746,11 +8805,25 @@ impl Written {
                  characters"
             ));
         }
-        Ok(Self {
+        let written = Self {
             name: name.to_owned(),
             when: when.to_owned(),
             instructions: instructions.to_owned(),
-        })
+        };
+        // Within the characters, words dense in letters of three or four
+        // bytes may still pass what a call's answer carries (#7977).
+        let answer = serde_json::json!({ "next": written.note() })
+            .to_string()
+            .len();
+        if answer > MOST_WRITTEN_NOTE_BYTES {
+            return Err(format!(
+                "when to use it and what the lamp should do are too long together: they take \
+                 {answer} bytes, {} more than the {MOST_WRITTEN_NOTE_BYTES} the lamp can hand \
+                 its model at once; try them in fewer words",
+                answer - MOST_WRITTEN_NOTE_BYTES
+            ));
+        }
+        Ok(written)
     }
 
     /// Its function's name: [`WRITTEN_TOOL_PREFIX`] and the name, `_` for
@@ -11673,14 +11746,55 @@ pub fn on_line(made: &Made) -> String {
     };
     // What it uses goes with what it does, before how often it starts on
     // its own (#6066 (a)), its own sentence.
-    match does.split_once(MANNERS_BEGIN) {
+    let line = match does.split_once(MANNERS_BEGIN) {
         Some((what, manners)) => format!(
             "I made {name}, and it's on: {}{using}. {}{manners}.",
             what.trim_end_matches('.'),
             MANNERS_BEGIN.trim_start()
         ),
         None => format!("I made {name}, and it's on: {does}{using}."),
+    };
+    quote_cut_to_fit(&line, most_line_bytes())
+}
+
+/// The most bytes of a line [`in_their_language`] frames with its note
+/// still within the say service's [`crate::say::MOST_WORDS_BYTES`]: the
+/// app's "I made" line is said as that note (`app_make::say_note`), and a
+/// cut turn's as written, within the same 900 (Heron's and Twelve's P2 on
+/// #7977).
+pub fn most_line_bytes() -> usize {
+    crate::say::MOST_WORDS_BYTES - in_their_language("").len()
+}
+
+/// What a line ends a cut quote with.
+const QUOTE_CUT: char = '…';
+
+/// `line` within `most` bytes by cutting the say's words it quotes
+/// ("says “…”", [`step_plainly`]) at a word, or a letter where there is
+/// none, ending on [`QUOTE_CUT`]: a description of what it says, never the
+/// say itself, which the skill says whole. As it is when it fits, or when
+/// it quotes nothing to cut.
+pub fn quote_cut_to_fit(line: &str, most: usize) -> String {
+    if line.len() <= most {
+        return line.to_owned();
     }
+    let Some(start) = line.find('“').map(|open| open + '“'.len_utf8()) else {
+        return line.to_owned();
+    };
+    let Some(close) = line[start..].find('”').map(|at| start + at) else {
+        return line.to_owned();
+    };
+    let quoted = &line[start..close];
+    let over = line.len() - most + QUOTE_CUT.len_utf8();
+    let mut end = quoted.len().saturating_sub(over);
+    while !quoted.is_char_boundary(end) {
+        end -= 1;
+    }
+    if let Some(space) = quoted[..end].rfind(' ').filter(|space| *space > 0) {
+        end = space;
+    }
+    let kept = quoted[..end].trim_end_matches([' ', ',', '.', '!', '?']);
+    format!("{}{kept}{QUOTE_CUT}{}", &line[..start], &line[close..])
 }
 
 /// What the lamp says when a made skill that sends or writes, already
@@ -13083,11 +13197,113 @@ say = { text = "Welcome back!" }
         // Within the characters, past the say service's bytes: told so.
         let wide = HELLO.replace("Welcome back!", &"𝄞".repeat(MOST_SAY_TEXT_CHARS));
         let why = capped(&wide).unwrap_err().0;
+        let most = most_say_text_bytes();
         assert!(
-            why.starts_with(SAY_TOO_LONG) && why.contains("1200 bytes, 300 more than the 900"),
+            why.starts_with(SAY_TOO_LONG)
+                && why.contains(&format!("1200 bytes, {} more than the {most}", 1200 - most)),
             "{why}"
         );
         assert_eq!(plain_reason(&why), why);
+        // Within both routes' wires (Heron's P3 on #7977): the say service's
+        // 900, and a live written turn's 1,024 with a made say's frame.
+        assert!(most <= crate::say::MOST_WORDS_BYTES);
+        assert!(
+            crate::say::made_turn(&"a".repeat(most)).len() <= lamp_gemini::wire::MAX_NOTE_BYTES
+        );
+        assert!(most >= 700, "{most}");
+    }
+
+    /// Heron's and Twelve's P2 on #7977: the app's "I made" line quotes
+    /// what the skill says, and is said as a note in the person's
+    /// language only while that note is within the say service's 900
+    /// bytes. A 300-character Vietnamese say, or 300 letters of three bytes
+    /// (a skill kept before the bytes bound, or from a file), still leave
+    /// the line in note form within 900 bytes: the quote is cut at a word,
+    /// ending on "…", the say itself whole. A short say is quoted whole.
+    #[test]
+    fn a_long_says_made_line_stays_a_note_in_their_language() {
+        let vietnamese = "Chào mừng bạn đã trở lại bàn làm việc. Hôm nay trời đẹp lắm, nhớ \
+                          uống một cốc nước và đứng dậy vươn vai sau mỗi giờ ngồi. Chúc bạn một \
+                          buổi chiều thật nhiều niềm vui và làm việc thật hiệu quả nhé bạn! Đừng \
+                          quên nghỉ mắt một chút, nhìn ra ngoài cửa sổ và hít thở sâu, rồi \
+                          chúng mình cùng làm tiếp nhé!";
+        assert_eq!(vietnamese.chars().count(), MOST_SAY_TEXT_CHARS);
+        let dense = "ộ".repeat(MOST_SAY_TEXT_CHARS);
+        let made = |description: String| Made {
+            name: "hello-desk".into(),
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            description,
+            uses: capped(HELLO).unwrap().1,
+            package: PathBuf::new(),
+        };
+        let long = HELLO.replace("Welcome back!", vietnamese);
+        capped(&long).unwrap();
+        let kept = made(plainly(&long).unwrap());
+        assert!(
+            kept.description.contains(vietnamese),
+            "{}",
+            kept.description
+        );
+        let older = made(format!(
+            "When someone has been at the desk for 5 seconds, it says “{dense}”, at most once \
+             an hour. It starts on its own, at most 3 times a day, one an hour with the lamp's \
+             other nudges, and rests till morning if ignored twice."
+        ));
+        for made in [&kept, &older] {
+            let line = on_line(made);
+            assert!(line.len() <= most_line_bytes(), "{}: {line}", line.len());
+            assert!(
+                line.starts_with("I made hello desk, and it's on: when someone"),
+                "{line}"
+            );
+            assert!(line.contains("…”, at most once an hour"), "{line}");
+            assert!(line.contains("It starts on its own"), "{line}");
+            let note = crate::app_make::say_note(&line).expect("said as a note");
+            assert!(note.starts_with(ALREADY_DONE), "{note}");
+            assert_eq!(note, in_their_language(&line));
+            assert!(note.len() <= crate::say::MOST_WORDS_BYTES, "{}", note.len());
+        }
+        let short = on_line(&made(plainly(HELLO).unwrap()));
+        assert!(short.contains("“Welcome back!”"), "{short}");
+        // Cut at a word, never inside a letter.
+        let cut = quote_cut_to_fit("it says “one two three four”.", 26);
+        assert_eq!(cut, "it says “one two…”.");
+        assert_eq!(
+            quote_cut_to_fit("no quote here at all", 5),
+            "no quote here at all"
+        );
+    }
+
+    /// Twelve's P3 on #7977: a remind step's words past lamp-skills' 120
+    /// characters or the schedule's 300 bytes are told as too long when it
+    /// is made, with the numbers, never only refused when it is packed.
+    #[test]
+    fn a_reminder_too_long_is_told_when_it_is_made() {
+        let remind = |words: &str| toml::Value::Table(toml::toml! { words = words });
+        assert_eq!(remind_too_long(&remind(&"ộ".repeat(100))), None);
+        let bytes = remind_too_long(&remind(&"ộ".repeat(101))).unwrap();
+        assert_eq!(
+            bytes,
+            "what its reminder would say is too long, its 101 characters take 303 bytes, 3 more \
+             than the 300 the lamp can say at once; try it in fewer words or with fewer symbols"
+        );
+        let chars = remind_too_long(&remind(&"a".repeat(121))).unwrap();
+        assert!(
+            chars.contains("121 characters, 1 more than the 120"),
+            "{chars}"
+        );
+        assert_eq!(plain_reason(&bytes), bytes);
+        let toml = HELLO
+            .replace("speak = true\n", "actions = [\"repeat_reminder\"]\n")
+            .replace(
+                "say = { text = \"Welcome back!\" }",
+                &format!(
+                    "remind = {{ every = \"30m\", words = \"{}\" }}",
+                    "ộ".repeat(101)
+                ),
+            );
+        assert_eq!(capped(&toml).unwrap_err().0, bytes);
     }
 
     /// #7245: the request is counted in characters, so a Vietnamese one
@@ -16113,11 +16329,42 @@ light = { colour = "green", level = 3, for = "20s" }
     fn a_written_skill_is_held_to_its_bounds() {
         let most = |chars: usize| "a".repeat(chars);
         assert!(Written::new("a", &most(MOST_WHEN_CHARS), &most(MOST_INSTRUCTIONS_CHARS)).is_ok());
-        // Counted in characters (#7245): Vietnamese, two or three bytes a
-        // letter, is as long as English.
-        let vi = |chars: usize| "ộ".repeat(chars);
-        assert!(Written::new("a", &vi(MOST_WHEN_CHARS), &vi(MOST_INSTRUCTIONS_CHARS)).is_ok());
+        // Counted in characters (#7245): Vietnamese as written, about 1.4
+        // bytes a letter, is as long as English.
+        let vi = |chars: usize| -> String {
+            "Mỗi sáng lúc bảy giờ hãy bật đèn ấm dịu và nhắc tôi uống nước "
+                .chars()
+                .cycle()
+                .take(chars - 1)
+                .chain(['a'])
+                .collect()
+        };
+        let longest =
+            Written::new("a", &vi(MOST_WHEN_CHARS), &vi(MOST_INSTRUCTIONS_CHARS)).unwrap();
         assert!(Written::new("a", &vi(MOST_WHEN_CHARS + 1), "y").is_err());
+        // Its answer at the call always reaches the model (Heron's P2 on
+        // #7977): within the link's bound, `use_skill`'s note added.
+        let mut told = serde_json::json!({ "next": longest.note() });
+        crate::use_skill::ran(&"x".repeat(64), &mut told);
+        assert!(crate::tools::sendable(&told), "{}", told.to_string().len());
+        // Words dense in three-byte letters, within the characters, would
+        // pass it: refused when written, with the bytes.
+        let dense = |chars: usize| "ộ".repeat(chars);
+        let refused = Written::new(
+            "a",
+            &dense(MOST_WHEN_CHARS),
+            &dense(MOST_INSTRUCTIONS_CHARS),
+        )
+        .unwrap_err();
+        assert!(
+            refused.starts_with("when to use it and what the lamp should do are too long together")
+                && refused.contains(&format!("more than the {MOST_WRITTEN_NOTE_BYTES}")),
+            "{refused}"
+        );
+        let held = Written::new("a", "x", &dense(1_000)).unwrap();
+        let mut told = serde_json::json!({ "next": held.note() });
+        crate::use_skill::ran(&"x".repeat(64), &mut told);
+        assert!(crate::tools::sendable(&told), "{}", told.to_string().len());
         assert!(Written::new(&most(MOST_WRITTEN_NAME_BYTES), "x", "y").is_ok());
         for (name, when, instructions, why) in [
             ("", "x", "y", "name"),
