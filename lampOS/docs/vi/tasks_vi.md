@@ -3199,6 +3199,45 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `task_news::tests::work_done_by_openclaw_on_the_lamp_is_told_as_done_here`.
   Chưa thấy trên đèn.
 
+## Nhà của Harness giữ ở `~/.harness` (#7906)
+
+Harness 0.6.72 (openharness#4469) chuyển `~/.harness` vào các thư mục XDG
+trên Linux khi daemon khởi động (`harness start`, `-f`, `--if-down`, hoặc
+`__harnessd` khi chưa có daemon nào chạy): `runtime` sang
+`${XDG_STATE_HOME:-~/.local/state}/harness/`, `cli` và mọi mục khác
+(trong đó có `lampos-upgrade-from`) sang `${XDG_DATA_HOME:-~/.local/share}/harness/`,
+với một cầu link cho từng mục, về sau sẽ bỏ. lampOS đọc
+`.harness/runtime/current-grid`, `.harness/cli/data` và
+`.harness/lampos-upgrade-from` dưới nhà của Harness
+(`/var/lib/lampos-tasks`), nên việc chuyển được giữ tắt bằng chính cách tắt
+của Harness: nó là `skipped-override` khi bất kỳ tên nào trong `OVERRIDE_NAMES`
+(`cli/src/homeMove/conditions.ts`, v0.6.72_cli) trỏ vào trong
+`~/.harness`, đọc từ môi trường của daemon và từ `HARNESS_ENV_FILE` của nó.
+lampOS đặt `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`,
+đúng từng chữ giá trị mặc định của chính Harness (`harnessPath('cli') + '/data'`,
+`config/env.ts`), nên không gì bị chuyển, và tên socket của daemon cùng tag
+pane, vốn băm từ giá trị đó, vẫn như cũ:
+
+- mọi lệnh Harness mà lamp-tasks chạy (môi trường client của nó, lấy từ
+  `HOME` của nó; giá trị đã có sẵn thì giữ), và vì thế cả daemon mà một
+  `harness start` sinh ra hay user unit mà nó viết lại (`ADAPTER_DATA_DIR` nằm
+  trong `CARRIED_ENV` của `lib/platformDaemon.ts`);
+- `harness-hold.env`, `HARNESS_ENV_FILE` mà lamp-tasks ghi (giữ hay đã gỡ),
+  nên daemon khởi động từ unit cũng đọc được;
+- launcher của Harness (`.local/bin/harness`), `export ADAPTER_DATA_DIR=…`
+  ngay trước dòng `exec`, giữ hay đã gỡ (canary), do lamp-tasks ghi lúc khởi
+  động và `lamp-update harness-install` ghi sau một lần cài, nên một lệnh chạy
+  bằng tay cũng có;
+- mọi lần chạy Harness của `lamp-update` (`harness service install`, `stop`,
+  `version`, trình cài, các script của bản giữ lại).
+
+Nếu nhà vẫn bị chuyển, lamp-tasks lúc khởi động và
+`lamp-update harness-install` sau một lần cài nói một dòng, và không chuyển
+gì về: `harness: home moved to XDG (<sign>): lampOS paths need
+~/.harness`, dấu hiệu là một trong `.local/state/harness/bridge.json`,
+`.local/share/harness/.harness-root`, `.harness/runtime is a link` hoặc
+`.harness/cli is a link`.
+
 ## Cài đặt của OpenClaw trên đèn (#6226)
 
 Khi `LAMP_OPENCLAW_ON_LAMP` bật, lamp-tasks lúc khởi động gộp những gì
