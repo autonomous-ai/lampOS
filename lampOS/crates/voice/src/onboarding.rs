@@ -1204,6 +1204,9 @@ pub struct Onboarding {
     /// [`FIRST_UPDATE_ENVIRONMENT`]): `None` with the switch off, and once
     /// the walk is let go, for the rest of this voice start.
     first_update: Option<FirstUpdateHold>,
+    /// What the last line [`Self::tick_line`] gave is, for `lamp/did`
+    /// (#7757): never a word of it.
+    line_moment: Option<crate::did_voice::Moment>,
     /// Whether the voice can save a face (`remember_my_face`, the eyes' who
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
@@ -1727,6 +1730,7 @@ impl Onboarding {
             model_refusing: false,
             model_held: false,
             first_update: None,
+            line_moment: None,
             face_kept: false,
             released: true,
             near_since: None,
@@ -2084,6 +2088,30 @@ impl Onboarding {
             .collect();
         let at = offered.iter().position(|offered| *offered == step)?;
         Some((at + 1, offered.len()))
+    }
+
+    /// What the last line [`Self::tick_line`] gave is, for `lamp/did`.
+    pub(crate) fn line_moment(&self) -> Option<crate::did_voice::Moment> {
+        self.line_moment
+    }
+
+    /// What `note` is: an update line, or a line of the step now led with its
+    /// number in the walk's order (the steps this voice has, as the counter
+    /// counts them, whether or not it is shown).
+    fn moment_of(&self, note: &str) -> crate::did_voice::Moment {
+        use crate::did_voice::Moment;
+        if note.contains(FIRST_UPDATE_LINE) || note.contains(FIRST_UPDATE_DONE_LINE) {
+            return Moment::UpdateLine;
+        }
+        let place = self.led.as_ref().and_then(|led| {
+            self.definition
+                .order
+                .iter()
+                .copied()
+                .filter(|step| self.step_available(*step))
+                .position(|step| step == led.step)
+        });
+        Moment::Onboarding(place.and_then(|at| u8::try_from(at + 1).ok()))
     }
 
     /// A step's first ask with its counter (#4080): "Step N of M." opens
@@ -3509,7 +3537,9 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
+        self.line_moment = None;
         let note = self.tick(now_us, quiet_us, can_speak, paused, face, still)?;
+        self.line_moment = Some(self.moment_of(&note));
         // A line with none in the owner's language stays a note, for the
         // model to say in it: never an own line in English.
         Some(if self.untranslated {
