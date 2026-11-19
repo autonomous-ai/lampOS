@@ -167,14 +167,25 @@ reopened epoch's first frame ("capture frame preceded certified running
 reference clock", #7224 fault 4, lamp-c0a4). With
 `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (on in the product unit) capture sends
 no frame after a reopen until the current playback epoch's clock has
-started, as the first start waits: up to 500 ms, then it drops and counts
+started, as the first start waits. Each block read meanwhile, under the
+authority every read checks, is dropped before the reference sees it, so
+the two blocks allowed before a start notice are never spent on it, and the
+100 ms prime barrier gives way to the hold's own bounds; a re-prime within
+800 ms of the reopen, after a first block went with the old clock, is held
+the same way, while one at a cancelled answer keeps the usual two blocks.
+A reopen during the wait starts step 1 again; after the recovery's reopen
+a further one leaves step 2's bound where it is. The wait lasts up to 500 ms, then it drops and counts
 frames until the clock comes, so at most that sound is lost, never the
 process; it says the counts in a line. A clock still not started 800 ms
 after the reopen is recovered once by a fresh reopen under the next
 authority, as after a stall, the speaker re-priming on its own; another
 800 ms without it ends capture with the old error, so the voice exits and
-systemd restarts it, one line per step with counts only. The
-coordinator's 1.5 s retention heartbeat stays the outer bound. The coordinator's check ends the
+systemd restarts it, one line per step with counts only, and each reopen
+journals the ms from the reopen to the clock's start. With the switch on
+the hold's two steps run before the coordinator's 1.5 s retention
+heartbeat: the recovery's `ClockNotStarted` gap moves the heartbeat's start
+to when it is read, as a ridden privacy gap's reopen does, once a hold,
+and the heartbeat still bounds everything else. The coordinator's check ends the
 voice only at the boot barrier, before the first certified start; anywhere
 else a frame failing only that check is dropped and counted as a gap's,
 said once per reopen (`unstarted_frames.rs`).
