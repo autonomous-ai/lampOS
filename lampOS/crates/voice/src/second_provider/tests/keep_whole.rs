@@ -27,6 +27,16 @@ struct Went {
 }
 
 fn went(heard: &str, whole: bool, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
+    went_with(heard, whole, rounds, false)
+}
+
+/// [`went`], with every `remember` refused as nobody known (`refused`).
+fn went_with(
+    heard: &str,
+    whole: bool,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+    refused: bool,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(rounds.into()),
@@ -36,7 +46,12 @@ fn went(heard: &str, whole: bool, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> W
     let seen = called.clone();
     let tools: ToolRunner = Arc::new(move |_, _, name, _| {
         seen.lock().unwrap().push(name.to_owned());
-        Box::pin(async move { json!({"ok": true, "remembered": true}) })
+        let answer = if refused && name == REMEMBER {
+            json!({"remembered": false, "note": crate::remember::needs_face::NOT_KEPT})
+        } else {
+            json!({"ok": true, "remembered": true})
+        };
+        Box::pin(async move { answer })
     });
     let mut engine = Engine::with_clock(
         script.clone(),
@@ -283,6 +298,43 @@ fn a_face_offer_that_waits_for_a_name_is_said_as_it_is() {
         went.said
             .iter()
             .any(|said| said.contains("once you tell me")),
+        "{went:?}"
+    );
+}
+
+/// V2's must-fix (4) and Friday's P2-2 on #7924: a `remember` refused with
+/// nobody known, then a reply that claims the keep anyway: the refusal's
+/// own line is said at once, never the note that asks to call `remember`
+/// again, nor "Tell me again and I'll remember it."
+#[test]
+fn a_claim_after_a_refused_keep_says_the_refusals_line() {
+    let went = went_with(
+        HEARD,
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    REMEMBER,
+                    json!({"text": "Their car is on Level B1, spot 7."}),
+                )])),
+                text("Got it."),
+                Ok(ChatEvent::Done),
+            ],
+            saying(E82D),
+        ],
+        true,
+    );
+    assert!(!claimed(&went), "{went:?}");
+    assert!(!went.noted, "{went:?}");
+    assert!(
+        went.said.last().is_some_and(|said| {
+            said.trim_start_matches("said:").trim() == crate::remember::needs_face::REFUSED_LINE
+        }),
+        "{went:?}"
+    );
+    assert!(
+        !went.said.iter().any(|said| said.contains(NOT_KEPT_LINE)),
         "{went:?}"
     );
 }
