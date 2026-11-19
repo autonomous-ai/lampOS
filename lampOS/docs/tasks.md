@@ -889,7 +889,8 @@ ID>`. It receives only explicitly allowed ordinary provisioning variables:
 `LOGNAME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`,
 `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `ADAPTER_DATA_DIR`,
 `HARNESS_AUTH_DIR`, `PORT`. `HOME` is absolute and every PATH entry is
-absolute. A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
+absolute. `ADAPTER_DATA_DIR`, when lamp-tasks has none, is set to
+`<HOME>/.harness/cli/data` (#7906, "Harness's home kept in `~/.harness`"). A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
 yet Harness 0.5.42's `harness start` runs `systemctl --user start
 harnessd.service`, which then fails ("Failed to connect to bus: No medium
 found"; after a sign-in from the app on lamp-c0a4, 5 Nov, #5385). So each one
@@ -2622,6 +2623,45 @@ for at most 20 s, and one line is journaled:
 The version is the one to compare with the build's pin (install.md, "The
 build's own pin"), which `lamp-update harness-install` also compares right
 after the install.
+
+### Harness's home kept in `~/.harness` (#7906)
+
+Harness 0.6.72 (openharness#4469) moves `~/.harness` into the XDG folders
+on Linux at a daemon start (`harness start`, `-f`, `--if-down`, or
+`__harnessd` with no daemon running): `runtime` to
+`${XDG_STATE_HOME:-~/.local/state}/harness/`, `cli` and every other entry
+(`lampos-upgrade-from` among them) to `${XDG_DATA_HOME:-~/.local/share}/harness/`,
+with a per-entry link bridge that goes later. lampOS reads
+`.harness/runtime/current-grid`, `.harness/cli/data` and
+`.harness/lampos-upgrade-from` under Harness's home
+(`/var/lib/lampos-tasks`), so the move is kept off with Harness's own
+opt-out: it is `skipped-override` when any name in `OVERRIDE_NAMES`
+(`cli/src/homeMove/conditions.ts`, v0.6.72_cli) points inside
+`~/.harness`, read from the daemon's environment and from its
+`HARNESS_ENV_FILE`. lampOS gives `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`,
+Harness's own default (`harnessPath('cli') + '/data'`, `config/env.ts`)
+spelled exactly, so nothing moves and the daemon's socket name and pane
+tags, which hash it, stay as they were:
+
+- every Harness command lamp-tasks runs (its client's environment, from
+  its `HOME`; one already set is kept), and so the daemon a `harness start`
+  spawns or the user unit it rewrites (`ADAPTER_DATA_DIR` is in
+  `lib/platformDaemon.ts` `CARRIED_ENV`);
+- `harness-hold.env`, the `HARNESS_ENV_FILE` lamp-tasks writes (held or
+  lifted), so a daemon started from the unit reads it too;
+- Harness's launcher (`.local/bin/harness`), `export ADAPTER_DATA_DIR=…`
+  just before its `exec` line, held or lifted (the canary), from lamp-tasks
+  at its start and `lamp-update harness-install` after an install, so a
+  command run by hand has it;
+- every Harness run of `lamp-update` (`harness service install`, `stop`,
+  `version`, the installer, the kept-copy scripts).
+
+Should the home have moved anyway, lamp-tasks at its start and
+`lamp-update harness-install` after an install say one line, and move
+nothing back: `harness: home moved to XDG (<sign>): lampOS paths need
+~/.harness`, the sign one of `.local/state/harness/bridge.json`,
+`.local/share/harness/.harness-root`, `.harness/runtime is a link` or
+`.harness/cli is a link`.
 
 ### Signing in by a spoken code (`--sign-in-by-code`, #1676)
 
