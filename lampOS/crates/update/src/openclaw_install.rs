@@ -1021,6 +1021,7 @@ pub fn after_round_with(
     };
     let there = present(root, shown);
     if there {
+        gateway_block(root, run, say);
         keep_gateway(root, systemd, gateway, true, say);
     }
     // #6685: the entry recorded is added again every round with the
@@ -2346,15 +2347,21 @@ pub fn runs_long_step(argv: &[String]) -> bool {
 
 /// The gateway's token made once (32 random bytes, hex; `lampos`'s, 0600)
 /// and OpenClaw's config given its `gateway` block: written when there is
-/// none, the block set in one there (every other key kept) when it lacks
-/// it or the token was just made. A config lamp-update cannot read as a
-/// JSON object is left as it is, and said. The new text is checked by
+/// none, the block's own keys set in one there (every other key kept, in
+/// the block and out of it) when it lacks them or holds others (#7868: a
+/// round runs it too, [`gateway_block`]). Whether it wrote is returned. A
+/// config lamp-update cannot read as a JSON object is left as it is, and
+/// said. The new text is checked by
 /// OpenClaw's own `config validate --json` ([`validate_argv`], #7868) on a
 /// file beside the config, `lampos`'s, before it is renamed into place
 /// (`lamp_checked_replace`, lamp-tasks' checked replace): refused, the
 /// config stays byte for byte, nothing is left beside it, and the install
 /// fails (`config`) with OpenClaw's words.
-fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> Result<(), String> {
+fn gateway_config(
+    root: &Path,
+    run: &mut Runner,
+    say: &mut dyn FnMut(&str),
+) -> Result<bool, String> {
     let token_path = on(root, GATEWAY_TOKEN);
     let kept = fs::symlink_metadata(&token_path)
         .ok()
@@ -2389,16 +2396,16 @@ fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> R
                 say(&format!(
                     "{CONFIG} is not a JSON object lamp-update reads: left as it is"
                 ));
-                return Ok(());
+                return Ok(false);
             }
         },
         Err(error) if error.kind() == ErrorKind::NotFound => serde_json::Map::new(),
         Err(error) => return Err(format!("{CONFIG}: {error}")),
     };
-    if !made && config.contains_key("gateway") {
-        return Ok(());
+    let block = config.entry("gateway").or_insert(serde_json::Value::Null);
+    if !set_within(block, gateway) && !made {
+        return Ok(false);
     }
-    config.insert("gateway".to_owned(), gateway);
     let text = serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?;
     // #7868: checked by OpenClaw itself before it is renamed into place,
     // as lamp-tasks' writes are (#7108). With no namespace script OpenClaw
@@ -2434,7 +2441,55 @@ fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> R
         &mut check,
     )
     .map_err(|error| format!("{CONFIG}: {error}"))?;
-    give_to_lampos(run, CONFIG)
+    give_to_lampos(run, CONFIG).map(|()| true)
+}
+
+/// `wanted`'s keys set in `have`, an object's keys within each one, every
+/// other key of `have` kept; whether anything changed.
+fn set_within(have: &mut serde_json::Value, wanted: serde_json::Value) -> bool {
+    match (have, wanted) {
+        (serde_json::Value::Object(have), serde_json::Value::Object(wanted)) => {
+            let mut changed = false;
+            for (key, value) in wanted {
+                changed |= set_within(have.entry(key).or_insert(serde_json::Value::Null), value);
+            }
+            changed
+        }
+        (have, wanted) if *have != wanted => {
+            *have = wanted;
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Each round with OpenClaw there (#7868, as #7879 checks the gateway's
+/// unit): OpenClaw's config is checked for the `gateway` block the install
+/// writes ([`gateway_config`]). A reset whose cut was not taken removes
+/// `openclaw.json`, and a lamp with OpenClaw installed runs no install, so
+/// nothing else writes the block again. Missing or not as the install
+/// writes it, it is written again through OpenClaw's own check, and the
+/// gateway, when it runs, restarted on it (`try-restart`; [`gateway_on`]
+/// then starts one that does not). Refused, `openclaw.json` stays byte for
+/// byte and nothing is restarted. One line, with no values of the config;
+/// still failing, the next round finds it again. No switch of its own: it
+/// only keeps what the install writes.
+fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
+    match gateway_config(root, run, say) {
+        Ok(false) => {}
+        Ok(true) => match run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
+            Ok(_) => say(&format!(
+                "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, and the gateway restarted if it ran"
+            )),
+            Err(why) => say(&format!(
+                "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, but the gateway not restarted: {}",
+                crate::world::clean_line(&why)
+            )),
+        },
+        Err(why) => say(&format!(
+            "{CONFIG}'s gateway block is not as lamp-update writes it and not written again, the gateway not restarted: {why}"
+        )),
+    }
 }
 
 /// `path` made `lampos`'s (a link as a link).
