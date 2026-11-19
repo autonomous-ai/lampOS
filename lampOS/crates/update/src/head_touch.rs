@@ -116,9 +116,64 @@ fn service(text: &str) -> String {
         .join("\n")
 }
 
+/// The one lamp-body option the factory's acceleration drop-in changes
+/// (#7946).
+const ACCELERATION_FLAG: &str = "--servo-acceleration";
+
+/// Whether `drop_in` is the factory's acceleration drop-in for `unit`, the
+/// installed lamp-body unit (#7946): its `[Service]` holds exactly an
+/// `ExecStart=` reset and one `ExecStart=` that is the unit's own last
+/// command word for word, but for the number after `--servo-acceleration`.
+/// Such a drop-in changes nothing head touch reads, so it is no mode
+/// override; anything else in it, or any other difference, still is.
+pub fn acceleration_only(drop_in: &str, unit: &str) -> bool {
+    let lines = service(drop_in);
+    let lines: Vec<&str> = lines.lines().collect();
+    let [reset, command] = lines.as_slice() else {
+        return false;
+    };
+    let Some(command) = command.strip_prefix("ExecStart=") else {
+        return false;
+    };
+    let unit = service(unit);
+    let Some(own) = unit
+        .lines()
+        .filter_map(|line| line.strip_prefix("ExecStart="))
+        .rfind(|command| !command.is_empty())
+    else {
+        return false;
+    };
+    let (ours, theirs): (Vec<&str>, Vec<&str>) = (
+        command.split_whitespace().collect(),
+        own.split_whitespace().collect(),
+    );
+    if *reset != "ExecStart=" || ours.len() != theirs.len() {
+        return false;
+    }
+    let mut differs = 0;
+    for (index, (word, own_word)) in ours.iter().zip(&theirs).enumerate() {
+        if word == own_word {
+            continue;
+        }
+        let after_flag = index > 0
+            && ours[index - 1] == ACCELERATION_FLAG
+            && theirs[index - 1] == ACCELERATION_FLAG;
+        if !after_flag || !word.parse::<u8>().is_ok_and(|value| value > 0) {
+            return false;
+        }
+        differs += 1;
+    }
+    differs <= 1
+}
+
 // The product uses literal Environment and ExecStart settings. Do not guess
 // when a local override can change those: leave the installed lamp untouched.
+// The one exception is lamp-body's factory acceleration drop-in
+// ([`acceleration_only`], #7946), matched against the installed unit.
 fn no_mode_overrides(inputs: &mut dyn HeadInputs, root: &Path, name: &str) -> Result<(), String> {
+    // The installed lamp-body unit, read only once a drop-in of it is found,
+    // so a lamp without one reads exactly what it read before.
+    let mut installed: Option<Option<String>> = None;
     for base in [
         "etc/systemd/system",
         "run/systemd/system",
@@ -141,6 +196,18 @@ fn no_mode_overrides(inputs: &mut dyn HeadInputs, root: &Path, name: &str) -> Re
                     continue;
                 }
                 let text = inputs.text(&path)?.unwrap_or_default();
+                if name == BODY {
+                    if installed.is_none() {
+                        installed = Some(inputs.text(&root.join("etc/systemd/system").join(name))?);
+                    }
+                    if installed
+                        .as_ref()
+                        .and_then(Option::as_deref)
+                        .is_some_and(|unit| acceleration_only(&text, unit))
+                    {
+                        continue;
+                    }
+                }
                 if service(&text).lines().any(|line| {
                     line.ends_with('\\')
                         || line.starts_with("ExecStart=")
