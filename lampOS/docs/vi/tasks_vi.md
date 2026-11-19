@@ -2602,13 +2602,28 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     chạy, nên một lần từ chối chiếm hết giới hạn vẫn được tính. Phiên do
     `ensure` tạo mới đang trong khoảng lời đầu tiên suốt 120 s
     (`OPEN_IDLE_WITHIN`): các lần từ chối của nó không được tính. Một lần
-    từ chối rồi reply được nhận thì không thay gì cả. Nó đi qua bậc thang
-    bên dưới như một phiên đã chết: (a) một lần resume thường nếu Gateway
-    còn giữ key. Bộ đếm được giữ qua lần resume đó, nên nếu nó gặp lại
-    đúng tiến trình bị đóng băng (`live` hoặc `resumed`, lại bị từ chối),
-    lần từ chối tiếp theo là (b) `--fresh`, không bao giờ resume lần nữa.
-    Việc đang chờ chưa hề chạy, nên được gõ vào phiên mới và được báo một
-    lần.
+    từ chối rồi reply được nhận thì không thay gì cả. Tiến trình của nó bị
+    đóng băng chứ không chết, nên chỉ resume thường thì lại thấy nó `live`
+    (lamp-c0a4 J3, 19/11: `ensure` báo `live`, `working`, và việc nằm chờ
+    bị từ chối tới khi hết hạn). Vì vậy `OneSession::restart_or_replace`:
+    (a) một lần, nếu Gateway còn giữ key, phiên được `close --now` trước,
+    giữ nguyên bản ghi và hội thoại OpenClaw (không `sessions.delete`), và
+    lần `ensure` thường tiếp theo khởi động một tiến trình mới trên cùng
+    hội thoại, giữ bộ nhớ. Đóng bị từ chối thì sang thẳng (b), cũng như đóng bị từ chối vì hội
+    thoại đã mất (`CLOSE_CONVERSATION_GONE`: không còn gì để resume). Dấu
+    của lần đóng này chỉ có hiệu lực 120 s (gấp đôi giới hạn), nên một việc
+    đã bỏ sau lần resume không bao giờ làm một lượt bận bình thường về sau
+    bị tính. Sau lần
+    resume đó, một `ensure` báo `live` với cùng agent (tiến trình bị đóng
+    băng sống sót qua lần đóng) là (b) `--fresh` ngay. Một `resumed` sau lần đóng đó là
+    tiến trình mới đang khởi động: bộ đếm bắt đầu lại, nên một lần từ chối
+    lúc khởi động không nhảy thẳng tới `--fresh` và làm mất bộ nhớ mà lần
+    resume đã giữ. Cho tới khi một reply được nhận, một lần từ chối
+    `NOT_IDLE` cũng được tính: không gì của ta chạy trong tiến trình mới
+    đó, nên `working` ở đó là của tiến trình bị đóng băng, không phải một
+    lượt cần chờ. Lại bị từ chối quá giới hạn thì là (b) `--fresh`, không
+    bao giờ resume lần nữa. Việc đang chờ chưa hề chạy, nên được gõ vào phiên
+    mới và được báo một lần.
     Bên cạnh giới hạn của #7895: một lần từ chối `ENGINE_NOT_READY` không
     bao giờ tiêu một trong `STARTING_RESUMES_MOST` (3) lần thử của một việc
     nói; các lần thử đó chỉ đếm `NOT_RUNNING`, một `TIMEOUT` không nhận gì

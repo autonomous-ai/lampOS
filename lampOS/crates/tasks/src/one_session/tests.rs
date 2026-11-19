@@ -85,6 +85,13 @@ struct Fake {
     moving: Mutex<bool>,
     status: Mutex<Option<String>>,
     last_role: Mutex<Option<String>>,
+    /// The agent whose engine process is frozen (#7906 sign 5, lamp-c0a4):
+    /// once `takes` is spent, its replies are refused `NOT_IDLE`, Harness
+    /// reading it `working`; a resume (a new process) thaws it.
+    frozen: Mutex<Option<String>>,
+    /// A kept close that answers but leaves the frozen process live: the
+    /// next plain `ensure` says `live`, the same agent.
+    close_leaves_live: Mutex<bool>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -268,6 +275,10 @@ impl PaneHarness for Fake {
         let (result, agent) = match kept.clone() {
             Some(agent) if !fresh && gone.contains(&agent) => {
                 gone.retain(|g| *g != agent);
+                let mut frozen = self.frozen.lock().unwrap();
+                if frozen.as_ref() == Some(&agent) {
+                    *frozen = None;
+                }
                 ("resumed", agent)
             }
             Some(agent) if !fresh => ("live", agent),
@@ -303,6 +314,10 @@ impl PaneHarness for Fake {
             return Took::EngineNotReady;
         }
         let took = self.takes.lock().unwrap().pop_front();
+        let frozen = self.frozen.lock().unwrap().clone();
+        let took = took.or_else(|| {
+            (frozen.is_some() && *self.kept.lock().unwrap() == frozen).then_some(Took::NotIdle)
+        });
         let took = took.unwrap_or_else(|| {
             let mut inputs = self.inputs.lock().unwrap();
             *inputs += 1;
@@ -371,6 +386,9 @@ impl PaneHarness for Fake {
         if *failing > 0 {
             *failing -= 1;
             return Err("busy".into());
+        }
+        if *self.close_leaves_live.lock().unwrap() {
+            return Ok(());
         }
         if *self.closed_resumes.lock().unwrap() {
             // Kept by name; its engine gone ("No session found").
@@ -4005,6 +4023,8 @@ fn a_revive_is_keyed_by_the_kept_session_and_counts_toward_the_backoff() {
 fn a_kept_session_refusing_engine_not_ready_twice_is_replaced_and_the_task_runs() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
+    // Its frozen process outlives sign 5's close: the resume finds it.
+    *fake.close_leaves_live.lock().unwrap() = true;
     one.open_if_due(&fake, &place());
     assert_eq!(one.agent(), Some(agent_of(1)));
     one_turn(&one, &fake, "task-0");
@@ -4046,7 +4066,8 @@ fn a_kept_session_refusing_engine_not_ready_twice_is_replaced_and_the_task_runs(
         ],
         "{calls:?}"
     );
-    assert_eq!(fake.count("close-kept"), 1, "{calls:?}");
+    // Closed before the plain resume, then again before `--fresh`.
+    assert_eq!(fake.count("close-kept"), 2, "{calls:?}");
 }
 
 /// #7906 sign 5 never fires on one `ENGINE_NOT_READY`: a kept session
@@ -4165,4 +4186,232 @@ fn a_spoken_task_refused_engine_not_ready_is_replaced_before_any_not_started() {
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         Some(LaunchOutcome::Joined { .. })
     ));
+}
+
+/// Two spoken rounds refused `ENGINE_NOT_READY` over the bound by the kept
+/// session `agent_of(1)`, frozen from then on: sign 5's put-back, then the
+/// one-session thread's open (#7906, lamp-c0a4 J3).
+fn frozen_after_sign_5(one: &OneSession, fake: &Fake) {
+    one.open_if_due(fake, &place());
+    one_turn(one, fake, "task-0");
+    // Past its first words' window (1 s here).
+    thread::sleep(Duration::from_millis(1100));
+    *fake.frozen.lock().unwrap() = Some(agent_of(1));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(one, fake, &spoken("lamp-1")), busy());
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(one, fake, &spoken("lamp-1")), busy());
+    assert_eq!(one.agent(), None, "{:?}", fake.calls());
+    // Harness reads the frozen process `working`.
+    *fake.ensure_state.lock().unwrap() = Some("working".into());
+    one.lock().next_open = None;
+    one.open_if_due(fake, &place());
+}
+
+/// The spoken task `lamp-1` put back until typed, as the store does, the
+/// one-session thread opening between: its answer, never left to expire.
+fn spoken_until_typed(one: &OneSession, fake: &Fake) -> Option<LaunchOutcome> {
+    for _ in 0..8 {
+        let outcome = spoken_launch(one, fake, &spoken("lamp-1"));
+        if outcome != busy() {
+            return outcome;
+        }
+        thread::sleep(Duration::from_millis(300));
+        one.lock().next_open = None;
+        one.open_if_due(fake, &place());
+    }
+    busy()
+}
+
+/// #7906 sign 5, seen on lamp-c0a4 (19 Nov, J3): the kept OpenClaw TUI
+/// process SIGSTOPped. After two `ENGINE_NOT_READY` refusals the plain
+/// resume found the same frozen process (`live`, `working`), so the
+/// waiting task sat refused `NOT_IDLE` until it expired. Sign 5 now closes
+/// the frozen process first; one still `live` after that close is replaced
+/// `--fresh`, and the task is typed into the new one and answered.
+#[test]
+fn a_frozen_kept_session_still_live_after_sign_5_is_replaced_fresh_and_the_task_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path())
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    *fake.close_leaves_live.lock().unwrap() = true;
+    frozen_after_sign_5(&one, &fake);
+    assert!(
+        matches!(
+            spoken_until_typed(&one, &fake),
+            Some(LaunchOutcome::Joined { .. })
+        ),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert!(
+        fake.asked.lock().unwrap()[&agent_of(2)].starts_with(&header("lamp-1")),
+        "typed into the new process"
+    );
+    let calls = fake.calls();
+    let ensures: Vec<&String> = calls.iter().filter(|c| c.starts_with("ensure")).collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ],
+        "{calls:?}"
+    );
+    // Closed before the plain resume, then again before `--fresh`.
+    assert_eq!(fake.count("close-kept"), 2, "{calls:?}");
+    // Answered, on the new session.
+    one.release("lamp-1");
+    *fake.ensure_state.lock().unwrap() = None;
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+}
+
+/// #7906 sign 5's lighter step: the frozen process closed (its OpenClaw
+/// conversation kept, never deleted), then a plain resume starts a new
+/// process on the same conversation, which takes the waiting task.
+#[test]
+fn a_frozen_kept_session_is_closed_then_resumed_keeping_its_conversation() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Arc::new(Fake::default());
+    let log = fake.clone();
+    let one = kept_session(dir.path())
+        .with_session_delete(Box::new(move |key| {
+            log.call(format!("delete {key}"));
+            Ok(())
+        }))
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    *fake.programs.lock().unwrap() = true;
+    *fake.closed_resumes.lock().unwrap() = true;
+    frozen_after_sign_5(&one, &fake);
+    // The new process warming up refuses once (Twelve's P3): its own first
+    // refusal, never a third in a row with the frozen one's, so no `--fresh`.
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert!(
+        matches!(
+            spoken_until_typed(&one, &fake),
+            Some(LaunchOutcome::Joined { .. })
+        ),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)), "the same conversation");
+    let calls = fake.calls();
+    assert_eq!(fake.count("close-kept"), 1, "{calls:?}");
+    assert_eq!(fake.count("delete"), 0, "its memory kept: {calls:?}");
+    assert!(!calls.iter().any(|c| c.ends_with("--fresh")), "{calls:?}");
+}
+
+/// #7906 sign 5: resumed after its close, yet Harness still reads it
+/// `working` and refuses `NOT_IDLE` before any reply is taken. Nothing of
+/// ours runs there, so the refusal counts as sign 5's: the next step is
+/// `--fresh`, and the waiting task is typed, never left to expire.
+#[test]
+fn a_kept_session_still_busy_after_sign_5_resume_is_replaced_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path())
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    *fake.closed_resumes.lock().unwrap() = true;
+    frozen_after_sign_5(&one, &fake);
+    assert_eq!(one.agent(), Some(agent_of(1)), "{:?}", fake.calls());
+    // The resumed process busy too.
+    *fake.frozen.lock().unwrap() = Some(agent_of(1));
+    assert!(
+        matches!(
+            spoken_until_typed(&one, &fake),
+            Some(LaunchOutcome::Joined { .. })
+        ),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    let calls = fake.calls();
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "ensure lamp-one-openclaw --fresh"),
+        "{calls:?}"
+    );
+}
+
+/// #7906 sign 5's mark is bounded: a task given up after the close and
+/// resume, then, past twice the bound, a healthy session busy over the
+/// bound (`NOT_IDLE` for a real turn). That busy is never counted as
+/// sign 5's: no close, no delete, its memory kept.
+#[test]
+fn a_busy_turn_long_after_a_sign_5_resume_is_not_counted() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Arc::new(Fake::default());
+    let log = fake.clone();
+    let one = kept_session(dir.path())
+        .with_session_delete(Box::new(move |key| {
+            log.call(format!("delete {key}"));
+            Ok(())
+        }))
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    *fake.programs.lock().unwrap() = true;
+    *fake.closed_resumes.lock().unwrap() = true;
+    frozen_after_sign_5(&one, &fake);
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    let closes = fake.count("close-kept");
+    // The task given up (its run's end); past twice the bound (2 s here).
+    thread::sleep(Duration::from_millis(2200));
+    // A real busy turn: refused `NOT_IDLE` over more than the bound.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::NotIdle, 10_000));
+    let began = Instant::now();
+    while began.elapsed() < Duration::from_millis(1500) {
+        assert_eq!(spoken_launch(&one, &*fake, &spoken("lamp-2")), busy());
+        thread::sleep(Duration::from_millis(250));
+    }
+    fake.takes.lock().unwrap().clear();
+    assert!(matches!(
+        spoken_launch(&one, &*fake, &spoken("lamp-2")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    let calls = fake.calls();
+    assert_eq!(one.agent(), Some(agent_of(1)), "{calls:?}");
+    assert_eq!(fake.count("close-kept"), closes, "{calls:?}");
+    assert_eq!(fake.count("delete"), 0, "{calls:?}");
+}
+
+/// #7906 sign 5: a close refused as its conversation already gone
+/// (`CLOSE_CONVERSATION_GONE`) leaves nothing to resume: `--fresh`, never
+/// a plain resume.
+#[test]
+fn a_sign_5_close_with_its_conversation_gone_goes_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path())
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    *fake.conversation_gone_closes.lock().unwrap() = true;
+    frozen_after_sign_5(&one, &fake);
+    let calls = fake.calls();
+    assert_eq!(one.agent(), Some(agent_of(2)), "{calls:?}");
+    let ensures: Vec<&String> = calls.iter().filter(|c| c.starts_with("ensure")).collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ],
+        "{calls:?}"
+    );
 }

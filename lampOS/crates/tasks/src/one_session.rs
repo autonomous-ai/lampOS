@@ -843,6 +843,15 @@ struct Inner {
     /// a turn answered or a session `ensure` made new; kept across a plain
     /// resume, so one more refusal after it is `--fresh`.
     not_ready_replies: Option<(Instant, Instant, u32)>,
+    /// The kept session sign 5 closed for its plain resume (#7906): its
+    /// agent then. Until a reply is taken, a turn answered or `ensure`
+    /// makes one new, the resume must be a new process: `live` with this
+    /// agent is the frozen one still there, `resumed` starts sign 5's count
+    /// again, and a `NOT_IDLE` refusal counts toward sign 5 as
+    /// `ENGINE_NOT_READY` does. With when it was closed: past
+    /// [`OneSession::restart_bound`] it no longer counts, so a turn given
+    /// up after the resume never leaves a later healthy busy turn counted.
+    restarted: Option<(String, Instant)>,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -2719,8 +2728,35 @@ impl OneSession {
             if ensured.result == "new" {
                 pane.made_new = Some(Instant::now());
                 inner.not_ready_replies = None;
+                inner.restarted = None;
+            }
+            // Sign 5's close then resume: a new process, warming up, may
+            // refuse its first replies; the frozen one's count is not its
+            // own. A `live` one (the frozen process) keeps the count.
+            if ensured.result == "resumed" && self.restarted_now(&inner).is_some() {
+                inner.not_ready_replies = None;
             }
             inner.pane = Some(pane);
+        }
+        // #7906 sign 5: closed for a plain resume, yet `live` with the same
+        // agent: the frozen process outlived its close, so `--fresh` (b).
+        if ensured.result == "live" && self.restarted_now(&self.lock()) == Some(agent.as_str()) {
+            self.lock().restarted = None;
+            self.replace_kept(
+                harness,
+                &place.machine,
+                &agent,
+                "still live after sign 5 closed it; its process outlived the close",
+            );
+            {
+                let inner = self.lock();
+                if inner.next_open.is_some() || inner.drop_due.is_some() {
+                    return Err(
+                        "its frozen process outlived the close; a fresh one is opened next".into(),
+                    );
+                }
+            }
+            return self.open_kept(harness, place, token, until, ended, settles);
         }
         if let Some((key, old)) = old
             && old != agent
@@ -2991,6 +3027,7 @@ impl OneSession {
         inner.replaced_in_row = 0;
         inner.revived = None;
         inner.not_ready_replies = None;
+        inner.restarted = None;
     }
 
     /// #7906 sign 5: the kept session `agent`'s reply refused
@@ -3069,6 +3106,84 @@ impl OneSession {
         // reopen loops with no backoff.
         self.count_replaced();
         true
+    }
+
+    /// #7906 sign 5, the ladder for a kept session `agent` refusing
+    /// `ENGINE_NOT_READY` (`why`): its process frozen, not dead, so a plain
+    /// resume alone finds it `live` again. (a) Closed `--now`, its record
+    /// and OpenClaw conversation kept (never deleted), so the next plain
+    /// `ensure` starts a new process on the same conversation, its memory
+    /// kept; once, as [`OneSession::revive_or_replace`]'s. (b) Otherwise,
+    /// a close refused, or signs again after it:
+    /// [`OneSession::replace_kept`], `--fresh`. Returns whether it was (a).
+    pub fn restart_or_replace(
+        &self,
+        harness: &dyn PaneHarness,
+        machine: &str,
+        agent: &str,
+        why: &str,
+    ) -> bool {
+        let kept = self.kept_now(agent);
+        let key = kept
+            .as_ref()
+            .map(|(name, token)| format!("{name}:{}", token.display()));
+        let restart = key.is_some()
+            && self.lock().revived != key
+            && harness.session_held(&self.kept_session_key(agent)) != Some(false);
+        let closed = match kept.filter(|_| restart) {
+            // Harness's own close, not `close_kept`'s: a close refused as
+            // its conversation already gone has nothing to resume, so
+            // `--fresh` below, never a plain resume.
+            Some((name, token)) => harness.close_kept(&name, &token, true),
+            None => Err("no plain resume left".into()),
+        };
+        if let Err(code) = closed {
+            if restart {
+                eprintln!(
+                    "tasks: one session: the frozen kept session {} not closed for a resume: {code}",
+                    short(agent)
+                );
+            }
+            self.replace_kept(harness, machine, agent, why);
+            return false;
+        }
+        eprintln!(
+            "tasks: one session: {} is stuck ({why}); closed, its conversation kept, and resumed in a new process (#7906)",
+            short(agent)
+        );
+        {
+            let mut inner = self.lock();
+            inner.revived = key;
+            inner.restarted = Some((agent.to_owned(), Instant::now()));
+        }
+        self.gone(agent, why);
+        self.count_replaced();
+        true
+    }
+
+    /// Whether the kept session `agent`'s `NOT_IDLE` refusal counts toward
+    /// #7906 sign 5: after sign 5's close and resume, before any reply is
+    /// taken, nothing of ours runs in that new process, so `working` there
+    /// is the frozen one's, not a turn to wait out.
+    fn busy_after_restart(&self) -> bool {
+        self.restarted_now(&self.lock()).is_some()
+    }
+
+    /// How long after sign 5's close its mark ([`Inner::restarted`])
+    /// counts: twice sign 5's own bound, as a gap between its refusals.
+    fn restart_bound(&self) -> Duration {
+        KEPT_NOT_READY_FOR
+            .min(self.open_idle_within)
+            .saturating_mul(2)
+    }
+
+    /// Sign 5's closed agent, while within [`OneSession::restart_bound`].
+    fn restarted_now<'a>(&self, inner: &'a Inner) -> Option<&'a str> {
+        inner
+            .restarted
+            .as_ref()
+            .filter(|(_, at)| at.elapsed() <= self.restart_bound())
+            .map(|(agent, _)| agent.as_str())
     }
 
     /// `harness ensure` said the engine is not ready: the next open after
@@ -3210,6 +3325,7 @@ impl OneSession {
     fn handed_over(&self, agent: &str, base: Option<(String, i64)>) {
         let mut inner = self.lock();
         inner.not_ready_replies = None;
+        inner.restarted = None;
         if let Some(pane) = inner.pane.as_mut()
             && pane.agent == agent
         {
@@ -3449,7 +3565,9 @@ impl Turn<'_> {
                         // #7906 sign 5, before the run's end is looked at:
                         // a frozen engine's refusal can take Harness ~62 s,
                         // past a spoken task's whole bound.
-                        if took == Took::EngineNotReady
+                        // After its close and resume, a `NOT_IDLE` counts too.
+                        if (took == Took::EngineNotReady
+                            || (took == Took::NotIdle && self.one.busy_after_restart()))
                             && let Some(why) = self.one.reply_not_ready(&agent)
                         {
                             if replaced && !revived {
@@ -3460,13 +3578,9 @@ impl Turn<'_> {
                             self.restarted.store(true, Ordering::Release);
                             refused = None;
                             refused_since = None;
-                            revived = self.one.revive_or_replace(
-                                harness,
-                                &place.machine,
-                                &agent,
-                                &why,
-                                true,
-                            );
+                            revived =
+                                self.one
+                                    .restart_or_replace(harness, &place.machine, &agent, &why);
                             continue;
                         }
                         if ended() || Instant::now() >= until {
