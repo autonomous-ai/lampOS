@@ -223,7 +223,13 @@ pub fn answer(
                         error.retry_ms = Some(wait.as_millis().max(1) as u64);
                         return Some(crate::protocol::refused(Some(re), &error));
                     }
-                    crate::protocol::ok(re, json!({}))
+                    // A turn offered this app and taken within the hold is
+                    // told to the voice (`Live::drain_took`) and answered
+                    // `taken: true`; any other (late, never offered, taken
+                    // already) is `taken: false`, and the app must not speak
+                    // for it: the voice has let the model answer.
+                    let taken = live.took_turn(name, turn, now);
+                    crate::protocol::ok(re, json!({"taken": taken}))
                 }
                 _ => refuse(
                     re,
@@ -350,6 +356,12 @@ pub fn phrases_reply(reply: &mut Value, count: usize) {
         fields.remove("events");
         fields.insert("phrases".to_owned(), json!(count));
     }
+}
+
+/// What an app is told when the voice holds a line that says one of its
+/// triggers (`app.trigger`): `turn` is what it answers with in `app.took`.
+pub fn trigger_event(turn: u64, trigger: &str, phrase: &str) -> Value {
+    json!({"ev": "app.trigger", "turn": turn.to_string(), "trigger": trigger, "phrase": phrase})
 }
 
 /// The event an app is told when the owner changed settings.
