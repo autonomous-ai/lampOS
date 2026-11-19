@@ -297,7 +297,9 @@ pub fn keep(place: Place, bus: Option<lamp_bus::Bus>, helper: PathBuf) {
 /// What [`keep`] carries from one look to the next.
 #[derive(Debug, Default)]
 struct Keeping {
-    was_on: bool,
+    /// On at the last look; none before the first, so a lamp-cloud that
+    /// starts with it off still lets go of an item an earlier one left.
+    was_on: Option<bool>,
     /// When the helper was last asked to turn it off, while its day is over.
     tried: Option<Instant>,
 }
@@ -318,12 +320,12 @@ impl Keeping {
             Look::On { said, due } => {
                 // On again since it turned itself off: that is no longer
                 // the news.
-                if !self.was_on
+                if self.was_on != Some(true)
                     && let Some(file) = &place.went_off
                 {
                     let _ = std::fs::remove_file(file);
                 }
-                self.was_on = true;
+                self.was_on = Some(true);
                 if due
                     && self
                         .tried
@@ -336,7 +338,8 @@ impl Keeping {
             }
             Look::Off => {
                 self.tried = None;
-                std::mem::take(&mut self.was_on).then(|| Diagnostic::stopping(HEALTH_NAME))
+                (self.was_on.replace(false) != Some(false))
+                    .then(|| Diagnostic::stopping(HEALTH_NAME))
             }
         }
     }

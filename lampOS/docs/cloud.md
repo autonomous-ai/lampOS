@@ -3158,7 +3158,9 @@ lamp".
   seconds, 60 to 86400; anything else is a day) is a shorter day for a lamp
   row only. A clock set back counts as just on. While lamp-cloud is stopped
   the item goes stale and nothing turns it off; it is turned off at the next
-  look after lamp-cloud starts. The app is not pushed a notice: it reads
+  look after lamp-cloud starts. A lamp-cloud that starts with it off (turned
+  off or reset while lamp-cloud was down) says once that it stopped on
+  purpose, so a stale item left by the one before goes. The app is not pushed a notice: it reads
   `monitor.get`.
 - **`monitor.link`** (`{"seal_to", "request_id"}`, both as `control.code`'s)
   asks lamp-peek's admin socket (`/run/lampos-peek/admin.sock`, lampos and

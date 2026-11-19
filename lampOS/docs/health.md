@@ -186,7 +186,8 @@ time go in, a `Health` comes out):
 - **The dev monitor** is its own item, `dev monitor`, sent by lamp-cloud
   only while the owner's dev monitor is on (#7432, cloud.md, "The dev
   monitor"): `ok`, "on since 3 h 12 min ago, off by itself in 20 h 48 min".
-  Off, lamp-cloud says it stopped on purpose (above), so the item goes; it
+  Off, lamp-cloud says it stopped on purpose (above), so the item goes,
+  also once as it starts with the dev monitor off; it
   turns itself off a day after it was turned on.
 - **The lamp's level** is the worst item's, and `stale` at least when a
   part is missing.
