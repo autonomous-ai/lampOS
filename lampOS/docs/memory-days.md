@@ -1159,18 +1159,24 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   scope so far. When the answer names no ids (or none comes), the forgetting
   person's and the room's unsent turns wait for the next start, when the memory
   no longer holds what went. Other people's unsent turns are never let go.
-  `history_send::deleting` takes the full ids the forget half queues for
-  deletion. A source forgotten outside the voice is taken as an unnamed forget
-  of that person's.
-- **Nothing lost at a restart, and no words on disk:** the only thing kept is a
-  mark per scope, the last id the server took with none before it unsent, in
-  `/var/lib/lampOS/voice/history-marks.json` (0600, `{"epoch","marks":{scope:id}}`,
-  written whole off the turn's path). At start the sending thread asks the
-  memory `history_issued` (until it answers; nothing is posted before) and sends
-  what the memory kept after each mark, by `exchanges_after`, under the same
-  ids. The memory stays the one copy of the words. An epoch unlike the marks' (the first
-  start, or a reset) starts the marks at what the memory holds now: nothing said
-  before the switch went on is sent.
+  Every memory answer the voice reads with `exchanges` turn ids (all five
+  forget ops, `history_forget::answered`) goes to `history_send::deleting`, so
+  those ids are never posted, whatever `LAMP_HISTORY_FORGET`. A forget about a
+  thing holds and lifts the posts as every other forget. A source forgotten
+  outside the voice is taken as an unnamed forget of that person's.
+- **Nothing lost at a restart, and no words on disk:** only ids are kept, in
+  `/var/lib/lampOS/voice/history-marks.json` (0600,
+  `{"epoch","marks":{scope:id},"offered":{scope:id}}`, written whole off the
+  turn's path): a mark per scope, the last id the server took with none before
+  it unsent, and the last id handed to the sender in each scope, written before
+  the post that carries it. At start the sending thread asks the memory
+  `history_issued` (until it answers; nothing is posted before), sends what the
+  memory kept after each mark up to what was handed over, by `exchanges_after`,
+  under the same ids, and then moves every mark to the memory's newest id. The
+  memory stays the one copy of the words. So on every start, not only the
+  first, nothing kept while no sender ran is ever sent: the switch off, the
+  Live route, or the voice down. An epoch unlike the marks' (the first start,
+  or a reset) starts the marks at what the memory holds now.
 - **Where:** only the lamp's own cloud API, the relay host the route's
   `llm_base_url` names (`https://campaign-api.autonomous.ai/api/v1/ai`, with or
   without `/v1`; `history_send::url`). With a direct provider's base, plain

@@ -10785,8 +10785,18 @@ impl DaysClient {
                 if let Ok(mut context) = self.context.lock() {
                     context.last_done = None;
                 }
+                // As every forget: nothing is posted to the account's
+                // history while the memory answers (`LAMP_HISTORY_SEND`,
+                // Twelve's P2 on #7957); what it removed is named in its
+                // answers (`history_send::forget_seen`), then posts go on.
+                crate::history_send::forgetting(person);
                 let (told, answered) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                crate::history_send::forget_answered(
+                    person,
+                    false,
+                    Some(&json!({"ok":true,"exchanges":{}})),
+                );
                 // A forget done, for a yes alone soon after it (Bug C).
                 if told["forgotten"] == true
                     && let Ok(mut context) = self.context.lock()
@@ -15331,7 +15341,10 @@ pub(crate) use tests::event_memory;
 
 /// The Days writer run over a fake memory, for `history_send`'s tests.
 #[cfg(test)]
-pub(crate) use tests::{forget_for_history_test, go_on_for_history_test, write_for_history_test};
+pub(crate) use tests::{
+    forget_about_for_history_test, forget_for_history_test, go_on_for_history_test,
+    write_for_history_test,
+};
 
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
@@ -26594,35 +26607,18 @@ mod tests {
         assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
     }
 
-    /// The Days writer on this thread over a fake memory, given `lines`
-    /// (whose scope, what was heard), as requests 1, 2, ...: the memory
-    /// writes a line heard as "kept N …" with id N ("kept …": 17), answers
-    /// one heard as "gone …" as a forgotten source's, and refuses any other;
-    /// then a session close, and the writer ends (its conversation with it).
-    /// Each call has a socket of its own, served until the writer is done,
-    /// however many requests it makes.
-    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
+    /// A fake memory for `history_send`'s tests on a socket of its own,
+    /// answering with `answer` until told to stop, however many requests.
+    fn history_memory(
+        answer: fn(&Value) -> Value,
+    ) -> (
+        PathBuf,
+        std::sync::Arc<std::sync::atomic::AtomicBool>,
+        std::thread::JoinHandle<()>,
+    ) {
         static CALLS: AtomicU64 = AtomicU64::new(0);
-        fn answer(request: &Value) -> Value {
-            let heard = request["heard"].as_str().unwrap_or("");
-            match request["op"].as_str() {
-                Some("append_linked") if heard.starts_with("kept") => {
-                    let id = heard
-                        .split(' ')
-                        .nth(1)
-                        .and_then(|n| n.parse::<u64>().ok())
-                        .unwrap_or(17);
-                    json!({"ok":true,"id":id})
-                }
-                Some("append_linked") if heard.starts_with("gone") => {
-                    json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
-                }
-                Some("append_linked") => json!({"ok":false,"error":"full"}),
-                _ => json!({"ok":true}),
-            }
-        }
         let socket = std::env::temp_dir().join(format!(
-            "lamp-remember-history-send-{}-{}.sock",
+            "lamp-remember-history-{}-{}.sock",
             std::process::id(),
             CALLS.fetch_add(1, Ordering::Relaxed)
         ));
@@ -26651,6 +26647,36 @@ mod tests {
                 }
             }
         });
+        (socket, stop, served)
+    }
+
+    /// The Days writer on this thread over a fake memory, given `lines`
+    /// (whose scope, what was heard), as requests 1, 2, ...: the memory
+    /// writes a line heard as "kept N …" with id N ("kept …": 17), answers
+    /// one heard as "gone …" as a forgotten source's, and refuses any other;
+    /// then a session close, and the writer ends (its conversation with it).
+    /// Each call has a socket of its own, served until the writer is done,
+    /// however many requests it makes.
+    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
+        fn answer(request: &Value) -> Value {
+            let heard = request["heard"].as_str().unwrap_or("");
+            match request["op"].as_str() {
+                Some("append_linked") if heard.starts_with("kept") => {
+                    let id = heard
+                        .split(' ')
+                        .nth(1)
+                        .and_then(|n| n.parse::<u64>().ok())
+                        .unwrap_or(17);
+                    json!({"ok":true,"id":id})
+                }
+                Some("append_linked") if heard.starts_with("gone") => {
+                    json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
+                }
+                Some("append_linked") => json!({"ok":false,"error":"full"}),
+                _ => json!({"ok":true}),
+            }
+        }
+        let (socket, stop, served) = history_memory(answer);
         let (send, receive) = sync_channel(lines.len() + 2);
         let now = Instant::now();
         for (n, (person, heard)) in lines.iter().enumerate() {
@@ -26725,6 +26751,46 @@ mod tests {
         assert!(answered && told["forgotten"] == true, "{told}");
         served.join().unwrap();
         drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// `person`'s "forget what I said about coffee", through the voice's
+    /// tools with a fake memory: nothing kept is about it, and the
+    /// exchanges forget removes `removed` (its turn id under epoch
+    /// 0a1b2c3d, the forget half's answer).
+    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: u64) {
+        static REMOVED: AtomicU64 = AtomicU64::new(0);
+        REMOVED.store(removed, Ordering::SeqCst);
+        fn answer(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("exchanges_forget") => {
+                    crate::history_send::probe_forget();
+                    let person = request["person"].as_str().unwrap_or("everyone");
+                    let turn = lamp_msgs::history_turn_id(
+                        "0a1b2c3d",
+                        person,
+                        REMOVED.load(Ordering::SeqCst),
+                    );
+                    json!({"ok":true,"removed":1,"exchanges":{person:[turn]}})
+                }
+                Some("kept") | Some("search") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":true,"removed":0}),
+            }
+        }
+        let (socket, stop, served) = history_memory(answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"coffee"})),
+            Duration::from_secs(3),
+            NOW,
+            Some(&EAST),
+            Some(person),
+        );
+        assert!(answered, "{told}");
+        drop(client);
+        stop.store(true, Ordering::Release);
+        served.join().unwrap();
         let _ = std::fs::remove_file(&socket);
     }
 
