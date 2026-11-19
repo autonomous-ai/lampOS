@@ -5562,6 +5562,42 @@ mod tests {
         assert_eq!(people.names().len(), 3);
     }
 
+    /// #7704: the voice skipped its face question only because the eyes'
+    /// known file named a face at the lamp, and that file can still name
+    /// Ada for up to 3 s after a stranger steps in. Asked `known_only`, a
+    /// capture recognised as nobody is refused ([`Refused::NotKnown`]) and
+    /// nobody is kept; a known face is still told by the name it is known
+    /// by, and its own name on its own face is still kept in place. Without
+    /// `known_only`, the stranger is kept as before.
+    #[test]
+    fn a_save_for_a_known_face_only_refuses_a_face_known_as_nobody() {
+        let mut people = People::open(file("known-only")).unwrap();
+        people
+            .remember("Ada", vec![print(0.3), print(0.31)], 1)
+            .unwrap();
+        assert_eq!(
+            people.remember_one_known_only("Walter", vec![print(2.9)], 2, false, false),
+            Err(Refused::NotKnown)
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one_known_only("Jay", vec![print(0.3)], 3, false, false),
+            Err(Refused::KnownAs("Ada".into()))
+        );
+        assert_eq!(
+            people
+                .remember_one_known_only("Ada", vec![print(0.31)], 4, false, false)
+                .map(|kept| kept.name),
+            Ok("Ada".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one("Walter", vec![print(2.9)], 5, false, false),
+            Ok("Walter".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned(), "Walter".to_owned()]);
+    }
+
     /// Reviewer-three's P1 on #5149: a remembering says exactly whom a
     /// `replace` forgot, so the voice moves the setup owner only on a
     /// rename of the owner's own face. Nobody for a plain remembering, the

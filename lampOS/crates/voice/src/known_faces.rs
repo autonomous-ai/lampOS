@@ -6622,6 +6622,65 @@ mod tests {
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
+    /// #7704: the face question is skipped while the eyes' known file names
+    /// a face at the lamp, and that file can still name Walter for up to
+    /// 3 s after a stranger steps in. With `LAMP_FACE_SAVE_KNOWN_ONLY` the
+    /// save asks the eyes to keep it only for a face they know
+    /// (`known_only`); their `not_known` is the face question
+    /// ([`ASK_FACE_FIRST`]) and nothing is kept. Off, the save is sent and
+    /// kept as before.
+    #[test]
+    fn with_known_only_a_face_the_eyes_do_not_know_is_asked_the_face_question() {
+        let save = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Jay"}),
+        };
+        let switches = |face_save_known_only: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_save_known_only,
+            ..FaceSwitches::default()
+        };
+        let (socket, sent) = eyes(vec![json!({"error": "not_known"})]);
+        std::fs::write(known_file_of(&socket), "Walter\n").unwrap();
+        let (told, _) = run_switched(
+            &socket,
+            &save,
+            switches(true),
+            &Said::now("Call me Jay."),
+            None,
+            &mut None,
+        );
+        assert_eq!(told["error"], ASK_FACE_FIRST, "{told}");
+        assert!(told.get("remembered").is_none(), "{told}");
+        assert_eq!(
+            sent.join().unwrap(),
+            vec![
+                json!({"remember": "Jay", "one_face": true, "replace": false, "known_only": true})
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+        // Off: no `known_only`, and the stranger is kept as the eyes answer.
+        let (socket, sent) = eyes(vec![json!({"remembered": "Jay"})]);
+        std::fs::write(known_file_of(&socket), "Walter\n").unwrap();
+        let (told, _) = run_switched(
+            &socket,
+            &save,
+            switches(false),
+            &Said::now("Call me Jay."),
+            None,
+            &mut None,
+        );
+        assert_eq!(told["remembered"], "Jay", "{told}");
+        assert_eq!(
+            sent.join().unwrap(),
+            vec![json!({"remember": "Jay", "one_face": true, "replace": false})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
     /// `LAMP_FACE_NO_ASK` with a face the eyes' known file names at the
     /// lamp (Heron's and Migrate's HOLDs on #7800): "Call me Jay." is no new
     /// face kept unasked; it reaches the eyes, whose "known as" answer holds
