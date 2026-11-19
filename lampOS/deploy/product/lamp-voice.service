@@ -414,8 +414,9 @@ Environment=LAMP_MAKE_AGENT_ONE_PATH=on
 Environment=LAMP_MAKE_AGENT_GUIDE=on
 # An ask the second route's model can't answer at once (the web, several steps, working something out, or no tool
 # for it) goes to the lamp's default agent as `ask_agent`, never a spoken "I can't" (the owner's ruling, 17 Nov;
-# the first builder's DEFAULT-ON, #7814): a holding line at once, the agent's answer when its run ends; the owner's
-# own line only, no service grant. Passed to the second route's worker alone; the same line in lamp-tasks.
+# the first builder's DEFAULT-ON, #7814): a holding line at once, the agent's answer when its run ends, which only
+# answers and sends or buys nothing, on Hermes and OpenClaw alike; the owner's own line only, no service grant.
+# Passed to the second route's worker alone; the same line in lamp-tasks.
 Environment=LAMP_HARD_ASKS_TO_AGENT=on
 # #7270, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_NOT_ON_TOLD=on

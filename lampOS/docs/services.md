@@ -2915,7 +2915,9 @@ transcript), and has the Gateway's tools, messaging channels and network.
 It is held to an answer by its rules, not by isolation
 (`voice_ask::ANSWER_ONLY`): send, buy, change, delete or post nothing, run
 nothing that does, use no messaging channel, and say what would be needed
-instead. Its answer may come from the owner's memory, so lamp-tasks marks
+instead. A Hermes hard ask is held to the same answer by the same rules
+(Heron's and Twelve's HOLD on #8006): its fresh home has no channel, but
+its run keeps the host network. OpenClaw's answer may come from the owner's memory, so lamp-tasks marks
 it `"owner_alone":true` (`voice_ask::OWNER_ALONE`, AppOnly's P2 on #7509)
 and it is said only while the owner is seen alone, as a full read's is
 (`say::NOT_ALONE`), else `agent_asks::NOT_ALONE_LINE`; a Hermes hard ask's

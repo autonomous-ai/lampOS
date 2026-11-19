@@ -55,7 +55,8 @@ Environment=LAMP_SKILL_WRITE_AGENT=on
 Environment=LAMP_SKILL_DEFAULT_AGENT=on
 # A live spoken ask with no grant from lamp-voice's make socket (`voice_ask`, the owner's ruling, 17 Nov; the first
 # builder's DEFAULT-ON, #7814), run on the lamp's default agent, at most 120 s, answering only, sending or buying
-# nothing. The same line in lamp-voice. Off: such a line is refused `off`.
+# nothing, on Hermes and OpenClaw alike (voice_ask::ANSWER_ONLY in its rules). The same line in lamp-voice. Off:
+# such a line is refused `off`.
 Environment=LAMP_HARD_ASKS_TO_AGENT=on
 # The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
 # lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks

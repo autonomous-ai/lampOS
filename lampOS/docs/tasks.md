@@ -3926,9 +3926,10 @@ memory and sessions (it keeps the turn's transcript), and the Gateway's
 tools, messaging channels and network. It is held to an answer by its
 rules alone (`voice_ask::ANSWER_ONLY`, Heron's P2 on #7509): send, buy,
 change, delete or post nothing, run nothing that does, use no messaging
-channel, and say what would be needed instead. Hermes's rules keep "do
-what they asked": its fresh home has no channel and none of the owner's
-memory. Its answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
+channel, and say what would be needed instead. Hermes's rules hold it to
+the same answer (`ANSWER_ONLY`, Heron's and Twelve's HOLD on #8006): its
+fresh home has no channel and none of the owner's memory, but its run
+keeps the host network, and no yes was asked at the lamp. OpenClaw's answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
 AppOnly's P2 on #7509): lamp-voice says it only while the owner is seen
 alone, as a full read's. Its answer is `answer.md`, else the agent's final chat
 answer when Harness didn't cut it (`voice_ask::run_answer`), held to 120 s

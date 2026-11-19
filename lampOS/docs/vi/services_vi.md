@@ -2981,7 +2981,10 @@ của chủ đèn, không phải một home mới: nó giữ workspace, bộ nh�
 của chủ đèn (cả bản ghi của lượt), và có các công cụ, kênh nhắn tin và mạng
 của Gateway. Nó chỉ được giữ ở mức trả lời bằng quy tắc của nó, không bằng
 sự cô lập (`voice_ask::ANSWER_ONLY`): không gửi, mua, đổi, xoá hay đăng gì,
-không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Câu trả lời có
+không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Một yêu cầu
+khó trên Hermes cũng được giữ ở mức chỉ trả lời đó bằng cùng quy tắc (HOLD của
+Heron và Twelve trên #8006): home mới của nó không có kênh nào, nhưng lần chạy
+vẫn giữ mạng của máy. Câu trả lời của OpenClaw có
 thể đến từ bộ nhớ của chủ đèn, nên lamp-tasks đánh dấu `"owner_alone":true`
 (`voice_ask::OWNER_ALONE`, P2 của AppOnly trên #7509) và nó chỉ được nói khi
 chủ đèn được thấy một mình, như một lần đọc đầy đủ (`say::NOT_ALONE`), nếu
