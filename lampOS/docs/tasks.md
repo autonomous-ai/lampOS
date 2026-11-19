@@ -5273,6 +5273,12 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     the same frozen process (`live` or `resumed`, refused again), the next
     refusal is (b) `--fresh`, never another resume. The waiting task never
     ran, so it is typed into the new session and told once.
+    Beside #7895's bound: an `ENGINE_NOT_READY` refusal never spends one
+    of a spoken task's `STARTING_RESUMES_MOST` (3) tries, which count only
+    `NOT_RUNNING`, a `TIMEOUT` with nothing taken and a failed open. So a
+    frozen session's refusals put the task back `busy` until sign 5 lets
+    it go, and only a session ensured again that still never takes the
+    words spends the tries and ends it `one_session_not_started`.
 
   Every sign calls `OneSession::replace_kept`, the one path for every
   sign (signs 3 and 4 through `OneSession::kept_gone`). It does a `close --now`, `sessions.delete` and the record removed,
