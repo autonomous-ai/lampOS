@@ -983,6 +983,30 @@ fn name_said_to(heard: &str, alone: &[&str], recognizer_stand_ins: bool) -> bool
             .any(|call| recognizer_stand_ins || call.real)
 }
 
+/// Whether `heard` is a line of one or two words, not a question, none of
+/// them the lamp's name or a word written for it ([`written_for_the_name`]):
+/// "Yeah.", "Okay.", "Thanks." said across a meeting, which lamp-name heard
+/// as its name at 0.939 and 0.973 on lamp-74ff on 19 Nov, where real calls
+/// score 0.90 to 1.00 (#7891). Such a line is not answered on a hearing of
+/// the name in the room's sound ([`Attention::weigh_the_name`]); "Lamp?",
+/// "Hey, Lynn." and "Hey, man." carry the name in their words, and "Okay?"
+/// asks.
+pub(crate) fn short_line_without_the_name(heard: &str) -> bool {
+    let words = crate::not_speech::plain_words(heard).len();
+    (1..=2).contains(&words) && !heard.contains('?') && !names_it_in_words(heard)
+}
+
+/// Whether any word of `heard` is the lamp's name or one written for it
+/// ([`written_for_the_name`]), wherever it stands: what a hearing of the
+/// name in the room's sound needs from the words to count as naming the
+/// line ([`short_line_without_the_name`]; `said_to_me`'s named line,
+/// #7891).
+pub(crate) fn names_it_in_words(heard: &str) -> bool {
+    crate::not_speech::plain_words(heard)
+        .iter()
+        .any(|word| written_for_the_name(word))
+}
+
 /// Whether what was heard is the lamp's name alone, or a word written for
 /// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
 /// off at a pause, the rest still to come. For the second route's carry, so
@@ -1802,6 +1826,10 @@ pub struct Attention {
     /// for the line last weighed ([`Self::weigh_the_name`]), for the
     /// journal (#3945).
     name_signs: Vec<&'static str>,
+    /// The name heard in the room's sound was dropped for the line last
+    /// weighed as a short line without the name in its words
+    /// ([`short_line_without_the_name`], #7891), for the journal.
+    name_short_dropped: bool,
 }
 
 /// The most text kept for one request.
@@ -2084,6 +2112,11 @@ impl Attention {
     /// the lamp going on (`going_on`) is a second sign too, and the line's
     /// start is none when its first word is said to a person
     /// ([`Self::start_said_to_a_person`]).
+    ///
+    /// Out of a conversation (`going_on`), a line of one or two words, not
+    /// a question, with nothing written for the name in its words, counts
+    /// the name for nothing whatever its second sign
+    /// ([`short_line_without_the_name`], #7891).
     pub fn weigh_the_name(&mut self, turned: Option<bool>, going_on: bool) -> bool {
         let text_calls = if self.name_in_passing_ignored {
             called_by_name(&self.heard)
@@ -2095,6 +2128,7 @@ impl Attention {
         // A conversation going on gives back only the start this switch
         // held, never a second sign for other lines (#1722's rule; the
         // Reviewer-lead's P3 on #4082).
+        let in_conversation = going_on;
         let going_on = going_on && said_to_a_person;
         let signs: Vec<&'static str> = [
             (turned == Some(true), "a face turned to the lamp"),
@@ -2108,8 +2142,13 @@ impl Attention {
         .filter_map(|(shown, sign)| shown.then_some(sign))
         .collect();
         let weighed = self.name_second_sign && self.named;
-        let alone = weighed && signs.is_empty();
-        self.name_signs = if weighed { signs } else { Vec::new() };
+        // A short line with nothing written for the name, out of a
+        // conversation, is never answered on the hearing alone, whatever
+        // its second sign (#7891).
+        self.name_short_dropped =
+            weighed && !in_conversation && short_line_without_the_name(&self.heard);
+        let alone = weighed && (signs.is_empty() || self.name_short_dropped);
+        self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -2123,6 +2162,13 @@ impl Attention {
     /// none was asked.
     pub fn second_signs(&self) -> &[&'static str] {
         &self.name_signs
+    }
+
+    /// Whether the name heard for the line last weighed was dropped as a
+    /// short line without the name in its words
+    /// ([`short_line_without_the_name`], #7891).
+    pub fn name_dropped_as_short(&self) -> bool {
+        self.name_short_dropped
     }
 
     /// In a busy room, let a line out only as the conversation going on
