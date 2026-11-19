@@ -8,6 +8,7 @@ use lamp_msgs::HeatLevel;
 use lamp_npu::{
     BOARD,
     engine::{Fake, Input, LoadError, Tensor},
+    head,
     model::{self, MANIFEST, SIGNATURE, Source, Store},
     serve,
     service::{Conditions, Config, Service},
@@ -66,10 +67,9 @@ fn store_key() -> (String, [u8; 32]) {
     (STANDARD.encode(document.as_ref()), public)
 }
 
-/// MoveNet's single output, every keypoint at `(y, x)` normalised.
-fn movenet_output(y: f32, x: f32, score: f32) -> Tensor {
-    let values: Vec<f32> = (0..17).flat_map(|_| [y, x, score]).collect();
-    Tensor::from_f32(vec![1, 1, 17, 3], &values)
+/// MoveNet's four maps, every keypoint at `(y, x)` normalised.
+fn movenet_output(y: f32, x: f32, score: f32) -> Vec<Tensor> {
+    head::movenet_maps(&[(y, x, score); 17], 48)
 }
 
 const SQUARE: Input = Input {
@@ -188,7 +188,7 @@ const OPEN: Conditions = Conditions {
 };
 
 fn fake_movenet() -> Fake {
-    Fake::new(SQUARE, vec![movenet_output(0.5, 0.25, 0.9)])
+    Fake::new(SQUARE, movenet_output(0.5, 0.25, 0.9))
 }
 
 #[test]
@@ -213,8 +213,8 @@ fn preparing_until_the_model_is_fetched_then_a_pose_in_the_pictures_pixels() {
     assert_eq!(answer["model"], "movenet-lightning-4");
     let pose = &answer["pose"];
     assert_eq!(pose["keypoints"].as_array().unwrap().len(), 17);
-    // (0.25, 0.5) of a 192 square that holds 640x480 at 0.3 from row 24:
-    // x 48 / 0.3 = 160, y (96 - 24) / 0.3 = 240.
+    // (0.25, 0.5) of a 192 square that holds the whole 640x480 picture
+    // from row 24: x 0.25 x 640 = 160, y (96 - 24) / 0.3 = 240.
     let nose = &pose["keypoints"][0];
     assert!((nose["x"].as_f64().unwrap() - 160.0).abs() < 0.5, "{nose}");
     assert!((nose["y"].as_f64().unwrap() - 240.0).abs() < 0.5, "{nose}");
@@ -515,4 +515,59 @@ fn a_yolov8_model_answers_the_same_shape() {
     assert_eq!(pose["keypoints"].as_array().unwrap().len(), 17);
     assert_eq!(pose["keypoints"][0].as_object().unwrap().len(), 3);
     assert!(pose["score"].as_f64().unwrap() > 0.98);
+}
+
+/// A person standing in the middle of the frame: shoulders at 0.4, hips
+/// at 0.6, the rest about them, all seen.
+fn standing() -> Fake {
+    let mut points = [(0.5, 0.5, 0.9); 17];
+    points[5] = (0.4, 0.4, 0.9);
+    points[6] = (0.4, 0.6, 0.9);
+    points[11] = (0.6, 0.45, 0.9);
+    points[12] = (0.6, 0.55, 0.9);
+    Fake::new(SQUARE, head::movenet_maps(&points, 48))
+}
+
+fn left_shoulder(answer: &Value) -> (f64, f64) {
+    let k = &answer["pose"]["keypoints"][5];
+    (k["x"].as_f64().unwrap(), k["y"].as_f64().unwrap())
+}
+
+#[test]
+fn a_clients_next_frame_is_cropped_around_its_person_until_it_goes_stale() {
+    let rig = Rig::new(standing(), true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    // The first frame whole: (0.4, 0.4) of the square is x 256, y 176.
+    let first = rig.pose("c_1", t + Duration::from_secs(1), OPEN);
+    let whole = left_shoulder(&first);
+    assert!(
+        (whole.0 - 256.0).abs() < 0.5 && (whole.1 - 176.0).abs() < 0.5,
+        "{first}"
+    );
+    // The next one is cropped around the person found: the fake NPU sees
+    // the same, so it maps back inside the crop, nearer the hips.
+    let second = rig.pose("c_1", t + Duration::from_millis(1100), OPEN);
+    let cropped = left_shoulder(&second);
+    assert!((cropped.0 - whole.0).abs() > 5.0, "{whole:?} {cropped:?}");
+    // Another client's first frame is whole.
+    let other = rig.pose("c_2", t + Duration::from_millis(1200), OPEN);
+    assert_eq!(left_shoulder(&other), whole);
+    // Stale after 1.5 s: whole again.
+    let late = rig.pose("c_1", t + Duration::from_secs(3), OPEN);
+    assert_eq!(left_shoulder(&late), whole);
+    // A private lamp forgets every crop.
+    rig.pose("c_1", t + Duration::from_millis(3100), OPEN);
+    let private = Conditions {
+        private: true,
+        heat: HeatLevel::Ok,
+    };
+    assert_eq!(
+        rig.pose("c_1", t + Duration::from_millis(3200), private)["code"],
+        "private"
+    );
+    let after = rig.pose("c_1", t + Duration::from_millis(3300), OPEN);
+    assert_eq!(left_shoulder(&after), whole);
 }
