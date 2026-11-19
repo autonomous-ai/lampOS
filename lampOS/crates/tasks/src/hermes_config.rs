@@ -43,9 +43,9 @@
 //! [`TOKEN_PATH`], which lamp-tasks (also `lampos`) reads. Neither file is
 //! followed through a link, and one that isn't a regular file is refused.
 use std::fs;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::io::{self, Read};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
 /// The custom provider's name in `providers:`.
 pub const PROVIDER: &str = "lamp";
@@ -801,42 +801,25 @@ pub(crate) fn read_or_empty(path: &Path) -> io::Result<String> {
 /// `text` in place of `path`, 0600, through a new file beside it renamed
 /// over it, so a reader never sees half a file.
 pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
-    replace_checked(path, text, &|_| Ok(()))
+    replace_checked(path, text, &mut |_| Ok(()))
 }
 
 /// [`replace`], with `check` run on the new file, whole and synced, before
 /// the rename (#7108: the engine's own check of its config): refused, the
-/// new file is removed and `path` is left as it was.
+/// new file is removed and `path` is left as it was. The one checked
+/// replace, shared with lamp-update's and lamp-setup's writers of
+/// OpenClaw's config (`lamp_checked_replace`, #7868).
 pub(crate) fn replace_checked(
     path: &Path,
     text: &str,
-    check: &dyn Fn(&Path) -> Result<(), String>,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
 ) -> io::Result<()> {
-    let dir = path.parent().unwrap_or(Path::new("."));
-    let name = path
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let mut random = [0u8; 8];
-    getrandom::fill(&mut random).map_err(|_| io::Error::other("no random bytes"))?;
-    let suffix: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
-    let temporary: PathBuf = dir.join(format!(".{name}.{suffix}.new"));
-    let written = (|| {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
-        check(&temporary).map_err(io::Error::other)?;
-        fs::rename(&temporary, path)
-    })();
-    if written.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    written
+    lamp_checked_replace::replace_checked(
+        path,
+        text.as_bytes(),
+        rustix::fs::Mode::from_raw_mode(0o600),
+        check,
+    )
 }
 
 /// Both files under `hermes_home` merged, on the forwarder's `port`, with
@@ -955,6 +938,7 @@ pub(crate) fn write_guidance_text(folder: &Path, text: &str) -> io::Result<bool>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
