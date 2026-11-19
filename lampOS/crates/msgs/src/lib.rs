@@ -3029,6 +3029,9 @@ mod tests {
             )
         };
         assert!(!passes(false), "missing, off");
+        assert!(!passes(true), "missing, on, before the old nos are done");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert!(!passes(false), "missing, off");
         assert!(passes(true), "missing, on");
         let no = consent::no_bytes(consent::FACE_EXPRESSIONS, 1, consent::BY_VOICE);
         for text in [no.as_slice(), b"not json"] {

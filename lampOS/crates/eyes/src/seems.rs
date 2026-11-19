@@ -343,8 +343,8 @@ mod tests {
         std::fs::remove_dir_all(&folder).unwrap();
     }
 
-    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing file is a yes;
-    /// a kept no and a file that can't be read stay no either way. Off, a
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing file is a yes
+    /// once the old nos are done (c7003588081), and no before; a kept no and a file that can't be read stay no either way. Off, a
     /// missing file is no, as [`face_expressions_yes`] reads it today.
     #[test]
     fn a_missing_yes_is_the_default_only_with_the_switch_and_a_no_stays_no() {
@@ -354,6 +354,18 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         let file = folder.join("face-expressions.json");
         assert!(!face_expressions_allowed(&file, false), "missing, off");
+        // The first builder's c7003588081: with the switch on, a missing
+        // file is no until the voice's migration of earlier nos is done.
+        assert!(
+            !face_expressions_allowed(&file, true),
+            "missing, on, no mark"
+        );
+        assert!(!face_expressions_yes(&file), "missing, no done mark");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert!(
+            !face_expressions_allowed(&file, false),
+            "missing, off, mark"
+        );
         assert!(face_expressions_allowed(&file, true), "missing, on");
         assert_eq!(face_expressions_yes(&file), consent::noticing_by_default());
         for text in [
