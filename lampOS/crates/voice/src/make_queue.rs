@@ -140,8 +140,14 @@ impl Entry {
     /// model of it, and the person was told it comes next.
     pub(crate) fn run(self) -> crate::tools::ToolAnswer {
         let (work, label) = (self.work, self.label);
-        let answer =
-            crate::make_skill_local::with_asker_kept(self.asker.heard, self.asker.owner, work);
+        // Who asked, kept for a change said while it is made (#7912).
+        let asked_by = crate::make_skill_local::AskedBy {
+            speaker: self.asker.speaker,
+            owner: self.asker.owner.clone(),
+        };
+        let answer = crate::make_skill_local::with_asked_by(asked_by, || {
+            crate::make_skill_local::with_asker_kept(self.asker.heard, self.asker.owner, work)
+        });
         crate::make_skill_local::failed_unless_said(|| failed_line(&label, &answer.told));
         answer
     }
@@ -322,6 +328,30 @@ pub fn said(request: u64) {
             slot.said = true;
         }
     });
+}
+
+/// A make changed as its say-back waited for a yes (#7912), made again
+/// for `request` in place of the make of `held` (Heron's HOLD 2 on #7936):
+/// the slot that make holds, or none held, taken at `now` for `request`
+/// and its line not said yet, so nothing waiting starts beside the remake
+/// and the one yes wait is never shared. Called before that wait is
+/// dropped. False when another make holds the slot: nothing is taken.
+pub fn retake(request: u64, held: u64, now: Instant) -> bool {
+    kept::queue(|queue| {
+        if queue
+            .running
+            .as_ref()
+            .is_some_and(|slot| slot.request != held)
+        {
+            return false;
+        }
+        queue.running = Some(Slot {
+            request,
+            said: false,
+            at: now,
+        });
+        true
+    })
 }
 
 /// What the model is told of a make queued at `place` as `label`: not made
@@ -992,6 +1022,53 @@ mod tests {
         said(5);
         let late = now + crate::skill_write_yes::YES_WITHIN + Duration::from_secs(1);
         assert!(step_now(late).run.is_some_and(|entry| entry.request == 6));
+    }
+
+    /// Heron's HOLD 2 on #7936 (#7912): make A waits for its yes, B is
+    /// queued, and "make it fifty" remakes A. The remake takes A's slot
+    /// before A's wait goes, so B never starts beside it and the one yes
+    /// wait is never shared; once the remake's line is said and its own
+    /// yes answered, B runs. A slot another make holds is never taken.
+    #[test]
+    fn a_remake_after_a_waiting_yes_keeps_the_slot() {
+        clear_for_test();
+        crate::skill_write_yes::clear_for_test();
+        let made = Arc::new(Mutex::new(Vec::new()));
+        let now = Instant::now();
+        assert!(matches!(
+            admit(3, by("ann"), "study".into(), now, work(3, &made)),
+            Admitted::Run
+        ));
+        assert!(matches!(
+            admit(4, by("ann"), "gold".into(), now, work(4, &made)),
+            Admitted::Queued { .. }
+        ));
+        let id = waits_for_yes("study-time", 3, now);
+        said(3);
+        // Another make's request holds nothing of A's: not taken.
+        assert!(!retake(9, 5, now));
+        // The change: the slot is taken for its request, then the wait goes.
+        assert!(retake(9, 3, now));
+        assert!(crate::skill_write_yes::drop_wait(&id));
+        assert!(
+            step_now(now + Duration::from_secs(1)).run.is_none(),
+            "B waits while A is made again"
+        );
+        // A's old request no longer frees it.
+        said(3);
+        assert!(step_now(now + Duration::from_secs(2)).run.is_none());
+        // The remake's line said, its own yes waiting: B still waits.
+        let again = waits_for_yes("study-time", 9, now + Duration::from_secs(3));
+        said(9);
+        assert!(step_now(now + Duration::from_secs(4)).run.is_none());
+        assert!(crate::skill_write_yes::drop_wait(&again));
+        let entry = step_now(now + Duration::from_secs(5)).run.expect("B runs");
+        assert_eq!(entry.request, 4);
+        // Nothing under way and none waiting: the remake takes the free slot.
+        clear_for_test();
+        assert!(retake(12, 11, now));
+        assert!(busy());
+        clear_for_test();
     }
 
     /// "Never mind the gold one": only that one is dropped, the rest keep

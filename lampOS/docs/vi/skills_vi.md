@@ -1627,24 +1627,49 @@ sau:
     và rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
     là dừng mới từ chối nó. Một câu là thay đổi, lời "không" hay chuyện
     khác là việc mô hình phán đoán, không bao giờ là danh sách từ; code áp
-    dụng nó (`make_skill_local::making_changed`). Khi đang chạy, thay đổi
-    được giữ cho lần tạo: ở lần nhìn cuối (`OneAsk::settled`) kỹ năng viết
-    trước được thả như một kỹ năng bị từ chối (`forget_unput`, không bao
-    giờ được nói) và lời nhờ được tạo lại, trong cùng lần tạo, với request
-    đầu nguyên vẹn và thay đổi theo sau, được nói là thắng ở chỗ hai cái
-    khác nhau, và câu nghe được của thay đổi sau câu đầu (một ghi được giữ
-    theo cả hai); một lời "không" hay thay đổi sau đó vẫn thấy nó đang chạy.
-    Lượt của thay đổi được báo là nó đã được nhận (`"changed": true`,
-    `CHANGED_NEXT`), không bao giờ là nó sẽ không được tạo; một thay đổi
-    sau một lời từ chối ngay trước đó lấy lại lần tạo; một thay đổi quá lần
+    dụng nó (`make_skill_local::making_changed`). Một thay đổi chỉ được
+    tính khi đến từ người đã nhờ tạo (người của họ trong memory scope, giữ
+    cùng lời nhờ, `AskedBy`; một lần tạo đã chờ lượt giữ người được đọc lúc
+    nhờ) hoặc chủ của đèn, đúng quy tắc huỷ của hàng đợi (HOLD 1 của Heron
+    trên #7936): của bất kỳ ai khác, hay một câu không ai được biết nói, không
+    đổi gì, không bao giờ vào câu nghe được của lần tạo, và được báo chỉ
+    người đã nhờ mới đổi được (`"error": "not_theirs"`). Một thay đổi làm
+    lời nhờ dài quá `made_skill::MOST_REQUEST_BYTES` không đổi gì và được
+    báo ngay (`"error": "too_long"`), không bao giờ "đã đổi" rồi mới "quá
+    dài". Khi đang chạy, thay đổi được giữ cho lần tạo: ở lần nhìn cuối
+    (`OneAsk::settled`) kỹ năng viết trước được thả như một kỹ năng bị từ
+    chối (`forget_unput`, không bao giờ được nói) và lời nhờ được tạo lại,
+    trong cùng lần tạo, với request đầu nguyên vẹn và thay đổi theo sau,
+    được nói là thắng ở chỗ hai cái khác nhau, và câu nghe được của thay
+    đổi sau câu đầu (một ghi được giữ theo cả hai); một lời "không" hay
+    thay đổi sau đó vẫn thấy nó đang chạy. Lượt của thay đổi được báo là nó
+    đã được nhận (`"changed": true`, `CHANGED_NEXT`), không bao giờ là nó sẽ
+    không được tạo. Một thay đổi sau "never mind", khi lần tạo còn đang
+    chạy, lấy lại lần tạo: nó được tạo, cùng thay đổi. Một thay đổi quá lần
     nhìn cuối được báo là sắp xong và có thể nhờ đổi khi nó sẵn sàng
     (`FINISHING_CHANGE_NEXT`). Code của một lần tạo bằng giọng nói đang chờ
-    lời "có", được đổi qua id của lần tạo hay id của chính lần chờ: lần chờ
-    bị bỏ, gói của nó (chưa từng bật) bị quên, và nó được tạo lại ngay
-    trong lượt của thay đổi (`Making::Again`). Một lần tạo đã xong và đã
-    bật được báo rằng thay đổi của nó là một lần tạo mới, cả lời nhờ cùng
-    thay đổi. Một câu về chuyện khác để yên lần tạo. Kiểm thử:
+    lời "có", được đổi qua id của lần tạo hay id của chính lần chờ: với
+    `LAMP_MAKE_QUEUE`, lần tạo lại trước hết lấy chỗ của hàng đợi từ lần
+    tạo đang chờ (`make_queue::retake`, HOLD 2), nên một lần tạo xếp hàng
+    sau nó không bao giờ chạy cùng lúc với lần tạo lại và lần chờ "có" duy
+    nhất không bao giờ bị dùng chung; khi một lần tạo khác giữ chỗ, không
+    gì được đổi (`"error": "busy"`). Rồi lần chờ bị bỏ, gói của nó (chưa
+    từng bật) bị quên, và lượt của thay đổi được báo ngay, như khi đang
+    chạy (`CHANGED_NEXT`, HOLD 3); lần tạo lại chạy ngoài lượt
+    (`second_provider::worker::run_remade`), theo người đã nhờ đầu tiên,
+    câu của nó được nói qua dịch vụ nói như của một lần tạo đã chờ lượt,
+    và việc đó trả chỗ. Một lần tạo đã xong và đã bật được báo rằng thay
+    đổi của nó là một lần tạo mới, cả lời nhờ cùng thay đổi. Một câu về
+    chuyện khác để yên lần tạo. "change" cho một lần chờ không phải của một
+    lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
+    đã thả) được đọc là chưa rõ, không bao giờ là lời "không". Kiểm thử:
     `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
+    `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `a_change_to_a_wait_of_no_make_reads_as_unclear`,
+    `a_change_past_the_longest_ask_is_told_at_once`,
+    `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
     `never_mind_said_while_made_ends_it`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
