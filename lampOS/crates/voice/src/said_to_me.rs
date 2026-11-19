@@ -447,6 +447,26 @@ mod tests {
         );
     }
 
+    /// #7891 (the P2 from #7908's cross-read): out of the window, a name
+    /// heard only in the room's sound is named by the words only where they
+    /// call the lamp: "lamp" anywhere, or a word written for it in a name's
+    /// place ("Lynn, what time is it?"). A stand-in mid-line ("the plan is
+    /// fine") is no name, so the face rule judges the line.
+    #[test]
+    fn a_sound_only_name_needs_its_words_to_call_the_lamp_out_of_the_window() {
+        let heard_only = |heard| Line {
+            name_heard: true,
+            ..facing(heard, false)
+        };
+        assert_eq!(
+            judge(heard_only("I think the plan is fine for Thursday")),
+            Said::Held(Held::NotSeenSpeaking)
+        );
+        for call in ["Lynn, what time is it?", "Hey, Lynn.", "Lamp?", "Turn the lamp off"] {
+            assert_eq!(judge(heard_only(call)), Said::Stands, "{call}");
+        }
+    }
+
     /// #7442's rules, one by one.
     #[test]
     fn a_line_is_said_to_the_lamp_by_name_conversation_or_face_and_words() {
