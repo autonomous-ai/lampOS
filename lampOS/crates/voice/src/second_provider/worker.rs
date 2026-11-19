@@ -7917,6 +7917,15 @@ pub(crate) struct Heeding {
     /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or seen spoken by
     /// two faces. Gone when a line is judged with no conversation going on.
     another_person: Option<u64>,
+    /// When a line judged under `LAMP_SAID_TO_ME` last ended that showed a
+    /// second voice in the room, by this process's monotonic clock: a face
+    /// in view read silent through it with none read speaking (a voice with
+    /// no mouth: a call's far side, a video, someone off camera), or two
+    /// faces seen speaking it ([`Self::not_said_to_me`]). Faces and looks
+    /// only, never a voice print (#7891). Read for
+    /// [`crate::said_to_me::Line::second_voice`] when after the end of the
+    /// lamp's last words and within `room_told::BUSY_ENDS_AFTER_US`.
+    second_voice_at: Option<u64>,
     /// [`Self::another_person`] told to the reply's owner-by-default rule
     /// (`LAMP_PERSON_NAME_BY_DEFAULT`, #3884): set while the conversation
     /// has shown another person.
@@ -8349,7 +8358,8 @@ fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
 /// to `ended_us`, by this process's clock; never without them. With
 /// `unread_spoils`, a turned mouth unread in any look says no
 /// ([`crate::speaking_faces::SpeakingFaces::turned_only_silent`]); without,
-/// it doesn't (`turned_not_seen_speaking`).
+/// a turned mouth the eyes judged and never read is not speaking either
+/// (`turned_never_seen_speaking`, #7891).
 fn turned_only_silent(
     eyes: Option<&(
         Arc<crate::speaking_faces::SpeakingFaces>,
@@ -8364,7 +8374,7 @@ fn turned_only_silent(
     };
     match line_between(began_us, ended_us) {
         Some((from, to)) if unread_spoils => eyes.turned_only_silent(from, to),
-        Some((from, to)) => eyes.turned_not_seen_speaking(from, to),
+        Some((from, to)) => eyes.turned_never_seen_speaking(from, to),
         None => false,
     }
 }
@@ -8971,6 +8981,7 @@ impl Heeding {
             rooms: None,
             in_view: None,
             another_person: None,
+            second_voice_at: None,
             another_voice: None,
             first_seconds_quiet: false,
             another_since_start: false,
@@ -11132,15 +11143,16 @@ impl Heeding {
     /// name's note read it (the reviewer-lead's P2 on #2546), and nothing
     /// fresh from the eyes (`None`) stays as it is.
     ///
-    /// `LAMP_TURNED_FACE_SPEAKS`: the same when the faces turned to it were
-    /// read and none was seen speaking the line, a look unread among them
-    /// ([`crate::speaking_faces::SpeakingFaces::turned_not_seen_speaking`]),
-    /// unless the line is in the conversation's voice
-    /// ([`crate::same_voice::SAME_FROM`] or over). The line, held, is then
-    /// talk for the room ([`crate::room_told::RoomTold::face_not_speaking`]).
-    /// With no speaking read (`LAMP_EYES_SPEAKING` off, or the turned
-    /// mouths never read), the face is a sign as before: fail open, so a
-    /// person alone at a lamp whose eyes can't read mouths is still answered.
+    /// `LAMP_TURNED_FACE_SPEAKS`: the same when none of the faces turned to
+    /// it was seen speaking the line, read still or never read
+    /// ([`crate::speaking_faces::SpeakingFaces::turned_never_seen_speaking`],
+    /// #7891: "speaking in 0, unread in 8" is not seen speaking), unless the
+    /// line is in the conversation's voice ([`crate::same_voice::SAME_FROM`]
+    /// or over). The line, held, is then talk for the room
+    /// ([`crate::room_told::RoomTold::face_not_speaking`]). With no speaking
+    /// judged at all (`LAMP_EYES_SPEAKING` off), the face is a sign as
+    /// before: fail open, so a person alone at a lamp whose eyes can't read
+    /// mouths is still answered.
     ///
     /// `LAMP_SAID_TO_ME` ([`Self::not_said_to_me`]) first: what it holds
     /// loses the face and the conversation as signs, and the rules below
@@ -11234,6 +11246,12 @@ impl Heeding {
             lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
             question_waits: self.question_waits(request, heard, signs),
             turned,
+            // An earlier line's second voice, since the lamp last spoke and
+            // within the busy room's span (#7891).
+            second_voice: self.second_voice_at.is_some_and(|at| {
+                at > self.said_until_us.unwrap_or_default()
+                    && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
+            }),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11242,11 +11260,23 @@ impl Heeding {
             Some(((eyes, _), (from, to))) => line.with_eyes(eyes, from, to, another_voice),
             None => (line, 0, false),
         };
+        // This line's own second voice, for the lines after it: a face in
+        // view read silent through it, none read speaking, and more than
+        // `SHORT_WORDS` words (a lip smack heard as "Mm." is the face's own,
+        // #7442), or two faces seen speaking it (#7891).
+        let voiceless =
+            line.read_silent && heard.split_whitespace().count() > crate::said_to_me::SHORT_WORDS;
+        if voiceless || speakers_between(self.eyes.as_ref(), said.0, said.1).0.len() > 1 {
+            self.second_voice_at = Some(said.1);
+        }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
+        }
+        if !going_on {
+            pose.push_str(&format!(", seen speaking facing in {}", line.facing_looks));
         }
         let words = heard.split_whitespace().count();
         // Every decision journaled with the pose, for a row to count
@@ -28357,9 +28387,10 @@ mod tests {
     /// "someone is turned to the lamp"): with `LAMP_SPOKEN_TO`, in a room
     /// not known to be busy, quiet, or busy, a line let out by a face turned
     /// to the lamp is held when that face was read and never seen speaking
-    /// it, a look unread among them; let out when it was seen speaking (its
-    /// mouth still between words too), when its mouth was never read, or
-    /// without the switch. `LAMP_TURNED_SPEAKING` alone lets the still face
+    /// it, a look unread among them, or never read (#7891); let out when it
+    /// was seen speaking (its mouth still between words too), when no
+    /// speaking was read at all, or without the switch.
+    /// `LAMP_TURNED_SPEAKING` alone lets the still face
     /// with one unread look through, as it did on the lamp.
     #[test]
     fn with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking() {
@@ -28412,10 +28443,9 @@ mod tests {
                 None,
                 "{room:?}: the face speaks"
             );
-            assert_eq!(
-                judged(true, false, room, &[Some(Unknown)]),
-                None,
-                "{room:?}: its mouth never read"
+            assert!(
+                judged(true, false, room, &[Some(Unknown)]).is_some(),
+                "{room:?}: its mouth never read (#7891)"
             );
             assert_eq!(
                 judged(true, false, room, &[None]),
@@ -28484,8 +28514,14 @@ mod tests {
             let held = |states: &[_], words| judged(true, false, states, facing, words).is_some();
             assert!(held(&[Some(Unknown)], "Mm."), "a mouth never read");
             assert!(held(&speaking, "Mm."), "seen speaking, a short remark");
-            assert!(!held(&speaking, "Weather today?"), "a short question");
-            assert!(!held(&speaking, "What time is it"), "four words");
+            // Seen speaking in one look is too few (#7891); in five, three.
+            let one_look = looks == 1;
+            assert_eq!(
+                held(&speaking, "Weather today?"),
+                one_look,
+                "a short question"
+            );
+            assert_eq!(held(&speaking, "What time is it"), one_look, "four words");
             assert!(
                 held(&still, "What time is it"),
                 "four words, not seen speaking"
