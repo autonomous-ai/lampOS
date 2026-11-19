@@ -1768,6 +1768,22 @@ fn round_saying(lamp: &Lamp, systemd: &mut Fake, runs: &Runs) -> Vec<String> {
     said
 }
 
+/// Harness's one-shot run with this build's own pins over the OpenClaw
+/// there, and the lines it said.
+fn one_shot_saying(lamp: &Lamp, runs: &Runs) -> Vec<String> {
+    let mut said = Vec::new();
+    install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 40,
+        &mut |line: &str| said.push(line.to_owned()),
+        &Kit::BUILT,
+    )
+    .unwrap();
+    said
+}
+
 fn config_of(lamp: &Lamp) -> serde_json::Value {
     serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap()
 }
@@ -1783,13 +1799,42 @@ fn installs_block(lamp: &Lamp) -> serde_json::Value {
     })
 }
 
+/// A round over a `gateway` block not as the install writes it: it writes
+/// nothing of OpenClaw's itself, as `lamp-update.service`'s sandbox never
+/// lets it write OpenClaw's state folder (`ProtectSystem=strict`, and a
+/// round never changes its own unit, `the_updaters_own_sandbox_is_still_the_7071_images`
+/// in main.rs): `openclaw.json` stays byte for byte, no command runs, and
+/// Harness's one-shot is asked and started.
+fn a_round_asks_the_one_shot(lamp: &Lamp) {
+    let before = fs::read(lamp.at(CONFIG)).ok();
+    let runs = Runs::new(lamp);
+    let mut systemd = Fake::default();
+    round_saying(lamp, &mut systemd, &runs);
+    assert_eq!(
+        fs::read(lamp.at(CONFIG)).ok(),
+        before,
+        "the round writes it not"
+    );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("config validate") || line.contains("chown")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(lamp.asked().is_some(), "the one-shot is asked");
+    assert!(systemd.asked.contains(&"start"), "and started");
+}
+
 /// #7868 (the first builder, 20:11): a reset whose cut was not taken
 /// removes `openclaw.json`, and a lamp with OpenClaw installed runs no
 /// install, so each round checks the `gateway` block, as #7879 checks the
-/// gateway's unit. Removed, the next round writes it again, checked by
-/// OpenClaw's own `config validate --json` before the gateway's
-/// `try-restart`, with no install and no one-shot; every other key is kept,
-/// and the round after it, finding it as written, checks nothing.
+/// gateway's unit. Removed, the next round asks Harness's one-shot (the
+/// round's own sandbox can't write it), which installs nothing: it writes
+/// the block again, checked by OpenClaw's own `config validate --json`
+/// before the gateway's `try-restart`, every other key kept. The round
+/// after it, finding it as written, asks nothing.
 #[test]
 fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round() {
     let lamp = installed_openclaw();
@@ -1799,9 +1844,9 @@ fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round(
     config["models"] = serde_json::json!({"mode": "merge"});
     fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
 
+    a_round_asks_the_one_shot(&lamp);
     let runs = Runs::new(&lamp);
-    let mut systemd = Fake::default();
-    let said = round_saying(&lamp, &mut systemd, &runs);
+    let said = one_shot_saying(&lamp, &runs);
     let config = config_of(&lamp);
     assert_eq!(config["gateway"], installs_block(&lamp));
     assert_eq!(config["models"], serde_json::json!({"mode": "merge"}));
@@ -1811,9 +1856,15 @@ fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round(
         "{:#?}",
         runs.lines()
     );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("curl") || line.contains(NPM_CI_ENV)),
+        "nothing installed: {:#?}",
+        runs.lines()
+    );
     assert_eq!(lamp.said().unwrap().install, "installed");
-    assert_eq!(lamp.asked(), None, "no install asked");
-    assert!(!systemd.asked.contains(&"start"), "no one-shot started");
     assert!(
         said.iter()
             .any(|line| line.contains("gateway block") && line.contains("written again")),
@@ -1821,20 +1872,15 @@ fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round(
     );
 
     let again = Runs::new(&lamp);
-    round_saying(&lamp, &mut Fake::default(), &again);
-    assert!(
-        !again
-            .lines()
-            .iter()
-            .any(|line| line.contains("config validate") || line.contains("try-restart")),
-        "{:#?}",
-        again.lines()
-    );
+    let mut systemd = Fake::default();
+    round_saying(&lamp, &mut systemd, &again);
+    assert_eq!(lamp.asked(), None, "nothing asked");
+    assert!(!systemd.asked.contains(&"start"), "no one-shot");
 }
 
 /// #7868: a `gateway` block not as the install writes it (another port, a
-/// changed token) is written again at the next round, a key of OpenClaw's
-/// own in it kept, and the gateway restarted on it.
+/// changed token) is written again by the one-shot the next round asks, a
+/// key of OpenClaw's own in it kept, and the gateway restarted on it.
 #[test]
 fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
     let lamp = installed_openclaw();
@@ -1844,8 +1890,9 @@ fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
     config["gateway"]["controlUi"] = serde_json::json!({"enabled": false});
     fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
 
+    a_round_asks_the_one_shot(&lamp);
     let runs = Runs::new(&lamp);
-    round_saying(&lamp, &mut Fake::default(), &runs);
+    one_shot_saying(&lamp, &runs);
     let mut wanted = installs_block(&lamp);
     wanted["controlUi"] = serde_json::json!({"enabled": false});
     assert_eq!(config_of(&lamp)["gateway"], wanted);
@@ -1855,10 +1902,10 @@ fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
     );
 }
 
-/// #7868: OpenClaw's own check refusing the round's `gateway` block leaves
+/// #7868: OpenClaw's own check refusing the `gateway` block leaves
 /// `openclaw.json` byte for byte with nothing beside it, restarts nothing,
 /// and says so in one line with no values: OpenClaw's words naming the
-/// gateway's token never reach the journal.
+/// gateway's token never reach the journal. The next round asks again.
 #[test]
 fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
     let lamp = installed_openclaw();
@@ -1872,18 +1919,21 @@ fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
         .unwrap()
         .to_owned();
 
+    a_round_asks_the_one_shot(&lamp);
     let refusing = Runs {
         fail_on: Some("config validate --json"),
         error: leak(format!("gateway.auth.token: Invalid input \"{token}\"")),
         ..Runs::new(&lamp)
     };
-    let mut systemd = Fake::default();
-    let said = round_saying(&lamp, &mut systemd, &refusing);
+    let said = one_shot_saying(&lamp, &refusing);
     assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
     assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), beside);
     refusing.position("config validate --json");
     assert!(
-        !refusing.lines().iter().any(|line| line.contains("restart")),
+        !refusing
+            .lines()
+            .iter()
+            .any(|line| line.contains(&format!("restart -- {UNIT}"))),
         "{:#?}",
         refusing.lines()
     );
@@ -1893,6 +1943,8 @@ fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
         .unwrap_or_else(|| panic!("{said:#?}"));
     assert!(!line.contains(&token), "{line}");
     assert!(line.contains("the gateway not restarted"), "{line}");
+
+    a_round_asks_the_one_shot(&lamp);
 }
 
 /// The app's tap (#6240, V2's ask of 12 Nov) is a deliberate try again, as
