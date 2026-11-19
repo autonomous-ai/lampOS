@@ -2481,6 +2481,33 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   engine xoá cả file token. Phiên chưa đóng được thì thử lại ở lần nhìn sau,
   và trong lúc đó không mở pane nào. Factory reset xoá thư mục store, cả
   token.
+- **Phiên mới khi gần giới hạn ngữ cảnh (#7906).** Điều này sửa quy tắc
+  "không bắt đầu lại" của #7246: trên lamp-52e6 một lần make làm tràn phiên
+  được giữ (`context_length_exceeded`, 127014 trên 128000 token, 175 tin
+  nhắn), rồi việc tự nén của OpenClaw làm mất nhiệm vụ của lần make
+  (`loss=summary-tail`) cho tới hạn chót 600 s. Harness không cho biết số
+  token, và bộ đếm riêng của pane (`Pane.tokens`, 4 ký tự một token của chữ
+  đã gõ và đã đọc) bỏ sót đầu ra của công cụ và về 0 sau khi khởi động lại,
+  nên trước mỗi lượt, một lần, lamp-tasks đọc kích thước phiên trong bản ghi
+  của chính OpenClaw (`harness::openclaw_session_size`: phiên hiện tại của
+  node trong `<OPENCLAW_STATE_DIR>/agents/main/agent/openclaw-agent.sqlite`,
+  mở chỉ đọc; đếm các dòng có vai trò, cộng số byte đã lưu và tính 4 byte
+  một token). Một lần make được vào phiên mới khi phiên cũ đã có 76.800
+  token (`MAKE_FRESH_TOKENS`, 60% của 128k, chừa khoảng 51k cho hướng dẫn
+  make, các ví dụ nó đọc, đầu ra công cụ và bản nháp) hoặc hơn 100 tin nhắn
+  (`MAKE_FRESH_MESSAGES`; phiên của 52e6 khoảng 725 token một tin nhắn, nên
+  khoảng 57%); các việc khác khi phiên có 108.800 token (`TASK_FRESH_TOKENS`,
+  85%) hoặc hơn 150 tin nhắn (`one_session::near_context_limit`). Việc bắt
+  đầu lại giống hệt xoay vòng: pane được bỏ, `ensure --fresh`, và
+  `engineSession` cũ bị xoá bằng `sessions.delete`; với việc nói, luồng
+  one-session mở phiên mới, như khi xoay vòng. Nhiều nhất một lần mỗi lượt,
+  và phiên nhỏ được giữ nguyên. Không đọc được bản ghi (không có file, schema
+  khác, bận quá 200 ms) thì bộ đếm riêng của pane được so với cùng ngưỡng
+  token. Lần đọc là một lần mở SQLite cục bộ và ba truy vấn ngắn theo khoá
+  `(session_id, seq)`: khoảng 2 ms khi đã ấm và nhiều nhất 15 ms khi nguội
+  trong bản build debug trên Mac, dưới xa 50 ms. Journal: `<id> is near its
+  context (<n> messages, ~<t> tokens) before a make: a fresh session (read in
+  <ms> ms)`.
 - **Quên, và rảnh lâu: bị gỡ, rồi mở phiên mới.** Lệnh "quên hết" của chủ
   đèn (`ForgetSessions`, #6274) gỡ phiên được giữ như khi đăng xuất, khi
   không còn gì giữ nó: `harness close`, rồi `sessions.delete` với

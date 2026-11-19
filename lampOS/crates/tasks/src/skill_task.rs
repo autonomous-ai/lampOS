@@ -4120,7 +4120,7 @@ impl HarnessRunner {
             folder: folder_text,
         };
         let turn = match one.enter(&run.run, Kind::Skill, until, stopped) {
-            Ok(turn) => turn,
+            Ok(turn) => turn.as_make(self.makes),
             Err(Refused::Busy) => return Some(Err(crate::one_session::BUSY.into())),
             Err(Refused::Ended) => {
                 return Some(Err("the skill run ended before hand-over".into()));
