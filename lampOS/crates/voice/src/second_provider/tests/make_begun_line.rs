@@ -104,9 +104,9 @@ async fn a_copied_make_line_with_no_call_is_not_said_and_asked_again_with_make_s
     // The history carries the lamp's own line, with no call beside it.
     assert!(
         asked[0].iter().any(|message| message.role == "assistant"
-            && message
-                .words()
-                .is_some_and(|words| words.contains("about a minute"))),
+            && message.words().is_some_and(
+                |words| words.contains(crate::make_skill_agent::ONE_PATH_WAITING_LINE)
+            )),
         "{:?}",
         asked[0]
             .iter()
@@ -128,7 +128,7 @@ async fn a_copied_make_line_with_no_call_is_not_said_and_asked_again_with_make_s
     assert!(!asked[1].iter().skip(asked[0].len()).any(|message| {
         message
             .words()
-            .is_some_and(|words| words.contains("about a minute"))
+            .is_some_and(|words| words.contains(crate::make_skill_agent::ONE_PATH_WAITING_LINE))
     }));
 }
 

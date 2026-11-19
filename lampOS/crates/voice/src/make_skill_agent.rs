@@ -158,7 +158,15 @@ pub fn waiting_line(one_path: bool) -> &'static str {
 /// copied it from the history (lamp-9adf, 18 Nov 04:23–04:25: after a make
 /// waited for its yes, three new make asks each got "I'll make it now. This
 /// takes about a minute. I'm on it." with `calls=none`, nothing made).
-pub const BEGUN_LINES: [&str; 2] = [ONE_PATH_WAITING_LINE, LONG_WAIT_LINE];
+pub const BEGUN_LINES: [&str; 3] = [
+    ONE_PATH_WAITING_LINE,
+    ONE_PATH_WAITING_LINE_BEFORE,
+    LONG_WAIT_LINE,
+];
+/// The waiting line the one run path said before 19 Nov ("about a minute"),
+/// still one of [`BEGUN_LINES`]: a conversation held over the update may
+/// carry it, and a copy of it from that history is caught as the new one is.
+pub const ONE_PATH_WAITING_LINE_BEFORE: &str = "This takes about a minute. I'm on it.";
 
 /// What the model is told when its reply said one of [`BEGUN_LINES`] with
 /// no `make_skill` call: that reply was not said, and the round is asked
