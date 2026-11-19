@@ -503,6 +503,23 @@ impl Net {
         self
     }
 
+    /// The task that sends forgets to the account's history, with the
+    /// route's key at the lamp's cloud API (`LAMP_HISTORY_FORGET`, #7771,
+    /// [`net::history::task`]); `None` with the switch off.
+    pub fn history_forget_task(&self) -> Option<BoxFuture<'static, ()>> {
+        if !crate::history_forget::on() {
+            return None;
+        }
+        let (queue, bell) = crate::history_forget::queue();
+        Some(Box::pin(net::history::task(
+            net::history::url(&self.config.llm_base_url),
+            self.config.llm_key.expose().to_owned(),
+            queue,
+            bell.clone(),
+            net::history::Pace::PRODUCT,
+        )))
+    }
+
     /// The task that asks the relay for its routes, for the worker's
     /// runtime ([`routes::task`]); `None` without [`Self::routing_through_the_relay`].
     pub fn routes_task(&self) -> Option<BoxFuture<'static, ()>> {

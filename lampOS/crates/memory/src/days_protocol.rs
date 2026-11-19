@@ -1340,9 +1340,56 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
     })
 }
 
+/// The most exchange ids a forget's answer names (#7771): an answer stays
+/// well inside the voice's 8 KiB. A scope with more is named in
+/// `exchanges_cut` instead, all of it.
+pub const MOST_TOLD_EXCHANGES: usize = 400;
+
+/// The forgets whose answer names the exchanges they removed (#7771).
+const TELLS_EXCHANGES: &[&str] = &[
+    "forget",
+    "forget_last",
+    "forget_all",
+    "forget_said",
+    "exchanges_forget",
+];
+
+/// What a forget removed of exchanges, for the voice to delete the same
+/// turns on the account (#7771): `exchanges`, each scope's ids, and
+/// `exchanges_cut`, the scopes with more than fit. `except`'s own are left
+/// out: a forget of everything of theirs is told whole by the voice.
+/// Ids only, never words.
+fn exchanges_told(gone: Vec<(String, u64)>, except: &str) -> Option<(Value, Vec<String>)> {
+    let mut scopes: std::collections::BTreeMap<String, Vec<u64>> = Default::default();
+    for (scope, id) in gone {
+        if scope != except {
+            scopes.entry(scope).or_default().push(id);
+        }
+    }
+    if scopes.is_empty() {
+        return None;
+    }
+    let mut told = serde_json::Map::new();
+    let mut cut = Vec::new();
+    let mut room = MOST_TOLD_EXCHANGES;
+    for (scope, mut ids) in scopes {
+        ids.sort_unstable();
+        ids.dedup();
+        if ids.len() > room {
+            cut.push(scope);
+        } else {
+            room -= ids.len();
+            told.insert(scope, json!(ids));
+        }
+    }
+    Some((Value::Object(told), cut))
+}
+
 pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
     let mut op = "?".to_owned();
     let mut who = "?".to_owned();
+    // Only this request's forgets are told in its answer.
+    store.take_forgot();
     let result = (|| -> Result<Value> {
         if line.len() > protocol::MOST_LINE_BYTES {
             return Err(Error::new("too_long", "a request line is at most 64 KiB"));
@@ -1438,6 +1485,21 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             )
         }
     })();
+    let gone = store.take_forgot();
+    let result = result.map(|mut response| {
+        if TELLS_EXCHANGES.contains(&op.as_str())
+            && response["ok"] == true
+            && who != "*"
+            && let Some((told, cut)) =
+                exchanges_told(gone, if op == "forget_all" { who.as_str() } else { "" })
+        {
+            response["exchanges"] = told;
+            if !cut.is_empty() {
+                response["exchanges_cut"] = json!(cut);
+            }
+        }
+        response
+    });
     let done = result.is_ok();
     let (response, outcome, storage_fault, wrote) = match result {
         Ok(response) => {
@@ -1528,6 +1590,72 @@ mod tests {
     }
 
     const NOW_MS: u64 = NOW;
+
+    /// #7771: a forget's answer names the exchanges it removed, by scope
+    /// and id, for the voice to delete the same turns on the account; a
+    /// forget of everything of a person's leaves their own out (the voice
+    /// sends that person's whole history's delete) and names the room's
+    /// lines it took; ids only, never words.
+    #[test]
+    fn a_forget_names_the_exchanges_it_removed_by_scope_and_id() {
+        let (_scratch, mut store) = Scratch::new("forgot-exchanges");
+        let minh = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let line = |store: &mut Days, person: &str, heard: &str| -> u64 {
+            let added = send(
+                store,
+                json!({"op":"append_linked","person":person,"at_unix_ms":NOW,"heard":heard,"said":"ok","source_ids":[]}),
+            );
+            added["id"].as_u64().unwrap()
+        };
+        let first = line(&mut store, minh, "the blue scarf");
+        let second = line(&mut store, minh, "coffee at nine");
+        let third = line(&mut store, minh, "coffee again");
+        // A forget by id: that exchange, and nothing else.
+        let forgot = send(&mut store, json!({"op":"forget","person":minh,"id":first}));
+        assert_eq!(forgot["exchanges"], json!({ minh: [first] }), "{forgot}");
+        assert!(!forgot.to_string().contains("scarf"), "{forgot}");
+        // A forget about a thing: each exchange it took.
+        let about = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":minh,"about":[["coffee"]]}),
+        );
+        assert_eq!(about["removed"], 2, "{about}");
+        assert_eq!(
+            about["exchanges"],
+            json!({ minh: [second, third] }),
+            "{about}"
+        );
+        // Nothing removed: nothing named.
+        let none = send(&mut store, json!({"op":"forget","person":minh,"id":first}));
+        assert!(none.get("exchanges").is_none(), "{none}");
+        // Forget everything of theirs: their own are not listed.
+        line(&mut store, minh, "tea later");
+        let all = send(&mut store, json!({"op":"forget_all","person":minh}));
+        assert_eq!(all["ok"], true, "{all}");
+        assert!(all.get("exchanges").is_none(), "{all}");
+        // Another request's answer never carries an earlier forget's.
+        let status = send(&mut store, json!({"op":"status","person":minh}));
+        assert!(status.get("exchanges").is_none(), "{status}");
+    }
+
+    /// #7771: more removed of a scope than an answer names is that scope
+    /// named as cut, never a partial list.
+    #[test]
+    fn more_exchanges_than_fit_are_told_as_a_cut_scope() {
+        let gone = (1..=MOST_TOLD_EXCHANGES as u64 + 1)
+            .map(|id| ("p-0123456789abcdef".to_owned(), id))
+            .chain([("everyone".to_owned(), 7)])
+            .collect();
+        let (told, cut) = exchanges_told(gone, "").unwrap();
+        assert_eq!(told, json!({"everyone":[7]}));
+        assert_eq!(cut, ["p-0123456789abcdef"]);
+        assert!(
+            exchanges_told(vec![("p-0123456789abcdef".into(), 1)], "p-0123456789abcdef").is_none()
+        );
+    }
 
     /// `LAMP_MEMORY_ROLE` (the memory owner's design, 6 Nov): a known
     /// person's role is kept across a reopen of the store, read with their

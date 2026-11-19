@@ -14727,7 +14727,12 @@ fn legacy_exchange(
 ) -> Option<Value> {
     match lease {
         Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
-        None => crate::tools::exchange(socket, line, budget),
+        None => {
+            let answer = crate::tools::exchange(socket, line, budget)?;
+            // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
+            crate::history_forget::answered(line, &answer);
+            Some(answer)
+        }
     }
 }
 
@@ -14902,6 +14907,10 @@ fn exchange_guarded(
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
+                    // What a forget removed reaches the account's history
+                    // too, whether or not this caller still wants the answer
+                    // (`LAMP_HISTORY_FORGET`, #7771).
+                    crate::history_forget::answered(line, &value);
                     if !current() {
                         return None;
                     }
