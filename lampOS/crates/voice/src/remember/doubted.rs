@@ -89,11 +89,11 @@ pub const TAKEN_BACK_LINE: &str = "Sorry, I didn't keep that after all.";
 
 /// [`NOT_KEPT`] with [`UNSURE_ENVIRONMENT`]: nothing kept, the person told
 /// so in [`NOT_CAUGHT_LINE`]'s few words, nothing asked, never said kept.
-pub const NOT_KEPT_NO_ASK: &str = "Not kept: in this same reply you doubted what you heard, so nothing is kept. Tell them so in a few words, with no question, for example \"I didn't catch that well enough to keep it.\" Never ask \"did you say ...?\" or ask them to say it again, and never say it was kept.";
+pub const NOT_KEPT_NO_ASK: &str = "Not kept: in this same reply you doubted what you heard, so nothing is kept. Tell them so in a few words, with no question, for example \"I didn't catch that well enough to keep it.\", and end your reply there: never ask \"did you say ...?\" or ask them to say it again, spell it or say more, and never say it was kept.";
 
 /// [`UNDONE_NOTE`] with [`UNSURE_ENVIRONMENT`]: taken back for good, the
 /// person told so plainly ([`TAKEN_BACK_LINE`]), nothing more asked.
-pub const UNDONE_NO_ASK_NOTE: &str = "(For you to know: what you kept just before is taken back, since your words doubt what you heard, and it stays not kept. Tell them so plainly in a few words, with no question, for example \"Sorry, I didn't keep that after all.\" Ask nothing more about it, and never say it is kept.)";
+pub const UNDONE_NO_ASK_NOTE: &str = "(For you to know: what you kept just before is taken back, since your words doubt what you heard, and it stays not kept. Tell them so plainly in a few words, with no question, for example \"Sorry, I didn't keep that after all.\", and end your reply there: never ask them to say it again, spell it or say more, and never say it is kept.)";
 
 /// What the model is told of a keep not run on a line: with
 /// [`UNSURE_ENVIRONMENT`] [`NOT_KEPT_NO_ASK`], else [`NOT_KEPT`].
@@ -561,6 +561,13 @@ mod tests {
             assert!(!note.contains("Ask them"), "{note}");
             assert!(!note.contains("yes"), "{note}");
             assert!(note.contains("never say it"), "{note}");
+            // The 06c1 ROW at ac50913437 heard "… could you spell or say it
+            // again?" after the line: the reply ends at it.
+            assert!(note.contains("end your reply there"), "{note}");
+            assert!(
+                note.contains("say it again, spell it or say more"),
+                "{note}"
+            );
         }
     }
 

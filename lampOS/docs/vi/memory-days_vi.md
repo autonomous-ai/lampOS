@@ -297,8 +297,9 @@ nghi ngờ đến từ chính mô hình, không từ danh sách từ nào phán 
 nói: lời của vòng trả lời nghi ngờ điều đã nghe, hoặc câu của mô hình có cách
 viết gần với một từ đã nghe. Một `remember` mà chính vòng của nó nghi ngờ thì
 không chạy, và mô hình được báo là không giữ gì, phải nói ngắn gọn cho người
-đó biết, không kèm câu hỏi ("I didn't catch that well enough to keep it."),
-không hỏi gì (không "did you say …?", không bảo nói lại) và không bao giờ nói là
+đó biết, không kèm câu hỏi ("I didn't catch that well enough to keep it."), và
+dừng câu trả lời ở đó, không hỏi gì (không "did you say …?", không bảo nói lại,
+đánh vần hay nói thêm) và không bao giờ nói là
 đã giữ: người nói phải nghe được là chưa lưu, để nói lại (P1 của Twelve trên
 #7966). Một lần giữ mà vòng ngay sau nghi ngờ thì bị quên theo id (cần
 `LAMP_MEMORY_DOUBT_UNDOES`) và không chờ lời "có" nào, nên không cần mắt, và

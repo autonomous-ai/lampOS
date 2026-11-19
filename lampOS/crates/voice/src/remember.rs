@@ -3604,8 +3604,8 @@ pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remembe
 pub const REMEMBER_DESCRIBED_UNSURE: &str = "Call this when someone asks you to remember something or keep it in mind for later. \
                           Give what to keep as one short sentence that will still make sense weeks from now, \
                           with their own words for names and numbers. If you are not sure you heard a key word \
-                          right (a name, a number, or the thing itself), do not call this: say in a few words, \
-                          with no question, that you didn't catch it well enough to keep it. Else say back \
+                          right (a name, a number), do not call this: say only \"I didn't catch that well enough \
+                          to keep it.\" and end there; never ask them to repeat, spell or say more. Else say back \
                           in a few words what you kept, so they can put you right if you misheard; \
                           never also ask whether to keep it.";
 
@@ -21563,9 +21563,13 @@ mod tests {
     fn an_unsure_word_is_neither_kept_nor_asked_about_in_remember_alone() {
         assert!(REMEMBER_DESCRIBED_UNSURE.len() <= REMEMBER_DESCRIBED.len());
         assert!(REMEMBER_DESCRIBED.contains("ask them"));
-        assert!(!REMEMBER_DESCRIBED_UNSURE.contains("ask them"));
-        assert!(REMEMBER_DESCRIBED_UNSURE.contains("didn't catch it well enough to keep it"));
-        assert!(REMEMBER_DESCRIBED_UNSURE.contains("with no question"));
+        assert!(!REMEMBER_DESCRIBED_UNSURE.contains("ask them, in a few words"));
+        // The 06c1 ROW at ac50913437: "… keep it — could you spell or say
+        // it again?". The line is given whole, and every follow-up ask is
+        // named as never.
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains(doubted::NOT_CAUGHT_LINE));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("and end there"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("never ask them to repeat, spell or say more"));
         for (forget_all, forget_about) in
             [(false, false), (true, false), (false, true), (true, true)]
         {
