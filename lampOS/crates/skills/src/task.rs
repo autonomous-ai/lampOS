@@ -179,6 +179,11 @@ pub struct TaskFile {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskStep {
     pub task: String,
+    /// Its words as the folder writes them, untrimmed: what a new skill's
+    /// pack holds to the voice's own rule
+    /// (`lamp_voice::made_skill::task_words_plain`, #7874), measured as the
+    /// voice measures them.
+    pub words: String,
     pub run: String,
     /// The skill's own `[quiet]`, local minutes: what its agent found
     /// ([`told`]) is held to it beside the lamp's quiet hours, as a
@@ -199,6 +204,7 @@ impl TaskFile {
         run_ok(dir, &self.run)?;
         Ok(TaskStep {
             task: task.to_owned(),
+            words: self.task.clone(),
             run: self.run,
             quiet,
         })

@@ -2499,7 +2499,7 @@ impl Skill {
     /// (`lamp_voice::made_skill::task_words_plain`).
     fn task_refuses(&self) -> Option<&'static str> {
         self.task_step()
-            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.task))
+            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.words))
             .map(|_| TASK_WORDS_NOT_PLAIN)
     }
 
@@ -13523,6 +13523,18 @@ mod tests {
             load(&folder).unwrap().made_refuses(),
             Some(TASK_WORDS_NOT_PLAIN)
         );
+        assert_eq!(
+            package::pack(&folder, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
+        // 119 characters and a space each end: 121 as the voice counts
+        // them, so refused by both, never trimmed to 119 here.
+        let spaced = format!(
+            " {} ",
+            "é".repeat(lamp_voice::made_skill::MOST_TASK_CHARS - 1)
+        );
+        assert!(!lamp_voice::made_skill::task_words_plain(&spaced));
+        let folder = with_words("spaced", &spaced);
         assert_eq!(
             package::pack(&folder, &out).unwrap_err(),
             format!("not packed: {TASK_WORDS_NOT_PLAIN}")
