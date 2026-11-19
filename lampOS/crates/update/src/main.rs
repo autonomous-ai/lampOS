@@ -1768,5 +1768,16 @@ mod own_unit_line_tests {
         ] {
             assert!(!writable(&SANDBOX_7071, path), "{path}");
         }
+        // OpenClaw's config (#7868): a round's check of its `gateway`
+        // block only reads it; Harness's one-shot writes it.
+        let openclaw_config = std::path::Path::new(lamp_update::openclaw_install::CONFIG)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(
+            !writable(&SANDBOX_7071, openclaw_config),
+            "{openclaw_config}"
+        );
     }
 }
