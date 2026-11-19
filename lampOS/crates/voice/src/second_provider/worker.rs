@@ -5500,6 +5500,28 @@ pub fn serve(
                 );
             }
         }
+        // lamp-name's hearings, read on a subscriber of their own: a short
+        // sound heard as the name at its bar is judged as a line (#7891),
+        // and with `LAMP_NAME_WORDLESS_BAR` a wordless call is weighed.
+        let hearings = match files
+            .bus_root
+            .as_deref()
+            .map(crate::second_provider::wordless_call::Hearings::on)
+        {
+            Some(Ok(hearings)) => Ok(Arc::new(hearings)),
+            Some(Err(why)) => Err(format!("cannot be taken from the bus: {why}")),
+            None => Err("have no bus to be read from".to_owned()),
+        };
+        match &hearings {
+            Ok(hearings) => {
+                let hearings = Arc::clone(hearings);
+                engine = engine
+                    .knowing_the_name_in_a_line(Arc::new(move |window| hearings.best(window)));
+            }
+            Err(why) => eprintln!(
+                "lamp-voice second: a short sound is held as before, whatever lamp-name heard in it: lamp-name's hearings {why} (#7891)"
+            ),
+        }
         // A line that was only the lamp's name, with no words back, is a
         // call only on a sure hearing (`LAMP_NAME_WORDLESS_BAR`, #5385).
         if crate::second_provider::wordless_call::on(
@@ -5507,12 +5529,8 @@ pub fn serve(
                 .ok()
                 .as_deref(),
         ) {
-            match files
-                .bus_root
-                .as_deref()
-                .map(crate::second_provider::wordless_call::Hearings::on)
-            {
-                Some(Ok(hearings)) => {
+            match hearings {
+                Ok(hearings) => {
                     eprintln!(
                         "lamp-voice second: a line that is only the lamp's name, with no words back, is answered as a call only when lamp-name heard it at {} or more (LAMP_NAME_WORDLESS_BAR)",
                         crate::second_provider::wordless_call::BAR
@@ -5520,11 +5538,8 @@ pub fn serve(
                     engine = engine
                         .holding_a_wordless_call(Arc::new(move |window| hearings.best(window)));
                 }
-                Some(Err(why)) => eprintln!(
-                    "lamp-voice second: a wordless call is answered as before: lamp-name's hearings cannot be taken from the bus: {why} (LAMP_NAME_WORDLESS_BAR)"
-                ),
-                None => eprintln!(
-                    "lamp-voice second: a wordless call is answered as before: no bus to read lamp-name's hearings from (LAMP_NAME_WORDLESS_BAR)"
+                Err(why) => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: lamp-name's hearings {why} (LAMP_NAME_WORDLESS_BAR)"
                 ),
             }
         }

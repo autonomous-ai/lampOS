@@ -8432,7 +8432,18 @@ Reported by the builders:
   to the lamp; otherwise it ends after its words, unanswered (#800,
   [not-speech.md](not-speech.md#a-room-sound-let-through-and-answered-800)).
   Being close to the lamp or facing it cannot be seen here, so it does not
-  count as it does on the Live route.
+  count as it does on the Live route. A hearing of the name does: a short
+  sound in whose window (from 1.5 s before its first sound to its end)
+  lamp-name heard the name at its own bar, 0.9 (`called::LEAST_SCORE`,
+  `lamp-name --least`), or more, is no short sound, its words come back as
+  another word, and the rule judges it as any line, where a line of one or
+  two words, not a question, with nothing written for the name, is still
+  not answered on the hearing alone (#7918). The journal says "a short
+  sound, but lamp-name heard the name in it at 0.917: judged as a line
+  (#7891)" (lamp-52e6, 19 Nov: "Lamp?", its word back not the name, was
+  held so). The hearings are read as `LAMP_NAME_WORDLESS_BAR`'s are
+  (`second_provider::wordless_call`), on, switch or not, whenever the
+  worker has a bus. Tests in `second_provider/tests/short_sound_name.rs`.
 - **The rule for whom it answers, without one sign:** a tap on the head is
   not given to it, so a line in a busy room that only that would let
   through on the Live route is held here. Like the Live route, it does not
