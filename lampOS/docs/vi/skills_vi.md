@@ -3152,7 +3152,10 @@ cả hai người viết.
   namespace đó, và không token nào được tạo.
 - **Cả trên OpenClaw, qua đường chạy chung
   (`LAMP_MAKE_AGENT_ONE_PATH=on`, bật trong unit lamp-voice của sản phẩm;
-  #7245).** Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
+  #7245).** Nút MAKE IT trong app cũng đi đường này, đọc từ môi trường
+  của chính coordinator (`Agent::for_app`), nên một lần tạo gõ trong app
+  trên đèn OpenClaw được giao cho OpenClaw như lần tạo bằng giọng nói;
+  trước đây lần tạo từ app chỉ giao cho Hermes. Khi bật, lần tạo được giao cho agent của đèn mỗi khi lamp-tasks
   báo agent đó nhận lần chạy, Hermes hay OpenClaw
   (`make_skill_agent::ONE_PATH_ENGINES`), và dòng của nó mang
   `"one_path":true`. lamp-tasks giữ runner namespace của Hermes cho Hermes;

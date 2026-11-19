@@ -6350,7 +6350,10 @@ the same code for both writers.
   and no token is minted.
 - **On OpenClaw too, through the one run path
   (`LAMP_MAKE_AGENT_ONE_PATH=on`, on in the product's lamp-voice; #7245).**
-  With it, the make is handed to the lamp's agent whenever lamp-tasks says
+  The app's MAKE IT takes it too, read from the coordinator's own
+  environment (`Agent::for_app`), so a make typed in the app on an
+  OpenClaw lamp goes to OpenClaw as a spoken one does; before, the app's
+  make went to Hermes only. With it, the make is handed to the lamp's agent whenever lamp-tasks says
   it takes runs, Hermes or OpenClaw (`make_skill_agent::ONE_PATH_ENGINES`),
   and its line carries `"one_path":true`. lamp-tasks keeps Hermes's
   namespace runner for Hermes; for OpenClaw it sends the rules as one turn

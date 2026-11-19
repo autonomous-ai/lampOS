@@ -58,8 +58,9 @@
 //! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a
 //! gateway agent). Off, the line and the hand-over are today's, byte for
 //! byte. A `cannot:` answer is passed on verbatim, as before (#7234). It is
-//! the voice's make's alone ([`Agent::for_voice`]): the app's MAKE IT below
-//! hands over to Hermes only, as before.
+//! the voice's make's, and the app's MAKE IT's from the coordinator's own
+//! environment ([`Agent::for_app`]), so a make typed in the app on an
+//! OpenClaw lamp goes to OpenClaw as a spoken one does.
 //!
 //! The app's MAKE IT (`crate::app_make`, the owner's ask, 13 Nov) makes the
 //! same way: its typed words go through the same order and this same
@@ -709,15 +710,18 @@ impl Agent {
         Self::for_app_with(
             var(ENVIRONMENT).as_deref(),
             var(GUIDE_ENVIRONMENT).as_deref(),
+            var(ONE_PATH_ENVIRONMENT).as_deref(),
             var(agent_tasks::ENVIRONMENT).as_deref(),
         )
     }
 
     /// [`Agent::for_app`] from the switch's value `switch`, the guide's
-    /// `guide` and the tasks part's directory `tasks`, absolute only.
+    /// `guide`, the one run path's `one_path` and the tasks part's
+    /// directory `tasks`, absolute only.
     pub fn for_app_with(
         switch: Option<&str>,
         guide: Option<&str>,
+        one_path: Option<&str>,
         tasks: Option<&str>,
     ) -> Option<Self> {
         if !on_with(switch) {
@@ -731,6 +735,7 @@ impl Agent {
         // the agent doesn't take it.
         Some(Self {
             repairs_if_untaken: true,
+            one_path: on_with(one_path),
             ..Self::made_with(tasks, None, on_with(guide))
         })
     }
@@ -749,7 +754,7 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
-            // The one run path is the voice's (#7245): `for_voice` sets it
+            // The one run path (#7245): `for_voice` and `for_app` set it
             // from its switch.
             one_path: false,
             repairs_if_untaken: false,
@@ -1674,14 +1679,15 @@ pub(crate) mod tests {
     #[test]
     fn the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part() {
         let tasks = Some("/run/lampos-tasks");
-        let agent = Agent::for_app_with(Some("on"), None, tasks).unwrap();
+        let agent = Agent::for_app_with(Some("on"), None, None, tasks).unwrap();
         assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
         assert_eq!(agent.say, None);
         assert!(!agent.guide);
         assert!(agent.repairs_if_untaken);
+        assert!(!agent.one_path);
         assert_eq!(agent.within, WRITE_WITHIN);
         assert_eq!(agent.make_within, MAKE_WITHIN);
-        let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
+        let guided = Agent::for_app_with(Some("on"), Some("on"), None, tasks).unwrap();
         assert!(guided.guide);
         assert_eq!(guided.within, GUIDED_WRITE_WITHIN);
         assert_eq!(guided.most_repairs(), GUIDED_MOST_REPAIRS);
@@ -1693,9 +1699,35 @@ pub(crate) mod tests {
             (Some("on"), Some("run/lampos-tasks")),
         ] {
             assert!(
-                Agent::for_app_with(switch, Some("on"), folder).is_none(),
+                Agent::for_app_with(switch, Some("on"), Some("on"), folder).is_none(),
                 "{switch:?} {folder:?}"
             );
+        }
+    }
+
+    /// The app's MAKE IT takes the one run path as the voice's make does
+    /// (#7245): with `LAMP_MAKE_AGENT_ONE_PATH` on, a make typed in the app
+    /// on an OpenClaw lamp is handed to OpenClaw, its line carrying
+    /// `one_path`; off, Hermes only, as before.
+    #[test]
+    fn the_apps_make_takes_the_one_run_path_with_its_switch() {
+        let tasks = Some("/run/lampos-tasks");
+        let on = Agent::for_app_with(Some("on"), None, Some("on"), tasks).unwrap();
+        assert!(on.one_path);
+        assert_eq!(on.say, None);
+        let stubbed = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            tasks: stubbed.agent().tasks,
+            ..on
+        };
+        assert_eq!(agent.hermes(), Some("OpenClaw"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = stubbed.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+        for value in [None, Some("off"), Some("ON")] {
+            let off = Agent::for_app_with(Some("on"), None, value, tasks).unwrap();
+            assert!(!off.one_path, "{value:?}");
         }
     }
 
