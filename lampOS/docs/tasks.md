@@ -3025,8 +3025,9 @@ never waits for it.
 The checked replace and the bounded check live in `crates/checked-replace`
 (`lamp_checked_replace`, #7868), which the other two writers of
 `openclaw.json` go through too: lamp-update's install (its `gateway`
-block, docs/install.md) and lamp-setup's reset (its cut to `gateway`,
-docs/setup.md).
+block, docs/install.md; a round that finds the block missing or
+different has Harness's one-shot write it again, #7868) and lamp-setup's
+reset (its cut to `gateway`, docs/setup.md).
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
