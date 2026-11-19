@@ -50,7 +50,9 @@ const SERVICES: &str = "services";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 34 (the desk
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 35 (a linked
+/// record's `record_source` since `LAMP_SERVICE_RECORDS_SOURCE` is on in the
+/// product since 20 Nov, and before it 34: the desk
 /// time's `desk_time` since `LAMP_DESK_TIME` is on in the product, #7694,
 /// and before it 33: a made skill's change, `change_skill`, beside `make_skill` since #8008, so
 /// `make_skill`'s parameters stay within
@@ -79,18 +81,18 @@ const SERVICES: &str = "services";
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 52, and 56 with the route's 4 (the
+/// light's `point_light` since #5744): 53, and 57 with the route's 4 (the
 /// search, its fetch, the weather and the look), within the bound of 64;
 /// 52 was past the bound of 48 it had until #7433, which left out the
 /// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 52;
+const PRODUCT_FUNCTIONS: usize = 53;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's
-/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 57,
+/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 58,
 /// within the bound of 64 (#7433), so nothing is cut.
 const HARD_ASKS_FUNCTIONS: usize = PRODUCT_FUNCTIONS + 1;
 
