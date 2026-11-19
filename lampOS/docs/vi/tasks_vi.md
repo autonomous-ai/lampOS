@@ -2506,7 +2506,10 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   hạn 600 s của một lần make đã đóng và xoá phiên, rồi mọi lần `ensure` sau
   đó lại resume nó (`kept session resumed <id> (openclaw, starting)`).
   Engine của nó thoát ("No session found"), và mọi việc chờ cho tới khi bị
-  báo bận. Hai dấu hiệu được xử lý:
+  báo bận. Bản ghi giữ mà bản ghi riêng của OpenClaw không còn giữ hội
+  thoại của nó (`openclaw_record`, chỉ đọc) cũng bị quên trước `ensure`, và
+  lần đó là `--fresh`: Harness resume một phiên đã đóng mà không kiểm tra
+  Gateway. Hai dấu hiệu được xử lý:
   - **Dấu hiệu 1, vẫn `starting`.** Khi mở mà tìm thấy phiên (`live` hoặc
     `resumed`, không bao giờ `new`), lamp-tasks gọi một lần `show`. Nếu
     phiên vẫn `starting` (hoặc `offline`, `unknown`) sau 120 s

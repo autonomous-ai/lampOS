@@ -5155,6 +5155,10 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   make's 600 s deadline closed and deleted the session, and every later
   `ensure` resumed it (`kept session resumed <id> (openclaw, starting)`).
   Its engine exited ("No session found"), and every task waited until busy.
+  A kept record whose conversation OpenClaw's own record no longer holds
+  (`openclaw_record`, read only) is also forgotten before `ensure`, which
+  is then `--fresh`: Harness resumes a closed session with no Gateway
+  check.
   Two signs are acted on:
   - **Sign 1, still `starting`.** At an open that found a session (`live`
     or `resumed`, never `new`), one `show` is made. If the session stays
