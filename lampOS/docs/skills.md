@@ -4739,7 +4739,7 @@ gone ([switches.md](switches.md)). What happens:
     to say only "Alright, I won't make it."
     (`make_skill_local::WONT_MAKE_NEXT`), asking nothing. The make looks
     for a no once, when the skill is written, and in the same lock marks
-    itself finishing (`OneAsk::dropped_or_finishing`): a no after that,
+    itself finishing (`OneAsk::settled`): a no after that,
     while the manage helper puts it on (which can take seconds) or its
     line is said, is told it is too late to stop, that they'll hear in a
     moment and can ask to remove it then
@@ -4752,7 +4752,39 @@ gone ([switches.md](switches.md)). What happens:
     the same way: the note has the model call a decline or a wait as
     `answer: "no"`, which drops it with the same line, and never say it is
     on or how to start it before the yes; a skill's writes, on already,
-    still call nothing on a decline. The `request` parameter says never to
+    still call nothing on a decline.
+
+    **A change said while it is made changes it, never cancels it**
+    (#7912, lamp-9adf, 19 Nov, both runs: "…remind me to take a break
+    after forty five minutes", then "make it fifty", was answered
+    "Alright, I won't make it." and nothing was made). Both notes (the
+    make under way's, and a voice make's code waiting for its yes) tell
+    the model that a line that changes the skill or adds to it (a number,
+    its name, another step) is `answer: "change"` with `change`, what they
+    changed said whole, and that a change is never a no: only a line that
+    means stop declines it. Whether a line is a change, a no or about
+    something else is the model's judgment, never a word list; code
+    applies it (`make_skill_local::making_changed`). Under way, the change
+    is held for the make: at its last look (`OneAsk::settled`) the skill
+    written first is let go as a declined one is (`forget_unput`, never
+    said) and the ask made again, in the same make, with the first request
+    whole and the change after it, said to win where the two differ, and
+    the change's heard line after the first (a write is held to both); a
+    later no or change still finds it under way. The change's turn is told
+    it is taken (`"changed": true`, `CHANGED_NEXT`), never that it won't be
+    made; a change declined a moment before takes the make back; one past
+    the last look is told it is almost done and the change can be asked
+    once it is ready (`FINISHING_CHANGE_NEXT`). A voice make's code waiting
+    for its yes, changed by its make's id or the wait's own: the wait is
+    dropped, its package (never on) forgotten, and it is made again at
+    once in the change's turn (`Making::Again`). A make done and on is
+    told its change is a new make of it, the whole ask with the change.
+    A line about something else leaves the make alone. Tests:
+    `a_change_said_while_made_makes_it_with_the_change`,
+    `never_mind_said_while_made_ends_it`,
+    `an_unrelated_line_while_made_leaves_the_make_alone`.
+
+    The `request` parameter says never to
     call it for an ask the person takes back in the same line ("make a
     skill that waters my plants. Actually, never mind."). Only a make
     still under way is told so: one ended (waiting for its yes, failed or

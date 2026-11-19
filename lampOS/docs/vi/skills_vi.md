@@ -1602,7 +1602,7 @@ sau:
     hình được bảo chỉ nói "Alright, I won't make it."
     (`make_skill_local::WONT_MAKE_NEXT`), không hỏi gì. Lần tạo tìm lời
     "không" một lần, khi kỹ năng được viết xong, và trong cùng lần khoá đó
-    tự đánh dấu đang hoàn tất (`OneAsk::dropped_or_finishing`): một lời
+    tự đánh dấu đang hoàn tất (`OneAsk::settled`): một lời
     "không" sau đó, trong lúc helper quản lý bật nó (có thể mất vài giây)
     hoặc câu của nó được nói, được báo là đã quá muộn để dừng, rằng họ sẽ
     nghe trong giây lát và khi đó có thể nhờ gỡ nó
@@ -1615,7 +1615,40 @@ sau:
     lời "có" được đáp theo cùng cách: note bảo mô hình gọi một lời từ chối
     hay hoãn là `answer: "no"`, bỏ nó với cùng câu đó, và không bao giờ nói
     nó đã bật hay cách khởi động nó trước lời "có"; ghi của một kỹ năng, đã
-    bật rồi, vẫn không gọi gì khi bị từ chối. Tham số `request` nói không
+    bật rồi, vẫn không gọi gì khi bị từ chối.
+
+    **Một thay đổi nói trong lúc đang tạo sẽ đổi nó, không bao giờ huỷ nó**
+    (#7912, lamp-9adf, 19/11, cả hai lượt chạy: "…remind me to take a break
+    after forty five minutes", rồi "make it fifty", được đáp "Alright, I
+    won't make it." và không gì được tạo). Cả hai note (của lần tạo đang
+    chạy, và của code một lần tạo bằng giọng nói đang chờ lời "có") bảo mô
+    hình rằng một câu đổi hay thêm vào kỹ năng (một con số, tên của nó, một
+    bước nữa) là `answer: "change"` với `change`, điều họ đã đổi, nói trọn,
+    và rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
+    là dừng mới từ chối nó. Một câu là thay đổi, lời "không" hay chuyện
+    khác là việc mô hình phán đoán, không bao giờ là danh sách từ; code áp
+    dụng nó (`make_skill_local::making_changed`). Khi đang chạy, thay đổi
+    được giữ cho lần tạo: ở lần nhìn cuối (`OneAsk::settled`) kỹ năng viết
+    trước được thả như một kỹ năng bị từ chối (`forget_unput`, không bao
+    giờ được nói) và lời nhờ được tạo lại, trong cùng lần tạo, với request
+    đầu nguyên vẹn và thay đổi theo sau, được nói là thắng ở chỗ hai cái
+    khác nhau, và câu nghe được của thay đổi sau câu đầu (một ghi được giữ
+    theo cả hai); một lời "không" hay thay đổi sau đó vẫn thấy nó đang chạy.
+    Lượt của thay đổi được báo là nó đã được nhận (`"changed": true`,
+    `CHANGED_NEXT`), không bao giờ là nó sẽ không được tạo; một thay đổi
+    sau một lời từ chối ngay trước đó lấy lại lần tạo; một thay đổi quá lần
+    nhìn cuối được báo là sắp xong và có thể nhờ đổi khi nó sẵn sàng
+    (`FINISHING_CHANGE_NEXT`). Code của một lần tạo bằng giọng nói đang chờ
+    lời "có", được đổi qua id của lần tạo hay id của chính lần chờ: lần chờ
+    bị bỏ, gói của nó (chưa từng bật) bị quên, và nó được tạo lại ngay
+    trong lượt của thay đổi (`Making::Again`). Một lần tạo đã xong và đã
+    bật được báo rằng thay đổi của nó là một lần tạo mới, cả lời nhờ cùng
+    thay đổi. Một câu về chuyện khác để yên lần tạo. Kiểm thử:
+    `a_change_said_while_made_makes_it_with_the_change`,
+    `never_mind_said_while_made_ends_it`,
+    `an_unrelated_line_while_made_leaves_the_make_alone`.
+
+    Tham số `request` nói không
     bao giờ gọi nó cho một lời nhờ mà người dùng rút lại trong cùng câu
     ("make a skill that waters my plants. Actually, never mind."). Chỉ một
     lần tạo còn đang chạy mới được báo như vậy: một lần tạo đã kết thúc
