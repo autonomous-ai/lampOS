@@ -239,3 +239,31 @@ fn a_long_story_is_said_sentence_by_sentence() {
         "{went:?}"
     );
 }
+
+/// V2's must-fix (3) on #7924: a keep in memory's own words beside another
+/// call is still no keep: "I'll remember you're vegetarian." beside a
+/// reminder set is not said, and the round is told.
+#[test]
+fn a_keep_said_beside_another_call_is_still_caught() {
+    let went = went(
+        "I'm vegetarian, and remind me to shop at five.",
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    "set_reminder",
+                    json!({"time": "17:00", "text": "shop"}),
+                )])),
+                text("Reminder set for five. I'll remember you're vegetarian."),
+                Ok(ChatEvent::Done),
+            ],
+            saying("Reminder set for five."),
+        ],
+    );
+    assert!(went.noted, "{went:?}");
+    assert!(
+        !went.said.iter().any(|said| said.contains("vegetarian")),
+        "{went:?}"
+    );
+}
