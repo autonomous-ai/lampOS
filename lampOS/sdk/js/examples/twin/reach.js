@@ -19,7 +19,7 @@ export function limitsOf(info) {
     out[name] = { min: joint.min_deg, max: joint.max_deg };
     if (info?.stands === true && ARM.includes(name) && finite(joint.folded_counts) && finite(joint.stand_counts)) {
       const stand = (joint.stand_counts - joint.folded_counts) * COUNT_DEG;
-      out[name].pose = { min: Math.min(0, stand), max: Math.max(0, stand) };
+      out[name].pose = { min: Math.min(0, stand), max: Math.max(0, stand), stand };
     }
   }
   return out;
@@ -37,8 +37,9 @@ export const clampTo = (limit, deg) => { const reach = reachOf(limit); return re
 // Whether the body will cut `deg` (more than `slack` degrees past its reach).
 export const pastReach = (limit, deg, slack = 0.05) => { const reach = reachOf(limit); return Boolean(reach) && finite(deg) && (deg < reach.min - slack || deg > reach.max + slack); };
 
-// Whether `deg` is above the stand where the body takes nothing yet (an arm joint on a standing lamp).
-export const aboveStand = (limit, deg, slack = 0.05) => Boolean(limit?.pose) && finite(deg) && deg > limit.pose.max + slack;
+// Whether `deg` is past the stand, away from the fold, where the body takes nothing yet (an arm joint on a standing lamp). "Above" is
+// the side of the stand the fold is not on: more degrees for a joint that counts up from its fold, fewer for one that counts down.
+export const aboveStand = (limit, deg, slack = 0.05) => Boolean(limit?.pose) && finite(deg) && (limit.pose.stand >= 0 ? deg > limit.pose.stand + slack : deg < limit.pose.stand - slack);
 
 const deg = (x) => `${(Math.round(x * 10) / 10).toFixed(1)}°`;
 
@@ -58,7 +59,8 @@ export function doneWords(done, joint, limit) {
   if (how === 'dropped') return `the lamp did not take it${said}`;
   if (how === 'cut_short') return `the lamp was cut short${said}`;
   const reached = finite(done?.[joint]) ? ` (reached ${deg(done[joint])})` : '';
-  const atStand = limit?.pose && finite(done?.[joint]) && Math.abs(done[joint] - limit.pose.max) <= 2.5 ? ' (at its stand: above it is not yet)' : '';
+  // 2.5 deg: the body's own "stopped more than 2 deg short" mark for `clamped` (control.md, `joints`), and half a degree of slack.
+  const atStand = limit?.pose && finite(done?.[joint]) && Math.abs(done[joint] - limit.pose.stand) <= 2.5 ? ' (at its stand: above it is not yet)' : '';
   if (how === 'finished') return done.clamped ? `the lamp took it, cut by the body${reached}${atStand}${said}` : `the lamp took it${reached}`;
   return '';
 }
