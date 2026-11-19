@@ -6223,9 +6223,11 @@ async fn run_call(
     // any other use of the function, as before.
     let queue_slot = made && heard && crate::make_queue::on();
     if queue_slot && let Some(id) = crate::make_queue::cancel_of(&call.args) {
+        // Never a line theirs only by their face alone in view: the same
+        // read as a make's change (`services::acting_person`).
         return ToolAnswer::plain(crate::make_queue::cancel(
             id,
-            speaker_of(scope.as_ref()).as_deref(),
+            crate::services::acting_person(scope.as_ref()).as_deref(),
             crate::services::owner_of(scope.as_ref()).is_some(),
         ));
     }
@@ -6420,10 +6422,38 @@ pub(crate) fn run_queued(entry: crate::make_queue::Entry) {
 /// and with `LAMP_MAKE_QUEUE` the slot it took
 /// (`make_queue::retake`) told once that line is said.
 pub(crate) fn run_remade(request: u64, work: crate::make_queue::Work) {
-    run_queued_with(request, work, say_made_line, move || {
+    run_remade_with(request, work, say_made_line, move || {
         crate::make_queue::said(request);
     });
 }
+
+/// [`run_remade`] with its `say` and what is done once the line is said,
+/// `ended`. A remake that failed with no line of its own (the part not
+/// running, a brief refused, the judge's unclear ask with
+/// `LAMP_MAKE_NO_ASKS`, the same ask refused) says why, as a make that
+/// waited its turn does (`make_queue::Entry::run`, Twelve's and Heron's
+/// HOLD on #7936): the person was told they'll hear when it's ready, so,
+/// as for a queued make, it is said whatever they said since. One dropped
+/// by their later no has no error and says nothing.
+fn run_remade_with(
+    request: u64,
+    work: crate::make_queue::Work,
+    say: impl FnOnce(String) + Send + 'static,
+    ended: impl FnOnce() + Send + 'static,
+) {
+    let work: crate::make_queue::Work = Box::new(move || {
+        let answer = work();
+        crate::make_skill_local::failed_unless_said(|| {
+            crate::make_queue::failed_line(REMADE_LABEL, &answer.told)
+        });
+        answer
+    });
+    run_queued_with(request, work, say, ended);
+}
+
+/// What a remake's failed line calls it ([`run_remade_with`]): "I couldn't
+/// make it with your change: …".
+const REMADE_LABEL: &str = "it with your change";
 
 /// [`run_queued`] with its `say` and what is done once the line is said,
 /// `ended`.
