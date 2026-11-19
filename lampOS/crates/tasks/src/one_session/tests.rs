@@ -1049,8 +1049,9 @@ fn queued_spoken_tasks_go_first_and_know_their_place() {
 }
 
 /// OpenClaw compacts its own sessions, so its pane is never rotated by
-/// count: past [`ROTATE_TURNS`] turns and a 250k-token answer it is still
-/// the one pane. Only an engine with no compaction (Hermes) has the bounds.
+/// count: past [`ROTATE_TURNS`] turns it is still the one pane. Only an
+/// engine with no compaction (Hermes) has the bounds; OpenClaw's size is
+/// bounded by its context instead ([`near_context_limit`], #7906).
 #[test]
 fn an_openclaw_pane_is_never_rotated_by_count() {
     assert_eq!((ROTATE_TURNS, ROTATE_TOKENS), (40, 250_000));
@@ -1068,8 +1069,6 @@ fn an_openclaw_pane_is_never_rotated_by_count() {
     for n in 0..=ROTATE_TURNS + 5 {
         one_turn(&one, &fake, &format!("task-{n}"));
     }
-    one.count_answer(&"y".repeat(1_000_001));
-    one_turn(&one, &fake, "after");
     assert_eq!(fake.count("new"), 1, "the same pane all along");
     assert_eq!(fake.count("close"), 0);
     assert_eq!(one.agent(), Some(agent_of(1)));
@@ -3081,5 +3080,149 @@ fn a_fresh_session_refusing_engine_not_ready_for_a_while_is_not_replaced() {
         fake.calls().contains(&"wait-after in-1".to_owned()),
         "its first words were taken after the refusals: {:?}",
         fake.calls()
+    );
+}
+
+/// OpenClaw's agent database (#7906), with the columns lampOS reads as
+/// lamp-52e6 has them, holding `messages` transcript rows of `bytes` each
+/// for Harness's `agent`'s session.
+fn openclaw_db(dir: &std::path::Path, agent: &str, messages: u64, bytes: u64) -> PathBuf {
+    let db = crate::harness::openclaw_record_path(&dir.join("openclaw-state"));
+    std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+    let connection = rusqlite::Connection::open(&db).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE session_nodes (session_key TEXT NOT NULL PRIMARY KEY, current_session_id TEXT, status TEXT);
+             CREATE TABLE transcript_events (session_id TEXT NOT NULL, seq INTEGER NOT NULL, message_role TEXT,
+               event_json TEXT, event_zstd BLOB, event_utf8_bytes INTEGER, PRIMARY KEY (session_id, seq));",
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO session_nodes VALUES (?1, 's1', 'done')",
+            [format!("agent:main:harness-{agent}")],
+        )
+        .unwrap();
+    for seq in 0..messages {
+        connection
+            .execute(
+                "INSERT INTO transcript_events VALUES ('s1', ?1, 'assistant', '{}', NULL, ?2)",
+                rusqlite::params![seq as i64, bytes as i64],
+            )
+            .unwrap();
+    }
+    db
+}
+
+/// A make's turn, entered, typed and waited for.
+fn one_make(one: &OneSession, fake: &Fake, id: &str) {
+    let turn = one
+        .enter(id, Kind::Skill, far(), &|| false)
+        .unwrap()
+        .as_make(true);
+    assert!(matches!(
+        turn.send(fake, &place(), "Make a skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    turn.wait_end(fake, MACHINE, &AtomicBool::new(false), &|| {});
+}
+
+fn fresh_ensures(fake: &Fake) -> usize {
+    fake.calls()
+        .iter()
+        .filter(|call| call.starts_with("ensure ") && call.ends_with(" --fresh"))
+        .count()
+}
+
+/// #7906: a make on a kept session past 60% of the context (80 messages of
+/// ~1000 tokens: 80k tokens) is given a fresh one (`ensure --fresh`, the
+/// old OpenClaw session deleted), once; an ordinary task on the same size
+/// (below 85%) keeps it.
+#[test]
+fn a_make_on_a_big_kept_session_starts_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = openclaw_db(dir.path(), &agent_of(1), 80, 4_000);
+    let deleted = Arc::new(Mutex::new(Vec::new()));
+    let seen = deleted.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one
+        .with_openclaw_db(db)
+        .with_session_delete(Box::new(move |key| {
+            seen.lock().unwrap().push(key.to_owned());
+            Ok(())
+        }));
+    one_turn(&one, &fake, "task-1");
+    one_turn(&one, &fake, "task-2");
+    assert_eq!(one.agent(), Some(agent_of(1)), "an ordinary task keeps it");
+    assert_eq!(fresh_ensures(&fake), 0);
+    one_make(&one, &fake, "make-1");
+    assert_eq!(fresh_ensures(&fake), 1, "{:?}", fake.calls());
+    assert_eq!(
+        one.agent(),
+        Some(agent_of(2)),
+        "the make's own fresh session"
+    );
+    assert_eq!(
+        deleted.lock().unwrap().as_slice(),
+        [format!("agent:main:kept-{}", agent_of(1))]
+    );
+    // The fresh session holds nothing in the record yet: kept.
+    one_make(&one, &fake, "make-2");
+    assert_eq!(fresh_ensures(&fake), 1);
+    assert_eq!(one.agent(), Some(agent_of(2)));
+}
+
+/// #7906: a make on a small kept session (10 messages, ~2.5k tokens) is
+/// typed into it: no fresh start.
+#[test]
+fn a_make_on_a_small_kept_session_stays_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = openclaw_db(dir.path(), &agent_of(1), 10, 1_000);
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_openclaw_db(db);
+    one_turn(&one, &fake, "task-1");
+    one_make(&one, &fake, "make-1");
+    assert_eq!((fake.count("ensure"), fresh_ensures(&fake)), (1, 0));
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// #7906: OpenClaw's record unreadable (no file): the pane's own token
+/// count is weighed; past a make's bound, a fresh session.
+#[test]
+fn an_unreadable_openclaw_record_falls_back_to_the_panes_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_openclaw_db(dir.path().join("no-such.sqlite"));
+    one_turn(&one, &fake, "task-1");
+    one_make(&one, &fake, "make-1");
+    assert_eq!(fresh_ensures(&fake), 0, "a few tokens counted: kept");
+    one.count_answer(&"y".repeat(MAKE_FRESH_TOKENS as usize * 4));
+    one_make(&one, &fake, "make-2");
+    assert_eq!(fresh_ensures(&fake), 1, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(2)));
+}
+
+/// #7906: an ordinary task on a session past 85% (140 messages of 800
+/// tokens: 112k) is given a fresh one too.
+#[test]
+fn an_ordinary_task_near_the_limit_starts_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = openclaw_db(dir.path(), &agent_of(1), 140, 3_200);
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_openclaw_db(db.clone());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    one_turn(&one, &fake, "task-1");
+    assert_eq!(fresh_ensures(&fake), 1, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(2)));
+    let began = Instant::now();
+    let size = crate::harness::openclaw_session_size(&db, "agent:main:x", &agent_of(1)).unwrap();
+    eprintln!("openclaw_session_size: {} us", began.elapsed().as_micros());
+    assert_eq!(
+        size,
+        SessionSize {
+            messages: 140,
+            bytes: 140 * 3_200
+        }
     );
 }
