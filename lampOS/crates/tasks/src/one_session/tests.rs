@@ -2512,6 +2512,13 @@ fn busy() -> Option<LaunchOutcome> {
     })
 }
 
+/// #7906 sign 5's end of the spoken task waiting ([`STUCK_ENDED`]).
+fn stuck() -> Option<LaunchOutcome> {
+    Some(LaunchOutcome::NotSent {
+        code: STUCK_ENDED.into(),
+    })
+}
+
 /// #7895: a kept session that never takes the words through every resume.
 /// The spoken task is put back for [`STARTING_RESUMES_MOST`] resumes, then
 /// ends `not_sent` with [`NOT_STARTED`], once: the store fails it and Task
@@ -4174,16 +4181,17 @@ fn a_spoken_task_refused_engine_not_ready_is_replaced_before_any_not_started() {
     assert!(one.lock().unstarted.is_none(), "no #7895 try spent");
     assert_eq!(fake.count("ensure"), 1);
     thread::sleep(Duration::from_millis(1100));
-    // Refused over the bound: sign 5 lets the session go, put back `busy`.
+    // Refused over the bound: sign 5 lets the session go, and the task
+    // ends at once, told to ask again.
     refuse(&fake);
-    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), busy());
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), stuck());
     assert_eq!(one.agent(), None, "{:?}", fake.calls());
     fake.takes.lock().unwrap().clear();
     one.lock().next_open = None;
     one.open_if_due(&fake, &place());
     assert_eq!(fake.count("ensure"), 2, "{:?}", fake.calls());
     assert!(matches!(
-        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        spoken_launch(&one, &fake, &spoken("lamp-2")),
         Some(LaunchOutcome::Joined { .. })
     ));
 }
@@ -4201,7 +4209,7 @@ fn frozen_after_sign_5(one: &OneSession, fake: &Fake) {
     assert_eq!(spoken_launch(one, fake, &spoken("lamp-1")), busy());
     thread::sleep(Duration::from_millis(1100));
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
-    assert_eq!(spoken_launch(one, fake, &spoken("lamp-1")), busy());
+    assert_eq!(spoken_launch(one, fake, &spoken("lamp-1")), stuck());
     assert_eq!(one.agent(), None, "{:?}", fake.calls());
     // Harness reads the frozen process `working`.
     *fake.ensure_state.lock().unwrap() = Some("working".into());
@@ -4209,11 +4217,11 @@ fn frozen_after_sign_5(one: &OneSession, fake: &Fake) {
     one.open_if_due(fake, &place());
 }
 
-/// The spoken task `lamp-1` put back until typed, as the store does, the
-/// one-session thread opening between: its answer, never left to expire.
+/// The person's next ask, `lamp-2`, after sign 5 ended `lamp-1`: put back
+/// until typed, as the store does, the one-session thread opening between.
 fn spoken_until_typed(one: &OneSession, fake: &Fake) -> Option<LaunchOutcome> {
     for _ in 0..8 {
-        let outcome = spoken_launch(one, fake, &spoken("lamp-1"));
+        let outcome = spoken_launch(one, fake, &spoken("lamp-2"));
         if outcome != busy() {
             return outcome;
         }
@@ -4250,7 +4258,7 @@ fn a_frozen_kept_session_still_live_after_sign_5_is_replaced_fresh_and_the_task_
     );
     assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
     assert!(
-        fake.asked.lock().unwrap()[&agent_of(2)].starts_with(&header("lamp-1")),
+        fake.asked.lock().unwrap()[&agent_of(2)].starts_with(&header("lamp-2")),
         "typed into the new process"
     );
     let calls = fake.calls();
@@ -4267,7 +4275,7 @@ fn a_frozen_kept_session_still_live_after_sign_5_is_replaced_fresh_and_the_task_
     // Closed before the plain resume, then again before `--fresh`.
     assert_eq!(fake.count("close-kept"), 2, "{calls:?}");
     // Answered, on the new session.
-    one.release("lamp-1");
+    one.release("lamp-2");
     *fake.ensure_state.lock().unwrap() = None;
     assert_eq!(
         one_turn(&one, &fake, "task-2"),
@@ -4326,11 +4334,21 @@ fn a_kept_session_still_busy_after_sign_5_resume_is_replaced_fresh() {
     *fake.closed_resumes.lock().unwrap() = true;
     frozen_after_sign_5(&one, &fake);
     assert_eq!(one.agent(), Some(agent_of(1)), "{:?}", fake.calls());
-    // The resumed process busy too.
+    // The resumed process busy too: sign 5's `--fresh` (b) ends the
+    // waiting `lamp-2` as its close did `lamp-1`.
     *fake.frozen.lock().unwrap() = Some(agent_of(1));
+    assert_eq!(
+        spoken_until_typed(&one, &fake),
+        stuck(),
+        "{:?}",
+        fake.calls()
+    );
+    one.lock().next_open = None;
+    one.open_if_due(&fake, &place());
+    // The next ask goes to the fresh session.
     assert!(
         matches!(
-            spoken_until_typed(&one, &fake),
+            spoken_launch(&one, &fake, &spoken("lamp-3")),
             Some(LaunchOutcome::Joined { .. })
         ),
         "{:?}",
@@ -4413,5 +4431,73 @@ fn a_sign_5_close_with_its_conversation_gone_goes_fresh() {
             "ensure lamp-one-openclaw --fresh"
         ],
         "{calls:?}"
+    );
+}
+
+/// #7906 sign 5 on lamp-c0a4 (19 Nov, 21:47-21:55): the kept OpenClaw TUI
+/// frozen, two `ENGINE_NOT_READY` refusals, then sign 5's close and a
+/// resume `starting` that went idle. The waiting spoken task was put back
+/// `busy` past the store's confirm bound, expired unheard and was left to
+/// its 480 s bound. It now ends at the close with [`STUCK_ENDED`] (Task
+/// news: "ask me again in a few minutes"), never typed later; the next ask
+/// is typed into the reopened session and answered.
+#[test]
+fn a_spoken_task_waiting_at_sign_5_ends_at_the_close_and_the_next_ask_is_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path())
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    *fake.closed_resumes.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-0");
+    // Past its first words' window (1 s here).
+    thread::sleep(Duration::from_millis(1100));
+    *fake.frozen.lock().unwrap() = Some(agent_of(1));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), busy());
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    let began = Instant::now();
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        stuck(),
+        "{:?}",
+        fake.calls()
+    );
+    assert!(
+        began.elapsed() < Duration::from_secs(1),
+        "ended at the close"
+    );
+    let calls = fake.calls();
+    assert_eq!(
+        calls.last().map(String::as_str),
+        Some("close-kept lamp-one-openclaw --now")
+    );
+    assert_eq!(one.agent(), None);
+    assert!(one.free(), "nothing holds the pane after");
+    // The one-session thread's reopen: resumed `starting`, `show` idle.
+    *fake.ensure_state.lock().unwrap() = Some("starting".into());
+    one.lock().next_open = None;
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)), "{:?}", fake.calls());
+    // The next ask: typed into the reopened session, and answered.
+    let replies = fake.count("reply-kept");
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-2")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    assert_eq!(fake.count("reply-kept"), replies + 1, "typed once");
+    let asked = fake.asked.lock().unwrap()[&agent_of(1)].clone();
+    assert!(asked.starts_with(&header("lamp-2")), "{asked}");
+    assert!(
+        !asked.contains(&header("lamp-1")),
+        "lamp-1 never typed later"
+    );
+    one.release("lamp-2");
+    assert_eq!(
+        one_turn(&one, &fake, "task-3"),
+        Ended::Answered("answer to New task task-3:".into())
     );
 }

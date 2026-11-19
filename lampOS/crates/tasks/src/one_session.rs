@@ -205,6 +205,15 @@ pub const STARTING_RESUMES_MOST: u32 = 3;
 pub const NOT_STARTED: &str = "one_session_not_started";
 /// [`Turn::send`]'s why when a spoken task's resumes are spent.
 const STARTING_SPENT: &str = "the kept session did not take the words after its resumes";
+/// The `not_sent` code of a spoken task waiting when #7906 sign 5 closed
+/// its stuck kept session: ended at once, never put back. A put-back past
+/// the store's confirm bound ([`crate::engine::CONFIRM_MS`], from the
+/// task's prepare) expires it silently, so it was left to its 480 s bound
+/// (lamp-c0a4, 19 Nov). Task news tells it once with its "ask me again in a
+/// few minutes" line; the next ask goes to the reopened session.
+pub const STUCK_ENDED: &str = "one_session_stuck";
+/// [`Turn::send`]'s why for [`STUCK_ENDED`].
+const STUCK_CLOSED: &str = "sign 5 closed the stuck kept session; ended, asked again later";
 /// Between two looks at a pane `wait` read idle but whose turn is not this
 /// task's yet, or a busy pane before its words are typed again.
 pub const TURN_LOOK: Duration = Duration::from_millis(500);
@@ -1190,6 +1199,11 @@ pub fn spoken_launch(
         // Its resumes spent (#7895): failed, so the store ends it and Task
         // news tells the asker once; never put back again.
         Sent::NotTyped(why) if why == STARTING_SPENT => Some(not_started(one, &launch.name)),
+        // #7906 sign 5 closed its stuck session: ended at once, never put
+        // back to expire unheard.
+        Sent::NotTyped(why) if why == STUCK_CLOSED => Some(LaunchOutcome::NotSent {
+            code: STUCK_ENDED.into(),
+        }),
         // `busy`, as a full queue: never a second session.
         Sent::NotTyped(_) => Some(LaunchOutcome::NotSent {
             code: "busy".into(),
@@ -3581,6 +3595,12 @@ impl Turn<'_> {
                             revived =
                                 self.one
                                     .restart_or_replace(harness, &place.machine, &agent, &why);
+                            // A spoken task never waits for the reopen: it
+                            // ends now, told once; the one-session thread
+                            // reopens the session for the next ask.
+                            if !self.opens {
+                                return self.fallback(STUCK_CLOSED);
+                            }
                             continue;
                         }
                         if ended() || Instant::now() >= until {

@@ -1836,6 +1836,9 @@ fn note_failed(
         // answer in time, or Harness is not running yet (#7282). Told so
         // at once, not as a hand-over that could not be started.
         Some("openclaw_gateway_not_ready" | "harness_not_running") => Some(&words.failed_not_ready),
+        // The lamp's kept session got stuck under it and is being restarted
+        // (#7906 sign 5): ended at once, the person asks again later.
+        Some("one_session_stuck") => Some(&words.failed_stuck),
         _ => None,
     };
     if let Some(line) = refused
@@ -3512,6 +3515,21 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    /// #7906 sign 5: a spoken task ended as the lamp's kept session got
+    /// stuck and was restarted under it (`one_session_stuck`) is told the
+    /// owner's line once, never as a plain failure.
+    #[test]
+    fn a_task_ended_by_a_stuck_restart_is_told_to_ask_again_in_a_few_minutes() {
+        let task = task("openclaw", json!([]));
+        let told = note_failed(&own(), &task, false, Some("one_session_stuck")).unwrap();
+        assert!(told.contains(crate::skill_words::STUCK_LINE), "{told}");
+        assert_eq!(
+            crate::skill_words::STUCK_LINE,
+            "I can't handle that right now; please ask me again in a few minutes."
+        );
+        assert_ne!(Some(told), note_failed(&own(), &task, false, None));
     }
 
     /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was
