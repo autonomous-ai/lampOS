@@ -652,6 +652,41 @@ riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
   voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
   dòng việc.
 
+### Kể bản ghi liên kết: giới hạn (lát 8, `LAMP_SERVICE_RECORDS_LINKED_TOLD` của voice, tắt)
+
+Khi `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` cùng `LAMP_SERVICE_RECORDS_TOLD`
+và `LAMP_SERVICE_RECORDS` (chỉ tuyến thứ hai,
+`process::service_records_linked_told_worker_environment`; `lamp-voice`
+`service_records::told::linked_on`), bản ghi liên kết được kể tách khỏi bản
+ghi connector, mỗi loại có giới hạn riêng:
+
+- **Ghi chú thường trực.** Bản ghi connector như trước, rồi tối đa 2 dòng
+  liên kết thay đổi trong 24 giờ qua, mới nhất trước, mỗi dòng gắn nhãn
+  loại kèm khóa: "[task] Book the dentist · done · today 15:40 · key
+  t-s1-7", với quy tắc "Lines tagged [task], [agent] or [reminder] are work
+  handed on for the owner, with its one-line summary only: never add to
+  it." và, khi kể đầy đủ có cấp `record_source`, "For more of one, call
+  record_source with its key." Dòng liên kết không bao giờ bị bỏ vì giới hạn
+  1.900 byte của ghi chú; dòng connector bị bỏ trước. Chúng lấy từ những gì
+  hộp chờ liên kết đã đưa vào (16 cái gần nhất, chỉ trong RAM) và, sau khi
+  khởi động, từ danh sách bản ghi của chủ mà memory trả về, danh sách này
+  không bao giờ đưa bản ghi liên kết vào sổ của bản ghi connector.
+- **Recall.** Hỏi memory 10 bản ghi theo các từ, không phải 5, kèm
+  `linked_most` 3: sau 3 bản ghi liên kết khớp nhất, memory bỏ qua bản ghi
+  liên kết, nên dù bao nhiêu bản ghi liên kết mới hơn cũng khớp, chúng không
+  bao giờ chiếm chỗ của bản ghi connector trong 10. Trong số đó, mọi bản ghi
+  connector tìm thấy được kể trước, tối đa 5, bản ghi liên kết lấp chỗ còn
+  lại, tối đa 3, nên bản ghi liên kết không bao giờ đẩy mất bản ghi
+  connector. Giữ thứ tự của memory; bản ghi liên kết được kể bằng dòng của
+  nó, loại, trạng thái, thời điểm và khóa.
+- **Có người khác.** Không đầy đủ (cổng của bản ghi được kể), dòng liên kết
+  và bản ghi liên kết của recall chỉ nói loại, trạng thái và thời điểm, không
+  tóm tắt hay khóa, kèm `BRIEF`.
+- **Quên.** Quên tất cả, quên người, hay quên về một điều khớp với tóm tắt
+  đều lấy đi các dòng liên kết đang giữ, như với các thay đổi đang chờ.
+- **Tắt.** Không đổi gì: không có dòng liên kết, recall hỏi 5 và kể những gì
+  tìm thấy như trước, danh sách của memory được gộp như trước.
+
 ### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, tắt)
 
 Khi `LAMP_SERVICE_RECORDS_SOURCE=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ

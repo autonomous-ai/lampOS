@@ -20,6 +20,7 @@ mod held_save;
 mod history_keeps_calls;
 mod just_made_note;
 mod keep_at_once;
+mod keep_whole;
 mod limit_local;
 mod made_line;
 mod made_not_on;
@@ -31,6 +32,7 @@ mod music_scope;
 mod music_warm_name;
 mod name_carries;
 mod name_near;
+mod needs_face_said;
 mod not_for_me_words;
 mod opens_further;
 mod pause_join;
@@ -5696,6 +5698,25 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
         );
         assert_eq!(asked, 1, "{checked} {marked} {heard}");
     }
+}
+
+/// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
+/// sound and was held 2 times in 5, `LAMP_ENDPOINT_PAUSE_JOIN` being off
+/// there. A line begun with the lamp's name set off is never held as a
+/// short sound, with any switch; one without the name still is.
+#[tokio::test]
+async fn a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked() {
+    for named in ["Lamp, put it back.", "Lamp, stop.", "Lamp, lights off."] {
+        let (labels, asked) = sound_turn(true, true, named).await;
+        assert!(
+            labels.iter().any(|label| label.starts_with("audio:")),
+            "{named}: {labels:?}"
+        );
+        assert_eq!(asked, 1, "{named}");
+    }
+    let (held, asked) = sound_turn(true, true, "Put it back.").await;
+    assert_eq!(held, ["started:1", "heard:Put it back.", "complete"]);
+    assert_eq!(asked, 0);
 }
 
 /// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
@@ -14386,6 +14407,93 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
     );
 }
 
+thread_local! {
+    /// `LAMP_CARRY_UNANSWERED_SOUND` for a test on this thread.
+    pub(super) static LONG_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// #7939 (lamp-9adf, 19 Nov): a line cut in three pieces none of which came
+/// back with words loses its opening when each piece goes on with only the
+/// last 1.5 s. With `LAMP_CARRY_UNANSWERED_SOUND` the chain keeps up to 6 s
+/// of it; off, as before. A piece whose words came back carries nothing
+/// either way, so a heard line costs the same.
+#[tokio::test]
+async fn a_chain_of_wordless_pieces_keeps_its_opening_only_with_the_switch() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    // Two wordless pieces of 4 s, then the line that is answered, with the
+    // words of the second back or not.
+    let run = |long: bool, second: &'static str| async move {
+        LONG_FOR_TEST.with(|test| test.set(Some(long)));
+        let pieces = 400u64;
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok(String::new()),
+                    Ok(second.to_owned()),
+                    Ok("what's the weather?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        // The first two pieces are held, so they are never answered.
+        let mut engine = engine.heeding(Arc::new(|request, _, _, _, _| {
+            (request <= 2).then_some("not said to the lamp")
+        }));
+        for request in 1..=2u64 {
+            engine.submit(start(request));
+            for sequence in 1..=pieces {
+                engine.submit(audio_at(request, sequence, 1_000));
+            }
+            engine.submit(end(request));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        }
+        engine.submit(start(3));
+        engine.submit(audio_at(3, 1, 9_000));
+        engine.submit(end(3));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let heard = script.samples_heard.load(Ordering::Relaxed);
+        LONG_FOR_TEST.with(|test| test.set(None));
+        // What the third line was sent besides its own frame: all heard,
+        // less the two pieces' own sound, the first's carried into the
+        // second and the second's own frames.
+        let own = 2 * pieces as usize * frame;
+        let first_carried = most_kept(long).min(pieces as usize * frame);
+        heard - own - first_carried - frame
+    };
+    // Both pieces wordless: the second piece carries the first's tail then
+    // its own, to the cap; the third line is sent that.
+    assert_eq!(run(false, "").await, KEPT_SAMPLES, "off: the last 1.5 s");
+    assert_eq!(
+        run(true, "").await,
+        KEPT_SAMPLES_LONG,
+        "on: up to 6 s, the opening kept"
+    );
+    // The second piece's words came back: nothing is carried into the third.
+    assert_eq!(run(true, "Okay yeah sure.").await, 0, "words back: nothing");
+    assert_eq!(KEPT_SAMPLES_LONG, 6 * 16_000);
+    assert!(!matches!(most_kept(false), KEPT_SAMPLES_LONG));
+}
+
+/// The sound kept across pieces is bounded: whatever is added, at most the
+/// cap, the oldest dropped.
+#[test]
+fn the_kept_sound_is_bounded_and_keeps_the_newest() {
+    let mut kept = VecDeque::new();
+    for round in 0..50i16 {
+        keep_sound(&mut kept, &vec![round; 16_000], KEPT_SAMPLES_LONG);
+        assert!(kept.len() <= KEPT_SAMPLES_LONG);
+    }
+    assert_eq!(kept.len(), KEPT_SAMPLES_LONG);
+    assert_eq!(*kept.back().unwrap(), 49);
+    assert_eq!(*kept.front().unwrap(), 44);
+    assert_eq!(most_kept(false), KEPT_SAMPLES);
+    assert_eq!(most_kept(true), KEPT_SAMPLES_LONG);
+}
+
 /// #2002's P1 (the first builder at 01:23): with the next line's socket
 /// kept ready, "Lamp, [600 ms] what time is it?" came back as "Lamp", held
 /// as a short sound, and "what time is it?", held for no name. The name's
@@ -18345,13 +18453,124 @@ async fn a_made_skills_words_are_asked_with_no_functions_and_run_no_call() {
         0,
         "a made skill's words run no call"
     );
-    assert_eq!(
-        *script.told_only.lock().unwrap(),
-        [&[] as &[&str]],
-        "told no function"
+    // Said as written with no chat asked (#7937): no function is offered.
+    assert!(script.asked.lock().unwrap().is_empty(), "no chat asked");
+    assert!(
+        script.told_only.lock().unwrap().is_empty(),
+        "no function told"
     );
-    let words = format!("{:?}", script.asked.lock().unwrap()[0].last());
-    assert!(words.contains("untrusted"), "{words}");
+}
+
+/// #7937, lamp-9adf on 19 Nov: `daily-brief`, a made skill, had its line
+/// "Here is your daily brief." asked of the model right after a chat about
+/// a cat, with the conversation around it, and the model answered the chat
+/// ("All right, no cat. What turned you off the idea?"). A made skill's
+/// line is said as written, its words alone: the chat is never asked for
+/// it, so nothing said before can turn it into an answer.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_after_a_chat_is_said_as_written_never_an_answer_to_the_chat() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(VecDeque::from([
+            vec![text("A cat could be lovely company."), Ok(ChatEvent::Done)],
+            vec![
+                text("All right, no cat. What turned you off the idea?"),
+                Ok(ChatEvent::Done),
+            ],
+        ])),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Should I get a cat?"));
+    let chat = turn(&mut engine).await;
+    assert!(
+        chat.iter().any(|label| label.contains("lovely company")),
+        "{chat:?}"
+    );
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::say::made_turn("Here is your daily brief."),
+        look: false,
+        quoted: true,
+    });
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    let said: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:Here is your daily brief."], "{labels:?}");
+    assert!(labels.contains(&"own_words:2".to_owned()), "{labels:?}");
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the chat's turn alone is asked"
+    );
+    assert_eq!(calls.lock().unwrap().len(), 0, "{labels:?}");
+}
+
+/// #7937's second case, the first builder at 16:44 on 19 Nov (lamp-06c1,
+/// stock 14521): a skill's line asked of a reply model that had not begun
+/// within 3 s (a new chat connection took 2.3 s) was dropped as
+/// `no_audio_answer`. A made skill's line is said by the voice directly:
+/// its first audio comes as soon as the speech service's, however slow the
+/// model is to start, or if it never starts.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_is_said_at_once_when_the_model_is_slow_or_never_starts() {
+    for never in [false, true] {
+        let script = Arc::new(Script {
+            chats: Mutex::new(VecDeque::from([vec![
+                text("Something else entirely."),
+                Ok(ChatEvent::Done),
+            ]])),
+            hold_chat: never,
+            first_event_after: Some(Duration::from_secs(if never { 3_600 } else { 5 })),
+            speech_after: Some(Duration::from_millis(300)),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false);
+        let asked = tokio::time::Instant::now();
+        engine.submit(ProviderInput::Written {
+            search: false,
+            request: 1,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::say::made_turn("Time for a stretch."),
+            look: false,
+            quoted: true,
+        });
+        let first_audio = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if let ProviderOutput::Audio { .. } = engine.next().await {
+                    return asked.elapsed();
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("never: {never}: no audio within 3 s"));
+        assert!(
+            first_audio <= Duration::from_millis(400),
+            "never: {never}: first audio after {first_audio:?}"
+        );
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        assert!(
+            labels.iter().all(|label| !label.contains("Something else")),
+            "never: {never}: {labels:?}"
+        );
+        assert_eq!(
+            *script.spoken.lock().unwrap(),
+            ["Time for a stretch."],
+            "never: {never}"
+        );
+        assert!(script.asked.lock().unwrap().is_empty(), "never: {never}");
+    }
 }
 
 /// A bounded local peer for the real second-route tool dispatcher. It is

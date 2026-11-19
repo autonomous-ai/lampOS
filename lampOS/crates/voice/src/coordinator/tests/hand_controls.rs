@@ -2240,6 +2240,100 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
     assert_eq!(faces_for(PrivacyState::Allowed), 0, "the slide open");
 }
 
+/// #7224 (`LAMP_GUARD_SIGN=on`): the muted wait tells the asleep face the
+/// guard's mute on every look while it holds, with one time for the wait,
+/// the first pulse once the face has come in; nothing from the look where
+/// the mute is no longer the guard's, and nothing for a person's mute or a
+/// hand's sleep.
+#[test]
+fn the_muted_wait_tells_the_asleep_face_of_the_guards_mute_only_while_it_holds() {
+    use crate::privacy::PrivacyState;
+    use crate::ring_asleep::{Asleep, Owed, SleepFace, TapFace};
+    use crate::service_privacy::WaitOutcome;
+    let directory =
+        std::env::temp_dir().join(format!("lamp-voice-guard-sign-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&directory);
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let told = |controls: HandControls, chosen_at: Option<usize>| {
+        let controls = RefCell::new(Some(controls));
+        let reminders = RefCell::new(None);
+        let guard = std::sync::Arc::new(Owed::default());
+        let mut told = Vec::new();
+        let mut trace = SessionState::default();
+        let began = Instant::now();
+        let outcome = muted_wait_pulsing(
+            &mut trace,
+            &mut None,
+            &controls,
+            &reminders,
+            None::<TapFace<fn() -> Option<Asleep>>>,
+            None::<SleepFace<fn() -> Option<Asleep>>>,
+            None,
+            None,
+            Some(guard.clone()),
+            None,
+            None,
+            |on_state, gate| {
+                on_state(
+                    PrivacyState::Allowed,
+                    crate::process::new_boot().unwrap(),
+                    1,
+                )?;
+                for look in 0..4 {
+                    if chosen_at == Some(look) {
+                        controls
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .mute_chosen()
+                            .unwrap();
+                    }
+                    assert!(!gate(&mut |_| Ok(()))?, "still muted");
+                    told.push(guard.guarded());
+                }
+                Ok(WaitOutcome::Stopped)
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome, WaitOutcome::Stopped);
+        (began, told)
+    };
+    let guarded = || {
+        HandControls::with_test_restored(
+            "test-hand-clock",
+            monotonic_us(),
+            &directory.join("guard.json"),
+        )
+        .unwrap()
+    };
+    // The guard's mute: told on every look, the same time, once the face is in.
+    let (began, all) = told(guarded(), None);
+    let first = all[0].expect("told the guard's mute");
+    assert!(all.iter().all(|since| *since == Some(first)), "{all:?}");
+    assert!(first >= began + crate::ring_asleep::GUARD_FIRST_AFTER);
+    // The person chooses a mute at the third look: no longer the guard's.
+    let (_, chosen) = told(guarded(), Some(2));
+    assert!(chosen[..2].iter().all(Option::is_some), "{chosen:?}");
+    assert!(chosen[2..].iter().all(Option::is_none), "{chosen:?}");
+    // A person's own mute, and a hand's sleep: never.
+    let muted = HandControls::with_test_muted(
+        "test-hand-clock",
+        monotonic_us(),
+        &directory.join("muted.json"),
+    )
+    .unwrap();
+    assert!(told(muted, None).1.iter().all(Option::is_none));
+    let asleep = HandControls::with_test_asleep(
+        "test-hand-clock",
+        monotonic_us(),
+        &directory.join("asleep.json"),
+    )
+    .unwrap();
+    assert!(told(asleep, None).1.iter().all(Option::is_none));
+    let _ = fs::remove_dir_all(&directory);
+}
+
 /// #1362: the muted wait's own closures, for a lamp a hand put to sleep,
 /// as the privacy wait calls them. The sleep's face begins at the first
 /// look, said once in the trace. With the privacy slide's route, the slide
@@ -2308,6 +2402,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
         None,
         None,
         None,
+        None,
         |on_state, gate| {
             let boot = crate::process::new_boot().unwrap();
             on_state(PrivacyState::Allowed, boot, 1)?;
@@ -2367,6 +2462,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
         &reminders,
         None::<TapFace<fn() -> Option<Asleep>>>,
         Some(face),
+        None,
         None,
         None,
         None,
@@ -3822,6 +3918,7 @@ fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
         near_call: directory.join("near-call.json"),
         room_sounds: directory.join("room-sounds.json"),
         room_sounds_group: None,
+        noticing_by_default: false,
     })
     .unwrap();
     let deadline = Instant::now() + Duration::from_secs(10);

@@ -318,9 +318,11 @@ forget restart remain written beside the results.
 
 A policy with `"preliminary": true` is a quick one-run look, never a
 registered result. It admits exactly one fixture, named `development` (the
-held-back persona cannot be named), one repetition, and exactly four setups
-in their registered relative order: `none`, `full_history`,
-`lampos_today_partial` and `tiers`. Everything else is checked as for the
+held-back persona cannot be named), one repetition, and exactly three setups
+in their registered relative order: `none`, `lampos_today_partial` and
+`tiers`, or `none`, `lampos_today_partial` and `lampos_today_partial_next`.
+Full history was left out on 3 November: runs 2, 3 and 5 gave it
+0.84, 0.80 and 0.83, at about 95% of each run's cost. Everything else is checked as for the
 registered kind: pins, approval cap, one shared speech cache, ordered
 attempts, the common answer loop and the blind judge. The field is omitted
 when false, so registered policy hashes do not change.
@@ -340,8 +342,20 @@ the same verification as a registered slot, its reported chat models, the
 spend, and ten example questions chosen by registration order alone (the
 first question of each kind), with every setup's answers and score. It never
 computes a three-run mean. `preliminary/policy.template.json` is the policy
-the lamp runbook fills: its placeholders are the runner and Tiers checksums
-and revision, the audio manifest, the relay's chat and speech addresses and
-the reported model. Its allowances total $39 under a $40 approval; a test
-keeps the template valid against the compiled evaluation policy and the
-development registration.
+the lamp runbook fills, in the second order: its placeholders are the runner
+checksum and revision, the audio manifest, the relay's chat and speech
+addresses and the reported model. Its allowances total $13 under a $40
+approval; a test keeps the template valid against the compiled evaluation
+policy and the development registration.
+
+`lampos_today_partial_next` is today's partial arm with the memory owner's
+Tiers-ideas switches on (3 Nov, P1-P3): its `search` also sends
+`newer_first` and `strength`, its `session_open` `strength` and `profile`, as
+the voice sends them with `LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH`
+and `LAMP_MEMORY_PROFILE` on. A recalled entry reaches the answerer as the
+voice's recall tells it (`remember.rs`): its `strength` only in the voice's
+words (`strength_told`; a label it doesn't tell is dropped), never `earlier`
+(it only orders entries), and a kept thing with an `on` day carries
+`event_on`, `event_status` and `today`. A Days without those fields refuses them, so the runner
+must be built from a branch that has P1-P3's Days; today's setup sends the
+same bytes as before.

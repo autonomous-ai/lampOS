@@ -56,6 +56,7 @@ fn the_name_wakes_a_sleep_and_its_capture_is_closed_before_the_wait_opens() {
         None,
         None,
         None,
+        None,
         Some(name),
         |on_state, gate| {
             let boot = crate::process::new_boot().unwrap();
@@ -148,6 +149,7 @@ fn a_closed_slide_or_a_persons_mute_never_listens() {
             None,
             None,
             None,
+            None,
             Some(name),
             |on_state, gate| {
                 let boot = crate::process::new_boot().unwrap();
@@ -196,6 +198,7 @@ fn the_slide_opening_wakes_a_sleep_through_the_wait() {
         &reminders,
         None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
         None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None,
         None,
         None,
         None,

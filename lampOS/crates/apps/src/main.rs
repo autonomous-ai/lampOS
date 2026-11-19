@@ -1,12 +1,11 @@
-//! `lamp-apps-manage asked`: one request line on standard input (the connection
+//! `lamp-apps asked`: one request line on standard input (the connection
 //! systemd hands over), one answer line on standard output.
-//! `lamp-apps-manage start-all`: the boot start. Both run only with `LAMP_STORE_APPS=on`
+//! `lamp-apps start-all`: the boot start. Both run only with `LAMP_STORE_APPS=on`
 //! in their own environment (a list excepted).
 use lamp_apps::{
     ask::{MOST_LINE, Parts, answer, build_sequence},
     client::AdminYes,
     effects::RealEffects,
-    launcher,
     layout::Layout,
     lock::Running,
     manage::start_all,
@@ -88,40 +87,15 @@ fn main() -> ExitCode {
                 staged_owner: owner,
                 build,
             };
-            if on()
-                && let Err(why) = launcher::ensure(&layout)
-            {
-                println!("{}", json!({"refused": format!("the launcher: {why}")}));
-                return ExitCode::FAILURE;
-            }
             println!("{}", answer(on(), &line, &mut parts));
             ExitCode::SUCCESS
         }
         Some("start-all") => {
             if !on() {
-                eprintln!("lamp-apps-manage: start-all: {SWITCH} is off");
+                eprintln!("lamp-apps: start-all: {SWITCH} is off");
                 return ExitCode::SUCCESS;
             }
-            if let Err(why) = launcher::ensure(&layout) {
-                eprintln!("lamp-apps-manage: the launcher: {why}");
-                return ExitCode::FAILURE;
-            }
             let mut fx = RealEffects;
-            // A cut remove ends with a word to lamp-control, which `Type=simple` may not have
-            // bound yet at boot: wait for its socket (30 s at most) only when one is waiting.
-            if lamp_apps::state::marked(&layout.state)
-                .iter()
-                .any(|(_, marks)| marks.contains(&lamp_apps::state::Mark::Removing))
-                && !lamp_apps::client::wait_for_path(
-                    std::path::Path::new(lamp_apps::client::ADMIN),
-                    30,
-                    || std::thread::sleep(std::time::Duration::from_secs(1)),
-                )
-            {
-                eprintln!(
-                    "lamp-apps-manage: start-all: lamp-control's admin socket did not appear in 30 s; a cut remove stays cut"
-                );
-            }
             // The sweep only with no other instance alive, and the lock is let go before the
             // boot start: it is held for the sweep alone.
             match Running::alone(&layout.state) {
@@ -129,9 +103,7 @@ fn main() -> ExitCode {
                     let report = sweep(&layout, &mut fx, &mut skills);
                     drop(alone);
                     for error in &report.errors {
-                        eprintln!(
-                            "lamp-apps-manage: sweep: {error} (a cut remove not finished here is resumed at the next boot, or when the owner asks for it again)"
-                        );
+                        eprintln!("lamp-apps-manage: sweep: {error}");
                     }
                 }
                 Ok(None) => eprintln!(
@@ -140,9 +112,9 @@ fn main() -> ExitCode {
                 Err(why) => eprintln!("lamp-apps-manage: the sweep is skipped: {why}"),
             }
             let (started, errors) = start_all(&layout, &mut fx);
-            eprintln!("lamp-apps-manage: started {started:?}");
+            eprintln!("lamp-apps: started {started:?}");
             for error in &errors {
-                eprintln!("lamp-apps-manage: start-all: {error}");
+                eprintln!("lamp-apps: start-all: {error}");
             }
             if errors.is_empty() {
                 ExitCode::SUCCESS
@@ -151,7 +123,7 @@ fn main() -> ExitCode {
             }
         }
         _ => {
-            eprintln!("usage: lamp-apps-manage asked | start-all");
+            eprintln!("usage: lamp-apps asked | start-all");
             ExitCode::from(2)
         }
     }

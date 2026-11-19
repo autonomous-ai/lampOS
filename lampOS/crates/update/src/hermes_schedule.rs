@@ -15,11 +15,17 @@
 //!    (`interrupted`) and tried again in the next round.
 //! 3. **The privacy reading lost** ([`Watch`]): the install is stopped at
 //!    once (`privacy_lost`), and tried again in the next round.
+//! 4. **The board hot** ([`Watch::look_with_heat`], #7879): with
+//!    `LAMP_HEAT_BACKOFF=on`, OpenClaw's install is frozen the same way
+//!    while lamp-health's `board/heat` reads hot ([`crate::heat`]), and goes
+//!    on once the board is no longer hot and the voice is quiet. It counts
+//!    toward [`MOST_FROZEN`] as talk does.
 //!
 //! Pure, every reading and every clock handed in, but for [`Watcher`]:
 //! `serve`'s thread that listens to the voice on the bus all along and
 //! watches each install, as the rounds go on.
 use crate::{
+    heat::{self, HeatIn},
     hermes_install::{self, Carried},
     openclaw_install,
     quiet::{BETWEEN_TURNS, Heard, Quiet},
@@ -132,6 +138,12 @@ pub enum Act {
     Freeze(String),
     /// Thaw it: rested again for [`RESTED`].
     Thaw,
+    /// Freeze the one-shot for heat (#7879): the board hot on OpenClaw's
+    /// turn, the voice quiet. Said once per pause.
+    Pause,
+    /// Thaw it after a [`Act::Pause`]: the board no longer hot and the
+    /// voice rested.
+    Resume,
     /// Stop it and record the install `failed` with `error`.
     Stop {
         error: &'static str,
@@ -154,6 +166,12 @@ pub struct Watch {
     began_ms: Option<u64>,
     /// Whether "no privacy watch" was said for this install.
     said_no_lease: bool,
+    /// The current freeze was paused for heat ([`Act::Pause`]) at some
+    /// look: its thaw is an [`Act::Resume`].
+    for_heat: bool,
+    /// A heat pause was part of this install's freezes, for the stop's
+    /// words.
+    heated: bool,
 }
 
 impl Watch {
@@ -169,6 +187,23 @@ impl Watch {
     /// again). Frozen [`MOST_FROZEN`] in all stops it too. Otherwise it is
     /// frozen while the voice is not quiet, and thawed once it has rested.
     pub fn look(&mut self, now_ms: u64, quiet: Result<(), String>, lease: &Lease) -> Act {
+        self.look_with_heat(now_ms, quiet, false, lease)
+    }
+
+    /// [`Watch::look`] with the board's heat (#7879): `hot` is
+    /// [`heat::holds`], so false with the switch off, on Hermes's turn and
+    /// for any reading not fresh and hot. Talk freezes first, as before; a
+    /// hot board with the voice quiet pauses it ([`Act::Pause`], once, also
+    /// when a talk freeze runs on into the heat); it goes on
+    /// ([`Act::Resume`]) only once neither holds it. Talk during a heat
+    /// pause says nothing more.
+    pub fn look_with_heat(
+        &mut self,
+        now_ms: u64,
+        quiet: Result<(), String>,
+        hot: bool,
+        lease: &Lease,
+    ) -> Act {
         match (lease.read(), &self.read_from) {
             (Some(boot), Some(before)) if boot != before => {
                 return self.stop(
@@ -196,27 +231,46 @@ impl Watch {
             Some(since) => {
                 let frozen = self.frozen_ms + now_ms.saturating_sub(since);
                 if frozen >= MOST_FROZEN.as_millis() as u64 {
+                    let held = if self.heated {
+                        "while the voice was not quiet or the board hot"
+                    } else {
+                        "while the voice was not quiet"
+                    };
                     return self.stop(
                         "interrupted",
-                        format!(
-                            "frozen {} min in all while the voice was not quiet",
-                            frozen / 60_000
-                        ),
+                        format!("frozen {} min in all {held}", frozen / 60_000),
                     );
                 }
-                if quiet.is_ok() {
-                    self.frozen_ms = frozen;
-                    self.frozen_since_ms = None;
-                    return Act::Thaw;
+                match (quiet.is_ok(), hot) {
+                    (true, false) => {
+                        self.frozen_ms = frozen;
+                        self.frozen_since_ms = None;
+                        if std::mem::take(&mut self.for_heat) {
+                            Act::Resume
+                        } else {
+                            Act::Thaw
+                        }
+                    }
+                    (true, true) if !self.for_heat => {
+                        self.for_heat = true;
+                        self.heated = true;
+                        Act::Pause
+                    }
+                    _ => Act::Nothing,
                 }
-                Act::Nothing
             }
-            None => match quiet {
-                Ok(()) => Act::Nothing,
-                Err(why) => {
+            None => match (quiet, hot) {
+                (Err(why), _) => {
                     self.frozen_since_ms = Some(now_ms);
                     Act::Freeze(why)
                 }
+                (Ok(()), true) => {
+                    self.frozen_since_ms = Some(now_ms);
+                    self.for_heat = true;
+                    self.heated = true;
+                    Act::Pause
+                }
+                (Ok(()), false) => Act::Nothing,
             },
         }
     }
@@ -243,6 +297,7 @@ impl Watch {
 
     fn stop(&mut self, error: &'static str, why: String) -> Act {
         self.frozen_since_ms = None;
+        self.for_heat = false;
         Act::Stop { error, why }
     }
 }
@@ -271,13 +326,15 @@ impl Watcher {
     /// frozen for good.
     pub fn start(bus_root: &Path, records: &Path) -> Self {
         let began = Instant::now();
+        // Read once at start, as each part reads its own switches (#7879).
+        let heat_on = heat::enabled_from_environment();
         let _ = Systemctl::default().thaw_harness_unit();
         let (bus_root, records) = (bus_root.to_owned(), records.to_owned());
         let frozen = Arc::new(AtomicBool::new(false));
         let held = Arc::clone(&frozen);
         let started = thread::Builder::new()
             .name("hermes-watch".to_owned())
-            .spawn(move || watch_installs(&bus_root, &records, &held, began));
+            .spawn(move || watch_installs(&bus_root, &records, &held, began, heat_on));
         if let Err(error) = started {
             // Nothing watches the install: it runs with no freeze and no
             // privacy watch.
@@ -297,10 +354,21 @@ impl Watcher {
 /// The watch's thread: listens [`LOOK_EVERY`], hands what it heard to its
 /// quiet, and, while [`hermes_install::installing`] (read once a second)
 /// says an install is under way, looks with a [`Watch`] of its own and
-/// carries out what it says ([`hermes_install::carry_out`]).
-fn watch_installs(bus_root: &Path, records: &Path, frozen: &AtomicBool, began: Instant) {
+/// carries out what it says ([`hermes_install::carry_out`]). With
+/// `heat_on` (`LAMP_HEAT_BACKOFF=on`, #7879) it also reads `board/heat`
+/// at most once a second ([`HeatIn`]) while OpenClaw's install alone is
+/// under way.
+fn watch_installs(
+    bus_root: &Path,
+    records: &Path,
+    frozen: &AtomicBool,
+    began: Instant,
+    heat_on: bool,
+) {
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
     let mut ears = BusEars::named(bus_root, LISTENER, &mut say);
+    let mut heat_in = HeatIn::on(heat_on.then(|| lamp_bus::Bus::new(bus_root).ok()).flatten());
+    let mut openclaw_turn = false;
     let mut systemd = Systemctl::default();
     let mut heard = Quiet::new(0);
     let mut watch: Option<Watch> = None;
@@ -313,8 +381,9 @@ fn watch_installs(bus_root: &Path, records: &Path, frozen: &AtomicBool, began: I
         let quiet = rested(&heard, now);
         if look % 10 == 0 {
             // Hermes's or OpenClaw's (#6226): one watch, one one-shot.
-            let under_way =
-                hermes_install::installing(records) || openclaw_install::installing(records);
+            let hermes = hermes_install::installing(records);
+            let under_way = hermes || openclaw_install::installing(records);
+            openclaw_turn = !hermes && under_way;
             if !under_way {
                 watch = None;
             } else if watch.is_none() {
@@ -325,7 +394,8 @@ fn watch_installs(bus_root: &Path, records: &Path, frozen: &AtomicBool, began: I
             frozen.store(false, Ordering::Relaxed);
             continue;
         };
-        let act = current.look(now, quiet, &ears.lease());
+        let hot = heat::holds(heat_in.level(), heat_on, openclaw_turn);
+        let act = current.look_with_heat(now, quiet, hot, &ears.lease());
         if let Some(line) = current.no_lease_line(now) {
             say(&line);
         }

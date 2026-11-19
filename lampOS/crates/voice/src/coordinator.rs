@@ -1561,11 +1561,19 @@ impl Reply {
         // played whole, with no gap in its playback.
         // A computer's stream is `spoken` when its last chunk played out;
         // a gap in a stream's sound is its computer's, not a cut.
+        // A long exact line's pieces (#7892) are `spoken` once the last
+        // played out and none went unrendered: a gap while a piece renders
+        // is no cut. One cut short, a piece not rendered, is never said
+        // whole, however the rest played (Fourteen's HOLD on #7897).
+        let fed_whole = self.notice.fed_whole() != Some(false);
         let sound = (matches!(
             self.notice.origin(),
             SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
         ) && self.playback_gaps == 0
-            || self.notice.origin() == SpeechOrigin::ComputerStream)
+            || self.notice.origin() == SpeechOrigin::ComputerStream
+            || self.notice.origin() == SpeechOrigin::ExactLine
+                && self.notice.fed_whole() == Some(true))
+            && fed_whole
             && self.settled(speaker_pending)
             && self.notice.retired();
         // A reminder that played through gaps and counts as said
@@ -1575,10 +1583,11 @@ impl Reply {
         // (#6749 D: a skill task's ask said whole was answered `dropped`
         // for its gaps, so lamp-skills counted it unsaid and asked again
         // 10 min later). Only a cut, a failed answer or no audio drops it.
-        let played_whole = sound
-            || self.heard_whole(speaker_pending, snapshot)
-            || self.said_through_gaps(speaker_pending, snapshot)
-            || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot);
+        let played_whole = fed_whole
+            && (sound
+                || self.heard_whole(speaker_pending, snapshot)
+                || self.said_through_gaps(speaker_pending, snapshot)
+                || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot));
         // complete_reminder runs first. Read its resulting settlement, not the
         // pre-completion eligibility that successful completion consumes.
         let reminder_complete = self
@@ -2016,6 +2025,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
         None,
         None,
         None,
+        None,
         wait,
     )
 }
@@ -2039,6 +2049,13 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// only after the capture and its grant are closed, and `voice/mute` says
 /// `hears_name` while it runs. It is closed before this returns.
 ///
+/// With `guard` (the asleep face's [`Asleep::owed`], `LAMP_GUARD_SIGN=on`,
+/// #7224), on each look while the mute is the restart guard's
+/// ([`HandControls::restored_after_fault`]), from when its pulses come:
+/// [`crate::ring_asleep::GUARD_FIRST_AFTER`] after the first look that
+/// finds it, kept for the wait; none from the look where it is not, so the
+/// pulse stops there.
+///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
 fn muted_wait_pulsing<
@@ -2053,6 +2070,7 @@ fn muted_wait_pulsing<
     sleep_face: Option<crate::ring_asleep::SleepFace<G>>,
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
+    guard: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
     light: Option<crate::ring_light::RingLight>,
     sleep_name: Option<crate::sleep_capture::SleepName<'_>>,
     wait: impl FnOnce(
@@ -2070,6 +2088,7 @@ fn muted_wait_pulsing<
     let tap_face = RefCell::new(tap_face);
     let sleep_face = RefCell::new(sleep_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
+    let guard_since = std::cell::Cell::new(None::<Instant>);
     let light = RefCell::new(light);
     // With LAMP_STALLS=on, each of the wait's checks of 50 ms or more is a
     // line of its own, by name (#4332).
@@ -2231,6 +2250,16 @@ fn muted_wait_pulsing<
             });
             let waiting =
                 crate::bus_out::Waiting::of(slide.get(), unreadable, allowed, asleep, restored);
+            // The restart guard's mute pulses on the asleep face while it
+            // holds, and not from the look it is lifted or chosen (#7224).
+            if let Some(guard) = &guard {
+                guard_since.set(restored.then(|| {
+                    guard_since
+                        .get()
+                        .unwrap_or_else(|| Instant::now() + crate::ring_asleep::GUARD_FIRST_AFTER)
+                }));
+                guard.guard(guard_since.get());
+            }
             // A due reminder is kept offered while it waits, and said once
             // the microphones open; meanwhile the journal, the trace and the
             // health say it is owed (#1545). Only while the wait is closed:
@@ -3566,6 +3595,15 @@ fn run_source(
                         .map(crate::ring_asleep::Asleep::owed);
                     #[cfg(not(target_os = "linux"))]
                     let pulse = None;
+                    // The restart guard's mute pulses on the asleep face
+                    // (#7224, `LAMP_GUARD_SIGN=on`).
+                    #[cfg(target_os = "linux")]
+                    let guard = asleep
+                        .as_ref()
+                        .filter(|_| crate::ring_asleep::guard_enabled_from_environment())
+                        .map(crate::ring_asleep::Asleep::owed);
+                    #[cfg(not(target_os = "linux"))]
+                    let guard = None;
                     let outcome = muted_wait_pulsing(
                         trace,
                         cues,
@@ -3575,6 +3613,7 @@ fn run_source(
                         sleep_face,
                         crate::bus_out::WaitHealth::from_environment(),
                         pulse,
+                        guard,
                         crate::ring_light::while_muted_from_environment(
                             options.ring_channel_ceiling.is_some(),
                         ),
@@ -15183,7 +15222,12 @@ fn play_exact_line(
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
         reply,
-        NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        // A long line's pieces play from their feed as they are rendered
+        // (#7892); any other line from its samples, as before.
+        match ticket.pieces() {
+            Some(feed) => NoticeDelivery::fed(SpeechOrigin::ExactLine, feed),
+            None => NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        },
         "exact_line",
         "a computer's exact words: nothing heard, nothing sent to the provider",
         0,

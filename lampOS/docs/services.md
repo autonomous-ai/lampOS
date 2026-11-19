@@ -1995,7 +1995,14 @@ minutes from when it came due, so a read queued behind another skips the
 day when its hour runs out ("skipped: another read under way"), never
 starting a fresh hour. Without it, two skills' reads held at their gates
 together (Morning agenda and Morning mail behind a visitor) would say their
-lines in turn, one's between the other's. A
+lines in turn, one's between the other's. A skill task's told answer
+(what its agent found, `service_read::tell_answer`) that its owner asked
+by voice now is not a read and has none of this gate (#7894,
+docs/skills.md): it is said as soon as its run ended, held only while the
+lamp is private or paused, and takes the turn only from a read under way,
+with no minute's gap; it gives the turn back as it ends, so a scheduled
+read still waits its minute after it. One asked by anyone else keeps this
+gate after one short line, and one nobody asked keeps it whole. A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
 restart of `lamp-skills` forgets it and can allow another read that day).
 While its run waits for the gate, and after it came

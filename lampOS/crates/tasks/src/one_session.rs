@@ -45,7 +45,9 @@
 //!   was started again ([`OneSession::forget`]); the lamp's machine id or
 //!   its default engine changed. `offline`, `unknown`, `starting` and
 //!   `installing` are waited on. Reopened once for a turn; a second
-//!   failure sends that run the per-run way, journaled.
+//!   failure sends that run the per-run way, journaled. A spoken task is
+//!   put back while the kept session is ensured again, at most
+//!   [`STARTING_RESUMES_MOST`] times; then it fails [`NOT_STARTED`] (#7895).
 //! - **No reply, no pane for tasks.** Harness takes a reply only with the
 //!   person's `programs-reply` setting on, off by default. A reply refused
 //!   `REPLY_OFF` sends that task, and every later one until lamp-tasks
@@ -157,6 +159,20 @@ pub const QUEUE_MOST: usize = 4;
 /// How long one run waits for the pane before it is [`BUSY`]: as long as
 /// lamp-skills' own queue holds a `busy` run (#7239).
 pub const QUEUE_WAIT: Duration = Duration::from_secs(15 * 60);
+/// How many times one spoken task's words may find the kept session not
+/// running (`NOT_RUNNING`, or a `TIMEOUT` with nothing taken), each time
+/// put back while the session is ensured again, before the task ends
+/// [`NOT_STARTED`] (#7895). On lamp-52e6 a round took about 25 s, so 3
+/// resumes end it at about 100 s, inside [`OPEN_IDLE_WITHIN`], the time a
+/// new pane is given to become ready: a session not taking words by then
+/// is not starting.
+pub const STARTING_RESUMES_MOST: u32 = 3;
+/// The `not_sent` code of a spoken task whose resumes are spent
+/// ([`STARTING_RESUMES_MOST`]). Task news tells it with its plain `failed`
+/// words ("it could not be started just now", with an offer to try again).
+pub const NOT_STARTED: &str = "one_session_not_started";
+/// [`Turn::send`]'s why when a spoken task's resumes are spent.
+const STARTING_SPENT: &str = "the kept session did not take the words after its resumes";
 /// Between two looks at a pane `wait` read idle but whose turn is not this
 /// task's yet, or a busy pane before its words are typed again.
 pub const TURN_LOOK: Duration = Duration::from_millis(500);
@@ -479,6 +495,9 @@ struct Inner {
     /// The spoken tasks the store keeps queued for the pane, in order:
     /// a skill run never goes before them.
     spoken_queue: Vec<String>,
+    /// The spoken task whose words found the kept session not running,
+    /// and how many times ([`STARTING_RESUMES_MOST`], #7895).
+    unstarted: Option<(String, u32)>,
     /// Counted at each [`OneSession::forget`]: [`OneSession::keep_open`]
     /// looks at the lamp again at once.
     woken: u64,
@@ -702,6 +721,19 @@ pub fn for_the_pane(one: &OneSession, launch: &Launch) -> Option<Place> {
         .then_some(place)
 }
 
+/// Spoken task `name` found the session not up past
+/// [`STARTING_RESUMES_MOST`] (#7895): `not_sent` [`NOT_STARTED`], which the
+/// store ends once and Task news tells once; its count spent with it.
+fn not_started(one: &OneSession, name: &str) -> LaunchOutcome {
+    one.lock().unstarted = None;
+    eprintln!(
+        "tasks: {name}: the lamp's session did not come up after {STARTING_RESUMES_MOST} tries; not sent ({NOT_STARTED})"
+    );
+    LaunchOutcome::NotSent {
+        code: NOT_STARTED.into(),
+    }
+}
+
 /// A spoken task typed into the lamp's pane (#7246): its place taken in
 /// the queue (spoken first; the store holds it queued while the pane is
 /// busy), its words typed after its header line once the pane's last were
@@ -719,6 +751,10 @@ pub fn spoken_launch(
     launch: &Launch,
 ) -> Option<LaunchOutcome> {
     let place = for_the_pane(one, launch)?;
+    // The pane's opens failed past the bound while it waited (#7895).
+    if one.not_up_spent(&launch.name) {
+        return Some(not_started(one, &launch.name));
+    }
     let began = Instant::now();
     let (within, stop) = match &one.spoken_bound {
         Some((within, stop)) => ((*within).min(one.queue_wait), Some(stop)),
@@ -790,6 +826,9 @@ pub fn spoken_launch(
             turn.keep();
             Some(LaunchOutcome::Uncertain { code })
         }
+        // Its resumes spent (#7895): failed, so the store ends it and Task
+        // news tells the asker once; never put back again.
+        Sent::NotTyped(why) if why == STARTING_SPENT => Some(not_started(one, &launch.name)),
         // `busy`, as a full queue: never a second session.
         Sent::NotTyped(_) => Some(LaunchOutcome::NotSent {
             code: "busy".into(),
@@ -1656,11 +1695,22 @@ impl OneSession {
         );
         let mut inner = self.lock();
         inner.holder = None;
+        let first = inner.spoken_queue.first().cloned();
         drop(inner);
-        self.turned.notify_all();
-        if let Err(why) = opened {
+        if let Err(why) = &opened {
             eprintln!("tasks: one session: not opened: {why}");
+            // A spoken task waits in the store for the pane: each failed
+            // open counts toward its bound, so it never waits for good
+            // through the backoff (#7895).
+            if let Some(first) = first
+                && self.not_up(&first)
+            {
+                eprintln!(
+                    "tasks: one session: {first} waited past {STARTING_RESUMES_MOST} failed opens; handed over to end"
+                );
+            }
         }
+        self.turned.notify_all();
     }
 
     /// The lamp's open at start: [`OneSession::look`] every
@@ -2295,6 +2345,32 @@ impl OneSession {
         format!("{why}; tried again in {} s", after.as_secs())
     }
 
+    /// Spoken task `id` found the session not up once more: its words
+    /// found it not running, or an open (`harness ensure`, `new`) failed
+    /// while it waited first for the pane. Whether that is past
+    /// [`STARTING_RESUMES_MOST`] (#7895).
+    fn not_up(&self, id: &str) -> bool {
+        let mut inner = self.lock();
+        let count = match &mut inner.unstarted {
+            Some((was, count)) if was == id => {
+                *count += 1;
+                *count
+            }
+            slot => {
+                *slot = Some((id.to_owned(), 1));
+                1
+            }
+        };
+        count > STARTING_RESUMES_MOST
+    }
+
+    /// Whether spoken task `id` found the session not up past
+    /// [`STARTING_RESUMES_MOST`]: the store hands it over at once, and it
+    /// ends [`NOT_STARTED`] ([`spoken_launch`]).
+    pub fn not_up_spent(&self, id: &str) -> bool {
+        matches!(&self.lock().unstarted, Some((was, count)) if was == id && *count > STARTING_RESUMES_MOST)
+    }
+
     /// The pane gone with `why`: let go, so the next open makes a new one.
     fn gone(&self, agent: &str, why: &str) {
         let mut inner = self.lock();
@@ -2371,6 +2447,7 @@ impl Turn<'_> {
             if let Some((name, token)) = self.one.kept_now(&agent) {
                 match harness.reply_kept(&name, &token, &text) {
                     Took::Taken(input) => {
+                        self.one.lock().unstarted = None;
                         let turns = self.counted(&agent, place, &text, Some(input));
                         return Sent::Typed(turns);
                     }
@@ -2387,6 +2464,15 @@ impl Turn<'_> {
                     // again once (a died pane comes back resumed).
                     Took::NotRunning | Took::Timeout if !reopened => {
                         reopened = true;
+                        // A spoken task is put back while the session is
+                        // ensured again, so a session that comes back
+                        // `resumed` but never takes words (`starting`, `No
+                        // session found` in OpenClaw's gateway) would take
+                        // it back forever (#7895): bounded, and the session
+                        // not let go for it once spent.
+                        if !self.opens && self.one.not_up(&self.id) {
+                            return self.fallback(STARTING_SPENT);
+                        }
                         self.one.gone(
                             &agent,
                             "Harness did not take the words into the kept session",

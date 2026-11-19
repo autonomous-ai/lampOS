@@ -905,6 +905,8 @@ struct Played {
     cursor: u64,
     snapshot: Snapshot,
     mask: PlaybackMask,
+    /// Every sample the speaker was handed, in turn.
+    heard: Vec<i16>,
 }
 
 fn play_sound(
@@ -914,13 +916,28 @@ fn play_sound(
     trace: &mut SessionState,
     chunks: usize,
 ) -> Played {
+    play_sound_with(owner, reply, pending, trace, chunks, |_| {})
+}
+
+/// [`play_sound`], `before` called with each chunk's number before it is
+/// handed to the speaker.
+fn play_sound_with(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    pending: &mut Option<PendingSpeaker>,
+    trace: &mut SessionState,
+    chunks: usize,
+    mut before: impl FnMut(usize),
+) -> Played {
     let directory = SessionDirectory::create().unwrap();
     let (channels, mut peer) = pair(&directory, "speaker");
     let mut speaker = Speaker { channels };
     let mut snapshot = owner.snapshot(now()).unwrap();
     let mut mask = PlaybackMask::new(TurnTaking::VadOnly);
     let (mut sequence, mut cursor, mut last) = (0, 0, None);
-    for _ in 0..chunks {
+    let mut heard = Vec::new();
+    for at in 0..chunks {
+        before(at);
         dispatch_speaker_chunk(
             owner,
             reply,
@@ -932,6 +949,7 @@ fn play_sound(
         )
         .unwrap();
         let chunk = peer.data.receive::<SpeakerChunk>().unwrap().unwrap();
+        heard.extend_from_slice(&chunk.samples);
         trace
             .receipts
             .dispatched(chunk.permit.owner(), chunk.chunk_sequence)
@@ -980,6 +998,7 @@ fn play_sound(
         cursor,
         snapshot,
         mask,
+        heard,
     }
 }
 
@@ -1142,6 +1161,7 @@ fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(line.to_owned()),
+            pieces: None,
         },
         crate::say::NORMAL_PRIORITY,
     );
@@ -1199,6 +1219,116 @@ fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
     );
 }
 
+/// Waits up to 2 s for `what`.
+fn until(what: impl Fn() -> bool) {
+    for _ in 0..400 {
+        if what() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    panic!("not within 2 s");
+}
+
+/// Fourteen's HOLD on #7897: a long exact line of three pieces whose third
+/// fails to render plays its first two whole and in order, then ends; it
+/// was not said whole, so it is never `spoken`, however its two pieces
+/// played.
+#[test]
+fn a_long_exact_line_whose_last_piece_fails_to_render_is_not_spoken() {
+    let line = "First, the lamp kept the room warm all evening and dimmed itself slowly while you read. \
+        Second, it listened for the kettle and the door and asked before it turned the speaker up. \
+        Third, it noted the weather at seven each morning and kept a short list of the day's tasks.";
+    let render: crate::say::tts_cache::Render = Box::new(|text: &str| {
+        if text.starts_with("First") {
+            Ok(vec![100; 4_800])
+        } else if text.starts_with("Second") {
+            Ok(vec![200; 4_800])
+        } else {
+            Err("offline".into())
+        }
+    });
+    let dir = std::env::temp_dir().join(format!("lamp-pieces-short-{}", std::process::id()));
+    let cache = std::sync::Arc::new(crate::say::tts_cache::TtsCache::new(
+        &dir, "Rachel", "m", "en", render,
+    ));
+    let Ok(crate::say::tts_cache::Played::Pieces(pieces)) = cache.render_played(line, None) else {
+        panic!("rendered in pieces");
+    };
+    let feed = pieces.feed();
+    // The second rendered at once, the third only once the first is taken.
+    until(|| feed.held_samples() == 9_600);
+    let (mut says, answered) = crate::say::Says::words_for_test(
+        "fig-facts",
+        crate::say::Words::ExactSound {
+            samples: Vec::new(),
+            text: None,
+            pieces: Some(pieces),
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut pending, mut trace) = (None, None, SessionState::default());
+    let admission = InputAdmission::default();
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+    // The first piece's 20 chunks, then the third's render fails, then the
+    // second's 20, the last of them the line's end.
+    let mut played = play_sound_with(&mut owner, &mut reply, &mut pending, &mut trace, 40, |at| {
+        if at == 20 {
+            until(|| feed.short());
+        }
+    });
+    assert_eq!(played.heard.len(), 9_600);
+    assert!(played.heard[..4_800].iter().all(|&sample| sample == 100));
+    assert!(
+        played.heard[4_800..9_360]
+            .iter()
+            .all(|&sample| sample == 200)
+    );
+    played
+        .peer
+        .control
+        .send(WorkerEvent::SpeechRetired {
+            owner: played.last.permit.owner(),
+            sequence: played.last.chunk_sequence,
+            final_sample: PlaybackCursor {
+                epoch: 1,
+                frame: played.cursor,
+            },
+            observed_at_us: monotonic_us(),
+        })
+        .unwrap();
+    service_speaker_control(
+        &mut played.speaker,
+        &mut owner,
+        &mut reply,
+        &mut pending,
+        &mut played.mask,
+        &mut played.snapshot,
+        &mut 0,
+        &mut 16,
+        &mut trace,
+        &mut None,
+    )
+    .unwrap();
+    let current = reply.as_mut().unwrap();
+    owner.complete_turn(now(), current.owner).unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    current.answer_say(&pending, snapshot);
+    assert!(
+        matches!(answered.try_recv(), Ok(Answer::Done(Outcome::Dropped(_)))),
+        "a line cut short by a piece not rendered is never spoken"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// An exact line's event says the words it plays.
 #[test]
 fn an_exact_lines_event_carries_its_text() {
@@ -1208,6 +1338,7 @@ fn an_exact_lines_event_carries_its_text() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(line.to_owned()),
+            pieces: None,
         },
         crate::say::NORMAL_PRIORITY,
     );
@@ -1335,6 +1466,7 @@ fn the_unplug_skills_exact_line_answers_the_conversation_it_is_in() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(crate::language::UNPLUG_UPDATING.to_owned()),
+            pieces: None,
         },
         8,
     );
@@ -1418,6 +1550,7 @@ fn the_unplug_skills_exact_line_waits_for_a_turn_still_on_its_way() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(crate::language::UNPLUG_STAY.to_owned()),
+            pieces: None,
         },
         8,
     );

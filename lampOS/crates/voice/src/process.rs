@@ -20,6 +20,18 @@ use ring_startup::RingResources;
 pub(crate) use ring_startup::RingStartup;
 
 pub const WORKER_STARTUP_TIMEOUT: Duration = Duration::from_secs(3);
+/// A worker's readiness bound in place of [`WORKER_STARTUP_TIMEOUT`] for its
+/// first ready in this process when it is started while the system is young
+/// ([`YOUNG_BOOT`]) and `LAMP_VOICE_YOUNG_BOOT_GRACE=on` (#7224: lamp-c0a4's
+/// cold boot, load 7.9, a worker missed its 3 s twice within 67 s of boot).
+pub const YOUNG_BOOT_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long after boot, on `CLOCK_BOOTTIME`, the system counts as young.
+pub const YOUNG_BOOT: Duration = Duration::from_secs(120);
+const YOUNG_BOOT_GRACE: &str = "LAMP_VOICE_YOUNG_BOOT_GRACE";
+/// The roles that have said ready once in this process with the grace's
+/// switch on, each once: a worker of one of them started again is given no
+/// young-boot grace. With the switch off it is never touched.
+static READY_ONCE: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 /// How long a worker whose peer went during startup is waited for to end
 /// ([`Worker::ended_or`]).
 const ENDED_WITHIN: Duration = Duration::from_millis(100);
@@ -54,6 +66,85 @@ pub(crate) mod startup_clock {
     /// Move it on by `by`: the wait runs on the thread that started it.
     pub(crate) fn move_on(by: Duration) {
         MOVED.with(|moved| moved.set(moved.get() + by));
+    }
+}
+
+/// How long the system has been up, on `CLOCK_BOOTTIME` (suspend counted).
+/// Off Linux there is none, so no start is young.
+fn since_boot() -> Option<Duration> {
+    #[cfg(target_os = "linux")]
+    {
+        let up = rustix::time::clock_gettime(rustix::time::ClockId::Boottime);
+        Some(Duration::new(
+            u64::try_from(up.tv_sec).ok()?,
+            u32::try_from(up.tv_nsec).ok()?,
+        ))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+/// Whether a worker started now is given the young-boot grace: the switch
+/// on, its role not yet ready once in this process, and the system up less
+/// than [`YOUNG_BOOT`]. Gives how long the system was up when it is.
+/// `since_boot` is read only with the switch on.
+fn young_boot_grace(
+    on: bool,
+    since_boot: impl FnOnce() -> Option<Duration>,
+    ready_before: bool,
+) -> Option<Duration> {
+    if !on || ready_before {
+        return None;
+    }
+    since_boot().filter(|up| *up < YOUNG_BOOT)
+}
+
+/// The readiness bound for a worker given the grace or not.
+fn readiness_bound(grace: Option<Duration>) -> Duration {
+    match grace {
+        Some(_) => YOUNG_BOOT_STARTUP_TIMEOUT,
+        None => WORKER_STARTUP_TIMEOUT,
+    }
+}
+
+/// The readiness bound for `role`'s worker, read as it is spawned, with the
+/// switch read by `var`, and whether the switch is on (for [`ready_noted`]);
+/// one journal line when the grace is given (#7224).
+fn startup_bound(role: &str, var: impl Fn(&str) -> Option<std::ffi::OsString>) -> (Duration, bool) {
+    let on = var(YOUNG_BOOT_GRACE).is_some_and(|value| value == "on");
+    let ready_before = || {
+        READY_ONCE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .any(|ready| ready == role)
+    };
+    let grace = young_boot_grace(on, since_boot, on && ready_before());
+    let bound = readiness_bound(grace);
+    if let Some(up) = grace {
+        eprintln!(
+            "lamp-voice: {role} was given the young-boot grace (system up {} s): readiness bound {} s",
+            up.as_secs(),
+            bound.as_secs()
+        );
+    }
+    (bound, on)
+}
+
+/// Notes that `role`'s worker has said ready, with the grace's switch on
+/// only, and each role once, so [`READY_ONCE`] holds at most one entry a
+/// role and the switch off leaves it untouched.
+fn ready_noted(role: &str, grace_on: bool) {
+    if !grace_on {
+        return;
+    }
+    let mut ready = READY_ONCE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if !ready.iter().any(|noted| noted == role) {
+        ready.push(role.to_owned());
     }
 }
 
@@ -411,7 +502,8 @@ impl Worker {
         listed(role)?;
         let channels = WorkerChannels::bind(directory, role, parent, boot, false)?;
         let child =
-            worker_command(executable, directory, role, (parent, boot), extra, var).spawn()?;
+            worker_command(executable, directory, role, (parent, boot), extra, &var).spawn()?;
+        let (bound, grace_on) = startup_bound(role, &var);
         let mut worker = Self {
             channels,
             child,
@@ -424,7 +516,8 @@ impl Worker {
             #[cfg(test)]
             after_terminate: None,
         };
-        worker.wait_until_ready(directory, &mut on_wait)?;
+        worker.wait_until_ready(directory, bound, &mut on_wait)?;
+        ready_noted(role, grace_on);
         Ok(worker)
     }
 
@@ -446,15 +539,18 @@ impl Worker {
         }
     }
 
+    /// Waits for the worker's ready for up to `bound` ([`startup_bound`]:
+    /// [`WORKER_STARTUP_TIMEOUT`], or the young-boot grace's).
     fn wait_until_ready(
         &mut self,
         directory: &Path,
+        bound: Duration,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
         // Read right after the spawn, so a timeout can say how long this
         // worker was waited for (#7224).
         let began = startup_now();
-        let mut deadline = began + WORKER_STARTUP_TIMEOUT;
+        let mut deadline = began + bound;
         let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
@@ -496,11 +592,11 @@ impl Worker {
                 // after. No authority is sent to it before ready, so none of
                 // its leases can lapse; `on_wait` keeps the other workers'
                 // renewed and ends the wait on a stop, the child killed.
+                // The usual time is the worker's own bound, so a speaker
+                // given the young-boot grace keeps it after (#7224).
                 Some(WorkerEvent::BusyAtStart) if role == "speaker" && !busy_at_start => {
                     busy_at_start = true;
-                    deadline = startup_now()
-                        + crate::open_at_start::SPEAKER_BUSY_AT_START
-                        + WORKER_STARTUP_TIMEOUT;
+                    deadline = startup_now() + crate::open_at_start::SPEAKER_BUSY_AT_START + bound;
                 }
                 Some(WorkerEvent::DiagnosticsStarted { started })
                     if self.diagnostic_start.is_none()
@@ -771,7 +867,7 @@ mod fixture_tests {
                 peer.control.send(WorkerEvent::BusyAtStart).unwrap();
             }
             let mut moved = Duration::ZERO;
-            let result = worker.wait_until_ready(&directory.path, || {
+            let result = worker.wait_until_ready(&directory.path, WORKER_STARTUP_TIMEOUT, || {
                 startup_clock::move_on(Duration::from_millis(500));
                 moved += Duration::from_millis(500);
                 if ready_after == Some(moved) {
@@ -829,7 +925,7 @@ mod fixture_tests {
         };
         // Each wait moves the startup clock on by 500 ms, as above.
         let error = worker
-            .wait_until_ready(dir, || {
+            .wait_until_ready(dir, WORKER_STARTUP_TIMEOUT, || {
                 startup_clock::move_on(Duration::from_millis(500));
                 Ok(())
             })
@@ -842,6 +938,153 @@ mod fixture_tests {
             .and_then(|ms| ms.parse::<u128>().ok())
             .unwrap_or_else(|| panic!("role and wait not named: {said}"));
         assert!((3000..4000).contains(&waited), "waited {waited} ms: {said}");
+    }
+
+    /// A capture worker waited for up to `bound`, the startup clock moved on
+    /// 500 ms each wait and Ready sent once it has moved `ready_after`, if
+    /// at all; gives the wait's result and how far the clock moved.
+    fn capture_waited(
+        bound: Duration,
+        ready_after: Option<Duration>,
+    ) -> (io::Result<()>, Duration) {
+        let directory = SessionDirectory::create().unwrap();
+        let dir = &directory.path;
+        let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let channels = WorkerChannels::bind(dir, "capture", parent, boot, false).unwrap();
+        let mut peer = WorkerChannels::bind(dir, "capture", parent, boot, true).unwrap();
+        peer.connect(dir, "capture", true).unwrap();
+        let child = Command::new("sleep")
+            .arg("60")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut worker = Worker {
+            channels,
+            child,
+            boot,
+            role: "capture".into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            on_stop: None,
+            after_terminate: None,
+        };
+        let mut moved = Duration::ZERO;
+        let result = worker.wait_until_ready(dir, bound, || {
+            startup_clock::move_on(Duration::from_millis(500));
+            moved += Duration::from_millis(500);
+            if ready_after == Some(moved) {
+                peer.control.send(WorkerEvent::Ready)?;
+            }
+            Ok(())
+        });
+        (result, moved)
+    }
+
+    /// How long a timed-out capture worker says it waited.
+    fn waited_ms(result: io::Result<()>) -> u128 {
+        let error = result.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        let said = error.to_string();
+        said.strip_prefix("worker readiness timed out (capture after ")
+            .and_then(|rest| rest.strip_suffix(" ms)"))
+            .and_then(|ms| ms.parse::<u128>().ok())
+            .unwrap_or_else(|| panic!("role and wait not named: {said}"))
+    }
+
+    const YOUNG: fn() -> Option<Duration> = || Some(Duration::from_secs(31));
+    const NOT_YOUNG: fn() -> Option<Duration> = || Some(Duration::from_secs(300));
+
+    /// With LAMP_VOICE_YOUNG_BOOT_GRACE=on a worker started 31 s after boot
+    /// has 10 s for its first ready, so one ready at 5 s starts (#7224).
+    #[test]
+    fn a_worker_started_young_with_the_grace_on_is_ready_at_five_seconds() {
+        let bound = readiness_bound(young_boot_grace(true, YOUNG, false));
+        assert_eq!(bound, YOUNG_BOOT_STARTUP_TIMEOUT);
+        let (ready, moved) = capture_waited(bound, Some(Duration::from_secs(5)));
+        ready.unwrap();
+        assert_eq!(moved, Duration::from_secs(5));
+    }
+
+    /// The grace's 10 s still end a worker that never says ready, named
+    /// with how long it waited.
+    #[test]
+    fn a_worker_started_young_with_the_grace_on_that_never_says_ready_ends_at_ten_seconds() {
+        let bound = readiness_bound(young_boot_grace(true, YOUNG, false));
+        let waited = waited_ms(capture_waited(bound, None).0);
+        assert!((10_000..11_000).contains(&waited), "waited {waited} ms");
+    }
+
+    /// Past the boot's first two minutes, or a role already ready once in
+    /// this process, the grace is not given: the usual 3 s.
+    #[test]
+    fn a_worker_started_after_two_minutes_with_the_grace_on_ends_at_three_seconds() {
+        assert_eq!(young_boot_grace(true, NOT_YOUNG, false), None);
+        assert_eq!(young_boot_grace(true, || None, false), None);
+        assert_eq!(young_boot_grace(true, YOUNG, true), None);
+        let bound = readiness_bound(young_boot_grace(true, NOT_YOUNG, false));
+        let waited = waited_ms(capture_waited(bound, Some(Duration::from_secs(5))).0);
+        assert!((3000..4000).contains(&waited), "waited {waited} ms");
+    }
+
+    /// Off, a young start is as before: 3 s, and the boot clock not read.
+    #[test]
+    fn a_worker_started_young_with_the_grace_off_ends_at_three_seconds() {
+        let grace = young_boot_grace(
+            false,
+            || panic!("boot clock read with the grace off"),
+            false,
+        );
+        assert_eq!(grace, None);
+        let waited =
+            waited_ms(capture_waited(readiness_bound(grace), Some(Duration::from_secs(5))).0);
+        assert!((3000..4000).contains(&waited), "waited {waited} ms");
+    }
+
+    /// A ready is noted only with the switch on, and each role once, so the
+    /// set stays bounded by the roles across every run's spawns, and the
+    /// switch off never touches it.
+    #[test]
+    fn a_ready_is_noted_once_a_role_and_only_with_the_grace_on() {
+        let noted = |role: &str| {
+            READY_ONCE
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .iter()
+                .filter(|ready| *ready == role)
+                .count()
+        };
+        let (ready, _) = capture_waited(WORKER_STARTUP_TIMEOUT, Some(Duration::from_secs(1)));
+        ready.unwrap();
+        ready_noted("grace-off-probe", false);
+        ready_noted("grace-off-probe", false);
+        assert_eq!(noted("grace-off-probe"), 0);
+        ready_noted("grace-on-probe", true);
+        ready_noted("grace-on-probe", true);
+        assert_eq!(noted("grace-on-probe"), 1);
+        // A role noted ready is given no grace on its next start.
+        assert_eq!(
+            young_boot_grace(true, YOUNG, noted("grace-on-probe") > 0),
+            None
+        );
+    }
+
+    /// The switch is read as `on` exactly, by the spawning process's `var`.
+    #[test]
+    fn the_grace_is_on_only_for_on_exactly() {
+        let given = |value: &'static str| {
+            startup_bound("grace-probe", move |name| {
+                (name == "LAMP_VOICE_YOUNG_BOOT_GRACE").then(|| value.into())
+            })
+            .0
+        };
+        assert_eq!(given("off"), WORKER_STARTUP_TIMEOUT);
+        assert_eq!(given("ON"), WORKER_STARTUP_TIMEOUT);
+        assert_eq!(
+            startup_bound("grace-probe", |_| None).0,
+            WORKER_STARTUP_TIMEOUT
+        );
     }
 
     #[test]
@@ -1195,6 +1438,10 @@ fn worker_command(
         .envs(service_records_sdk_worker_environment(
             role,
             var(crate::service_records::sdk_counts::ENVIRONMENT).as_deref(),
+        ))
+        .envs(service_records_linked_told_worker_environment(
+            role,
+            var(crate::service_records::told::LINKED_ENVIRONMENT).as_deref(),
         ))
         .envs(service_read_ids_worker_environment(
             role,
@@ -1970,6 +2217,18 @@ fn service_records_sdk_worker_environment(
         .then_some((crate::service_records::sdk_counts::ENVIRONMENT, "on"))
 }
 
+// Linked records told (the linked-service memory plan, slice 8), passed
+// the same narrow way: the exact `on`, to the second route alone, where
+// the records are told. It acts only beside `LAMP_SERVICE_RECORDS_TOLD`
+// (`service_records::told::linked_on`).
+fn service_records_linked_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_records::told::LINKED_ENVIRONMENT, "on"))
+}
+
 // A calendar read's event ids kept for the next request (tracker row
 // C132), passed the same narrow way: the exact `on`, to the second route
 // alone, the one that prepares writes.
@@ -2652,6 +2911,8 @@ fn second_route_worker_environment(
         crate::action_claim::DOING_ENVIRONMENT,
         // And a made skill said removed, off or on (#7683).
         crate::action_claim::SKILL_ENVIRONMENT,
+        // A keep claimed anywhere in a reply, read whole (#7878).
+        crate::remember::WHOLE_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2705,6 +2966,8 @@ fn second_route_worker_environment(
         crate::make_queue::ENVIRONMENT,
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
+        // Only a quick reaction made by DeepSeek, any other by the agent (#6811).
+        crate::made_skill::REACTIONS_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
         // What a skill on the lamp already does offered, not made (#7747).
         crate::make_core_offer::ENVIRONMENT,
@@ -2718,6 +2981,7 @@ fn second_route_worker_environment(
         crate::opens_further::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+        crate::second_provider::CARRY_LONG_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
         crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
@@ -2746,6 +3010,8 @@ fn second_route_worker_environment(
         crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
         // A recent exchange told once, as history, not again (#6218).
         crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
+        // What a forget removes reaches the account's history (#7771).
+        crate::history_forget::ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -2791,6 +3057,8 @@ fn second_route_worker_environment(
         crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
         // A new face past setup kept with nothing asked (the first builder 18:50).
         crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
+        // The model's decline of the walk's name ask (#7876).
+        crate::onboarding::learn_later::ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
         crate::owner_link::ENVIRONMENT,
         // A held rename's short yes, with it (#7419).
@@ -3017,6 +3285,7 @@ mod tests {
             crate::made_not_on::ENVIRONMENT,
             crate::action_claim::DOING_ENVIRONMENT,
             crate::action_claim::SKILL_ENVIRONMENT,
+            crate::remember::WHOLE_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -3044,6 +3313,7 @@ mod tests {
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
             crate::make_queue::ENVIRONMENT,
+            crate::made_skill::REACTIONS_ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
             crate::make_core_offer::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
@@ -3053,6 +3323,7 @@ mod tests {
             crate::opens_further::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+            crate::second_provider::CARRY_LONG_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -3108,9 +3379,11 @@ mod tests {
             crate::known_faces::RENAME_YES_ENVIRONMENT,
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
             crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
+            crate::onboarding::learn_later::ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
+            crate::history_forget::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -3551,6 +3824,12 @@ mod tests {
                     (
                         service_records_reminders_worker_environment,
                         "LAMP_SERVICE_RECORDS_REMINDERS",
+                        ["second"].as_slice(),
+                    ),
+                    // Linked records told: the second route alone.
+                    (
+                        service_records_linked_told_worker_environment,
+                        "LAMP_SERVICE_RECORDS_LINKED_TOLD",
                         ["second"].as_slice(),
                     ),
                     // A record's source fetched: the second route alone.
@@ -4077,6 +4356,7 @@ mod tests {
                     crate::service_records::source::ENVIRONMENT,
                     crate::service_records::agent_rows::ENVIRONMENT,
                     crate::service_records::sdk_counts::ENVIRONMENT,
+                    crate::service_records::told::LINKED_ENVIRONMENT,
                     crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
@@ -4092,6 +4372,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::light_told::ENVIRONMENT,
+                    crate::history_forget::ENVIRONMENT,
                     crate::services_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
@@ -4174,6 +4455,7 @@ mod tests {
                     || name == crate::made_not_on::ENVIRONMENT
                     || name == crate::action_claim::DOING_ENVIRONMENT
                     || name == crate::action_claim::SKILL_ENVIRONMENT
+                    || name == crate::remember::WHOLE_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -4203,6 +4485,7 @@ mod tests {
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
                     || name == crate::make_queue::ENVIRONMENT
                     || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
+                    || name == crate::made_skill::REACTIONS_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::make_core_offer::ENVIRONMENT
                     || name == crate::agent_asks::SERVICES_ENVIRONMENT
@@ -4212,6 +4495,7 @@ mod tests {
                     || name == crate::opens_further::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
+                    || name == crate::second_provider::CARRY_LONG_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
@@ -4267,6 +4551,7 @@ mod tests {
                     || name == crate::known_faces::RENAME_YES_ENVIRONMENT
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
                     || name == crate::known_faces::FACE_NO_ASK_ENVIRONMENT
+                    || name == crate::onboarding::learn_later::ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
@@ -4366,6 +4651,7 @@ mod tests {
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
+                    "LAMP_CARRY_UNANSWERED_SOUND=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
@@ -4384,6 +4670,7 @@ mod tests {
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",
+                    "LAMP_FACE_LEARN_LATER=on",
                     "LAMP_FACE_NO_ASK=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
@@ -4391,10 +4678,12 @@ mod tests {
                     "LAMP_HARD_ASKS_TO_AGENT=on",
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
+                    "LAMP_HISTORY_FORGET=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
+                    "LAMP_KEEP_CLAIM_WHOLE=on",
                     "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KEEP_QUIETLY_ONE_FACE=on",
                     "LAMP_KERNEL_CLOCK=on",
@@ -4410,6 +4699,7 @@ mod tests {
                     "LAMP_MAKE_CORE_OFFER=on",
                     "LAMP_MAKE_NO_CANNOT=on",
                     "LAMP_MAKE_QUEUE=on",
+                    "LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",
@@ -4535,6 +4825,7 @@ mod tests {
                     "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
                     "LAMP_SERVICE_RECORDS_AGENT=on",
+                    "LAMP_SERVICE_RECORDS_LINKED_TOLD=on",
                     "LAMP_SERVICE_RECORDS_REMINDERS=on",
                     "LAMP_SERVICE_RECORDS_SDK=on",
                     "LAMP_SERVICE_RECORDS_SOURCE=on",

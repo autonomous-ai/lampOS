@@ -27,6 +27,11 @@ pub(crate) struct Paths {
     /// lamp), and the group that may read it: `None` keeps it root's alone.
     pub room_sounds: PathBuf,
     pub room_sounds_group: Option<u32>,
+    /// `LAMP_NOTICING_BY_DEFAULT` (#7767,
+    /// `lamp_msgs::consent::noticing_by_default`), where a missing yes file
+    /// is on: a kept no is then left alone, and a "no" at the lamp is kept
+    /// as one in place of the removal ([`take_back`], [`consent`]).
+    pub noticing_by_default: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Tag {
@@ -496,6 +501,12 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
 /// or redo leaves an app yes given after it. The consent folder is synced
 /// after a removal, so the take-back is on disk before the progress that
 /// keeps the "no". The first error is returned, after every step is tried.
+///
+/// With [`Paths::noticing_by_default`] on (#7767, Twelve's HOLD on #7928),
+/// where a missing file is on, a step whose progress holds the "no" keeps a
+/// no at its file (`lamp_msgs::consent::no_bytes`, `"by":"voice"`, at the
+/// "no"'s time) in place of the removal, and a redo leaves a kept no as it
+/// is (any other file is removed, as before: missing is on).
 fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> io::Result<()> {
     let no = |progress: &Progress, step: &str| {
         progress
@@ -518,20 +529,39 @@ fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> i
             continue;
         }
         let path = consent_path(paths, step);
-        let result = match fs::remove_file(&path) {
-            Ok(()) => path
-                .parent()
-                .ok_or_else(|| io::Error::other("a consent file has no folder"))
-                .and_then(fs::File::open)
-                .and_then(|folder| folder.sync_all()),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e),
-        };
+        if paths.noticing_by_default {
+            let result = if let Some(at) = no(progress, step) {
+                keep_no(&path, step, at, paths.room_sounds_group)
+            } else if lamp_msgs::consent::kept_no(&path, step) {
+                Ok(())
+            } else {
+                remove_synced(&path)
+            };
+            if first.is_ok() {
+                first = result;
+            }
+            continue;
+        }
+        let result = remove_synced(&path);
         if first.is_ok() {
             first = result;
         }
     }
     first
+}
+
+/// The file at `path` removed, and its folder synced after a removal; one
+/// already gone is no error.
+fn remove_synced(path: &Path) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => path
+            .parent()
+            .ok_or_else(|| io::Error::other("a consent file has no folder"))
+            .and_then(fs::File::open)
+            .and_then(|folder| folder.sync_all()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// [`consent`] for every step in [`YES_STEPS`], each handled before the
@@ -589,11 +619,15 @@ fn app_yes_stands(path: &Path, step: &str) -> bool {
 /// reader group's (0600 with no group). Never written again from the
 /// progress: a forget of everything removes it for good (`remember.rs`),
 /// whoever gave it. Only the answer and its time, never words, sound or a
-/// face.
+/// face. With [`Paths::noticing_by_default`] on (#7767, Twelve's HOLD on
+/// #7928) a kept no is left alone too: a stop's, the app's, or the walk's
+/// own ([`take_back`]); only a yes or a factory reset replaces it.
 fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
     let path = &consent_path(paths, step);
     let Some(at) = kept_yes(progress, step) else {
-        if app_yes_stands(path, step) {
+        if app_yes_stands(path, step)
+            || (paths.noticing_by_default && lamp_msgs::consent::kept_no(path, step))
+        {
             return Ok(());
         }
         return match fs::remove_file(path) {
@@ -620,11 +654,32 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
 /// onboarding steps' yeses ([`consent`]) and seen activity's
 /// (`crate::seen_yes`, #6543) alike. A write that fails leaves no yes.
 pub(crate) fn keep_yes(path: &Path, key: &str, at: u64, group: Option<u32>) -> io::Result<()> {
+    keep_whole(
+        path,
+        &lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_VOICE),
+        group,
+    )
+}
+
+/// `key`'s no kept at `path` as [`keep_yes`] keeps a yes, given by voice at
+/// `at`: `{"version":1,KEY:"no","at_unix_s":AT,"by":"voice"}`
+/// (`lamp_msgs::consent::no_bytes`, #7767), so that with
+/// `LAMP_NOTICING_BY_DEFAULT` on a stop is never read as the default.
+pub(crate) fn keep_no(path: &Path, key: &str, at: u64, group: Option<u32>) -> io::Result<()> {
+    keep_whole(
+        path,
+        &lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_VOICE),
+        group,
+    )
+}
+
+/// `bytes` kept at `path`, whole: written beside it and renamed into
+/// place, 0640 and `group`'s (0600 with no group).
+fn keep_whole(path: &Path, bytes: &[u8], group: Option<u32>) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let folder = path
         .parent()
         .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
-    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_VOICE);
     let next = path.with_extension("storage-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -638,7 +693,7 @@ pub(crate) fn keep_yes(path: &Path, key: &str, at: u64, group: Option<u32>) -> i
         if let Some(group) = group {
             std::os::unix::fs::fchown(&file, None, Some(group))?;
         }
-        file.write_all(&bytes)?;
+        file.write_all(bytes)?;
         file.sync_all()?;
         fs::rename(&next, path)?;
         fs::File::open(folder)?.sync_all()
@@ -761,6 +816,7 @@ mod tests {
                 near_call: self.0.join("near-call.json"),
                 room_sounds: self.0.join("room-sounds.json"),
                 room_sounds_group: None,
+                noticing_by_default: false,
             }
         }
     }
@@ -1002,6 +1058,76 @@ mod tests {
                 .as_deref(),
             Some("voice")
         );
+    }
+
+    /// Twelve's HOLD on #7928 (#7767): with `LAMP_NOTICING_BY_DEFAULT` on,
+    /// where a missing file is on, a kept no (the stop's, the app's) stays
+    /// through every start and write whose progress holds no yes, and
+    /// through a redo; a "no" in the walk keeps one in place of the
+    /// removal; a yes in the walk, or one from the app, replaces it.
+    #[test]
+    fn with_the_switch_on_a_kept_no_stays_and_a_walk_no_keeps_one() {
+        use super::super::Outcome;
+        use lamp_msgs::consent::{BY_APP, BY_VOICE, allowed, kept_no, no_bytes};
+        let files = Files::new();
+        let mut paths = files.paths();
+        paths.noticing_by_default = true;
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        // A voice's no in both files (the stop's for faces), then a start
+        // and writes: both still no (Heron's HOLD on #7928).
+        let stop = no_bytes("face_expressions", 9, BY_VOICE);
+        let sounds = no_bytes("room_sounds", 9, BY_VOICE);
+        fs::write(&face, &stop).unwrap();
+        fs::write(&paths.room_sounds, &sounds).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(fs::read(&face).unwrap(), stop);
+        assert_eq!(fs::read(&paths.room_sounds).unwrap(), sounds);
+        for progress in [
+            Progress::default(),
+            kept("face_expressions", Outcome::Later, 20),
+            kept("room_sounds", Outcome::NotAvailable, 20),
+        ] {
+            execute(&paths, Operation::Commit(progress, false)).unwrap();
+            execute(&paths, Operation::Initialize).unwrap();
+            assert_eq!(fs::read(&face).unwrap(), stop);
+            assert_eq!(fs::read(&paths.room_sounds).unwrap(), sounds);
+            assert!(!allowed(&face, "face_expressions", true));
+            assert!(!allowed(&paths.room_sounds, "room_sounds", true));
+        }
+        // The app's no too, and through a redo of its step.
+        let app = no_bytes("room_sounds", 9, BY_APP);
+        fs::write(&paths.room_sounds, &app).unwrap();
+        let mut redone = Progress::default();
+        redone.yes_redone_at_unix_s.insert("room_sounds".into(), 30);
+        execute(&paths, Operation::Commit(redone, false)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(fs::read(&paths.room_sounds).unwrap(), app);
+        // A "no" in the walk with no file (on by default): a kept no, the
+        // voice's at the "no"'s time, kept through a start.
+        fs::remove_file(&face).unwrap();
+        let no = kept("face_expressions", Outcome::Skipped, 40);
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(
+            fs::read(&face).unwrap(),
+            no_bytes("face_expressions", 40, BY_VOICE)
+        );
+        assert!(kept_no(&face, "face_expressions"));
+        // A yes in the walk replaces it.
+        execute(
+            &paths,
+            Operation::Commit(kept("face_expressions", Outcome::Done, 50), false),
+        )
+        .unwrap();
+        assert!(allowed(&face, "face_expressions", false));
+        // Off: the same "no" removes the file and a start removes a kept
+        // no, as before.
+        paths.noticing_by_default = false;
+        execute(&paths, Operation::Commit(no, false)).unwrap();
+        assert!(!face.exists());
+        fs::write(&face, &stop).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!face.exists());
     }
 
     /// A progress holding only `step`'s kept `outcome` at `at_unix_s`.

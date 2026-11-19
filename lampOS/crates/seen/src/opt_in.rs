@@ -262,7 +262,11 @@ impl Store for Record {
 /// slow that removal is: a yes whose `at_unix_s` is not later than the
 /// forget is refused, until the file is gone ([`OptIn::gone`]) or replaced
 /// by a later yes. A yes with no time cannot be shown to be later, so it
-/// stays off while the latch holds.
+/// stays off while the latch holds. The latch holds only an explicit yes
+/// (#7767): the default's (no file at all, with `LAMP_NOTICING_BY_DEFAULT`
+/// on, read as [`consent::Kept::by_default`], never from a file's text) is
+/// no yes a forget takes back, since a forget never turns noticing off when
+/// nobody turned it on.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OptIn {
     /// When the last forget came, in Unix seconds, if one has since start
@@ -290,6 +294,9 @@ impl OptIn {
     pub fn on(&self, kept: &Kept) -> bool {
         if !kept.yes {
             return false;
+        }
+        if kept.by_default {
+            return true;
         }
         match self.forgot_at_unix_s {
             None => true,
@@ -469,6 +476,7 @@ mod tests {
             yes: true,
             by: None,
             at_unix_s: at,
+            ..Kept::default()
         };
         // A record kept before posture: the plain line.
         std::fs::write(
@@ -546,6 +554,7 @@ mod tests {
             yes: true,
             by: Some("app".into()),
             at_unix_s: at,
+            ..Kept::default()
         };
         let mut latch = OptIn::default();
         assert!(latch.on(&yes_at(Some(100))));
@@ -562,5 +571,34 @@ mod tests {
         latch.gone();
         assert!(latch.on(&yes_at(Some(120))));
         assert!(latch.on(&yes_at(None)));
+    }
+
+    /// #7767: the latch holds only an explicit yes. With
+    /// `LAMP_NOTICING_BY_DEFAULT` on, a missing file (the default's yes) is
+    /// on through a forget, since a forget never turns noticing off that
+    /// nobody turned on; a kept yes, the voice's or the app's, is held as
+    /// before, and a kept no stays no. Off, a missing file is no either way.
+    #[test]
+    fn a_forget_holds_only_an_explicit_yes() {
+        let folder = folder("forget-default");
+        let on = File::in_folder(&folder).by_default(true);
+        let off = File::in_folder(&folder).by_default(false);
+        let mut latch = OptIn::default();
+        latch.forgot(200);
+        assert!(latch.on(&on.read()), "the default, after a forget");
+        assert!(!latch.on(&off.read()), "missing, off");
+        std::fs::write(&on.path, consent::bytes(KEY, 100, consent::BY_VOICE)).unwrap();
+        assert!(!latch.on(&on.read()), "a kept yes before the forget");
+        std::fs::write(&on.path, consent::no_bytes(KEY, 300, consent::BY_VOICE)).unwrap();
+        assert!(!latch.on(&on.read()), "a kept no");
+        // A yes with no time from a file is no default's.
+        std::fs::write(&on.path, br#"{"seen_activity":"yes","by":"app"}"#).unwrap();
+        assert!(!latch.on(&on.read()), "a kept yes with no time");
+        // Nor one whose text says the default's `by` (Twelve's P3 3 on
+        // #7928): only a missing file is, either way the switch is.
+        std::fs::write(&on.path, br#"{"seen_activity":"yes","by":"default"}"#).unwrap();
+        assert!(!latch.on(&on.read()), "a file saying by default, on");
+        assert!(!latch.on(&off.read()), "a file saying by default, off");
+        let _ = std::fs::remove_dir_all(folder);
     }
 }

@@ -271,8 +271,17 @@ pub const GATEWAY_ENV: &str = "LAMP_OPENCLAW_GATEWAY";
 /// killed and the install recorded `failed` with `timeout` (#6226: on
 /// lamp-c0a4 an npm install with no output flags hung 38 min at its
 /// extract; with `--foreground-scripts --loglevel=http` it took 3 min).
-/// The clock goes on while the watch has the one-shot frozen.
+/// The clock goes on while the watch has the one-shot frozen, so the
+/// bound a step is given is [`LONG_STEP_WITHIN`].
 pub const STEP_WITHIN: Duration = Duration::from_secs(20 * 60);
+/// The bound each long step is given ([`crate::install::bound_of`]):
+/// [`STEP_WITHIN`] running and the most the one-shot may be kept frozen
+/// ([`crate::hermes_schedule::MOST_FROZEN`]), as Hermes's stage has
+/// (`HERMES_STAGE_WITHIN`). A step frozen past 20 min, for talk or a hot
+/// board (#7879), is not taken for timed out on its thaw; frozen 40 min
+/// in all, the watch stops it as `interrupted`, tried again next round.
+pub const LONG_STEP_WITHIN: Duration =
+    Duration::from_secs(STEP_WITHIN.as_secs() + crate::hermes_schedule::MOST_FROZEN.as_secs());
 /// The largest file fetched (`curl --max-filesize`).
 const MOST_BYTES: &str = "536870912";
 /// The prefix of the folder fetched files are kept in while the install
@@ -917,12 +926,12 @@ pub fn after_round(
     say: &mut dyn FnMut(&str),
 ) -> Option<OpenclawInstall> {
     match crate::writer_unit::write_unit(root, UNIT, &unit_text_for(shown)) {
-        Ok(true) => {
-            if let Err(why) = systemd.reload() {
+        Ok(written) => {
+            if written && let Err(why) = systemd.reload() {
                 say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
             }
+            loaded_as_written(systemd, say);
         }
-        Ok(false) => {}
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
     let mut before = record(records);
@@ -1075,6 +1084,83 @@ fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str))
     }
     if let Err(why) = systemd.start_unit(UNIT) {
         say(&format!("{UNIT} not started: {why}"));
+    }
+}
+
+/// The properties [`loaded_as_written`] reads of [`UNIT`], in `systemctl
+/// show`'s form.
+pub const LOADED: &str = "DropInPaths,NeedDaemonReload,CPUQuotaPerSecUSec,ActiveState";
+
+/// What [`UNIT_TEXT`]'s `CPUQuota=100%` reads back as in `systemctl show`.
+pub const QUOTA_READ_BACK: &str = "1s";
+
+/// After the gateway's unit is written or found as written, each round
+/// (#7879): the unit systemd loaded is checked against its text. A failed
+/// `daemon-reload` was only said once and never tried again, as the next
+/// round found the same bytes; so a reload still owed
+/// (`NeedDaemonReload=yes`) or a CPU cap not read back as
+/// [`QUOTA_READ_BACK`] reloads systemd again and, with the gateway running,
+/// `try-restart`s it so the cap applies, one line naming the check. A
+/// drop-in is not lamp-update's: it is said and left as it is, with no
+/// reload or restart, as neither would take it out. Any check still failing
+/// is found again by the next round. No switch of its own: it only makes
+/// systemd run lamp-update's own unit as written.
+fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+    let show = match systemd.gateway_unit_properties() {
+        Ok(show) => show,
+        Err(why) => {
+            say(&format!(
+                "{UNIT}: what systemd loaded is not checked: {why}"
+            ));
+            return;
+        }
+    };
+    let field = |name: &str| {
+        show.lines()
+            .find_map(|line| line.strip_prefix(name)?.strip_prefix('='))
+            .map(str::trim)
+    };
+    if let Some(paths) = field("DropInPaths").filter(|paths| !paths.is_empty()) {
+        say(&format!(
+            "{UNIT} has a drop-in lamp-update did not write, left as it is: {}",
+            crate::world::clean_line(paths)
+        ));
+        return;
+    }
+    let failed = match (field("NeedDaemonReload"), field("CPUQuotaPerSecUSec")) {
+        (Some("no"), Some(QUOTA_READ_BACK)) => return,
+        (Some("no"), quota) => format!(
+            "its CPU cap reads back as {:?}, not {QUOTA_READ_BACK:?}",
+            crate::world::clean_line(quota.unwrap_or("nothing"))
+        ),
+        (owed, _) => format!(
+            "NeedDaemonReload is {:?}, not \"no\"",
+            crate::world::clean_line(owed.unwrap_or("nothing"))
+        ),
+    };
+    let running = matches!(
+        field("ActiveState"),
+        Some("active" | "activating" | "reloading")
+    );
+    if let Err(why) = systemd.reload() {
+        say(&format!(
+            "{UNIT} not loaded as written ({failed}), and systemd not reloaded: {why}"
+        ));
+        return;
+    }
+    if !running {
+        say(&format!(
+            "{UNIT} not loaded as written ({failed}): systemd reloaded"
+        ));
+        return;
+    }
+    match systemd.try_restart_gateway() {
+        Ok(()) => say(&format!(
+            "{UNIT} not loaded as written ({failed}): systemd reloaded and the gateway restarted"
+        )),
+        Err(why) => say(&format!(
+            "{UNIT} not loaded as written ({failed}): systemd reloaded, the gateway not restarted: {why}"
+        )),
     }
 }
 

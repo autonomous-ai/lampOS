@@ -669,13 +669,13 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 12 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 13 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
 product unit the lamp lacks added, 9 the switch in the build's own order,
 which every product build asks for: `ORDER_UPDATER`, #4582, 10 the Skills
 Store's switch file among the settings: `STORE_ENV_UPDATER`, 11 the models
 switch file among the settings: `MODELS_ENV_UPDATER`, 12 lamp-update's own
-switch file among the settings: `UPDATE_ENV_UPDATER`, #6607). With its product deploy tree, this workflow now
+switch file among the settings: `UPDATE_ENV_UPDATER`, #6607, 13 the factory's acceleration drop-in admitted and moved aside, which every product build asks for since: `ACCELERATION_UPDATER`, #7946). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1560,6 +1560,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `Update now: the voice gave way; switching` | an Update now round's moment for the voice ended in its 3 s of quiet: the switch goes on |
 | `Update now: no quiet in 10 s (…); switching anyway` | an Update now round's 10 s for the voice passed without 3 s of quiet: the switch goes on anyway |
 | `switching to build N` | the parts' switch begins |
+| `… is moved aside to …, the build's lamp-body taking the servo's own acceleration cap (#7946)` | a switch that changes lamp-body, after its journal is saved: the factory's acceleration drop-in (`head_touch::acceleration_only`) is copied into the records' `aside/` folder, never deleted, and taken from its place |
+| `… is put back where it was (#7946)` | a build put back, or a round cut short: that drop-in written back where it was, before the reload, for the old lamp-body |
 | `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
 | `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
@@ -2158,7 +2160,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
+before the field climbs first. The current `UPDATER` is 13; a build with the product's units raises the floor to 13 (`manifest::ACCELERATION_UPDATER`, #7946: an updater at 12 or below refuses the factory's acceleration drop-in, so it climbs first), past the switch in the build's own order (9), their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 The publish (`.github/scripts/lampos-publish.py`) passes `--models` with
 the product's `deploy/product/models.json`, so every published build
@@ -2521,7 +2523,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 13; a build with the product's units raises the floor to 13 (`manifest::ACCELERATION_UPDATER`, #7946: an updater at 12 or below refuses the factory's acceleration drop-in, so it climbs first), past the switch in the build's own order (9), their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`,
 `/etc/lampOS/skills/store.env` (from updater 10), `/etc/lampOS/models.env`
@@ -2647,7 +2649,18 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   written bytes. Local wiring is still kept by the three-way rule; an
   incompatible custom file, partial pair, or nonliteral/local override of
   the mode refuses the round rather than guessing. Harmless exit-note
-  drop-ins do not block it. Controls' effective `--pins` path selects the
+  drop-ins do not block it, nor does the factory's acceleration drop-in
+  (#7946): a `lamp-body.service.d/*.conf` holding exactly an `ExecStart=`
+  reset and the installed unit's own command, word for word but for the
+  number after `--servo-acceleration` (`head_touch::acceleration_only`).
+  The bench wrote it (`zz-acceleration-50.conf`) for servos whose EEPROM caps
+  acceleration at 50. A round that changes lamp-body moves it aside after
+  its journal is saved: copied into the records' `aside/` folder (never
+  deleted), then taken from its place, one journal line each, so the
+  build's own unit runs (its lamp-body takes each servo's cap itself,
+  docs/body.md). A build put back, or a round cut short, puts it back where
+  it was (`Journal::aside`). Any other change in such a file is refused as
+  before. Controls' effective `--pins` path selects the
   file checked: build-local/custom active pins are kept byte-for-byte and
   checked against their readers, while an unused product pins file follows
   ordinary settings handling without imposing a head-reader restart.
@@ -2787,7 +2800,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 12. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 13. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
@@ -3743,7 +3756,28 @@ that runs past its bound ends only the waiting: systemd's job goes on, so
 its result is read from what the command leaves, not from the start.
 
 A round runs it to refresh the settings writer ("The settings writer
-refreshed", below). The unit has been checked by its tests' reading of the
+refreshed", below), and for the build's own lampos SDK (#7415). Before #7415
+only the Hermes one-shot wrote `/usr/local/lib/lampos/sdk-python`, so a lamp
+where that one-shot doesn't run (OpenClaw by default, or no Hermes round)
+kept the first SDK it got: lamp-0c89 on 14420 still had 18 Nov's, with no
+`Lamp.connect_app`. Now:
+
+- **Every run of the unit** that changes the writer, or finds it this build
+  already, also writes the build's SDK when the folder isn't exactly the
+  build's files (`sdk_tree::present`, then `sdk_tree::write`). So a newer
+  build's SDK lands with its writer. A failed write is said, never the end of
+  the writer's run.
+- **A round whose writer is this lamp-update already** (`writer_swap::holds`)
+  and whose SDK isn't the build's asks the same unit for the SDK alone
+  (`writer_swap::Op::Sdk`). The unit's program writes the SDK and nothing
+  else: the writer and its record (`writer-refresh.done`) stay as they are.
+  The round says `the build's lampos SDK is written at
+  /usr/local/lib/lampos/sdk-python (it differs from this build's)`. A second
+  round finds the SDK in place and asks nothing.
+- A lamp with no writer at all, or a writer refreshed and not proved yet, is
+  not asked: the SDK comes once the writer is this build's.
+
+The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 

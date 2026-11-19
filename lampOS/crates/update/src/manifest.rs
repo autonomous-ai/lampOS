@@ -39,8 +39,18 @@ pub const SCHEMA: u32 = 1;
 /// ([`ORDER_UPDATER`]). 10: the Skills Store's switch file among the
 /// settings ([`STORE_ENV_UPDATER`]). 11: the models switch file among the
 /// settings ([`MODELS_ENV_UPDATER`]). 12: lamp-update's own switch file
-/// among the settings ([`UPDATE_ENV_UPDATER`], #6607).
-pub const UPDATER: u64 = 12;
+/// among the settings ([`UPDATE_ENV_UPDATER`], #6607). 13: the factory's
+/// acceleration drop-in admitted and moved aside ([`ACCELERATION_UPDATER`],
+/// #7946).
+pub const UPDATER: u64 = 13;
+
+/// The level every product build asks for since #7946: an updater at 12 or
+/// below refuses the factory's acceleration drop-in
+/// (`lamp-body.service.d/zz-acceleration-50.conf`) as a head-touch mode
+/// override before it switches anything, so a lamp that has it never
+/// updates. Asked for this level, such an updater takes only the lamp-update
+/// the build carries, and that one admits the drop-in and moves it aside.
+pub const ACCELERATION_UPDATER: u64 = 13;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -1757,11 +1767,11 @@ mod tests {
             said.iter().all(|level| *level == UPDATER),
             "{said:?} against {UPDATER}"
         );
-        let floors = levels("raises the floor to ", " (`manifest::ORDER_UPDATER`)");
+        let floors = levels("raises the floor to ", " (`manifest::ACCELERATION_UPDATER`");
         assert!(!floors.is_empty());
         assert!(
-            floors.iter().all(|level| *level == ORDER_UPDATER),
-            "{floors:?} against {ORDER_UPDATER}"
+            floors.iter().all(|level| *level == ACCELERATION_UPDATER),
+            "{floors:?} against {ACCELERATION_UPDATER}"
         );
     }
 }

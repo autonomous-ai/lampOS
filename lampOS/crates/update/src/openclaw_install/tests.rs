@@ -16,7 +16,20 @@ struct Fake {
     asked: Vec<&'static str>,
     /// Harness's one-shot's `ActiveState`, for the watch's acts.
     active: Option<&'static str>,
+    /// What `systemctl show` says of the gateway's loaded unit (#7879):
+    /// none, the unit as written, with the gateway stopped.
+    loaded: Option<&'static str>,
+    /// How many of the next reloads fail.
+    reloads_fail: usize,
+    /// How many times the gateway's loaded unit was shown.
+    shown: usize,
 }
+
+/// The gateway's unit loaded as written, the gateway stopped.
+const LOADED_AS_WRITTEN: &str = "DropInPaths=\n\
+    NeedDaemonReload=no\n\
+    CPUQuotaPerSecUSec=1s\n\
+    ActiveState=inactive\n";
 
 impl Systemd for Fake {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
@@ -56,6 +69,18 @@ impl Systemd for Fake {
     }
     fn reload(&mut self) -> Result<(), String> {
         self.asked.push("reload");
+        if self.reloads_fail > 0 {
+            self.reloads_fail -= 1;
+            return Err("Failed to reload daemon: Connection timed out".to_owned());
+        }
+        Ok(())
+    }
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        self.shown += 1;
+        Ok(self.loaded.unwrap_or(LOADED_AS_WRITTEN).to_owned())
+    }
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        self.asked.push("try-restart");
         Ok(())
     }
     fn restart(&mut self, _: &str) -> Result<(), String> {
@@ -986,18 +1011,27 @@ fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     assert_eq!(mode(&lamp.at(WRAPPER)), 0o755);
 }
 
-/// Each fetch, the unpacking and `npm ci` get [`STEP_WITHIN`]; OpenClaw's
-/// other steps the plain bound.
+/// Each fetch, the unpacking and `npm ci` get [`LONG_STEP_WITHIN`]
+/// ([`STEP_WITHIN`] and the most it may be frozen, as Hermes's stage);
+/// OpenClaw's other steps the plain bound.
 #[test]
 fn openclaw_s_long_steps_get_the_long_bound() {
     let downloads = Downloads::make().unwrap();
     let file = downloads.file("node.tar.gz").to_string_lossy().into_owned();
     let unpack = as_lampos(&["tar", "-xzf", file.as_str()]);
     assert!(runs_long_step(&unpack));
-    assert_eq!(install::bound_of(&unpack), STEP_WITHIN);
+    assert_eq!(install::bound_of(&unpack), LONG_STEP_WITHIN);
     let npm = in_namespace("1000", "1000", true, &[]);
     assert!(runs_long_step(&npm));
-    assert_eq!(install::bound_of(&npm), STEP_WITHIN);
+    assert_eq!(install::bound_of(&npm), LONG_STEP_WITHIN);
+    assert_eq!(
+        LONG_STEP_WITHIN,
+        STEP_WITHIN + crate::hermes_schedule::MOST_FROZEN
+    );
+    assert!(
+        LONG_STEP_WITHIN <= Duration::from_secs(3600),
+        "the one-shot's hour"
+    );
     let version = in_namespace("1000", "1000", false, &["--version"]);
     assert!(!runs_long_step(&version));
     assert_eq!(install::bound_of(&version), crate::world::RESTART_WITHIN);
@@ -1083,6 +1117,95 @@ fn openclaw_asks_while_hermes_s_install_is_under_way() {
     assert_eq!(round(&lamp, &mut systemd, false, 200), None);
     assert!(lamp.asked().is_some(), "OpenClaw's ask is written");
     assert!(!systemd.asked.contains(&"start"), "no second one-shot");
+}
+
+/// Heron's HOLD on #7942: `npm ci` paused for a hot board 2 min in, kept
+/// frozen 38 min (past [`STEP_WITHIN`], under `MOST_FROZEN`), then 3 min
+/// more to finish: the watch never stops it, and the step's 43 min are
+/// inside its bound, so it is not recorded `timeout` on the thaw.
+#[test]
+fn a_long_step_frozen_past_20_min_for_heat_is_not_timed_out() {
+    use crate::hermes_schedule::{Act, Lease, Watch};
+    const MIN: u64 = 60_000;
+    let lease = Lease::Fresh {
+        boot: "a".into(),
+        physical: Some(false),
+        no_slide: false,
+    };
+    let npm = in_namespace("1000", "1000", true, &[]);
+    let mut watch = Watch::default();
+    assert_eq!(watch.look_with_heat(0, Ok(()), false, &lease), Act::Nothing);
+    assert_eq!(
+        watch.look_with_heat(2 * MIN, Ok(()), true, &lease),
+        Act::Pause
+    );
+    for at in (3..40).map(|minute| minute * MIN) {
+        assert_eq!(watch.look_with_heat(at, Ok(()), true, &lease), Act::Nothing);
+    }
+    assert_eq!(
+        watch.look_with_heat(40 * MIN, Ok(()), false, &lease),
+        Act::Resume
+    );
+    assert_eq!(
+        watch.look_with_heat(43 * MIN, Ok(()), false, &lease),
+        Act::Nothing
+    );
+    let step = Duration::from_millis(43 * MIN);
+    assert!(step > STEP_WITHIN, "the old bound killed it as timeout");
+    assert!(step < install::bound_of(&npm), "not timed out");
+}
+
+/// #7879: a pause for heat freezes the one-shot and says so in one line,
+/// and the resume thaws it with one line.
+#[test]
+fn the_watch_pauses_openclaws_install_for_heat_with_a_line_each_way() {
+    use crate::hermes_schedule::{Act, carry_out_turns};
+    let lamp = Lamp::new();
+    let records = lamp.records();
+    fs::write(
+        records.join(RECORD),
+        serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 1}).to_string(),
+    )
+    .unwrap();
+    let mut systemd = Fake {
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    let mut lines = Vec::new();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    for act in [Act::Pause, Act::Resume] {
+        assert_eq!(
+            carry_out_turns(&act, &records, &mut systemd, 2, &mut say),
+            Carried::Done
+        );
+    }
+    assert_eq!(systemd.asked, ["state", "freeze", "state", "thaw"]);
+    assert_eq!(
+        lines,
+        [
+            "OpenClaw's install pauses while the board is hot (board/heat)",
+            "OpenClaw's install goes on: the board is no longer hot and the voice is quiet",
+        ]
+    );
+    // The turn passed to Hermes during the pause: the resume says so, not
+    // that the board cooled (Heron's P3 on #7942).
+    fs::write(
+        records.join(hermes_install::RECORD),
+        serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 1}).to_string(),
+    )
+    .unwrap();
+    lines.clear();
+    let mut say = |line: &str| lines.push(line.to_owned());
+    assert_eq!(
+        carry_out_turns(&Act::Resume, &records, &mut systemd, 3, &mut say),
+        Carried::Done
+    );
+    assert_eq!(
+        lines,
+        [
+            "the pause for a hot board ends: the turn passed to Hermes's install, which heat does not pause"
+        ]
+    );
 }
 
 /// One watch for both: a freeze with OpenClaw's install alone under way is
@@ -2666,4 +2789,130 @@ fn gateway_waits_for_control_only_with_the_one_run_path() {
             }
         }
     }
+}
+
+/// A round of [`after_round`] with the switch on and the lines it said.
+fn round_said(lamp: &Lamp, systemd: &mut Fake) -> Vec<String> {
+    let runs = Runs::new(lamp);
+    let mut said = Vec::new();
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        sk(false),
+        systemd,
+        &mut runs.runner(),
+        1,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut |line: &str| said.push(line.to_owned()),
+    );
+    said
+}
+
+/// The lines naming the gateway's unit as not loaded as written.
+fn not_loaded(said: &[String]) -> Vec<&String> {
+    said.iter()
+        .filter(|line| line.contains("not loaded as written") || line.contains("drop-in"))
+        .collect()
+}
+
+/// #7879: a reload that failed after the unit was written is tried again
+/// by the next round, which finds the same bytes but a reload still owed.
+#[test]
+fn a_failed_reload_after_the_write_is_tried_again_next_round() {
+    let lamp = Lamp::new();
+    let owed =
+        "DropInPaths=\nNeedDaemonReload=yes\nCPUQuotaPerSecUSec=infinity\nActiveState=inactive\n";
+    let mut systemd = Fake {
+        loaded: Some(owed),
+        reloads_fail: 2,
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert!(
+        said.iter()
+            .any(|line| line.contains("systemd not reloaded"))
+    );
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+
+    let mut systemd = Fake {
+        loaded: Some(owed),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(
+        systemd.asked,
+        ["reload"],
+        "reloaded again; not running, so not restarted"
+    );
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(lines[0].contains("NeedDaemonReload"), "{}", lines[0]);
+}
+
+/// #7879: a drop-in at the gateway's unit is not lamp-update's: said, left
+/// as it is, and neither a reload nor a restart, which would not take it out.
+#[test]
+fn a_drop_in_at_the_gateway_is_said_and_left_as_it_is() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let folder = lamp.at("/etc/systemd/system/lamp-openclaw-gateway.service.d");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("cap.conf"), "[Service]\nCPUQuota=\n").unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=/etc/systemd/system/lamp-openclaw-gateway.service.d/cap.conf\n\
+             NeedDaemonReload=no\nCPUQuotaPerSecUSec=infinity\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(
+        lines[0].contains("drop-in") && lines[0].contains("cap.conf"),
+        "{}",
+        lines[0]
+    );
+    assert!(folder.join("cap.conf").exists(), "never deleted");
+}
+
+/// #7879: the CPU cap read back as `infinity` with the gateway running:
+/// systemd reloaded and the gateway try-restarted, so the cap applies.
+#[test]
+fn a_cap_read_back_as_infinity_reloads_and_restarts_a_running_gateway() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=infinity\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(systemd.asked, ["reload", "try-restart"]);
+    let lines = not_loaded(&said);
+    assert_eq!(lines.len(), 1, "{said:?}");
+    assert!(
+        lines[0].contains("CPU cap") && lines[0].contains("infinity"),
+        "{}",
+        lines[0]
+    );
+}
+
+/// #7879: the unit loaded as written: checked, and nothing else done.
+#[test]
+fn a_gateway_unit_loaded_as_written_is_left_alone() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    let mut systemd = Fake {
+        loaded: Some(
+            "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=1s\nActiveState=active\n",
+        ),
+        ..Fake::default()
+    };
+    let said = round_said(&lamp, &mut systemd);
+    assert_eq!(systemd.shown, 1, "checked once");
+    assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
+    assert!(not_loaded(&said).is_empty(), "{said:?}");
 }

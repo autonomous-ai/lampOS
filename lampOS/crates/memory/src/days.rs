@@ -217,6 +217,14 @@ pub struct Days {
     /// when, so a record asked before it that was sent to one of them is
     /// refused. Never on disk, held as [`Self::records_forgot_about`] is.
     pub(crate) records_forgot_addresses: std::collections::VecDeque<(String, Vec<String>, u64)>,
+    /// The exchanges the last forget removed, each by its scope and id
+    /// (#7771): the voice asks the account's history to delete the same
+    /// turns. Never on disk; taken by the request's answer
+    /// ([`Self::take_forgot`]).
+    forgot: Vec<(String, u64)>,
+    /// What the last forget's answer had no room for, paged by
+    /// `forgot_exchanges` ([`Self::forgot_page`]). Never on disk.
+    forgot_rest: std::collections::VecDeque<(String, u64)>,
     _held: File,
 }
 
@@ -289,6 +297,8 @@ impl Days {
             said_pending: std::collections::VecDeque::new(),
             records_forgot_about: std::collections::VecDeque::new(),
             records_forgot_addresses: std::collections::VecDeque::new(),
+            forgot: Vec::new(),
+            forgot_rest: std::collections::VecDeque::new(),
             taste_rules: false,
             _held: held,
         };
@@ -1438,8 +1448,10 @@ impl Days {
         // Nightly pass B: what rests on anything going goes too.
         crate::nightly::with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
+        let gone = doomed_exchanges(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
+        self.forgot.extend(gone);
         Ok(count)
     }
     /// The room's lines `speaker` said (#2849, the voice's
@@ -1485,8 +1497,10 @@ impl Days {
         }
         talk_with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
+        let gone = doomed_exchanges(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
+        self.forgot.extend(gone);
         self.forget_set_aside()?;
         Ok(count)
     }
@@ -1517,11 +1531,33 @@ impl Days {
     }
     pub fn forget_all(&mut self, person: Option<&Person>) -> Result<u64> {
         let tx = self.db.transaction()?;
-        let count = empty(&tx, person)?;
+        let mut gone = Vec::new();
+        let count = empty(&tx, person, &mut gone)?;
         crate::service_records::mark_forgot(&tx, person, self.now)?;
         tx.commit()?;
+        self.forgot.extend(gone);
         self.forget_set_aside()?;
         Ok(count)
+    }
+
+    /// The exchanges the forgets since the last call removed, by scope and
+    /// id, and none kept after (#7771).
+    pub fn take_forgot(&mut self) -> Vec<(String, u64)> {
+        std::mem::take(&mut self.forgot)
+    }
+
+    /// The ids a forget's answer had no room for, kept for paging in place
+    /// of any earlier forget's.
+    pub fn keep_forgot_rest(&mut self, rest: Vec<(String, u64)>) {
+        self.forgot_rest = rest.into();
+    }
+
+    /// The next `most` of what [`Self::keep_forgot_rest`] kept, and
+    /// whether more remain.
+    pub fn forgot_page(&mut self, most: usize) -> (Vec<(String, u64)>, bool) {
+        let take = self.forgot_rest.len().min(most);
+        let page = self.forgot_rest.drain(..take).collect();
+        (page, !self.forgot_rest.is_empty())
     }
 
     /// Everything kept for one person and every rule in their rules scope
@@ -1538,8 +1574,8 @@ impl Days {
             .rules()
             .ok_or_else(|| Error::new("bad_person", "the person has no rules scope"))?;
         let tx = self.db.transaction()?;
-        let removed = empty(&tx, Some(person))?;
-        let ruled = empty(&tx, Some(&rules))?;
+        let removed = empty(&tx, Some(person), &mut Vec::new())?;
+        let ruled = empty(&tx, Some(&rules), &mut Vec::new())?;
         tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
         crate::service_records::mark_forgot(&tx, Some(person), self.now)?;
         tx.commit()?;
@@ -3622,7 +3658,12 @@ fn role_session(tx: &Transaction<'_>, person: &Person, session: &str, expected: 
 
 /// Every entry of `person`, or of every person for `None`, erased in the
 /// caller's transaction, with their session notes, jobs and skipped count.
-fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
+/// `gone` takes the exchanges it removes, by scope and id (#7771).
+fn empty(
+    tx: &Transaction<'_>,
+    person: Option<&Person>,
+    gone: &mut Vec<(String, u64)>,
+) -> Result<u64> {
     tx.execute("DELETE FROM doomed", [])?;
     tx.execute(
         "INSERT INTO doomed SELECT rid FROM entries WHERE ?1 IS NULL OR person=?1",
@@ -3647,6 +3688,7 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         "UPDATE people SET generation=generation+1 WHERE (?1 IS NULL OR person=?1) AND NOT EXISTS(SELECT 1 FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.person=people.person)",
         [person.map(Person::as_str)],
     )?;
+    gone.extend(doomed_exchanges(tx)?);
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
@@ -3836,6 +3878,15 @@ fn talk_fitted(text: &str, room: usize) -> Option<String> {
     }
     Some(lines.join("\n"))
 }
+/// The exchanges among what is doomed, each by its scope and id, read
+/// before [`erase`] (#7771).
+fn doomed_exchanges(tx: &Transaction<'_>) -> Result<Vec<(String, u64)>> {
+    Ok(tx
+        .prepare("SELECT e.person,e.id FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.kind='exchange' ORDER BY e.person,e.id")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
 pub(crate) fn erase(tx: &Transaction<'_>) -> Result<u64> {
     let people: Vec<String> = tx
         .prepare("SELECT DISTINCT person FROM entries WHERE rid IN (SELECT rid FROM doomed)")?

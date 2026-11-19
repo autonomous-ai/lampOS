@@ -102,6 +102,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod heat;
+pub use heat::*;
 mod account;
 pub use account::*;
 mod energy;
@@ -1198,6 +1200,21 @@ impl VoiceTone {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
 }
+
+/// The memory requests whose answer names the exchanges they removed,
+/// `"exchanges":{"<scope>":[ids]}` (#7771), for the voice to delete the same
+/// turns from the account's history. No other answer's `exchanges` is read.
+pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
+    "forget",
+    "forget_last",
+    "forget_all",
+    "forget_said",
+    "exchanges_forget",
+];
+
+/// The memory request that pages the rest of the exchanges the last forget
+/// removed, when its answer said `"exchanges_more":true` (#7771).
+pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
 
 /// Memory has forgotten everything it kept under a person, asked by the
 /// app or by voice (`memory/forgot`), so every other part lets its own go
@@ -2711,6 +2728,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(app_trigger_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(heat_topics())
         .chain(reports_topics())
         .chain(account_topics())
         .chain(energy_topics())

@@ -104,7 +104,6 @@ differs. Folders are what the unit makes or names.
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
 | setup | `lamp-setup serve` (first boot only, until setup's marker) and `lamp-setup watch-reset` (the reset button, in the target); `docs/setup.md` | root | `/var/lib/lampos-setup/` (its `StateDirectory`; the marker `done`) | `/etc/lampOS/setup/serve.json` and `reset-plan.json` | setup's hotspot and page, where `serve.json`'s `listen` says; the bus (the reset's watch) |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
-| apps-manage | `lamp-apps-manage asked` (root's, one per connection; `lamp-apps-manage start-all` at boot): the Store apps' helper, off unless `LAMP_STORE_APPS=on` (#7415) | root (`CAP_DAC_OVERRIDE`, `CAP_FOWNER`), in `lampos-parts.slice` | `/var/lib/lampos-apps-state/` (0755: the marks); `/opt/lampOS/apps/` (the apps' code, 0755); each app's data is systemd's, `/var/lib/private/lampapp-<name>` behind `/var/lib/lampapp-<name>` (a remove asks `systemctl clean --what=state`; the helper writes none of it) | the staging folder `/var/lib/lampos-apps-staging/` (lampos's) | its own socket, `/run/lampos-apps-manage/manage.sock`; the owner's yes from lamp-control's admin socket |
 | skills | `lamp-skills` | lampos (product unit, #811) | `/var/lib/lampos-skills-state/` (0700, `daily.json`); `/run/lampos-skills/` (0755, runtime) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its runtime folder |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
 
@@ -1187,7 +1186,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
    `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
    and `lamp-region.path` (#6256, below), and the helpers'
-   sockets `lamp-skills-manage.socket`, `lamp-apps-manage.socket`, `lamp-setup-change.socket`,
+   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
    never enabled; each timer's service is started by the timer
@@ -1690,6 +1689,26 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        frozen). A freeze or thaw systemd refuses stops it too, so the
        one-shot is never left frozen; and a `serve` that starts thaws it
        first, in case one ended mid-freeze;
+     - the board hot, OpenClaw's install only and only with
+       `LAMP_HEAT_BACKOFF=on` exactly in `lamp-update.service`'s
+       environment (#7879; dark, in no unit): the watch reads
+       lamp-health's kept `board/heat` at most once a second, never
+       waiting, and while it says `hot` on OpenClaw's turn (not Hermes's)
+       the one-shot is frozen as for talk, journaled `OpenClaw's install
+       pauses while the board is hot (board/heat)`; it goes on when the
+       board is no longer hot and the voice is quiet, journaled `OpenClaw's
+       install goes on: the board is no longer hot and the voice is quiet`.
+       Warm, an expired, future-dated or invalid value, and no bus are
+       not hot. The app shows the install `frozen` during a heat pause,
+       as it does for talk (the watch's `frozen` flag, #6240). Talk
+       during a heat pause says nothing more; a pause that
+       ends as the turn passes to Hermes's install says so (`the pause for a
+       hot board ends: the turn passed to Hermes's install, …`). A heat
+       pause counts toward `MOST_FROZEN` as talk does, and each of
+       OpenClaw's long steps (fetch, unpack, `npm ci`) is bounded by
+       `LONG_STEP_WITHIN`, its 20 min running and `MOST_FROZEN`, so a step
+       frozen past 20 min is not taken for `timeout` on the thaw
+       (`crates/update/src/heat.rs`);
      - the privacy reading lost: once a fresh lease with the slide read
        (or a lamp with no slide) was seen on `voice/privacy`, its newest
        lease older than 250 ms (`LOST_AFTER`, its life being 50 ms), one
@@ -1743,7 +1762,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      writes them to `/usr/local/lib/lampos/sdk-python` (root's, files 0644:
      the namespace leaves `/usr` as it is, so a run reads it and cannot change
      it). The folder holding anything but exactly this build's files counts
-     as Hermes missing, so a newer build has it written again; a skill's run
+     as Hermes missing, so a newer build has it written again. Every lamp,
+     whatever its agent, also gets it from lamp-update's own round through
+     the writer's one-shot unit (#7415, `docs/updates.md`, "The writer's
+     one-shot unit"); a skill's run
      has it on `PYTHONPATH` (`docs/tasks.md`). Hermes's own launcher replaces
      the `PYTHONPATH` it is started with, so the same one-shot also writes
      `/usr/local/lib/lampos/hermes-run-env.sh` (root's, 0644, never run),
@@ -2486,6 +2508,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
      this build's yet; …", and leaves a working OpenClaw and its gateway
      as they are; the next round writes the unit and asks again (#7135).
+     After writing the unit or finding it as written, each round checks
+     what systemd loaded (#7879): `systemctl show -p
+     DropInPaths,NeedDaemonReload,CPUQuotaPerSecUSec,ActiveState`. A
+     reload still owed (`NeedDaemonReload=yes`, as after a `daemon-reload`
+     that failed, which the next round's same bytes never tried again) or
+     a CPU cap not read back as `1s` (`CPUQuota=100%`) reloads systemd
+     again and, with the gateway running, `systemctl try-restart`s it so
+     the cap applies, with one journal line naming the check. A drop-in
+     is not lamp-update's: one journal line names it, and it is left as it
+     is, with no reload or restart, as neither would take it out. Any
+     check still failing is found again by the next round. There is no
+     switch of its own: it only makes systemd run lamp-update's own unit
+     as its text says.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

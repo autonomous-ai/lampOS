@@ -121,6 +121,8 @@ impl Trial<'_> {
         let mut turns = 0;
         let mut malformed_answers = 0;
         let mut malformed_judgments = 0;
+        let mut failed_answer_calls = 0;
+        let mut failed_judge_calls = 0;
         let mut nights = 0;
         let ends = self.corpus.day_end_records()?;
         let memory_mode = match self.arm {
@@ -153,6 +155,7 @@ impl Trial<'_> {
                 let mut answers = Vec::<Answer>::new();
                 let mut recorded = Vec::new();
                 let mut any_malformed = false;
+                let mut any_failed = false;
                 for (index, query) in std::iter::once(&question.query)
                     .chain(&question.followups)
                     .enumerate()
@@ -194,8 +197,17 @@ impl Trial<'_> {
                         any_malformed = true;
                         malformed_answers += 1;
                     }
+                    if result.failed_call {
+                        any_failed = true;
+                        failed_answer_calls += 1;
+                    }
                     answers.push(result.answer);
                     turns += 1;
+                    // Over the limit, no further followup calls the model: the
+                    // probe still closes and restores below, then the run ends.
+                    if failed_answer_calls + failed_judge_calls > evaluation::MAX_FAILED_CALLS {
+                        break;
+                    }
                 }
                 let after = ops.run(Op::Inspect, json!({"person_id":self.corpus.persona.id}))?;
                 coverage.observe(
@@ -218,7 +230,9 @@ impl Trial<'_> {
                     }
                 }
                 if self.mode == Mode::Live {
-                    let evaluated = if any_malformed {
+                    let evaluated = if any_failed {
+                        evaluation::malformed(evaluation::FAILED_ANSWER_CALL, None)
+                    } else if any_malformed {
                         evaluation::malformed(evaluation::MALFORMED_ANSWER, None)
                     } else {
                         evaluation::evaluate_with_history(
@@ -232,6 +246,9 @@ impl Trial<'_> {
                     };
                     if evaluated.score.reason == evaluation::MALFORMED_JUDGE {
                         malformed_judgments += 1;
+                    }
+                    if evaluated.score.reason == evaluation::FAILED_JUDGE_CALL {
+                        failed_judge_calls += 1;
                     }
                     if evaluated.score.needs_audit {
                         audit.push(question.id.clone());
@@ -287,6 +304,11 @@ impl Trial<'_> {
                         audit.push(question.id.clone());
                     }
                 }
+                if failed_answer_calls + failed_judge_calls > evaluation::MAX_FAILED_CALLS {
+                    return Err(invalid(
+                        "more model calls failed in transit than one run allows",
+                    ));
+                }
                 probes += 1;
             }
         }
@@ -315,7 +337,7 @@ impl Trial<'_> {
             (kind,json!({"questions":values.len(),"mean":mean,"scored":values.iter().flatten().count()}))
         }).collect();
         Ok(
-            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"malformed_answers":malformed_answers,"malformed_judgments":malformed_judgments,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"topic":topic,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
+            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"malformed_answers":malformed_answers,"malformed_judgments":malformed_judgments,"failed_answer_calls":failed_answer_calls,"failed_judge_calls":failed_judge_calls,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"topic":topic,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
         )
     }
 }

@@ -461,6 +461,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         fetching: Vec::new(),
         model_backs: Vec::new(),
         exit_notes: Vec::new(),
+        aside: Vec::new(),
         envelope: Vec::new(),
         setting_writes: Vec::new(),
         image_writes: Vec::new(),
@@ -605,6 +606,10 @@ struct Run<'r, 'w> {
     /// The exit notes the switch writes ([`Self::exit_notes_owed`]), as
     /// lamp paths: journaled, and removed again with a build put back.
     exit_notes: Vec<String>,
+    /// The factory's acceleration drop-ins the switch moves aside
+    /// ([`Self::acceleration_drop_ins`], #7946): journaled, and put back
+    /// where they were with a build put back.
+    aside: Vec<crate::records::SetAside>,
     /// The envelope read, as it came: staged for `lamp-update-apply`.
     envelope: Vec<u8>,
     /// The settings the build writes here (crate::apply), and the build
@@ -714,7 +719,16 @@ impl Run<'_, '_> {
         let asked =
             crate::writer_swap::ask(&self.config.root, held, running.bytes(), records::unix_ms());
         let ran = match asked {
-            Ok(false) => return,
+            // The writer is this build already: the build's SDK, which only the Hermes one-shot wrote
+            // before, is put there by the same unit when it differs (#7415).
+            Ok(false) => {
+                if crate::writer_swap::holds(&self.config.root, running.bytes())
+                    && !crate::sdk_tree::present(&self.config.root)
+                {
+                    self.writer_op(crate::writer_swap::Op::Sdk, "it differs from this build's");
+                }
+                return;
+            }
             Ok(true) => crate::writer_unit::run(&self.config.root, self.world.systemd),
             Err(why) => Err(why),
         };
@@ -766,6 +780,23 @@ impl Run<'_, '_> {
                 format!(
                     "the settings writer refreshed has proved itself ({why}): the copy before is removed"
                 )
+            }
+            (crate::writer_swap::Op::Sdk, Ok(()))
+                if crate::sdk_tree::present(&self.config.root) =>
+            {
+                format!(
+                    "the build's lampos SDK is written at {} ({why})",
+                    crate::sdk_tree::DIR
+                )
+            }
+            (crate::writer_swap::Op::Sdk, Ok(())) => format!(
+                "{} ran, and the build's lampos SDK is still not at {}",
+                crate::writer_unit::UNIT,
+                crate::sdk_tree::DIR
+            ),
+            (crate::writer_swap::Op::Sdk, Err(error)) => {
+                crate::writer_swap::forget(&folder);
+                format!("the build's lampos SDK is not written: {error}")
             }
             (_, Ok(())) => return,
             (_, Err(error)) => {
@@ -2482,6 +2513,19 @@ impl Run<'_, '_> {
                 let _ = fs::remove_dir(folder);
             }
         }
+        // The factory's acceleration drop-ins moved aside, where they were,
+        // before the same reload: the old lamp-body needs its own (#7946).
+        for aside in std::mem::take(&mut self.aside) {
+            let path = self.config.on(&aside.path);
+            let put = path
+                .parent()
+                .map_or(Ok(()), fs::create_dir_all)
+                .and_then(|()| crate::records::write_whole(&path, aside.text.as_bytes(), 0o644));
+            match put {
+                Ok(()) => self.say(&format!("{} is put back where it was (#7946)", aside.path)),
+                Err(error) => troubles.push(format!("{} cannot be put back: {error}", aside.path)),
+            }
+        }
         if let Err(why) = self.write_units(
             backs
                 .iter()
@@ -2579,6 +2623,68 @@ impl Run<'_, '_> {
                 }))
             })
             .and_then(|()| self.switch_models())
+    }
+
+    /// The factory's acceleration drop-ins this switch moves aside (#7946):
+    /// only in a round that changes lamp-body, each a `.conf` under
+    /// `/etc/systemd/system/lamp-body.service.d/` that is the installed
+    /// unit's own command but for its acceleration
+    /// ([`crate::head_touch::acceleration_only`]). The build's lamp-body runs
+    /// at the servo's own cap, so the drop-in is no longer needed, and its
+    /// old command line would run over the build's unit.
+    fn acceleration_drop_ins(&self, changes: &[Change]) -> Vec<crate::records::SetAside> {
+        if !changes.iter().any(|change| change.unit == BODY_UNIT) {
+            return Vec::new();
+        }
+        let folder = format!("/etc/systemd/system/{BODY_UNIT}.d");
+        let Ok(unit) =
+            fs::read_to_string(self.config.on(&format!("/etc/systemd/system/{BODY_UNIT}")))
+        else {
+            return Vec::new();
+        };
+        let Ok(entries) = fs::read_dir(self.config.on(&folder)) else {
+            return Vec::new();
+        };
+        let mut aside: Vec<crate::records::SetAside> = entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+            .filter_map(|entry| {
+                let name = entry.file_name().into_string().ok()?;
+                let text = fs::read_to_string(entry.path()).ok()?;
+                (name.ends_with(".conf") && crate::head_touch::acceleration_only(&text, &unit))
+                    .then(|| crate::records::SetAside {
+                        path: format!("{folder}/{name}"),
+                        text,
+                    })
+            })
+            .collect();
+        aside.sort_by(|one, other| one.path.cmp(&other.path));
+        aside
+    }
+
+    /// Each of [`Self::aside`] copied into the records' `aside/` folder, then
+    /// taken from its place: never deleted. One journal line each, no values.
+    fn move_aside(&mut self) -> Result<(), String> {
+        let kept = self.records.folder().join("aside");
+        for aside in self.aside.clone() {
+            let path = self.config.on(&aside.path);
+            let name = path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            fs::create_dir_all(&kept)
+                .and_then(|()| {
+                    crate::records::write_whole(&kept.join(&name), aside.text.as_bytes(), 0o600)
+                })
+                .and_then(|()| fs::remove_file(&path))
+                .map_err(|error| format!("{} cannot be moved aside: {error}", aside.path))?;
+            self.say(&format!(
+                "{} is moved aside to {}, the build's lamp-body taking the servo's own acceleration cap (#7946)",
+                aside.path,
+                kept.join(&name).display()
+            ));
+        }
+        Ok(())
     }
 
     /// The exit notes a switch owes, as lamp paths: install's
@@ -2802,6 +2908,7 @@ impl Run<'_, '_> {
             .map(|placing| placing.back.clone())
             .collect();
         self.exit_notes = self.exit_notes_owed(&changes);
+        self.aside = self.acceleration_drop_ins(&changes);
         let journal = Journal {
             build: build.clone(),
             rollback_order: self.rollback_order.clone(),
@@ -2818,6 +2925,7 @@ impl Run<'_, '_> {
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
             exit_notes: self.exit_notes.clone(),
+            aside: self.aside.clone(),
             refusing: None,
         };
         if let Err(error) = self
@@ -2826,6 +2934,13 @@ impl Run<'_, '_> {
             .and_then(|()| self.records.save_journal(&journal))
         {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
+        }
+        // The factory's acceleration drop-in out of the way of the build's
+        // own lamp-body unit, which takes the servo's cap itself (#7946):
+        // after the journal, so a put-back, or a round cut short, puts it
+        // back.
+        if let Err(why) = self.move_aside() {
+            return self.put_back(state, &build, &backs, None, why, String::new());
         }
         // Head pins depend on the candidate units; other settings retain
         // their established apply-before-units ordering.
@@ -3585,6 +3700,7 @@ impl Run<'_, '_> {
         ));
         self.model_backs = journal.models.clone();
         self.exit_notes = journal.exit_notes.clone();
+        self.aside = journal.aside.clone();
         self.applying = journal.settings.then_some(journal.build.sequence);
         let mut backs = Vec::new();
         for switching in &journal.units {

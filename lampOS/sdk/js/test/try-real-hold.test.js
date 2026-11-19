@@ -19,9 +19,11 @@ test('the slider\'s lease is still held 4 s after the last drag, and a let_go gi
   page.send({ type: 'drag', joint: 'pitch', deg: 3, final: true });
   for (let i = 0; i < 100 && fake.asked('joints').length < 1; i += 1) await new Promise((r) => setTimeout(r, 50));
   assert.equal(fake.leases.size, 1, 'the drag took the body lease');
+  assert.ok(page.messages.some((m) => m.type === 'holding' && m.ms === 25000), 'the page is told how long it is held, to show the time left');
   await new Promise((r) => setTimeout(r, 4000));
   assert.equal(fake.leases.size, 1, 'it is still held after the old 3 s');
   page.send({ type: 'let_go' });
   for (let i = 0; i < 100 && fake.leases.size > 0; i += 1) await new Promise((r) => setTimeout(r, 50));
   assert.equal(fake.leases.size, 0, 'a let_go gives it back at once');
+  assert.ok(page.messages.some((m) => m.type === 'holding' && m.ms === 0), 'and the page is told the hold is over');
 });

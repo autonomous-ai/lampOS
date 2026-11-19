@@ -247,6 +247,10 @@ struct Look {
     /// The faces turned to the lamp whose mouth was not read (`unknown`, or
     /// not judged at all) in this look.
     turned_unread: Vec<String>,
+    /// Of those, the ones whose mouth was not judged at all (no `speaking`:
+    /// the eyes' speaking read off), for
+    /// [`SpeakingFaces::turned_never_seen_speaking`].
+    turned_unjudged: Vec<String>,
     /// Of the faces turned to the lamp, the one read speaking, when the eyes
     /// gave its head pitch or gaze: its `pitch` (radians, down positive) and
     /// `looking`, both from that face (`LAMP_EYES_PITCH_GAZE`,
@@ -460,6 +464,11 @@ impl SpeakingFaces {
             .filter(|face| !matches!(state(face), Some(SpeakingState::Yes | SpeakingState::No)))
             .map(|face| face.id.clone())
             .collect();
+        let turned_unjudged = turned_faces
+            .iter()
+            .filter(|face| state(face).is_none())
+            .map(|face| face.id.clone())
+            .collect();
         // The pose of the one turned face read speaking, pitch and gaze
         // from that face alone: a bystander turned to the lamp says nothing
         // about the speaker (Seventh's P2 on #7457). None with no such face
@@ -523,6 +532,7 @@ impl SpeakingFaces {
             turned,
             turned_silent,
             turned_unread,
+            turned_unjudged,
             turned_pose,
             speaker_pose,
             speaker_lone,
@@ -1085,6 +1095,53 @@ impl SpeakingFaces {
                 .is_empty()
     }
 
+    /// Whether a face was turned to the lamp from `from` to `to` and none
+    /// turned to it was seen speaking: no turned face read `yes` in any look,
+    /// a face the eyes read still or could not read (`unknown`) both count as
+    /// not speaking (`LAMP_TURNED_FACE_SPEAKS`, #7891: on lamp-74ff on 19 Nov
+    /// "Is it after all?" was let out by a turned face read in 8 looks,
+    /// speaking in 0, unread in 8). As [`Self::turned_not_seen_speaking`],
+    /// and more. A turned face whose mouth the eyes never judged through the
+    /// line (no `speaking` at all, `LAMP_EYES_SPEAKING` off) says nothing, so
+    /// never true while one is there.
+    pub fn turned_never_seen_speaking(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            let judged = |id: &String| {
+                during().any(|look| {
+                    look.turned_silent.contains(id)
+                        || look.turned_unread.contains(id) && !look.turned_unjudged.contains(id)
+                })
+            };
+            during().any(|look| !look.turned_silent.is_empty() || !look.turned_unread.is_empty())
+                && !during().any(|look| !look.turned.is_empty())
+                && during().flat_map(|look| &look.turned_unjudged).all(judged)
+        })
+    }
+
+    /// How many looks from `from` to `to` read a face turned to the lamp
+    /// speaking while it faced the lamp: the turned face read `yes`, its
+    /// pitch inside `said_to_me::PITCH_DEG` and not looking away when the
+    /// eyes give them (unknown blocks nothing) (`LAMP_SAID_TO_ME`, #7891).
+    pub fn turned_speaking_facing_looks(&self, from: Instant, to: Instant) -> usize {
+        self.looks.lock().map_or(0, |looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= from && look.at <= to && !look.turned.is_empty())
+                .filter(|look| {
+                    !crate::said_to_me::outside_pitch(look.turned_pose.0)
+                        && look.turned_pose.1 != Some(false)
+                })
+                .count()
+        })
+    }
+
     /// Whether a face was seen speaking from `from` to `to`: read `yes` in
     /// at least one look, a face turned to the lamp with `turned`
     /// (`LAMP_SAID_TO_ME`, #7442). One `yes` is a face seen speaking, as
@@ -1118,19 +1175,29 @@ impl SpeakingFaces {
         })
     }
 
-    /// The head pitch (radians, down positive) and gaze of the turned face
-    /// read speaking, from `from` to `to`, both from the newest look that
-    /// gave either; `None` when none did, which is unknown (`LAMP_SAID_TO_ME`,
-    /// #7442).
-    pub fn turned_pose_between(&self, from: Instant, to: Instant) -> (Option<f32>, Option<bool>) {
-        self.looks.lock().map_or((None, None), |looks| {
-            looks
-                .kept
-                .iter()
-                .rev()
-                .filter(|look| look.at >= from && look.at <= to)
-                .find(|look| look.turned_pose != (None, None))
-                .map_or((None, None), |look| look.turned_pose)
+    /// The pose of the turned face read speaking over the looks from `from`
+    /// to `to` (each look's [`Look::turned_pose`]), read as
+    /// [`Self::speaker_pose_between`] reads the speaker's: the median pitch
+    /// (radians, down positive), `looking` false when more looks read it
+    /// false than true, and the number of looks that gave either; `None`
+    /// when none did, which is unknown (`LAMP_SAID_TO_ME`, #7442). Over the
+    /// line, not its newest look (#7891: three looks head down to a phone
+    /// and a last one level were read as facing). The eyes' lost marks stay
+    /// a pitch here, outside `said_to_me::PITCH_DEG`, as before.
+    pub fn turned_pose_between(
+        &self,
+        from: Instant,
+        to: Instant,
+    ) -> (Option<f32>, Option<bool>, usize) {
+        self.looks.lock().map_or((None, None, 0), |looks| {
+            pose_over(
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+                    .map(|look| look.turned_pose),
+                false,
+            )
         })
     }
 
@@ -1151,34 +1218,16 @@ impl SpeakingFaces {
         lone: bool,
     ) -> (Option<f32>, Option<bool>, usize) {
         self.looks.lock().map_or((None, None, 0), |looks| {
-            let during = || {
+            // The eyes' lost-marks sentinel is no pitch (#7721).
+            pose_over(
                 looks
                     .kept
                     .iter()
                     .filter(|look| look.at >= from && look.at <= to)
                     .filter(|look| lone || !look.speaker_lone)
-            };
-            // The eyes' lost-marks sentinel is no pitch (#7721).
-            let measured = |look: &&Look| {
-                look.speaker_pose
-                    .0
-                    .filter(|pitch| !crate::said_to_me::lost(*pitch))
-            };
-            let mut pitches: Vec<f32> = during().filter_map(|look| measured(&look)).collect();
-            let used = during()
-                .filter(|look| measured(look).is_some() || look.speaker_pose.1.is_some())
-                .count();
-            pitches.sort_by(f32::total_cmp);
-            let half = pitches.len() / 2;
-            let pitch = match pitches.len() {
-                0 => None,
-                n if n % 2 == 1 => Some(pitches[half]),
-                _ => Some((pitches[half - 1] + pitches[half]) / 2.0),
-            };
-            let gaze: Vec<bool> = during().filter_map(|look| look.speaker_pose.1).collect();
-            let away = gaze.iter().filter(|looking| !**looking).count();
-            let looking = (!gaze.is_empty()).then_some(away * 2 <= gaze.len());
-            (pitch, looking, used)
+                    .map(|look| look.speaker_pose),
+                true,
+            )
         })
     }
 
@@ -1664,6 +1713,33 @@ pub fn seen_speaking_note(
             ids.join(", ")
         )),
     }
+}
+
+/// A pose over looks (each `(pitch, looking)`): the median pitch, `looking`
+/// false when more looks read it false than true, and how many looks gave
+/// either; with `drop_lost`, the eyes' lost marks
+/// ([`crate::said_to_me::LOST_DEG`]) are no pitch.
+fn pose_over(
+    poses: impl Iterator<Item = (Option<f32>, Option<bool>)>,
+    drop_lost: bool,
+) -> (Option<f32>, Option<bool>, usize) {
+    let (mut pitches, mut gaze, mut used) = (Vec::new(), Vec::new(), 0);
+    for (pitch, looking) in poses {
+        let pitch = pitch.filter(|pitch| !drop_lost || !crate::said_to_me::lost(*pitch));
+        pitches.extend(pitch);
+        gaze.extend(looking);
+        used += usize::from(pitch.is_some() || looking.is_some());
+    }
+    pitches.sort_by(f32::total_cmp);
+    let half = pitches.len() / 2;
+    let pitch = match pitches.len() {
+        0 => None,
+        n if n % 2 == 1 => Some(pitches[half]),
+        _ => Some((pitches[half - 1] + pitches[half]) / 2.0),
+    };
+    let away = gaze.iter().filter(|looking| !**looking).count();
+    let looking = (!gaze.is_empty()).then_some(away * 2 <= gaze.len());
+    (pitch, looking, used)
 }
 
 #[cfg(test)]
@@ -2734,6 +2810,29 @@ mod tests {
         assert!(!not_seen(&[missed; 4]), "f1 never read");
     }
 
+    /// #7891 (lamp-74ff, request 65, "speaking in 0, unread in 8"): for
+    /// `LAMP_TURNED_FACE_SPEAKS` a turned face the eyes judged and never
+    /// read is not seen speaking, alone or beside a still one; one read
+    /// speaking in any look is; a face whose speaking was never judged at
+    /// all (`LAMP_EYES_SPEAKING` off) says nothing; no turned face, nothing.
+    #[test]
+    fn a_turned_face_never_read_speaking_is_not_seen_speaking() {
+        let never = |looks: &[&[TurnedFace]]| {
+            let (eyes, from, to) = turned_seen(looks);
+            eyes.turned_never_seen_speaking(from, to)
+        };
+        let missed: &[TurnedFace] = &[("f1", Some(Unknown), true)];
+        assert!(never(&[missed; 8]), "request 65");
+        let beside: &[TurnedFace] = &[("f1", Some(No), true), ("f2", Some(Unknown), true)];
+        assert!(never(&[beside; 4]), "beside a still face");
+        let spoke: &[TurnedFace] = &[("f1", Some(Yes), true)];
+        assert!(!never(&[missed, missed, spoke, missed]), "seen speaking");
+        let unjudged: &[TurnedFace] = &[("f1", None, true)];
+        assert!(!never(&[unjudged; 4]), "no speaking read");
+        let away: &[TurnedFace] = &[("f1", Some(Unknown), false)];
+        assert!(!never(&[away; 4]), "nobody turned");
+    }
+
     /// `LAMP_TURNED_SPEAKING` (lamp-4ace, 21 Oct 14:00): the faces turned to
     /// the lamp are all silent only when one read still in half the looks,
     /// none turned to it spoke, and none turned to it went unread.
@@ -2893,11 +2992,13 @@ mod tests {
         );
     }
 
-    /// #7442: the speaking turned face's newest pitch and gaze through the
-    /// line, both from the newest look that gave either; a face not turned
-    /// to the lamp, or none given, is unknown.
+    /// #7442, #7891: the speaking turned face's pitch and gaze over the
+    /// line, the median pitch and most looks' gaze, not the newest look's:
+    /// three looks head down to a phone (40 degrees) and a last one level
+    /// (10) is head down; a face not turned to the lamp, or none given, is
+    /// unknown.
     #[test]
-    fn the_turned_faces_pose_is_its_newest_through_the_line() {
+    fn the_turned_faces_pose_is_read_over_the_line() {
         let eyes = SpeakingFaces::default();
         let from = Instant::now();
         let look = |index: u32, facing: bool, pitch: Option<f32>, looking: Option<bool>| {
@@ -2907,12 +3008,30 @@ mod tests {
             seen.faces[0].looking = looking;
             eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
         };
-        look(0, true, Some(0.1), Some(true));
-        look(1, true, Some(0.6), None);
+        look(0, true, Some(0.25), Some(true));
+        look(1, true, Some(0.75), None);
         look(2, false, Some(-0.9), Some(false));
         let to = from + EVERY * 3;
-        assert_eq!(eyes.turned_pose_between(from, to), (Some(0.6), None));
-        assert_eq!(eyes.turned_pose_between(to, to), (None, None));
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (Some(0.5), Some(true), 2)
+        );
+        assert_eq!(eyes.turned_pose_between(to, to), (None, None, 0));
+        let phone = SpeakingFaces::default();
+        let down = |index: u32, degrees: f32| {
+            let mut seen = faces(&[("f1", Yes)]);
+            seen.faces[0].facing = Some(true);
+            seen.faces[0].pitch = Some(degrees.to_radians());
+            phone.look(from + EVERY * index, Some((("b", index.into()), &seen)));
+        };
+        for (index, degrees) in [40.0, 40.0, 40.0, 10.0].into_iter().enumerate() {
+            down(index as u32, degrees);
+        }
+        let (pitch, looking, looks) = phone.turned_pose_between(from, from + EVERY * 4);
+        assert_eq!(
+            (pitch.map(f32::to_degrees), looking, looks),
+            (Some(40.0), None, 4)
+        );
     }
 
     /// Seventh's P2 on #7457: a bystander turned to the lamp, still and
@@ -2932,11 +3051,14 @@ mod tests {
         seen.faces[1].looking = Some(true);
         eyes.look(from, Some((("b", 0), &seen)));
         let to = from + EVERY;
-        assert_eq!(eyes.turned_pose_between(from, to), (Some(0.1), Some(true)));
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (Some(0.1), Some(true), 1)
+        );
         let both = SpeakingFaces::default();
         seen.faces[0].speaking.as_mut().unwrap().state = Yes;
         both.look(from, Some((("b", 0), &seen)));
-        assert_eq!(both.turned_pose_between(from, to), (None, None));
+        assert_eq!(both.turned_pose_between(from, to), (None, None, 0));
     }
 
     /// #7721: the speaker's pose over the line, turned to the lamp or not:
@@ -2968,7 +3090,7 @@ mod tests {
         );
         assert_eq!(
             eyes.turned_pose_between(from, to),
-            (None, None),
+            (None, None, 0),
             "not turned"
         );
         let unread = SpeakingFaces::default();

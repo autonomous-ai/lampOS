@@ -983,6 +983,21 @@ fn name_said_to(heard: &str, alone: &[&str], recognizer_stand_ins: bool) -> bool
             .any(|call| recognizer_stand_ins || call.real)
 }
 
+/// Whether `heard` is a line of one or two words, not a question, none of
+/// them the lamp's name or a word written for it ([`written_for_the_name`]):
+/// "Yeah.", "Okay.", "Thanks." said across a meeting, which lamp-name heard
+/// as its name at 0.939 and 0.973 on lamp-74ff on 19 Nov, where real calls
+/// score 0.90 to 1.00 (#7891). Such a line is not answered on a hearing of
+/// the name in the room's sound ([`Attention::weigh_the_name`]); "Lamp?",
+/// "Hey, Lynn." and "Hey, man." carry the name in their words, and "Okay?"
+/// asks.
+pub(crate) fn short_line_without_the_name(heard: &str) -> bool {
+    let words = crate::not_speech::plain_words(heard);
+    (1..=2).contains(&words.len())
+        && !heard.contains('?')
+        && !words.iter().any(|word| written_for_the_name(word))
+}
+
 /// Whether what was heard is the lamp's name alone, or a word written for
 /// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
 /// off at a pause, the rest still to come. For the second route's carry, so
@@ -1802,6 +1817,10 @@ pub struct Attention {
     /// for the line last weighed ([`Self::weigh_the_name`]), for the
     /// journal (#3945).
     name_signs: Vec<&'static str>,
+    /// The name heard in the room's sound was dropped for the line last
+    /// weighed as a short line without the name in its words
+    /// ([`short_line_without_the_name`], #7891), for the journal.
+    name_short_dropped: bool,
 }
 
 /// The most text kept for one request.
@@ -2084,6 +2103,13 @@ impl Attention {
     /// the lamp going on (`going_on`) is a second sign too, and the line's
     /// start is none when its first word is said to a person
     /// ([`Self::start_said_to_a_person`]).
+    ///
+    /// Out of a conversation (`going_on`), a line of one or two words, not
+    /// a question, with nothing written for the name in its words and words
+    /// the rule does not read as a call (`called`, `called_by_name`, the
+    /// owner's language's forms too), counts the name for nothing whatever
+    /// its second sign, unless the lamp's own question is open
+    /// ([`Self::lamp_asked`]) ([`short_line_without_the_name`], #7891).
     pub fn weigh_the_name(&mut self, turned: Option<bool>, going_on: bool) -> bool {
         let text_calls = if self.name_in_passing_ignored {
             called_by_name(&self.heard)
@@ -2095,6 +2121,7 @@ impl Attention {
         // A conversation going on gives back only the start this switch
         // held, never a second sign for other lines (#1722's rule; the
         // Reviewer-lead's P3 on #4082).
+        let in_conversation = going_on;
         let going_on = going_on && said_to_a_person;
         let signs: Vec<&'static str> = [
             (turned == Some(true), "a face turned to the lamp"),
@@ -2108,8 +2135,18 @@ impl Attention {
         .filter_map(|(shown, sign)| shown.then_some(sign))
         .collect();
         let weighed = self.name_second_sign && self.named;
-        let alone = weighed && signs.is_empty();
-        self.name_signs = if weighed { signs } else { Vec::new() };
+        // A short line with nothing written for the name, out of a
+        // conversation, is never answered on the hearing alone, whatever
+        // its second sign (#7891).
+        // Never while the lamp's own question is open: "Yes." then answers
+        // the lamp (V2 on #7918).
+        self.name_short_dropped = weighed
+            && !in_conversation
+            && !self.lamp_asked
+            && !text_calls
+            && short_line_without_the_name(&self.heard);
+        let alone = weighed && (signs.is_empty() || self.name_short_dropped);
+        self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -2123,6 +2160,13 @@ impl Attention {
     /// none was asked.
     pub fn second_signs(&self) -> &[&'static str] {
         &self.name_signs
+    }
+
+    /// Whether the name heard for the line last weighed was dropped as a
+    /// short line without the name in its words
+    /// ([`short_line_without_the_name`], #7891).
+    pub fn name_dropped_as_short(&self) -> bool {
+        self.name_short_dropped
     }
 
     /// In a busy room, let a line out only as the conversation going on
@@ -2885,7 +2929,13 @@ impl Attention {
         // when what was heard is a short word said to the lamp, or it was
         // said close to the lamp, or someone is turned to it, or it has a
         // word in it and answers the lamp's own question in a conversation.
-        if self.sound_in_hand() && !own {
+        // A line begun with the lamp's name set off is never held as one
+        // (#7834: on lamp-9adf "Lamp, put it back." was, 2 times in 5): the
+        // rule below judges it as any line. A short word ("Hey Lamp")
+        // keeps its own reason here.
+        let named_line =
+            begins_with_the_name(&self.heard) && !crate::not_speech::short_word(&self.heard);
+        if self.sound_in_hand() && !own && !named_line {
             // A reply to someone the room had just called by name is not
             // the lamp's, short or not (the reviewer on #918 at 06:06): only
             // the lamp's name lets it out.
@@ -3646,6 +3696,48 @@ mod tests {
         assert!(attention.sound_in_hand());
         attention.began_at(8, 1, 80_000_000);
         assert!(!attention.sound_in_hand());
+    }
+
+    /// #7834: on lamp-9adf on 19 Nov "Lamp, put it back.", played from a
+    /// speaker, ended as a short sound and was held 2 times in 5: not a
+    /// short word, not close, nobody turned to it. A line begun with the
+    /// lamp's name set off is never held as a short sound, however its
+    /// name is written ("Lamp,", "lamp", "Hey Lamp", or only its first
+    /// piece heard yet); the rule judges it as any line. One without the
+    /// name, or with it later or not set off, is held as before.
+    #[test]
+    fn a_short_sound_begun_with_the_lamps_name_is_never_held_as_one() {
+        let decide = |heard: &str| {
+            let mut attention = Attention::default();
+            attention.check_sounds(true);
+            attention.began_at(7, 1, 70_000_000);
+            attention.heard(heard);
+            attention.ended_as_sound(7);
+            attention
+                .first_output_busy(7, Room::Quiet, false, false, None)
+                .unwrap()
+        };
+        for named in [
+            "Lamp, put it back.",
+            "Lamp, stop.",
+            "Lamp, lights off.",
+            "lamp, put it back",
+            "LAMP. Lights off.",
+            "Hey Lamp, put it back.",
+            "Lamp,",
+        ] {
+            let verdict = decide(named);
+            assert!(matches!(verdict, Verdict::Play(_)), "{named}: {verdict:?}");
+        }
+        for unnamed in [
+            "Put it back.",
+            "¿Qué?",
+            "",
+            "and the lamp is on sale now",
+            "Lamp is broken again today",
+        ] {
+            assert_eq!(decide(unnamed), Verdict::Hold(SOUND_HELD), "{unnamed}");
+        }
     }
 
     /// On lamp-4ace on 2026-10-17 at 16:11 "Yes. Please start it.", said
@@ -7220,6 +7312,30 @@ mod tests {
         attention.name_heard_scored(began + 1_600_000, 0.95);
         attention.continued_at(2, 1, began + 1_800_000);
         assert!(attention.weigh_the_name(None, false));
+    }
+
+    /// #7891, the Reviewer-lead's P2 on #7918: a short line whose words the
+    /// rule reads as a call (`called`, `called_by_name`: the owner's
+    /// language's forms too, `calls_as_written`) keeps the name heard in the
+    /// room's sound, though no word of it is on [`written_for_the_name`]:
+    /// "Lamp's here." is "lamp's" to that list. The owner's language is read
+    /// once per process (`language::at_start`), so English stands in for it
+    /// here; the same `text_calls` passes its forms. "Okay." is still dropped.
+    #[test]
+    fn a_short_line_whose_words_call_the_lamp_keeps_a_name_heard_in_the_sound() {
+        let dropped = |heard: &str, passing: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.ignore_name_in_passing(passing);
+            attention.began_at(1, 1, 10_000_000);
+            attention.name_heard_scored(10_200_000, 0.97);
+            attention.heard(heard);
+            attention.weigh_the_name(Some(true), false)
+        };
+        for passing in [false, true] {
+            assert!(!dropped("Lamp's here.", passing), "{passing}");
+            assert!(dropped("Okay.", passing), "{passing}");
+        }
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s

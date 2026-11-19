@@ -202,7 +202,10 @@ pub fn make_with(
             min_updater
                 .unwrap_or(1)
                 .max(manifest::ADDS_UPDATER)
-                .max(manifest::ORDER_UPDATER),
+                .max(manifest::ORDER_UPDATER)
+                // A lamp with the factory's acceleration drop-in climbs to
+                // an updater that admits it (#7946).
+                .max(manifest::ACCELERATION_UPDATER),
         );
     }
     // The Store's switch file among the settings: an older updater refuses
@@ -322,13 +325,13 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::ORDER_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ACCELERATION_UPDATER));
         // An updater of level 8, which restarts lamp-controls before the
         // voice, reads the build as too new for it and takes only the
         // lamp-update it carries (second-P1); this updater reads it whole.
         let bytes = serde_json::to_vec(&made).unwrap();
         let too_old = manifest::too_old(&bytes, manifest::ADDS_UPDATER).unwrap();
-        assert_eq!(too_old.needed, manifest::ORDER_UPDATER);
+        assert_eq!(too_old.needed, manifest::ACCELERATION_UPDATER);
         assert_eq!(too_old.carried.unwrap().name, "lamp-update");
         assert!(manifest::too_old(&bytes, manifest::UPDATER).is_none());
         assert_eq!(made.units.len(), 3);
@@ -428,7 +431,7 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        assert_eq!(made.min_updater, Some(manifest::ORDER_UPDATER));
+        assert_eq!(made.min_updater, Some(manifest::ACCELERATION_UPDATER));
         let units: Vec<String> = made.units.iter().map(Unit::file_name).collect();
         assert_eq!(
             units,

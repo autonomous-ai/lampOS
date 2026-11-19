@@ -410,6 +410,11 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
   tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
   câu cuối cùng bên trong, rồi "There's more; ask me if you want it."
+  Một dòng dài quá khoảng 10 giây lời nói được giọng nói render thành nhiều
+  đoạn, cắt ở ranh giới câu, rồi mệnh đề, rồi từ, và phát trọn dòng: đoạn đầu
+  phát ngay khi render xong, mỗi đoạn sau được render trong lúc đoạn trước
+  đang phát, để không đoạn nào quá 20 giây của bộ nhớ đệm giọng nói mà bị bỏ
+  (#7892).
   Không có gì theo dõi việc script của lần chạy đã tự nói qua `say` của
   lamp-control hay chưa; agent được bảo để trống câu trả lời (một dấu gạch
   ngang, hoặc `answer.md` trống) khi đã nói (P3 của Heron trên #7591).
@@ -2224,7 +2229,9 @@ một byte (`crates/tasks/src/one_session.rs`).
   (`Engine::put_back_launch`), có ghi journal, và pane không được thử lại
   trong 2 s (`PANE_RETRY`). Hàng đợi đầy trả lời ngay và việc thất bại
   `busy` như trước, việc đã được đưa lại tổng cộng 15 phút kể từ lần giao
-  đầu (`QUEUE_WAIT`) cũng vậy.
+  đầu (`QUEUE_WAIT`) cũng vậy. Việc có lời gặp phiên được giữ không chạy
+  sau 3 lần resume thì không được đưa lại: nó thất bại
+  `one_session_not_started` (#7895, phiên được giữ ở dưới).
 - **Lượt của lần chạy kỹ năng.** Kết thúc khi `harness wait`, rồi `show`,
   đọc pane rảnh trên đúng dòng đầu của lần chạy đó; pane rảnh trên lời
   hỏi khác thì chờ tiếp, nên mỗi lần chạy chỉ giữ câu trả lời của lượt
@@ -2431,7 +2438,27 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `cancelled: false` và có `inputId` đã được gõ và được chờ sau đó, không bao
   giờ gõ lại. `NOT_RUNNING` (engine của nó đã chết) hoặc một `TIMEOUT` không
   có gì được nhận thì ensure lại phiên một lần, phiên quay lại `resumed` với
-  cùng id và hội thoại của nó, rồi việc thất bại như trước. Kết thúc của
+  cùng id và hội thoại của nó, rồi việc thất bại như trước. Một việc nói
+  thì được đặt lại hàng đợi (`busy`) trong lúc luồng one-session ensure lại
+  phiên, nên một phiên quay lại `resumed` nhưng cứ ở `starting` (#7895,
+  lamp-52e6: gateway của OpenClaw không biết phiên đó, `No
+  session found` ở mỗi lần resume) sẽ nhận lại việc mãi mãi. Vì vậy một
+  việc nói chỉ gặp phiên không chạy tối đa `STARTING_RESUMES_MOST` (3) lần;
+  lần kế tiếp kết thúc việc `not_sent` với `one_session_not_started`, ghi
+  journal `the lamp's session did not come up after 3 tries`, và Task news
+  báo cho người hỏi một lần bằng lời `failed` thường của nó (chưa bắt đầu
+  được lúc này, thử lại sau). Khi đó phiên không bị buông vì việc này, nên
+  không có gì resume nó cho tới khi lời của việc kế tiếp thấy nó không chạy,
+  với giới hạn riêng của việc đó. Một vòng mất khoảng 25 s trên lamp-52e6,
+  nên việc kết thúc ở khoảng 100 s, trong 120 s mà một pane mới được cho để
+  sẵn sàng (`OPEN_IDLE_WITHIN`). Lời được nhận trong giới hạn thì việc chạy
+  như trước. Một lần mở thất bại (`harness ensure` bị từ chối, hoặc một
+  `harness new`) trong lúc một việc nói đứng đầu chờ pane trong store được
+  tính vào cùng giới hạn của việc đó: quá giới hạn, store giao việc đi mà
+  không chờ pane (`pane_turn`), và việc kết thúc theo cùng cách, không có
+  reply và không có ensure riêng của nó. Backoff riêng của các lần mở (5 s
+  nhân đôi, `OPEN_RETRY_FIRST`; 60 s nhân đôi cho `ENGINE_NOT_READY`) không
+  đổi. Kết thúc của
   lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
   `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất).
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi

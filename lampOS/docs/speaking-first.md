@@ -763,7 +763,30 @@ network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
 the lamp is unplugged after a shutdown) and played; at most 64 lines and
-20 s each are kept, a line past 20 s is played but not kept. A line written
+20 s each are kept, a line past 20 s is played but not kept. An exact line
+(`"exact": true`: a task's told answer, a read's lines, lamp-control's `say`,
+the app's voice preview) is rendered now and never kept
+(`TtsCache::render_once`, `render_once_in`); one past about 10 s of speech
+(`tts_cache::MOST_PIECE_CHARS`, 150 characters: half of what plays in the
+cap's 20 s, `MOST_FRAMES`, at about 15 characters a second) is rendered in
+pieces (`tts_cache::pieces`, #7892), cut at its sentence ends, then its
+clause ends (`,` `;` `:`), then between its words, every word kept in its
+order, and played as one line as it comes
+(`TtsCache::render_played`): its first piece is rendered on the asker's
+thread (a failure refuses the line, as before) and starts to play at once,
+from a feed of its own (`speaker_stream::Feed::for_line`); each later piece
+is rendered on a thread of its own while the one before it plays, so at
+most one piece waits rendered, the pieces play strictly in order, and the
+next is ready before the one playing ends (a piece renders in a second or
+two and plays for up to about 10 s, so there is no gap between them unless
+the speech service is that slow). A line cut, refused, expired or ended
+lets go of its pieces (`tts_cache::Pieces`), and its renderer stops: no
+later piece is rendered or played. A piece that fails to render ends the
+line there, answered `dropped`; one played to its end is `spoken`, a gap
+while a piece renders being no cut. Each piece keeps the 20 s cap, which is
+not raised for any line: before, a line past it (an agent's long answer)
+was refused whole and never said. A line within 150 characters is rendered
+whole and played as before. A line written
 to a full cache first makes room (#4883): the oldest files go, never one of
 the owner's current fixed lines (those the voice warms at start, under this
 voice, model and language), so lines left by an earlier voice or language

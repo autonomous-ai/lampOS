@@ -3424,6 +3424,8 @@ pub fn serve(
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
     let routes_task = net.routes_task();
+    // Forgets reach the account's history (`LAMP_HISTORY_FORGET`, #7771).
+    let history_forget_task = net.history_forget_task();
     crate::cut_in_told::marking_cut_answers(files.cut_in_told);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -4491,6 +4493,15 @@ pub fn serve(
         );
     }
     engine = engine.checking_doing_claims(action_claims && doing_claims);
+    // A keep claimed anywhere in a reply to a line about the person, read
+    // whole (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878).
+    let keep_whole = crate::remember::whole_on();
+    if keep_whole {
+        eprintln!(
+            "lamp-voice second: a reply to a line about the person is held whole until a remember runs, and a keep or replace said in any sentence with none is asked again, then said not kept (LAMP_KEEP_CLAIM_WHOLE)"
+        );
+    }
+    engine = engine.checking_keep_claims_whole(keep_whole);
     // A made skill said removed, turned off or on in the lamp's own result
     // words, untrue and with no `make_skill` that did it, is held the same
     // way (`LAMP_SKILL_CLAIM_CHECKED=on`, #7683), with a voice make offered:
@@ -5660,6 +5671,12 @@ pub fn serve(
         .enable_all()
         .build()?;
     if let Some(task) = routes_task {
+        runtime.spawn(task);
+    }
+    if let Some(task) = history_forget_task {
+        eprintln!(
+            "lamp-voice second: what a forget removes reaches the account's history (LAMP_HISTORY_FORGET)"
+        );
         runtime.spawn(task);
     }
     if let Some((bus, told)) = air {
@@ -7908,6 +7925,15 @@ pub(crate) struct Heeding {
     /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or seen spoken by
     /// two faces. Gone when a line is judged with no conversation going on.
     another_person: Option<u64>,
+    /// When a line judged under `LAMP_SAID_TO_ME` last ended that showed a
+    /// second voice in the room, by this process's monotonic clock: a face
+    /// in view read silent through it with none read speaking (a voice with
+    /// no mouth: a call's far side, a video, someone off camera), or two
+    /// faces seen speaking it ([`Self::not_said_to_me`]). Faces and looks
+    /// only, never a voice print (#7891). Read for
+    /// [`crate::said_to_me::Line::second_voice`] when after the end of the
+    /// lamp's last words and within `room_told::BUSY_ENDS_AFTER_US`.
+    second_voice_at: Option<u64>,
     /// [`Self::another_person`] told to the reply's owner-by-default rule
     /// (`LAMP_PERSON_NAME_BY_DEFAULT`, #3884): set while the conversation
     /// has shown another person.
@@ -8340,7 +8366,8 @@ fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
 /// to `ended_us`, by this process's clock; never without them. With
 /// `unread_spoils`, a turned mouth unread in any look says no
 /// ([`crate::speaking_faces::SpeakingFaces::turned_only_silent`]); without,
-/// it doesn't (`turned_not_seen_speaking`).
+/// a turned mouth the eyes judged and never read is not speaking either
+/// (`turned_never_seen_speaking`, #7891).
 fn turned_only_silent(
     eyes: Option<&(
         Arc<crate::speaking_faces::SpeakingFaces>,
@@ -8355,7 +8382,7 @@ fn turned_only_silent(
     };
     match line_between(began_us, ended_us) {
         Some((from, to)) if unread_spoils => eyes.turned_only_silent(from, to),
-        Some((from, to)) => eyes.turned_not_seen_speaking(from, to),
+        Some((from, to)) => eyes.turned_never_seen_speaking(from, to),
         None => false,
     }
 }
@@ -8962,6 +8989,7 @@ impl Heeding {
             rooms: None,
             in_view: None,
             another_person: None,
+            second_voice_at: None,
             another_voice: None,
             first_seconds_quiet: false,
             another_since_start: false,
@@ -11123,15 +11151,16 @@ impl Heeding {
     /// name's note read it (the reviewer-lead's P2 on #2546), and nothing
     /// fresh from the eyes (`None`) stays as it is.
     ///
-    /// `LAMP_TURNED_FACE_SPEAKS`: the same when the faces turned to it were
-    /// read and none was seen speaking the line, a look unread among them
-    /// ([`crate::speaking_faces::SpeakingFaces::turned_not_seen_speaking`]),
-    /// unless the line is in the conversation's voice
-    /// ([`crate::same_voice::SAME_FROM`] or over). The line, held, is then
-    /// talk for the room ([`crate::room_told::RoomTold::face_not_speaking`]).
-    /// With no speaking read (`LAMP_EYES_SPEAKING` off, or the turned
-    /// mouths never read), the face is a sign as before: fail open, so a
-    /// person alone at a lamp whose eyes can't read mouths is still answered.
+    /// `LAMP_TURNED_FACE_SPEAKS`: the same when none of the faces turned to
+    /// it was seen speaking the line, read still or never read
+    /// ([`crate::speaking_faces::SpeakingFaces::turned_never_seen_speaking`],
+    /// #7891: "speaking in 0, unread in 8" is not seen speaking), unless the
+    /// line is in the conversation's voice ([`crate::same_voice::SAME_FROM`]
+    /// or over). The line, held, is then talk for the room
+    /// ([`crate::room_told::RoomTold::face_not_speaking`]). With no speaking
+    /// judged at all (`LAMP_EYES_SPEAKING` off), the face is a sign as
+    /// before: fail open, so a person alone at a lamp whose eyes can't read
+    /// mouths is still answered.
     ///
     /// `LAMP_SAID_TO_ME` ([`Self::not_said_to_me`]) first: what it holds
     /// loses the face and the conversation as signs, and the rules below
@@ -11225,6 +11254,12 @@ impl Heeding {
             lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
             question_waits: self.question_waits(request, heard, signs),
             turned,
+            // An earlier line's second voice, since the lamp last spoke and
+            // within the busy room's span (#7891).
+            second_voice: self.second_voice_at.is_some_and(|at| {
+                at > self.said_until_us.unwrap_or_default()
+                    && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
+            }),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11233,11 +11268,23 @@ impl Heeding {
             Some(((eyes, _), (from, to))) => line.with_eyes(eyes, from, to, another_voice),
             None => (line, 0, false),
         };
+        // This line's own second voice, for the lines after it: a face in
+        // view read silent through it, none read speaking, and more than
+        // `SHORT_WORDS` words (a lip smack heard as "Mm." is the face's own,
+        // #7442), or two faces seen speaking it (#7891).
+        let voiceless =
+            line.read_silent && heard.split_whitespace().count() > crate::said_to_me::SHORT_WORDS;
+        if voiceless || speakers_between(self.eyes.as_ref(), said.0, said.1).0.len() > 1 {
+            self.second_voice_at = Some(said.1);
+        }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
+        }
+        if !going_on {
+            pose.push_str(&format!(", seen speaking facing in {}", line.facing_looks));
         }
         let words = heard.split_whitespace().count();
         // Every decision journaled with the pose, for a row to count
@@ -11764,7 +11811,12 @@ impl Heeding {
         // rule's form.
         let said_to_a_person = self.attention.start_said_to_a_person();
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
-            if let Some(word) = said_to_a_person {
+            if self.attention.name_dropped_as_short() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing on a line of one or two words, not a question, with no word written for the name and no conversation going on; the model is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if let Some(word) = said_to_a_person {
                 eprintln!(
                     "lamp-voice second: request {request}: lamp-name heard the name at the line's start (began {} ms into the line{soft_lead}), but its first word, set off, is said to a person (\"{word}\"), and nothing else shows it was called: not counted; the model is not told it was heard (LAMP_NAME_SAID_TO_A_PERSON)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
@@ -27643,7 +27695,17 @@ mod tests {
                 "I think the oven is still on, by the way.",
                 signs(vec![(12_900_000, 0.999)]),
             );
-            let second = heeding.heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()));
+            // Four words: since #7891 (fault 1) a line of one or two words,
+            // not a question, with no name in its words ("Yes.") is never
+            // answered on a name heard only in the sound, whatever this
+            // switch, so the control needs a longer one
+            // (`a_short_line_after_a_hearing_in_the_line_before_is_held_either_way`).
+            let second = heeding.heed_signs(
+                2,
+                (13_100_000, 13_600_000),
+                "Yes, go ahead please.",
+                signs(Vec::new()),
+            );
             assert_eq!(second.is_some(), stays, "the second line, stays {stays}");
             if stays {
                 assert!(
@@ -27658,6 +27720,64 @@ mod tests {
                     "the third line"
                 );
             }
+        }
+    }
+
+    /// #7891 (fault 1), V2's case 1: the lamp's own question open, the
+    /// person's bare "Yes." with the name heard in the room's sound at its
+    /// start is answered, `LAMP_NAME_SECOND_SIGN` on or off, in a
+    /// conversation's window or out of it, a quiet room or a busy one: an
+    /// answer to the lamp is never a short line dropped as meeting talk.
+    #[test]
+    fn a_bare_yes_to_the_lamps_own_question_keeps_a_name_heard_in_the_sound() {
+        use crate::room_told::Room;
+        for on in [false, true] {
+            for going_on in [false, true] {
+                for room in [Room::Quiet, Room::Busy] {
+                    let signs = super::Signs {
+                        lamp_asked: true,
+                        ..room_name_signs(room, going_on, None, false, vec![(10_200_000, 0.97)])
+                    };
+                    assert_eq!(
+                        room_name_heeding(on).judge(7, (10_000_000, 10_600_000), "Yes.", signs),
+                        None,
+                        "second sign {on}, going on {going_on}, {room:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// #7891 (fault 1), V2's cases 2 and 3: "Yes." after a line whose 0.999
+    /// hearing came at its end (12.9 s of 10 s to 13 s) is held in a busy
+    /// room with `LAMP_NAME_STAYS_IN_ITS_LINE` on or off: on, the hearing
+    /// stays with its line; off, it reaches "Yes." at its start, but a line
+    /// of one or two words, not a question, with no name in its words, is
+    /// not answered on a name heard only in the sound. It is case 2, not an
+    /// answer to the lamp: a busy room, no conversation going on, and the
+    /// lamp asked nothing (`lamp_asked` false), so the line before was
+    /// someone's remark to the room, not the lamp's question.
+    #[test]
+    fn a_short_line_after_a_hearing_in_the_line_before_is_held_either_way() {
+        use crate::room_told::Room;
+        let signs = |names| room_name_signs(Room::Busy, false, None, false, names);
+        for stays in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if stays {
+                heeding.keeping_the_name_in_its_line();
+            }
+            heeding.heed_signs(
+                1,
+                (10_000_000, 13_000_000),
+                "I think the oven is still on, by the way.",
+                signs(vec![(12_900_000, 0.999)]),
+            );
+            assert!(
+                heeding
+                    .heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()))
+                    .is_some(),
+                "stays {stays}"
+            );
         }
     }
 
@@ -27702,6 +27822,109 @@ mod tests {
             // Heard just before the line's sound began: at its start too.
             assert_eq!(judged(line.0 - 300_000), None, "{room:?}");
         }
+    }
+
+    /// #7891 (lamp-74ff, 19 Nov, a meeting): "Yeah." (request 29, a 15 s
+    /// line, the name heard at 0.939 3.25 s in, "the name said close to
+    /// it", in a busy room) and "Okay." (request 4, heard at 0.973 at the
+    /// line's start, the room not known) were answered on the name heard
+    /// only in the room's sound. With `LAMP_NAME_SECOND_SIGN=on`, a line of
+    /// one or two words, not a question, whose words carry nothing written
+    /// for the name, is not answered on that hearing, whatever its second
+    /// sign. A line whose words carry the name, even misheard, a question,
+    /// a longer line, or one in an open window, is judged as before: the
+    /// first builder's "Lamp?", "Hey Lamp." and "Hey, Lynn", #7834's "Lamp,
+    /// put it back.", and a named question inside a busy room.
+    ///
+    /// A face turned to the lamp is its own reason to answer, apart from
+    /// the name: out of a busy room it lets a line out with no name at all
+    /// (`Attention::face_shows`), so a short line said to a turned face is
+    /// still dropped as a name but answered on the face, and held in a busy
+    /// room by `busy_bar`. Holding meeting talk said facing the lamp is
+    /// #7891's faults 2-3 (#7908), not this rule.
+    #[test]
+    fn with_a_second_sign_asked_a_short_line_without_the_name_is_not_answered_on_its_sound() {
+        use crate::room_told::Room;
+        let judged = |room, going_on, turned, near, heard, (line, at, score)| {
+            room_name_heeding(true).judge(
+                29,
+                line,
+                heard,
+                room_name_signs(room, going_on, turned, near, vec![(at, score)]),
+            )
+        };
+        // Said close to the lamp to a face turned to it: whether the name
+        // was dropped too.
+        let faced = |room, heard, (line, at, score)| {
+            let mut heeding = room_name_heeding(true);
+            let verdict = heeding.judge(
+                29,
+                line,
+                heard,
+                room_name_signs(room, false, Some(true), true, vec![(at, score)]),
+            );
+            (verdict, heeding.attention.name_dropped_as_short())
+        };
+        // Request 29: a 15 s line, the hearing 3253 ms into it.
+        let yeah = ((10_000_000, 25_000_000), 13_253_000, 0.939);
+        assert!(
+            judged(Room::Busy, false, None, true, "Yeah.", yeah).is_some(),
+            "request 29"
+        );
+        // Request 4: a 3 s line, the hearing at its start.
+        let start = ((10_000_000, 13_000_000), 10_200_000, 0.973);
+        for room in [Room::Unknown, Room::Quiet, Room::Busy] {
+            assert!(
+                judged(room, false, None, false, "Okay.", start).is_some(),
+                "{room:?}: request 4"
+            );
+            for meeting in ["Sure.", "Thanks.", "Okay, sure."] {
+                assert!(
+                    judged(room, false, None, true, meeting, start).is_some(),
+                    "{room:?}: {meeting}"
+                );
+                let (verdict, dropped) = faced(room, meeting, start);
+                assert!(dropped, "{room:?}: {meeting}, faced");
+                assert_eq!(
+                    verdict.is_some(),
+                    room == Room::Busy,
+                    "{room:?}: {meeting}, faced"
+                );
+            }
+            for call in [
+                "Lamp?",
+                "Hey Lamp.",
+                "Hey, Lynn.",
+                "Lamp, put it back.",
+                "Okay?",
+            ] {
+                assert_eq!(
+                    judged(room, false, None, false, call, start),
+                    None,
+                    "{room:?}: {call}"
+                );
+            }
+        }
+        // The real call at 10:56:45, heard at 1.000 in a busy room.
+        let call = ((10_000_000, 13_000_000), 10_478_000, 1.0);
+        assert_eq!(
+            judged(
+                Room::Busy,
+                false,
+                Some(true),
+                true,
+                "Hey, Lamp. What is one plus one?",
+                call
+            ),
+            None,
+            "a named question in a busy room"
+        );
+        // In an open window the name is weighed as before.
+        assert_eq!(
+            judged(Room::Quiet, true, None, false, "Okay.", start),
+            None,
+            "in the window"
+        );
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
@@ -28348,9 +28571,10 @@ mod tests {
     /// "someone is turned to the lamp"): with `LAMP_SPOKEN_TO`, in a room
     /// not known to be busy, quiet, or busy, a line let out by a face turned
     /// to the lamp is held when that face was read and never seen speaking
-    /// it, a look unread among them; let out when it was seen speaking (its
-    /// mouth still between words too), when its mouth was never read, or
-    /// without the switch. `LAMP_TURNED_SPEAKING` alone lets the still face
+    /// it, a look unread among them, or never read (#7891); let out when it
+    /// was seen speaking (its mouth still between words too), when no
+    /// speaking was read at all, or without the switch.
+    /// `LAMP_TURNED_SPEAKING` alone lets the still face
     /// with one unread look through, as it did on the lamp.
     #[test]
     fn with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking() {
@@ -28403,10 +28627,9 @@ mod tests {
                 None,
                 "{room:?}: the face speaks"
             );
-            assert_eq!(
-                judged(true, false, room, &[Some(Unknown)]),
-                None,
-                "{room:?}: its mouth never read"
+            assert!(
+                judged(true, false, room, &[Some(Unknown)]).is_some(),
+                "{room:?}: its mouth never read (#7891)"
             );
             assert_eq!(
                 judged(true, false, room, &[None]),
@@ -28475,8 +28698,14 @@ mod tests {
             let held = |states: &[_], words| judged(true, false, states, facing, words).is_some();
             assert!(held(&[Some(Unknown)], "Mm."), "a mouth never read");
             assert!(held(&speaking, "Mm."), "seen speaking, a short remark");
-            assert!(!held(&speaking, "Weather today?"), "a short question");
-            assert!(!held(&speaking, "What time is it"), "four words");
+            // Seen speaking in one look is too few (#7891); in five, three.
+            let one_look = looks == 1;
+            assert_eq!(
+                held(&speaking, "Weather today?"),
+                one_look,
+                "a short question"
+            );
+            assert_eq!(held(&speaking, "What time is it"), one_look, "four words");
             assert!(
                 held(&still, "What time is it"),
                 "four words, not seen speaking"
@@ -28784,6 +29013,358 @@ mod tests {
         };
         assert!(judged(false).is_some(), "his own voice, head down");
         assert_eq!(judged(true), None, "another voice says it");
+    }
+
+    /// One face as [`product_looks`] gives it: its id, its mouth, its
+    /// head pitch in degrees and its gaze, turned to the lamp.
+    type ProductFace = (
+        &'static str,
+        Option<lamp_msgs::SpeakingState>,
+        Option<f32>,
+        Option<bool>,
+    );
+
+    /// The eyes' looks of the faces in `looks`, one look each, 400 ms apart
+    /// from `from_ms` after `now`, every face turned to the lamp.
+    fn product_looks(
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        now: Instant,
+        from_ms: u64,
+        looks: &[&[ProductFace]],
+        seq: &mut u64,
+    ) {
+        use lamp_msgs::{Face, Faces, Speaking};
+        for (index, look) in looks.iter().enumerate() {
+            *seq += 1;
+            let faces = Faces {
+                faces: look
+                    .iter()
+                    .enumerate()
+                    .map(|(at, (id, state, pitch, looking))| Face {
+                        pitch: pitch.map(f32::to_radians),
+                        looking: *looking,
+                        id: (*id).into(),
+                        xmin: 0.1 + 0.3 * at as f32,
+                        ymin: 0.3,
+                        xmax: 0.2 + 0.3 * at as f32,
+                        ymax: 0.45,
+                        confidence: 1.0,
+                        yaw: Some(0.1),
+                        facing: Some(true),
+                        speaking: state.map(|state| Speaking {
+                            state,
+                            score: 0.0,
+                            from: None,
+                        }),
+                        follows: None,
+                    })
+                    .collect(),
+            };
+            eyes.look(
+                now + Duration::from_millis(from_ms + index as u64 * 400),
+                Some((("b", *seq), &faces)),
+            );
+        }
+    }
+
+    /// The second route as the product runs it for #7891: `LAMP_SAID_TO_ME`
+    /// and `LAMP_TURNED_FACE_SPEAKS` both on (`lamp-voice.service`), the
+    /// name's second sign asked (`LAMP_NAME_SECOND_SIGN`), the room kept.
+    fn product_heeding(eyes: Arc<crate::speaking_faces::SpeakingFaces>) -> super::Heeding {
+        let mut heeding = super::Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.attention.ask_a_second_sign_of_the_name(true);
+        heeding.seeing_speaking_faces(eyes, None);
+        heeding.hearing_only_said_to_me();
+        heeding.needing_the_turned_face_to_speak();
+        heeding
+    }
+
+    /// #7891 fault 2 (lamp-74ff, 19 Nov 11:04:26, request 65): "Is it after
+    /// all?", in a busy room, was played as "someone is turned to the lamp"
+    /// while the face turned to it was read in every look and its speaking
+    /// never read ("speaking in 0, unread in 8"). With both switches on, as
+    /// the product runs, `LAMP_SAID_TO_ME` lets a line with the name heard
+    /// in its sound stand, and the face was then the name's second sign.
+    /// The face never read speaking is not seen speaking: no second sign,
+    /// the line held as the busy room's. The name at the line's start, the
+    /// name in its words, a look read speaking, or no speaking read at all
+    /// (`LAMP_EYES_SPEAKING` off) let it out as before.
+    #[test]
+    fn with_both_switches_a_turned_face_never_read_speaking_is_no_sign_for_a_heard_name() {
+        use lamp_msgs::SpeakingState::{Unknown, Yes};
+        let _one = crate::provider_worker::tests::one_thread();
+        let judged = |states: &[Option<lamp_msgs::SpeakingState>], name_ms: u64, words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let looks: Vec<[ProductFace; 1]> = (0..8)
+                .map(|look| [("f1", states[look % states.len()], None, None)])
+                .collect();
+            let looks: Vec<&[ProductFace]> = looks.iter().map(|look| &look[..]).collect();
+            product_looks(&eyes, now, 200, &looks, &mut 0);
+            let mut heeding = product_heeding(eyes);
+            let signs = super::Signs {
+                names: vec![(now_us + name_ms * 1_000, 0.92)],
+                ..turned_signs(crate::room_told::Room::Busy)
+            };
+            let verdict = heeding.heed_signs(65, (now_us, now_us + 3_400_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let unread = [Some(Unknown)];
+        let mid_line = 1_800;
+        assert_eq!(
+            judged(&unread, mid_line, "Is it after all?"),
+            Some(crate::attention::BUSY_UNCALLED),
+            "request 65"
+        );
+        assert_eq!(
+            judged(&unread, mid_line, "Lamp, is it after all?"),
+            None,
+            "the name in its words"
+        );
+        assert_eq!(
+            judged(&[Some(Unknown), Some(Yes)], mid_line, "Is it after all?"),
+            None,
+            "seen speaking in a look"
+        );
+        assert_eq!(
+            judged(&[None], mid_line, "Is it after all?"),
+            None,
+            "no speaking read"
+        );
+    }
+
+    /// #7891 fault 3 (lamp-74ff, 19 Nov 11:16:37, request 151): "They can
+    /// do a and terminal. Hey. I terminate. Okay.", meeting talk across the
+    /// table with no name and no window, was let through as "said to the
+    /// lamp, facing and seen speaking" on one look of a speaking face (pitch
+    /// -18, looking). With both switches on it needs at least
+    /// `said_to_me::FACING_LOOKS` looks reading the turned face speaking
+    /// while facing. Three looks pass; "Hey, Lamp. What is one plus one?"
+    /// (10:56:45) and a "Yes." while the lamp waits for one pass on one.
+    #[test]
+    fn with_both_switches_facing_alone_needs_two_speaking_looks() {
+        use lamp_msgs::SpeakingState::{No, Yes};
+        let _one = crate::provider_worker::tests::one_thread();
+        let judged = |spoken: usize, words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let looks: Vec<[ProductFace; 1]> = (0..5)
+                .map(|look| {
+                    let state = if look < spoken { Yes } else { No };
+                    [("f1", Some(state), Some(-18.0), Some(true))]
+                })
+                .collect();
+            let looks: Vec<&[ProductFace]> = looks.iter().map(|look| &look[..]).collect();
+            product_looks(&eyes, now, 200, &looks, &mut 0);
+            let mut heeding = product_heeding(eyes);
+            let verdict = heeding.heed_signs(
+                151,
+                (now_us, now_us + 2_200_000),
+                words,
+                turned_signs(crate::room_told::Room::Unknown),
+            );
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let meeting = "They can do a and terminal. Hey. I terminate. Okay.";
+        assert!(judged(1, meeting).is_some(), "request 151, one look");
+        assert!(
+            judged(1, "What time works for you?").is_some(),
+            "a question, one look"
+        );
+        assert_eq!(judged(3, meeting), None, "three looks");
+        assert_eq!(
+            judged(1, "Hey, Lamp. What is one plus one?"),
+            None,
+            "named in its words"
+        );
+        assert_eq!(
+            crate::said_to_me::awaiting_yes(true, || judged(1, "Yes.")),
+            None,
+            "a yes awaited"
+        );
+    }
+
+    /// #7891, talking to a screen or a call while facing the lamp, and a
+    /// meeting across the table (the first builder at 11:20, V2's ruling at
+    /// 12:06): once a line has shown a second voice in the room since the
+    /// lamp last spoke and within `room_told::BUSY_ENDS_AFTER_US` (180 s), a
+    /// line out of the window passes on facing alone no more, whatever the
+    /// facing. A second voice is a line the face in view was read silent
+    /// through (the call's far side, its mouth closed), or one two faces
+    /// were seen speaking (two people across the lamp). Faces and looks
+    /// only, no voice print. The name in the words, the window, a yes
+    /// awaited, a person alone, an earlier line's mouth unread (unknown
+    /// holds nothing), a lip smack, or the lamp having spoken since, pass.
+    #[test]
+    fn with_both_switches_after_a_second_voice_facing_alone_is_held() {
+        use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+        let _one = crate::provider_worker::tests::one_thread();
+        let face = |state| [("f1", Some(state), Some(0.0), Some(true))];
+        let (still, talks, unread) = (face(No), face(Yes), face(Unknown));
+        let two: [ProductFace; 2] = [
+            ("f1", Some(Yes), Some(0.0), Some(true)),
+            ("f2", Some(Yes), Some(0.0), Some(true)),
+        ];
+        // An earlier line, `before`, 3 s, its words `then`; the lamp's words
+        // ending after it with `spoke`; then the facing line, seen speaking
+        // in every look, `going_on` or not.
+        let judged =
+            |before: &[ProductFace], then: &str, spoke: bool, going_on: bool, words: &str| {
+                let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                let (now, now_us) = (Instant::now(), monotonic_us());
+                let mut seq = 0;
+                product_looks(&eyes, now, 200, &[before; 6], &mut seq);
+                product_looks(&eyes, now, 4_200, &[&talks[..]; 5], &mut seq);
+                let mut heeding = product_heeding(eyes);
+                let earlier = heeding.heed_signs(
+                    150,
+                    (now_us, now_us + 2_600_000),
+                    then,
+                    turned_signs(crate::room_told::Room::Unknown),
+                );
+                if spoke {
+                    heeding.lamp_did(crate::second_provider::Did::Said(150, now_us + 3_000_000));
+                }
+                let signs = super::Signs {
+                    going_on,
+                    ..turned_signs(crate::room_told::Room::Unknown)
+                };
+                let verdict =
+                    heeding.heed_signs(151, (now_us + 4_000_000, now_us + 6_200_000), words, signs);
+                *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+                (earlier, verdict)
+            };
+        let far_side = "Can you hear me now? The line is bad.";
+        let asks = "What time works for you tomorrow?";
+        assert!(
+            judged(&still, far_side, false, false, asks).1.is_some(),
+            "a voice with no mouth, then facing"
+        );
+        assert!(
+            judged(&two, "So we ship it on Friday then.", false, false, asks)
+                .1
+                .is_some(),
+            "two faces speaking, then facing"
+        );
+        assert_eq!(
+            judged(&still, far_side, false, false, "Hey Lamp, what time is it?").1,
+            None,
+            "named in its words"
+        );
+        assert_eq!(
+            judged(&still, far_side, false, true, asks).1,
+            None,
+            "in the window"
+        );
+        assert_eq!(
+            crate::said_to_me::awaiting_yes(true, || judged(
+                &still, far_side, false, false, "Yes."
+            )
+            .1),
+            None,
+            "a yes awaited"
+        );
+        assert_eq!(
+            judged(&talks, "I need to buy some milk today.", false, false, asks).1,
+            None,
+            "alone"
+        );
+        assert_eq!(
+            judged(&unread, far_side, false, false, asks).1,
+            None,
+            "the earlier mouth unread"
+        );
+        assert_eq!(
+            judged(&still, "Mm.", false, false, asks).1,
+            None,
+            "a lip smack"
+        );
+        assert_eq!(
+            judged(&still, far_side, true, false, asks).1,
+            None,
+            "the lamp spoke since"
+        );
+    }
+
+    /// #7891, the name heard only in the room's sound (lamp-74ff, 19 Nov
+    /// 11:14:39, request 140, 17 words of meeting talk, the turned face read
+    /// speaking and looking away; and head down over a phone, G1): with
+    /// both switches on, a name heard mid-line in the sound, not in the
+    /// words, should not exempt the line from the face rule, so the line is
+    /// held and the face is no second sign for the name. Closed by
+    /// Seventh's `said_to_me::named` fix (a sound-only name no longer
+    /// stands); kept here so it passes once both land.
+    #[test]
+    #[ignore = "passes with Seventh's named() fix (#7891)"]
+    fn with_both_switches_a_name_heard_only_in_the_sound_keeps_the_face_rule() {
+        use lamp_msgs::SpeakingState::Yes;
+        let _one = crate::provider_worker::tests::one_thread();
+        let judged = |pitch: f32, looking: Option<bool>, words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let face = [("f1", Some(Yes), Some(pitch), looking)];
+            product_looks(&eyes, now, 200, &[&face[..]; 8], &mut 0);
+            let mut heeding = product_heeding(eyes);
+            let signs = super::Signs {
+                names: vec![(now_us + 1_800_000, 0.95)],
+                ..turned_signs(crate::room_told::Room::Busy)
+            };
+            let verdict = heeding.heed_signs(140, (now_us, now_us + 3_400_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let meeting = "I'm definitely not... Wait. Wait. Wait. Wait. Wait. Wait. Attached that I'll show that the layout would...";
+        assert!(judged(-14.0, Some(false), meeting).is_some(), "request 140");
+        assert!(
+            judged(40.0, None, "Can you send it to her now?").is_some(),
+            "head down, a sound name"
+        );
+        assert_eq!(
+            judged(40.0, None, "Lamp, send it to her."),
+            None,
+            "the name in its words"
+        );
+    }
+
+    /// #7891, head down over a phone, talking into it (V2 at 12:04, the
+    /// proposal's G2): with both switches on, out of the window, the turned
+    /// face read speaking in four looks, 40 degrees down in three and 10 in
+    /// the newest, is head down over the line: held. Its newest look alone
+    /// read it facing. "Lamp, send it to her." head down, and a "Yes." while
+    /// the lamp waits for one, pass.
+    #[test]
+    fn with_both_switches_a_head_down_line_is_read_over_its_looks() {
+        use lamp_msgs::SpeakingState::Yes;
+        let _one = crate::provider_worker::tests::one_thread();
+        let judged = |words: &str| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let down = |pitch: f32| [("f1", Some(Yes), Some(pitch), None)];
+            let (low, level) = (down(40.0), down(10.0));
+            product_looks(&eyes, now, 200, &[&low[..], &low, &low, &level], &mut 0);
+            let mut heeding = product_heeding(eyes);
+            let verdict = heeding.heed_signs(
+                9,
+                (now_us, now_us + 1_800_000),
+                words,
+                turned_signs(crate::room_told::Room::Unknown),
+            );
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        assert!(
+            judged("Can you send it to her now?").is_some(),
+            "40/40/40/10"
+        );
+        assert_eq!(judged("Lamp, send it to her."), None, "named");
+        assert_eq!(
+            crate::said_to_me::awaiting_yes(true, || judged("Yes.")),
+            None,
+            "a yes awaited"
+        );
     }
 
     /// `LAMP_TURNED_FACE_SPEAKS` (lamp-52e6, 24 Oct 05:31): desk talk between

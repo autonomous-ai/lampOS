@@ -229,6 +229,54 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
   memory doesn't make), and each protocol's
   `only_a_forget_all_that_was_done_says_whose`.
 
+## Forgets reach the account's history (`LAMP_HISTORY_FORGET`)
+
+With `LAMP_HISTORY_FORGET=on` (off unless set, in no unit; #7771), what a
+forget removes on the lamp is deleted from the conversation history the
+account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
+- **What memory says:** with `--memory-days`, the answer to `forget`,
+  `forget_last`, `forget_all`, `forget_said` and `exchanges_forget` names the
+  exchanges it removed, by scope and id: `"exchanges":{"p-…":[4,6],
+  "everyone":[3]}`. Ids only, never words. A known person's `forget_all`
+  leaves their own out (the voice deletes that person's whole history), so
+  it names only the room's lines it took with them; the room's own
+  `forget_all` names its ids. Every removed id is told: at most 400 in the
+  answer, which then says `"exchanges_more":true`, and the rest paged by
+  `{"op":"forgot_exchanges"}` (1,500 a page, `"more"` while some remain;
+  kept in RAM until the next forget). Nothing removed, no field. The legacy
+  store names none.
+- **What the voice queues** (the second route's worker, `history_forget`):
+  for a known person's forget everything, `{"all":true,"person":<their p-
+  id>}`; for every other forget, `{"ids":[…]}` of the exchanges named, each
+  turn id `<scope>:<id>` (`history_forget::turn_id`, which the turn's save
+  mints the same way). The person key is memory's own scope id: a known
+  person's `p-` id, `""` for the room's. A forget never deletes more of the
+  account's history than the lamp forgot: a whole-history delete is a known
+  person's forget everything only, and never sent without a person. Only
+  memory's forgets and their pages are read (the list shared in
+  `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`). A forget of every
+  person's memory, or a page that can't be read, is journalled as not
+  reached.
+- **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
+  before. The queue is a file in the voice's state folder
+  (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
+  restart, at most 20,000 ids (past it, the known person with the most
+  waiting is coalesced into their whole history, never the room's, whose
+  newest past it are let go; each journalled as a count). It is sent in the
+  background with the lamp's key in `x-api-key`, 100 ids a call, and only
+  to the lamp's own cloud API (`https://campaign-api.autonomous.ai`); with
+  any other base, nothing is sent and the forgets wait on the lamp.
+- **Done or kept:** a 2xx answer is done (`deleted` and `missing`, `missing`
+  meaning already gone; `deleted_count`; `{"enabled":false}`, the account
+  keeps no history). A 400 is let go. No answer, 5xx and any other status
+  keep the call, tried again after 5 s, doubling to 15 minutes. The journal
+  says counts only.
+- **Not covered yet:** the app's removal of a person (`forget_person`, asked
+  by lamp-cloud) and a forget on the Live route.
+- **Tests:** `history_forget`'s and `second_provider::net::history`'s (a
+  fake server), and `days_protocol`'s
+  `a_forget_names_the_exchanges_it_removed_by_scope_and_id`.
+
 ## Forgetting a person
 
 The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,
@@ -2593,7 +2641,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `room_sounds` and `face_expression_consent_result` for the neighbouring
     face-expression consent file. Each is `cleared` when `remove_file`
     succeeds or returns `NotFound` (already absent), and `uncertain` for
-    any other error. These fields carry fixed states only, never paths,
+    any other error. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767) the forget
+    removes only a kept yes: a kept no stays and is `kept as a no`, which
+    is no failed step and leaves `everything` as it is; any other file it
+    leaves holds no yes and is `cleared`. These fields carry fixed states only, never paths,
     error text, person ids or remembered words.
   - A room or consent cleanup result other than `cleared` sets
     `everything: false`; a later successful cleanup does not restore it
@@ -4126,7 +4177,8 @@ then use that person's scope:
   `everything: false` and the fixed `room_memory_result`,
   `sound_consent_result` and `face_expression_consent_result` outcomes when
   the internal forget reports them. Only `cleared`, `kept` and `uncertain`
-  survive; unknown values become `uncertain`, never copied private text.
+  survive (and `kept as a no` for the two consents, #7767, which is no
+  partial cleanup); unknown values become `uncertain`, never copied private text.
   A non-cleared or malformed outcome prevents a complete-deletion claim,
   even when primary memory was already empty. A successful memory receipt
   cannot upgrade a partial face result or a note about old face records
@@ -4339,6 +4391,7 @@ then use that person's scope:
   a record counts only when it says "now" or that the old name is gone
   ("Your face is known as Sam now, and the old name is gone."). The full
   matcher is in second-voice.md.
+- **A keep claimed in a later sentence** (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878, off unless set): while no `remember` has run, a reply is said sentence by sentence, and a later sentence that says a keep or replace done ("Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before." on lamp-e82d, 19 Nov, with nothing kept) is held; with no call in the round it is a claim, as those above are. Its rules are its row in `switches.md`.
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
@@ -4355,8 +4408,27 @@ then use that person's scope:
     wasn't kept: nobody known is speaking. If they want it kept, they can
     tell you who they are, or let the lamp see their face, and say it
     again. …"}`, which asks it to say so, short and friendly, not as a
-    refusal. Nothing is held for later, so the note promises no later keep
-    and the answer never says it was kept. "Remember the plant needs water
+    refusal, asking nothing and never "Got it" or "Noted". Nothing is held
+    for later, so the note promises no later keep and the answer never says
+    it was kept. On the second route a spoken line that only asks to keep
+    (`keep_at_once::only_keeps_refused`: `only_keeps`, or the keep with its
+    own details in clauses after it, "… level B2, spot 4T", and a short
+    address before it, the lamp's name as heard; never a question or a
+    further ask), whose round 1 called `remember` alone with
+    no words beside it and every call came back so refused
+    (`needs_face::refused`), is answered by the lamp itself with
+    `needs_face::REFUSED_LINE`, "I'm not sure who's talking, so I can't
+    keep that.", true for a face it doesn't know and for a known person not
+    seen saying it alike (in the owner's language from
+    `language::FIXED_LINES`), and
+    the turn ends with no second round (#7877: on lamp-e82d, 19 Nov, such
+    keeps were left to the model's words). A plain fix, no switch: it only
+    makes a refusal truthful. A line asking more, or a keep refused for
+    another reason, goes to round 2 as before. A keep so refused that goes
+    to round 2 anyway has one journal line naming the condition that failed
+    (`… goes to round 2: <why> (LAMP_MEMORY_PERSONAL_NEEDS_FACE)`, no
+    words). Tests:
+    `second_provider::tests::needs_face_said`. "Remember the plant needs water
     on Fridays" is kept as before; "remember I left my keys on the shelf"
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`

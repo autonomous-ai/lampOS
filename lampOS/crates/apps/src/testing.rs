@@ -24,18 +24,6 @@ pub struct FakeEffects {
     /// The exit status `systemctl` gives a command line (default 0): the
     /// fake judges it as the real one does ([`crate::effects::judge_status`]).
     pub exits: Vec<(String, i32)>,
-    /// A `clean` removes the app's data link and folder under this layout,
-    /// as systemd would (the real thing is first seen on a lamp).
-    pub cleans: Option<crate::layout::Layout>,
-}
-
-impl FakeEffects {
-    pub fn cleaning(layout: &crate::layout::Layout) -> Self {
-        Self {
-            cleans: Some(layout.clone()),
-            ..Default::default()
-        }
-    }
 }
 
 impl FakeEffects {
@@ -49,10 +37,6 @@ impl FakeEffects {
 }
 
 impl Effects for FakeEffects {
-    fn forget(&mut self, name: &str) -> Result<(), String> {
-        self.record(format!("app_forget {name}"))
-    }
-
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String> {
         let line = argv(verb, unit).join(" ");
         self.record(line.clone())?;
@@ -61,23 +45,7 @@ impl Effects for FakeEffects {
             .iter()
             .find(|(l, _)| *l == line)
             .map_or(0, |(_, c)| *c);
-        crate::effects::judge_status(verb, unit, Some(code))?;
-        if verb == Verb::Clean
-            && let Some(layout) = &self.cleans
-            && let Some(name) = unit
-                .strip_prefix("lampapp-net@")
-                .or_else(|| unit.strip_prefix("lampapp@"))
-                .and_then(|rest| rest.strip_suffix(".service"))
-        {
-            for path in [layout.data_link(name), layout.data_real(name)] {
-                let _ = match std::fs::symlink_metadata(&path) {
-                    Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(&path),
-                    Ok(_) => std::fs::remove_file(&path),
-                    Err(_) => Ok(()),
-                };
-            }
-        }
-        Ok(())
+        crate::effects::judge_status(verb, unit, Some(code))
     }
 
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String> {

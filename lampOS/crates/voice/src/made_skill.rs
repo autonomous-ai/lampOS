@@ -417,6 +417,388 @@ pub fn set_english_here(english: Option<bool>) {
     ENGLISH_HERE.with(|here| here.set(english));
 }
 
+/// The switch for a skill made by the lamp's agent unless it is a quick
+/// reaction (the first builder's ruling on #6811, 18 Nov 16:23, points 1
+/// to 3, with the scope asked after it: only quick reactions stay with
+/// DeepSeek; his 19:50 ruling, the middle form; the owner's "do it like V1"
+/// on #7764): `on` only, off unless set, in no product unit. On, a voice
+/// or app make is first judged a quick reaction or not by DeepSeek
+/// ([`REACTION_JUDGE`]); only one judged so is drafted, and a draft that
+/// is no quick reaction ([`quick_reaction`]) is never kept. Any other is
+/// written by the lamp as one task for its agent, on the trigger its own
+/// model picks, with sip-of-water's guards ([`template_guards`],
+/// `crate::make_skill_local`, `crate::make_no_cannot::skill_text`); a `[[while]]` on
+/// [`GUARD_TOPICS`] is a guard, granted and said plainly ([`guards_said`]);
+/// a skill on a presence or person topic ([`BEHAVIOUR_TOPICS`]) keeps the
+/// lamp's manners even loosened; and who made it is written
+/// ([`MADE_WITH`]). Off, every make is byte for byte as before. Read by
+/// the voice alone (both routes' makes and the app's): set it in
+/// `lamp-voice`.
+pub const REACTIONS_ENVIRONMENT: &str = "LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK";
+
+thread_local! {
+    /// [`REACTIONS_ENVIRONMENT`] as a test of this thread sets it.
+    static REACTIONS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether only a quick reaction is made by DeepSeek in this process.
+pub fn reactions_on() -> bool {
+    if let Some(on) = REACTIONS_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(REACTIONS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`reactions_on`] for the calling thread alone, for tests (this crate's
+/// and `lamp-skills`' own against the real check); `None` reads the
+/// environment again. The product never calls it.
+#[doc(hidden)]
+pub fn set_reactions_here(on: Option<bool>) {
+    REACTIONS_HERE.with(|here| here.set(on));
+}
+
+/// The presence and person topics a behaviour nudge starts on (#6811,
+/// point 1): someone at the desk, a face in view, what the sitter is doing
+/// and what the eyes see them do. With [`reactions_on`], a made skill on
+/// one keeps the lamp's manners (`most_a_day`, the `wellbeing` budget,
+/// `[rest]`) even loosened, as sip-of-water's ([`keep_asked`]).
+pub const BEHAVIOUR_TOPICS: [&str; 4] = [
+    lamp_msgs::RoomPresence::TOPIC,
+    FACES_TOPIC,
+    lamp_msgs::RoomActivity::TOPIC,
+    lamp_msgs::HumanDoing::TOPIC,
+];
+
+/// The topics a person's own hand on the lamp says: a touch, a pat, a
+/// gesture, the button (`controls/*`).
+const CONTROLS_PREFIX: &str = "controls/";
+
+/// The step kinds a quick reaction may have: the light, a gesture, its
+/// exact words and its hum.
+const REACTION_STEPS: [&str; 4] = ["light", "body", "say", "cue"];
+
+/// The read-only guards of a behaviour nudge (#6811, point 3): the voice's
+/// state and the sitter's activity, as sip-of-water reads them in its
+/// `[[while]]`s. In a `[[while]]` they are guards: granted in
+/// `[permissions] topics` by the lamp ([`topic_granted`]) and said plainly
+/// ([`guards_said`]); no made-skill cap counts topics since #6066, so they
+/// count toward none. In `[trigger]` they are a trigger like any other.
+pub const GUARD_TOPICS: [&str; 2] = [lamp_msgs::VoiceState::TOPIC, ACTIVITY_TOPIC];
+
+/// Whether a made skill's `skill.toml` is a quick reaction, the only make
+/// DeepSeek keeps with [`reactions_on`] (#6811): structural, by its start
+/// and its step kinds alone, never a word. Both must hold:
+/// - its start is the person's own act: words they say (`asks`, or a
+///   `[said]` start), a hand on the lamp (a `[trigger]` on `controls/*`:
+///   a touch, a pat, a gesture, the button), or nothing at all, run only
+///   when asked (no `[trigger]`);
+/// - its steps are only the light, a gesture, its exact words or its hum
+///   ([`REACTION_STEPS`]), with no `task`, no `[[while]]` and no code.
+///
+/// A clock, presence, person or any other sensor trigger, a guard, or a
+/// step of any other kind (a read, a write, a task) is not: the lamp's
+/// agent makes it. What can't be read is no reaction either.
+pub fn quick_reaction(toml: &str) -> bool {
+    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+        return false;
+    };
+    let started_by_person = match table.get("trigger") {
+        None => true,
+        Some(trigger) => trigger
+            .get("topic")
+            .and_then(toml::Value::as_str)
+            .is_some_and(|topic| topic.starts_with(CONTROLS_PREFIX)),
+    };
+    let reaction_steps = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            !steps.is_empty()
+                && steps.iter().all(|step| {
+                    step.as_table().is_some_and(|step| {
+                        step.keys()
+                            .any(|key| REACTION_STEPS.contains(&key.as_str()))
+                            && step.keys().all(|key| {
+                                REACTION_STEPS.contains(&key.as_str())
+                                    || matches!(key.as_str(), "on" | "after")
+                            })
+                    })
+                })
+        });
+    started_by_person
+        && reaction_steps
+        && !table.contains_key("while")
+        && !table.contains_key("grants")
+        && !says_a_marker(&table)
+}
+
+/// What the lamp's own model is told for a make's first call with
+/// [`reactions_on`] (the owner's "do it like V1" on #7764): a judgement of
+/// the request's meaning alone, never a draft and never a word list: is it
+/// a quick reaction? Judged one, DeepSeek drafts it, the draft still held
+/// to [`quick_reaction`]; judged none, unsure or no answer, the make goes
+/// straight to the lamp's agent ([`reaction_judged`]).
+pub const REACTION_JUDGE: &str = "You judge, for a desk lamp, what kind of skill a person \
+asks it to make, by what the request means, in any language. A quick reaction is one the person \
+starts themselves, by saying a phrase, touching or patting the lamp or pressing its button, and \
+that only changes the lamp's light, moves its body, says fixed words or hums. Anything else is \
+not one: a skill that needs the internet, a sensor or the camera, a time of day, reading or \
+sending anything, remembering, or thinking about what to say or do. A one-off reminder or timer \
+is the lamp's own timer, never a skill: judge it a quick reaction, so the lamp tells the person \
+so. Answer only one line of JSON and nothing else: {\"quick_reaction\": true or false, \
+\"reason\": \"a few words\"}.";
+
+/// The judgement's request ([`REACTION_JUDGE`]): the person's words alone.
+pub fn reaction_brief(request: &str) -> String {
+    format!("Request: {}", request.trim())
+}
+
+/// The model's judgement ([`REACTION_JUDGE`]) read: `quick_reaction`'s
+/// value in its one JSON object, fenced or not; `None` when there is none
+/// or it isn't a bool. Its reason is never read, so never journaled.
+pub fn reaction_judged(answer: &str) -> Option<bool> {
+    let from = answer.find('{')?;
+    let to = answer.rfind('}')?;
+    let judged: Value = serde_json::from_str(answer.get(from..=to)?).ok()?;
+    judged.get("quick_reaction")?.as_bool()
+}
+
+/// Whether a say step's words begin, in any case, with the make's own
+/// marker: [`crate::make_no_cannot::NEEDS_NET`] or [`CANNOT`], the model's
+/// line for what no step does, written as words to say (lamp-9adf, 18
+/// Nov: "internet: current price of Zorbo coin"). Never a quick reaction
+/// ([`quick_reaction`]) and never kept ([`held`]).
+fn says_a_marker(table: &toml::Table) -> bool {
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("say")?.get("text")?.as_str())
+        .any(|text| {
+            [crate::make_no_cannot::NEEDS_NET, CANNOT]
+                .iter()
+                .any(|marker| after_word(text.trim_start(), marker).is_some())
+        })
+}
+
+/// Why `answer`, a DeepSeek draft, goes to the lamp's agent with
+/// [`reactions_on`]: `on <topic>`, its trigger's, or `not a quick
+/// reaction` when its start or its steps aren't one ([`quick_reaction`]).
+/// None for a quick reaction, or an answer with no skill in it (a
+/// `cannot:`, the internet's line, what can't be read), which keeps its
+/// own route.
+pub fn not_a_reaction(answer: &str) -> Option<String> {
+    let files = files(answer).ok()?;
+    let table = toml::from_str::<toml::Table>(&files.toml).ok()?;
+    if quick_reaction(&files.toml) {
+        return None;
+    }
+    let topic = table
+        .get("trigger")
+        .and_then(|trigger| trigger.get("topic"))
+        .and_then(toml::Value::as_str)
+        .filter(|topic| lamp_has(topic));
+    Some(topic.map_or_else(
+        || "not a quick reaction".to_owned(),
+        |topic| format!("on {topic}"),
+    ))
+}
+
+/// Whether a made skill's trigger reads [`BEHAVIOUR_TOPICS`].
+fn behaviour_trigger_of(toml: &str) -> bool {
+    toml::from_str::<toml::Table>(toml).is_ok_and(|table| {
+        table
+            .get("trigger")
+            .and_then(|trigger| trigger.get("topic"))
+            .and_then(toml::Value::as_str)
+            .is_some_and(|topic| BEHAVIOUR_TOPICS.contains(&topic))
+    })
+}
+
+/// Sip-of-water's guards for a behaviour nudge (#6811, point 2), as a
+/// whole skill the lamp's check takes: since the middle form (19:50), the
+/// source of the guards a task the lamp writes keeps ([`template_guards`]),
+/// no longer told to the agent. Its line is exact words,
+/// as a made skill's say is ([`say_text`]), never sip-of-water's note for
+/// the voice to word: a made skill's say is said as written.
+pub const BEHAVIOUR_TEMPLATE: &str = "A nudge on a sitting, an arrival or a leaving \
+keeps the guards of the lamp's own sip-of-water, in this form; the trigger, the times and the \
+line are the request's, and voice/state and room/activity stay in [[while]] only:
+
+```skill.toml
+kind = \"installable\"
+version = \"1.0.0\"
+needs = [\"voice\"]
+most_a_day = 3
+
+[permissions]
+speak = true
+topics = [\"room/presence\", \"voice/state\", \"room/activity\"]
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"30m\"
+rearm = \"leaves\"
+cooldown = \"1h\"
+
+[[while]]
+topic = \"voice/state\"
+field = \"state\"
+not_equals = \"speaking\"
+for = \"30s\"
+
+[[while]]
+topic = \"voice/state\"
+field = \"state\"
+equals = \"resting\"
+for = \"5s\"
+
+[[while]]
+topic = \"room/activity\"
+field = \"state\"
+not_equals = \"head_down\"
+unknown = \"holds\"
+
+[active]
+from = \"08:00\"
+to = \"22:00\"
+
+[quiet]
+from = \"22:00\"
+to = \"08:00\"
+
+[budget]
+group = \"wellbeing\"
+per_hour = 1
+
+[rest]
+after_ignored = 2
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+say = { text = \"One short, warm line.\" }
+```";
+
+/// [`BEHAVIOUR_TEMPLATE`]'s `skill.toml`, its fenced block's text: what
+/// its tests hold to the check (here and in `lamp-skills`' own).
+#[doc(hidden)]
+pub fn behaviour_template_toml() -> &'static str {
+    BEHAVIOUR_TEMPLATE
+        .split_once("```skill.toml\n")
+        .and_then(|(_, rest)| rest.split_once("```"))
+        .map_or("", |(toml, _)| toml)
+}
+
+/// [`BEHAVIOUR_TEMPLATE`]'s `[[while]]` guards alone, as TOML: what a task
+/// the lamp writes on a trigger keeps with [`reactions_on`] (the first
+/// builder's 19:50 ruling on #6811, the middle form;
+/// `crate::make_no_cannot::skill_text`), its topics granted as any guard's
+/// ([`topic_granted`]).
+pub fn template_guards() -> &'static str {
+    let toml = behaviour_template_toml();
+    toml.find("[[while]]")
+        .and_then(|from| {
+            let guards = &toml[from..];
+            guards.find("\n[active]").map(|to| guards[..to].trim())
+        })
+        .unwrap_or_default()
+}
+
+/// The `[[while]]`s of `table` said plainly when each is one of the lamp's
+/// guards ([`GUARD_TOPICS`], with [`reactions_on`]): the voice's state
+/// `equals = "resting"` or `not_equals = "speaking"`, and the sitter's
+/// activity `not_equals = "head_down"`, each with at most `for` and
+/// `unknown = "holds"`. Any other `[[while]]`, a guard topic read another
+/// way among them, is none: the part is unsaid, as before.
+fn guards_said(table: &toml::Table) -> Option<String> {
+    if !reactions_on() {
+        return None;
+    }
+    let whiles = table.get("while")?.as_array()?;
+    let (mut talk, mut head) = (false, false);
+    for part in whiles {
+        let part = part.as_table()?;
+        let text = |key: &str| part.get(key).and_then(toml::Value::as_str);
+        let keys_ok = part.keys().all(|key| {
+            matches!(
+                key.as_str(),
+                "topic" | "field" | "equals" | "not_equals" | "for" | "unknown"
+            )
+        });
+        let lasting_ok = part
+            .get("for")
+            .is_none_or(|lasting| lasting.as_str().and_then(spell).is_some());
+        let unknown_ok = part
+            .get("unknown")
+            .is_none_or(|unknown| unknown.as_str() == Some("holds"));
+        if !keys_ok || !lasting_ok || !unknown_ok || text("field") != Some("state") {
+            return None;
+        }
+        match (text("topic")?, text("equals"), text("not_equals")) {
+            (topic, Some("resting"), None) | (topic, None, Some("speaking"))
+                if topic == lamp_msgs::VoiceState::TOPIC =>
+            {
+                talk = true
+            }
+            (ACTIVITY_TOPIC, None, Some("head_down")) => head = true,
+            _ => return None,
+        }
+    }
+    Some(
+        match (talk, head) {
+            (true, true) => ", never in the middle of a conversation or with your head down",
+            (true, false) => ", never in the middle of a conversation",
+            (false, true) => ", never with your head down",
+            (false, false) => return None,
+        }
+        .to_owned(),
+    )
+}
+
+/// Who made a skill (#6811, with [`reactions_on`]): written by the lamp
+/// alone as `made_with: <key>` on its card, after `made_by`, and as
+/// `"made_with"` in its [`INDEX`] entry. A line the model wrote is dropped,
+/// as a `made_by` one is.
+pub const MADE_WITH: &str = "made_with";
+
+/// The engine that wrote a made skill ([`MADE_WITH`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MadeWith {
+    /// The lamp's own model, DeepSeek (`crate::make_skill_local`).
+    #[default]
+    DeepSeek,
+    /// The lamp's agent, Hermes (`crate::make_skill_agent`).
+    Hermes,
+    /// The lamp's agent, OpenClaw, on the one run path.
+    OpenClaw,
+}
+
+impl MadeWith {
+    /// The engine `crate::make_skill_agent` names (`Hermes`, `OpenClaw`):
+    /// any other is the lamp's own model's.
+    pub fn of_engine(engine: &str) -> Self {
+        match engine.to_ascii_lowercase().as_str() {
+            "hermes" => Self::Hermes,
+            "openclaw" => Self::OpenClaw,
+            _ => Self::DeepSeek,
+        }
+    }
+
+    /// As the card and the index say it.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::DeepSeek => "deepseek",
+            Self::Hermes => "hermes",
+            Self::OpenClaw => "openclaw",
+        }
+    }
+}
+
 /// Whether a make is held to what was heard (#7621): [`unrelated_on`], and
 /// the lamp's language English ([`crate::language::at_start`]), the only
 /// one whose words [`content_words`] reads. In another language the check
@@ -1448,6 +1830,16 @@ const RUNNABLE_ENDING: &str = ".py";
 const MOST_SCRIPT_PATH_BYTES: usize = 64;
 /// The most of a `task` step's own words, said back whole.
 pub const MOST_TASK_CHARS: usize = 120;
+
+/// Whether a `task` step's words are one plain sentence, read back whole
+/// to the owner for their yes: not empty, at most [`MOST_TASK_CHARS`]
+/// characters, and no control or format character ([`is_format`]). The
+/// same check `lamp-skills pack` holds a made skill to (#7874).
+pub fn task_words_plain(words: &str) -> bool {
+    !words.trim().is_empty()
+        && words.chars().count() <= MOST_TASK_CHARS
+        && words.chars().all(|c| !c.is_control() && !is_format(c))
+}
 
 /// The folder a made skill's light shows are kept in (#7245, `show =
 /// "NAME"` and `shows/NAME.toml`, lamp-skills' #1679 format), inside its
@@ -2858,10 +3250,16 @@ pub const SAY_HOURS: (&str, &str) = ("07:00", "22:00");
 const SAY_NOT_TEXT: &str = "what it would say isn't its exact words; try saying the words \
                             themselves, like 'Welcome back!'";
 
+/// Why a say step whose words are the make's own marker is refused
+/// (lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" kept as a say of
+/// "internet: current price of Zorbo coin", read aloud as it stood): a
+/// draft the model got wrong, never kept, whatever the switches.
+pub const SAY_IS_MARKER: &str = "what it would say is a note for the lamp, not words to say";
+
 /// A Unicode format character (general category Cf): zero-width marks,
 /// bidirectional controls and the like (U+200B, U+202E), which
 /// [`char::is_control`] doesn't cover (App Only's P2b on #6062).
-pub(crate) fn is_format(c: char) -> bool {
+pub fn is_format(c: char) -> bool {
     matches!(
         c as u32,
         0x00AD
@@ -3902,7 +4300,25 @@ pub fn topic_granted(text: &str) -> String {
     };
     let mut topics = granted;
     let mut added = false;
-    for topic in trigger.into_iter().chain(looks.then_some(FACES_TOPIC)) {
+    // With [`REACTIONS_ENVIRONMENT`] on, a guard a `[[while]]` reads
+    // ([`GUARD_TOPICS`]) is granted too (#6811, point 3), as lamp-skills
+    // reads only what `[permissions] topics` lists.
+    let guards: Vec<&str> = match table.get("while").and_then(toml::Value::as_array) {
+        Some(whiles) if reactions_on() => GUARD_TOPICS
+            .into_iter()
+            .filter(|guard| {
+                whiles
+                    .iter()
+                    .any(|part| part.get("topic").and_then(toml::Value::as_str) == Some(guard))
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    for topic in trigger
+        .into_iter()
+        .chain(looks.then_some(FACES_TOPIC))
+        .chain(guards)
+    {
         if !topics.iter().any(|given| given.as_str() == Some(topic)) {
             topics.push(toml::Value::String(topic.to_owned()));
             added = true;
@@ -5003,6 +5419,24 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 .flatten()
         };
         let says: Vec<&toml::Value> = steps().filter_map(|step| step.get("say")).collect();
+        // The make's own marker as its words (lamp-9adf, 18 Nov): a draft
+        // the model got wrong, refused for its repair whatever the
+        // switches, so never a skill that reads a note aloud.
+        if says_a_marker(table) {
+            let net = crate::make_no_cannot::net_by_agent();
+            let markers = if net {
+                format!("A {} or {CANNOT} line", crate::make_no_cannot::NEEDS_NET)
+            } else {
+                format!("A {CANNOT} line")
+            };
+            return Err(Refused(
+                SAY_IS_MARKER.into(),
+                Some(format!(
+                    "The lamp refused it: {SAY_IS_MARKER}. {markers} is the whole answer, one \
+                     line and no blocks, never the words of a say step."
+                )),
+            ));
+        }
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
@@ -5165,10 +5599,7 @@ fn code_held(
         ));
     }
     let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
-    let plain = !words.trim().is_empty()
-        && words.chars().count() <= MOST_TASK_CHARS
-        && words.chars().all(|c| !c.is_control() && !is_format(c));
-    if !plain {
+    if !task_words_plain(words) {
         return Err(scripts_not_held(
             "a task's words, empty, too long or not plain",
         ));
@@ -6167,12 +6598,16 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     if !code && (has_task || table.contains_key("grants")) {
         return Err(Unsaid::cant(CODE_OF_ITS_OWN));
     }
+    // The lamp's guards in `[[while]]` (#6811, with
+    // [`REACTIONS_ENVIRONMENT`] on): said below, never an extra part.
+    let guards = guards_said(table);
     let extras: Vec<&String> = table
         .keys()
         .filter(|key| {
             let said_below = parts.contains(&key.as_str())
                 || (code && key.as_str() == "grants")
-                || (asks_on() && key.as_str() == "asks");
+                || (asks_on() && key.as_str() == "asks")
+                || (guards.is_some() && key.as_str() == "while");
             !said_below
         })
         .collect();
@@ -6342,6 +6777,9 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
         said.push_str(&format!(", it {}", steps.join(", then ")));
     }
     said.push_str(conditions);
+    if let Some(guards) = &guards {
+        said.push_str(guards);
+    }
     if let Some(cooldown) = trigger.get("cooldown") {
         match cooldown.as_str().and_then(duration) {
             Some((1, unit)) => said.push_str(&format!(", at most once {}", one(unit))),
@@ -6446,10 +6884,7 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     // `do.task` is read back.
     let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
-    (!words.is_empty()
-        && words.chars().count() <= MOST_TASK_CHARS
-        && words.chars().all(|c| !c.is_control() && !is_format(c)))
-    .then(|| {
+    task_words_plain(words).then(|| {
         if agents {
             format!("hands one task to the lamp's agent: “{words}”")
         } else {
@@ -8026,7 +8461,7 @@ impl Maker {
 /// `description` ([`plainly`]'s) in place of the one written. A `made` or
 /// `made_by` line the model wrote is dropped: only the lamp says them.
 fn card(text: &str, description: &str, maker: Maker) -> Result<(String, String), Refused> {
-    card_asked(text, description, maker, false)
+    card_asked(text, description, maker, false, None)
 }
 
 /// The front matter line, after `made_by`, of a made skill whose request
@@ -8043,16 +8478,21 @@ fn card_asked(
     description: &str,
     maker: Maker,
     limits: bool,
+    made_with: Option<MadeWith>,
 ) -> Result<(String, String), Refused> {
     let asked = if limits {
         format!("\n{LIMITS_ASKED}")
     } else {
         String::new()
     };
+    // Who made it (#6811), the lamp's own line, with its switch alone.
+    let with = made_with
+        .map(|with| format!("\n{MADE_WITH}: {}", with.key()))
+        .unwrap_or_default();
     card_marked(
         text,
         description,
-        &format!("made: here\n{MADE_BY}: {}{asked}", maker.key()),
+        &format!("made: here\n{MADE_BY}: {}{with}{asked}", maker.key()),
     )
 }
 
@@ -8089,9 +8529,12 @@ fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, St
     for line in front.lines() {
         let continued = in_description && line.starts_with([' ', '\t']);
         in_description = continued || line.starts_with("description:");
-        let marker = line
-            .split_once(':')
-            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY | "added" | "limits"));
+        let marker = line.split_once(':').is_some_and(|(key, _)| {
+            matches!(
+                key.trim(),
+                "made" | MADE_BY | MADE_WITH | "added" | "limits"
+            )
+        });
         if !in_description && !marker {
             kept.push(line);
         }
@@ -9022,6 +9465,9 @@ pub struct Asked<'a> {
     /// The judge of a voice make with no word of the ask (#7621,
     /// [`UNRELATED_ENVIRONMENT`]): none for the app's, and none off.
     pub judge: Option<Judge<'a>>,
+    /// The engine whose answer this is ([`MadeWith`]), written on the card
+    /// and in the index with [`reactions_on`] alone.
+    pub made_with: MadeWith,
 }
 
 /// [`keep`], with the person's request: the times of day it named
@@ -9076,7 +9522,10 @@ pub fn keep_asked(
     // A repeat in the request's words, or the heard line's (read with
     // [`LOOSE_ENVIRONMENT`] on alone).
     let repeat = repeat_asked(request.request).or_else(|| request.heard.and_then(repeat_asked));
-    let limits = limits_asked(request.request);
+    // A behaviour nudge keeps the lamp's manners, sip-of-water's, even
+    // loosened (#6811, with [`REACTIONS_ENVIRONMENT`] on): marked as asked.
+    let limits =
+        limits_asked(request.request) || (reactions_on() && behaviour_trigger_of(&files.toml));
     files.toml = paced_for(&files.toml, asked, limits, repeat);
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
@@ -9157,6 +9606,7 @@ pub fn keep_asked(
         waited: waited.as_deref(),
         asked,
         limits,
+        made_with: reactions_on().then_some(request.made_with),
         from,
         keeping,
     };
@@ -9189,6 +9639,8 @@ struct Ending<'a> {
     /// Whether the request asked for limits ([`limits_asked`]), marked on
     /// its card ([`LIMITS_ASKED`]).
     limits: bool,
+    /// Who made it ([`MADE_WITH`]), with [`reactions_on`] alone.
+    made_with: Option<MadeWith>,
     from: &'a str,
     keeping: &'a Keeping,
 }
@@ -9202,6 +9654,7 @@ impl Ending<'_> {
             waited,
             asked,
             limits,
+            made_with,
             from,
             keeping,
         } = *self;
@@ -9240,6 +9693,7 @@ impl Ending<'_> {
             said.as_deref().unwrap_or_default(),
             Maker::of(from),
             limits,
+            made_with,
         )?;
         // A name a skill on the lamp has already (a factory reset keeps the
         // lamp's own, welcome-back among them): the first free one, or "you
@@ -10008,6 +10462,16 @@ pub fn agent_secrets(directory: &Path, sha256: &str) -> Option<Vec<String>> {
 /// 1,024 bytes (`lamp-skills`' check), with room for its quotes.
 const MOST_ADDED_DESCRIPTION_BYTES: usize = 900;
 
+/// The value of a card's front matter line `key: value` ([`MADE_WITH`]):
+/// the lamp's own marks, read back from the card it marked.
+fn card_mark(card: &str, key: &str) -> Option<String> {
+    let front = card.strip_prefix("---\n")?.split_once("\n---")?.0;
+    front.lines().find_map(|line| {
+        let (named, value) = line.split_once(':')?;
+        (named.trim() == key).then(|| value.trim().to_owned())
+    })
+}
+
 /// A `SKILL.md`'s own `description:`, on one line, with no control
 /// characters.
 pub fn written_description(card: &str) -> Option<String> {
@@ -10144,7 +10608,16 @@ fn packed_and_kept(
         let toml_sha256 = hex(&Sha256::digest(
             made_words(toml, &[scripts, shows].concat()).as_bytes(),
         ));
-        remember(&keeping.directory, from, &made, added, &toml_sha256).map_err(unkept)?;
+        // Who made it, as its card says (#6811): the lamp's own line.
+        let made_with = card_mark(&marked, MADE_WITH);
+        remember_with(
+            &keeping.directory,
+            from,
+            &made,
+            (added, made_with.as_deref()),
+            &toml_sha256,
+        )
+        .map_err(unkept)?;
         // A write's exact contents, kept beside it for the person's yes
         // (#6066, [`writes_of`]): the voice's own folder, as the package.
         let writes = writes_in(toml);
@@ -10400,13 +10873,38 @@ pub(crate) fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
 /// The kept skill on the lamp whose name is `asked` ([`name_asked`]), to
 /// read it back (`make_skill_local::read_back`); none when no skill kept
 /// here and put on has that name.
+/// The name as written first ([`names_written`]), so a skill named
+/// `my-day` is found by `my-day` or "my day" even though [`name_asked`]
+/// drops the "my" (#7874).
 pub fn kept_on_named(directory: &Path, asked: &str) -> Option<Made> {
-    let asked = name_asked(asked);
-    index(directory)
+    let on: Vec<Value> = index(directory)
         .into_iter()
         .filter(|entry| entry["on"] == true)
-        .find(|entry| entry["name"].as_str() == Some(asked.as_str()))
+        .collect();
+    let named = |name: &str| {
+        on.iter()
+            .find(|entry| entry["name"].as_str() == Some(name))
+            .cloned()
+    };
+    names_written(asked)
+        .iter()
+        .find_map(|name| named(name))
+        .or_else(|| named(&name_asked(asked)))
         .and_then(|entry| made_of(directory, &entry))
+}
+
+/// A name as written ([`name_written`]), then without a "skill" after it
+/// ("My Day skill" is `my-day-skill`, then `my-day`): the exact names a
+/// kept skill is looked up by before [`name_asked`] drops a "my" (#7874).
+pub fn names_written(asked: &str) -> Vec<String> {
+    let written = name_written(asked);
+    let mut names = vec![written.clone()];
+    if let Some(cut) = written.strip_suffix("-skill")
+        && !cut.is_empty()
+    {
+        names.push(cut.to_owned());
+    }
+    names
 }
 
 /// The names of the kept skills on the lamp.
@@ -10416,6 +10914,18 @@ pub fn kept_on_names(directory: &Path) -> Vec<String> {
         .filter(|entry| entry["on"] == true)
         .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
         .collect()
+}
+
+/// A name as written, lower case, each run of anything but a letter or a
+/// digit one dash, nothing dropped ("my Day" is `my-day`): what
+/// [`name_asked`] gives before it drops a "my" or a "skill".
+pub fn name_written(asked: &str) -> String {
+    asked
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// A skill's name as the person or the model gives it, as a kept skill's
@@ -10518,11 +11028,25 @@ pub fn name_digits(name: &str) -> String {
 /// entry still names stays. `toml_sha256` is its `skill.toml`'s (with its
 /// code, [`made_words`]), so a make of the same words is known as the
 /// person's own ([`free_name`]).
+#[cfg(test)]
 fn remember(
     directory: &Path,
     from: &str,
     made: &Made,
     added: bool,
+    toml_sha256: &str,
+) -> io::Result<()> {
+    remember_with(directory, from, made, (added, None), toml_sha256)
+}
+
+/// `made` kept in the index as the comment above `remember` says, with
+/// who made it (`made_with`, [`MADE_WITH`]) in its entry when its card
+/// says so.
+fn remember_with(
+    directory: &Path,
+    from: &str,
+    made: &Made,
+    (added, made_with): (bool, Option<&str>),
     toml_sha256: &str,
 ) -> io::Result<()> {
     let mut entries = index(directory);
@@ -10554,6 +11078,9 @@ fn remember(
     });
     if added {
         entry["added"] = json!("file");
+    }
+    if let Some(made_with) = made_with {
+        entry[MADE_WITH] = json!(made_with);
     }
     entries.push(entry);
     while entries.len() > KEPT_MOST {
@@ -11257,6 +11784,27 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7874: a kept, on skill named `my-day` is found by its name as
+    /// written and by "my day", never looked up as `day`; `desk-check`
+    /// asked as "my desk check skill" is still found.
+    #[test]
+    fn kept_on_named_finds_a_name_starting_with_my() {
+        let (root, keeping) = crate::make_skill_local::tests::keeping("kept-my-day");
+        crate::made_remove::tests::made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (asked, name) in [
+            ("my-day", "my-day"),
+            ("my day", "my-day"),
+            ("My Day skill", "my-day"),
+            ("my desk check skill", "desk-check"),
+            ("desk-check", "desk-check"),
+        ] {
+            let found = kept_on_named(&keeping.directory, asked).map(|made| made.name);
+            assert_eq!(found.as_deref(), Some(name), "{asked}");
+        }
+        assert!(kept_on_named(&keeping.directory, "day").is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
     /// 18:10) is caught; a reminder the person asked to be told, or words
@@ -12478,7 +13026,9 @@ say = { text = "Welcome back!" }
         let written = CARD.replace("name:", "limits: asked\nname:");
         let unasked = card(&written, said, Maker::Voice).unwrap().1;
         assert!(!unasked.contains("limits:"), "{unasked}");
-        let asked = card_asked(&written, said, Maker::Voice, true).unwrap().1;
+        let asked = card_asked(&written, said, Maker::Voice, true, None)
+            .unwrap()
+            .1;
         assert_eq!(asked.matches("limits:").count(), 1);
         assert!(
             asked.contains(&format!("\nmade_by: voice\n{LIMITS_ASKED}\n---")),
@@ -18536,5 +19086,281 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert!(put_on_scripts(SHOW_TOML, &Uses::default(), put).is_err());
         set_asks_here(None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A whole made skill of `trigger` (a `[trigger]` table's lines, or
+    /// none) and `steps` (each a `[[do]]` step's lines), for the quick
+    /// reaction's tests (#6811).
+    fn reaction_of(top: &str, trigger: Option<&str>, steps: &[&str]) -> String {
+        let trigger = trigger.map_or(String::new(), |trigger| format!("[trigger]\n{trigger}\n"));
+        let steps: String = steps
+            .iter()
+            .map(|step| format!("[[do]]\n{step}\n"))
+            .collect();
+        format!(
+            "{top}kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nlight = true\n\
+             body = true\nspeak = true\n\n{trigger}[ask]\npolicy = \"nudge\"\n\n{steps}"
+        )
+    }
+
+    /// The scope asked after the first builder's ruling on #6811 (his yes
+    /// at 16:34): only a quick reaction stays DeepSeek's, by its start and
+    /// its step kinds alone. A phrase that turns the light on and a pat
+    /// that nods are; a say at 8 am, one on someone at the desk, a guard, a
+    /// task or a read beside a pat are not.
+    #[test]
+    fn a_quick_reaction_is_a_persons_act_with_only_light_body_or_words() {
+        let phrase = "asks = [\"lights please\"]\n";
+        let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"";
+        let touch =
+            "topic = \"controls/touch\"\nfield = \"enabled\"\nequals = true\nrearm = \"ends\"";
+        let eight = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                     during = { from = \"08:00\", to = \"08:01\" }";
+        let presence =
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\nfor = \"30m\"";
+        let light = "light = { colour = \"green\", level = 3 }";
+        let nod = "body = { gesture = \"nod\" }";
+        let say = "say = { text = \"Good morning!\" }";
+        // DeepSeek's: phrase to light, pat to nod, touch to a say and a
+        // hum, a run only when asked.
+        for made in [
+            reaction_of(phrase, None, &[light]),
+            reaction_of("", Some(pet), &[nod]),
+            reaction_of("", Some(touch), &[say, "cue = \"hum\""]),
+            reaction_of("", None, &[light, nod]),
+        ] {
+            assert!(quick_reaction(&made), "{made}");
+            assert_eq!(not_a_reaction(&answer(&made, CARD)), None, "{made}");
+        }
+        // The agent's: the clock, someone at the desk, any other sensor, a
+        // guard, a task, a read, nothing it does, or what can't be read.
+        let guarded = format!(
+            "{}\n[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+            reaction_of("", Some(pet), &[nod])
+        );
+        let task = reaction_of(
+            "",
+            Some(pet),
+            &["task = { task = \"tidy\", run = \"scripts/main.py\" }"],
+        );
+        let read = reaction_of(
+            phrase,
+            None,
+            &["read = { service = \"gmail\", what = \"recent\" }"],
+        );
+        for (made, why) in [
+            (reaction_of("", Some(eight), &[say]), "on clock/local"),
+            (reaction_of("", Some(presence), &[say]), "on room/presence"),
+            (
+                reaction_of(
+                    "",
+                    Some("topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200"),
+                    &[light],
+                ),
+                "on air/state",
+            ),
+            (guarded, "on controls/pet"),
+            (task, "on controls/pet"),
+            (read, "not a quick reaction"),
+            (reaction_of("", Some(pet), &[]), "on controls/pet"),
+        ] {
+            assert!(!quick_reaction(&made), "{made}");
+            assert_eq!(
+                not_a_reaction(&answer(&made, CARD)).as_deref(),
+                Some(why),
+                "{made}"
+            );
+        }
+        assert!(!quick_reaction("not toml ["));
+        // No skill in the answer, a one-off reminder's cannot among them:
+        // its own route, never the agent's make.
+        for answer in [
+            "cannot: I can't do that yet: a reminder. Ask me for a reminder instead, like \
+             'remind me every hour to stand up'.",
+            "no blocks here",
+        ] {
+            assert_eq!(not_a_reaction(answer), None, "{answer}");
+        }
+    }
+
+    /// lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" was kept as a
+    /// say of DeepSeek's own `internet:` line, read aloud as it stood. A
+    /// say that is the model's marker (`internet:` or `cannot:`) is never
+    /// a quick reaction, so the lamp's agent makes it, and never kept, on
+    /// any route and whatever the switches.
+    const ZORBO_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+                              permissions = { speak = true }\n\
+                              asks = [\"tell me the price of Zorbo coin\"]\n\
+                              [ask]\npolicy = \"nudge\"\n\
+                              [[do]]\nsay = { text = \"internet: current price of Zorbo coin\" }\n";
+
+    #[test]
+    fn a_say_of_the_models_marker_is_no_quick_reaction() {
+        assert!(!quick_reaction(ZORBO_TOML));
+        assert_eq!(
+            not_a_reaction(&answer(ZORBO_TOML, CARD)).as_deref(),
+            Some("not a quick reaction")
+        );
+        for marker in ["  Internet: the price", "CANNOT: look it up", "cannot:x"] {
+            let made = ZORBO_TOML.replace("internet: current price of Zorbo coin", marker);
+            assert!(!quick_reaction(&made), "{made}");
+        }
+        // Exact words of the person's own are still DeepSeek's.
+        let coffee = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "go get that coffee, champ",
+        );
+        assert!(quick_reaction(&coffee), "{coffee}");
+        assert_eq!(not_a_reaction(&answer(&coffee, CARD)), None);
+        // Only at its start: a word inside the line is words.
+        let inside = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "the internet: what a place",
+        );
+        assert!(quick_reaction(&inside), "{inside}");
+    }
+
+    /// The owner's "do it like V1" on #7764: the first call's judgement
+    /// read as the model's bool alone; anything else is unsure.
+    #[test]
+    fn a_reaction_judgement_is_read_as_its_bool_alone() {
+        for (answer, judged) in [
+            (
+                "{\"quick_reaction\": true, \"reason\": \"a pat\"}",
+                Some(true),
+            ),
+            (
+                "```json\n{\"quick_reaction\": false, \"reason\": \"a price\"}\n```",
+                Some(false),
+            ),
+            ("{\"quick_reaction\": \"yes\"}", None),
+            ("{\"reason\": \"a pat\"}", None),
+            ("true", None),
+            ("", None),
+            ("{not json}", None),
+        ] {
+            assert_eq!(reaction_judged(answer), judged, "{answer}");
+        }
+        assert_eq!(
+            reaction_brief("  when I pat you, glow "),
+            "Request: when I pat you, glow"
+        );
+    }
+
+    #[test]
+    fn a_say_of_the_models_marker_is_never_kept() {
+        set_asks_here(Some(true));
+        for reads in [false, true] {
+            let refused = capped_with(ZORBO_TOML, reads).unwrap_err();
+            assert_eq!(refused.0, SAY_IS_MARKER, "{reads}");
+            let lines = refused.1.expect("repair lines");
+            assert!(lines.contains(SAY_IS_MARKER), "{lines}");
+        }
+        assert_eq!(put_on_cap(ZORBO_TOML).unwrap_err().0, SAY_IS_MARKER);
+        let cannot = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            " Cannot: check prices",
+        );
+        assert_eq!(capped(&cannot).unwrap_err().0, SAY_IS_MARKER);
+        // Whatever the route's switch.
+        for on in [Some(false), Some(true)] {
+            set_reactions_here(on);
+            assert_eq!(capped(ZORBO_TOML).unwrap_err().0, SAY_IS_MARKER);
+        }
+        set_reactions_here(None);
+        let coffee = ZORBO_TOML.replace(
+            "internet: current price of Zorbo coin",
+            "go get that coffee, champ",
+        );
+        assert!(capped(&coffee).is_ok(), "{coffee}");
+        set_asks_here(None);
+    }
+
+    /// sip-of-water's guards in the agent's template (#6811, points 2 and
+    /// 3), with the switch on: the voice's cap and the say-back take them,
+    /// voice/state and room/activity in `[[while]]` said plainly and
+    /// counted toward nothing; and a guard read another way, or a
+    /// `[[while]]` on any other topic, is still a part it can't say. Off,
+    /// as before, a `[[while]]` is never said.
+    #[test]
+    fn the_templates_guards_are_said_plainly_and_any_other_while_is_not() {
+        let template = behaviour_template_toml().to_owned();
+        set_reactions_here(Some(false));
+        assert!(capped_with(&template, false).is_ok());
+        assert!(plainly_with(&template, false).is_err(), "off: as before");
+        set_reactions_here(Some(true));
+        let said = plainly_with(&template, false).unwrap();
+        assert!(
+            said.contains("never in the middle of a conversation or with your head down"),
+            "{said}"
+        );
+        // Two topics more beside the guards: still said, no topic counted.
+        let wider = template.replace(
+            "topics = [\"room/presence\", \"voice/state\", \"room/activity\"]",
+            "topics = [\"room/presence\", \"voice/state\", \"room/activity\", \"air/state\", \
+             \"clock/local\"]",
+        );
+        assert!(capped_with(&wider, false).is_ok());
+        assert!(plainly_with(&wider, false).is_ok());
+        // A while on another topic counts as a part of its own: unsaid.
+        let other = format!(
+            "{template}\n[[while]]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n"
+        );
+        let refused = plainly_with(&other, false).unwrap_err();
+        assert_eq!(refused.0, UNSAID, "{refused:?}");
+        // A guard topic read another way is no guard.
+        let sitting = template.replace(
+            "not_equals = \"head_down\"\nunknown = \"holds\"",
+            "field = \"sitting_s\"\nabove = 1799",
+        );
+        assert!(plainly_with(&sitting, false).is_err(), "{sitting}");
+        // The guards are granted by the lamp when the model leaves them out.
+        let ungranted = template.replace(
+            "topics = [\"room/presence\", \"voice/state\", \"room/activity\"]",
+            "topics = [\"room/presence\"]",
+        );
+        let granted = topic_granted(&ungranted);
+        assert!(
+            granted.contains("topics = [\"room/presence\", \"voice/state\", \"room/activity\"]"),
+            "{granted}"
+        );
+        set_reactions_here(Some(false));
+        assert_eq!(topic_granted(&ungranted), ungranted, "off: as before");
+        set_reactions_here(None);
+    }
+
+    /// #6811: who made a skill is the lamp's line alone. With the switch
+    /// on, `made_with` is written for each engine after `made_by`, and one
+    /// the model wrote is dropped; off, none is written and the model's is
+    /// dropped all the same, as its `made_by` is.
+    #[test]
+    fn made_with_is_the_lamps_line_for_each_engine_and_the_models_is_dropped() {
+        let written = CARD.replace("name:", "made_with: openclaw\nmade_by: app\nname:");
+        for (with, key) in [
+            (MadeWith::DeepSeek, "deepseek"),
+            (MadeWith::Hermes, "hermes"),
+            (MadeWith::OpenClaw, "openclaw"),
+        ] {
+            assert_eq!(with.key(), key);
+            let marked = card_asked(&written, "said", Maker::Voice, false, Some(with))
+                .unwrap()
+                .1;
+            assert_eq!(marked.matches("made_with:").count(), 1, "{marked}");
+            assert!(
+                marked.contains(&format!(
+                    "\nmade: here\nmade_by: voice\nmade_with: {key}\n---"
+                )),
+                "{marked}"
+            );
+            assert_eq!(card_mark(&marked, MADE_WITH).as_deref(), Some(key));
+        }
+        assert_eq!(MadeWith::of_engine("Hermes"), MadeWith::Hermes);
+        assert_eq!(MadeWith::of_engine("OpenClaw"), MadeWith::OpenClaw);
+        assert_eq!(MadeWith::of_engine("other"), MadeWith::DeepSeek);
+        let unmarked = card_asked(&written, "said", Maker::Voice, false, None)
+            .unwrap()
+            .1;
+        assert!(!unmarked.contains("made_with"), "{unmarked}");
+        assert_eq!(card_mark(&unmarked, MADE_WITH), None);
     }
 }

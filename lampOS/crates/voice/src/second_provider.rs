@@ -93,6 +93,34 @@ pub use services::{
     SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
 };
 
+/// What a refused keep's line said at once needs (#7877), each kept apart
+/// so the journal can name the one that failed.
+#[derive(Clone, Copy, Debug)]
+struct RefusedGate {
+    heard: bool,
+    first_calls: bool,
+    held_forget_ran: bool,
+    worded: bool,
+    only_keeps: bool,
+}
+
+impl RefusedGate {
+    /// The first condition that keeps the line from being said, or none;
+    /// `refused_all`: every call came back refused with nobody known.
+    fn failed(self, refused_all: bool) -> Option<&'static str> {
+        [
+            (!self.heard, "not a spoken line"),
+            (!self.first_calls, "not round 1's first calls"),
+            (self.held_forget_ran, "a held forget ran"),
+            (self.worded, "the model's words came beside the call"),
+            (!self.only_keeps, "the line asks more than a keep"),
+            (!refused_all, "not every call was so refused"),
+        ]
+        .into_iter()
+        .find_map(|(fails, why)| fails.then_some(why))
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -229,6 +257,48 @@ pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
 /// held each line's words back 1 to 2.5 s while Deepgram worked through it
 /// (the first builder on lamp-4ace on 19 Oct at 18:56).
 pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
+/// With `LAMP_CARRY_UNANSWERED_SOUND=on`: the most of a line's sound kept for
+/// the next, 6 s at 16 kHz (#7939). A line is carried only when its words
+/// did not come back (the `carries` rule in [`Engine`]'s start), so a line
+/// that was heard keeps and carries nothing more than before. On lamp-9adf,
+/// "Lamp, make a skill called tech news: tell me one short tech headline"
+/// was cut in three pieces none of which came back with words; each went on
+/// with only the last 1.5 s, and "Lamp, make a skill" was lost, so no make
+/// was asked.
+pub const KEPT_SAMPLES_LONG: usize = 16_000 * 6;
+/// Where the second route reads it: `on` exactly; off unless set.
+pub const CARRY_LONG_ENVIRONMENT: &str = "LAMP_CARRY_UNANSWERED_SOUND";
+
+/// The most of a line's sound kept for the next: [`KEPT_SAMPLES`], or with
+/// [`CARRY_LONG_ENVIRONMENT`] [`KEPT_SAMPLES_LONG`]. Read once.
+fn kept_most() -> usize {
+    #[cfg(test)]
+    if let Some(long) = tests::LONG_FOR_TEST.with(std::cell::Cell::get) {
+        return most_kept(long);
+    }
+    static LONG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    most_kept(
+        *LONG
+            .get_or_init(|| std::env::var(CARRY_LONG_ENVIRONMENT).is_ok_and(|value| value == "on")),
+    )
+}
+
+/// [`kept_most`] for `long` (the switch).
+fn most_kept(long: bool) -> usize {
+    if long {
+        KEPT_SAMPLES_LONG
+    } else {
+        KEPT_SAMPLES
+    }
+}
+
+/// `new` after `kept`, the oldest dropped past `most`.
+fn keep_sound(kept: &mut VecDeque<i16>, new: &[i16], most: usize) {
+    kept.extend(new.iter().copied());
+    let over = kept.len().saturating_sub(most);
+    kept.drain(..over);
+}
+
 /// A line beginning this soon after the last one ended, that one not
 /// answered, goes on from it: its sound goes first ([`KeptSound`]).
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
@@ -1898,6 +1968,8 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// [`Engine::checking_keep_claims_whole`] (#7878).
+    keep_whole: bool,
     /// [`Engine::reading_made_names`] (#7683).
     made_names: Option<MadeNames>,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
@@ -4887,8 +4959,8 @@ fn name_first(text: &str) -> bool {
 /// Whether a line begins with the lamp's name, set off as a call at its
 /// start ([`crate::attention::begins_with_the_name`]: "Lamp, …", "Hey Lamp
 /// …"), however many words follow: such a line is never held as a short
-/// sound (`LAMP_ENDPOINT_PAUSE_JOIN`, #4449: "Lamp, can you tell me", four
-/// words past the name, was). Never the name later in a line ("Turn the
+/// sound (#4449: "Lamp, can you tell me", four words past the name, was;
+/// since #7834 with any switch). Never the name later in a line ("Turn the
 /// lamp off", a television's "…the lamp is…"), nor "Lamp is broken", where
 /// it is not set off. Its own check: [`name_first`] and [`NAME_FIRST_MORE`],
 /// the name's carry (`LAMP_SECOND_NAME_CARRIES`), stay as they are, and the
@@ -5060,6 +5132,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                keep_whole: false,
                 made_names: None,
                 one_path_wait: None,
                 no_words_again: false,
@@ -6051,9 +6124,9 @@ impl Engine {
     /// [`crate::pause_join::GRACE`] after its speech ended, its chat and
     /// speech going on meanwhile, so a line set off in the grace cuts it
     /// short with none of it heard and is joined to it (with
-    /// [`Self::joining_cut_words`]); and a line begun with the lamp's name
-    /// (set off first, [`name_at_start`]) is never held as a short sound,
-    /// however many words follow it. Before any turn only.
+    /// [`Self::joining_cut_words`]). A line begun with the lamp's name (set
+    /// off first, [`name_at_start`]) is never held as a short sound, with
+    /// the switch or without it (#7834). Before any turn only.
     pub fn joining_pauses(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.pause_join = on;
@@ -6429,6 +6502,22 @@ impl Engine {
     pub fn checking_doing_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.doing_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_KEEP_CLAIM_WHOLE=on` ([`crate::remember::WHOLE_ENVIRONMENT`],
+    /// #7878): on a turn whose spoken line is a statement about the person
+    /// (`remember::about_someone`, never a question), while no `remember`
+    /// of the turn has run, a reply is held to its round's end and judged
+    /// whole for a keep, replace or update said done
+    /// (`remember::claims_a_change`), not only by its opening. With such a
+    /// claim and no `remember`, it is asked again once, then said not kept,
+    /// as an opening's claim is. Every other turn streams as before. Before
+    /// any turn only.
+    pub fn checking_keep_claims_whole(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_whole = on;
         }
         self
     }
@@ -8006,9 +8095,7 @@ impl Engine {
                     if kept.said_from == 0 {
                         kept.said_from = read_completed_at_us;
                     }
-                    kept.samples.extend(samples.iter().copied());
-                    let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
-                    kept.samples.drain(..over);
+                    keep_sound(&mut kept.samples, &samples, kept_most());
                 }
                 match audio.try_send(LinePart::Sound(samples, true, read_completed_at_us)) {
                     Ok(()) => {}
@@ -8260,6 +8347,17 @@ impl Engine {
                     );
                     // Its exchange never reaches the memory's journal either.
                     crate::remember::keep_out(request);
+                    None
+                } else if crate::onboarding::learn_later::is_ask(&text) {
+                    // The walk's "What should I call you?" (#7876): its own
+                    // line, said with no chat; no one's memory is read for
+                    // it, and its exchange is kept out of memory.
+                    eprintln!(
+                        "lamp-voice second: request {request} is the walk's ask for a name: nothing read from memory, nothing kept (LAMP_FACE_LEARN_LATER)"
+                    );
+                    crate::remember::keep_out(request);
+                    // The next line is its answer, judged by the model.
+                    crate::onboarding::learn_later::asked_now();
                     None
                 } else {
                     self.memory_scope(request, session, false)
@@ -10596,14 +10694,15 @@ async fn spoken(
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
     // shows it was said to the lamp, so it is never held as a short sound.
-    // Nor, with `LAMP_ENDPOINT_PAUSE_JOIN`, a line begun with the name set
-    // off at its start, however many words follow it (#4449: "Lamp, can
-    // you tell me" was held so).
+    // Nor a line begun with the name set off at its start, however many
+    // words follow it, with or without `LAMP_ENDPOINT_PAUSE_JOIN` (#4449:
+    // "Lamp, can you tell me" was held so; #7834: on lamp-9adf, where the
+    // switch is off, "Lamp, put it back." was, 2 times in 5).
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text)
         && !name_waits
         && name_of.is_none()
-        && !(shared.pause_join && name_at_start(&text));
+        && !name_at_start(&text);
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
@@ -16585,6 +16684,8 @@ fn claim_released(
     found: &[Vec<String>],
     asked: Option<&str>,
     faces: bool,
+    whole: bool,
+    held_whole: &mut bool,
 ) -> Option<String> {
     let held = claim_held.as_mut()?;
     if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
@@ -16597,6 +16698,20 @@ fn claim_released(
         };
     }
     match crate::remember::claims_a_keep_said(held, false, faces, yes) {
+        // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878): an opening
+        // that claims no keep lets go only its complete sentences that claim
+        // none, and the hold goes on, so a keep or replace said in a later
+        // sentence is held to the round's end and judged there.
+        Some(false) if whole => {
+            let end = crate::remember::unclaimed_sentences(held);
+            if end < held.len() {
+                *held_whole = true;
+            }
+            (end > 0).then(|| {
+                let rest = held.split_off(end);
+                std::mem::replace(held, rest)
+            })
+        }
         Some(false) => claim_held.take(),
         _ => None,
     }
@@ -17095,6 +17210,22 @@ async fn answer(
         _ => Vec::new(),
     };
     let made_asked = crate::action_claim::asked_as_a_question(&said);
+    // A turn whose reply is judged sentence by sentence for a keep claimed
+    // in any of them (`LAMP_KEEP_CLAIM_WHOLE`, #7878): structure only, never
+    // words of the person's line (the first builder's 13:44 ruling on
+    // #7924); held while no `remember` of the turn has run.
+    let keep_whole_turn = shared.keep_whole && !quoted;
+    // With it, whether nobody known speaks (no person in the turn's admitted
+    // scope): then a keep claimed with none made is answered with the
+    // refusal's own true line, never "Tell me again and I'll remember it"
+    // (#7885's `REFUSED_LINE`, V2's must-fix (4) on #7924).
+    let keep_nobody_known = keep_whole_turn
+        && crate::remember::needs_face::on()
+        && scope
+            .as_ref()
+            .and_then(|lease| lease.scope())
+            .and_then(|scope| scope.person())
+            .is_none();
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -17139,6 +17270,14 @@ async fn answer(
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
+        // A made skill's line (#7937): its words as written, no chat asked.
+        // Asked of the model beside the conversation, "Here is your daily
+        // brief." was answered as the chat's next line (lamp-9adf, 19 Nov).
+        .or_else(|| {
+            quoted
+                .then(|| crate::say::made_words(&said).map(str::to_owned))
+                .flatten()
+        })
         // A person who talks to the lamp while the first update after setup
         // holds the walk (#6284) hears that it is updating, and no chat.
         .or_else(|| {
@@ -17230,8 +17369,13 @@ async fn answer(
             return Err(Stop::Gone);
         }
         if let Some(words) = own {
+            let whose = if quoted {
+                "a made skill's line"
+            } else {
+                "the onboarding walk's own line"
+            };
             eprintln!(
-                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+                "lamp-voice second: request {request} is {whose}; its words are said, no chat asked"
             );
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;
@@ -17258,6 +17402,11 @@ async fn answer(
         // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
+        // The line after the walk's "What should I call you?" (#7876): the
+        // model judges whether it is a name or a decline.
+        if heard && crate::onboarding::learn_later::answering() {
+            notes.push(crate::onboarding::learn_later::ANSWER_NOTE.to_owned());
+        }
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
         {
             notes.push(line);
@@ -17926,6 +18075,14 @@ async fn answer(
         // #3504), and whether a `remember` of this request ran.
         let mut offer_hold = crate::remember::OfferHold::default();
         let mut remember_ran = carried.remembered;
+        // Whether a `remember` of this turn came back refused with nobody
+        // known (`needs_face::refused`): a later claim is then answered with
+        // the refusal's own line at once (Friday's P2-2 on #7924).
+        let mut keep_refused = false;
+        // Whether a `remember` of this turn was held for their yes
+        // (`held_keep_told`): its own ask stands, so no refusal is said
+        // over it (Friday's P2 on #7924).
+        let mut keep_held = false;
         // Whether a don't-know was recalled once already in this turn
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
@@ -18112,6 +18269,10 @@ async fn answer(
             // this request was kept already, nor on a turn offered no
             // function (a quoted add-on's or a reminder's).
             let mut claim_held = (!kept_now && !quoted && !reminder).then(String::new);
+            // Whether a sentence of this round's reply claiming a keep or
+            // replace was held (`LAMP_KEEP_CLAIM_WHOLE`, #7878), said in the
+            // journal.
+            let mut held_whole = false;
             // A reply's opening, held until it is known whether it narrates
             // a call as words ("Calling not_for_me.", lamp-06c1, 30 Oct);
             // one that does is never said, nor kept as the lamp's words for
@@ -18670,6 +18831,8 @@ async fn answer(
                                     &recall_found,
                                     yes_answers.as_deref(),
                                     shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
                                 ) {
                                     Some(said) => said,
                                     // Undecided, or a claim: held.
@@ -19195,6 +19358,8 @@ async fn answer(
                                 &recall_found,
                                 yes_answers.as_deref(),
                                 shared.face_claims,
+                                keep_whole_turn && !remember_ran,
+                                &mut held_whole,
                             )
                             .unwrap_or_default()
                         }
@@ -19253,6 +19418,8 @@ async fn answer(
                                     &recall_found,
                                     yes_answers.as_deref(),
                                     shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
                                 )
                                 .unwrap_or_default()
                             }
@@ -19279,6 +19446,11 @@ async fn answer(
             // lead's P2 on #3628). Alone, the model is told once and asked
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
+            if held_whole {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a sentence of its reply says a keep or replace, held to the round's end (LAMP_KEEP_CLAIM_WHOLE)"
+                );
+            }
             if let Some(mut held) = claim_held.take().filter(|held| !held.is_empty()) {
                 // Sentences whose said-back keeps name a found thing are
                 // said; what follows them is judged here on its own, never
@@ -19338,7 +19510,33 @@ async fn answer(
                             yes_answers.as_deref(),
                             true,
                         ),
-                );
+                )
+                .or_else(|| {
+                    // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878):
+                    // a sentence held for a keep or replace said done, as a
+                    // hard claim ("Got it — your car is on Level B1, spot 7
+                    // now. That replaces wherever it was before."). A keep
+                    // in memory's own words ("I'll remember you're
+                    // vegetarian.") counts beside any call; a replace or
+                    // update only with no call at all, since beside a
+                    // light's or a reminder's it is that call's ("Done, I've
+                    // updated your light."; the Reviewer-lead's P2 and V2's
+                    // must-fix (3) on #7924).
+                    (keep_whole_turn
+                        && held_whole
+                        && !remember_ran
+                        && match crate::remember::change_claim(&held) {
+                            Some(crate::remember::Change::Keep) => true,
+                            Some(crate::remember::Change::Replace) => calls.is_empty(),
+                            None => false,
+                        })
+                    .then(|| {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a held sentence of its reply says something was kept or replaced, with no remember (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        crate::remember::KeepClaim::Hard
+                    })
+                });
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
                 // with no call) is kept by `remember_my_face`: one in this
@@ -19384,6 +19582,29 @@ async fn answer(
                     {
                         queue.push(rest).await?;
                     }
+                    // A `remember` of this turn refused as nobody known: the
+                    // refusal's own line is said now, with no round asked to
+                    // call a `remember` that would be refused again
+                    // (`LAMP_KEEP_CLAIM_WHOLE`, V2's must-fix (4) and
+                    // Friday's P2-2 on #7924). Only on a real refusal: with
+                    // nobody known a room fact is still kept, so that case
+                    // keeps its one retry (Friday's P2 at 3410d5b787).
+                    if !face && keep_whole_turn && keep_refused && !keep_held {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, nobody known: the refusal's line said (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        for sentence in offered(&mut offer_hold, false, request, round) {
+                            queue.push(sentence).await?;
+                        }
+                        queue
+                            .push(
+                                shared
+                                    .fixed(crate::remember::needs_face::REFUSED_LINE)
+                                    .to_owned(),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
                     if !calls.is_empty() {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, its other calls run"
@@ -19407,7 +19628,19 @@ async fn answer(
                         for sentence in offered(&mut offer_hold, false, request, round) {
                             queue.push(sentence).await?;
                         }
-                        queue.push(not_kept.to_owned()).await?;
+                        // The second miss with nobody known: the refusal's
+                        // own line, never "Tell me again and I'll remember
+                        // it." (the first builder's 12:54 ruling).
+                        let line = if !face
+                            && keep_whole_turn
+                            && !keep_held
+                            && (keep_refused || keep_nobody_known)
+                        {
+                            shared.fixed(crate::remember::needs_face::REFUSED_LINE)
+                        } else {
+                            not_kept
+                        };
+                        queue.push(line.to_owned()).await?;
                         return Ok(());
                     }
                 } else {
@@ -20040,6 +20273,24 @@ async fn answer(
                 && !crate::not_speech::names_a_function(&text);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
+            // A line that only asks to keep, round 1's first calls all
+            // `remember`, no words beside them: one whose every keep was
+            // refused with nobody known speaking is said plainly by the lamp
+            // (#7877), with or without `LAMP_KEEP_ANSWERS_AT_ONCE`. Each
+            // condition kept apart, for the journal when one fails.
+            let only_remember = !calls.is_empty()
+                && calls
+                    .iter()
+                    .all(|call| call.name == crate::remember::REMEMBER);
+            let refused_gate = RefusedGate {
+                heard,
+                first_calls,
+                held_forget_ran,
+                worded: text.chars().any(char::is_alphanumeric),
+                only_keeps: crate::keep_at_once::only_keeps_refused(&heard_words),
+            };
+            // What each `remember` was told, when every call is one.
+            let mut refused_told: Vec<Value> = Vec::new();
             // A plain keep answered at once (`LAMP_KEEP_ANSWERS_AT_ONCE`,
             // C59): a spoken line that only asks to keep, round 1's first
             // calls all `remember`, no words beside them. What each was told.
@@ -20781,6 +21032,10 @@ async fn answer(
                         scope.as_ref(),
                     );
                 }
+                if call.name == crate::remember::REMEMBER {
+                    keep_refused |= crate::remember::needs_face::refused(&answer.told);
+                    keep_held |= answer.told.get("held").is_some();
+                }
                 // A `use_skill` that ran an unplug tool is kept under that
                 // tool's name, for the unplug claim's outcome (#6457).
                 call_statuses.push(after_forget::status(
@@ -20872,6 +21127,9 @@ async fn answer(
                 }
                 if may_keep_at_once {
                     kept_told.push(answer.told.clone());
+                }
+                if only_remember {
+                    refused_told.push(answer.told.clone());
                 }
                 // Any call of this request that ran and was not refused (a
                 // remember, a reminder set, a skill's add): its confirmation
@@ -21057,6 +21315,35 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
                 );
+            }
+            // Every keep of a line that only asks to keep refused for want
+            // of a known face (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`, #7877):
+            // the lamp says so itself, one true line that asks nothing, and
+            // the turn ends with no second round, so no "Got it" is said
+            // for what was not kept.
+            let refused_all = only_remember
+                && refused_told.len() == calls.len()
+                && refused_told
+                    .iter()
+                    .all(crate::remember::needs_face::refused);
+            if only_remember
+                && refused_told
+                    .iter()
+                    .any(crate::remember::needs_face::refused)
+                && let Some(why) = refused_gate.failed(refused_all)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a keep refused with nobody known goes to round 2: {why} (LAMP_MEMORY_PERSONAL_NEEDS_FACE)"
+                );
+            }
+            if refused_all && refused_gate.failed(true).is_none() {
+                let line = shared.fixed(crate::remember::needs_face::REFUSED_LINE);
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) refused, nobody known; the refusal said at once, and no round 2 is asked (LAMP_MEMORY_PERSONAL_NEEDS_FACE)",
+                    calls.len()
+                );
+                queue.push(line.to_owned()).await?;
+                return Ok(());
             }
             // A skill asked for a look (#941): as a look by its own call, the
             // coordinator takes the turn's full look once the lamp's words

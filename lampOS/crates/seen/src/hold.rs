@@ -19,7 +19,8 @@
 //!   model's own confidence threshold ([`CONFIDENCE`]) and at least
 //!   [`CLOSE_SHARE`] of the frame's width apart. One answer without a close
 //!   person is forgiven; the second in a row ends it ([`FAR_IN_ROW`]).
-//!   Posture keeps its one frame every 30 s and activity its bursts, each
+//!   Posture keeps its one frame every 30 s, even on a hot board
+//!   ([`crate::heat::Pace::holding`]), and activity its bursts, each
 //!   behind the ring's mark as ever; the opt-in, the said-back line, the
 //!   privacy and sleep must still hold (a lease or a state not known closes
 //!   that step, and the hold stays).
@@ -48,7 +49,7 @@
 //!   is.
 //! - **The first answer** (lamp-06c1, run 4: the face lost seconds after
 //!   every beginning, the first answer ~30 s away): a hold begins with the
-//!   newest pose answer when its frame went under [`crate::pose::EVERY_US`]
+//!   newest pose answer when its frame went under posture's spacing
 //!   ago ([`crate::pose::Pose::recent_answer`]); else posture's next frame
 //!   is already due (one each 30 s, as ever) and goes at the ring's next
 //!   mark. Until a close person's answer comes, a lost face keeps the hold
@@ -192,7 +193,7 @@ pub struct Now<'a> {
     pub stood_up: bool,
     pub forgot: bool,
     /// The newest pose answer's [`share`], when its frame went under
-    /// [`crate::pose::EVERY_US`] ago ([`crate::pose::Pose::recent_answer`]):
+    /// posture's spacing ago (30 s, or 60 s on a hot board before a hold) ([`crate::pose::Pose::recent_answer`]):
     /// a hold beginning this step begins with it.
     pub recent_answer: Option<Option<f32>>,
     /// Posture's frames go (`LAMP_SEEN_POSTURE`): without it no answer
@@ -352,8 +353,8 @@ impl Hold {
                         far_while_away: false,
                     });
                     self.notes.push(Note::Began);
-                    // The newest answer, when its frame went under 30 s
-                    // ago: no wait for the next one.
+                    // The newest answer, when its frame went under
+                    // posture's spacing ago: no wait for the next one.
                     if let Some(share) = now.recent_answer {
                         self.answer(share);
                     }

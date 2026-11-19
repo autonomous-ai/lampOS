@@ -494,6 +494,163 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
+/// Where the second worker reads the switch for a keep claimed in any
+/// sentence of a reply (#7878). `on` only, off unless set: while no
+/// `remember` of the turn has run, a reply is said sentence by sentence,
+/// each held only until it is complete and judged ([`unclaimed_sentences`],
+/// [`claims_a_change`]), not only by its opening; a sentence that claims a
+/// keep or replace is held, with the rest, to the round's end. On
+/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on
+/// Level B1, spot 7 now." got no call and "Got it — your car is on Level
+/// B1, spot 7 now. That replaces wherever it was before.": its opening
+/// claims nothing, so all of it was said, and nothing was kept. No word of
+/// the person's line is read (the first builder's 13:44 ruling on #7924).
+pub const WHOLE_ENVIRONMENT: &str = "LAMP_KEEP_CLAIM_WHOLE";
+
+/// Whether [`WHOLE_ENVIRONMENT`] is on in this process's environment.
+pub fn whole_on() -> bool {
+    std::env::var(WHOLE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a sentence may open with that says something was kept, replaced or
+/// updated, past a lead-in ("Okay,", "Got it —"): the replace and update
+/// claims [`keep_claim`] doesn't read ("That replaces wherever it was
+/// before.", "I've updated that.", "Updated.").
+const CHANGE_CLAIMS: [&str; 12] = [
+    "that replaces",
+    "this replaces",
+    "that'll replace",
+    "that will replace",
+    "that's replaced",
+    "that has replaced",
+    "i've updated that",
+    "i've updated it",
+    "i have updated that",
+    "i've replaced it",
+    "i've replaced that",
+    "i've changed it",
+];
+
+/// How far `held`, a reply's text so far, may be said now (#7878, the
+/// first builder's 13:44 ruling): the byte length of its leading complete
+/// sentences that claim no keep or replace ([`claims_a_change`]). It stops
+/// at the first sentence that does (held, with all after it, to the
+/// round's end) and at a sentence not finished yet (held until it is). The
+/// bound is one sentence: nothing waits longer than its own sentence.
+pub fn unclaimed_sentences(held: &str) -> usize {
+    let mut said = 0;
+    for sentence in held.split_inclusive(['.', '!', '?']) {
+        if !sentence.trim_end().ends_with(['.', '!', '?']) || claims_a_change(sentence) {
+            break;
+        }
+        said += sentence.len();
+    }
+    said
+}
+
+/// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
+const CHANGE_LEADS: [&str; 9] = [
+    "okay",
+    "ok",
+    "got it",
+    "sure",
+    "alright",
+    "all right",
+    "done",
+    "so",
+    "and",
+];
+
+/// Whether any sentence of the whole `reply` claims a keep: one of today's
+/// keep claims ([`keep_claim`], hard or soft) or a replace or update said
+/// done ([`CHANGE_CLAIMS`]), at the sentence's start or after a lead-in
+/// ([`CHANGE_LEADS`]), never in a sentence asked as a question (#7878).
+/// Structure only, as [`keep_claim`] reads a reply.
+pub fn claims_a_change(reply: &str) -> bool {
+    change_claim(reply).is_some()
+}
+
+/// The keeps said in the person's own words after "I'll remember", which
+/// [`keep_claim`] leaves to an object word ("that", "it"): "I'll remember
+/// you're vegetarian.", "I'll remember your car is on B1." (V2's must-fix
+/// (3) on #7924). Never "I'll remember to …", a promise to remind, nor in a
+/// sentence that names a face or waits on a condition ([`change_claim`]).
+const KEEP_SAID: [&str; 4] = [
+    "i'll remember you",
+    "i will remember you",
+    "i'll remember your",
+    "i will remember your",
+];
+
+/// What a sentence of a reply says was done to the person's things
+/// ([`change_claim`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Change {
+    /// A keep said in memory's own words (a hard [`keep_claim`], or
+    /// [`KEEP_SAID`]): only a `remember` makes it true, whatever else ran.
+    Keep,
+    /// A replace or update said done ([`CHANGE_CLAIMS`]) or a soft keep:
+    /// another call that ran may be what it means ("I've updated that"
+    /// beside a reminder moved), so it counts only with no call at all.
+    Replace,
+}
+
+/// The strongest change any sentence of `reply` says done, never in a
+/// sentence asked as a question: a [`Change::Keep`] over a
+/// [`Change::Replace`] (#7878, #7924).
+pub fn change_claim(reply: &str) -> Option<Change> {
+    let text = reply
+        .replace('\u{2019}', "'")
+        .replace(['\u{2014}', '\u{2013}'], ",");
+    let mut found = None;
+    for sentence in text
+        .split_inclusive(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|sentence| !sentence.is_empty() && !sentence.ends_with('?'))
+    {
+        match keep_claim(sentence) {
+            Some(KeepClaim::Hard | KeepClaim::Face) => return Some(Change::Keep),
+            Some(KeepClaim::Soft) => found = Some(Change::Replace),
+            None => {}
+        }
+        let mut rest = sentence.to_lowercase();
+        for _ in 0..2 {
+            let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
+                rest.strip_prefix(**lead).is_some_and(|after| {
+                    after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
+                })
+            }) else {
+                break;
+            };
+            rest = rest[lead.len()..]
+                .trim_start_matches(|c: char| !c.is_alphanumeric())
+                .to_owned();
+        }
+        let opens = |claim: &&str| {
+            rest.strip_prefix(*claim).is_some_and(|after| {
+                after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
+            })
+        };
+        // Never a face's sentence (the face reading decides those) nor a
+        // promise with a condition ("I'll remember your face once you tell
+        // me your name."): Friday's P2 on #7924.
+        let words: Vec<&str> = rest
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let offer = words
+            .iter()
+            .any(|word| matches!(*word, "face" | "once" | "when" | "if" | "after" | "soon"));
+        if !offer && KEEP_SAID.iter().any(opens) {
+            return Some(Change::Keep);
+        }
+        if CHANGE_CLAIMS.iter().any(opens) {
+            found = Some(Change::Replace);
+        }
+    }
+    found
+}
+
 /// What the model is told of a reply that said it saved, or was saving,
 /// their face with no `remember_my_face` call ([`KeepClaim::Face`], #5141
 /// row 8). Its words were not said.
@@ -2083,9 +2240,10 @@ pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
             let state = match value.as_str() {
                 Some("cleared") => "cleared",
                 Some("kept") => "kept",
+                Some(CONSENT_KEPT_AS_NO) => CONSENT_KEPT_AS_NO,
                 _ => "uncertain",
             };
-            partial |= state != "cleared";
+            partial |= state != "cleared" && state != CONSENT_KEPT_AS_NO;
             face[field] = json!(state);
         }
     }
@@ -2569,11 +2727,28 @@ fn forget_said_result(answer: Option<&Value>) -> &'static str {
     }
 }
 
+/// A household consent's cleanup state when `forget_everything` leaves a
+/// person's kept no in place (`LAMP_NOTICING_BY_DEFAULT` on, #7767; Twelve's
+/// P3 4 on #7928): the model may say the no was kept, and it is no failed
+/// step, so `everything` stays as it is.
+pub(crate) const CONSENT_KEPT_AS_NO: &str = "kept as a no";
+
+/// What a forget that left `key`'s file at `path` in place tells: a kept
+/// no is [`CONSENT_KEPT_AS_NO`]; a file that can't be read holds no yes to
+/// take back (off either way), so it is `cleared`, as before.
+fn consent_kept_state(path: &std::path::Path, key: &str) -> &'static str {
+    if lamp_msgs::consent::kept_no(path, key) {
+        CONSENT_KEPT_AS_NO
+    } else {
+        "cleared"
+    }
+}
+
 /// Fixed step names and states only: no path, person id, error text or memory.
 /// A later successful step must never upgrade an earlier partial result.
 fn note_forget_cleanup(told: &mut Value, field: &str, state: &str) {
     told[field] = json!(state);
-    if state != "cleared" {
+    if state != "cleared" && state != CONSENT_KEPT_AS_NO {
         told["everything"] = json!(false);
     }
 }
@@ -11049,15 +11224,27 @@ impl DaysClient {
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
-            // #2110), whoever asked.
+            // #2110), whoever asked. With `LAMP_NOTICING_BY_DEFAULT` on
+            // (#7767) only a kept yes goes: a kept no stays, so the forget
+            // never turns either on ([`crate::seen_yes::forget_takes`]).
             if call.name == FORGET_EVERYTHING {
-                for (field, consent) in [
-                    ("sound_consent_result", self.room_sounds.clone()),
+                let by_default = lamp_msgs::consent::noticing_by_default();
+                for (field, key, consent) in [
+                    (
+                        "sound_consent_result",
+                        lamp_msgs::consent::ROOM_SOUNDS,
+                        self.room_sounds.clone(),
+                    ),
                     (
                         "face_expression_consent_result",
+                        lamp_msgs::consent::FACE_EXPRESSIONS,
                         crate::onboarding::face_expressions_beside(&self.room_sounds),
                     ),
                 ] {
+                    if !crate::seen_yes::forget_takes(&consent, key, by_default) {
+                        note_forget_cleanup(&mut told, field, consent_kept_state(&consent, key));
+                        continue;
+                    }
                     let state = match std::fs::remove_file(&consent) {
                         Ok(()) => {
                             eprintln!(
@@ -14727,7 +14914,12 @@ fn legacy_exchange(
 ) -> Option<Value> {
     match lease {
         Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
-        None => crate::tools::exchange(socket, line, budget),
+        None => {
+            let answer = crate::tools::exchange(socket, line, budget)?;
+            // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
+            crate::history_forget::answered(socket, line, &answer);
+            Some(answer)
+        }
     }
 }
 
@@ -14902,6 +15094,10 @@ fn exchange_guarded(
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
+                    // What a forget removed reaches the account's history
+                    // too, whether or not this caller still wants the answer
+                    // (`LAMP_HISTORY_FORGET`, #7771).
+                    crate::history_forget::answered(socket, line, &value);
                     if !current() {
                         return None;
                     }
@@ -32781,6 +32977,47 @@ mod tests {
             }
         }
 
+        /// Twelve's P3 4 on #7928 (#7767): with `LAMP_NOTICING_BY_DEFAULT`
+        /// on, a household consent the forget leaves as a kept no is told
+        /// as `"kept as a no"`, never `"cleared"`, and is no failed step: it
+        /// leaves `everything` as it is, through the face adapter too.
+        #[test]
+        fn a_forget_that_keeps_a_no_says_so() {
+            let folder = std::env::temp_dir().join(format!(
+                "remember-kept-no-{}",
+                crate::process::boot_text(crate::process::new_boot().unwrap())
+            ));
+            std::fs::create_dir_all(&folder).unwrap();
+            let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+            let key = lamp_msgs::consent::FACE_EXPRESSIONS;
+            std::fs::write(
+                &face,
+                lamp_msgs::consent::no_bytes(key, 5, lamp_msgs::consent::BY_VOICE),
+            )
+            .unwrap();
+            assert!(!crate::seen_yes::forget_takes(&face, key, true));
+            assert_eq!(consent_kept_state(&face, key), CONSENT_KEPT_AS_NO);
+            let mut told = json!({"forgotten": true, "everything": true});
+            note_forget_cleanup(
+                &mut told,
+                "face_expression_consent_result",
+                consent_kept_state(&face, key),
+            );
+            assert_eq!(told["face_expression_consent_result"], "kept as a no");
+            assert_eq!(told["everything"], true);
+            // A file that can't be read holds no yes to take: cleared.
+            std::fs::write(&face, b"not json").unwrap();
+            assert_eq!(consent_kept_state(&face, key), "cleared");
+            // The face adapter carries it, and it is no partial cleanup.
+            let carried = face_and_memory(
+                json!({"face_forgotten": true}),
+                &json!({"forgotten": true, "face_expression_consent_result": "kept as a no"}),
+            );
+            assert_eq!(carried["face_expression_consent_result"], "kept as a no");
+            assert_eq!(carried["memory"], "forgotten too");
+            let _ = std::fs::remove_dir_all(folder);
+        }
+
         #[test]
         fn forget_cleanup_reports_each_consent_failure_and_still_clears_the_other() {
             for (name, failed) in [
@@ -33034,5 +33271,84 @@ mod chapter_tests {
                 "chapter":"A new library job.","about":CHAPTER_ABOUT,"theirs":true})
         );
         assert!(chapters_found(&json!({"ok":false,"error":"bad_person"})).is_empty());
+    }
+
+    /// #7878: a keep, replace or update said done in any sentence is a
+    /// claim; a restatement, a question or a reply about something else is
+    /// not.
+    #[test]
+    fn a_change_claimed_in_any_sentence_is_read_whole() {
+        for reply in [
+            "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.",
+            "Okay, your car is on B1. I've updated that.",
+            "Okay, I've updated that: B1, spot 7.",
+            "Sure. I'll remember that.",
+            "Okay. I'll remember you're vegetarian.",
+            "Spot 7 on B1. Kept.",
+        ] {
+            assert!(claims_a_change(reply), "{reply}");
+        }
+        for reply in [
+            "Your car is on Level B1, spot 7 now. Good to know where to look.",
+            "Got it \u{2014} your car is on Level B1, spot 7 now.",
+            "Should I remember that your car is on B1?",
+            "Updates come every night.",
+            "I'll remember to remind you at five.",
+            "Done, I've updated your light.",
+            "Okay, it replaces your old one.",
+            "Updated forecast: rain at noon.",
+            "That replacement part sounds expensive.",
+        ] {
+            assert!(!claims_a_change(reply), "{reply}");
+        }
+    }
+
+    /// #7924: each complete sentence that claims nothing may be said; the
+    /// first that claims a keep or replace, and an unfinished one, are held.
+    #[test]
+    fn sentences_are_said_until_one_claims_a_keep() {
+        let e82d = "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.";
+        let first = "Got it \u{2014} your car is on Level B1, spot 7 now.";
+        assert_eq!(unclaimed_sentences(e82d), first.len());
+        assert_eq!(unclaimed_sentences("Got it"), 0);
+        assert_eq!(
+            unclaimed_sentences("Once upon a time, a lamp. It glowed"),
+            "Once upon a time, a lamp.".len()
+        );
+        assert_eq!(unclaimed_sentences("Kept: your car is on B1."), 0);
+        let story = "Here's one. A lamp lit a room. The end.";
+        assert_eq!(unclaimed_sentences(story), story.len());
+    }
+
+    /// V2's must-fix (3) on #7924: a keep in memory's own words is a
+    /// [`Change::Keep`], which counts beside any call; a replace or update
+    /// is a [`Change::Replace`], which counts only with none.
+    #[test]
+    fn a_keep_said_is_a_keep_and_an_update_is_a_replace() {
+        assert_eq!(
+            change_claim("Okay. I'll remember you're vegetarian."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Your reminder is at 3. Kept."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Got it. That replaces wherever it was before."),
+            Some(Change::Replace)
+        );
+        assert_eq!(
+            change_claim("Okay, I've updated that."),
+            Some(Change::Replace)
+        );
+        assert_eq!(change_claim("I'll remember to remind you at five."), None);
+        assert_eq!(
+            change_claim("I'll remember your face once you tell me your name."),
+            None
+        );
+        assert_eq!(
+            change_claim("I'll remember your spot once you say yes."),
+            None
+        );
     }
 }
