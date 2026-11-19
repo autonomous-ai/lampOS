@@ -19,6 +19,10 @@ struct Servo {
     keeps_force: bool,
     /// Its own lower and upper position limits (registers 9 and 11).
     range: (u16, u16),
+    /// Its own maximum acceleration (register 85, EEPROM): a write of a
+    /// higher acceleration reads back as this, as the STS3215s capped at 50
+    /// do (#7946). 254 on most.
+    max_acceleration: u8,
 }
 
 /// Something that happens to one servo at a given time.
@@ -183,6 +187,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
         force: 1_000,
         keeps_force: true,
         range: (0, 4_095),
+        max_acceleration: 254,
     };
     let time = Rc::new(Cell::new(Duration::ZERO));
     (
@@ -425,6 +430,7 @@ impl Lamp {
                 12 => servo.range.1.to_le_bytes()[1],
                 40 => servo.torque,
                 41 => servo.acceleration,
+                85 => servo.max_acceleration,
                 42 => servo.goal.to_le_bytes()[0],
                 43 => servo.goal.to_le_bytes()[1],
                 46 => servo.speed.to_le_bytes()[0],
@@ -562,7 +568,7 @@ impl Lamp {
                     }
                     let servo = &mut self.servos[usize::from(id) - 1];
                     match (address, data.as_slice()) {
-                        (41, [value]) => servo.acceleration = *value,
+                        (41, [value]) => servo.acceleration = (*value).min(servo.max_acceleration),
                         (46, [low, high]) => servo.speed = u16::from_le_bytes([*low, *high]),
                         // A goal by itself: only ever to the shoulder or the
                         // elbow, or to a joint the body takes hold of.
@@ -691,6 +697,87 @@ fn the_three_writes_are_exactly_these_bytes() {
     assert_eq!(
         hex(&acceleration_write(Joint::BaseYaw, 50)),
         "ffff01040329329c"
+    );
+}
+
+/// #7946: lamp-5ee8's base yaw (and many of the 200-lamp round's) holds a
+/// maximum acceleration of 50 in its EEPROM, so the 50 asked by the folded
+/// limits' own servo cap is no problem, and 60 asked reads back as 50 and
+/// used to stop the start. Now each joint runs at the lower of what is
+/// asked and its own cap: the write asked is the cap, and the start goes on.
+#[test]
+fn a_servo_capped_at_50_runs_at_its_cap_and_the_start_goes_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.servos[0].max_acceleration = 50;
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.moved);
+    // The capped base yaw is asked its cap; the wrist roll its 60.
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![50])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        lamp.registers.contains(&(4, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        !lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert_eq!(lamp.servos[0].acceleration, 50);
+}
+
+/// Without the fix the same lamp stopped before moving, the read back
+/// naming the cap, as lamp-5ee8's did (`profile read back as …`): the test
+/// above is the one that fails on lamp-voice before #7946. Here, a servo with
+/// the usual cap runs at the 60 asked, and nothing is said.
+#[test]
+fn a_servo_with_the_usual_cap_runs_at_what_is_asked() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+}
+
+/// The caps' rule by itself: the lower of asked and the cap, the known low
+/// cap when nothing could be read, never higher, and only a lower one said.
+#[test]
+fn each_joint_runs_at_the_lower_of_asked_and_its_cap() {
+    let joints = [Joint::BaseYaw, Joint::WristRoll];
+    let mut said = Vec::new();
+    let mut say = |line: String| said.push(line);
+    let each = accelerations(60, &joints, Ok(vec![50, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 60);
+    let each = accelerations(60, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 50);
+    let each = accelerations(40, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 40, "never higher than asked");
+    let each = accelerations(60, &joints, Ok(vec![0, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50, "a cap of 0 is no reading");
+    assert_eq!(said.len(), 3, "{said:?}");
+    assert!(
+        said[0].contains("base yaw") || said[0].contains("BaseYaw") || said[0].contains("50"),
+        "{said:?}"
     );
 }
 
