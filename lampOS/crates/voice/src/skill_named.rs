@@ -454,11 +454,8 @@ fn wanted<'a>(
     wanted.extend(
         functions
             .iter()
-            .filter_map(|function| Some((function.strip_prefix(MADE)?, *function)))
-            .map(|(made, function)| (spoken(made), function))
-            .filter(|(said, _)| ask_refused(said).is_none() && own_words_of(said) >= 2)
-            .map(|(said, function)| (loose_ask(&said), function))
-            .filter(|(name, _)| !name.is_empty() && !plain_word(name)),
+            .filter_map(|function| Some((made_name(function)?, *function)))
+            .map(|(said, function)| (loose_ask(&said), function)),
     );
     shared_among(&mut wanted);
     let mut phrases: Vec<(String, &'a str)> = given(&functions, asks, taken)
@@ -469,6 +466,40 @@ fn wanted<'a>(
     phrases.retain(|(phrase, _)| !wanted.iter().any(|(name, _)| name == phrase));
     wanted.extend(phrases);
     wanted
+}
+
+/// A made skill's name as it is said, by its function (`made:` and its
+/// name, [`MADE`]), when that name alone may run it ([`wanted`]): two words
+/// of its own, never a refused ask nor a plain word; else none, as for
+/// any other function.
+fn made_name(function: &str) -> Option<String> {
+    let said = spoken(function.strip_prefix(MADE)?);
+    let loose = loose_ask(&said);
+    (ask_refused(&said).is_none()
+        && own_words_of(&said) >= 2
+        && !loose.is_empty()
+        && !plain_word(&loose))
+    .then_some(said)
+}
+
+/// Whether `lamp_said`, the lamp's own words, name one of the made skills
+/// `made` (their functions, [`MADE`] and a name) by a name that alone
+/// would run it ([`made_name`]), as words in a row: the lamp was talking
+/// of its made skills ("Which one do you want me to delete, tech news or
+/// the weather?", "You have tech news and daily brief."), so a made
+/// skill's name said next answers it and is the model's to read
+/// (`second_provider`'s `lamp_awaits_answer_for`, Heron's and Twelve's
+/// HOLD on #7916). Spelling only, by the skills the lamp has: no word of
+/// the question is judged by what it means.
+pub fn names_made(lamp_said: &str, made: &[&str]) -> bool {
+    let said = lower_words(lamp_said);
+    made.iter()
+        .filter_map(|function| made_name(function))
+        .any(|name| {
+            let name = lower_words(&name);
+            let name: Vec<&str> = name.iter().map(String::as_str).collect();
+            holds(&said, &name)
+        })
 }
 
 /// Each of `functions`' asks [`wanted`] may match, loosely, by the function
@@ -857,6 +888,23 @@ impl Heard {
         named_among(heard, &wanted)
             .map(|function| call(self.settings.use_skill, function))
             .or_else(|| shared_call(heard, shared))
+    }
+
+    /// [`names_made`] over the skills made on the lamp that [`Self::heard`]
+    /// may run (`LAMP_MADE_SKILL_ASKS`, the tools file's `made_asks`), read
+    /// from the files: asked only after the lamp's question, for a line
+    /// that named a made skill (`second_provider`'s
+    /// `lamp_awaits_answer_for`), so never on the way of any other line.
+    pub fn names_made(&self, lamp_said: &str) -> bool {
+        if !crate::made_skill::asks_on() {
+            return false;
+        }
+        let made: Vec<String> = crate::tools::made_skill_asks(&self.settings)
+            .into_keys()
+            .map(|made| format!("{MADE}{made}"))
+            .collect();
+        let made: Vec<&str> = made.iter().map(String::as_str).collect();
+        names_made(lamp_said, &made)
     }
 
     /// What the functions are read from: each skills folder's tools file
@@ -1436,12 +1484,51 @@ mod tests {
         ] {
             assert_eq!(heard(&settings, line), None, "{line}");
         }
+        // The lamp's words are read for the made skills' names
+        // ([`Heard::names_made`]), only those its tools file lists.
+        let named = Heard::new(settings.clone());
+        assert!(named.names_made("Which one should I delete, tech news or the weather?"));
+        assert!(named.names_made("You have daily brief."));
+        assert!(!named.names_made("What sort of name do you like?"));
         crate::made_skill::set_asks_here(Some(false));
         for line in ["daily brief", "tech news"] {
             assert_eq!(heard(&settings, line), None, "{line}");
         }
+        assert!(!named.names_made("You have daily brief."));
         crate::made_skill::set_asks_here(None);
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// Heron's and Twelve's HOLD on #7916: the lamp's words name a made
+    /// skill by a name that alone would run it, as words in a row, any
+    /// case or punctuation; a part of a name, a one-word name or a word
+    /// said around an ask ("hello"), none, and nothing for a function not
+    /// made on the lamp.
+    #[test]
+    fn the_lamps_words_name_a_made_skill_by_its_name() {
+        let made = [
+            "made:daily-brief",
+            "made:tech-news",
+            "made:timer",
+            "made:hello",
+            "photo_booth",
+        ];
+        for said in [
+            "Which one do you want me to delete, tech news or the weather?",
+            "You have Daily Brief.",
+            "Turn off daily-brief?",
+        ] {
+            assert!(names_made(said, &made), "{said}");
+        }
+        for said in [
+            "What sort of name do you like?",
+            "Want a timer?",
+            "Hello! What's up?",
+            "Is the news daily?",
+            "Shall I open photo booth?",
+        ] {
+            assert!(!names_made(said, &made), "{said}");
+        }
     }
 
     /// The first builder's answer 2 on #7249, with `LAMP_MADE_SKILL_ASKS`

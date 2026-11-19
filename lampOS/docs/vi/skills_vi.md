@@ -4310,11 +4310,25 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    your daily brief idea" có từ khác nên là của model. Câu phủ định, câu
    hỏi, cụm hai kỹ năng cùng có, một phần của tên, hay khi đang giữ một
    lời đồng ý: không bắt đầu gì. Sau khi lời cuối của đèn hỏi điều gì đó
-   (`remarks::lamp_asked`), câu chỉ là của model khi lời đó nêu kỹ năng
-   hay chính các từ của câu (`skill_named::asked_about`: "Which one, daily
-   brief or tech news?"); nếu không, kỹ năng tự tạo vẫn bắt đầu trong code
-   (lần thử trực tiếp của lead, 19/11 09:06: bốn câu "daily brief" sau câu
-   "Want me to ...?" của đèn đều để model đọc, và model không gọi gì). Một lần chạy tự nói lời của nó
+   (`remarks::lamp_asked`), câu là của model, được báo kỹ năng mà câu cũng
+   có thể là (`skill_named::awaited_note`), khi code gắn câu hỏi đó với
+   các kỹ năng tự tạo: lời đó nêu kỹ năng hay chính các từ của câu
+   (`skill_named::asked_about`: "Which one, daily brief or tech news?"),
+   hoặc nêu bất kỳ kỹ năng tự tạo nào bằng một tên tự nó chạy được kỹ năng
+   (`skill_named::names_made`: "Which one do you want me to delete, tech
+   news or the weather?"), hoặc lượt của đèn nói lời đó đã chạy một lời
+   gọi `make_skill` được giữ trong lịch sử (xoá, tắt hay bật,
+   `LAMP_HISTORY_KEEPS_CALLS`). Số nhiều hay không ("Daily briefs.") thì
+   câu vẫn là câu trả lời (HOLD của Heron và Twelve trên #7916). Mối gắn
+   này là cấu trúc, theo các kỹ năng đèn có và các lời gọi nó đã chạy:
+   không từ nào của câu hỏi được so để đoán nó hỏi gì, việc đó vẫn do
+   model phán đoán, nên một câu hỏi về kỹ năng tự tạo không nêu tên nào và
+   không theo sau lời gọi được giữ nào (chỉ "Which skill should I turn
+   off?") không được phân biệt, và tên nói tiếp theo sẽ bắt đầu kỹ năng.
+   Sau mọi câu hỏi khác, kỹ năng tự tạo vẫn bắt đầu trong code ("What sort
+   of name do you like?"; lần thử trực tiếp của lead, 19/11 09:06: bốn câu
+   "daily brief" sau câu "Want me to ...?" của đèn đều để model đọc, và
+   model không gọi gì). Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau

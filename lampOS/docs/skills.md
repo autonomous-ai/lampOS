@@ -7951,12 +7951,25 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    about your daily brief idea" holds other words and is the model's. A
    no, a question, a phrase two skills give, a part of the name, or a line
    while a yes is held starts nothing. After the lamp's last words asked
-   something (`remarks::lamp_asked`), the line is the model's only when
-   those words name the skill or the line's own words (`skill_named::
-   asked_about`: "Which one, daily brief or tech news?"); otherwise the
-   made skill still starts in code (the lead's live test, 19 Nov 09:06:
-   four "daily brief" lines after the lamp's "Want me to ...?" were each
-   left to the model, which called nothing). A run that speaks
+   something (`remarks::lamp_asked`), the line is the model's, told the
+   skill it also reads as (`skill_named::awaited_note`), when the code
+   ties that question to the made skills: those words name the skill or
+   the line's own words (`skill_named::asked_about`: "Which one, daily
+   brief or tech news?"), or any made skill by a name that alone would
+   run it (`skill_named::names_made`: "Which one do you want me to
+   delete, tech news or the weather?"), or the lamp's turn that said them
+   ran a `make_skill` call kept in the history (a remove, a turn off or
+   on, `LAMP_HISTORY_KEEPS_CALLS`). Plural or not ("Daily briefs.") the
+   line then stays the answer (Heron's and Twelve's HOLD on #7916). The
+   tie is structural, by the skills the lamp has and the calls it ran:
+   no word of the question is matched for what it asks, which stays the
+   model's to judge, so a question of the made skills that names none
+   and follows no kept call ("Which skill should I turn off?" alone) is
+   not told apart, and the name said next starts the skill. After any
+   other question the made skill still starts in code ("What sort of
+   name do you like?"; the lead's live test, 19 Nov 09:06: four "daily
+   brief" lines after the lamp's "Want me to ...?" were each left to the
+   model, which called nothing). A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second

@@ -1128,6 +1128,76 @@ fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
     assert_eq!(went.said, ["Photo booth didn't run today."]);
 }
 
+/// What a turn ran for `line` after `history`, with the made skill
+/// daily-brief offered by its asks, "daily brief", and the lamp's words
+/// read for the names of the made skills `made` (their functions).
+async fn made_ran(
+    line: &str,
+    history: Vec<Message>,
+    made: &'static [&'static str],
+) -> Vec<(String, Value)> {
+    let asks: std::collections::BTreeMap<String, Vec<String>> = [(
+        "made:daily-brief".to_owned(),
+        vec!["daily brief".to_owned()],
+    )]
+    .into();
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(line.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async { json!({"ran": true, "next": "Say: here it is."}) })
+    });
+    let mut engine = Engine::new(
+        script.clone(),
+        move || Told {
+            text: "SYSTEM".into(),
+            after: None,
+            history: history.clone(),
+        },
+        runner,
+    )
+    .announcing(false)
+    .calling_skills_named(Arc::new(move |heard: &str| {
+        crate::skill_named::asked(heard, &["made:daily-brief"], &asks)
+            .map(|function| crate::skill_named::call(true, function))
+    }))
+    .knowing_made_names(Arc::new(|said: &str| {
+        crate::skill_named::names_made(said, made)
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+    assert_eq!(heard.last().unwrap(), "complete", "{line}: {heard:?}");
+    ran.lock()
+        .unwrap()
+        .iter()
+        .map(|(name, args, _)| (name.clone(), args.clone()))
+        .collect()
+}
+
+/// The made skills [`made_ran`] reads the lamp's words for.
+const MADE_HERE: &[&str] = &["made:daily-brief", "made:tech-news"];
+
+/// The call that runs the made skill daily-brief.
+fn brief_run() -> (String, Value) {
+    (
+        crate::made_skill::MAKE.to_owned(),
+        json!({ crate::made_run::RUN: "daily-brief" }),
+    )
+}
+
 /// The lead's live test, 19 Nov 09:06 to 09:07 (`LAMP_MADE_SKILL_ASKS`):
 /// a made skill whose asks are "daily brief" was on, and "Hey Lamp, daily
 /// brief" and "daily brief", said after the lamp's words had asked
@@ -1139,15 +1209,6 @@ fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
 /// model reads it, as before; with no question, it runs as before.
 #[tokio::test]
 async fn a_made_skills_words_run_it_after_a_question_that_names_it_not() {
-    let asks: std::collections::BTreeMap<String, Vec<String>> = [(
-        "made:daily-brief".to_owned(),
-        vec!["daily brief".to_owned()],
-    )]
-    .into();
-    let run = (
-        crate::made_skill::MAKE.to_owned(),
-        json!({ crate::made_run::RUN: "daily-brief" }),
-    );
     // The row of #7916 on lamp-9adf, 19 Nov 14:36 and 14:44: "Um, daily
     // brief." and "Lamp, um, daily brief." came back from speech to text
     // as "Daily briefs." and "Lamp, daily briefs.", the "um" dropped and an
@@ -1168,65 +1229,68 @@ async fn a_made_skills_words_run_it_after_a_question_that_names_it_not() {
             (Some("Okay, I saved your day."), true),
             (None, true),
         ] {
-            let script = Arc::new(Script {
-                heard: Mutex::new([Ok(line.to_owned())].into()),
-                chats: Mutex::new(
-                    [
-                        vec![text("Okay."), Ok(ChatEvent::Done)],
-                        vec![text("Okay."), Ok(ChatEvent::Done)],
-                    ]
-                    .into(),
-                ),
-                ..Script::default()
-            });
-            let ran: Calls = Arc::default();
-            let seen = ran.clone();
-            let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
-                seen.lock().unwrap().push((name, args, heard));
-                Box::pin(async { json!({"ran": true, "next": "Say: here it is."}) })
-            });
             let history: Vec<Message> = lamp
                 .map(|lamp| vec![Message::user("save my day"), Message::assistant(lamp)])
                 .unwrap_or_default();
-            let asks = asks.clone();
-            let mut engine = Engine::new(
-                script.clone(),
-                move || Told {
-                    text: "SYSTEM".into(),
-                    after: None,
-                    history: history.clone(),
-                },
-                runner,
-            )
-            .announcing(false)
-            .calling_skills_named(Arc::new(move |heard: &str| {
-                crate::skill_named::asked(heard, &["made:daily-brief"], &asks)
-                    .map(|function| crate::skill_named::call(true, function))
-            }));
-            engine.submit(start(1));
-            engine.submit(audio(1, 1));
-            engine.submit(end(1));
-            let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
-            assert_eq!(
-                heard.last().unwrap(),
-                "complete",
-                "{line} {lamp:?}: {heard:?}"
-            );
-            let ran: Vec<(String, Value)> = ran
-                .lock()
-                .unwrap()
-                .iter()
-                .map(|(name, args, _)| (name.clone(), args.clone()))
-                .collect();
+            let ran = made_ran(line, history, MADE_HERE).await;
             if runs {
-                assert_eq!(
-                    ran,
-                    std::slice::from_ref(&run),
-                    "{line} {lamp:?}: run in code"
-                );
+                assert_eq!(ran, [brief_run()], "{line} {lamp:?}: run in code");
             } else {
                 assert!(ran.is_empty(), "{line} {lamp:?}: the model's: {ran:?}");
             }
+        }
+    }
+}
+
+/// Heron's and Twelve's HOLD on #7916: after the lamp asked which of its
+/// made skills to turn off or delete, "daily brief" (or "Daily briefs.",
+/// through `spelled_as`) is the answer the model needs, never a run. Told
+/// by what the code knows, never by the question's words: the lamp's last
+/// words name a made skill (any of them, not only the one heard), or its
+/// last turn ran a `make_skill` call kept in the history (a remove, a turn
+/// off or on). A question with neither ("What sort of name do you like?",
+/// "What's pulling you toward one?") still lets the name run.
+#[tokio::test]
+async fn a_made_skills_name_answers_a_question_of_the_lamps_made_skills() {
+    let asked = |lamp: &str| vec![Message::user("my skills"), Message::assistant(lamp)];
+    // The lamp's turn before ran a turn off, kept in the history
+    // (`LAMP_HISTORY_KEEPS_CALLS`, `kept_made`), and asked on in words that
+    // name no skill.
+    let turned = || {
+        let call = net::ToolCall {
+            id: format!("{}7-0", crate::thread::KEPT_CALL_ID),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({ crate::made_turn::TURN_OFF: "tech-news" }),
+            extra: None,
+        };
+        vec![
+            Message::user("turn off a skill"),
+            Message::assistant_calls(None, std::slice::from_ref(&call)),
+            Message::tool(call.id.clone(), MADE_TURNED),
+            Message::assistant("Done. Which one should I turn off next?"),
+        ]
+    };
+    for line in ["daily brief", "Daily briefs.", "Lamp, daily brief"] {
+        for (history, why) in [
+            (
+                asked("Which one do you want me to delete, tech news or the weather?"),
+                "names another made skill",
+            ),
+            (
+                asked("You have tech news and daily brief. Which skill should I turn off?"),
+                "lists the made skills",
+            ),
+            (turned(), "its last turn ran make_skill"),
+        ] {
+            let ran = made_ran(line, history, MADE_HERE).await;
+            assert!(ran.is_empty(), "{line} ({why}): the model's: {ran:?}");
+        }
+        for lamp in [
+            "What sort of name do you like?",
+            "What's pulling you toward one?",
+        ] {
+            let ran = made_ran(line, asked(lamp), MADE_HERE).await;
+            assert_eq!(ran, [brief_run()], "{line} {lamp:?}: run in code");
         }
     }
 }
