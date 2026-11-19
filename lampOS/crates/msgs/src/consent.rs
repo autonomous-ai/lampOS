@@ -71,6 +71,13 @@ pub struct Kept {
     pub by: Option<String>,
     /// When, in Unix seconds, if said.
     pub at_unix_s: Option<u64>,
+    /// `KEY` is exactly `"no"` ([`no_bytes`], #7767): a person's kept no, as
+    /// against a file that can't be read.
+    pub no: bool,
+    /// No file at all, read as on with [`NOTICING_BY_DEFAULT`] (#7767): set
+    /// only there, never from a file's text, so a file holding
+    /// `"by":"default"` is no default's yes (Twelve's P3 on #7928).
+    pub by_default: bool,
 }
 
 impl Kept {
@@ -120,6 +127,8 @@ pub fn read_or(path: &Path, key: &str, by_default: bool) -> Kept {
                 yes: true,
                 by: Some(BY_DEFAULT.to_owned()),
                 at_unix_s: None,
+                no: false,
+                by_default: true,
             };
         }
         Err(_) => return Kept::default(),
@@ -133,10 +142,13 @@ pub fn read_or(path: &Path, key: &str, by_default: bool) -> Kept {
     let Ok(Value::Object(value)) = serde_json::from_str::<Value>(&text) else {
         return Kept::default();
     };
+    let answer = value.get(key).and_then(Value::as_str);
     Kept {
-        yes: value.get(key).and_then(Value::as_str) == Some("yes"),
+        yes: answer == Some("yes"),
         by: value.get("by").and_then(Value::as_str).map(str::to_owned),
         at_unix_s: value.get("at_unix_s").and_then(Value::as_u64),
+        no: answer == Some("no"),
+        by_default: false,
     }
 }
 
@@ -152,6 +164,13 @@ pub fn read(path: &Path, key: &str) -> Kept {
 /// that can't be read is not. Readers pass [`noticing_by_default`].
 pub fn allowed(path: &Path, key: &str, by_default: bool) -> bool {
     read_or(path, key, by_default).yes
+}
+
+/// Whether `path` holds a person's kept no for `key` (`KEY` exactly `"no"`,
+/// [`no_bytes`], #7767), which with [`NOTICING_BY_DEFAULT`] on nothing but
+/// a yes or a factory reset replaces.
+pub fn kept_no(path: &Path, key: &str) -> bool {
+    read(path, key).no
 }
 
 /// A kept file's bytes, whole, with `KEY` as `answer`.
@@ -344,7 +363,7 @@ pub fn bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
 
 /// A kept no's bytes, whole: `{"version":1,KEY:"no","at_unix_s":N,"by":BY}`
 /// (#7767). Kept, not removed, so that [`NOTICING_BY_DEFAULT`] never turns
-/// a person's no back on; nothing writes it yet.
+/// a person's no back on.
 pub fn no_bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
     answer_bytes(key, "no", at_unix_s, by)
 }
@@ -521,7 +540,9 @@ mod tests {
             Kept {
                 yes: true,
                 by: Some(BY_DEFAULT.into()),
-                at_unix_s: None
+                at_unix_s: None,
+                no: false,
+                by_default: true,
             }
         );
         assert_eq!(read(&file, SEEN_ACTIVITY), Kept::default());
@@ -574,6 +595,35 @@ mod tests {
         std::fs::remove_file(&file).unwrap();
         std::fs::create_dir(&file).unwrap();
         assert!(!allowed(&file, SEEN_ACTIVITY, true), "a folder");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// Twelve's HOLD and P3 3 on #7928: `no` is a kept no only, never a
+    /// file that can't be read; `by_default` is set only for no file with
+    /// the switch on, never from a file's text.
+    #[test]
+    fn a_kept_no_and_the_default_are_told_apart_from_a_files_text() {
+        let folder = std::env::temp_dir().join(format!("msgs-consent-no-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = file_in(&folder, FACE_EXPRESSIONS).unwrap();
+        assert!(!kept_no(&file, FACE_EXPRESSIONS), "missing");
+        assert!(read_or(&file, FACE_EXPRESSIONS, true).by_default);
+        assert!(!read_or(&file, FACE_EXPRESSIONS, false).by_default);
+        std::fs::write(&file, no_bytes(FACE_EXPRESSIONS, 9, BY_VOICE)).unwrap();
+        assert!(kept_no(&file, FACE_EXPRESSIONS));
+        assert!(!read_or(&file, FACE_EXPRESSIONS, true).by_default);
+        for text in [
+            &b"not json"[..],
+            br#"{"face_expressions":"NO"}"#,
+            br#"{"face_expressions":"yes","by":"default"}"#,
+        ] {
+            std::fs::write(&file, text).unwrap();
+            assert!(!kept_no(&file, FACE_EXPRESSIONS));
+            for by_default in [false, true] {
+                assert!(!read_or(&file, FACE_EXPRESSIONS, by_default).by_default);
+            }
+        }
         let _ = std::fs::remove_dir_all(folder);
     }
 

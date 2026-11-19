@@ -36,9 +36,30 @@ lamp also says once when the opt-in is turned off.
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
    expressions, room sounds and health reports: exactly `"yes"` is on,
    exactly `"no"` stays off with the switch on, and a file that can't be
-   read is off. With it off, a missing file is no, as before. Nothing
-   writes a kept no yet: a later slice of #7767 (the voice's "stop
-   looking" and the app's off keeping a no) comes before any unit sets it.
+   read is off. With it off, a missing file is no, as before. With it on,
+   the voice's stop and the app's desk off keep a no (`consent::no_bytes`)
+   where today they remove the file (#7767, slice 2): the voice's
+   `stop_looking_at_my_desk` writes `"no"` (`"by":"voice"`) for seen
+   activity and face expressions both, under the mark's lock with the mark
+   raised, and the app's `desk_noticing` off writes it (`"by":"app"`) for
+   seen activity alone, with the mark raised to its `request_id`, so a late
+   app yes still loses to it. Face reads have their own switch in the app
+   (`consent.set`'s `face_expressions`, a later slice), so the app's desk
+   off and on leave them as they are. The stop's answer counts face reads
+   too: with only faces on it says it stopped, in its own line
+   (`seen_yes::STOPPED_FACES`, since lamp-seen says back only seen
+   activity's change). `look_at_my_desk` ("start looking again") keeps the
+   owner's own spoken yes with no offer and no "turn it on in the app",
+   turning a no in either file back to a yes, and says it is on already
+   only when both were (`LOOKING_FACES` when only faces come back); the
+   model judges the phrase from the two descriptions, and no function is
+   added. A forget removes only a kept yes and keeps a no, so it never
+   turns noticing on, and lamp-seen's forget latch holds only an explicit
+   yes, never the default's: the default is only a missing file
+   (`consent::Kept::by_default`), never a file's text, `"by":"default"`
+   or not. The voice's start and setup's walk leave a kept no in place too
+   ([onboarding.md](onboarding.md), "Room sounds"). The reset still removes
+   the file, the no too, so the next setup starts at the default.
 2. **The ring shows its mark whenever a frame is going out.**
 3. **No frames** while the privacy slide is on, nobody is at the desk, or
    the lamp is asleep. Phase 0 also closed on a stranger in view; the

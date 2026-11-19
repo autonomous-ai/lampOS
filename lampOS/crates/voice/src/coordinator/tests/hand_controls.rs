@@ -3918,6 +3918,7 @@ fn walk_for_the_next_loop(ended: &[&str]) -> PathBuf {
         near_call: directory.join("near-call.json"),
         room_sounds: directory.join("room-sounds.json"),
         room_sounds_group: None,
+        noticing_by_default: false,
     })
     .unwrap();
     let deadline = Instant::now() + Duration::from_secs(10);

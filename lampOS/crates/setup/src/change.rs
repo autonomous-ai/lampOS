@@ -72,7 +72,10 @@
 //!   after it. A `request_id` more than a day past the lamp's now
 //!   ([`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`]) is no send time: a yes
 //!   is refused, an off raises the mark only to the lamp's now. `lamp-cloud`
-//!   sends it only with `LAMP_SEEN_ACTIVITY=on`.
+//!   sends it only with `LAMP_SEEN_ACTIVITY=on`. With
+//!   `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`), where a
+//!   missing file is on, an off keeps a no (`"by":"app"`) in place of the
+//!   removal, under the same lock and mark ([`apply_or`]).
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -374,6 +377,12 @@ fn remove(path: &Path) -> io::Result<()> {
 
 /// Make `change` with setup's writers on the files `config` names.
 pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
+    apply_or(change, config, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`apply`] with `LAMP_NOTICING_BY_DEFAULT` given (#7767): `by_default`
+/// changes only the desk noticing switch, whose off then keeps a no.
+pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Result<Done> {
     let mut files = Files(config);
     match change {
         Change::PersonName(Some(name)) => {
@@ -630,7 +639,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             let path = lamp_msgs::consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
             let lock = lamp_msgs::consent::lock_mark(&config.consent)?;
-            let before = lamp_msgs::consent::read(&path, key).yes;
+            let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
             if *yes {
                 if let Some(why) = desk_refused(*id, lock.read()) {
                     return Err(io::Error::other(Refused(why)));
@@ -640,7 +649,11 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                     keep_yes(&path, key)?;
                 }
             } else {
-                remove(&path)?;
+                if by_default {
+                    keep_no(&path, key)?;
+                } else {
+                    remove(&path)?;
+                }
                 let id = if lamp_msgs::consent::too_far_ahead(*id) {
                     lamp_msgs::consent::now_unix_ms()
                 } else {
@@ -723,6 +736,23 @@ fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
 /// folder's group (`lampos` on a lamp, which the eyes and the ears are in),
 /// or 0600 where the folder's group is root's, as the voice keeps its own.
 fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// A no from the app kept at `path` as [`keep_yes`] keeps a yes (#7767):
+/// `{"version":1,KEY:"no","at_unix_s":N,"by":"app"}`, so that with
+/// `LAMP_NOTICING_BY_DEFAULT` on the off is never read as the default.
+fn keep_no(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// `bytes(now)` kept at `path`, whole: written beside it and renamed into
+/// place, in the mode and group [`keep_yes`] names.
+fn keep_answer(path: &Path, bytes: impl FnOnce(u64) -> Vec<u8>) -> io::Result<()> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let folder = path
         .parent()
@@ -731,7 +761,7 @@ fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
     let at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP);
+    let bytes = bytes(at);
     let next = path.with_extension("change-next");
     let _ = fs::remove_file(&next);
     let result = (|| {

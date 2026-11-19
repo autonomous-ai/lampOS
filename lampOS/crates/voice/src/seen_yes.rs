@@ -35,6 +35,16 @@
 //! across its own check and write (Twelve's P2 on #7551).
 //! lamp-seen only reads the file, and says the lines back itself, on and
 //! off, so the model is told to add nothing to them.
+//!
+//! With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`, off
+//! unless set, in no unit) a missing file is on, so a way off keeps a no
+//! ([`run_by_default`]): the stop writes `"no"` for seen activity and face
+//! expressions both, under the mark's lock with the mark raised, as the
+//! removal is today. `look_at_my_desk` ("start looking again") keeps the
+//! owner's own spoken yes with no offer and no `APP_FIRST`, a no in either
+//! file turned back to a yes; the model judges the phrase, from the two
+//! descriptions ([`tools_for`]), and no function is added. A forget keeps a
+//! no in place and never turns noticing on ([`forget_takes`]).
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
 use std::{
@@ -100,6 +110,14 @@ pub const NOT_KEPT: &str = "Not done: it could not be changed just now. Say so i
 /// Taken back: lamp-seen says it has stopped.
 pub const STOPPED: &str =
     "Done. The lamp says itself that it has stopped looking, so say nothing more about it.";
+/// With `LAMP_NOTICING_BY_DEFAULT` on (#7767): the stop took back face
+/// reads alone (seen activity was off already), which lamp-seen does not
+/// say back.
+pub const STOPPED_FACES: &str = "Done: say in a few words that you have stopped looking at them.";
+/// With `LAMP_NOTICING_BY_DEFAULT` on (#7767): "start looking again" turned
+/// face reads alone back on (seen activity was on already), which lamp-seen
+/// does not say back.
+pub const LOOKING_FACES: &str = "Done: say in a few words that you are looking at them again, and that they can say stop looking at any time.";
 /// Nothing to take back.
 pub const NOT_LOOKING: &str =
     "It was not on: say in a few words that you are not looking at their desk.";
@@ -125,7 +143,39 @@ pub fn is_tool(name: &str) -> bool {
     matches!(name, OFFER | LOOK | STOP)
 }
 
+/// The three functions, as [`tools_for`] gives them for this process's
+/// `LAMP_NOTICING_BY_DEFAULT` (`lamp_msgs::consent::noticing_by_default`).
 pub fn tools() -> [Tool; 3] {
+    tools_for(lamp_msgs::consent::noticing_by_default())
+}
+
+/// `look_at_my_desk` with `LAMP_NOTICING_BY_DEFAULT` on (#7767): "start
+/// looking again", with no offer before it.
+const LOOK_AGAIN: &str = "Call this when the person asks you to start looking at their desk or at \
+                          what they are doing again, after they asked you to stop (\"start looking \
+                          again\", \"you can watch me again\"). It turns noticing back on, which \
+                          sends pictures from your camera to the lamp's server to be labelled. An \
+                          ordinary request to look at something (\"look at my desk, where are my \
+                          keys?\") is a look, never this. Then say only what it tells you.";
+
+/// The stop with `LAMP_NOTICING_BY_DEFAULT` on (#7767): face reads too.
+const STOP_ALL: &str = "Call this when someone asks you to stop looking at them, at their desk or at \
+                        what they are doing, or to stop sending pictures (\"stop looking\", \"don't \
+                        watch me\"). It stops noticing what they do at the desk and how their face \
+                        seems. Then say only what it tells you.";
+
+/// The three functions; with `by_default` (`LAMP_NOTICING_BY_DEFAULT` on,
+/// #7767) only the descriptions of [`LOOK`] and [`STOP`] change.
+pub fn tools_for(by_default: bool) -> [Tool; 3] {
+    let [offer, mut look, mut stop] = tools_as_today();
+    if by_default {
+        look.description = LOOK_AGAIN.into();
+        stop.description = STOP_ALL.into();
+    }
+    [offer, look, stop]
+}
+
+fn tools_as_today() -> [Tool; 3] {
     [
         Tool {
             name: OFFER.into(),
@@ -326,11 +376,21 @@ pub fn run(
     let Ok(mut offer) = OFFERED.lock() else {
         return json!({"ok": false, "note": NOT_KEPT});
     };
+    let by_default = lamp_msgs::consent::noticing_by_default();
     match call.name.as_str() {
         OFFER => offered(&mut offer, request, heard, posture),
         LOOK => {
             let answered = offer.answered_in(request);
             drop(offer);
+            if by_default {
+                return run_by_default(
+                    &path(),
+                    LOOK,
+                    owners_spoken_yes(request, heard, lease),
+                    now_unix_s(),
+                    crate::onboarding::consent_group,
+                );
+            }
             let owners = answered && owners_spoken_yes(request, heard, lease);
             run_at(
                 &path(),
@@ -344,6 +404,15 @@ pub fn run(
         }
         _ => {
             drop(offer);
+            if by_default {
+                return run_by_default(
+                    &path(),
+                    STOP,
+                    false,
+                    now_unix_s(),
+                    crate::onboarding::consent_group,
+                );
+            }
             run_at(&path(), STOP, offer_on, false, false, 0, || None)
         }
     }
@@ -431,6 +500,88 @@ fn run_at(
     }
 }
 
+/// [`run`] at `path` with `LAMP_NOTICING_BY_DEFAULT` on (#7767), where a
+/// missing file is on: `owners`, the call's line is the owner's own spoken
+/// yes; `at`, now in Unix seconds; `group`, the reader group's id.
+///
+/// - `look_at_my_desk`: the owner's line alone, with no offer before it (the
+///   model judged it a "start looking again"). A file that is not on, a
+///   kept no (or one that can't be read), is made a yes, for seen activity
+///   and face expressions both; a missing one is on already and stays
+///   missing.
+/// - The stop, anyone's: a kept no for both, under the mark's lock and the
+///   mark raised to now first, as [`run_at`]'s removal, so no app yes sent
+///   before lands after it.
+fn run_by_default(
+    path: &Path,
+    name: &str,
+    owners: bool,
+    at: u64,
+    group: impl FnOnce() -> Option<u32>,
+) -> Value {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in};
+    let face = path
+        .parent()
+        .and_then(|folder| file_in(folder, FACE_EXPRESSIONS));
+    // What was on before, seen activity and face reads apart (Twelve's
+    // P3 1 and Heron's on #7928): lamp-seen says back only seen activity's
+    // change, so face reads alone get their own line.
+    let seen_was = allowed(path, SEEN_ACTIVITY, true);
+    let face_was = face
+        .as_deref()
+        .is_some_and(|face| allowed(face, FACE_EXPRESSIONS, true));
+    let both = std::iter::once((path.to_path_buf(), SEEN_ACTIVITY))
+        .chain(face.map(|face| (face, FACE_EXPRESSIONS)));
+    if name == LOOK {
+        if !owners {
+            eprintln!("lamp-voice: a start looking again not the owner's own line: not kept");
+            return json!({"ok": false, "note": OWNER_ONLY});
+        }
+        // The group asked only for a yes to keep, as [`run_at`] asks it.
+        let mut group = Some(group);
+        let mut id = None;
+        let mut kept = Ok(());
+        for (file, key) in both {
+            if !allowed(&file, key, true) {
+                if let Some(group) = group.take() {
+                    id = group();
+                }
+                kept = kept.and(crate::onboarding::storage::keep_yes(&file, key, at, id));
+            }
+        }
+        return match kept {
+            Err(error) => {
+                eprintln!("lamp-voice: start looking again was not kept: {error}");
+                json!({"ok": false, "note": NOT_KEPT})
+            }
+            Ok(()) if seen_was && face_was => json!({"ok": true, "note": LOOKING_ALREADY}),
+            Ok(()) => {
+                eprintln!("lamp-voice: the owner's start looking again is kept");
+                json!({"ok": true, "note": if seen_was { LOOKING_FACES } else { LOOKING }})
+            }
+        };
+    }
+    let lock = lock_beside(path);
+    raise_mark_beside(lock.as_ref(), path, lamp_msgs::consent::now_unix_ms());
+    let group = group();
+    let mut kept = Ok(());
+    for (file, key) in both {
+        kept = kept.and(crate::onboarding::storage::keep_no(&file, key, at, group));
+    }
+    drop(lock);
+    match kept {
+        Err(error) => {
+            eprintln!("lamp-voice: the stop's no was not kept: {error}");
+            json!({"ok": false, "note": NOT_KEPT})
+        }
+        Ok(()) if seen_was || face_was => {
+            eprintln!("lamp-voice: seen activity and face expressions are a kept no by voice");
+            json!({"ok": true, "note": if seen_was { STOPPED } else { STOPPED_FACES }})
+        }
+        Ok(()) => json!({"ok": true, "note": NOT_LOOKING}),
+    }
+}
+
 /// The mark's lock in the folder of the yes at `path`, held across a "no"'s
 /// raise and removal (Twelve's P2 on #7551), so root's helper never keeps an
 /// app yes it checked before it. One not taken is said in the journal; the
@@ -478,7 +629,23 @@ fn remove(path: &Path) -> io::Result<bool> {
 /// `forget_everything`), takes back the yes at `path` (#6543): said in the
 /// journal only when there was one, and the app's mark raised to now when
 /// there was one or a mark is kept. With neither there, nothing changes.
+/// With `LAMP_NOTICING_BY_DEFAULT` on, only a kept yes is removed
+/// ([`forget_takes`]).
 pub fn forgotten(path: &Path) {
+    forgotten_or(path, lamp_msgs::consent::noticing_by_default());
+}
+
+/// Whether a forget removes `key`'s file at `path` (#7767, the first
+/// builder's answer 1 on #7767): always with `by_default` off, as before;
+/// with it on only a kept yes, which leaves noticing on by default, so a
+/// kept no (or a file that can't be read, off) stays and a forget never
+/// turns noticing on.
+pub fn forget_takes(path: &Path, key: &str, by_default: bool) -> bool {
+    !by_default || lamp_msgs::consent::read(path, key).yes
+}
+
+/// [`forgotten`] with `LAMP_NOTICING_BY_DEFAULT` given.
+fn forgotten_or(path: &Path, by_default: bool) {
     // The mark only where the app's switch has been used or a yes is kept:
     // a forget on a lamp without seen activity writes nothing.
     let marked = path
@@ -488,7 +655,11 @@ pub fn forgotten(path: &Path) {
         .then(|| lock_beside(path))
         .flatten();
     raise_mark_beside(lock.as_ref(), path, lamp_msgs::consent::now_unix_ms());
-    let removed = remove(path);
+    let removed = if forget_takes(path, lamp_msgs::consent::SEEN_ACTIVITY, by_default) {
+        remove(path)
+    } else {
+        Ok(false)
+    };
     drop(lock);
     match removed {
         Ok(true) => eprintln!("lamp-voice provider: a forget removed {}", path.display()),
@@ -841,6 +1012,195 @@ mod tests {
             run_at(&path, STOP, true, true, true, 9, || None),
             json!({"ok": false, "note": NOT_KEPT})
         );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, where a missing file is
+    /// on, the stop keeps a no for seen activity and face expressions both,
+    /// in the yes's mode and with the mark raised, and says it stopped only
+    /// when something was on; off, the stop removes, as before.
+    #[test]
+    fn with_the_switch_on_a_stop_keeps_a_no_for_both() {
+        use lamp_msgs::consent::{
+            BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, mark_in, no_bytes, read_mark,
+        };
+        let folder = folder("stop-default");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        let group = std::fs::metadata(&folder).unwrap().gid();
+        let before = lamp_msgs::consent::now_unix_ms();
+        // Nothing kept: on by default, so it stops.
+        assert_eq!(
+            run_by_default(&path, STOP, false, 9, || Some(group)),
+            json!({"ok": true, "note": STOPPED})
+        );
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            no_bytes(SEEN_ACTIVITY, 9, BY_VOICE)
+        );
+        assert_eq!(
+            std::fs::read(&face).unwrap(),
+            no_bytes(FACE_EXPRESSIONS, 9, BY_VOICE)
+        );
+        for file in [&path, &face] {
+            let kept = std::fs::metadata(file).unwrap();
+            assert_eq!(kept.permissions().mode() & 0o777, 0o640);
+            assert_eq!(kept.gid(), group);
+        }
+        assert!(!allowed(&path, SEEN_ACTIVITY, true) && !allowed(&face, FACE_EXPRESSIONS, true));
+        assert!(read_mark(&mark_in(&folder)).unwrap() >= before);
+        // Again: a no already, so nothing was on.
+        assert_eq!(
+            run_by_default(&path, STOP, false, 10, || None),
+            json!({"ok": true, "note": NOT_LOOKING})
+        );
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        // A kept yes: a no in its place.
+        std::fs::write(&path, lamp_msgs::consent::bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        assert_eq!(
+            run_by_default(&path, STOP, false, 11, || None)["note"],
+            STOPPED
+        );
+        assert!(path.exists() && !allowed(&path, SEEN_ACTIVITY, true));
+        // Off: the stop removes the file, as before, and leaves face's.
+        run_at(&path, STOP, false, false, false, 0, || None);
+        assert!(!path.exists() && face.exists());
+        // A no that can't be written says not done.
+        std::fs::create_dir(path.with_extension("storage-next")).unwrap();
+        assert_eq!(
+            run_by_default(&path, STOP, false, 12, || None),
+            json!({"ok": false, "note": NOT_KEPT})
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// Twelve's P3 1 and Heron's on #7928: with `LAMP_NOTICING_BY_DEFAULT`
+    /// on, what was on is seen activity and face reads apart. A stop with
+    /// only faces on says it stopped (in its own line, since lamp-seen says
+    /// back only seen activity), and "start looking again" with only faces
+    /// off says it is looking again, never that it was already.
+    #[test]
+    fn with_the_switch_on_the_answer_counts_face_reads_too() {
+        use lamp_msgs::consent::{
+            BY_APP, BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, no_bytes,
+        };
+        let folder = folder("faces-default");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        // The app's desk off, faces on by default: the stop stops faces.
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        assert_eq!(
+            run_by_default(&path, STOP, false, 9, || None),
+            json!({"ok": true, "note": STOPPED_FACES})
+        );
+        assert!(!allowed(&face, FACE_EXPRESSIONS, true));
+        // The mirror: seen activity on by default, faces a kept no.
+        std::fs::remove_file(&path).unwrap();
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        assert_eq!(
+            run_by_default(&path, LOOK, true, 10, || None),
+            json!({"ok": true, "note": LOOKING_FACES})
+        );
+        assert!(allowed(&face, FACE_EXPRESSIONS, false));
+        assert!(!path.exists());
+        // Both on now: on already.
+        assert_eq!(
+            run_by_default(&path, LOOK, true, 11, || panic!("no write")),
+            json!({"ok": true, "note": LOOKING_ALREADY})
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, "start looking again" is
+    /// the owner's own line alone, with no offer and no `APP_FIRST`: a kept
+    /// no in either file turned back to a yes, a missing one left on by
+    /// default, a guest's line refused. Off, the same call with no offer is
+    /// refused, as before.
+    #[test]
+    fn with_the_switch_on_start_looking_again_is_the_owners_yes() {
+        use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, no_bytes};
+        let folder = folder("look-default");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        // Missing: on already, and nothing written.
+        assert_eq!(
+            run_by_default(&path, LOOK, true, 7, || panic!("no write")),
+            json!({"ok": true, "note": LOOKING_ALREADY})
+        );
+        assert!(!path.exists() && !face.exists());
+        // After a stop: a guest's line keeps nothing; the owner's turns both on.
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        assert_eq!(
+            run_by_default(&path, LOOK, false, 7, || panic!("no write")),
+            json!({"ok": false, "note": OWNER_ONLY})
+        );
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        assert_eq!(
+            run_by_default(&path, LOOK, true, 8, || None),
+            json!({"ok": true, "note": LOOKING})
+        );
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            lamp_msgs::consent::bytes(SEEN_ACTIVITY, 8, BY_VOICE)
+        );
+        assert!(allowed(&face, FACE_EXPRESSIONS, false));
+        // Off: with no offer just before, refused as before.
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        assert_eq!(
+            run_at(&path, LOOK, false, false, true, 9, || panic!("no write")),
+            json!({"ok": false, "note": APP_FIRST})
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #7767: only the descriptions of the look and the stop change with
+    /// the switch; the names, the offer and the count stay.
+    #[test]
+    fn the_switch_changes_only_two_descriptions() {
+        let today = tools_for(false);
+        let on = tools_for(true);
+        assert_eq!(today, tools_as_today());
+        assert_eq!(on[0], today[0]);
+        for (on, today) in on.iter().zip(&today) {
+            assert_eq!(on.name, today.name);
+            assert_eq!(on.parameters, today.parameters);
+            assert_eq!(on.silent, today.silent);
+        }
+        assert!(on[1].description != today[1].description);
+        assert!(on[1].description.contains("start looking"));
+        assert!(on[1].description.contains("server"));
+        assert!(on[1].description.contains("where are my"));
+        assert!(!on[1].description.contains("offer"));
+        assert!(on[2].description != today[2].description);
+        assert!(on[2].description.contains("face"));
+    }
+
+    /// #7767, the first builder's answer 1: with `LAMP_NOTICING_BY_DEFAULT`
+    /// on, a forget keeps a no (and a file that can't be read) in place and
+    /// removes only a kept yes, so it never turns noticing on; off, it
+    /// removes whatever is there, as before.
+    #[test]
+    fn with_the_switch_on_a_forget_keeps_a_no() {
+        use lamp_msgs::consent::{BY_APP, SEEN_ACTIVITY, allowed, bytes, no_bytes};
+        let folder = folder("forget-default");
+        let path = file_in(&folder);
+        for text in [no_bytes(SEEN_ACTIVITY, 5, BY_APP), b"not json".to_vec()] {
+            std::fs::write(&path, &text).unwrap();
+            assert!(!forget_takes(&path, SEEN_ACTIVITY, true));
+            forgotten_or(&path, true);
+            assert_eq!(std::fs::read(&path).unwrap(), text);
+            assert!(!allowed(&path, SEEN_ACTIVITY, true));
+            assert!(forget_takes(&path, SEEN_ACTIVITY, false));
+        }
+        std::fs::write(&path, bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        assert!(forget_takes(&path, SEEN_ACTIVITY, true));
+        forgotten_or(&path, true);
+        assert!(!path.exists() && allowed(&path, SEEN_ACTIVITY, true));
+        // Off: a no is removed, as any file was.
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        forgotten_or(&path, false);
+        assert!(!path.exists());
         let _ = std::fs::remove_dir_all(folder);
     }
 
