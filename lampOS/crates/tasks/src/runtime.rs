@@ -3516,8 +3516,10 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// lamp-cloud's forwarder, with the lamp's work folder under `home` its
 /// workspace, the lamp's skills when `skills` and V1's tool grants when
 /// `v1` (`LAMP_OPENCLAW_V1_TOOLS`, #7245). Run as `lampos`, OpenClaw's own
-/// user, at every start, so an existing lamp's file is brought up to date
-/// on its next start or update. One journal line; no token is in the file.
+/// user, at every start (on a thread of its own: it waits for OpenClaw's
+/// gateway to check the text, minutes at most, #7268), so an existing
+/// lamp's file is brought up to date on its next start or update. One
+/// journal line, and one per wait; no token is in the file.
 pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool, v1: bool) -> String {
     let workspace = lamp_folder(home);
     match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills, v1) {
@@ -4948,10 +4950,15 @@ pub fn serve<C: Clock>(
                 .ok()
                 .as_deref(),
         );
-        eprintln!(
-            "{}",
-            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills, v1)
-        );
+        // Beside the start: the write waits for OpenClaw's gateway to check
+        // it, minutes at most (`openclaw_config::GATEWAY_WAITS`, #7268).
+        let home = side.home.clone();
+        std::thread::spawn(move || {
+            eprintln!(
+                "{}",
+                set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &home, skills, v1)
+            )
+        });
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a

@@ -3003,9 +3003,19 @@ bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
 it (status 1): <lời của OpenClaw>". Không có wrapper ở
 `/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
 trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
-OpenClaw (không có token của forwarder, không có Node, hoặc không có gateway
-đang chạy: nó đóng an toàn) thì từ chối, nên
-không ghi gì cho tới lần lamp-tasks khởi động sau.
+OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
+không ghi gì cho tới lần lamp-tasks khởi động sau. Không có gateway đang chạy
+thì wrapper cũng đóng an toàn, và lamp-tasks có thể khởi động trước gateway
+(lúc boot, hoặc một lần cập nhật khởi động lại cả hai: HOLD của #7268), nên
+riêng lần từ chối đó ("is not running in its own namespaces" của wrapper,
+hoặc "'node': No such file or directory" từ một gateway vừa khởi động) được
+thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
+(`openclaw_config::GATEWAY_WAITS`), mỗi lần chờ một dòng nhật ký
+"OpenClaw's settings wait for its gateway to check them; tried again in N
+s"; không ghi gì trước khi gateway kiểm tra nó. Quá lần chờ cuối thì không
+ghi cho tới lần lamp-tasks khởi động sau; văn bản bị OpenClaw từ chối thì
+không bao giờ thử lại. Việc ghi chạy trên một thread riêng, nên lamp-tasks
+khởi động không bao giờ phải chờ nó.
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 

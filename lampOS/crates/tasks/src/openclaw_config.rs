@@ -326,7 +326,9 @@ pub fn merge_config(
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
 /// written when it can't be merged, or when OpenClaw's own check
-/// ([`validate`] through [`VALIDATOR`]) refuses it. Run at every
+/// ([`validate`] through [`VALIDATOR`]) refuses it; with no gateway there
+/// to check it, it is tried again over [`GATEWAY_WAITS`]
+/// ([`write_waiting`]), so it can take minutes. Run at every
 /// lamp-tasks start, so an existing lamp's file gets V1's tools (or loses
 /// them) on its next start or update, its model, workspace and every other
 /// key kept; the gateway takes `tools` hot and reads `agents` per turn,
@@ -338,7 +340,16 @@ pub fn write(
     skills: bool,
     v1: bool,
 ) -> io::Result<bool> {
-    write_checked(state_dir, port, workspace, skills, v1, Path::new(VALIDATOR))
+    write_waiting(
+        state_dir,
+        port,
+        workspace,
+        skills,
+        v1,
+        Path::new(VALIDATOR),
+        &GATEWAY_WAITS,
+        &mut |line| eprintln!("{line}"),
+    )
 }
 
 /// [`write`], with `validator` as OpenClaw's wrapper.
@@ -451,8 +462,42 @@ pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
     }
 }
 
+/// What lamp-update's wrapper says when it finds no running gateway to
+/// join, and fails closed.
+pub const NO_GATEWAY: &str = "is not running in its own namespaces";
+/// What it says joining a gateway just started whose namespace does not
+/// show Node yet (`lamp_update::openclaw_install::NODE_NOT_READY`).
+pub const NODE_NOT_READY: &str = "'node': No such file or directory";
+/// The waits before each new try of a write OpenClaw's gateway was not
+/// there to check ([`write_waiting`]), 5 min 15 s in all: lamp-tasks can
+/// start before the gateway, at a boot or an update that restarts both
+/// (#7268's HOLD), and a gateway takes 27-53 s to start on lamp-c0a4,
+/// about 3 min with a reinstall beside it.
+// ponytail: a fixed schedule; past it the write waits for lamp-tasks' next
+// start, as a refusal does.
+pub const GATEWAY_WAITS: [Duration; 8] = [
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+    Duration::from_secs(20),
+    Duration::from_secs(40),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+];
+
+/// Whether a write was refused only because OpenClaw's gateway was not
+/// there to check it ([`NO_GATEWAY`], [`NODE_NOT_READY`]), not for its
+/// text.
+pub fn gateway_not_there(error: &str) -> bool {
+    error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
+}
+
 /// [`write_checked`] tried again after each of `waits` while OpenClaw's
-/// gateway is not there to check the text.
+/// gateway is not there to check the text ([`gateway_not_there`]), each
+/// wait said in one line with no value of the file; anything else (written,
+/// right already, refused for its text) ends it at once, and past the last
+/// wait the refusal is returned.
 #[allow(clippy::too_many_arguments)]
 pub fn write_waiting(
     state_dir: &Path,
@@ -464,8 +509,22 @@ pub fn write_waiting(
     waits: &[Duration],
     say: &mut dyn FnMut(&str),
 ) -> io::Result<bool> {
-    let _ = (waits, say);
-    write_checked(state_dir, port, workspace, skills, v1, validator)
+    let mut waits = waits.iter();
+    loop {
+        match write_checked(state_dir, port, workspace, skills, v1, validator) {
+            Err(error) if gateway_not_there(&error.to_string()) => {
+                let Some(wait) = waits.next() else {
+                    return Err(error);
+                };
+                say(&format!(
+                    "tasks: OpenClaw's settings wait for its gateway to check them; tried again in {} s",
+                    wait.as_secs()
+                ));
+                std::thread::sleep(*wait);
+            }
+            done => return done,
+        }
+    }
 }
 
 /// The lamp's guidance for OpenClaw: the same words as Hermes'

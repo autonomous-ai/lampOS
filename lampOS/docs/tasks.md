@@ -2879,9 +2879,19 @@ for byte, and the journal line says "OpenClaw's settings not written: ...
 OpenClaw's own config check refused it (status 1): <OpenClaw's words>".
 With no wrapper at `/usr/local/bin/openclaw` (OpenClaw not installed) the
 text is written as before, with a journal line "written unchecked". A
-wrapper that can't run OpenClaw (no forwarder token, no Node, or no gateway
-running: it fails closed) refuses, so nothing is written until lamp-tasks'
-next start.
+wrapper that can't run OpenClaw (no forwarder token, no Node) refuses, so
+nothing is written until lamp-tasks' next start. With no gateway running
+the wrapper fails closed too, and lamp-tasks can start before the gateway
+(at a boot, or an update that restarts both: #7268's HOLD), so that
+refusal alone (the wrapper's "is not running in its own namespaces", or
+"'node': No such file or directory" from a gateway just started) is tried
+again after 5, 10, 20, 40 s and then 60 s four times, 5 min 15 s in all
+(`openclaw_config::GATEWAY_WAITS`), each wait one journal line "OpenClaw's
+settings wait for its gateway to check them; tried again in N s"; nothing
+is written before the gateway checks it. Past the last wait it is not
+written until lamp-tasks' next start; a text OpenClaw refuses is never
+tried again. The write runs on a thread of its own, so lamp-tasks' start
+never waits for it.
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
