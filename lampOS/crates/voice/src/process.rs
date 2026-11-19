@@ -2701,6 +2701,8 @@ fn second_route_worker_environment(
         crate::make_skill_agent::GUIDE_ENVIRONMENT,
         // With the make on the one run path (#7245).
         crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+        // A make while another is made waits its turn (#7679).
+        crate::make_queue::ENVIRONMENT,
         // Every make straight to that agent (#7245).
         crate::make_skill_local::AGENT_FIRST_ENVIRONMENT,
         crate::make_no_cannot::ENVIRONMENT,
@@ -3041,6 +3043,7 @@ mod tests {
             crate::make_skill_agent::ENVIRONMENT,
             crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::make_skill_agent::ONE_PATH_ENVIRONMENT,
+            crate::make_queue::ENVIRONMENT,
             crate::make_no_cannot::ENVIRONMENT,
             crate::make_core_offer::ENVIRONMENT,
             crate::agent_asks::SERVICES_ENVIRONMENT,
@@ -4198,6 +4201,7 @@ mod tests {
                     || name == crate::make_skill_agent::ENVIRONMENT
                     || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::make_skill_agent::ONE_PATH_ENVIRONMENT
+                    || name == crate::make_queue::ENVIRONMENT
                     || name == crate::make_skill_local::AGENT_FIRST_ENVIRONMENT
                     || name == crate::make_no_cannot::ENVIRONMENT
                     || name == crate::make_core_offer::ENVIRONMENT
@@ -4405,6 +4409,7 @@ mod tests {
                     "LAMP_MAKE_AGENT_ONE_PATH=on",
                     "LAMP_MAKE_CORE_OFFER=on",
                     "LAMP_MAKE_NO_CANNOT=on",
+                    "LAMP_MAKE_QUEUE=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MAKE_SKILL_ASKED=on",

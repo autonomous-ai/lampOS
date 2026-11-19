@@ -468,6 +468,38 @@ async fn a_bare_make_skill_call_has_the_lamps_opening_said_first_once() {
     );
 }
 
+/// #7679 (`LAMP_MAKE_QUEUE`): a bare make asked while another is under way
+/// waits its turn, so the lamp's "I'll make it now" is never said before
+/// it: the one line is the model's "I'll make the gold one next". Idle
+/// again, the opening is said as before.
+#[tokio::test]
+async fn a_bare_make_while_another_is_made_says_no_opening_only_its_next_line() {
+    let opening = format!("said:{}", crate::make_skill_agent::MAKE_OPENING);
+    let next = || vec![text("I'll make the gold one next."), Ok(ChatEvent::Done)];
+    let plain = || vec![Message::user("And another: check the gold price at six.")];
+    let fast = (false, false, Duration::ZERO);
+    crate::make_queue::clear_for_test();
+    assert!(matches!(
+        crate::make_queue::admit(
+            7_679_100,
+            crate::make_queue::Asker::default(),
+            "bitcoin price".into(),
+            Instant::now(),
+            Box::new(|| crate::tools::ToolAnswer::plain(json!({}))),
+        ),
+        crate::make_queue::Admitted::Run
+    ));
+    assert_eq!(
+        a_make_turn(7_679_101, plain(), fast, vec![a_bare_make(), next()]).await,
+        ["said:I'll make the gold one next."]
+    );
+    crate::make_queue::clear_for_test();
+    assert_eq!(
+        a_make_turn(7_679_102, plain(), fast, vec![a_bare_make(), next()]).await,
+        [opening, "said:I'll make the gold one next.".into()]
+    );
+}
+
 /// The model's own opening before its call is said once, and the lamp's
 /// never beside it; a round with no call says no opening, nor does a
 /// `make_skill` call that makes nothing new (a remove, a run, a yes: the

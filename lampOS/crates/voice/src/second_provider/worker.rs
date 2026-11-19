@@ -36,6 +36,8 @@ mod held_colleagues;
 #[cfg(test)]
 mod made_line;
 #[cfg(test)]
+mod make_queue_runs;
+#[cfg(test)]
 mod memory_note_retries;
 
 /// The coordinator renews authority at least this often.
@@ -2457,6 +2459,10 @@ pub fn serve(
         if let Some(place) = &files.tools.tasks {
             crate::make_skill_agent::set_tasks_dir(place.directory.clone());
         }
+        // With `LAMP_MAKE_QUEUE` (#7679): makes left waiting when the voice
+        // last stopped told as not made, and the queue's own thread.
+        crate::make_queue::told_after_restart(say_made_line, say_service_answers);
+        crate::make_queue::start(run_queued, say_made_line);
     }
     // A live ask handed to the lamp's agent (`LAMP_SERVICES_TO_AGENT`,
     // `LAMP_HARD_ASKS_TO_AGENT`) goes through this worker's tasks part.
@@ -6130,6 +6136,68 @@ async fn run_call(
         return ToolAnswer::plain(search.answer(&call.name, &call.args).await);
     }
     let made = call.name == crate::made_skill::MAKE;
+    // `LAMP_MAKE_QUEUE` (#7679): a new make while another is made waits its
+    // turn, told at once; a drop of a waiting one is answered here. Off, or
+    // any other use of the function, as before.
+    let queue_slot = made && heard && crate::make_queue::on();
+    if queue_slot && let Some(id) = crate::make_queue::cancel_of(&call.args) {
+        return ToolAnswer::plain(crate::make_queue::cancel(
+            id,
+            speaker_of(scope.as_ref()).as_deref(),
+            crate::services::owner_of(scope.as_ref()).is_some(),
+        ));
+    }
+    let queue_slot = queue_slot && crate::make_queue::is_new_make(&call.args);
+    if queue_slot {
+        let began = Instant::now();
+        // Its turn and scope are over by the time it runs: made as a cut
+        // make is, with no turn and no lease ([`run_queued`]).
+        let later = queued_work(settings.clone(), call.clone(), request);
+        // Who asked, kept at the ask, only when it would wait: by then its
+        // scope is over and its line may be gone from the thread's twelve
+        // exchanges. One lock and a short memory read; the owner's ids may
+        // read the setup name's small file. An idle make reads none of it.
+        let asker = if crate::make_queue::busy() {
+            crate::make_queue::Asker {
+                speaker: speaker_of(scope.as_ref()),
+                owner: crate::services::owner_of(scope.as_ref()),
+                heard: crate::thread::THREAD.lock().ok().and_then(|thread| {
+                    thread
+                        .heard_in_own_line(request)
+                        .or_else(|| thread.heard_for(request, began))
+                }),
+            }
+        } else {
+            crate::make_queue::Asker::default()
+        };
+        match crate::make_queue::admit(
+            request,
+            asker,
+            crate::make_queue::label_of(&call.args),
+            began,
+            later,
+        ) {
+            crate::make_queue::Admitted::Run => {}
+            crate::make_queue::Admitted::Queued { place, id } => {
+                eprintln!(
+                    "lamp-voice second: request {request}: make queued at place {place} in {:.2} ms (target 10 ms)",
+                    began.elapsed().as_secs_f64() * 1000.0
+                );
+                return ToolAnswer::plain(crate::make_queue::queued_told(
+                    place,
+                    &id,
+                    &crate::make_queue::label_of(&call.args),
+                ));
+            }
+            crate::make_queue::Admitted::Full => {
+                eprintln!(
+                    "lamp-voice second: request {request}: a make wasn't queued: {} already wait",
+                    crate::make_queue::MOST_WAITING
+                );
+                return ToolAnswer::plain(crate::make_queue::full_told());
+            }
+        }
+    }
     let running = move || {
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
@@ -6178,13 +6246,25 @@ async fn run_call(
     // A skill made by voice goes on to the end if a cut ends its turn, and
     // its line is then said through the say service ([`made_running`]), at
     // the product's socket: a worker is given no `LAMP_SAY_SOCKET`.
+    // With `LAMP_MAKE_QUEUE`, the make that holds the queue's slot tells it
+    // once its line is given to its turn or said.
+    if made && queue_slot {
+        return made_running_ended(
+            request,
+            running,
+            say_made_line,
+            crate::make_skill_local::went_on_after,
+            move || {
+                crate::make_queue::said(request);
+            },
+        )
+        .await;
+    }
     if made {
         return made_running(
             request,
             running,
-            |line| {
-                crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
-            },
+            say_made_line,
             crate::make_skill_local::went_on_after,
         )
         .await;
@@ -6192,6 +6272,105 @@ async fn run_call(
     tokio::task::spawn_blocking(running)
         .await
         .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+}
+
+/// A voice make's line said through the say service, at the product's
+/// socket: a worker is given no `LAMP_SAY_SOCKET`.
+fn say_made_line(line: String) {
+    crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
+}
+
+/// A waiting make's work: `call` of `request` answered as a heard make with
+/// no lease, its turn and scope over by the time it runs ([`run_queued`]).
+pub(crate) fn queued_work(
+    settings: crate::tools::Settings,
+    call: lamp_gemini::ToolCall,
+    request: u64,
+) -> crate::make_queue::Work {
+    Box::new(move || {
+        crate::tools::ToolAnswer::plain(crate::tools::answer_keeping_news(
+            &settings, &call, request, true, None,
+        ))
+    })
+}
+
+/// The person whose line `scope` is, as the memory scope holds it: none for
+/// the room's, a held line, or no scope. Atomics only, no I/O: who asked
+/// for a waiting make, and who may drop it (`LAMP_MAKE_QUEUE`).
+fn speaker_of(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    scope?
+        .scope()
+        .filter(|scope| !scope.held())?
+        .person()
+        .map(str::to_owned)
+}
+
+/// Whether the say service answers at the product's socket: a connection
+/// taken, as `say::bind` tells a socket still served from one left behind
+/// (`RuntimeDirectoryPreserve=yes` keeps the old file). Closed at once,
+/// nothing asked.
+fn say_service_answers() -> bool {
+    std::os::unix::net::UnixStream::connect(crate::say::DEFAULT_SOCKET).is_ok()
+}
+
+/// A make that waited its turn (`LAMP_MAKE_QUEUE`, #7679), run now by the
+/// queue's thread on a thread of its own: no turn waits on it, so it says
+/// no waiting line, and its line goes through the say service as a cut
+/// make's does, its say-back's yes forced as usual. It is held to the line
+/// heard at its ask (`make_queue::Entry::run`). The queue is told once that
+/// line is said.
+pub(crate) fn run_queued(entry: crate::make_queue::Entry) {
+    let request = entry.request;
+    run_queued_with(
+        request,
+        Box::new(move || entry.run()),
+        say_made_line,
+        move || {
+            crate::make_queue::said(request);
+        },
+    );
+}
+
+/// [`run_queued`] with its `say` and what is done once the line is said,
+/// `ended`.
+fn run_queued_with(
+    request: u64,
+    work: crate::make_queue::Work,
+    say: impl FnOnce(String) + Send + 'static,
+    ended: impl FnOnce() + Send + 'static,
+) {
+    let pending = crate::make_skill_local::Pending::begin();
+    let ended = OnEnd(Some(ended));
+    let running = std::thread::Builder::new()
+        .name("lamp-voice-queued-make".into())
+        .spawn(move || {
+            // A queued make's failure is always said: the person was told
+            // it comes next, and every later line of theirs is a going on.
+            made_on_this_thread(
+                request,
+                work,
+                say,
+                |_| false,
+                None,
+                std::sync::Weak::new(),
+                (pending, ended),
+            );
+        });
+    if running.is_err() {
+        // The closure, and its `ended`, dropped: the queue goes on.
+        eprintln!("lamp-voice second: request {request}: a waiting make couldn't run: no thread");
+    }
+}
+
+/// `f`, run once when this is dropped: wherever a make ends, a panic too.
+struct OnEnd<F: FnOnce()>(Option<F>);
+
+impl<F: FnOnce()> Drop for OnEnd<F> {
+    fn drop(&mut self) {
+        if let Some(f) = self.0.take() {
+            f();
+        }
+    }
 }
 
 /// A voice [`crate::made_skill::MAKE`] of `request`, `work`, run on the
@@ -6220,72 +6399,143 @@ fn made_running(
     say: impl FnOnce(String) + Send + 'static,
     went_on: impl FnOnce(u64) -> bool + Send + 'static,
 ) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
+    made_running_ended(request, work, say, went_on, || ())
+}
+
+/// [`made_running`], and `ended` run once the make's line was given to its
+/// turn, said through the say service, or there was none to say: the
+/// queue's slot let go (`LAMP_MAKE_QUEUE`, #7679).
+fn made_running_ended(
+    request: u64,
+    work: impl FnOnce() -> crate::tools::ToolAnswer + Send + 'static,
+    say: impl FnOnce(String) + Send + 'static,
+    went_on: impl FnOnce(u64) -> bool + Send + 'static,
+    ended: impl FnOnce() + Send + 'static,
+) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
     let pending = crate::make_skill_local::Pending::begin();
     let (given, answered) = tokio::sync::oneshot::channel();
     // Held by the turn while it waits: gone once the turn is cut, so the
     // make says no waiting line to nobody (`LAMP_MAKE_SKILL_AGENT`).
     let turn = std::sync::Arc::new(());
     let watched = std::sync::Arc::downgrade(&turn);
+    let ended = OnEnd(Some(ended));
     tokio::task::spawn_blocking(move || {
-        crate::make_skill_local::set_turn(watched);
-        // The agent's waiting line goes to this request's turn (#6749).
-        crate::make_skill_agent::set_made_for(request);
-        // Nothing an earlier call left on this thread is taken as this one's.
-        let _ = crate::make_skill_local::take_said_outcome();
-        let answer = work();
-        crate::make_skill_agent::set_made_for(0);
-        let made = crate::make_skill_local::take_said_outcome();
-        if given.send(answer).is_ok() {
-            drop(pending);
-            return;
-        }
-        use crate::make_skill_local::Outcome;
-        let Some((line, outcome)) = made else {
-            eprintln!(
-                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and nothing was made to say"
-            );
-            return;
-        };
-        // Failed, and the person went on since (lamp-9adf, 17 Nov 18:10: a
-        // make cut by the next ask failed 88 s later, and "I couldn't make
-        // that" was said in a later, unrelated turn): nothing is said.
-        if outcome == Outcome::Failed && went_on(request) {
-            eprintln!(
-                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and it kept nothing; the person went on with a line of their own: nothing is said"
-            );
-            return;
-        }
-        eprintln!(
-            "lamp-voice second: request {request}: its turn was cut while make_skill ran, {}: its line is said through the say service",
-            match outcome {
-                Outcome::Made => "and the skill was made",
-                Outcome::Clash => "and the made skill clashes, its choice waiting",
-                Outcome::Failed => "and it kept nothing, the person not gone on",
-            }
+        made_on_this_thread(
+            request,
+            work,
+            say,
+            went_on,
+            Some(given),
+            watched,
+            (pending, ended),
         );
-        // No model round saw the make's answer, so its wait is an app
-        // make's: the line after the say-back must answer it (#7245).
-        // A make with code is said back word for word in place of its cut
-        // code line, so the yes after it is heard whole is forced; one that
-        // also sends keeps its cut write line.
-        let line = crate::skill_write_yes::said_by_the_say_service(request, &line).unwrap_or(line);
-        let saying = std::thread::Builder::new()
-            .name("lamp-voice-made-line".into())
-            .spawn(move || {
-                say(line);
-                drop(pending);
-            });
-        if saying.is_err() {
-            eprintln!(
-                "lamp-voice second: request {request}: the made skill's line couldn't be said: no thread"
-            );
-        }
     });
     async move {
         let _turn = turn;
         answered
             .await
             .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()))
+    }
+}
+
+/// A voice make of `request`, `work`, on this (blocking) thread: its answer
+/// `given` to the turn that waits on it (`watched`), or, with the turn cut
+/// or no turn at all (`given` none: a make that waited its turn,
+/// `LAMP_MAKE_QUEUE`), its line said by `say` on a thread of its own, once.
+/// `held`, its `pending` and `ended`, are dropped once that line is given
+/// or said.
+fn made_on_this_thread<F: FnOnce() + Send + 'static>(
+    request: u64,
+    work: impl FnOnce() -> crate::tools::ToolAnswer,
+    say: impl FnOnce(String) + Send + 'static,
+    went_on: impl FnOnce(u64) -> bool,
+    given: Option<tokio::sync::oneshot::Sender<crate::tools::ToolAnswer>>,
+    watched: std::sync::Weak<()>,
+    held: (crate::make_skill_local::Pending, OnEnd<F>),
+) {
+    let (pending, ended) = held;
+    crate::make_skill_local::set_turn(watched);
+    // The agent's waiting line goes to this request's turn (#6749).
+    crate::make_skill_agent::set_made_for(request);
+    // Nothing an earlier call left on this thread is taken as this one's.
+    let _ = crate::make_skill_local::take_said_outcome();
+    let answer = work();
+    crate::make_skill_agent::set_made_for(0);
+    let made = crate::make_skill_local::take_said_outcome();
+    let queued = given.is_none();
+    let answer = match given {
+        Some(given) => match given.send(answer) {
+            Ok(()) => {
+                drop(pending);
+                drop(ended);
+                return;
+            }
+            Err(answer) => answer,
+        },
+        None => answer,
+    };
+    use crate::make_skill_local::Outcome;
+    // A make that waited its turn and made nothing of its own to say, whose
+    // answer gives a line to say word for word (a core skill turned on,
+    // #7763): no turn says it, so it is said here.
+    let made = made.or_else(|| {
+        queued
+            .then(|| crate::make_queue::line_to_say(&answer.told))
+            .flatten()
+            .map(|line| (line, Outcome::Made))
+    });
+    let Some((line, outcome)) = made else {
+        if queued {
+            eprintln!(
+                "lamp-voice second: request {request}: a make that waited its turn ran, and nothing was made to say"
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and nothing was made to say"
+            );
+        }
+        return;
+    };
+    // Failed, and the person went on since (lamp-9adf, 17 Nov 18:10: a
+    // make cut by the next ask failed 88 s later, and "I couldn't make
+    // that" was said in a later, unrelated turn): nothing is said.
+    if outcome == Outcome::Failed && went_on(request) {
+        eprintln!(
+            "lamp-voice second: request {request}: its turn was cut while make_skill ran, and it kept nothing; the person went on with a line of their own: nothing is said"
+        );
+        return;
+    }
+    let came_to = match outcome {
+        Outcome::Made => "and the skill was made",
+        Outcome::Clash => "and the made skill clashes, its choice waiting",
+        Outcome::Failed => "and it kept nothing, the person not gone on",
+    };
+    if queued {
+        eprintln!(
+            "lamp-voice second: request {request}: a make that waited its turn ran, {came_to}: its line is said through the say service"
+        );
+    } else {
+        eprintln!(
+            "lamp-voice second: request {request}: its turn was cut while make_skill ran, {came_to}: its line is said through the say service"
+        );
+    }
+    // No model round saw the make's answer, so its wait is an app
+    // make's: the line after the say-back must answer it (#7245).
+    // A make with code is said back word for word in place of its cut
+    // code line, so the yes after it is heard whole is forced; one that
+    // also sends keeps its cut write line.
+    let line = crate::skill_write_yes::said_by_the_say_service(request, &line).unwrap_or(line);
+    let saying = std::thread::Builder::new()
+        .name("lamp-voice-made-line".into())
+        .spawn(move || {
+            say(line);
+            drop(pending);
+            drop(ended);
+        });
+    if saying.is_err() {
+        eprintln!(
+            "lamp-voice second: request {request}: the made skill's line couldn't be said: no thread"
+        );
     }
 }
 
