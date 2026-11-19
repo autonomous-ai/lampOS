@@ -3883,7 +3883,12 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   giữ các câu và số đếm trong ngày): tối đa 3 câu một kỹ năng (`MOST_LINES`),
   mỗi câu kèm lúc được soạn, còn mới trong 24 giờ (`FRESH_MS`) và chỉ nói một
   lần (`Kept::take`). Kỹ năng có hai task (Sit back, Meal check) giữ câu của
-  từng task riêng, tổng cộng 3.
+  từng task riêng, tổng cộng 3. Sau `worded_ahead::Store`: mỗi lần ghi là ghi
+  một bản sao lấy dưới khóa riêng, nên lần kích hoạt không bao giờ chờ đĩa.
+  Mọi câu được giữ bị bỏ, và tệp được ghi lại, khi bộ nhớ "quên hết" (sự kiện
+  `memory/forgot` của nó, của bất kỳ ai) và khi ngôn ngữ của chủ đèn đổi
+  (nội dung `LAMP_LANGUAGE_FILE`, đọc mỗi lần xem; câu soạn theo ngôn ngữ cũ
+  không được giữ). Số đếm trong ngày vẫn còn.
 - **Khi nào nạp lại** (`Kept::next_refill`, xem mỗi 5 giây, mỗi lần một, trên
   luồng riêng):
   - đèn rảnh: `voice/state` đang nghỉ, và không khác đi trong 15 giây vừa qua
@@ -3898,10 +3903,14 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     ahead: refills paused: the board is warm or hot` và `... go on: the board
     is cool again` khi nó đổi;
   - tối đa 3 lần nạp một kỹ năng trong 24 giờ bất kỳ (`MOST_REFILLS_A_DAY`,
-    giới hạn cứng, khoảng 30 lần một ngày trên một đèn; điều kiện 2), đếm khi
-    mỗi lần bắt đầu, dù kết quả ra sao, và chỉ trả lại khi lamp-tasks không
-    nhận nó (bận, không liên lạc được: không gì chạy; lần xem sau chờ một
-    phút);
+    giới hạn cứng, khoảng 30 lần một ngày trên một đèn; điều kiện 2), đếm và
+    ghi vào tệp khi mỗi lần bắt đầu, trước khi giao đi
+    (`Store::begin_refill`, HOLD của Heron trên #7903: sập hay khởi động lại
+    giữa chừng vẫn giữ số đếm; số đếm không ghi được thì không bắt đầu gì),
+    dù kết quả ra sao, và chỉ trả lại khi lamp-tasks không nhận nó (bận,
+    không liên lạc được: không gì chạy; lần xem sau chờ một phút). Lần nạp bị
+    hủy vẫn giữ số đếm, nên giới hạn vẫn là một cận dù người dùng chen vào
+    bao nhiêu lần;
   - hạn mức hằng ngày của chủ đèn chưa hết (`worded_ahead::Allowance`, chỗ móc
     cho #7664: việc nạp lấy từ đó trước và dừng khi nó hết, trước bất cứ gì
     một người yêu cầu; đến khi có nó, `NoAllowanceYet`, chỉ giới hạn cứng);
@@ -3910,12 +3919,15 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   định (`core_agent::script`), đúng dòng mà task của một lần kích hoạt sẽ giao,
   đánh dấu `"ahead": true` (`worded_ahead::marked`). Không gì riêng tư được
   đưa vào: các lời nhắc này không mang nội dung nào của lần kích hoạt.
-  lamp-tasks hủy nó ngay cho một câu hỏi trực tiếp của người trên make socket
-  hay task của bất kỳ kỹ năng nào khác (`skill_task::Ahead`,
-  [tasks_vi.md](tasks_vi.md)): nó được kết thúc như lúc hết hạn và được báo
-  `cancelled`, còn cái kia chạy, không bao giờ bị báo bận. Lần giao của việc
-  nạp không phải lần mà một task chờ lượt sau nó (`LAMP_SKILL_TASK_SURE`), nên
-  không gì chờ nó.
+  lamp-tasks hủy nó ngay cho một câu hỏi trực tiếp của người trên make socket,
+  một lần tạo kỹ năng của người hay task của bất kỳ kỹ năng nào khác
+  (`skill_task::Ahead`, [tasks_vi.md](tasks_vi.md)): nó được kết thúc như lúc
+  hết hạn và được báo `cancelled`, còn cái kia chạy khi chỗ được nhả (lần
+  chạy qua Harness vẫn có thể bị báo bận, xem tasks_vi.md). Nó không bao giờ
+  chạy trong pane OpenClaw được giữ (`LAMP_TASKS_ONE_SESSION`), chỉ trong một
+  phiên ngắn của riêng nó, nên lệnh hủy không bao giờ khiến người dùng phải
+  chờ một phiên lạnh. Lần giao của việc nạp không phải lần mà một task chờ
+  lượt sau nó (`LAMP_SKILL_TASK_SURE`), nên không gì chờ nó.
 - **Mỗi câu được kiểm** như trước (`worded_ahead::checked`): một câu ngắn (hai
   câu, 200 ký tự, `core_agent::heard`), không bao giờ `-` hay rỗng, và không
   bao giờ là câu trả lời chỉ dành cho chủ đèn.

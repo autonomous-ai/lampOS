@@ -924,6 +924,11 @@ pub struct SkillRun {
     /// ask that comes while it runs (#7765's follow-up's make cancel,
     /// #7789, for an ask). Never set for any other run.
     pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// The lamp's own refill of a core skill's lines (`"ahead"`, #7903):
+    /// never typed into the kept pane of [`crate::one_session`], but run in
+    /// a short session of its own, so its cancel closes only that, never
+    /// the person's kept session (Twelve's HOLD on #7903).
+    pub refill: bool,
 }
 
 impl SkillRun {
@@ -1037,6 +1042,7 @@ impl SkillRun {
             net: false,
             tells: false,
             cancel: Default::default(),
+            refill: false,
         }
     }
 
@@ -1462,6 +1468,7 @@ pub fn answer_for(
             token,
         );
         made.net = keeps_net;
+        made.refill = hand.ahead;
         if let Some(cancel) = &agent.cancel {
             made.cancel = cancel.clone();
         }
@@ -3775,6 +3782,9 @@ impl Runner for HarnessRunner {
         // lamp-tasks is: Harness closes an idle pane an agent started after
         // 30 min, so as an agent each run keeps its own.
         // OpenClaw's only: a Hermes default keeps the per-run path.
+        // Never the lamp's own refill (Twelve's HOLD on #7903): a cancel
+        // closes the kept session it runs in, and the person who spoke
+        // would wait for a cold one.
         // A make (#7245, the owner 18 Nov 13:4x) is typed into the same
         // kept pane: its runner is built before the pane is, so it reads
         // the lamp's one session here; a fresh `new` per make spent 73 s
@@ -3785,6 +3795,7 @@ impl Runner for HarnessRunner {
                 .flatten()
         });
         if by_start
+            && !run.refill
             && harness.config.as_person
             && crate::one_session::shares(engine)
             && let Some(one) = &one_session
@@ -4622,16 +4633,20 @@ impl HandOvers {
         };
         let ahead = serde_json::from_slice::<Value>(&line)
             .is_ok_and(|line| line["ahead"] == Value::Bool(true));
-        if !take_run_place(running, &self.ahead, ahead) {
+        let cancel = ahead.then(|| std::sync::Arc::new(AtomicBool::new(false)));
+        // A refill's cancel is kept before its place is taken
+        // ([`take_ahead_place`]), so a task never finds it holding the place
+        // with nothing to cancel.
+        let held = match &cancel {
+            Some(cancel) => take_ahead_place(running, &self.ahead, cancel.clone()),
+            None => take_run_place(running, &self.ahead).then_some(None),
+        };
+        let Some(_held) = held else {
             eprintln!("[lamp-tasks] skill task: refused busy, one already runs");
             write_answer(stream, &refusal("busy", BUSY));
             return;
-        }
+        };
         let place = Place(running);
-        let cancel = ahead.then(|| std::sync::Arc::new(AtomicBool::new(false)));
-        let _held = cancel
-            .clone()
-            .map(|cancel| AheadHeld::hold(&self.ahead, cancel));
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
             held: self.held.as_deref().map(|held| held as &dyn Runner),
@@ -4665,11 +4680,10 @@ impl HandOvers {
     }
 }
 
-/// The one run's place, `ahead` the lamp's own refill: free, or held by
-/// the lamp's own refill and `ahead` not, which is cancelled at once and
-/// waited for at most [`crate::voice_ask::CANCEL_WAIT`]. A refill never
-/// cancels anything.
-fn take_run_place(running: &AtomicBool, slot: &Ahead, ahead: bool) -> bool {
+/// The one run's place for a task not the lamp's own refill: free, or held
+/// by the lamp's own refill, which is cancelled at once and waited for at
+/// most [`crate::voice_ask::CANCEL_WAIT`].
+fn take_run_place(running: &AtomicBool, slot: &Ahead) -> bool {
     let take = || {
         running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -4678,8 +4692,9 @@ fn take_run_place(running: &AtomicBool, slot: &Ahead, ahead: bool) -> bool {
     if take() {
         return true;
     }
-    if ahead || !cancel_ahead(slot) {
-        return false;
+    // Nothing to cancel: a task holds it, or a refill let it go just now.
+    if !cancel_ahead(slot) {
+        return take();
     }
     eprintln!("[lamp-tasks] skill task: the lamp's own refill is cancelled for a skill's task");
     let until = std::time::Instant::now() + crate::voice_ask::CANCEL_WAIT;
@@ -4694,14 +4709,36 @@ fn take_run_place(running: &AtomicBool, slot: &Ahead, ahead: bool) -> bool {
     }
 }
 
+/// The one run's place for the lamp's own refill, its `cancel` kept in
+/// `slot` before the place is taken (Heron's P3 on #7903): a task that
+/// comes in between finds it to cancel, never `busy`. None: the place is
+/// held, or another refill's cancel is kept. A refill never cancels
+/// anything.
+fn take_ahead_place<'a>(
+    running: &AtomicBool,
+    slot: &'a Ahead,
+    cancel: std::sync::Arc<AtomicBool>,
+) -> Option<Option<AheadHeld<'a>>> {
+    let held = AheadHeld::hold(slot, cancel)?;
+    running
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+        .then_some(Some(held))
+}
+
 /// The lamp's own refill's cancel, kept in [`Ahead`] while it holds the one
 /// run's place, and taken back however it ends.
 struct AheadHeld<'a>(&'a Ahead);
 
 impl<'a> AheadHeld<'a> {
-    fn hold(slot: &'a Ahead, cancel: std::sync::Arc<AtomicBool>) -> Self {
-        *slot.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(cancel);
-        Self(slot)
+    /// `cancel` kept in `slot`, if no other refill's is.
+    fn hold(slot: &'a Ahead, cancel: std::sync::Arc<AtomicBool>) -> Option<Self> {
+        let mut kept = slot.lock().unwrap_or_else(|poison| poison.into_inner());
+        if kept.is_some() {
+            return None;
+        }
+        *kept = Some(cancel);
+        Some(Self(slot))
     }
 }
 
@@ -6395,20 +6432,19 @@ mod tests {
 
     /// The lamp's own refill (`"ahead": true`) holding the one run's place
     /// yields to any other skill's task at once: cancelled, and its place
-    /// taken within the cancel's wait, never told busy. A refill never
+    /// taken within the cancel's wait (this runner stops at its cancel; a
+    /// Harness run may take longer, docs/tasks.md). A refill never
     /// cancels anything, and holds no grant.
     #[test]
     fn a_refill_yields_its_place_to_a_skills_task() {
         let running = std::sync::Arc::new(AtomicBool::new(false));
         let slot = Ahead::default();
-        assert!(
-            take_run_place(&running, &slot, true),
-            "free: the refill runs"
-        );
         let cancel = std::sync::Arc::new(AtomicBool::new(false));
-        let held = AheadHeld::hold(&slot, cancel.clone());
+        let held =
+            take_ahead_place(&running, &slot, cancel.clone()).expect("free: the refill runs");
         // Another refill: busy, and nothing cancelled.
-        assert!(!take_run_place(&running, &slot, true));
+        let other = std::sync::Arc::new(AtomicBool::new(false));
+        assert!(take_ahead_place(&running, &slot, other).is_none());
         assert!(!cancel.load(Ordering::Acquire));
         // The refill's run ends once cancelled, as a runner's loop does.
         let ends = {
@@ -6421,17 +6457,18 @@ mod tests {
             })
         };
         let asked = std::time::Instant::now();
-        assert!(
-            take_run_place(&running, &slot, false),
-            "a skill's task runs"
-        );
+        assert!(take_run_place(&running, &slot), "a skill's task runs");
         assert!(cancel.load(Ordering::Acquire));
         assert!(asked.elapsed() < crate::voice_ask::CANCEL_WAIT);
         ends.join().unwrap();
         drop(held);
         assert!(slot.lock().unwrap().is_none(), "taken back as it ends");
-        // A skill's task holding the place: another is busy, as before.
-        assert!(!take_run_place(&running, &slot, false));
+        // A skill's task holding the place: another is busy, as before, and
+        // a refill too.
+        assert!(!take_run_place(&running, &slot));
+        let late = std::sync::Arc::new(AtomicBool::new(false));
+        assert!(take_ahead_place(&running, &slot, late).is_none());
+        assert!(slot.lock().unwrap().is_none(), "its cancel never kept");
         // The line: `ahead` is read, and holds no grant.
         let ahead = HandOver::parse(
             &line(|value| {
@@ -6448,6 +6485,45 @@ mod tests {
             granted.unwrap_err().1,
             "the lamp's own refill holds no grant"
         );
+    }
+
+    /// Heron's P3 on #7903: a task that comes while a refill is taking its
+    /// place always finds its cancel, never `busy`. A refill takes and lets
+    /// go its place over and over, ending at once when cancelled, while
+    /// tasks come: every one of them runs.
+    #[test]
+    fn a_task_while_a_refill_takes_its_place_cancels_it() {
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let slot = Ahead::default();
+        let done = std::sync::Arc::new(AtomicBool::new(false));
+        let refills = {
+            let (running, slot, done) = (running.clone(), slot.clone(), done.clone());
+            std::thread::spawn(move || {
+                while !done.load(Ordering::Acquire) {
+                    let cancel = std::sync::Arc::new(AtomicBool::new(false));
+                    if let Some(held) = take_ahead_place(&running, &slot, cancel.clone()) {
+                        // Its run, until cancelled or a moment passes.
+                        for _ in 0..50 {
+                            if cancel.load(Ordering::Acquire) {
+                                break;
+                            }
+                            std::hint::spin_loop();
+                        }
+                        // Its place let go before its cancel, as `one`'s
+                        // drops do.
+                        running.store(false, Ordering::Release);
+                        drop(held);
+                    }
+                    std::thread::sleep(Duration::from_micros(20));
+                }
+            })
+        };
+        for at in 0..2_000 {
+            assert!(take_run_place(&running, &slot), "task {at} told busy");
+            running.store(false, Ordering::Release);
+        }
+        done.store(true, Ordering::Release);
+        refills.join().unwrap();
     }
 
     /// A run cancelled (the lamp's own news ask, by a person's ask; the make

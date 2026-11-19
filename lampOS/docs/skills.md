@@ -2324,6 +2324,12 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   (`MOST_LINES`), each with when it was worded, fresh for 24 h
   (`FRESH_MS`) and said once (`Kept::take`). A skill of two tasks (Sit
   back, Meal check) keeps each task's lines on their own, 3 together.
+  Behind `worded_ahead::Store`: each write is of a copy taken under its own
+  lock, so a fire's take never waits on the disk. Every kept line is let
+  go, and the file written so, at memory's "forget everything" (its
+  `memory/forgot` event, any person's) and when the owner's language
+  changes (the `LAMP_LANGUAGE_FILE` text, read at each look; a line worded
+  under the old language is not kept). The day's count stays.
 - **When a refill runs** (`Kept::next_refill`, looked for every 5 s, one
   at a time, on a thread of its own):
   - the lamp idle: `voice/state` resting, and not otherwise for the last
@@ -2338,10 +2344,14 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
     hour. The journal says `worded ahead: refills paused: the board is
     warm or hot` and `... go on: the board is cool again` as it changes;
   - at most 3 refills a skill in any 24 hours (`MOST_REFILLS_A_DAY`, a
-    hard cap, about 30 a day on a lamp; condition 2), counted as each
-    begins, whatever comes of it, and given back only when lamp-tasks
+    hard cap, about 30 a day on a lamp; condition 2), counted and written
+    to the file as each begins, before it is handed over
+    (`Store::begin_refill`, Heron's HOLD on #7903: a crash or a restart
+    mid-run keeps the count; a count that can't be written begins
+    nothing), whatever comes of it, and given back only when lamp-tasks
     never took it (busy, not reached: nothing ran; the next look then
-    waits a minute);
+    waits a minute). A cancelled refill keeps its count, so the cap stays a
+    bound however often a person cuts in;
   - the owner's daily allowance not spent (`worded_ahead::Allowance`, the
     hook for #7664: refills come out of it first and stop once it is
     spent, before anything a person asked for; until it lands,
@@ -2351,11 +2361,15 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   fixed brief (`core_agent::script`), the same line a fire's task would
   hand over, marked `"ahead": true` (`worded_ahead::marked`). Nothing
   private goes in: these nudges carry no content of a fire. lamp-tasks
-  cancels it at once for a person's live ask on the make socket or any
-  other skill's task (`skill_task::Ahead`, [tasks.md](tasks.md)): it is
-  ended as at its deadline and told `cancelled`, and the other runs,
-  never told busy. A refill's hand-over is not one a task waits its turn
-  behind (`LAMP_SKILL_TASK_SURE`), so nothing waits for it.
+  cancels it at once for a person's live ask on the make socket, a
+  person's make or any other skill's task (`skill_task::Ahead`,
+  [tasks.md](tasks.md)): it is ended as at its deadline and told
+  `cancelled`, and the other runs once its place is let go (a Harness run
+  may still be told busy, see tasks.md). It never runs in the kept
+  OpenClaw pane (`LAMP_TASKS_ONE_SESSION`), only in a short session of its
+  own, so a cancel never costs the person a cold session. A refill's
+  hand-over is not one a task waits its turn behind
+  (`LAMP_SKILL_TASK_SURE`), so nothing waits for it.
 - **Each line is checked** as before (`worded_ahead::checked`): one short
   line (two sentences, 200 characters, `core_agent::heard`), never `-` or
   empty, and never an answer for the owner alone.

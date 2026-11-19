@@ -704,6 +704,7 @@ pub fn make_run_with(
         net: false,
         tells: false,
         cancel: Default::default(),
+        refill: false,
     }
 }
 
@@ -1853,6 +1854,9 @@ pub struct MakeHandOvers {
     /// taken only with one of its switches on; `None`, refused `off` as
     /// any line that is not a make's.
     pub asks: Option<Arc<crate::voice_ask::Asks>>,
+    /// The lamp's own refill of a core skill's lines, which a person's make
+    /// cancels as it takes its place ([`take_make_place`]).
+    pub ahead: crate::skill_task::Ahead,
 }
 
 impl MakeHandOvers {
@@ -1860,8 +1864,9 @@ impl MakeHandOvers {
     /// kept in `ahead`, the skill tasks' slot ([`crate::skill_task::Ahead`]).
     pub fn with_ahead(mut self, ahead: crate::skill_task::Ahead) -> Self {
         if let Some(asks) = self.asks.as_mut().and_then(Arc::get_mut) {
-            asks.ahead = ahead;
+            asks.ahead = ahead.clone();
         }
+        self.ahead = ahead;
         self
     }
 
@@ -1915,6 +1920,7 @@ impl MakeHandOvers {
             one_path: Some(gateway),
             caller: caller_may,
             asks,
+            ahead: Default::default(),
         }
     }
 
@@ -2025,10 +2031,7 @@ impl MakeHandOvers {
             write_answer(stream, &answered);
             return;
         }
-        if running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        if !take_make_place(running, &self.ahead) {
             eprintln!("[lamp-tasks] skill make: refused busy, one is being made");
             write_answer(stream, &refusal("busy", BUSY));
             return;
@@ -2048,6 +2051,24 @@ impl MakeHandOvers {
         eprintln!("{}", journal_line(&answered));
         write_answer(stream, &answered);
     }
+}
+
+/// The one make's place: taken, a person's make cancels the lamp's own
+/// refill of a core skill's lines (Heron's P3 on #7903), so the agent's
+/// CPU is the make's; refused busy, it cancels nothing.
+fn take_make_place(running: &AtomicBool, ahead: &crate::skill_task::Ahead) -> bool {
+    if running
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return false;
+    }
+    if crate::skill_task::cancel_ahead(ahead) {
+        eprintln!(
+            "[lamp-tasks] skill make: the lamp's own refill is cancelled for a person's make"
+        );
+    }
+    true
 }
 
 /// The journal's line for a make's outcome: its code and, refused, the
@@ -2113,6 +2134,21 @@ mod tests {
     /// tells it: by the one run path the lamp's Harness runner, asked for a
     /// last chat answer fit to say; else the make's net runner, asked to
     /// write it to the run's own `answer.md`.
+    /// Heron's P3 on #7903: a person's make cancels the lamp's own refill as
+    /// it takes its place; a make refused busy cancels nothing.
+    #[test]
+    fn a_persons_make_cancels_the_lamps_refill() {
+        let ahead = crate::skill_task::Ahead::default();
+        let refill = Arc::new(AtomicBool::new(false));
+        *ahead.lock().unwrap() = Some(refill.clone());
+        let running = AtomicBool::new(true);
+        assert!(!take_make_place(&running, &ahead), "busy");
+        assert!(!refill.load(Ordering::Acquire));
+        running.store(false, Ordering::Release);
+        assert!(take_make_place(&running, &ahead));
+        assert!(refill.load(Ordering::Acquire));
+    }
+
     #[test]
     fn a_net_runner_keeps_an_answer_by_either_path() {
         let home = Path::new("/var/lib/lampos-tasks");
@@ -3320,6 +3356,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3363,6 +3400,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3388,6 +3426,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
         }
         .start(false, Arc::default())
         .unwrap();

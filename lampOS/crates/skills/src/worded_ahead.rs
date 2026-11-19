@@ -170,6 +170,115 @@ pub struct Kept {
     /// Each refill begun: its skill and when, in Unix ms.
     #[serde(default)]
     pub refills: Vec<(String, u64)>,
+    /// The owner's language file's text the lines were worded under
+    /// (`LAMP_LANGUAGE_FILE`): another, and they are let go
+    /// ([`Store::in_language`]).
+    #[serde(default)]
+    pub language: Option<String>,
+}
+
+/// What is kept, behind its lock, and its file (Heron's HOLD and P3 on
+/// #7903): each write is of a copy taken under a lock of its own, so a
+/// fire's take never waits on a write (the copy is taken in a moment), and
+/// the newest copy is always the one written last.
+#[derive(Debug, Default)]
+pub struct Store {
+    kept: std::sync::Mutex<Kept>,
+    writing: std::sync::Mutex<()>,
+    file: Option<std::path::PathBuf>,
+}
+
+/// Why no refill began: its count couldn't be written.
+pub const NOT_WRITTEN: &str = "worded ahead: no refill begins: its count couldn't be written";
+/// Why the kept lines were let go.
+pub const FORGOTTEN: &str = "memory forgot everything";
+pub const LANGUAGE_CHANGED: &str = "the owner's language changed";
+
+impl Store {
+    /// What `file` keeps, if there is one; in this process alone otherwise.
+    pub fn at(file: Option<std::path::PathBuf>) -> Self {
+        let kept = file.as_deref().map(Kept::load).unwrap_or_default();
+        Self {
+            kept: std::sync::Mutex::new(kept),
+            writing: std::sync::Mutex::new(()),
+            file,
+        }
+    }
+
+    /// What is kept, locked.
+    pub fn kept(&self) -> std::sync::MutexGuard<'_, Kept> {
+        self.kept
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// What is kept now, written whole to its file, if it has one.
+    pub fn save(&self) -> Result<(), String> {
+        let Some(file) = &self.file else {
+            return Ok(());
+        };
+        let _writing = self
+            .writing
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let copy = self.kept().clone();
+        copy.save(file)
+    }
+
+    /// The refill to begin now ([`Kept::next_refill`]) and `today`, its
+    /// count of the day's cap: counted and written to the file before it
+    /// is handed over (Heron's HOLD on #7903), so a crash or a restart
+    /// during its run keeps the count. None when none may begin; the count
+    /// not written, it is given back and none begins.
+    pub fn begin_refill(
+        &self,
+        kinds: &[Kind],
+        now: &Now<'_>,
+    ) -> Result<Option<(Kind, usize)>, String> {
+        let (kind, today) = {
+            let mut kept = self.kept();
+            let Ok(kind) = kept.next_refill(kinds, now) else {
+                return Ok(None);
+            };
+            kept.count_refill(kind.pilot.name, now.now_ms);
+            (kind, kept.refills_today(kind.pilot.name, now.now_ms))
+        };
+        if let Err(why) = self.save() {
+            self.kept().uncount_refill(kind.pilot.name, now.now_ms);
+            return Err(format!("{NOT_WRITTEN}: {why}"));
+        }
+        Ok(Some((kind, today)))
+    }
+
+    /// Every kept line let go, and written so; the day's count stays, so
+    /// the cap holds. Whether any was kept.
+    pub fn clear(&self) -> bool {
+        let had = {
+            let mut kept = self.kept();
+            let had = !kept.lines.is_empty();
+            kept.lines.clear();
+            had
+        };
+        if let Err(why) = self.save() {
+            eprintln!("lamp-skills: {why}");
+        }
+        had
+    }
+
+    /// The lines kept in the owner's `language` now (the language file's
+    /// text): worded under another, they are let go and the new one kept.
+    /// Whether any were let go.
+    pub fn in_language(&self, language: Option<&str>) -> bool {
+        let language = language.map(str::trim).map(str::to_owned);
+        {
+            let mut kept = self.kept();
+            if kept.language == language {
+                return false;
+            }
+            kept.language = language;
+        }
+        self.clear()
+    }
 }
 
 /// Whether a line worded at `worded_ms` is fresh at `now_ms`: under

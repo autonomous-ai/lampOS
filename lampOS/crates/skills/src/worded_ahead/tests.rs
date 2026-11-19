@@ -299,3 +299,60 @@ fn the_journal_gives_the_rows_numbers() {
     assert_eq!(cpu_usec(&dir.join("none")), None);
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Heron's HOLD on #7903: a refill's count is written before it is handed
+/// over. Counted, then a crash (the file read again, the run never ended):
+/// after three, the next is refused at the cap.
+#[test]
+fn the_count_outlives_a_crash_mid_refill() {
+    let dir = std::env::temp_dir().join(format!("worded-ahead-crash-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(FILE);
+    let only_sip = Kind::all_of(|name| name == "sip-of-water");
+    for at in 0..MOST_REFILLS_A_DAY as u64 {
+        // A new process each time: what the file keeps, and nothing else.
+        let store = Store::at(Some(file.clone()));
+        let now = idle(NOON_MS + at * HOUR_MS, &never, &NoAllowanceYet);
+        let (kind, today) = store.begin_refill(&only_sip, &now).unwrap().unwrap();
+        assert_eq!(kind.key(), "sip-of-water");
+        assert_eq!(today, at as usize + 1);
+        // The crash: dropped with the run under way, no end, no save.
+        drop(store);
+    }
+    let store = Store::at(Some(file.clone()));
+    let later = idle(NOON_MS + 5 * HOUR_MS, &never, &NoAllowanceYet);
+    assert_eq!(store.begin_refill(&only_sip, &later), Ok(None));
+    assert_eq!(store.kept().next_refill(&only_sip, &later), Err(CAPPED));
+    // A count that can't be written begins nothing and is given back.
+    let unwritable = Store::at(Some(dir.join("no-such-folder").join(FILE)));
+    let now = idle(NOON_MS, &never, &NoAllowanceYet);
+    assert!(unwritable.begin_refill(&only_sip, &now).is_err());
+    assert_eq!(unwritable.kept().refills_today("sip-of-water", NOON_MS), 0);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// Heron's P3 on #7903: "forget everything" and a language change let the
+/// kept lines go, written so; the day's count stays.
+#[test]
+fn forget_and_a_language_change_let_the_kept_lines_go() {
+    let dir = std::env::temp_dir().join(format!("worded-ahead-forget-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(FILE);
+    let store = Store::at(Some(file.clone()));
+    let sip = kind("sip-of-water");
+    assert!(
+        !store.in_language(Some("en\n")),
+        "the first read: nothing to let go"
+    );
+    assert!(!store.in_language(Some("en")), "the same language");
+    store.kept().keep(&sip, "A sip?".into(), NOON_MS);
+    store.kept().count_refill("sip-of-water", NOON_MS);
+    assert!(store.clear());
+    assert!(Kept::load(&file).lines.is_empty(), "written so");
+    assert_eq!(Kept::load(&file).refills_today("sip-of-water", NOON_MS), 1);
+    store.kept().keep(&sip, "A sip?".into(), NOON_MS);
+    assert!(store.in_language(Some("vi")));
+    assert!(store.kept().take(&sip, NOON_MS).is_none());
+    assert_eq!(Kept::load(&file).language.as_deref(), Some("vi"));
+    std::fs::remove_dir_all(&dir).unwrap();
+}

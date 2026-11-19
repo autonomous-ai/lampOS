@@ -2976,10 +2976,20 @@ for each run, and is answered once the run ends
   and `"ahead": true` for the lamp's own refill of a core skill's lines
   worded ahead (`lamp_skills::worded_ahead`, [skills.md](skills.md)): it
   holds no grant, and while its run holds the one place, any other skill's
-  task, or a person's live ask on the make socket (`voice_ask`), cancels it
-  at once (`skill_task::Ahead`, one slot both sockets share; the run ended
-  as at its deadline and told `cancelled`) and runs within the cancel's
-  0.75 s, never told busy. A refill never cancels anything.
+  task, a person's live ask on the make socket (`voice_ask`) or a person's
+  make, cancels it at once (`skill_task::Ahead`, one slot both sockets
+  share; the run ended as at its deadline and told `cancelled`). Its cancel
+  is kept before it takes the place, so none finds the place held with
+  nothing to cancel. A task or an ask then takes the place within the
+  cancel's 0.75 s once the refill's run has let it go: at once with a run
+  that stops at its cancel; a Harness run first closes its session and
+  ends its token, and a `harness new` under way isn't cut, so there it can
+  still be told busy (not measured on a lamp). A make takes its own place
+  and cancels it. A refill never cancels anything, and never runs in the
+  kept pane of `LAMP_TASKS_ONE_SESSION` (`SkillRun::refill`): it runs in a
+  short session of its own, the per-run way, so its cancel closes only
+  that and never the person's kept OpenClaw session (Twelve's HOLD on
+  #7903).
   Every field but `ahead` is needed and no other is taken. `skill` is a skill's name
   (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
   `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only) or,

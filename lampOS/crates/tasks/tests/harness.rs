@@ -7561,6 +7561,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         net: false,
         tells: false,
         cancel: Default::default(),
+        refill: false,
     }
 }
 
@@ -10087,6 +10088,122 @@ fn one_session_plan(rig: &Rig) {
         "reply":{"default":true},
         "close":{"exit":0},
     }));
+}
+
+/// Twelve's HOLD on #7903: the lamp's own refill never runs in the kept
+/// pane. With `LAMP_TASKS_ONE_SESSION` on, a run opens the pane; a refill
+/// runs in a session of its own, and one cancelled mid-turn (a person
+/// spoke) closes only that; the next run is typed into the same pane,
+/// never a cold `new`.
+#[test]
+fn a_refill_cancel_leaves_the_kept_session_open() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    let plan = |wait_ms: u64| {
+        let own = step(
+            json!({"ok":true,"machineId":MACHINE,"agent":{"id":OTHER,"name":"skill-task-1","engine":"openclaw"}}),
+        );
+        json!({
+            "machines":{"default":true},
+            "new":{"each":[{"default":true}, own]},
+            "wait":{"stdout":waited("idle", AGENT),"delay_ms":wait_ms,
+                "by_arg":{OTHER:{"stdout":waited("stopped", OTHER),"delay_ms":wait_ms}}},
+            "show":{"stdout":json!({
+                "id":AGENT,"state":"idle","ask":"New task task-1:\nRun the skill.",
+                "answer":"Took the photo.","truncated":false,"tools":1
+            }).to_string(),"by_arg":{OTHER:{"stdout":json!({
+                "id":OTHER,"state":"stopped","ask":"Run the skill.",
+                "answer":"Took the photo.","truncated":false,"tools":1
+            }).to_string()}}},
+            "reply":{"default":true},
+            "close":{"exit":0},
+        })
+    };
+    rig.plan(plan(0));
+    let runner = one_session_runner(&rig);
+    let run = |made: SkillRun| {
+        let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let ran = runner.run(&made, &|| {});
+        let _ = launched.join();
+        ran
+    };
+    assert_eq!(run(skill_run(Duration::from_secs(20))), Ok(0));
+    let mut refill = skill_run(Duration::from_secs(20));
+    refill.refill = true;
+    assert_eq!(run(refill), Ok(0), "a refill not cancelled ends as any run");
+    // Its turn waited on; cancelled as it waits.
+    rig.plan(plan(2_000));
+    let mut refill = skill_run(Duration::from_secs(20));
+    refill.refill = true;
+    let cancel = refill.cancel.clone();
+    let waits = |rig: &Rig| {
+        rig.calls()
+            .iter()
+            .filter(|call| call["args"][0] == "wait")
+            .count()
+    };
+    let before = waits(&rig);
+    let cancels = {
+        let root = rig.root.path().to_path_buf();
+        thread::spawn(move || {
+            let until = Instant::now() + Duration::from_secs(20);
+            let waited = || {
+                fs::read_to_string(root.join("calls.jsonl"))
+                    .unwrap_or_default()
+                    .lines()
+                    .filter(|line| line.contains("\"wait\""))
+                    .count()
+            };
+            while waited() <= before && Instant::now() < until {
+                thread::sleep(Duration::from_millis(5));
+            }
+            cancel.store(true, Ordering::Release);
+        })
+    };
+    let _ = run(refill);
+    cancels.join().unwrap();
+    rig.plan(plan(0));
+    assert_eq!(run(skill_run(Duration::from_secs(20))), Ok(0));
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    let replies: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "reply")
+        .collect();
+    assert_eq!(
+        replies.len(),
+        2,
+        "only the two runs typed into the pane: {verbs:?}"
+    );
+    for reply in replies {
+        assert_eq!(reply["args"][3], AGENT, "the kept pane: {reply}");
+    }
+    let news: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new")
+        .collect();
+    assert_eq!(news.len(), 3, "the pane, then each refill's own: {verbs:?}");
+    assert!(news[0].to_string().contains("one-session"), "{}", news[0]);
+    assert!(
+        news[1..]
+            .iter()
+            .all(|new| !new.to_string().contains("one-session")),
+        "the refills' own: {verbs:?}"
+    );
+    let closes: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "close")
+        .collect();
+    assert!(!closes.is_empty(), "each refill's own closed: {verbs:?}");
+    for close in closes {
+        assert!(
+            !close.to_string().contains(AGENT),
+            "the kept pane closed: {close}"
+        );
+    }
 }
 
 /// #7246: with `LAMP_TASKS_ONE_SESSION` on, an OpenClaw gateway default's

@@ -1314,7 +1314,7 @@ fn serve(
             socket: options.tasks_socket.clone(),
             say: sockets.say.clone(),
             via_agent: HashSet::new(),
-            ahead: WordedAhead::at(options.state.as_deref()),
+            ahead: WordedAhead::at(options.state.as_deref(), &bus),
         }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
@@ -2149,49 +2149,53 @@ struct Tasks {
 /// The core skills' lines worded ahead (`LAMP_CORE_VIA_AGENT`,
 /// [`lamp_skills::worded_ahead`]): what is kept, and where (`--state-dir`);
 /// whether a refill is under way; when `voice/state` was last read, and
-/// last not resting; when a refill was last looked for; and whether the
-/// board was warm then, for the journal's line when it changes.
+/// last not resting; when a refill was last looked for; whether the board
+/// was warm then, for the journal's line when it changes; and memory's
+/// `memory/forgot`, which lets the kept lines go.
 #[derive(Default)]
 struct WordedAhead {
-    kept: Arc<Mutex<lamp_skills::worded_ahead::Kept>>,
-    file: Option<PathBuf>,
+    store: Arc<lamp_skills::worded_ahead::Store>,
     refilling: Arc<std::sync::atomic::AtomicBool>,
     read: Cell<Option<Instant>>,
     talked: Cell<Option<Instant>>,
     looked: Cell<Option<Instant>>,
     warm: Cell<bool>,
+    forgot: RefCell<Option<Subscriber>>,
 }
 
 impl WordedAhead {
     /// What `state`'s file keeps, if there is one; in this process alone
-    /// otherwise.
-    fn at(state: Option<&Path>) -> Self {
+    /// otherwise; `memory/forgot` heard on `bus`.
+    fn at(state: Option<&Path>, bus: &Bus) -> Self {
         let file = state.map(|state| state.join(lamp_skills::worded_ahead::FILE));
-        let kept = file
-            .as_deref()
-            .map(lamp_skills::worded_ahead::Kept::load)
-            .unwrap_or_default();
+        let forgot = bus
+            .subscribe_typed(
+                lamp_msgs::MemoryForgot::TOPIC,
+                "skills_ahead",
+                lamp_msgs::MemoryForgot::TYPE,
+            )
+            .map_err(|error| {
+                eprintln!(
+                    "lamp-skills: worded ahead: memory/forgot not heard, so a forget leaves the kept lines: {error}"
+                )
+            })
+            .ok();
         Self {
-            kept: Arc::new(Mutex::new(kept)),
-            file,
+            store: Arc::new(lamp_skills::worded_ahead::Store::at(file)),
+            forgot: RefCell::new(forgot),
             ..Self::default()
         }
     }
 
-    /// What is kept now, written to its file on a thread of its own, never
-    /// the fire's: the newest is written, whichever thread writes last.
-    fn save(&self) {
-        let (kept, Some(file)) = (self.kept.clone(), self.file.clone()) else {
-            return;
-        };
-        std::thread::spawn(move || save_kept(&kept, &file));
-    }
-}
-
-fn save_kept(kept: &Mutex<lamp_skills::worded_ahead::Kept>, file: &Path) {
-    let kept = kept.lock().unwrap_or_else(|poison| poison.into_inner());
-    if let Err(why) = kept.save(file) {
-        eprintln!("lamp-skills: {why}");
+    /// What is kept now, written on a thread of its own, never the fire's
+    /// (Heron's P3 on #7903): the fire waits on no disk.
+    fn save_soon(&self) {
+        let store = self.store.clone();
+        std::thread::spawn(move || {
+            if let Err(why) = store.save() {
+                eprintln!("lamp-skills: {why}");
+            }
+        });
     }
 }
 
@@ -2205,16 +2209,10 @@ fn said_ahead(skill: &str, tasks: &[Call], calls: Vec<Call>, ahead: &WordedAhead
         Call::Task(step) => Kind::of(skill, &step.task),
         _ => None,
     });
-    let line = kind.and_then(|kind| {
-        ahead
-            .kept
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner())
-            .take(&kind, now_ms)
-    });
+    let line = kind.and_then(|kind| ahead.store.kept().take(&kind, now_ms));
     match line {
         Some(line) => {
-            ahead.save();
+            ahead.save_soon();
             let ago_ms = now_ms.saturating_sub(line.worded_ms);
             eprintln!(
                 "lamp-skills: skill:{skill}: {}",
@@ -2254,6 +2252,20 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
         return;
     }
     ahead.read.set(Some(now));
+    // "Forget everything" (memory's `memory/forgot`, any person's): the
+    // kept lines go with it.
+    if let Some(forgot) = ahead.forgot.borrow_mut().as_mut() {
+        let mut heard = false;
+        while receive(forgot, Duration::ZERO).is_some() {
+            heard = true;
+        }
+        if heard && ahead.store.clear() {
+            eprintln!(
+                "lamp-skills: worded ahead: the kept lines let go: {}",
+                worded::FORGOTTEN
+            );
+        }
+    }
     // Not resting, or not known: a turn is open.
     if said_lately::<VoiceState>(&runner.bus, VoiceState::TOPIC).map(|now| now.state)
         != Some(Voice::Resting)
@@ -2266,6 +2278,13 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
         return;
     }
     ahead.looked.set(Some(now));
+    // Worded in another language than the owner's now: let go.
+    if ahead.store.in_language(language_now().as_deref()) {
+        eprintln!(
+            "lamp-skills: worded ahead: the kept lines let go: {}",
+            worded::LANGUAGE_CHANGED
+        );
+    }
     let heat = reading(&runner.bus, worded::BOARD_HEAT);
     let state = reading(&runner.bus, lamp_msgs::BoardState::TOPIC);
     let warm = worded::warm(
@@ -2292,11 +2311,8 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
     let kinds = Kind::all_of(|name| tasks.via_agent.contains(name) && tasks.of.contains_key(name));
     let now_ms = unix_ms();
     let talking = since(&ahead.talked).is_some_and(|since| since < worded::IDLE_AFTER);
-    let mut kept = ahead
-        .kept
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
-    let Ok(kind) = kept.next_refill(
+    // Counted and written before it is handed over (Heron's HOLD on #7903).
+    let begun = ahead.store.begin_refill(
         &kinds,
         &Now {
             now_ms,
@@ -2305,35 +2321,31 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
             quiet,
             allowance: worded::allowance(),
         },
-    ) else {
-        return;
+    );
+    let (kind, today) = match begun {
+        Ok(Some(begun)) => begun,
+        Ok(None) => return,
+        Err(why) => {
+            eprintln!("lamp-skills: {why}");
+            return;
+        }
     };
-    kept.count_refill(kind.pilot.name, now_ms);
-    let today = kept.refills_today(kind.pilot.name, now_ms);
-    drop(kept);
     let Some((folder, _)) = tasks.of.get(kind.pilot.name).cloned() else {
         return;
     };
     ahead
         .refilling
         .store(true, std::sync::atomic::Ordering::Release);
-    let (kept, file, refilling) = (
-        ahead.kept.clone(),
-        ahead.file.clone(),
-        ahead.refilling.clone(),
-    );
+    let (store, refilling) = (ahead.store.clone(), ahead.refilling.clone());
     std::thread::spawn(move || {
-        refill(
-            kind,
-            &folder,
-            &state_dir,
-            &socket,
-            (&kept, file.as_deref()),
-            now_ms,
-            today,
-        );
+        refill(kind, &folder, &state_dir, &socket, &store, now_ms, today);
         refilling.store(false, std::sync::atomic::Ordering::Release);
     });
+}
+
+/// The owner's language file's text now (`LAMP_LANGUAGE_FILE`).
+fn language_now() -> Option<String> {
+    lamp_body::first_stand::language_text()
 }
 
 /// How long a refill lamp-tasks was busy for waits before the next look.
@@ -2349,7 +2361,7 @@ fn refill(
     folder: &Path,
     state: &Path,
     socket: &Path,
-    (kept, file): (&Mutex<lamp_skills::worded_ahead::Kept>, Option<&Path>),
+    store: &lamp_skills::worded_ahead::Store,
     at_ms: u64,
     today: usize,
 ) {
@@ -2382,6 +2394,7 @@ fn refill(
     };
     let cpu = Path::new(worded::CPU_STAT);
     let before = worded::cpu_usec(cpu);
+    let language = language_now();
     let began = Instant::now();
     let answer = std::cell::RefCell::new(None);
     let said = lamp_skills::task::hand(
@@ -2405,8 +2418,10 @@ fn refill(
         .zip(worded::cpu_usec(cpu))
         .map(|(before, after)| after.saturating_sub(before) as f32 / 1_000_000.0);
     worded::allowance().spent(run, cpu_s);
-    let mut kept = kept.lock().unwrap_or_else(|poison| poison.into_inner());
+    let mut kept = store.kept();
     let outcome = match answer.into_inner() {
+        // Worded under another language than the owner's now: not kept.
+        Some(_) if language_now() != language => Err(worded::LANGUAGE_CHANGED.to_owned()),
         Some(answer) => kept
             .refilled(&kind, &answer, at_ms, unix_ms())
             .map_err(str::to_owned),
@@ -2419,12 +2434,10 @@ fn refill(
         }
         None => Err(said),
     };
-    if let Some(file) = file
-        && let Err(why) = kept.save(file)
-    {
+    drop(kept);
+    if let Err(why) = store.save() {
         eprintln!("lamp-skills: {why}");
     }
-    drop(kept);
     let busy = outcome
         .as_ref()
         .is_err_and(|why| why.starts_with(worded::BUSY));
@@ -9373,24 +9386,22 @@ mod tests {
                 via_agent: HashSet::from([skill.to_owned()]),
                 ahead: {
                     let ahead = WordedAhead::default();
+                    let mut held = ahead.store.kept();
                     let sip = lamp_skills::worded_ahead::Kind::of(
                         skill,
                         lamp_skills::core_agent::PILOTS[0].tasks[0].task,
                     )
                     .unwrap();
                     match kept {
-                        Some("stale") => ahead.kept.lock().unwrap().keep(
+                        Some("stale") => held.keep(
                             &sip,
                             "Old words.".into(),
                             unix_ms() - lamp_skills::worded_ahead::FRESH_MS - 60_000,
                         ),
-                        Some(line) => ahead
-                            .kept
-                            .lock()
-                            .unwrap()
-                            .keep(&sip, line.into(), unix_ms()),
+                        Some(line) => held.keep(&sip, line.into(), unix_ms()),
                         None => {}
                     }
+                    drop(held);
                     ahead
                 },
             }),
@@ -9441,7 +9452,7 @@ mod tests {
         );
         let (at, line) = ask.recv_timeout(Duration::from_secs(5)).unwrap();
         let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
-        let kept = runner.tasks.borrow().ahead.kept.lock().unwrap().clone();
+        let kept = runner.tasks.borrow().ahead.store.kept().clone();
         (at.duration_since(fired), asked, kept)
     }
 
