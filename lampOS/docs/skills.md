@@ -5587,9 +5587,15 @@ added (even from a file), kept to turn back on ... Never remove for this,
 even one that starts only when they say its words. Call it at once. Ask
 nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
-remove a skill for good, never to turn one off, pause or stop it". A call
-that carries a turn-off is read before the remove, so a turn-off never
-becomes a remove. **A turn off acts at once** (#7562's rows on lamp-9adf,
+remove a skill for good, never to turn one off, pause, stop or change it
+(no change yet: say so)". A call that carries a turn-off is read before
+the remove, so a turn-off never becomes a remove. **A change never
+removes** (#7975, lamp-9adf, 19 Nov: "change rain check to seven thirty"
+was called as a remove, and the skill went): no made skill is changed by
+voice yet, so the model is told a change is no remove and to say it
+can't be done yet, and the skill is left as it is; whether a line asks a
+change or a removal is the model's to judge (the 13 Nov rule). Test:
+`a_change_is_never_a_remove_and_is_said_cannot_yet`. **A turn off acts at once** (#7562's rows on lamp-9adf,
 18 Nov, second route, DeepSeek: "Lamp, turn off my space facts skill."
 was answered "Do you want it off? If yes, tell me…", "nothing running to
 switch off" for a skill started only by its words, and "Remove space
