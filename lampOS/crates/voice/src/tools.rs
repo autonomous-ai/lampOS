@@ -1312,6 +1312,9 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // #7704): only with names checked.
         face_save_known_only: settings.names_checked
             && crate::known_faces::face_save_known_only_on(),
+        // A question whether the lamp knows them is no ask to remember them
+        // (`LAMP_FACE_QUESTION_NOT_ASK`, lamp-74ff 19 Nov).
+        face_question: crate::known_faces::face_question_not_ask_on(),
     }
 }
 
@@ -1710,8 +1713,9 @@ fn answer_inner(
             }
             // Worded as the Live route's line, which is read on the lamp. A
             // refusal the name checks gave here never reached the eyes, so
-            // it is not said to be theirs (the Reviewer-lead's P3 on #5415).
-            let whom = if crate::known_faces::refused_here(&answer.told) {
+            // it is not said to be theirs (the Reviewer-lead's P3 on #5415),
+            // nor an answer given here (`known_faces::answered_here`).
+            let whom = if crate::known_faces::answered_here(&answer.told) {
                 "the name checks here (the eyes not asked)"
             } else {
                 whom
@@ -3618,6 +3622,7 @@ mod tests {
             name_learn_fix: false,
             face_no_ask: false,
             face_save_known_only: false,
+            face_question: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {

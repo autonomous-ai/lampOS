@@ -238,6 +238,9 @@ struct Look {
     /// The faces whose mouth read still (`no`), turned to the lamp or not
     /// ([`SpeakingFaces::alone_in_view`]).
     still: Vec<String>,
+    /// The passing ids at least [`NEAR_FACE_HEIGHT`] of the frame tall
+    /// ([`SpeakingFaces::one_near_face`]).
+    near: Vec<String>,
     /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
     /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
     turned: Vec<String>,
@@ -348,6 +351,11 @@ pub struct SpeakingFaces {
     named: Mutex<Option<(String, String, Instant)>>,
 }
 
+/// The near-face bar: a face at least this share of the frame tall is
+/// near the lamp ([`SpeakingFaces::one_near_face`]), as the eyes' own
+/// (`lamp-eyes` who.rs `NEAR_ENOUGH`).
+pub const NEAR_FACE_HEIGHT: f32 = 0.10;
+
 /// How long [`SpeakingFaces::known_lately`] keeps a pair read from the
 /// known file: a conversation's going on (`thread::GOING_ON_FOR`, 45 s).
 pub const NAMED_FOR: Duration = Duration::from_secs(45);
@@ -423,6 +431,16 @@ impl SpeakingFaces {
                     .zip(crate::known_faces::at_desk(&faces.faces, desk_only))
                     .filter(|(_, counted)| *counted)
                     .map(|(face, _)| face.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let near = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .filter(|face| face.ymax - face.ymin >= NEAR_FACE_HEIGHT)
+                    .map(|face| face.id.clone())
                     .collect()
             })
             .unwrap_or_default();
@@ -529,6 +547,7 @@ impl SpeakingFaces {
             tracked,
             counted,
             still,
+            near,
             turned,
             turned_silent,
             turned_unread,
@@ -862,6 +881,35 @@ impl SpeakingFaces {
                         })
                     })
             })
+    }
+
+    /// The one near face in view at `at` (`boot/f3`): the eyes' newest own
+    /// look from [`IN_VIEW_BEFORE`] before `at` to `at`, with exactly one
+    /// face at least [`NEAR_FACE_HEIGHT`] tall. `None` for no look then, no
+    /// near face, or two (`LAMP_FACE_QUESTION_NOT_ASK`'s reused name,
+    /// `known_faces::reused_name`).
+    pub fn one_near_face(&self, at: Instant) -> Option<String> {
+        let from = at.checked_sub(IN_VIEW_BEFORE).unwrap_or(at);
+        let looks = self.looks.lock().ok()?;
+        let look = looks
+            .kept
+            .iter()
+            .rev()
+            .find(|look| look.at >= from && look.at <= at && !look.boot.is_empty())?;
+        match look.near.as_slice() {
+            [id] => Some(format!("{}/{id}", look.boot)),
+            _ => None,
+        }
+    }
+
+    /// Whether the faces `then` and `now` (`boot/f3`) are one track as of
+    /// `at`: the same passing id, or one the eyes said follows the other
+    /// ([`Looks::links_at`]). A link no longer kept is no track.
+    pub fn same_track(&self, then: &str, now: &str, at: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let links = looks.links_at(at);
+            one_face(then.to_owned(), &links) == one_face(now.to_owned(), &links)
+        })
     }
 
     /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b), lamp-06c1, 18 Nov): the
