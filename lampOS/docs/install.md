@@ -2457,7 +2457,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `<state>/openclaw.json` with only its `gateway` block
      (`mode: "local"`, `bind: "loopback"`, token auth). lamp-tasks merges
      the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
-     lamp").
+     lamp"). The block is checked by OpenClaw before it lands (#7868), as
+     lamp-tasks' writes are (#7108): the new text goes to a new 0600 file
+     beside `openclaw.json`, made `lampos`'s, and OpenClaw's own `config
+     validate --json` runs on it as `lampos` inside `openclaw-ns`, as the
+     install's `--version` does (`openclaw_install::validate_argv`),
+     pointed at that file by `OPENCLAW_CONFIG_PATH`, never the live one,
+     with a stand-in `LAMP_HERMES_TOKEN` (the check reads the file and
+     calls no provider). Only status 0 renames it into place
+     (`lamp_checked_replace::replace_checked`). Refused, the new file is
+     removed, `openclaw.json` stays byte for byte, and the install fails
+     with error `config` and OpenClaw's words ("... OpenClaw's own config
+     check refused it: ..."), so the gateway is not restarted onto it. With
+     no `openclaw-ns` there the block is written unchecked, said.
    - **From a pinned lockfile, inside the namespace:** the tree is never
      resolved freely. The build carries `crates/update/openclaw/package.json`
      (`openclaw` at 2026.11.2 exactly) and its `package-lock.json` (made
