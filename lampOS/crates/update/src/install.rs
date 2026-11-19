@@ -1507,14 +1507,26 @@ impl Host for System {
     }
 }
 
-/// The Harness CLI as `user`, with `home` as its `HOME` and the user's
-/// own runtime folder (`/run/user/<uid>`), which its per-user service needs.
+/// `ADAPTER_DATA_DIR=<home>/.harness/cli/data`, Harness's own default
+/// exactly (#7906): given to every Harness run here, so Harness 0.6.72's
+/// move of `~/.harness` into the XDG folders (openharness#4469) is
+/// `skipped-override` (`homeMove/conditions.ts` `OVERRIDE_NAMES`) and the
+/// home lampOS reads stays where it is.
+pub(crate) fn harness_data(home: &str) -> String {
+    use lamp_msgs::harness_hold::{DATA_DIR, HARNESS_DATA};
+    format!("{DATA_DIR}={home}/{HARNESS_DATA}")
+}
+
+/// The Harness CLI as `user`, with `home` as its `HOME`, the user's own
+/// runtime folder (`/run/user/<uid>`), which its per-user service needs,
+/// and Harness's data folder ([`harness_data`]).
 pub(crate) fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String> {
     let mut argv: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
     argv.push(format!("HOME={home}"));
     argv.push(format!("XDG_RUNTIME_DIR=/run/user/{uid}"));
+    argv.push(harness_data(home));
     argv.push(HARNESS.to_owned());
     argv.extend(args.iter().map(|arg| (*arg).to_owned()));
     argv
@@ -1774,6 +1786,7 @@ pub fn harness_on_pinned_with(
     installer.extend([
         format!("HOME={home}"),
         format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
+        harness_data(home),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "SHELL=/bin/sh".to_owned(),
     ]);

@@ -20,7 +20,9 @@
 //! start. Which lamp that is, is decided in `lamp_msgs::harness_hold`, for
 //! both.
 use crate::install::{HARNESS_HOME, Runner};
-use lamp_msgs::harness_hold::{HarnessHold, REFUSE_UPDATE, harness_hold};
+use lamp_msgs::harness_hold::{
+    DATA_DIR, HARNESS_DATA, HarnessHold, REFUSE_UPDATE, harness_hold, home_moved_line,
+};
 use rustix::{
     fs::{self as rfs, AtFlags, Mode, OFlags},
     io::Errno,
@@ -90,18 +92,21 @@ pub fn own_exec_start(run: &mut Runner) -> Option<String> {
 /// other line are kept as they are, so a launcher already pinned comes back
 /// byte for byte. `None` when there is no `exec` line. The same text as
 /// lamp-tasks' own.
-pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
-    shaped(text, Some(env_file))
+pub fn pinned_launcher(text: &str, env_file: &str, data: &str) -> Option<String> {
+    shaped(text, Some(env_file), data)
 }
 
 /// `text`, a Harness launcher, with the hold taken out (#6300): the same
 /// lines as [`pinned_launcher`] takes out, none put back. `None` when there
 /// is no `exec` line. The same text as lamp-tasks' own.
-pub fn unpinned_launcher(text: &str) -> Option<String> {
-    shaped(text, None)
+pub fn unpinned_launcher(text: &str, data: &str) -> Option<String> {
+    shaped(text, None, data)
 }
 
-fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
+/// In both shapes, `export ADAPTER_DATA_DIR=<data>` just before the `exec`
+/// line, any earlier one taken out (#7906), so every Harness command, by
+/// hand too, and a daemon it starts keep Harness's home in `~/.harness`.
+fn shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<String> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let exec = lines
         .iter()
@@ -111,6 +116,7 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text.starts_with(&format!("export {DATA_DIR}="))
             || line_text == REFUSE_UPDATE
         {
             continue;
@@ -123,6 +129,7 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         pinned.push_str(REFUSE_UPDATE);
         pinned.push('\n');
     }
+    pinned.push_str(&format!("export {DATA_DIR}={data}\n"));
     for line in &lines[exec..] {
         pinned.push_str(line);
     }
@@ -227,7 +234,8 @@ fn write_shaped(launcher: &Path, env_file: Option<&str>) -> Result<Pinned, Strin
         return Err(said(&why));
     }
     drop(file);
-    let pinned = shaped(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
+    let data = format!("{HARNESS_HOME}/{HARNESS_DATA}");
+    let pinned = shaped(&text, env_file, &data).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Pinned::Kept);
     }
@@ -316,6 +324,11 @@ fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()>
 /// lamp-tasks' unit unreadable (taken as off), the launcher not looked at
 /// or written, and one line said.
 pub fn after_install(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
+    // Harness's home moved to the XDG folders after all (#7906): one fixed
+    // line; nothing is moved back.
+    if let Some(line) = home_moved_line(&root.join(HARNESS_HOME.trim_start_matches('/'))) {
+        say(&line);
+    }
     match switch_on(run) {
         Ok(true) => {}
         Ok(false) => {

@@ -1401,7 +1401,7 @@ impl Cli {
     /// service user's runtime folder and bus looked up now ([`with_user_bus`]).
     pub fn child_environment(&self) -> BTreeMap<String, OsString> {
         with_user_bus(
-            self.config.environment.clone(),
+            crate::hold::with_data_dir(self.config.environment.clone()),
             &self.config.user_runtime_root,
             rustix::process::geteuid().as_raw(),
             &|place: &Path| place.exists(),
