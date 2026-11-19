@@ -162,3 +162,41 @@ pub fn validate(argv: &[String], env: &[(&str, &str)], within: Duration) -> Resu
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    /// Seventh's P3 on #7872: OpenClaw's words go to the journal, so a
+    /// value its error quotes from the config (a gateway token, a
+    /// provider's key, a secret) comes out masked; the rest of what it
+    /// said stays, so the reason can still be read.
+    #[test]
+    fn a_value_openclaws_error_quotes_is_masked() {
+        let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let dir = std::env::temp_dir().join(format!("lamp-checked-replace-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let program = dir.join("openclaw");
+        std::fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\necho 'gateway.auth.token: Invalid input: \"{token}\"'\necho '{{\"gateway\":{{\"auth\":{{\"token\":\"{token}\"}}}},\"apiKey\": \"sk-person-1\", secret=hunter2}}'\nexit 1\n"
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let argv = [program.to_string_lossy().into_owned()];
+        let error = validate(&argv, &[], Duration::from_secs(10)).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        for value in [token, "sk-person-1", "hunter2"] {
+            assert!(!error.contains(value), "{value} in {error}");
+        }
+        assert!(
+            error.contains("gateway.auth.token: Invalid input"),
+            "{error}"
+        );
+        assert!(error.contains("status 1"), "{error}");
+        assert!(error.contains("***"), "{error}");
+    }
+}
