@@ -2820,7 +2820,8 @@ for it.
   lowercase hex, and nothing else (`package::install_made`). The helper
   finds the package the voice's made-skills folder
   (`/var/lib/lampOS/voice/made-skills`, root's, 0700, read by the helper as
-  its owner) names with that hash in its `made.json`. Only a made skill the
+  its owner, and writable to it: in its `ReadWritePaths`, so a no to reports
+  can take `.counts.lock` and delete `counts.json`, #7907) names with that hash in its `made.json`. Only a made skill the
   voice marked to go on (`goes_on_at_unix_ms`, written by
   `made_skill::goes_on` right before it asks: the narrow "put on as made"
   entry, no yes faked) within 30 s (`GOES_ON_WITHIN`) and not yet on goes
