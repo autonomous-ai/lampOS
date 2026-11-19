@@ -85,7 +85,7 @@ pub const DOES_MOST: usize = 200;
 /// What [`UNDO`]'s parameter says: short, so with every switch the
 /// product's unit sets on `make_skill`'s parameters stay within the link's
 /// 4,096 bytes (#8002).
-pub const UNDO_TOLD: &str = "Only when the lamp just turned on a skill in place of a make and the person asks for their own instead: true, alone.";
+pub const UNDO_TOLD: &str = "Only when the lamp just turned on a skill instead of making one and they ask for their own: true, alone.";
 
 /// What the model is told of an undo with nothing to undo.
 pub const NOTHING_TO_UNDO: &str =
