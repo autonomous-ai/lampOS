@@ -58,6 +58,10 @@ ring = "0.17"
 
 [dev-dependencies]
 tempfile = "3"
+# The bound on skills' runs read in the forwarder's own test (#7342,
+# `hermes_llm`'s tests): lamp-skills' switches and reading's folder set for
+# the test's thread alone.
+lamp-skills = { path = "../skills", features = ["share-fixture"] }
 # A real zone for the skill counts' local day (src/reports/skills.rs).
 jiff-tzdb = "0.1"
 # The Skills Store's tests (src/skills.rs): a package signed with a key of
