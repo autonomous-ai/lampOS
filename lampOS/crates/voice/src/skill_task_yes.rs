@@ -162,10 +162,12 @@ pub const NET: (&str, &str) = ("net", "reaches the public internet");
 /// untrusted text and a way out never share one run. `look` is one (whether
 /// someone is there, so whether the house is empty: the first builder's
 /// ruling on #7590, 18 Nov 02:01); `air` is not, and its yes says its
-/// readings can go out ([`AIR_BESIDE_NET`]). With any service's read or
+/// readings can go out ([`AIR_BESIDE_NET`]); nor are the skill's own
+/// `notes`, so a net skill can compare a price with yesterday's (the first
+/// builder's ruling on #7850, 19 Nov 07:20). With any service's read or
 /// write ([`private_grant`]). lamp-tasks keeps the same list
 /// (`lamp_tasks::skill_task::PRIVATE_GRANTS`, held equal by a test).
-pub const PRIVATE_GRANTS: [&str; 5] = ["camera", "microphone", "speech", "notes", "look"];
+pub const PRIVATE_GRANTS: [&str; 4] = ["camera", "microphone", "speech", "look"];
 
 /// Said after the grants when `air` sits beside [`NET`] ([`uses_said`]):
 /// `air` may (it is no private grant), and its readings can leave the lamp,
@@ -174,7 +176,7 @@ pub const AIR_BESIDE_NET: &str = "so its air readings can go to the internet";
 
 /// Said when a skill's grants name [`NET`] beside a private one
 /// (`lamp_tasks::skill_task::NET_BESIDE_PRIVATE`, held equal by a test).
-pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone, what the lamp says or its notes, or know whether someone is there: make it two skills";
+pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone or what the lamp says, or know whether someone is there: make it two skills";
 
 /// Whether `grant` is one a run granted [`NET`] never holds:
 /// [`PRIVATE_GRANTS`], or any service's read or write.
