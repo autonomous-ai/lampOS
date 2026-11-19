@@ -122,15 +122,14 @@ const HELD_UP: Duration = Duration::from_millis(50);
 /// come no faster than one a capture block, so 1.5 s leaves at most 150.
 const HELD_UP_CONTROL: usize = 256;
 
-/// How many control messages a worker's tick may read: a tick held up
-/// (#784) finds the snapshots sent meanwhile queued, and reads them all.
-/// The speaker kept the tight bound (#7804, lamp-0c89 in an update's
-/// restart): a hold-up's queued renewals ended it with "speaker control
-/// tick bound", and lamp-voice with it.
-fn control_bound(tick: Instant, last_tick: &mut Instant) -> usize {
-    let held_up = tick.duration_since(*last_tick) > HELD_UP;
-    *last_tick = tick;
-    if held_up {
+/// How many control messages a worker's tick may read, asked before each
+/// one: a tick held up (#784), since the last tick or within this one (an
+/// install's look at the device), finds the snapshots sent meanwhile queued,
+/// and reads them all. The speaker kept the tight bound (#7804, lamp-0c89 in
+/// an update's restart): a hold-up's queued renewals ended it with "speaker
+/// control tick bound", and lamp-voice with it.
+fn control_bound(tick: Instant, last_tick: Instant) -> usize {
+    if tick.duration_since(last_tick) > HELD_UP || tick.elapsed() > HELD_UP {
         HELD_UP_CONTROL
     } else {
         MAX_CONTROL
@@ -652,8 +651,9 @@ fn capture_loop<D: CaptureDevice>(
         cost.begin();
         // A worker held up (#784) finds the snapshots sent meanwhile queued:
         // they are read in this tick, up to what the longest gap can leave.
-        let bound = control_bound(tick, &mut last_tick);
-        for index in 0..=bound {
+        let previous = std::mem::replace(&mut last_tick, tick);
+        let mut bound = control_bound(tick, previous);
+        for index in 0..=HELD_UP_CONTROL {
             let control = match held.pop_front() {
                 Some(control) => control,
                 None => match channels.control.receive_renewed(Control::is_renewal)? {
@@ -661,6 +661,7 @@ fn capture_loop<D: CaptureDevice>(
                     None => break,
                 },
             };
+            bound = control_bound(tick, previous);
             if index == bound {
                 return Err(io::Error::other("capture control tick bound").into());
             }
@@ -1715,12 +1716,12 @@ fn speaker_loop(
         let tick = Instant::now();
         output.times.begin(tick);
         let stall_pass = stalls.begin();
-        let bound = control_bound(tick, &mut last_tick);
-        for index in 0..=bound {
+        let previous = std::mem::replace(&mut last_tick, tick);
+        for index in 0..=HELD_UP_CONTROL {
             let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
                 break;
             };
-            if index == bound {
+            if index == control_bound(tick, previous) {
                 return Err(io::Error::other("speaker control tick bound").into());
             }
             match control {
