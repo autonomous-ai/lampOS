@@ -5835,6 +5835,11 @@ impl Engine {
                     held.call.name, held.request
                 );
             }
+            // Words cut short a split line was told are not told across a
+            // privacy close or a mute (Heron's P3 on #7990).
+            if let Ok(mut split) = self.shared.split_before.lock() {
+                *split = None;
+            }
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -9677,6 +9682,10 @@ impl Engine {
     /// Words cut short and not yet taken are let go, and the journal says
     /// `why`.
     fn let_go_cut(&self, why: &str) {
+        // Words a split line was told go with them (Heron's P3 on #7990).
+        if let Ok(mut split) = self.shared.split_before.lock() {
+            *split = None;
+        }
         if let Some(cut) = self.shared.cut.lock().ok().and_then(|mut cut| cut.take()) {
             eprintln!(
                 "lamp-voice second: request {}'s words, cut short, are let go: {why}",
@@ -12796,6 +12805,20 @@ async fn spoken(
         &marks,
         carried.as_ref().filter(|_| !the_name_refused && !cut_told),
     );
+    // Nothing showed one person said them all: in the dark no print and no
+    // face, so the words may be another person's. The line's keep is the
+    // room's, as words told first are (Heron's and Twelve's P2 on #7990),
+    // and the chat begun early, asked as the person's, is dropped.
+    if split.is_some() {
+        if let Some(scope) = &scope {
+            scope.narrow_to_room();
+        }
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was asked as the person's, and the line is told cut words (#7976)"
+            );
+        }
+    }
     let earlier_parts: Vec<Part> = kept_earlier
         .into_iter()
         .chain(
@@ -14605,7 +14628,10 @@ struct SplitBefore {
 /// the join's window and the whole within [`CHAIN_MOST_FOR`]. Only when
 /// nothing told the two lines apart: words a voice print or two speaking
 /// faces showed another person's ([`Shared::cut_told_apart`]) are never
-/// told. Anything else, or the switch off, tells none and keeps none.
+/// told; nor are words whose line already ran a call, or any told it
+/// before them: that line acted on them, and telling them as not answered
+/// would do it twice (Twelve's P2 on #7990). Anything else, or the switch
+/// off, tells none and keeps none.
 fn keep_split_before(
     shared: &Shared,
     request: u64,
@@ -14625,15 +14651,11 @@ fn keep_split_before(
     let split = carried
         .filter(|carried| carried.said_by == carried.request)
         .filter(|carried| apart != Some((carried.request, request)))
+        .filter(|carried| !ran_a_call(&carried.rounds))
         .filter(|_| crate::make_no_asks::on())
         .and_then(|carried| {
             let (_, gap) = marks.after_end.filter(|(of, _)| *of == carried.request)?;
-            let mut parts: Vec<Part> = before
-                .filter(|before| before.request == carried.request)
-                .map(|before| before.parts)
-                .unwrap_or_default();
-            parts.retain(|part| now.saturating_duration_since(part.at) <= CHAIN_MOST_FOR);
-            parts.extend(carried.parts.iter().cloned());
+            let parts = split_parts(before, carried, now);
             let words = words_of(&parts);
             (gap <= JOIN_WITHIN
                 && words.chars().any(char::is_alphanumeric)
@@ -14663,6 +14685,26 @@ fn keep_split_before(
         split.gap.as_millis()
     );
     Some(crate::make_no_asks::split_note(&said, split.gap))
+}
+
+/// The parts a split line is told ([`keep_split_before`]): those the cut
+/// line `carried` was itself told, when `before` is that line's own and
+/// each began within [`CHAIN_MOST_FOR`] of `now`, then `carried`'s own,
+/// oldest first.
+fn split_parts(before: Option<SplitBefore>, carried: &Carried, now: Instant) -> Vec<Part> {
+    let mut parts: Vec<Part> = before
+        .filter(|before| before.request == carried.request)
+        .map(|before| before.parts)
+        .unwrap_or_default();
+    parts.retain(|part| now.saturating_duration_since(part.at) <= CHAIN_MOST_FOR);
+    parts.extend(carried.parts.iter().cloned());
+    parts
+}
+
+/// Whether finished chat rounds kept with a line's words ([`Carried::rounds`])
+/// ran a call: a call's result among them.
+fn ran_a_call(rounds: &[Message]) -> bool {
+    rounds.iter().any(|message| message.role == "tool")
 }
 
 /// `text`, the words of `request`, let out or held (`let_out`), and
