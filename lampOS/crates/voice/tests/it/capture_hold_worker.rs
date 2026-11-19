@@ -1824,8 +1824,12 @@ impl Drop for ReopenHoldOn {
 fn with_the_switch_a_reopen_holds_its_blocks_until_a_late_clock_and_goes_on() {
     warm_up();
     let signal = Signal::new(600);
-    let mut rig = Rig::start("scripted reopen hold");
+    // On before the worker starts: it reads the switch once, at its start.
     let _on = ReopenHoldOn::on();
+    // Bounded recovery, as `stalls_in_a_row_…`: with it off the reference
+    // the speaker goes on accepting through the stall is a backlog that
+    // ends the worker before it reopens.
+    let mut rig = Rig::start_with("scripted reopen hold", 0, ReferenceRecovery::Bounded);
     rig.stream(&signal, 30);
     rig.hold_up(400);
     rig.wait_for_start(2);
@@ -1860,8 +1864,12 @@ fn with_the_switch_a_reopen_holds_its_blocks_until_a_late_clock_and_goes_on() {
 fn with_the_switch_a_clock_that_never_starts_is_recovered_then_ends_capture() {
     warm_up();
     let signal = Signal::new(600);
-    let mut rig = Rig::start("scripted reopen never");
+    // On before the worker starts: it reads the switch once, at its start.
     let _on = ReopenHoldOn::on();
+    // Bounded recovery, as `stalls_in_a_row_…`: with it off the reference
+    // the speaker goes on accepting through the stall is a backlog that
+    // ends the worker before it reopens.
+    let mut rig = Rig::start_with("scripted reopen never", 0, ReferenceRecovery::Bounded);
     rig.tolerate_fault = true;
     rig.stream(&signal, 30);
     rig.hold_up(400);
