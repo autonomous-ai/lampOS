@@ -693,6 +693,29 @@ mod tests {
         panic!("run")
     }
 
+    /// #7874 on c0a4: OpenClaw made `my-day`, on, but "run my day" found
+    /// it and then looked it up again as `day`, so it "isn't on". A skill
+    /// named `desk-check` asked as "my desk check skill" still runs.
+    #[test]
+    fn a_made_skill_named_my_something_runs_now() {
+        let (root, keeping) = keeping("run-my-day");
+        made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (heard, name) in [
+            ("my day", "my-day"),
+            ("my-day", "my-day"),
+            ("my desk check skill", "desk-check"),
+        ] {
+            let mut ran = Vec::new();
+            let told = asked(ask(heard), &keeping, owner, no_task, approved, |skill| {
+                ran.push(skill.to_owned());
+                Ok(false)
+            });
+            assert_eq!(ran, [name], "{heard}: {told}");
+            assert_eq!(told[RUN], name, "{heard}: {told}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The owner's two lines at 15:49 and 15:52, as the model passes the
     /// name it heard to `make_skill`'s `run`: each runs that made skill
     /// once, by its name as written, and the model says it is running,
