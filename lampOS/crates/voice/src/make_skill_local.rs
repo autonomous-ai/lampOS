@@ -8687,7 +8687,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
         made_skill::set_writes_here(Some(true));
         made_skill::set_scripts_here(Some(true));
-        let task = "task = { task = \"...\", run = \"scripts/main.py\" }";
+        // #7874: the task in full, and the summary read back for the yes.
+        let task = "task = { task = \"...\", summary = \"...\", run = \"scripts/main.py\" }";
         for reads in [true, false] {
             let on = system_for(reads, true);
             for part in [

@@ -1492,6 +1492,7 @@ mod tests {
     fn step(dir: &Path, run: &str) -> Result<TaskStep, String> {
         TaskFile {
             task: "Take a photo".into(),
+            summary: None,
             run: run.into(),
         }
         .step(dir, None)
@@ -1527,6 +1528,7 @@ mod tests {
         for task in ["", "  ", "a\nb"] {
             let refused = TaskFile {
                 task: task.into(),
+                summary: None,
                 run: "scripts/main.py".into(),
             }
             .step(&folder, None)
