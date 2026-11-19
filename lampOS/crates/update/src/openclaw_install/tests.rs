@@ -3914,6 +3914,7 @@ fn a_gateway_block_the_gateway_was_not_there_to_check_is_tried_again() {
         config.as_object_mut().unwrap().remove("gateway");
         let before = config.to_string();
         fs::write(lamp.at(CONFIG), &before).unwrap();
+        a_round_asks_the_one_shot(&lamp);
         let runs = Runs {
             main_pid: "4242",
             ..Runs::new(&lamp)
