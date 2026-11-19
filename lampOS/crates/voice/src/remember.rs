@@ -11090,12 +11090,17 @@ impl DaysClient {
                 {
                     crate::service_records::unsent(person);
                 }
+                // Nothing unsent goes to the account's history after a
+                // forget (`LAMP_HISTORY_SEND`, #7771): let go now, and again
+                // once the writer let finish what it had in hand.
+                crate::history_send::forgot();
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
                         .saturating_sub(started.elapsed())
                         .min(FORGET_SETTLE),
                 );
+                crate::history_send::forgot();
             }
             if deadline.checked_sub(started.elapsed()).is_none() {
                 return settled((gone(), false));
@@ -14159,6 +14164,9 @@ fn go_on_as(
     current: &Mutex<Current>,
 ) {
     let new = |old: u64| moved.iter().find(|(was, _)| *was == old).map(|(_, id)| *id);
+    // The moved lines go to the account's history as `to`'s, under their
+    // new ids (`LAMP_HISTORY_SEND`, #7771).
+    crate::history_send::moved(to, moved);
     conversation.sources = conversation
         .sources
         .iter()
@@ -14433,6 +14441,12 @@ fn days_writer(
         .map(|early| early.lines);
     let mut end = |conversation: &mut Conversation| {
         let ended = std::mem::take(conversation);
+        // The room's lines of an ended conversation can no longer move to
+        // someone's scope: they go to the account's history as the room's
+        // (`LAMP_HISTORY_SEND`, #7771).
+        if ended.person.is_none() {
+            crate::history_send::settled(&ended.sources);
+        }
         if let Ok(mut current) = current.lock() {
             *current = Current::default();
         }
@@ -14731,7 +14745,8 @@ fn days_writer(
                         .and_then(|mut context| context.inhibit(Stopped::SourceGone));
                     say(said);
                     // Lines made before the stop are not written after it,
-                    // as after a forget said here.
+                    // as after a forget said here, nor sent unsent.
+                    crate::history_send::forgot();
                     hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                     end(&mut conversation);
                     hand_ons.done.fetch_add(1, Ordering::AcqRel);
@@ -14744,6 +14759,16 @@ fn days_writer(
                 conversation.person = person;
                 report(id.is_some());
                 if let Some(id) = id {
+                    // What the memory wrote, under its own id, to the
+                    // account's history with `LAMP_HISTORY_SEND` (#7771):
+                    // queued, never waited on.
+                    crate::history_send::offered(
+                        conversation.person.as_deref(),
+                        id,
+                        at_unix_ms,
+                        &heard,
+                        &said,
+                    );
                     if conversation.full() {
                         let mut piece = conversation.close_piece();
                         let closed = OVERFLOW_CLOSED.fetch_add(1, Ordering::Relaxed) + 1;
@@ -15289,6 +15314,10 @@ fn unconnected() -> Option<UnixStream> {
 /// the switch census reads it as one (reviewer-two on #3059, 23:17).
 #[cfg(test)]
 pub(crate) use tests::event_memory;
+
+/// The Days writer run over a fake memory, for `history_send`'s tests.
+#[cfg(test)]
+pub(crate) use tests::write_for_history_test;
 
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
@@ -26549,6 +26578,59 @@ mod tests {
             took[CALLS - 1]
         );
         assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
+    }
+
+    /// The Days writer on this thread over a fake memory, given `lines`
+    /// (whose scope, what was heard): the memory writes a line heard as
+    /// "kept …" with id 17 and refuses any other; then a session close.
+    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
+        let (socket, served) = memory(
+            "history-send",
+            lines.len() + 1,
+            |request| match request["op"].as_str() {
+                Some("append_linked")
+                    if request["heard"]
+                        .as_str()
+                        .is_some_and(|h| h.starts_with("kept")) =>
+                {
+                    json!({"ok":true,"id":17})
+                }
+                Some("append_linked") => json!({"ok":false,"error":"full"}),
+                _ => json!({"ok":true}),
+            },
+        );
+        let (send, receive) = sync_channel(lines.len() + 2);
+        let now = Instant::now();
+        for (n, (person, heard)) in lines.iter().enumerate() {
+            send.send(DaysJob::Exchange {
+                request: n as u64 + 1,
+                at_unix_ms: NOW,
+                finished: now,
+                heard: (*heard).to_owned(),
+                said: "answer".into(),
+                sources: vec![],
+                rules: vec![],
+                person: person.map(str::to_owned),
+                forgotten: 0,
+                observe_forgets: 0,
+                keeper: None,
+            })
+            .unwrap();
+        }
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(socket);
     }
 
     pub(super) fn memory(
