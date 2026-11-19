@@ -63,6 +63,10 @@ pub struct FaceSwitches {
     /// setup and at setup's first save, only on speaking-face proof
     /// ([`FACE_NO_ASK_ENVIRONMENT`]).
     pub face_no_ask: bool,
+    /// With names checked, a new face's save sent past the face question
+    /// only because the eyes' known file named a face is kept only for a
+    /// face the eyes know ([`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`], #7704).
+    pub face_save_known_only: bool,
 }
 
 /// A refused face request tells the model the face record as it stands
@@ -124,6 +128,25 @@ pub const FACE_NO_ASK_ENVIRONMENT: &str = "LAMP_FACE_NO_ASK";
 /// Whether [`FACE_NO_ASK_ENVIRONMENT`] is exactly `on`.
 pub fn face_no_ask_on() -> bool {
     std::env::var(FACE_NO_ASK_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With `LAMP_NAME_LEARN_FIX`, a new face's save skips the face question
+/// while the eyes' known file names a face at the lamp (#7653), and that
+/// file can still name someone for up to its 3 s after a stranger steps in
+/// (#7704). With this switch that save asks the eyes to keep it only for a
+/// face they know (`"known_only":true`); their `not_known` is told as the
+/// face question ([`ASK_FACE_FIRST`]), nothing kept. Not with
+/// `LAMP_FACE_NO_ASK`, which asks nothing. Voice and eyes ship together:
+/// an older eyes build refuses the field. Only with names checked; `on`
+/// only, off unless set.
+pub const FACE_SAVE_KNOWN_ONLY_ENVIRONMENT: &str = "LAMP_FACE_SAVE_KNOWN_ONLY";
+
+/// Whether [`FACE_SAVE_KNOWN_ONLY_ENVIRONMENT`] is exactly `on`.
+pub fn face_save_known_only_on() -> bool {
+    std::env::var(FACE_SAVE_KNOWN_ONLY_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
 }
 
 /// The exchanges before the turn in hand that a name may have been said
@@ -2073,6 +2096,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         rename_yes: false,
         name_learn_fix: false,
         face_no_ask: false,
+        face_save_known_only: false,
     })
 }
 
@@ -2197,6 +2221,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         },
         None,
         None,
@@ -2725,6 +2750,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         },
         said,
         None,
@@ -2834,13 +2860,17 @@ fn run_switched(
     {
         return (json!({"error": FACE_KEPT_OUT}), true);
     }
-    if new_face
-        && switches.name_learn_fix
-        && !speaker_gave_face_leave(&said.this, lamp_before)
-        && known_now(&known_file_of(socket)).is_none()
-    {
+    let face_question_skipped =
+        new_face && switches.name_learn_fix && !speaker_gave_face_leave(&said.this, lamp_before);
+    if face_question_skipped && known_now(&known_file_of(socket)).is_none() {
         return (json!({"error": ASK_FACE_FIRST}), true);
     }
+    // Skipped only because the known file named a face, which can still
+    // name someone for its 3 s after a stranger steps in: with
+    // `LAMP_FACE_SAVE_KNOWN_ONLY` the eyes keep it only for a face they
+    // know, and their `not_known` is the face question (#7704).
+    let known_only =
+        face_question_skipped && switches.face_save_known_only && !switches.face_no_ask;
     // At setup, a name not heard is taken as they spelled it in the turn in
     // hand: the letters are their own words, not the model's guess (#5140
     // row 6, lamp-0c4e: a misheard name never passed this check).
@@ -2937,7 +2967,7 @@ fn run_switched(
     } else {
         name
     };
-    let line = match call.name.as_str() {
+    let mut line = match call.name.as_str() {
         // `apart` only when true: eyes from before #2176 row 4 refuse a
         // field they don't know.
         REMEMBER if checked && apart => {
@@ -2948,6 +2978,10 @@ fn run_switched(
         FORGET => json!({"forget": name}),
         _ => return (crate::tools::unavailable(), false),
     };
+    // Only when true, as `apart`: eyes from before #7704 refuse the field.
+    if known_only && let Some(line) = line.as_object_mut() {
+        line.insert("known_only".into(), json!(true));
+    }
     if fence.is_some_and(|fence| !fence()) {
         eprintln!(
             "lamp-voice: a face request's authority was gone before it was sent; nothing was sent"
@@ -3360,6 +3394,11 @@ fn told_asking(answer: &Value, visits: bool) -> Value {
     }
     if answer.get("error").and_then(Value::as_str) == Some("not_like_them") {
         return json!({"error": NOT_LIKE_THEM});
+    }
+    // Asked to keep only a face they know (#7704), the eyes knew nobody:
+    // the face question, nothing kept.
+    if answer.get("error").and_then(Value::as_str) == Some("not_known") {
+        return json!({"error": ASK_FACE_FIRST});
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -4694,6 +4733,7 @@ mod tests {
                 rename_yes: false,
                 name_learn_fix: false,
                 face_no_ask: false,
+                face_save_known_only: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -5779,6 +5819,7 @@ mod tests {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         };
         let (told, _) = run_switched(
             &socket,

@@ -1717,6 +1717,26 @@ With the switch:
   is asked first as before. Off, a new face is kept
   on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
+- **A known face only, when the known file let the save past the face
+  question** (`LAMP_FACE_SAVE_KNOWN_ONLY=on`, lamp-voice; off unless set,
+  in no product unit; #7704). The known file stays up to its 3 s after a
+  known face leaves, so a stranger who steps in and gives a name in that
+  gap was saved as a new person with no face question. With the switch,
+  that save alone (the face question skipped only because the known file
+  named a face; never with `LAMP_FACE_NO_ASK`) is sent with
+  `"known_only":true`. The eyes refuse a capture recognised as nobody,
+  under a name nobody is kept under, with `{"error":"not_known"}` before
+  the new-person save (`who::People::remember_one_known_only`,
+  `Refused::NotKnown`; the journal says "asked for a known face only, it is
+  known as nobody"), and the voice tells it as the face question
+  (`ASK_FACE_FIRST`), nothing kept. A known face is still answered "known
+  as" and the rename held (#7653), and their own name on their own face is
+  still kept in place
+  (`a_save_for_a_known_face_only_refuses_a_face_known_as_nobody`,
+  `with_known_only_a_face_the_eyes_do_not_know_is_asked_the_face_question`).
+  `known_only` is sent only when true: eyes from before it refuse a field
+  they don't know, so voice and eyes ship in one build. Off, the line is
+  as before.
 - **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
   checked; off unless set; the first builder 18:50, 18 Nov, from the
   product owner). A face is kept unasked **only with speaking-face proof**
