@@ -3594,12 +3594,14 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
-### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, off)
+### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, on in the product)
 
 A skill's run is an agent session. Its chats go through lamp-cloud's model
 forwarder on the voice's key, so they spend the same daily allowance the
 voice talks on. With up to 100 runs a day (#7151), skills must never leave
-the lamp unable to answer. The switch is off unless set, in no product unit.
+the lamp unable to answer. The switch is off unless set; the product's
+`lamp-skills.service` and `lamp-cloud.service` set it `on` (half the day for
+the voice) since 19 Nov, the first builder's DEFAULT-ON on #7814.
 
 - **The meter:** the relay's `X-Usage-Day-Used` header, from 0 to 1, on each
   HTTP answer of a metered route. It is counted the way the relay counts,
