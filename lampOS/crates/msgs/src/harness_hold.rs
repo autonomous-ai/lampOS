@@ -86,6 +86,32 @@ pub const DATA_DIR: &str = "ADAPTER_DATA_DIR";
 /// (`harnessPath('cli') + '/data'`, `cli/src/config/env.ts`).
 pub const HARNESS_DATA: &str = ".harness/cli/data";
 
+/// `ADAPTER_DATA_DIR=<data>` and its newline: the one line `harness-hold.env`
+/// carries for Harness's data folder (#7906), written alike by lamp-tasks
+/// (crates/tasks/src/hold.rs) and lamp-update after an install or a move
+/// (crates/update/src/harness_install/launcher.rs).
+pub fn data_line(data: &str) -> String {
+    format!("{DATA_DIR}={data}\n")
+}
+
+/// `text`, an env file's words, with [`data_line`] of `data` last (#7906):
+/// any earlier `ADAPTER_DATA_DIR=` line taken out, every other line kept
+/// as it is, a last line with no newline given one.
+pub fn with_data_line(text: &str, data: &str) -> String {
+    let mut kept = String::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with(&format!("{DATA_DIR}=")) {
+            continue;
+        }
+        kept.push_str(line);
+        if !line.ends_with('\n') {
+            kept.push('\n');
+        }
+    }
+    kept.push_str(&data_line(data));
+    kept
+}
+
 /// Which sign says Harness's home under `home` was moved to the XDG
 /// folders after all (#7906): Harness's bridge record, its data root's
 /// marker, or an entry of `~/.harness` left as a link. `None` when none is
@@ -173,6 +199,23 @@ mod tests {
                 assert_eq!(harness_hold(switch, exec.as_deref()), HarnessHold::Off);
             }
         }
+    }
+
+    /// #7906: the env file's data line put last, once, every other line kept.
+    #[test]
+    fn the_data_line_is_put_last_once_and_other_lines_are_kept() {
+        let data = "/var/lib/lampos-tasks/.harness/cli/data";
+        let line = format!("ADAPTER_DATA_DIR={data}\n");
+        assert_eq!(data_line(data), line);
+        assert_eq!(with_data_line("", data), line);
+        let held = "ADAPTER_UPDATE_DISABLE=true\nHERMES_HOME=/h\n";
+        assert_eq!(with_data_line(held, data), format!("{held}{line}"));
+        assert_eq!(
+            with_data_line("ADAPTER_DATA_DIR=/old\nSHELL=/bin/sh", data),
+            format!("SHELL=/bin/sh\n{line}")
+        );
+        let done = with_data_line(held, data);
+        assert_eq!(with_data_line(&done, data), done);
     }
 
     #[test]

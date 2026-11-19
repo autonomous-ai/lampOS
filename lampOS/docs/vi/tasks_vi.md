@@ -3234,17 +3234,27 @@ lampOS đặt `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`,
 pane, vốn băm từ giá trị đó, vẫn như cũ:
 
 - mọi lệnh Harness mà lamp-tasks chạy (môi trường client của nó, lấy từ
-  `HOME` của nó; giá trị đã có sẵn thì giữ), và vì thế cả daemon mà một
+  `HOME` của nó; giá trị đã có sẵn bị thay, nên mọi nơi ghi đều cho
+  cùng một giá trị mà Harness băm), và vì thế cả daemon mà một
   `harness start` sinh ra hay user unit mà nó viết lại (`ADAPTER_DATA_DIR` nằm
   trong `CARRIED_ENV` của `lib/platformDaemon.ts`);
 - `harness-hold.env`, `HARNESS_ENV_FILE` mà lamp-tasks ghi (giữ hay đã gỡ),
-  nên daemon khởi động từ unit cũng đọc được;
+  nên daemon khởi động từ unit cũng đọc được, luôn với giá trị mặc định.
+  `lamp-update harness-install`, sau một lần cài hay một lần
+  chuyển, cũng đặt dòng này vào `harness-hold.env` đã có sẵn (cùng một dòng,
+  `lamp_msgs::harness_hold::with_data_line`: dòng cũ bị bỏ, mọi dòng khác giữ
+  nguyên; ghi bằng root mà không đi theo link, giữ chủ sở hữu và 0600; file
+  chưa có thì không tạo), nên một lần khởi động lại giữa lúc cài Harness
+  0.6.72 và lúc lamp-tasks mới khởi động không làm daemon khởi động thiếu nó;
 - launcher của Harness (`.local/bin/harness`), `export ADAPTER_DATA_DIR=…`
   ngay trước dòng `exec`, giữ hay đã gỡ (canary), do lamp-tasks ghi lúc khởi
   động và `lamp-update harness-install` ghi sau một lần cài, nên một lệnh chạy
   bằng tay cũng có;
 - mọi lần chạy Harness của `lamp-update` (`harness service install`, `stop`,
-  `version`, trình cài, các script của bản giữ lại).
+  `version`, trình cài, các script của bản giữ lại);
+- chính `~/.harness`, do `lampos` tạo (`mkdir -p -m 0700`) trước khi trình
+  cài của Harness chạy, có ghim hay không, nên trên một đèn mới trình cài
+  thấy nó và không chọn các thư mục XDG (và ghi `.harness-root`).
 
 Nếu nhà vẫn bị chuyển, lamp-tasks lúc khởi động và
 `lamp-update harness-install` sau một lần cài nói một dòng, và không chuyển

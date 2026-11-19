@@ -889,8 +889,8 @@ ID>`. It receives only explicitly allowed ordinary provisioning variables:
 `LOGNAME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`,
 `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `ADAPTER_DATA_DIR`,
 `HARNESS_AUTH_DIR`, `PORT`. `HOME` is absolute and every PATH entry is
-absolute. `ADAPTER_DATA_DIR`, when lamp-tasks has none, is set to
-`<HOME>/.harness/cli/data` (#7906, "Harness's home kept in `~/.harness`"). A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
+absolute. `ADAPTER_DATA_DIR` is always set to
+`<HOME>/.harness/cli/data`, any value lamp-tasks has replaced (#7906, "Harness's home kept in `~/.harness`"). A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
 yet Harness 0.5.42's `harness start` runs `systemctl --user start
 harnessd.service`, which then fails ("Failed to connect to bus: No medium
 found"; after a sign-in from the app on lamp-c0a4, 5 Nov, #5385). So each one
@@ -2644,17 +2644,28 @@ spelled exactly, so nothing moves and the daemon's socket name and pane
 tags, which hash it, stay as they were:
 
 - every Harness command lamp-tasks runs (its client's environment, from
-  its `HOME`; one already set is kept), and so the daemon a `harness start`
+  its `HOME`; one already set is replaced, so every writer gives the
+  one value Harness hashes), and so the daemon a `harness start`
   spawns or the user unit it rewrites (`ADAPTER_DATA_DIR` is in
   `lib/platformDaemon.ts` `CARRIED_ENV`);
 - `harness-hold.env`, the `HARNESS_ENV_FILE` lamp-tasks writes (held or
-  lifted), so a daemon started from the unit reads it too;
+  lifted), so a daemon started from the unit reads it too, always with the
+  default. `lamp-update harness-install`, after an install
+  or a move, also puts the line in a `harness-hold.env` already there (the
+  same line, `lamp_msgs::harness_hold::with_data_line`: any earlier one
+  taken out, every other line kept; written as root without following a
+  link, its owner and 0600 kept; a missing file is not made), so a reboot
+  between Harness 0.6.72's install and the new lamp-tasks' start does not
+  start the daemon without it;
 - Harness's launcher (`.local/bin/harness`), `export ADAPTER_DATA_DIR=…`
   just before its `exec` line, held or lifted (the canary), from lamp-tasks
   at its start and `lamp-update harness-install` after an install, so a
   command run by hand has it;
 - every Harness run of `lamp-update` (`harness service install`, `stop`,
-  `version`, the installer, the kept-copy scripts).
+  `version`, the installer, the kept-copy scripts);
+- `~/.harness` itself, made by `lampos` (`mkdir -p -m 0700`) before
+  Harness's installer runs, pinned or not, so on a fresh lamp the installer
+  finds it and does not pick the XDG folders (and write `.harness-root`).
 
 Should the home have moved anyway, lamp-tasks at its start and
 `lamp-update harness-install` after an install say one line, and move

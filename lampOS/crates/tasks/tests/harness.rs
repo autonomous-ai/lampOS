@@ -6158,7 +6158,7 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
 /// #7906: every Harness call lamp-tasks makes, and so any daemon it
 /// starts, is given `ADAPTER_DATA_DIR` at Harness's own default under its
 /// `HOME`, exactly, so Harness 0.6.72's XDG move is `skipped-override` and
-/// Harness's home stays `~/.harness`; one already set is kept.
+/// Harness's home stays `~/.harness`; one already set is replaced by it.
 #[test]
 fn every_harness_call_keeps_harnesss_home_in_dot_harness() {
     let rig = Rig::new();
@@ -6175,7 +6175,7 @@ fn every_harness_call_keeps_harnesss_home_in_dot_harness() {
     let cli = Cli::new(config, "stable".into()).unwrap();
     assert_eq!(
         cli.child_environment()["ADAPTER_DATA_DIR"],
-        "/set/elsewhere"
+        given["ADAPTER_DATA_DIR"]
     );
 }
 

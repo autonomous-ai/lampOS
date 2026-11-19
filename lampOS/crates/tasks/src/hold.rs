@@ -129,13 +129,14 @@ pub fn data_dir(home: &Path) -> Option<String> {
 
 /// `environment` with [`DATA_DIR`] at [`data_dir`] of its `HOME` (#7906),
 /// so a Harness command, and a daemon it starts, keeps Harness's home in
-/// `~/.harness`. A value already set is kept; nothing is added with no
+/// `~/.harness`. A value already set is replaced by that default, so the
+/// socket name and pane tags Harness hashes from it are the same for every
+/// writer (lamp-tasks, the launcher, lamp-update); nothing is added with no
 /// plain absolute `HOME`.
 pub fn with_data_dir(mut environment: BTreeMap<String, OsString>) -> BTreeMap<String, OsString> {
-    if !environment.contains_key(DATA_DIR)
-        && let Some(data) = environment
-            .get("HOME")
-            .and_then(|home| data_dir(Path::new(home)))
+    if let Some(data) = environment
+        .get("HOME")
+        .and_then(|home| data_dir(Path::new(home)))
     {
         environment.insert(DATA_DIR.into(), data.into());
     }
@@ -217,6 +218,8 @@ pub fn env_file_changed(
         "OPENCLAW_STATE_DIR is not a plain absolute path",
     )?;
     let grid = hold.then(|| pinned_grid(&home)).flatten();
+    // Always Harness's own default (#7906), any value already given
+    // replaced, as the launcher and lamp-update write it.
     let data = data_dir(&home).ok_or("HOME is not a plain absolute path")?;
     let mut text = String::new();
     if hold {
@@ -237,7 +240,7 @@ pub fn env_file_changed(
     }
     // Harness's home kept in `~/.harness` (#7906), read by the daemon
     // through this file even when it is started without the variable.
-    text.push_str(&format!("{DATA_DIR}={data}\n"));
+    text.push_str(&lamp_msgs::harness_hold::data_line(&data));
     let path = home.join(FILE);
     let changed = !matches!(fs::read(&path), Ok(was) if was == text.as_bytes());
     write_whole(&path, text.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -708,6 +711,34 @@ mod tests {
         fs::write(&path, "ADAPTER_UPDATE_DISABLE=false\n").unwrap();
         hold(&mut environment).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), want);
+    }
+
+    /// #7906: an `ADAPTER_DATA_DIR` already in lamp-tasks' environment is
+    /// replaced by Harness's own default, in the environment and in the env
+    /// file, as the launcher and lamp-update write it, so the hash is one.
+    #[test]
+    fn a_data_folder_already_given_is_replaced_by_the_default() {
+        let home = tempfile::tempdir().unwrap();
+        let mut environment = BTreeMap::new();
+        environment.insert("HOME".to_owned(), OsString::from(home.path()));
+        environment.insert(DATA_DIR.to_owned(), OsString::from("/srv/harness-data"));
+        let path = hold(&mut environment).unwrap();
+        assert_eq!(
+            environment[DATA_DIR],
+            OsString::from(data_dir(home.path()).unwrap())
+        );
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            format!("{TEXT}{}", data_line(home.path()))
+        );
+        let given = with_data_dir(BTreeMap::from([
+            ("HOME".to_owned(), OsString::from("/var/lib/lampos-tasks")),
+            (
+                DATA_DIR.to_owned(),
+                OsString::from("/var/lib/lampos-tasks/../x"),
+            ),
+        ]));
+        assert_eq!(given[DATA_DIR], "/var/lib/lampos-tasks/.harness/cli/data");
     }
 
     /// #7906: Harness's data folder given exactly as Harness spells its own
