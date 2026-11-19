@@ -18,6 +18,13 @@
 //! - Unlike the live tally, a restart loses nothing (its lines are in the
 //!   journal), and an answer near midnight is in the day its line is.
 //! - A gap between pulls is a gap in the count: nothing here can see it.
+//!
+//! The same answers can come as a lamp-side TSV instead
+//! ([`tsv_replayed`]: `time\tprompt\tcached\tnot_cached\tcompletion`,
+//! numbers only). Each row is the `usage` it stands for and is counted by
+//! the same rule (`count_into`); a row whose prompt is not its cached and
+//! not cached tokens together is refused. [`window_told`] says which part
+//! of the day a window that began at a given time covers.
 
 use super::{DAY_S, Day, one_answer};
 use serde_json::{Map, Value};
@@ -42,21 +49,89 @@ pub fn replayed<'a>(pulls: impl IntoIterator<Item = &'a str>, day: u64) -> Day {
     };
     for line in pulls.into_iter().flat_map(str::lines) {
         let line = line.trim_end();
-        let in_day = line
-            .split_whitespace()
-            .next()
-            .and_then(unix_s_of)
-            .is_some_and(|at| at.div_euclid(DAY_S as i64) == day as i64);
-        if !in_day {
+        let Some(at) = line.split_whitespace().next().and_then(unix_s_of) else {
             continue;
-        }
+        };
         if let Some(usage) = usage_of(line)
             && seen.insert(line)
         {
-            counted.add(&one_answer(MODEL, usage.as_ref()));
+            count_into(&mut counted, at, usage.as_ref());
         }
     }
     counted
+}
+
+/// The one rule both inputs count by: an answer at `at` (seconds since
+/// 1970) with the service's `usage` is counted by [`one_answer`] if it is
+/// in `counted`'s UTC day.
+fn count_into(counted: &mut Day, at: i64, usage: Option<&Value>) {
+    if at.div_euclid(DAY_S as i64) == counted.day as i64 {
+        counted.add(&one_answer(MODEL, usage));
+    }
+}
+
+/// The header a lamp-side TSV begins with.
+const TSV_HEADER: &str = "time\tprompt\tcached\tnot_cached\tcompletion";
+
+/// A lamp-side TSV's rows (`time\tprompt\tcached\tnot_cached\tcompletion`,
+/// numbers only) in UTC day `day`, and the line numbers of the rows
+/// refused: one that is not a time and four counts, or whose prompt is not
+/// its cached and not cached tokens together. Nothing of a refused row is
+/// kept but its number.
+pub fn tsv_replayed(tsv: &str, day: u64) -> (Day, Vec<usize>) {
+    let mut counted = Day {
+        day,
+        ..Day::default()
+    };
+    let mut refused = Vec::new();
+    for (index, row) in tsv.lines().enumerate() {
+        let row = row.trim_end();
+        if row.is_empty() || (index == 0 && row == TSV_HEADER) {
+            continue;
+        }
+        match row_of(row) {
+            Some((at, usage)) => count_into(&mut counted, at, Some(&usage)),
+            None => refused.push(index + 1),
+        }
+    }
+    (counted, refused)
+}
+
+/// A TSV row's time and the service's `usage` it stands for, or `None` for
+/// a row refused.
+fn row_of(row: &str) -> Option<(i64, Value)> {
+    let mut fields = row.split('\t');
+    let at = unix_s_of(fields.next()?)?;
+    let mut count = || fields.next()?.parse::<u64>().ok();
+    let (prompt, cached, not_cached, completion) = (count()?, count()?, count()?, count()?);
+    if fields.next().is_some() || cached.checked_add(not_cached)? != prompt {
+        return None;
+    }
+    let usage = serde_json::json!({
+        "prompt_tokens": prompt,
+        "prompt_cache_hit_tokens": cached,
+        "prompt_cache_miss_tokens": not_cached,
+        "completion_tokens": completion,
+    });
+    Some((at, usage))
+}
+
+/// Which part of UTC day `day` a lamp-side window from `from` (RFC 3339)
+/// on covers.
+pub fn window_told(from: &str, day: u64) -> Option<String> {
+    let from = unix_s_of(from)? - (day * DAY_S) as i64;
+    Some(if from <= 0 {
+        "the whole day".to_owned()
+    } else if from >= DAY_S as i64 {
+        "none of the day".to_owned()
+    } else {
+        format!(
+            "from {:02}:{:02}:{:02} UTC on",
+            from / 3_600,
+            from / 60 % 60,
+            from % 60
+        )
+    })
 }
 
 /// The service's `usage` as a `chat answer` line tells it: `None` for a
@@ -85,18 +160,6 @@ fn usage_of(line: &str) -> Option<Option<Value>> {
         }
     }
     Some(Some(Value::Object(usage)))
-}
-
-/// A lamp-side TSV's rows (`time\tprompt\tcached\tnot_cached\tcompletion`)
-/// in UTC day `day`, and the line numbers of the rows refused.
-pub fn tsv_replayed(_tsv: &str, _day: u64) -> (Day, Vec<usize>) {
-    (Day::default(), Vec::new())
-}
-
-/// Which part of UTC day `day` a lamp-side window from `from` (RFC 3339)
-/// covers.
-pub fn window_told(_from: &str, _day: u64) -> Option<String> {
-    None
 }
 
 /// `YYYY-MM-DD` as days since 1970.
