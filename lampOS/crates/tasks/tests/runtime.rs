@@ -2222,7 +2222,10 @@ fn a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_l
     assert_eq!(prepared["ok"], true, "{prepared}");
     let start = Instant::now();
     while s.counts.machine_reads.load(Ordering::SeqCst) == 0 {
-        assert!(start.elapsed() < Duration::from_secs(5), "machines not read");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "machines not read"
+        );
         thread::sleep(Duration::from_millis(10));
     }
     let answered = Instant::now();
