@@ -618,6 +618,12 @@ fn capture_loop<D: CaptureDevice>(
     // reference's barrier to keep, and a stall in it still ends the worker.
     let mut gap: Option<u64> = None;
     let mut started = false;
+    // With LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224), a reopened
+    // microphone sends nothing until the speaker's clock has started again,
+    // as the first start waits for it: the speaker may re-prime on the
+    // same fresh authority.
+    let mut reopen_hold =
+        crate::unstarted_frames::ReopenHold::new(crate::unstarted_frames::from_environment());
     let mut last_tick = Instant::now();
     channels.control.send(WorkerEvent::Ready)?;
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
@@ -727,6 +733,7 @@ fn capture_loop<D: CaptureDevice>(
                                 privacy,
                             ))?;
                             gap = None;
+                            reopen_hold.reopened(monotonic_us());
                         }
                         // The fresh authority lapsed between open and start:
                         // the microphone closed again; the next one reopens it.
@@ -911,6 +918,31 @@ fn capture_loop<D: CaptureDevice>(
                 .fault(ReferenceFaultKind::BarrierTimeout, monotonic_us())
                 .into());
         }
+        // A clock a reopen waits for that has not come (#7224): first a
+        // fresh reopen, as after a stall, then the old exit. Never silent
+        // for good.
+        if gap.is_none() {
+            match reopen_hold.due(&reference.timing(), monotonic_us()) {
+                None => {}
+                Some(crate::unstarted_frames::Recovery::Reopen(line)) => {
+                    eprintln!("{line}");
+                    microphone.revoke()?;
+                    let closed_at_us = monotonic_us();
+                    channels.control.send(WorkerEvent::CaptureGap {
+                        epoch: microphone.epoch(),
+                        reason: "ClockNotStarted".to_owned(),
+                        closed_at_us,
+                    })?;
+                    hold = CaptureHold::new(hold.blocks())
+                        .ok_or_else(|| io::Error::other("capture hold beyond its bound"))?;
+                    gap = Some(closed_at_us);
+                }
+                Some(crate::unstarted_frames::Recovery::Exit(line)) => {
+                    eprintln!("{line}");
+                    return Err(io::Error::other(crate::unstarted_frames::UNSTARTED_ERROR).into());
+                }
+            }
+        }
         let read = if microphone.is_running() {
             let from = cost.now();
             let read = microphone.try_read();
@@ -1040,6 +1072,28 @@ fn capture_loop<D: CaptureDevice>(
                 Err(error) => return Err(error.into()),
             }
             let timing = reference.timing();
+            // After a reopen, nothing before the clock has started again
+            // (#7224): the coordinator takes such a first frame for one that
+            // preceded the boot's certified start.
+            let taken = reopen_hold.takes(&timing, monotonic_us());
+            if let Some(line) = reopen_hold.line() {
+                eprintln!("{line}");
+            }
+            if !taken {
+                said(cost.done());
+                stall_pass.done();
+                pace(
+                    wait,
+                    microphone,
+                    channels,
+                    link.as_ref(),
+                    gap,
+                    primed_at,
+                    available,
+                    tick,
+                );
+                continue;
+            }
             let processing_completed_at_us = monotonic_us();
             if let Some(recording) = recording {
                 let _ = recording.recorder.try_capture(

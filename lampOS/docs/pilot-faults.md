@@ -802,6 +802,33 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
 
+- **A reopen raced the speaker's re-prime after a held turn's cut.** On
+  lamp-c0a4 at 22:31:06 on 18 Nov, on stable 14732's code, a turn held
+  about 3 min for a make had its capture frames stop for 63 ms; it was cut
+  40 ms before its lease lapsed, the speaker's authority lapsed and a fresh
+  one came at once, and about 400 ms later the voice exited 1 on `capture
+  frame preceded certified running reference clock`, then came back muted
+  by the restart guard (#7224, fault 4). From the code: the cut revokes
+  both audio workers; capture reopens under the fresh authority with its
+  sequence from 1, and the speaker re-primes on it, clearing the clock's
+  start until `ClockStarted`; a reopen, unlike the first start, did not
+  wait for it. With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (on in the
+  product unit) capture holds a reopened microphone's frames back until the
+  clock has started, up to 500 ms and then dropped and counted until it
+  comes; a clock still not started 800 ms after the reopen is recovered
+  by one fresh reopen, and 800 ms more without it ends capture with the
+  old error (exit, systemd restart), never silence for good; and the
+  coordinator ends the voice on that check only at the boot
+  barrier; mid-run the frame is a gap's dropped frame, said once per
+  reopen. Unit tests: in the harness the held turn's cut then a reopen
+  whose first frame has no clock start goes on with the switch, the reply
+  cut once as `capture_gap` and the frame counted in the gap, and ends
+  with the exit off; a boot's first frame before the clock still ends the
+  voice with it on; the worker's hold, its 500 ms bound, the recovery
+  then the exit for a clock that never starts, and the coordinator's
+  once-per-reopen line each on their own. Not yet tried on a
+  lamp.
+
 - **The voice's processes stalled together on a page read back from the
   card.** On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush,
   capture, the ring and the coordinator stalled 120-132 ms together, each

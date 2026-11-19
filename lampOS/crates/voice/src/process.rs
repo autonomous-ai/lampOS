@@ -1588,6 +1588,10 @@ fn worker_command(
             role,
             var(crate::quiet_pace::CAPTURE_WAIT_ENVIRONMENT).as_deref(),
         ))
+        .envs(unstarted_frame_drop_worker_environment(
+            role,
+            var(crate::unstarted_frames::ENVIRONMENT).as_deref(),
+        ))
         .envs(vad_input_worker_environment(
             role,
             var(crate::activity::INPUT_ENVIRONMENT).as_deref(),
@@ -2699,6 +2703,16 @@ fn capture_wait_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::quiet_pace::CAPTURE_WAIT_ENVIRONMENT, "on"))
+}
+
+// A reopen's wait for the speaker's clock (#7224), to the capture worker
+// only.
+fn unstarted_frame_drop_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::unstarted_frames::ENVIRONMENT, "on"))
 }
 
 // The per-stage minute line, to the one worker it times: capture.
@@ -4066,6 +4080,12 @@ mod tests {
                     (
                         capture_wait_worker_environment,
                         "LAMP_CAPTURE_WAIT",
+                        ["capture"].as_slice(),
+                    ),
+                    // A reopen's wait for the clock, the capture worker's.
+                    (
+                        unstarted_frame_drop_worker_environment,
+                        "LAMP_VOICE_UNSTARTED_FRAME_DROP",
                         ["capture"].as_slice(),
                     ),
                     // The per-stage line, the capture worker's.

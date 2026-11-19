@@ -157,6 +157,28 @@ A failed or expired start call publishes no successful start notice and cannot
 announce readiness. This corrects restart phase accounting,
 not echo admission or adaptation lost when the DSP resets.
 
+A microphone closed by a stall reopens under the next fresh authority, and
+its sequence counts from 1 again. At first start the microphone waits for
+the clock-start notice; a reopen does not, and the speaker may re-prime on
+the same fresh authority (a held turn cut before its lease lapses revokes
+both), which clears the clock's start until its notice. The coordinator's
+check, meant for the boot barrier, then ended the voice with exit 1 on the
+reopened epoch's first frame ("capture frame preceded certified running
+reference clock", #7224 fault 4, lamp-c0a4). With
+`LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (on in the product unit) capture sends
+no frame after a reopen until the current playback epoch's clock has
+started, as the first start waits: up to 500 ms, then it drops and counts
+frames until the clock comes, so at most that sound is lost, never the
+process; it says the counts in a line. A clock still not started 800 ms
+after the reopen is recovered once by a fresh reopen under the next
+authority, as after a stall, the speaker re-priming on its own; another
+800 ms without it ends capture with the old error, so the voice exits and
+systemd restarts it, one line per step with counts only. The
+coordinator's 1.5 s retention heartbeat stays the outer bound. The coordinator's check ends the
+voice only at the boot barrier, before the first certified start; anywhere
+else a frame failing only that check is dropped and counted as a gap's,
+said once per reopen (`unstarted_frames.rs`).
+
 Jieli capture and C-Media playback have separate USB clocks. Reference cursors
 prove delivered sample continuity, not synchronized physical capture time. The
 runtime explicitly bounds DSP call imbalance to eight render blocks, reference

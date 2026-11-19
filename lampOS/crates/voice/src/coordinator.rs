@@ -5898,6 +5898,9 @@ thread_local! {
     static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_RIDES_STALL=on` (#5611), as `TEST_FULL_LOOK`.
     static TEST_PRIVACY_RIDES_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (#7224), as
+    /// `TEST_FULL_LOOK`.
+    static TEST_UNSTARTED_FRAME_DROP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's stall inside a pass (#5633): at the first time, on the
     /// scenario clock, the pass after its top is held this many
     /// microseconds with nothing read, as a page fault in running code is.
@@ -6520,6 +6523,14 @@ fn conversation_with_gate_inner(
     let mut capture_epoch = None;
     let mut last_capture = None;
     let mut capture_gap = CaptureGap::default();
+    // Frames before the speaker's clock has started again, taken as a gap's
+    // with LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224).
+    #[cfg(test)]
+    let unstarted_on = crate::unstarted_frames::from_environment()
+        || TEST_UNSTARTED_FRAME_DROP.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let unstarted_on = crate::unstarted_frames::from_environment();
+    let mut unstarted_frames = crate::unstarted_frames::UnstartedFrames::new(unstarted_on);
     // The epoch a stall closed: its frames still in flight are dropped.
     let mut closed_epoch = None;
     // A gap cut into someone's utterance: it is abandoned as a hand Stop
@@ -9689,7 +9700,7 @@ fn conversation_with_gate_inner(
                 capture_gap.dropped += 1;
                 continue;
             }
-            if let Some(gone) = validate_capture_frame(
+            let closed = match check_capture_frame(
                 &mut rig.capture.channels.control,
                 &mut capture_epoch,
                 snapshot.microphone_generation(),
@@ -9697,6 +9708,36 @@ fn conversation_with_gate_inner(
                 rig.noise_suppression,
                 trace,
             )? {
+                CheckedFrame::Valid(closed) => {
+                    unstarted_frames.passed();
+                    closed
+                }
+                // With LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224), a frame
+                // before the speaker's clock has started again (a reopen
+                // racing a re-prime) ends the voice only at the boot
+                // barrier; mid-run it is a gap's dropped frame, said once
+                // per reopen. Off, the voice ends as before.
+                CheckedFrame::Unstarted(closed) => {
+                    match unstarted_frames.failed(frame.epoch) {
+                        crate::unstarted_frames::Unstarted::Exit => {
+                            return Err(unstarted_clock_error());
+                        }
+                        crate::unstarted_frames::Unstarted::Drop(line) => {
+                            if let Some(line) = line {
+                                eprintln!("{line}");
+                            }
+                        }
+                    }
+                    if let Some(gone) = closed {
+                        closed_epoch = Some(gone);
+                        capture_gap.closed = true;
+                        gap_cut_utterance = true;
+                    }
+                    capture_gap.dropped += 1;
+                    continue;
+                }
+            };
+            if let Some(gone) = closed {
                 // Closed and maybe already reopened: either way this pass
                 // takes no frame across the cut.
                 closed_epoch = Some(gone);
@@ -17571,6 +17612,7 @@ impl CaptureGap {
     }
 }
 
+#[cfg(test)]
 fn validate_capture_frame(
     channel: &mut Channel,
     epoch: &mut Option<u64>,
@@ -17579,6 +17621,43 @@ fn validate_capture_frame(
     expected_noise_suppression: NoiseSuppression,
     trace: &mut SessionState,
 ) -> Result<Option<u64>> {
+    match check_capture_frame(
+        channel,
+        epoch,
+        privacy_generation,
+        frame,
+        expected_noise_suppression,
+        trace,
+    )? {
+        CheckedFrame::Valid(closed) => Ok(closed),
+        CheckedFrame::Unstarted(_) => Err(unstarted_clock_error()),
+    }
+}
+
+fn unstarted_clock_error() -> Box<dyn std::error::Error + Send + Sync> {
+    io::Error::other("capture frame preceded certified running reference clock").into()
+}
+
+/// A capture frame's check, with the one failure the coordinator may take
+/// as a gap kept apart (#7224).
+#[derive(Debug, PartialEq)]
+enum CheckedFrame {
+    /// Passed; the epoch the control drain found closed, if any.
+    Valid(Option<u64>),
+    /// Failed only the reference clock's start: before its playback epoch,
+    /// or a microphone epoch's first frame with no clock start. The epoch
+    /// found closed, as for `Valid`.
+    Unstarted(Option<u64>),
+}
+
+fn check_capture_frame(
+    channel: &mut Channel,
+    epoch: &mut Option<u64>,
+    privacy_generation: u64,
+    frame: &MicrophoneFrame,
+    expected_noise_suppression: NoiseSuppression,
+    trace: &mut SessionState,
+) -> Result<CheckedFrame> {
     // The worker sends its start report before its first frame, but the two
     // sockets may become readable between our control drain and data receive.
     // Re-read control after receiving the frame instead of discarding its words.
@@ -17588,20 +17667,16 @@ fn validate_capture_frame(
     if epoch.is_none() || Some(frame.epoch) != *epoch {
         closed = drain_capture_control(channel, epoch, expected_noise_suppression, trace)?;
         if closed == Some(frame.epoch) {
-            return Ok(closed);
+            return Ok(CheckedFrame::Valid(closed));
         }
     }
     if Some(frame.epoch) != *epoch || frame.privacy_generation != privacy_generation {
         return Err(io::Error::other("microphone lineage changed during test").into());
     }
-    if frame.timing.reference.playback_epoch == 0
-        || (frame.frame_sequence == 1 && frame.timing.reference.clock_started_at_us.is_none())
-    {
-        return Err(
-            io::Error::other("capture frame preceded certified running reference clock").into(),
-        );
+    if crate::unstarted_frames::unstarted(frame.frame_sequence, &frame.timing.reference) {
+        return Ok(CheckedFrame::Unstarted(closed));
     }
-    Ok(closed)
+    Ok(CheckedFrame::Valid(closed))
 }
 
 /// A change of trust in the capture worker's echo reference. It is a status,

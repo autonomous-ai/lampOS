@@ -1694,6 +1694,23 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// #7224, fault 4 (the first builder, 23:14): a capture reopen racing the
+/// speaker's re-prime mid-run is dropped as a gap, never the voice's exit,
+/// in the product from landing.
+#[test]
+fn the_product_voice_drops_frames_before_a_restarted_clock() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on"),
+        "the voice lacks LAMP_VOICE_UNSTARTED_FRAME_DROP=on"
+    );
+}
+
 /// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
 /// #4746): until its played test over days and two reads, no product file
 /// sets it, so lamp-memory serves Days alone.
