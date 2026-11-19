@@ -2549,6 +2549,33 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `ensure`. `OneSession::with_on_replaced` là hook cho câu báo duy nhất tới
   người dùng của #7895, chưa nối ở đây. Journal: `<id> is gone or stuck
   (<why>); closed, forgotten and replaced with a fresh session (#7906)`.
+- **Cách mở lại nhẹ nhất trước, và không mất việc (#7906, quy tắc của
+  chủ đèn).** `OneSession::revive_or_replace` là một thang:
+  - **(a)** Phiên được giữ mà engine hoặc pane đã chết (shell trơn,
+    `stopped`, mất) trong khi bản ghi của OpenClaw vẫn giữ hội thoại của nó
+    (hoặc không đọc được bản ghi) thì được buông mà không close, không
+    xoá. Lần `ensure` tiếp theo là một resume thường, giữ được bộ nhớ của
+    nó. Bước này chỉ thử một lần cho tới khi có một lượt được trả lời.
+  - **(b)** Chết lại sau lần resume đó, hội thoại mà OpenClaw không còn
+    giữ, chính lần close khi hết hạn của ta, hoặc vẫn `starting`: một hội
+    thoại mới (`replace_kept`, rồi `ensure --fresh`, cùng tên và token).
+  - **(c)** Từ lần thay thứ hai liên tiếp, áp dụng backoff ở trên.
+
+  Một lần chạy kỹ năng mà phiên chết ngay trong lượt của nó (`wait` đọc
+  một shell trơn là idle), trong khi `show` chưa đếm được tool nào chạy,
+  được đưa lại một lần: lời của nó được gõ lại vào phiên vừa mở lại. Lượt
+  của nó vẫn giữ hàng đợi, nên các việc phía sau giữ nguyên thứ tự, và
+  token của lần chạy được giữ. Lượt đã chạy một tool thì không bao giờ
+  được chạy lại. Nó kết thúc với "...after the task had started work, so
+  it was not run again; ask again". Nếu chết lần thứ hai, nó kết thúc với
+  câu báo duy nhất của nó. Việc nói thì không bao giờ được gõ lại ở đây:
+  store đưa lại nó như trước (giới hạn của #7919), nên không có chuyện
+  đưa lại hai lần. Journal: `<id> died (<why>); OpenClaw still holds its
+  conversation, so a plain resume first (#7906)`, và `<task>: its session
+  died (<why>); its words typed again once into the reopened one (#7906)`.
+  Câu báo tới người dùng khi thay phiên chưa nối ở đây:
+  `with_on_replaced` vẫn chỉ ghi journal, và câu báo đó thuộc đường của
+  #7895 và #7919.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 

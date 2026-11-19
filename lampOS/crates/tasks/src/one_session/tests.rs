@@ -57,6 +57,12 @@ struct Fake {
     /// As a real Harness: a kept session closed is resumed by name and
     /// token, unless `--fresh` (#7906, lamp-52e6).
     closed_resumes: Mutex<bool>,
+    /// `show`'s tool count; none: 1.
+    tools: Mutex<Option<u64>>,
+    /// Plain (not `--fresh`) `ensure`s that leave a died session as it is
+    /// before one brings it back, its shell gone (#7906 step a); none:
+    /// never.
+    resume_heals: Mutex<Option<u32>>,
     /// The session keys OpenClaw's record holds; none: can't be read.
     held: Mutex<Option<Vec<String>>>,
     /// `ensure`'s `confirmed` and `whyCode` (openharness#4484); none: absent.
@@ -173,7 +179,7 @@ impl PaneHarness for Fake {
                 answer: format!("answer to {}", ask.lines().next().unwrap_or_default()),
                 ask: Some(ask),
                 truncated: false,
-                tools: 1,
+                tools: self.tools.lock().unwrap().unwrap_or(1),
             },
             taken,
             shell: self
@@ -232,6 +238,17 @@ impl PaneHarness for Fake {
             return Err(code);
         }
         let mut kept = self.kept.lock().unwrap();
+        let mut heals = self.resume_heals.lock().unwrap();
+        if !fresh && let Some(left) = heals.as_mut() {
+            if *left == 0 {
+                if let Some(agent) = kept.as_ref() {
+                    self.shells.lock().unwrap().retain(|shell| shell != agent);
+                }
+            } else {
+                *left -= 1;
+            }
+        }
+        drop(heals);
         let mut gone = self.gone.lock().unwrap();
         let (result, agent) = match kept.clone() {
             Some(agent) if !fresh && gone.contains(&agent) => {
@@ -2910,4 +2927,111 @@ fn harness_replacing_a_dead_conversation_is_kept_with_no_extra_close() {
     assert_eq!(fake.count("close-kept"), 0);
     assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
     assert_eq!(again.kept().map(|(agent, _, _)| agent), Some(agent_of(2)));
+}
+
+/// #7906 ladder (a): a kept session whose engine died (a plain shell) while
+/// OpenClaw still holds its conversation gets one plain `ensure`, a resume
+/// that keeps its memory: no close, no delete, no `--fresh`.
+#[test]
+fn ladder_a_a_died_session_still_held_is_resumed_with_its_memory() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let deleted = Arc::new(Mutex::new(0));
+    let seen = deleted.clone();
+    let one = one.with_session_delete(Box::new(move |_| {
+        *seen.lock().unwrap() += 1;
+        Ok(())
+    }));
+    one.open_if_due(&fake, &place());
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.resume_heals.lock().unwrap() = Some(1);
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(1)), "{:?}", fake.calls());
+    assert_eq!(fake.count("close-kept"), 0);
+    assert_eq!(*deleted.lock().unwrap(), 0, "its conversation kept");
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    assert_eq!(
+        fake.count("ensure"),
+        3,
+        "the first, the restart's, the resume"
+    );
+}
+
+/// #7906 ladder (b): died again after its one resume: replaced fresh.
+#[test]
+fn ladder_b_a_session_that_dies_again_after_its_resume_is_replaced_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    let ensures: Vec<String> = fake
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("ensure"))
+        .collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ]
+    );
+    assert_eq!(again.agent(), Some(agent_of(2)));
+}
+
+/// #7906, never lose the task: a skill run whose session dies under its
+/// turn before any tool ran is put back once into the reopened session
+/// and answered there; the person's one line comes from one replacement.
+#[test]
+fn a_task_whose_session_died_before_any_tool_is_put_back_and_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let told = Arc::new(Mutex::new(0));
+    let seen = told.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_on_replaced(Box::new(move |_| *seen.lock().unwrap() += 1));
+    one.open_if_due(&fake, &place());
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.tools.lock().unwrap() = Some(0);
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert_eq!(ended, Ended::Answered("answer to New task task-1:".into()));
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert_eq!(*told.lock().unwrap(), 1, "one replacement, one line");
+}
+
+/// #7906: a turn that had already run a tool is never replayed blindly:
+/// it ends saying it was interrupted after it started, and the session is
+/// reopened for the next task.
+#[test]
+fn a_task_that_had_run_a_tool_is_not_replayed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    let typed = fake.count("reply-kept");
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.tools.lock().unwrap() = Some(2);
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert!(
+        matches!(&ended, Ended::Failed(why) if why.contains("after the task had started work") && why.contains("ask again")),
+        "{ended:?}"
+    );
+    assert_eq!(fake.count("reply-kept"), typed, "never typed again");
 }
