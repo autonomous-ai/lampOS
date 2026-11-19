@@ -1909,6 +1909,29 @@ fn the_product_takes_back_a_doubted_keep() {
     );
 }
 
+/// An unsure line is simply not kept, and nothing is asked, in the
+/// product (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739): the product owner's
+/// no-asks rule of 18 Nov. The near word's ask stays out of it.
+#[test]
+fn the_product_keeps_no_unsure_line_and_asks_nothing() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_UNSURE_NOT_KEPT=on"),
+        "the voice lacks LAMP_MEMORY_UNSURE_NOT_KEPT"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_MEMORY_ASK_NEAR_HEARD")),
+        "the voice asks about a near word"
+    );
+}
+
 /// "Forget that" right after a keep forgets that keep in the product
 /// (C88, #5022): the memory owner's call on 5 Nov, after lamp-06c1 answered
 /// a bare "forget that" after the umbrella keep in words two days running.

@@ -3509,7 +3509,10 @@ fn recall_v2_request(
 
 /// [`tools`] with the rules switched on or off.
 pub fn tools_with(rules: bool) -> Vec<Tool> {
-    let tools = tools_for(rules, forget_all_on(), forget_about_on());
+    let tools = unsure_described(
+        tools_for(rules, forget_all_on(), forget_about_on()),
+        doubted::unsure_not_kept_on(),
+    );
     let tools = if replaces_on() {
         replaces_described(tools)
     } else {
@@ -3594,6 +3597,32 @@ pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remembe
                           words, and call it once they say it again; never keep a word you doubt. Then say back \
                           in a few words what you kept, so they can put you right if you misheard; \
                           never also ask whether to keep it.";
+
+/// [`REMEMBER_DESCRIBED`] when an unsure line is not kept
+/// ([`doubted::UNSURE_ENVIRONMENT`], #7739): a doubted key word is neither
+/// kept nor asked about. Shorter than it, for the link's 1,024 bytes.
+pub const REMEMBER_DESCRIBED_UNSURE: &str = "Call this when someone asks you to remember something or keep it in mind for later. \
+                          Give what to keep as one short sentence that will still make sense weeks from now, \
+                          with their own words for names and numbers. If you are not sure you heard a key word \
+                          right (a name, a number, or the thing itself), do not call this and do not ask about \
+                          it; never keep a word you doubt. Then say back \
+                          in a few words what you kept, so they can put you right if you misheard; \
+                          never also ask whether to keep it.";
+
+/// `remember` with [`REMEMBER_DESCRIBED_UNSURE`] in place of
+/// [`REMEMBER_DESCRIBED`] when `unsure` ([`doubted::UNSURE_ENVIRONMENT`]);
+/// every other function, and every function when off, as it is.
+fn unsure_described(mut tools: Vec<Tool>, unsure: bool) -> Vec<Tool> {
+    if !unsure {
+        return tools;
+    }
+    for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
+        tool.description =
+            tool.description
+                .replacen(REMEMBER_DESCRIBED, REMEMBER_DESCRIBED_UNSURE, 1);
+    }
+    tools
+}
 
 fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
     let mut tools = vec![
@@ -21526,6 +21555,40 @@ mod tests {
     /// about a kept thing near misheard words, after its own, which still
     /// says never to forget something else; every other function is as it
     /// was, with each forget switch off or on.
+    /// #7739: with an unsure line not kept, `remember` says never to ask
+    /// about a doubted word, in no more bytes than before; every other
+    /// function is as it was, so "forget everything" still asks them to
+    /// confirm. Off, every function is as it was.
+    #[test]
+    fn an_unsure_word_is_neither_kept_nor_asked_about_in_remember_alone() {
+        assert!(REMEMBER_DESCRIBED_UNSURE.len() <= REMEMBER_DESCRIBED.len());
+        assert!(REMEMBER_DESCRIBED.contains("ask them"));
+        assert!(!REMEMBER_DESCRIBED_UNSURE.contains("ask them"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("do not ask about"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("never keep a word you doubt"));
+        for (forget_all, forget_about) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let before = tools_for(true, forget_all, forget_about);
+            assert_eq!(unsure_described(before.clone(), false).len(), before.len());
+            for (was, now) in before.iter().zip(&unsure_described(before.clone(), false)) {
+                assert_eq!(was.description, now.description);
+            }
+            let after = unsure_described(before.clone(), true);
+            assert_eq!(before.len(), after.len());
+            for (was, now) in before.iter().zip(&after) {
+                if was.name == REMEMBER {
+                    assert_eq!(now.description, REMEMBER_DESCRIBED_UNSURE);
+                } else {
+                    assert_eq!(was.description, now.description, "{}", was.name);
+                }
+                if was.name == FORGET_EVERYTHING {
+                    assert!(now.description.contains("to confirm"));
+                }
+            }
+        }
+    }
+
     #[test]
     fn asking_about_a_misheard_forget_adds_to_forget_alone() {
         for (forget_all, forget_about) in

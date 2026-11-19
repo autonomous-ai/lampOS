@@ -58,6 +58,43 @@ pub const NOT_KEPT: &str = "Not kept: in this same reply you doubted what you he
 /// The journal's line for one not run: no words of it.
 pub const SKIPPED: &str = "a remember was not run: its own round's words doubt what was heard";
 
+/// The switch for #7739, in the voice service's environment: `on` only.
+/// An unsure line is simply not kept, and nothing is asked (the product
+/// owner's no-asks rule, 18 Nov: "An unsure line is simply not acted on,
+/// with no 'did you say…?'"). On, a keep its own round doubts is told
+/// [`NOT_KEPT_NO_ASK`]; a keep the round right after it doubts is taken
+/// back and never held for a yes ([`UNDONE_NO_ASK_NOTE`], with
+/// [`UNDOES_ENVIRONMENT`]); a keep with a near spelling of a heard word is
+/// not kept and nothing is asked (`heard::near_not_kept_told`, in place of
+/// `heard::NEAR_ENVIRONMENT`'s ask); and `remember`'s description says not
+/// to ask about a word it doubts (`super::REMEMBER_DESCRIBED_UNSURE`). The
+/// doubt is the model's own: its words, or its sentence against the words
+/// heard. "Forget everything" and its "sure?" are untouched.
+pub const UNSURE_ENVIRONMENT: &str = "LAMP_MEMORY_UNSURE_NOT_KEPT";
+
+/// Whether [`UNSURE_ENVIRONMENT`] is `on`.
+pub fn unsure_not_kept_on() -> bool {
+    std::env::var(UNSURE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`NOT_KEPT`] with [`UNSURE_ENVIRONMENT`]: nothing kept, nothing asked,
+/// never said kept.
+pub const NOT_KEPT_NO_ASK: &str = "Not kept: in this same reply you doubted what you heard, so nothing is kept. Ask nothing about it: no \"did you say ...?\" and no asking them to say it again. Never say it was kept.";
+
+/// [`UNDONE_NOTE`] with [`UNSURE_ENVIRONMENT`]: taken back for good, and
+/// nothing more asked.
+pub const UNDONE_NO_ASK_NOTE: &str = "(For you to know: what you kept just before is taken back, since your words doubt what you heard, and it stays not kept. Ask nothing more about it, and never say it is kept.)";
+
+/// What the model is told of a keep not run on a line: with
+/// [`UNSURE_ENVIRONMENT`] [`NOT_KEPT_NO_ASK`], else [`NOT_KEPT`].
+pub fn not_kept_note(unsure_not_kept: bool) -> &'static str {
+    if unsure_not_kept {
+        NOT_KEPT_NO_ASK
+    } else {
+        NOT_KEPT
+    }
+}
+
 /// What a reply says when it doubts what it heard, lower case, `'` for `’`.
 const DOUBTS: &[&str] = &[
     "misheard",
@@ -493,6 +530,23 @@ pub fn corrected(text: &str, kept: &str, offered: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7739: with an unsure line not kept the model is told nothing is
+    /// kept, to ask nothing and never to say it was kept; off, as before.
+    #[test]
+    fn an_unsure_keep_is_told_not_kept_and_to_ask_nothing() {
+        assert_eq!(not_kept_note(false), NOT_KEPT);
+        assert!(NOT_KEPT.contains("Ask them"));
+        for note in [not_kept_note(true), UNDONE_NO_ASK_NOTE] {
+            assert!(note.contains("Ask nothing"), "{note}");
+            assert!(!note.contains("Ask them"), "{note}");
+            assert!(!note.contains("yes"), "{note}");
+            assert!(
+                note.contains("never say it") || note.contains("Never say it"),
+                "{note}"
+            );
+        }
+    }
 
     /// P5's words, and the other ways a reply doubts, EN and VI.
     #[test]

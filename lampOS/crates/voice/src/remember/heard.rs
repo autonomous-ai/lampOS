@@ -838,6 +838,24 @@ pub fn near_held_told(near: &[(String, String)]) -> Value {
     })
 }
 
+/// What the model is told of a `remember` with [`near_heard`] words when
+/// an unsure line is not kept (`doubted::UNSURE_ENVIRONMENT`, #7739):
+/// nothing kept, nothing asked ("is that ...?", "did you say ...?"), and
+/// never said kept or noted. Their words alone, not the model's.
+pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
+    let heard = near
+        .iter()
+        .map(|(heard, _)| format!("\"{heard}\""))
+        .collect::<Vec<_>>()
+        .join(" and ");
+    json!({
+        "remembered": false,
+        "note": format!(
+            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Ask nothing about it: no \"is that ...?\" and no \"did you say ...?\". Never say it is kept or noted."
+        ),
+    })
+}
+
 /// For a `remember` the voice runs for heard line `request`: the call with
 /// the heard words in place of the model's, and those words, when
 /// [`heard_instead`] keeps them. `heard` is false for a line not heard at

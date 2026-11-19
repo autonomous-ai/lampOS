@@ -2437,6 +2437,9 @@ struct Shared {
     /// for their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
     /// [`Engine::asking_near_heard_words`]).
     near_heard_asks: bool,
+    /// An unsure line is simply not kept, and nothing is asked
+    /// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739, [`Engine::not_keeping_unsure`]).
+    unsure_not_kept: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -5292,6 +5295,7 @@ impl Engine {
                 doubt_undoes: false,
                 forget_target: None,
                 near_heard_asks: false,
+                unsure_not_kept: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
@@ -5942,6 +5946,22 @@ impl Engine {
     pub fn asking_near_heard_words(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.near_heard_asks = on;
+        self
+    }
+
+    /// An unsure line is simply not kept, and nothing is asked
+    /// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739, the product owner's no-asks
+    /// rule of 18 Nov). A keep its own round doubts is told
+    /// `remember::doubted::NOT_KEPT_NO_ASK`; a keep the round right after
+    /// it doubts is taken back by its id and never held for a yes (with
+    /// [`Self::undoing_doubted_keeps`], which forgets by id, and without
+    /// the eyes, since no yes is waited for); a spoken keep with a near
+    /// spelling of a heard word is not kept and nothing is asked, in place
+    /// of [`Self::asking_near_heard_words`]'s ask. A clear keep is kept as
+    /// before. Off, as before.
+    pub fn not_keeping_unsure(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.unsure_not_kept = on;
         self
     }
 
@@ -15118,7 +15138,7 @@ fn hold_near_heard_keep(
     // on to `keep_quietly::unheard`, which keeps nothing with a word not
     // heard, so a yes about a spelling never becomes consent to keep
     // (Reviewer-lead on #6850).
-    if !shared.near_heard_asks
+    if !(shared.near_heard_asks || shared.unsure_not_kept)
         || !heard
         || call.name != crate::remember::REMEMBER
         || call.args.get("replaces").is_some_and(|id| !id.is_null())
@@ -15129,6 +15149,16 @@ fn hold_near_heard_keep(
     let near = crate::remember::heard::near_heard(call.args["text"].as_str()?, said);
     if near.is_empty() {
         return None;
+    }
+    // An unsure line is simply not kept, and nothing is asked (#7739): no
+    // hold, so no eyes or known person are needed.
+    if shared.unsure_not_kept {
+        eprintln!(
+            "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not kept, and nothing is asked ({})",
+            near.len(),
+            crate::remember::doubted::UNSURE_ENVIRONMENT
+        );
+        return Some(crate::remember::heard::near_not_kept_told(&near));
     }
     let not = if shared.forget_sight.is_none() {
         Some("the eyes don't read who speaks")
@@ -16015,7 +16045,9 @@ struct JustKept {
 /// keeps the call with that word in place of the kept one. On a line its
 /// person's by their face alone in view the same person may take back their
 /// own keep this way ([`keep_asker`]); their yes still needs their face
-/// seen saying it.
+/// seen saying it. With an unsure line not kept
+/// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739) it is only forgotten: no yes is
+/// waited for, so nothing is held and the eyes are not needed.
 async fn undo_doubted_keep(
     shared: &Shared,
     request: u64,
@@ -16027,11 +16059,12 @@ async fn undo_doubted_keep(
     if !shared.doubt_undoes {
         return Ok(false);
     }
+    let unsure = shared.unsure_not_kept;
     let asker = keep_asker(scope);
     let now = (shared.clock)();
     let not = if !heard {
         Some("a turn the lamp wrote")
-    } else if shared.forget_sight.is_none() {
+    } else if !unsure && shared.forget_sight.is_none() {
         Some("the eyes don't read who speaks, so no yes could keep it again")
     } else if asker.is_none() || asker != kept.asker {
         Some("not the same known person")
@@ -16050,6 +16083,63 @@ async fn undo_doubted_keep(
     let Some(asker) = asker else {
         return Ok(false);
     };
+    if !unsure && !hold_doubted_keep(shared, (request, round), (kept, offered), asker, now) {
+        return Ok(false);
+    }
+    let forget = net::ToolCall {
+        id: format!("{}-doubted", kept.call.id),
+        name: crate::remember::FORGET.to_owned(),
+        args: serde_json::json!({ "source_id": kept.id }),
+        ..kept.call.clone()
+    };
+    // Its own keep's id alone may be forgotten on a lone face's line.
+    if let Some(scope) = scope {
+        scope.mark_own_keep_undone(&OwnKeepUndone(()), kept.id);
+    }
+    let told = run_tool(shared, request, heard, &forget, scope).await;
+    if scope.is_some_and(|scope| !scope.is_current()) {
+        return Err(Stop::Gone);
+    }
+    if told["forgotten"] != true {
+        if !unsure
+            && let Ok(mut hold) = shared.held_forget.lock()
+            && hold
+                .held
+                .as_ref()
+                .is_some_and(|held| held.request == request)
+        {
+            hold.held = None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: the forget did not run ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+        return Ok(false);
+    }
+    if unsure {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, not kept, and nothing is asked ({})",
+            crate::remember::doubted::UNSURE_ENVIRONMENT
+        );
+    } else {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, kept again only on their yes ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+    }
+    Ok(true)
+}
+
+/// [`undo_doubted_keep`]'s hold of `kept` for `asker`'s yes, asked already
+/// since the round's answer is the question. Whether it is held; the
+/// journal says why not.
+fn hold_doubted_keep(
+    shared: &Shared,
+    (request, round): (u64, usize),
+    (kept, offered): (&JustKept, Option<(String, String)>),
+    asker: (u64, String),
+    now: Instant,
+) -> bool {
     // Their yes to "is that ranunculus?" keeps "ranunculus".
     let held_call = match (&offered, kept.call.args["text"].as_str()) {
         (Some((was, offered)), Some(text)) => {
@@ -16067,7 +16157,7 @@ async fn undo_doubted_keep(
                 "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: another call is held ({})",
                 crate::remember::doubted::UNDOES_ENVIRONMENT
             );
-            return Ok(false);
+            return false;
         }
     }
     if let Ok(mut hold) = shared.held_forget.lock()
@@ -16080,40 +16170,7 @@ async fn undo_doubted_keep(
         // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
         held.line = held_call.args["text"].as_str().map(str::to_owned);
     }
-    let forget = net::ToolCall {
-        id: format!("{}-doubted", kept.call.id),
-        name: crate::remember::FORGET.to_owned(),
-        args: serde_json::json!({ "source_id": kept.id }),
-        ..kept.call.clone()
-    };
-    // Its own keep's id alone may be forgotten on a lone face's line.
-    if let Some(scope) = scope {
-        scope.mark_own_keep_undone(&OwnKeepUndone(()), kept.id);
-    }
-    let told = run_tool(shared, request, heard, &forget, scope).await;
-    if scope.is_some_and(|scope| !scope.is_current()) {
-        return Err(Stop::Gone);
-    }
-    if told["forgotten"] != true {
-        if let Ok(mut hold) = shared.held_forget.lock()
-            && hold
-                .held
-                .as_ref()
-                .is_some_and(|held| held.request == request)
-        {
-            hold.held = None;
-        }
-        eprintln!(
-            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: the forget did not run ({})",
-            crate::remember::doubted::UNDOES_ENVIRONMENT
-        );
-        return Ok(false);
-    }
-    eprintln!(
-        "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, kept again only on their yes ({})",
-        crate::remember::doubted::UNDOES_ENVIRONMENT
-    );
-    Ok(true)
+    true
 }
 
 fn hold_forget(
@@ -20250,7 +20307,11 @@ async fn answer(
                 .await?
                 && !calls.is_empty()
             {
-                doubt_note = Some(crate::remember::doubted::UNDONE_NOTE);
+                doubt_note = Some(if shared.unsure_not_kept {
+                    crate::remember::doubted::UNDONE_NO_ASK_NOTE
+                } else {
+                    crate::remember::doubted::UNDONE_NOTE
+                });
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
@@ -20897,7 +20958,8 @@ async fn answer(
                     continue;
                 }
                 // A keep its own round's words doubt is not run (#3504
-                // finding N5): asked again, kept once they say it.
+                // finding N5): asked again, kept once they say it; with
+                // `LAMP_MEMORY_UNSURE_NOT_KEPT` (#7739) nothing is asked.
                 if doubted_calls[call_index] {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: {}",
@@ -20907,7 +20969,9 @@ async fn answer(
                         call.id.clone(),
                         serde_json::json!({
                             "remembered": false,
-                            "note": crate::remember::doubted::NOT_KEPT
+                            "note": crate::remember::doubted::not_kept_note(
+                                shared.unsure_not_kept
+                            )
                         })
                         .to_string(),
                     ));
