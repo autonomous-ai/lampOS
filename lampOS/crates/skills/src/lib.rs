@@ -119,6 +119,13 @@ pub const BROKEN_BY: [&str; 4] = ["voice/heard", "name/heard", "body/hand", "con
 
 /// Why a skill reads a `broken_by` topic ([`Skill::listens`]).
 const BROKEN_BY_READ: &str = "a [[while]]'s broken_by";
+/// How a `drops_kept` `[[while]]` reads the privacy slide (#7668): told by
+/// the program on a change ([`Engine::privacy`]), from the bus's newest
+/// `voice/privacy` as the watches read it, never subscribed (the voice
+/// renews that lease every 10 ms: Heron's P2 on #7668).
+const PRIVACY_TOLD: &str = "the privacy slide, told by the program";
+/// The topic a `drops_kept` `[[while]]` reads ([`Engine::privacy`]).
+pub const PRIVACY_TOPIC: &str = "voice/privacy";
 
 /// Whether `value` on `topic` begins again a clock carried `through`: what
 /// was heard, only with a letter or a digit in it (a sound heard as no words
@@ -673,6 +680,9 @@ struct RearmLine {
     below: Option<f64>,
     #[serde(rename = "for")]
     lasting: Option<String>,
+    /// `{ still = D }` (#7668, the owner's call): again only once the
+    /// trigger's `rise` has not risen for D, one chance a stretch.
+    still: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -1021,6 +1031,13 @@ struct TestFile {
     /// A lower `above` while another topic's field is above a line (#6543):
     /// one table or a list of them, each naming its own `above_to`.
     sooner: Option<SoonersFile<WhileSoonerFile>>,
+    /// `true` (#6543, the seen reactions' privacy slide): once its topic
+    /// says a value it does not hold on, every chance the skill's triggers
+    /// keep (`wait`) is dropped, and a `rise` forgets the readings before
+    /// it, so nothing seen before is said once it holds again. A chance
+    /// held back by it is dropped, never kept. With a field's test, without
+    /// `for` or `unknown`.
+    drops_kept: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -2667,11 +2684,16 @@ impl Skill {
             .triggers
             .iter()
             .map(|trigger| (trigger.topic.clone(), "a trigger"))
-            .chain(
-                self.conditions
-                    .iter()
-                    .map(|test| (test.topic.clone(), "a [[while]]")),
-            )
+            .chain(self.conditions.iter().map(|test| {
+                (
+                    test.topic.clone(),
+                    if test.drops_kept {
+                        PRIVACY_TOLD
+                    } else {
+                        "a [[while]]"
+                    },
+                )
+            }))
             .chain(looks.then(|| (Faces::TOPIC.to_owned(), "a look at a face")))
             .chain(
                 self.history
@@ -2847,10 +2869,12 @@ impl Skill {
 }
 
 /// The line a trigger's field must stay past for a while before the trigger
-/// runs again.
+/// runs again; with no line (`still`, #7668), the while its `rise` must
+/// not have risen: a meal or a drinking stretch has one chance, and the
+/// next is a new one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rearm {
-    test: Test,
+    test: Option<Test>,
     pub for_us: u64,
 }
 
@@ -3057,6 +3081,8 @@ struct Condition {
     /// ([`SOONER_ENVIRONMENT`], #6543); empty without `sooner`. Of those
     /// holding, the lowest wins. Only on an `above` without `for`.
     sooner: Vec<WhileSooner>,
+    /// Failing, it drops the skill's kept chances (`drops_kept`, #6543).
+    drops_kept: bool,
 }
 
 /// A `[[while]]`'s `sooner` (#6543): while `test` holds on `topic`'s newest
@@ -3880,6 +3906,24 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
                 "rearm = {other:?}: \"leaves\", \"ends\" or {{ below or above, for }}"
             ));
         }
+        Some(RearmFile::Line(RearmLine {
+            above: None,
+            below: None,
+            lasting: None,
+            still: Some(still),
+        })) => {
+            if file.rise.is_none() {
+                return Err("rearm = { still }: on a trigger with a rise".into());
+            }
+            let for_us = duration_us(&still)?;
+            if !(60_000_000..=HOUR_US).contains(&for_us) {
+                return Err("rearm = { still }: 1m to 1h".into());
+            }
+            (true, Some(Rearm { test: None, for_us }))
+        }
+        Some(RearmFile::Line(RearmLine { still: Some(_), .. })) => {
+            return Err("rearm = { still }: alone, without below, above or for".into());
+        }
         Some(RearmFile::Line(line)) => {
             let test = match (file.field.clone(), line.above, line.below) {
                 (Some(field), Some(above), None) => Test::Above(field, above),
@@ -3892,7 +3936,13 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
                 }
             };
             let for_us = line.lasting.as_deref().map_or(Ok(0), duration_us)?;
-            (true, Some(Rearm { test, for_us }))
+            (
+                true,
+                Some(Rearm {
+                    test: Some(test),
+                    for_us,
+                }),
+            )
         }
     };
     let wait_us = optional(&file.wait)?;
@@ -4813,6 +4863,18 @@ fn manifest(
                 above: one.above_to,
             });
         }
+        let drops_kept = condition.drops_kept.unwrap_or(false);
+        if drops_kept
+            && (condition.topic != PRIVACY_TOPIC
+                || condition.lasting.is_some()
+                || condition.unknown.is_some()
+                || matches!(test, Test::Faces(_) | Test::NoFaces | Test::FacesAtMost(_)))
+        {
+            return Err(format!(
+                "on {}: drops_kept is for {PRIVACY_TOPIC}, a field's test without for or unknown",
+                condition.topic
+            ));
+        }
         conditions.push(Condition {
             topic: condition.topic,
             test,
@@ -4822,6 +4884,7 @@ fn manifest(
             through,
             broken_by,
             sooner,
+            drops_kept,
         });
     }
     let quiet = match file.quiet {
@@ -7206,6 +7269,8 @@ pub struct Engine {
     /// start spent: given back if the write waits for the owner's yes
     /// ([`Engine::unwritten`]).
     unwritten: HashMap<String, Spent>,
+    /// The privacy slide as last told ([`Engine::privacy`]): closed or not.
+    privacy_told: Option<bool>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
@@ -7297,6 +7362,9 @@ struct Spent {
     group: Option<String>,
     /// Its `[rest]` watch before it, once one was begun for it.
     nudge: Option<Option<Nudge>>,
+    /// It disarmed a rearm line, given back with it (#7668: a meal whose
+    /// line was never heard is not spent).
+    disarmed: bool,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -7535,6 +7603,7 @@ impl Engine {
             group_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
             unwritten: HashMap::new(),
+            privacy_told: None,
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             done_until: HashMap::new(),
@@ -8660,14 +8729,20 @@ impl Engine {
     /// given back.
     ///
     /// A skill in no `[budget]` group with a `[stop] group` (#7401, the
-    /// seen reactions) has nothing to give back but that: a run never heard is
-    /// no longer the one that came last for its `[stop]`, so a "stop that"
+    /// seen reactions) gives back all its start spent, as an unsent write
+    /// does ([`Engine::unwritten`], #6543): its trigger's `cooldown` (the
+    /// per-kind rest counts from a line heard), and a run never heard is no
+    /// longer the one that came last for its `[stop]`, so a "stop that"
     /// stops the remark they heard. None is said.
     pub fn unsaid(&mut self, skill: &str, now_us: u64) -> Option<String> {
         let known = self.skills.iter().find(|known| known.name == skill)?;
         let Some((group, _)) = known.budget.as_ref() else {
-            if stop_group(known).is_some()
-                && let Some(ran) = self.unsaid_from.remove(skill)
+            stop_group(known)?;
+            if self.unwritten(skill) {
+                eprintln!(
+                    "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
+                );
+            } else if let Some(ran) = self.unsaid_from.remove(skill)
                 && self.group_ran.get(skill) == Some(&ran)
             {
                 self.group_ran.remove(skill);
@@ -8718,6 +8793,9 @@ impl Engine {
             && watch.ran_us == Some(spent.at_us)
         {
             watch.ran_us = spent.ran_us;
+            if spent.disarmed {
+                watch.disarmed = false;
+            }
             if watch.since_us == spent.since_us {
                 watch.spent = true;
                 watch.unwritten = true;
@@ -8766,6 +8844,32 @@ impl Engine {
     /// its own (a queued `each` item) gives back nothing of this one.
     pub fn kept(&mut self, skill: &str) {
         self.unwritten.remove(skill);
+    }
+
+    /// Whether a skill reads the privacy slide through a `drops_kept`
+    /// `[[while]]` ([`Engine::privacy`]).
+    pub fn reads_privacy(&self) -> bool {
+        self.skills.iter().any(|skill| {
+            skill
+                .conditions
+                .iter()
+                .any(|condition| condition.drops_kept)
+        })
+    }
+
+    /// The privacy slide, as the program read it from the bus's newest
+    /// `voice/privacy` (the watches' own reading, `physical_muted`), told
+    /// on a change only (#7668): lamp-skills does not subscribe to the
+    /// voice's 10 ms lease. Said to the skills as `voice/privacy` with
+    /// `permitted` (open) or not (closed), a value that lasts until the
+    /// next; closing drops every chance a `drops_kept` skill keeps.
+    pub fn privacy(&mut self, closed: bool, now_us: u64) -> Vec<Run> {
+        if !self.reads_privacy() || self.privacy_told == Some(closed) {
+            return Vec::new();
+        }
+        self.privacy_told = Some(closed);
+        let told = json!({ "permitted": !closed }).to_string();
+        self.observe(PRIVACY_TOPIC, now_us, told.as_bytes(), None)
     }
 
     /// Until when `skill` rests after runs nobody noticed, if it does.
@@ -9139,6 +9243,8 @@ impl Engine {
                     // with the switch on (reviewer-two on #3092): off, the
                     // engine reads nothing it did not before.
                     .filter(|(_, why)| self.rest_through_sounds || *why != BROKEN_BY_READ)
+                    // The privacy slide is told by the program (#7668).
+                    .filter(|(_, why)| *why != PRIVACY_TOLD)
                     .map(|(topic, _)| topic)
             })
             .collect();
@@ -9606,6 +9712,7 @@ impl Engine {
             self.latest_without_more
                 .insert(topic.to_owned(), (value.clone(), now_us, lifespan_us));
         }
+        let mut dropping: Vec<String> = Vec::new();
         for skill in &self.skills {
             if more && !self.seen_more.contains(&skill.name) {
                 continue;
@@ -9641,6 +9748,46 @@ impl Engine {
                 } else if !carried {
                     self.holding.remove(&key);
                 }
+                if condition.drops_kept && !condition.test.holds(&value) {
+                    dropping.push(skill.name.clone());
+                }
+            }
+        }
+        // A `drops_kept` condition said not to hold (#6543, the privacy
+        // slide closed): every chance its skill keeps is dropped, and a
+        // rise forgets what it read, so nothing seen before it is said.
+        let mut kept_dropped = Vec::new();
+        for name in dropping {
+            let Some(skill) = self.skills.iter().find(|skill| skill.name == name) else {
+                continue;
+            };
+            for (index, trigger) in skill.triggers.iter().enumerate() {
+                let Some(watch) = self.watches.get_mut(&(name.clone(), index)) else {
+                    continue;
+                };
+                let kept = watch.waiting_us.take().is_some() && !watch.spent;
+                watch.readings = Readings::default();
+                if kept {
+                    watch.spent = true;
+                    kept_dropped.push(Run {
+                        held: None,
+                        generation: None,
+                        skill: name.clone(),
+                        events: vec![event(
+                            &name,
+                            SkillStage::Answered,
+                            format!(
+                                "{} chance dropped: {topic} said its while does not hold; a kept chance is never said after it",
+                                trigger.name.as_deref().unwrap_or("trigger")
+                            ),
+                            Some(false),
+                        )],
+                        calls: Vec::new(),
+                        ask: None,
+                        queue: false,
+                        from: None,
+                    });
+                }
             }
         }
         self.note_lowered(now_us);
@@ -9656,7 +9803,7 @@ impl Engine {
             }
         }
         self.invalidate_changes(now_us);
-        let mut runs = Vec::new();
+        let mut runs = kept_dropped;
         let mut stood_in_for: Vec<String> = Vec::new();
         let minute = self.local_minute(now_us);
         let moment = self.local_moment(now_us);
@@ -9864,6 +10011,8 @@ impl Engine {
                 // A rise kept for its `wait` until a message past it: still
                 // not risen there, as before, but its drop is said (below).
                 let mut kept_past_wait = false;
+                // A rise of this message itself, not one kept (`still`).
+                let mut rising = false;
                 if let Some(rise) = &trigger.rise {
                     let Some(reading) = at(&value, &rise.field)
                         .as_f64()
@@ -9873,6 +10022,7 @@ impl Engine {
                         continue;
                     };
                     rose = watch.readings.rose(reading, now_us, rise);
+                    rising = rose;
                     // A rise kept waiting for its `[[while]]` (the lamp
                     // talking, #7401) is still that rise until it is taken
                     // or its `wait` runs out: a count that rose mid-turn
@@ -9888,10 +10038,26 @@ impl Engine {
                 }
                 watch.unknown_us = None;
                 if let Some(line) = rearm_line {
-                    if !line.test.holds(&value) {
-                        watch.past_line_us = None;
-                    } else if now_us - *watch.past_line_us.get_or_insert(now_us) >= line.for_us {
-                        watch.disarmed = false;
+                    match &line.test {
+                        Some(test) if !test.holds(&value) => watch.past_line_us = None,
+                        Some(_) => {
+                            if now_us - *watch.past_line_us.get_or_insert(now_us) >= line.for_us {
+                                watch.disarmed = false;
+                            }
+                        }
+                        // `still` (#7668): the last rise was long enough
+                        // ago, then this one begins the still while again.
+                        None => {
+                            if watch
+                                .past_line_us
+                                .is_some_and(|rose| now_us - rose >= line.for_us)
+                            {
+                                watch.disarmed = false;
+                            }
+                            if rising {
+                                watch.past_line_us = Some(now_us);
+                            }
+                        }
                     }
                 }
                 let holds = trigger.test.holds(&value) && followed;
@@ -10023,20 +10189,26 @@ impl Engine {
                         &skill.name,
                         "rearm",
                         now_us,
-                        || {
-                            format!(
+                        || match &line.test {
+                            Some(test) => format!(
                                 "not rearmed: {} for {} s first",
-                                line.test.shows(),
+                                test.shows(),
                                 line.for_us / 1_000_000
-                            )
+                            ),
+                            None => format!(
+                                "not rearmed: no rise for {} s first",
+                                line.for_us / 1_000_000
+                            ),
                         },
                     );
                     continue;
                 }
                 watch.spent = once;
-                if rearm_line.is_some() {
+                if let Some(line) = rearm_line {
                     watch.disarmed = true;
-                    watch.past_line_us = None;
+                    if line.test.is_some() {
+                        watch.past_line_us = None;
+                    }
                 }
                 if trigger.when == When::Appears && watch.away_us < trigger.absent_for_us {
                     let (away, absent) = (watch.away_us, trigger.absent_for_us);
@@ -10456,7 +10628,19 @@ impl Engine {
                     // and taken at its next message once they hold.
                     // A chance kept is not yet had: the rearm line waits too.
                     let waited = now_us - *watch.waiting_us.get_or_insert(now_us);
-                    if waited < trigger.wait_us {
+                    // Held back by a `drops_kept` condition (#6543, the
+                    // privacy slide closed): never kept.
+                    let dropping = skill.conditions.iter().enumerate().any(|(at, condition)| {
+                        condition.drops_kept
+                            && !Self::condition_holds(
+                                seen!(self, skill),
+                                condition,
+                                self.holding.get(&(skill.name.clone(), at)),
+                                self.sooner,
+                                now_us,
+                            )
+                    });
+                    if waited < trigger.wait_us && !dropping {
                         watch.spent = false;
                         watch.disarmed = false;
                         // A chance kept waiting says so, once a hold: a
@@ -10727,8 +10911,13 @@ impl Engine {
                 if acts {
                     // A write's start, as it was before: given back if the
                     // write waits for the owner's yes (#6066), or if a note
-                    // that may end unsaid does (#6543).
-                    if skill.writes_a_service() || skill.may_end_unsaid() {
+                    // that may end unsaid does (#6543), or if a `[stop]
+                    // group`'s line is never heard (#6543: the seen
+                    // reactions' rest counts from a line heard).
+                    if skill.writes_a_service()
+                        || skill.may_end_unsaid()
+                        || stop_group(skill).is_some()
+                    {
                         self.unwritten.insert(
                             skill.name.clone(),
                             Spent {
@@ -10744,6 +10933,7 @@ impl Engine {
                                     .filter(|_| counted)
                                     .map(|(group, _)| group.clone()),
                                 nudge: None,
+                                disarmed: rearm_line.is_some(),
                             },
                         );
                     }
