@@ -170,7 +170,11 @@ fn told(call: &Call) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::history_forget::{Pending, turn_id};
+    use crate::history_forget::Pending;
+
+    fn turn_id(scope: &str, id: u64) -> String {
+        lamp_msgs::history_turn_id("0a1b2c3d", scope, id)
+    }
     use serde_json::json;
     use std::sync::Mutex;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -334,8 +338,8 @@ mod tests {
     #[tokio::test]
     async fn missing_and_switched_off_count_as_done() {
         for body in [
-            r#"{"deleted":[],"missing":["p-0123456789abcdef:4"]}"#,
-            r#"{"deleted":["p-0123456789abcdef:4"],"missing":[]}"#,
+            r#"{"deleted":[],"missing":["0a1b2c3d.p-0123456789abcdef:4"]}"#,
+            r#"{"deleted":["0a1b2c3d.p-0123456789abcdef:4"],"missing":[]}"#,
             r#"{"enabled":false}"#,
             r#"{"deleted_count":3}"#,
             r#"{"status":1,"data":{"missing":["x"]}}"#,
@@ -347,7 +351,7 @@ mod tests {
             assert_eq!(seen.len(), 1);
             assert_eq!(seen[0].0, "POST /api/v1/ai/history/turns/delete HTTP/1.1");
             assert_eq!(seen[0].1, "k-lamp");
-            assert_eq!(seen[0].2, json!({"ids":["p-0123456789abcdef:4"]}));
+            assert_eq!(seen[0].2, json!({"ids":["0a1b2c3d.p-0123456789abcdef:4"]}));
         }
     }
 
@@ -374,7 +378,10 @@ mod tests {
             Say::Hang,
             Say::Answer(502, "{}"),
             Say::Answer(200, r#"{"deleted_count":2}"#),
-            Say::Answer(200, r#"{"deleted":[],"missing":["p-0123456789abcdef:4"]}"#),
+            Say::Answer(
+                200,
+                r#"{"deleted":[],"missing":["0a1b2c3d.p-0123456789abcdef:4"]}"#,
+            ),
         ])
         .await;
         let queue = queue("retry");
@@ -406,7 +413,7 @@ mod tests {
                 json!({"all":true,"person":MINH}),
                 json!({"all":true,"person":MINH}),
                 json!({"all":true,"person":MINH}),
-                json!({"ids":["everyone:4"]}),
+                json!({"ids":["0a1b2c3d.everyone:4"]}),
             ]
         );
         // Something new queued wakes it.

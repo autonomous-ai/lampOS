@@ -1202,8 +1202,9 @@ impl VoiceTone {
 }
 
 /// The memory requests whose answer names the exchanges they removed,
-/// `"exchanges":{"<scope>":[ids]}` (#7771), for the voice to delete the same
-/// turns from the account's history. No other answer's `exchanges` is read.
+/// `"exchanges":{"<scope>":[turn ids]}` (#7771), each by
+/// [`history_turn_id`], for the voice to delete the same turns from the
+/// account's history. No other answer's `exchanges` is read.
 pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
     "forget",
     "forget_last",
@@ -1215,6 +1216,39 @@ pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
 /// The memory request that pages the rest of the exchanges the last forget
 /// removed, when its answer said `"exchanges_more":true` (#7771).
 pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
+
+/// The memory request that answers its store's epoch,
+/// `{"ok":true,"epoch":"<8 hex>"}` (#7771): for [`history_turn_id`].
+pub const MEMORY_HISTORY_EPOCH_OP: &str = "history_epoch";
+
+/// A memory exchange's id on the account's history (#7771):
+/// `<epoch>.<scope>:<id>`. The epoch is the memory store's own, 8 hex
+/// characters minted when the store is made and again when it is wiped
+/// whole, so an exchange id the memory gives again after a wipe (ids
+/// start at 1 in a new store) never names a turn deleted before it. The
+/// scope is a known person's `p-` id or `everyone`. The only maker of the
+/// id: the memory's forget answers, and the voice's save of a turn, call
+/// it.
+pub fn history_turn_id(epoch: &str, scope: &str, id: u64) -> String {
+    format!("{epoch}.{scope}:{id}")
+}
+
+/// A memory store's epoch as [`history_turn_id`] takes it: 8 lowercase
+/// hex characters.
+pub fn is_history_epoch(epoch: &str) -> bool {
+    epoch.len() == 8
+        && epoch
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The scope of a [`history_turn_id`], when `turn` is one: a well-formed
+/// epoch, a scope and a number.
+pub fn history_turn_scope(turn: &str) -> Option<&str> {
+    let (epoch, rest) = turn.split_once('.')?;
+    let (scope, id) = rest.rsplit_once(':')?;
+    (is_history_epoch(epoch) && !scope.is_empty() && id.parse::<u64>().is_ok()).then_some(scope)
+}
 
 /// Memory has forgotten everything it kept under a person, asked by the
 /// app or by voice (`memory/forgot`), so every other part lets its own go
@@ -2751,6 +2785,28 @@ mod tests {
     use super::*;
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
+
+    /// #7771: a turn id is `<epoch>.<scope>:<id>`, and only such an id
+    /// gives its scope.
+    #[test]
+    fn a_history_turn_id_carries_the_epoch_scope_and_id() {
+        let turn = history_turn_id("0a1b2c3d", "p-0123456789abcdef", 12);
+        assert_eq!(turn, "0a1b2c3d.p-0123456789abcdef:12");
+        assert_eq!(history_turn_scope(&turn), Some("p-0123456789abcdef"));
+        assert_eq!(
+            history_turn_scope(&history_turn_id("ffffffff", "everyone", 7)),
+            Some("everyone")
+        );
+        for bad in [
+            "everyone:7",
+            "0A1B2C3D.everyone:7",
+            "0a1b2c.everyone:7",
+            "0a1b2c3d.:7",
+            "0a1b2c3d.everyone:x",
+        ] {
+            assert_eq!(history_turn_scope(bad), None, "{bad}");
+        }
+    }
 
     /// `value` is written as exactly `text`, reads back as itself, and
     /// reads the same with a field no version yet knows beside the others.
