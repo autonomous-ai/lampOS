@@ -1059,9 +1059,9 @@ impl Kept<'_> {
             (Ok(()), _) => Ok(true),
             (Err(_), Some(why)) => {
                 // A reset fails toward wiping: the person's keys never
-                // outlive it. lamp-update's next round writes the
-                // `gateway` block again into a config that has none, with
-                // no install run (#7868).
+                // outlive it. lamp-update's next round has Harness's
+                // one-shot write the `gateway` block again into a config
+                // that has none, with no install run (#7868).
                 remove_at(&dir, name, true)?;
                 say(&format!(
                     "lamp-setup: reset: {} removed: its cut was not taken: {why}",
