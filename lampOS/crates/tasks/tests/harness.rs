@@ -10994,12 +10994,23 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         cli.reply_kept("lamp-one-openclaw", &token, "x"),
         Took::NotIdle
     );
+    // #8001: a hand-over's first try held short (10 s), then the rest of the 60 s.
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::EngineNotReady
     );
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_HELD - lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::Timeout
     );
     // Typed though timed out: that input, never typed again.
@@ -11060,6 +11071,27 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let held = last_reply["args"].as_array().unwrap();
     let at = held.iter().position(|arg| arg == "--timeout").unwrap();
     assert_eq!(held[at + 1], "60s");
+    let holds: Vec<String> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "reply")
+        .map(|call| {
+            let args = call["args"].as_array().unwrap();
+            let at = args.iter().position(|arg| arg == "--timeout").unwrap();
+            args[at + 1].as_str().unwrap().to_owned()
+        })
+        .collect();
+    let first = lamp_tasks::harness::REPLY_KEPT_FIRST_HELD;
+    let rest = lamp_tasks::harness::REPLY_KEPT_HELD - first;
+    let (first, rest) = (
+        format!("{}s", first.as_secs()),
+        format!("{}s", rest.as_secs()),
+    );
+    assert_eq!(
+        holds,
+        ["60s", "60s", &first, &rest, "60s", "60s", "60s", "60s"],
+        "#8001: the short hold, then the rest"
+    );
+    assert_eq!((first.as_str(), rest.as_str()), ("10s", "50s"));
     let closes: Vec<Vec<Value>> = calls
         .iter()
         .filter(|call| call["args"][0] == "close")
