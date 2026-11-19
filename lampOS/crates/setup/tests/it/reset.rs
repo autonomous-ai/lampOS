@@ -3553,9 +3553,9 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
         [
             "list-units",
             "stop",
+            "agents",
             "skills",
             "apps",
-            "agents",
             "sync",
             "sync"
         ]
