@@ -573,7 +573,8 @@ pub fn claims_a_change(reply: &str) -> bool {
 /// The keeps said in the person's own words after "I'll remember", which
 /// [`keep_claim`] leaves to an object word ("that", "it"): "I'll remember
 /// you're vegetarian.", "I'll remember your car is on B1." (V2's must-fix
-/// (3) on #7924). Never "I'll remember to …", a promise to remind.
+/// (3) on #7924). Never "I'll remember to …", a promise to remind, nor in a
+/// sentence that names a face or waits on a condition ([`change_claim`]).
 const KEEP_SAID: [&str; 4] = [
     "i'll remember you",
     "i will remember you",
@@ -630,7 +631,17 @@ pub fn change_claim(reply: &str) -> Option<Change> {
                 after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
             })
         };
-        if KEEP_SAID.iter().any(opens) {
+        // Never a face's sentence (the face reading decides those) nor a
+        // promise with a condition ("I'll remember your face once you tell
+        // me your name."): Friday's P2 on #7924.
+        let words: Vec<&str> = rest
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let offer = words
+            .iter()
+            .any(|word| matches!(*word, "face" | "once" | "when" | "if" | "after" | "soon"));
+        if !offer && KEEP_SAID.iter().any(opens) {
             return Some(Change::Keep);
         }
         if CHANGE_CLAIMS.iter().any(opens) {
@@ -33251,5 +33262,13 @@ mod chapter_tests {
             Some(Change::Replace)
         );
         assert_eq!(change_claim("I'll remember to remind you at five."), None);
+        assert_eq!(
+            change_claim("I'll remember your face once you tell me your name."),
+            None
+        );
+        assert_eq!(
+            change_claim("I'll remember your spot once you say yes."),
+            None
+        );
     }
 }
