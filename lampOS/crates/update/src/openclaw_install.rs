@@ -2330,7 +2330,8 @@ fn gateway_config(
         let file = Path::new("/").join(file.strip_prefix(root).unwrap_or(file));
         let file = file.to_string_lossy();
         give_to_lampos(run, &file)?;
-        run(&validate_argv(uid, gid, &file))
+        let joined = run(&MAIN_PID.map(str::to_owned)).is_ok_and(|said| has_main_pid(&said));
+        run(&validate_argv(uid, gid, &file, joined))
             .map(drop)
             .map_err(|why| {
                 format!(
@@ -2506,20 +2507,40 @@ fn in_namespace(uid: &str, gid: &str, npm_ci: bool, args: &[&str]) -> Vec<String
 /// no provider, and the forwarder's own token never goes on a command line.
 const CHECK_TOKEN: &str = "LAMP_HERMES_TOKEN=lamp-config-check";
 
+/// What prints the `MainPID` of OpenClaw's gateway's unit: a number not
+/// `0` while it runs ([`has_main_pid`]), as [`WRAPPER`] finds the gateway.
+pub const MAIN_PID: [&str; 7] = ["systemctl", "show", "-p", "MainPID", "--value", "--", UNIT];
+
+/// Whether [`MAIN_PID`]'s output names a running gateway.
+pub fn has_main_pid(said: &str) -> bool {
+    let pid = said.trim();
+    !pid.is_empty() && pid != "0"
+}
+
 /// OpenClaw's own check of the config in `file` (a path on the lamp beside
 /// `openclaw.json`, never the live one, readable by `lampos`): `config
-/// validate --json` as `lampos` inside OpenClaw's namespace, as the
-/// install's `--version` runs ([`in_namespace`]), pointed at `file` by
-/// `OPENCLAW_CONFIG_PATH`, with [`CHECK_TOKEN`]. Status 0 takes it. The
-/// install's `gateway` block (#7868) and lamp-setup's reset cut both run it.
-pub fn validate_argv(uid: &str, gid: &str, file: &str) -> Vec<String> {
+/// validate --json` as `lampos`, pointed at `file` by
+/// `OPENCLAW_CONFIG_PATH`. Status 0 takes it. `joined` (the gateway's unit
+/// has a [`MAIN_PID`]): through [`WRAPPER`], which joins the running
+/// gateway's namespaces, as OpenClaw 2026.11.2 refuses a check from any
+/// other while its gateway runs (`GatewayLockNamespaceError`, #7268); the
+/// wrapper passes the forwarder's token and fails closed with no gateway.
+/// Else, with no gateway and so no lock to clash with, inside OpenClaw's
+/// namespace of its own, as the install's `--version` runs
+/// ([`in_namespace`]), with [`CHECK_TOKEN`]. The install's `gateway` block
+/// (#7868) and lamp-setup's reset cut both run it.
+pub fn validate_argv(uid: &str, gid: &str, file: &str, joined: bool) -> Vec<String> {
+    let config = format!("OPENCLAW_CONFIG_PATH={file}");
+    if joined {
+        return as_lampos(&[config.as_str(), WRAPPER, "config", "validate", "--json"]);
+    }
     let mut argv = in_namespace(uid, gid, false, &["config", "validate", "--json"]);
     let at = argv
         .iter()
         .position(|arg| arg == "/usr/bin/unshare")
         .unwrap_or(argv.len());
     argv.insert(at, CHECK_TOKEN.to_owned());
-    argv.insert(at, format!("OPENCLAW_CONFIG_PATH={file}"));
+    argv.insert(at, config);
     argv
 }
 
