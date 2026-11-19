@@ -3792,6 +3792,16 @@ pub fn serve(
             );
             engine = engine.carrying_skill_yes_from_question(true);
         }
+        // The face last named as them, the same unbroken track alone in
+        // view though the eyes no longer name it, carries (C63(b)).
+        if std::env::var(crate::second_provider::CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line no face was seen speaking carries on the face last named as them while the same unbroken track is alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
+            );
+            engine = engine.carrying_own_track(true);
+        }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.

@@ -48,6 +48,9 @@ thread_local! {
     /// `LAMP_CONVERSATION_CARRIED_MEMORY` ([`Engine::reading_carried`]) for
     /// the next [`lines_known`] on this thread, once.
     static CARRIED_MEMORY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` ([`Engine::carrying_own_track`])
+    /// for the next [`lines_known`] on this thread, once.
+    static OWN_TRACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The same-voice check not running for the route
     /// ([`Engine::reading_carried_where_heard`]) for the next
     /// [`lines_known`] on this thread, once.
@@ -657,6 +660,7 @@ async fn lines_known(
     let mut engine = engine
         .saving_carried(saves)
         .reading_carried(CARRIED_MEMORY.with(|on| on.replace(false)))
+        .carrying_own_track(OWN_TRACK.with(|on| on.replace(false)))
         .reading_carried_where_heard(!CARRIED_UNHEARD.with(|unheard| unheard.replace(false)));
     if let Some(found) = DONT_KNOW_FOUND.with(|found| found.borrow_mut().take()) {
         engine = engine.recalling_before_a_dont_know(found);
@@ -5225,4 +5229,92 @@ fn a_one_face_forget_not_asked_says_why_in_the_journal() {
         !line.contains("umbrella"),
         "the about's words are never journaled: {line}"
     );
+}
+
+/// C63(b), lamp-06c1, 18 Nov (request 111): A names herself on `f1`, then
+/// says the next line with a hand over her face. The eyes let her name go
+/// (their known file gone), her face still the one `f1` alone in view. With
+/// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` that line is carried in her
+/// conversation going on: the same unbroken track as the face last named as
+/// her, alone in view. Another face alone, or a second face beside hers,
+/// is still the room's; with the switch off, as before, the room's. A line
+/// admitted as the room's, the face cache naming nobody, carries the same.
+#[tokio::test]
+async fn her_own_covered_face_carries_with_the_own_track_switch() {
+    let a = crate::remember::person_id("A");
+    fn let_go(request: u64, known: &std::path::Path) {
+        if request == 2 {
+            let _ = std::fs::remove_file(known);
+            let _ = std::fs::remove_file(known_face_of(known));
+        }
+    }
+    for (what, on, covered, carried, named) in [
+        ("own-track-on", true, vec![("f1", false)], true, true),
+        ("own-track-other", true, vec![("f2", false)], false, true),
+        (
+            "own-track-two",
+            true,
+            vec![("f1", false), ("f2", false)],
+            false,
+            true,
+        ),
+        ("own-track-off", false, vec![("f1", false)], false, true),
+        ("own-track-room", true, vec![("f1", false)], true, false),
+        (
+            "own-track-room-off",
+            false,
+            vec![("f1", false)],
+            false,
+            false,
+        ),
+        (
+            "own-track-room-two",
+            true,
+            vec![("f1", false), ("f2", false)],
+            false,
+            false,
+        ),
+    ] {
+        OWN_TRACK.with(|own| own.set(on));
+        let chats = vec![
+            vec![text("Lunch, then."), Ok(ChatEvent::Done)],
+            vec![text("Okay."), Ok(ChatEvent::Done)],
+        ];
+        let got = lines_known(
+            what,
+            vec![
+                (
+                    "Lamp, I'm planning lunch.".to_owned(),
+                    vec![("f1", true)],
+                    0,
+                ),
+                ("What do you remember about my food?".to_owned(), covered, 0),
+            ],
+            chats,
+            (BOOT, true, true),
+            None,
+            Some(true),
+            named,
+            false,
+            None,
+            Voice::Off,
+            (false, &[]),
+            let_go,
+            (false, None, None),
+        )
+        .await;
+        if named {
+            assert_eq!(
+                got.asked[0],
+                Message::system(format!("for {:?}", Some(a.as_str()))),
+                "{what}: her opening line, seen said, hers"
+            );
+        }
+        let told = if carried {
+            Message::system(format!("for {:?}", Some(a.as_str())))
+        } else {
+            Message::system("for None")
+        };
+        assert_eq!(got.asked[1], told, "{what}: the covered line");
+    }
 }
