@@ -388,7 +388,10 @@ the product's unit, where that switch is off, and held "Lamp, put it back."
 so 2 times in 5; test
 `a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked`
 in `second_provider/tests.rs`). Nor is one in which lamp-name heard the
-name at its own bar, 0.9, or more, whatever its words came back as: the
+name at its own bar, 0.9, or more, whatever its words came back as, if
+it began clear of the lamp's voice and its 1.5 s echo tail
+(`own_echo::TAIL_US`; lamp-name runs without `--not-while-speaking` in the
+product, and on lamp-4ace heard the lamp's own reply at 0.990, #7994): the
 rule judges it as any line, and a line of one or two words, not a
 question, with nothing written for the name, is still not answered on the
 hearing alone (#7891: on lamp-52e6 on 19 Nov "Lamp?", heard at 0.917, its

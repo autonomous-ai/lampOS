@@ -10759,11 +10759,19 @@ async fn spoken(
     // and the rule judges it as any line, where a line of one or two words,
     // not a question, with nothing written for the name, is still not
     // answered on the hearing alone (#7918). On lamp-52e6 on 19 Nov
-    // "Lamp?", heard at 0.917, was held so (#7891).
+    // "Lamp?", heard at 0.917, was held so (#7891). Only one begun clear of
+    // the lamp's voice and its echo tail: in the product lamp-name runs
+    // without `--not-while-speaking`, and on lamp-4ace it heard the lamp's
+    // own reply at 0.990 (the Reviewer-lead's P2 on #7994).
+    let began_clear_of_the_lamp = !marks.over_the_lamps_voice
+        && !own_echo::in_the_tail(
+            said.lock().map_or(0, |said| said.0),
+            shared.said_until_us.load(Ordering::Relaxed),
+        );
     let heard_at = shared
         .name_in_line
         .as_ref()
-        .filter(|_| marked)
+        .filter(|_| marked && began_clear_of_the_lamp)
         .and_then(|best| best(said.lock().map_or((0, 0), |said| *said)))
         .filter(|score| *score >= crate::called::LEAST_SCORE);
     if let Some(score) = heard_at {
