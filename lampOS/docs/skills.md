@@ -6478,10 +6478,12 @@ the same code for both writers.
   on #6811; 90 s without the guide, `WRITE_WITHIN`), within the agent's
   10 minutes 30 s (`MAKE_WITHIN`, 30 s over lamp-tasks', `TASKS_MARGIN`). The voice still puts the answer through its whole check;
   one it refuses goes back with the check's words (`REPAIR_MARK`) at most
-  2 more times (`GUIDED_MOST_REPAIRS`), each begun only while one more
-  answer fits the agent's time (so with the guide, whose one run already
-  drafts, checks and fixes twice, the voice's own repair rarely begins),
-  and one still refused is said as not made, as today. Off, the line, the run's words and the make's folder are today's,
+  2 more times (`GUIDED_MOST_REPAIRS`), each begun only while at least
+  2 minutes of the agent's time are left (`make_skill_local::REPAIR_AT_LEAST`,
+  #7874: asking for a whole 10-minute answer's time left let a repair begin
+  only when the first answer came within 30 s, and OpenClaw's takes 34-40 s)
+  and given no more than what is left, so the make's 10 minutes 30 s still
+  hold; and one still refused is said as not made, as today. Off, the line, the run's words and the make's folder are today's,
   byte for byte. Read by the second route's worker (passed by
   `process::second_route_worker_environment`), and for the app's MAKE IT
   by the coordinator (below).
