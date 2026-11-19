@@ -8289,6 +8289,17 @@ impl Engine {
                     // Its exchange never reaches the memory's journal either.
                     crate::remember::keep_out(request);
                     None
+                } else if crate::onboarding::learn_later::is_ask(&text) {
+                    // The walk's "What should I call you?" (#7876): its own
+                    // line, said with no chat; no one's memory is read for
+                    // it, and its exchange is kept out of memory.
+                    eprintln!(
+                        "lamp-voice second: request {request} is the walk's ask for a name: nothing read from memory, nothing kept (LAMP_FACE_LEARN_LATER)"
+                    );
+                    crate::remember::keep_out(request);
+                    // The next line is its answer, judged by the model.
+                    crate::onboarding::learn_later::asked_now();
+                    None
                 } else {
                     self.memory_scope(request, session, false)
                 };
@@ -17286,6 +17297,11 @@ async fn answer(
         // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
+        // The line after the walk's "What should I call you?" (#7876): the
+        // model judges whether it is a name or a decline.
+        if heard && crate::onboarding::learn_later::answering() {
+            notes.push(crate::onboarding::learn_later::ANSWER_NOTE.to_owned());
+        }
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
         {
             notes.push(line);

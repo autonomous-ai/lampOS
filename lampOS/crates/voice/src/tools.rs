@@ -979,6 +979,13 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
+        // The model's decline of "What should I call you?" (#7876).
+        if crate::onboarding::learn_later::worker_on(
+            settings.names_checked,
+            settings.remember_speaker,
+        ) {
+            tools.push(crate::onboarding::learn_later::tool());
+        }
         // A face added from a photo, asked about at the lamp (#1968).
         if settings.photo_faces {
             tools.extend(crate::photo_faces::tools());
@@ -1353,7 +1360,10 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
     }
-    if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
+    if crate::known_faces::is_tool(name)
+        || crate::photo_faces::is_tool(name)
+        || name == crate::onboarding::learn_later::DECLINED
+    {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
             Route::Faces(socket, face_switches(settings), settings.onboarding.clone())
         });
@@ -2754,7 +2764,17 @@ fn run_call_with_scope(
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
+        Route::Faces(_, _, onboarding) if call.name == crate::onboarding::learn_later::DECLINED => {
+            (
+                "the walk",
+                crate::onboarding::learn_later::declined(call, onboarding.as_deref()),
+            )
+        }
         Route::Faces(socket, switches, onboarding) => 'faces: {
+            // A name given to "What should I call you?" (#7876): answered.
+            if call.name == crate::known_faces::REMEMBER {
+                crate::onboarding::learn_later::remembered(onboarding.as_deref());
+            }
             // The owner's "I'm <the typed name>" from their own face kept
             // under another name links that face as the owner in place of a
             // rename (`LAMP_OWNER_LINK`, #7501); anything else goes on.

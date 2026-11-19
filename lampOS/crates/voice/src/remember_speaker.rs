@@ -597,6 +597,53 @@ mod tests {
         assert_eq!(answer, json!({"ok": true, "remembered": "Ada"}));
     }
 
+    /// `LAMP_FACE_LEARN_LATER` (#7876): the answer to the walk's "What
+    /// should I call you?" past setup is an ordinary line, proven by this
+    /// route unchanged. Said by the face in view, it is kept and the model
+    /// says the one line; the eyes refusing (two faces, none), nothing is
+    /// kept and the line is never said. A name the setup gave is the same
+    /// person's memory; another name is its own.
+    #[test]
+    fn the_answer_to_what_should_i_call_you_is_kept_only_when_the_eyes_remember() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let no_ask = known_faces::FaceSwitches {
+            face_no_ask: true,
+            ..switches()
+        };
+        for (words, name) in [
+            ("Walter.", "Walter"),
+            ("Call me Walter.", "Walter"),
+            ("I'm Nora.", "Nora"),
+        ] {
+            let (answer, requests) =
+                own_name_exchange_with(words, name, false, no_ask, json!({"remembered": name}));
+            assert_eq!(answer["ok"], true, "{words}: {answer}");
+            assert_eq!(answer["note"], known_faces::KEPT_NO_ASK, "{words}");
+            assert_eq!(requests.len(), 1, "{words}: {requests:?}");
+            assert_eq!(requests[0]["remember_speaker"]["name"], name);
+        }
+        for refused in ["two_faces", "no_face", "too_far"] {
+            let (answer, _) = own_name_exchange_with(
+                "Walter.",
+                "Walter",
+                false,
+                no_ask,
+                json!({"error": refused}),
+            );
+            assert_eq!(answer["error"], known_faces::NOT_SEEN_NO_ASK, "{answer}");
+            assert!(!answer.to_string().contains("I'll know you"), "{answer}");
+        }
+        // The setup name is one person's memory; another name another's.
+        assert_eq!(
+            known_faces::memory_person("Walter"),
+            known_faces::memory_person("Walter")
+        );
+        assert_ne!(
+            known_faces::memory_person("Walter"),
+            known_faces::memory_person("Nora")
+        );
+    }
+
     /// `LAMP_FACE_NO_ASK` at setup (the Reviewer-lead's HOLD and the first
     /// builder's ruling on #7810): the walk's first save keeps a face
     /// unasked only on the same speaking-face proof as past setup. The face
