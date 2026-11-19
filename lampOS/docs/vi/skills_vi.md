@@ -4166,8 +4166,11 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    không trigger được nạp (một lần đọc hay ghi có thể là bước duy nhất).
    Kỹ năng từ Store, đẩy lên, core hay thêm từ file có asks mà không tool
    vẫn bị từ chối như trước (P2 của sim-2 và Heron trên #7249), và `tools.json` liệt kê asks của nó dưới `made_asks`,
-   theo tên kỹ năng. Tắt: bị từ chối như trước và `tools.json` giữ nguyên
-   từng byte.
+   theo tên kỹ năng. Kỹ năng tạo ở đây không có asks và không tool (chỉ có
+   trigger, như tech-news) cũng được liệt kê ở đó, theo tên với danh sách
+   rỗng (`"tech-news": []`, `Skill::made_here`), để nói tên nó là bắt đầu
+   nó (mục 6); kỹ năng đã tắt (`enabled = false`) không được liệt kê.
+   Tắt: bị từ chối như trước và `tools.json` giữ nguyên từng byte.
 6. **Bắt đầu bằng lời** (`skill_named`, `LAMP_SKILL_NAMED=on`, đường thứ
    hai): một câu nghe được là một trong các asks của kỹ năng tự tạo, nói
    đơn giản, được so như asks của kỹ năng Store, tạo lời gọi vòng 1 trong
@@ -4175,9 +4178,24 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    chạy ngay bằng giọng nói (`made_run`): chỉ của chủ đèn (với
    `LAMP_PRIVATE_ROOM` thì ai nói cũng là chủ; không thêm cổng nhận diện),
    lần ghi chỉ theo lời đồng ý đã giữ, một lần mỗi lượt chạy, trong giới hạn
-   của ngày, task giữ lời đồng ý, token một lần chạy và grant. Câu phủ
-   định, câu hỏi, cụm hai kỹ năng cùng có, chỉ tên kỹ năng, hay khi đèn đang
-   chờ câu trả lời: không bắt đầu gì. Một lần chạy tự nói lời của nó
+   của ngày, task giữ lời đồng ý, token một lần chạy và grant. Tên kỹ năng
+   cũng bắt đầu nó theo cùng cách so ("tech news", "run tech news" cho
+   tech-news; chủ đèn, 19/11: "a skill must be called by its exact name"),
+   khi tên có hai từ của riêng nó và không phải ask bị từ chối. Việc so
+   khớp nằm trong code, không để model quyết: bỏ qua hoa thường và dấu câu,
+   và câu chỉ được có thêm những từ nói quanh một ask (tên đèn, lời chào,
+   "please", "now", lời đề nghị đứng trước như "can you", từ xin chạy như
+   "run") và từ đệm (`skill_named::FILLERS`: "um", "uh", "er", "erm",
+   "hmm"). "Hey Lamp, daily brief", "Lamp, daily brief please", "Daily
+   brief." và "um, daily brief now" bắt đầu daily-brief; "tell me about
+   your daily brief idea" có từ khác nên là của model. Câu phủ định, câu
+   hỏi, cụm hai kỹ năng cùng có, một phần của tên, hay khi đang giữ một
+   lời đồng ý: không bắt đầu gì. Sau khi lời cuối của đèn hỏi điều gì đó
+   (`remarks::lamp_asked`), câu chỉ là của model khi lời đó nêu kỹ năng
+   hay chính các từ của câu (`skill_named::asked_about`: "Which one, daily
+   brief or tech news?"); nếu không, kỹ năng tự tạo vẫn bắt đầu trong code
+   (lần thử trực tiếp của lead, 19/11 09:06: bốn câu "daily brief" sau câu
+   "Want me to ...?" của đèn đều để model đọc, và model không gọi gì). Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau

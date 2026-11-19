@@ -15231,7 +15231,12 @@ enum Taken {
 /// "Sounds good." after "Shall I start it?" is the model's, whatever a
 /// skill's `asks` say.
 fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
-    held || messages
+    held || lamp_last_words(messages).is_some_and(crate::remarks::lamp_asked)
+}
+
+/// The lamp's newest words in `messages` that hold a letter or a digit.
+fn lamp_last_words(messages: &[Message]) -> Option<&str> {
+    messages
         .iter()
         .rev()
         .filter(|message| message.role == "assistant")
@@ -15240,7 +15245,33 @@ fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
                 .words()
                 .filter(|words| words.chars().any(char::is_alphanumeric))
         })
-        .is_some_and(crate::remarks::lamp_asked)
+}
+
+/// [`lamp_awaits_answer`] for a line the heard words matched to a skill
+/// (`named`, its call): a made skill's own words or name, said plainly,
+/// still run it in code after the lamp's last words asked something, when
+/// those words name neither the skill nor the line's own words
+/// ([`crate::skill_named::asked_about`]). The lead's live test, 19 Nov
+/// 09:06: after the lamp's question, four "daily brief" lines were each
+/// left to the model, which called nothing. A held yes still waits.
+fn lamp_awaits_answer_for(
+    held: bool,
+    messages: &[Message],
+    named: Option<&(String, Value)>,
+    heard: &str,
+) -> bool {
+    if !lamp_awaits_answer(held, messages) {
+        return false;
+    }
+    let made = named.filter(|(name, _)| name == crate::made_skill::MAKE);
+    match (held, made, lamp_last_words(messages)) {
+        (false, Some((name, args)), Some(said)) => crate::skill_named::asked_about(
+            said,
+            heard,
+            crate::skill_named::function_of(name, args),
+        ),
+        _ => true,
+    }
 }
 
 /// Whether a yes of any kind is held for the person's next words: a keep or
@@ -17092,6 +17123,9 @@ async fn answer(
                 .and_then(|named| named(&said))
         })
         .flatten();
+    // The line a skill was matched in, for whether the lamp's last words
+    // asked of that skill ([`lamp_awaits_answer_for`]); none, no copy.
+    let named_said = skill_named.as_ref().map(|_| said.clone());
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -17733,6 +17767,20 @@ async fn answer(
                 );
             }
         }
+        // A made skill's words or name run it past a question that names
+        // it not ([`lamp_awaits_answer_for`], the lead's live test, 19 Nov).
+        let awaits_named = lamp_awaits_answer_for(
+            held,
+            &messages,
+            skill_named.as_ref(),
+            named_said.as_deref().unwrap_or_default(),
+        );
+        if awaits && !awaits_named {
+            eprintln!(
+                "lamp-voice second: request {request}: the lamp's last words asked something, but not of the made skill the heard words named: called in code"
+            );
+        }
+        let awaits = awaits_named;
         if let Some((name, args)) = skill_named
             .as_ref()
             .filter(|_| !forgot_before_question && awaits)

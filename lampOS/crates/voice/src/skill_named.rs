@@ -32,7 +32,8 @@
 //! word or a digit, [`crate::made_skill::name_digits`]), and nothing else
 //! but what is said around a plain ask: a greeting, the lamp's name, a
 //! "please" ([`crate::tools::skill_asked`]'s `AROUND`, but never "wait",
-//! which may be a person stopping: [`NOT_AROUND`]), a request before it
+//! which may be a person stopping: [`NOT_AROUND`]), a filler ("um",
+//! [`FILLERS`]), a request before it
 //! ("can you", "start", "I want", its `REQUESTS`), or a word that asks to
 //! run it ([`RUNS`]: "run", "use", "open", "try", "skill"). Any other word
 //! leaves the line to the model, as before: a question about the skill
@@ -86,8 +87,10 @@ pub fn on() -> bool {
 /// ([`functions`], with `LAMP_MADE_SKILL_ASKS` on): a made skill has no
 /// function of its own, so its `asks` (the tools file's `made_asks`,
 /// [`crate::tools::made_skill_asks`]) run it through the run-now path
-/// ([`call`]: `make_skill` with `run`, [`crate::made_run`]), never by its
-/// name, which stays the model's to read (`made_run`).
+/// ([`call`]: `make_skill` with `run`, [`crate::made_run`]), and so does
+/// its name, held as its asks are (the owner, 19 Nov: "a skill must be
+/// called by its exact name"; lamp-skills lists one with no asks by its
+/// name with none).
 pub const MADE: &str = "made:";
 
 /// The id round 1's call is given when the heard words named its skill:
@@ -99,6 +102,12 @@ pub const CALL_ID: &str = "skill_named_by_words";
 /// changing their mind, so such a line is the model's (Twelve's P2 4 on
 /// #6782). A skill named "wait" is still never matched ([`plain_word`]).
 pub const NOT_AROUND: &[&str] = &["wait"];
+
+/// Fillers a spoken line may hold anywhere around a skill's name or ask,
+/// as the words `AROUND` it are: "um, daily brief now" (the lead's live
+/// test, 19 Nov). Sounds, never words with a meaning of their own, so no
+/// yes or no is read from them.
+pub const FILLERS: &[&str] = &["um", "umm", "uh", "uhm", "er", "erm", "hmm"];
 
 /// Words a line that names a skill may hold anywhere besides those
 /// `AROUND` it: what asks to run a skill, and the skill itself ("run the
@@ -368,6 +377,7 @@ fn own_words(words: &[String]) -> Vec<&str> {
     let mut at = 0;
     while at < words.len() {
         if let Some(taken) = phrase_at(words, at, AROUND)
+            .or_else(|| FILLERS.contains(&words[at].as_str()).then_some(1))
             .or_else(|| phrase_at(words, at, REQUESTS))
             .or_else(|| phrase_at(words, at, RUNS))
         {
@@ -438,6 +448,18 @@ fn wanted<'a>(
         .map(|function| (loose(function), *function))
         .filter(|(name, _)| !name.is_empty() && !plain_word(name))
         .collect();
+    // A made skill by its name too (the owner, 19 Nov: "a skill must be
+    // called by its exact name"), held as its asks are: two words of its
+    // own and never a refused ask, so a one-word name ("yes") never runs.
+    wanted.extend(
+        functions
+            .iter()
+            .filter_map(|function| Some((function.strip_prefix(MADE)?, *function)))
+            .map(|(made, function)| (spoken(made), function))
+            .filter(|(said, _)| ask_refused(said).is_none() && own_words_of(said) >= 2)
+            .map(|(said, function)| (loose_ask(&said), function))
+            .filter(|(name, _)| !name.is_empty() && !plain_word(name)),
+    );
     shared_among(&mut wanted);
     let mut phrases: Vec<(String, &'a str)> = given(&functions, asks, taken)
         .into_iter()
@@ -627,6 +649,8 @@ fn named_among<'a>(heard: &str, wanted: &[(String, &'a str)]) -> Option<&'a str>
 fn around_at(words: &[String], at: usize) -> Option<usize> {
     if NOT_AROUND.contains(&words[at].as_str()) {
         None
+    } else if FILLERS.contains(&words[at].as_str()) {
+        Some(1)
     } else {
         phrase_at(words, at, AROUND)
     }
@@ -696,6 +720,25 @@ pub fn heard(settings: &crate::tools::Settings, heard: &str) -> Option<(String, 
 fn short(heard: &str) -> bool {
     let count = lower_words(heard).len();
     count > 0 && count <= MOST_WORDS
+}
+
+/// Whether the lamp's last words `lamp_said` name the skill `function`
+/// that `heard` started ([`function_of`]): its name, or the line's own
+/// words past those said around an ask, as words in a row. A line after
+/// such a question ("Which one, daily brief or tech news?") answers it and
+/// is the model's to read; after one that names it not ("Want me to remind
+/// you tomorrow?"), a made skill's words still run it in code
+/// (`second_provider`'s `lamp_awaits_answer`, the lead's live test, 19
+/// Nov). Spelling only: no word is judged by what it means.
+pub fn asked_about(lamp_said: &str, heard: &str, function: &str) -> bool {
+    let said = lower_words(lamp_said);
+    let name = function.strip_prefix(MADE).unwrap_or(function);
+    let name = lower_words(&spoken(name));
+    let heard = lower_words(heard);
+    let own = own_words(&heard);
+    [name.iter().map(String::as_str).collect::<Vec<&str>>(), own]
+        .iter()
+        .any(|words| holds(&said, words))
 }
 
 /// What [`heard`] matches a line against, read from the files.
@@ -1295,11 +1338,10 @@ mod tests {
             assert_eq!(function_of(&run.0, &run.1), "test-note");
             assert_eq!(spoken(function_of(&run.0, &run.1)), "test note");
             assert!(same_skill_again(&run.0, &run.1, &run));
-            for line in [
-                "don't send my test note",
-                "did you send my test note?",
-                "test note",
-            ] {
+            // Its name runs it too (the owner, 19 Nov: "a skill must be
+            // called by its exact name").
+            assert_eq!(heard(&settings, "test note"), Some(run.clone()));
+            for line in ["don't send my test note", "did you send my test note?"] {
                 assert_eq!(heard(&settings, line), None, "{line}");
             }
             assert_eq!(
@@ -1311,6 +1353,73 @@ mod tests {
                 heard(&settings, "cozy reading time").map(|(_, args)| args),
                 Some(json!({ crate::made_run::RUN: "desk-glow" }))
             );
+        }
+        crate::made_skill::set_asks_here(None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// The lead's live test, 19 Nov 09:06 (`LAMP_MADE_SKILL_ASKS` on): a
+    /// made skill's phrase or its name, wrapped in the lamp's name, a
+    /// greeting, a "please", a "now", a request or a filler ("um"), runs it
+    /// in code, whatever the case and punctuation; one with no asks
+    /// (tech-news, a trigger alone) by its name. A longer line that only
+    /// holds the phrase, a no, a question, a part of the name, the switch
+    /// off, or a made skill lamp-skills doesn't list (turned off), none.
+    #[test]
+    fn a_made_skills_phrase_or_name_wrapped_in_fillers_runs_it() {
+        let mut tools = on_a_lamp();
+        tools[crate::tools::MADE_ASKS] = json!({
+            "daily-brief": ["daily brief"],
+            "tech-news": [],
+        });
+        let dir = skills_folder("fillers", tools);
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let run = |made: &str| {
+            Some((
+                crate::made_skill::MAKE.to_owned(),
+                json!({ crate::made_run::RUN: made }),
+            ))
+        };
+        crate::made_skill::set_asks_here(Some(true));
+        for (line, made) in [
+            ("Hey Lamp, daily brief", "daily-brief"),
+            ("Lamp, daily brief please", "daily-brief"),
+            ("daily brief", "daily-brief"),
+            ("Daily brief.", "daily-brief"),
+            ("um, daily brief now", "daily-brief"),
+            ("Uh, can you do my daily brief?", "daily-brief"),
+            ("tech news", "tech-news"),
+            ("run tech news", "tech-news"),
+            ("Hey Lamp, run tech news please.", "tech-news"),
+            ("um, tech news now", "tech-news"),
+        ] {
+            assert_eq!(heard(&settings, line), run(made), "{line}");
+            assert_eq!(
+                Heard::new(settings.clone()).heard(line),
+                run(made),
+                "{line}"
+            );
+        }
+        for line in [
+            "tell me about your daily brief idea",
+            "what's in the daily brief?",
+            "don't run tech news",
+            "I liked the tech news today",
+            "daily",
+            "tech",
+            "news",
+            "um",
+            "off news",
+        ] {
+            assert_eq!(heard(&settings, line), None, "{line}");
+        }
+        crate::made_skill::set_asks_here(Some(false));
+        for line in ["daily brief", "tech news"] {
+            assert_eq!(heard(&settings, line), None, "{line}");
         }
         crate::made_skill::set_asks_here(None);
         std::fs::remove_dir_all(dir).ok();

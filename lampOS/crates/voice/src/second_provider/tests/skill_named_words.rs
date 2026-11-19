@@ -1127,3 +1127,96 @@ fn a_made_skill_its_words_start_is_heard_first_with_no_line_of_the_lamps() {
     );
     assert_eq!(went.said, ["Photo booth didn't run today."]);
 }
+
+/// The lead's live test, 19 Nov 09:06 to 09:07 (`LAMP_MADE_SKILL_ASKS`):
+/// a made skill whose asks are "daily brief" was on, and "Hey Lamp, daily
+/// brief" and "daily brief", said after the lamp's words had asked
+/// something, were each answered by the model with `calls=none`: the line
+/// was left to the model to judge, and it ran nothing. A made skill's own
+/// words or name, said plainly, run it in code past a question that does
+/// not name it ("Want me to remind you tomorrow?"); after one that does
+/// ("Which one, daily brief or tech news?") the line answers it, and the
+/// model reads it, as before; with no question, it runs as before.
+#[tokio::test]
+async fn a_made_skills_words_run_it_after_a_question_that_names_it_not() {
+    let asks: std::collections::BTreeMap<String, Vec<String>> = [(
+        "made:daily-brief".to_owned(),
+        vec!["daily brief".to_owned()],
+    )]
+    .into();
+    let run = (
+        crate::made_skill::MAKE.to_owned(),
+        json!({ crate::made_run::RUN: "daily-brief" }),
+    );
+    for line in ["Hey Lamp, daily brief", "daily brief", "Daily brief."] {
+        for (lamp, runs) in [
+            (
+                Some("Saved your day. Want me to remind you tomorrow?"),
+                true,
+            ),
+            (Some("Which one, daily brief or tech news?"), false),
+            (Some("Okay, I saved your day."), true),
+            (None, true),
+        ] {
+            let script = Arc::new(Script {
+                heard: Mutex::new([Ok(line.to_owned())].into()),
+                chats: Mutex::new(
+                    [
+                        vec![text("Okay."), Ok(ChatEvent::Done)],
+                        vec![text("Okay."), Ok(ChatEvent::Done)],
+                    ]
+                    .into(),
+                ),
+                ..Script::default()
+            });
+            let ran: Calls = Arc::default();
+            let seen = ran.clone();
+            let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+                seen.lock().unwrap().push((name, args, heard));
+                Box::pin(async { json!({"ran": true, "next": "Say: here it is."}) })
+            });
+            let history: Vec<Message> = lamp
+                .map(|lamp| vec![Message::user("save my day"), Message::assistant(lamp)])
+                .unwrap_or_default();
+            let asks = asks.clone();
+            let mut engine = Engine::new(
+                script.clone(),
+                move || Told {
+                    text: "SYSTEM".into(),
+                    after: None,
+                    history: history.clone(),
+                },
+                runner,
+            )
+            .announcing(false)
+            .calling_skills_named(Arc::new(move |heard: &str| {
+                crate::skill_named::asked(heard, &["made:daily-brief"], &asks)
+                    .map(|function| crate::skill_named::call(true, function))
+            }));
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+            assert_eq!(
+                heard.last().unwrap(),
+                "complete",
+                "{line} {lamp:?}: {heard:?}"
+            );
+            let ran: Vec<(String, Value)> = ran
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(name, args, _)| (name.clone(), args.clone()))
+                .collect();
+            if runs {
+                assert_eq!(
+                    ran,
+                    std::slice::from_ref(&run),
+                    "{line} {lamp:?}: run in code"
+                );
+            } else {
+                assert!(ran.is_empty(), "{line} {lamp:?}: the model's: {ran:?}");
+            }
+        }
+    }
+}

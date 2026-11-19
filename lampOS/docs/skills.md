@@ -7788,9 +7788,12 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    and Heron's P2 on #7249: its words would reach a run now that runs only
    the person's own made skill), and
    `tools.json` lists its asks as `made_asks`, by the skill's name, one
-   holding another skill's name left out. Off, it is refused as before
-   ("skill.toml needs a trigger or a tool") and `tools.json` is byte for
-   byte as before.
+   holding another skill's name left out. A skill made here with no asks
+   and no tool (a trigger alone, tech-news) is listed there too, by its
+   name with none (`"tech-news": []`, `Skill::made_here`), so its name
+   said starts it (item 6); one turned off (`enabled = false`) is not
+   listed. Off, it is refused as before ("skill.toml needs a trigger or a
+   tool") and `tools.json` is byte for byte as before.
 6. **Started by the words** (`skill_named`, `LAMP_SKILL_NAMED=on`, the
    second route): a heard line that is one of a made skill's asks, said
    plainly ("send my test note", "Lamp, send my test note please."),
@@ -7799,9 +7802,26 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    run now by voice ("Run now by voice" above, `made_run`): the owner's alone (under `LAMP_PRIVATE_ROOM` whoever
    speaks; no new identity gate), its writes only as the owner's kept yes
    has them, once a run, within the day's bounds, a task with its yes, its
-   one-run token and grants, each step held where it is made. A no, a
-   question, a phrase two skills give, the skill's name alone, or a line
-   while the lamp waits for an answer starts nothing. A run that speaks
+   one-run token and grants, each step held where it is made. Its name
+   starts it the same way, as its words are matched ("tech news", "run
+   tech news" for tech-news; the owner, 19 Nov: "a skill must be called by
+   its exact name"), when it has two words of its own and is no refused
+   ask. The match is in code, never left to the model: case and
+   punctuation dropped, and the only other words the line may hold are
+   those said around an ask (the lamp's name, a greeting, "please", "now",
+   a request before it such as "can you", a word that asks to run it such
+   as "run") and a filler (`skill_named::FILLERS`: "um", "uh", "er",
+   "erm", "hmm"). "Hey Lamp, daily brief", "Lamp, daily brief please",
+   "Daily brief." and "um, daily brief now" start daily-brief; "tell me
+   about your daily brief idea" holds other words and is the model's. A
+   no, a question, a phrase two skills give, a part of the name, or a line
+   while a yes is held starts nothing. After the lamp's last words asked
+   something (`remarks::lamp_asked`), the line is the model's only when
+   those words name the skill or the line's own words (`skill_named::
+   asked_about`: "Which one, daily brief or tech news?"); otherwise the
+   made skill still starts in code (the lead's live test, 19 Nov 09:06:
+   four "daily brief" lines after the lamp's "Want me to ...?" were each
+   left to the model, which called nothing). A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second
