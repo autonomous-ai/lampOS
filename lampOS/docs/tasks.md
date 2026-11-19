@@ -4943,7 +4943,15 @@ exactly, the default when unset), every task and run is its own
   the gateway default agent are typed into the pane with
   `harness reply --machine <id> <pane> --json -- <words>`
   (`Cli::reply_to`). The words start with one line, `New task <id>:`,
-  then the task (a skill run's: the launcher's task as before). They are
+  then one line `Reply in the language of the words below, whatever
+  language earlier tasks used.` (`REPLY_LANGUAGE`, #8030: a long kept
+  session otherwise answered English asks in an earlier task's language),
+  then the task (a skill run's: the launcher's task as before). This is
+  every hand-over (`hand_over`): a spoken task, a skill run, a make, the
+  first into a fresh or rotated session and one typed again after a
+  resume. The kept session's first words (`OPEN_PROMPT`) carry the same
+  sentence. The header stays alone on the first line, so the turn's end
+  and `wait_taken` still match an ask that starts with it. They are
   typed only once `show` reads the pane idle with its last words taken
   (no `told`, or `told.taken`): Harness queues words typed before that,
   which would mix two tasks. The pane is never closed at a task's end.
