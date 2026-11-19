@@ -2761,7 +2761,7 @@ four rows, "Without it" is what `off` leaves.
 | `--reach UP,DOWN,ROLL,YAW` | farthest a goal may be from home, in counts | 45,15,30,40 | 180,25,100,250 |
 | `--speed N` | fastest the commanded pose moves, counts a second | 50 | 300 |
 | `--servo-speed N` | goal speed written to the three servos | 150 | 1,000 |
-| `--servo-acceleration N` | acceleration written to them | 50 | 150 |
+| `--servo-acceleration N` | acceleration written to them; each joint runs at the lower of this and its servo's own EEPROM cap (register 85, #7946), or of this and 50 when the cap can't be read, said once a start | 50 | 150 |
 | `--stand P,R,Y,S,E` with `--folded-arm S,E` | the pose it stands in and the arm's folded one, in counts | never stands | shoulder and elbow each at most 1,400 from folded |
 | `--stand-share N` | how much of the way up it goes, percent | 100 | 1 to 100 |
 | `--stand-seconds N` | fastest the whole way is travelled | 5 | 2 to 20 |
