@@ -3,11 +3,13 @@
 //! now." got no call and "Got it — your car is on Level B1, spot 7 now. That
 //! replaces wherever it was before.": its opening claims nothing, so it was
 //! said, and nothing was kept). With `LAMP_KEEP_CLAIM_WHOLE`
-//! ([`Engine::checking_keep_claims_whole`]), on a line about the person the
-//! reply is held to its round's end and judged whole: a claim with no
-//! `remember` is asked again once with [`crate::remember::KEEP_CLAIMED_UNKEPT`],
-//! then said as [`crate::remember::NOT_KEPT_LINE`]. A plain restatement is
-//! said as it is, a question isn't held, and off nothing changes.
+//! ([`Engine::checking_keep_claims_whole`]), while no `remember` has run a
+//! reply is said sentence by sentence, each judged when complete: one that
+//! claims a keep or replace is held, with the rest, to the round's end, and
+//! with no call it is asked again once with
+//! [`crate::remember::KEEP_CLAIMED_UNKEPT`], then said as
+//! [`crate::remember::NOT_KEPT_LINE`]. A restatement, a story and a light
+//! reply beside its call are said as they are, and off nothing changes.
 use super::*;
 use crate::remember::{KEEP_CLAIMED_UNKEPT, NOT_KEPT_LINE, REMEMBER};
 
@@ -97,15 +99,24 @@ const HEARD: &str = "Actually, I moved my car. It's on Level B1, spot 7 now.";
 const E82D: &str =
     "Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before.";
 
-/// e82d's 09:52 turn, twice with no call: nothing of it is said, the round
-/// is asked again once with the note, then said not kept.
+/// e82d's 09:52 turn, twice with no call: its true first sentence is said,
+/// its claim never is; asked again once with the note, then said not kept.
 #[test]
 fn a_keep_claimed_in_a_later_sentence_with_no_call_is_said_not_kept() {
     let went = went(HEARD, true, vec![saying(E82D), saying(E82D)]);
     assert!(!claimed(&went), "{went:?}");
     assert!(went.noted, "{went:?}");
     assert_eq!(went.rounds, 2, "{went:?}");
-    assert_eq!(went.said, [format!("said:{NOT_KEPT_LINE}")], "{went:?}");
+    assert!(
+        went.said
+            .last()
+            .is_some_and(|said| said.trim_start_matches("said:").trim() == NOT_KEPT_LINE),
+        "{went:?}"
+    );
+    assert!(
+        went.said.iter().any(|said| said.contains("spot 7 now.")),
+        "{went:?}"
+    );
     assert!(went.called.is_empty(), "{went:?}");
 }
 
@@ -143,14 +154,32 @@ fn a_restatement_with_no_claim_is_said_as_it_is() {
     );
 }
 
-/// A question about the person isn't held whole: its answer is said as
-/// before (an opening that claims nothing is let go at once).
+/// A first-person request with no claim streams as today: "Make my light
+/// warmer." with its light call and "Done, I've updated your light." said
+/// whole, no note.
 #[test]
-fn a_question_about_the_person_is_not_held() {
-    let went = went("Where did I park my car?", true, vec![saying(E82D)]);
+fn a_first_person_request_with_no_keep_claim_is_said_as_it_is() {
+    let reply = "Done, I've updated your light. It's warmer now.";
+    let went = went(
+        "Make my light warmer.",
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    "light_warmer",
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying(reply),
+        ],
+    );
     assert!(!went.noted, "{went:?}");
-    assert_eq!(went.rounds, 1, "{went:?}");
-    assert!(claimed(&went), "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("warmer now")),
+        "{went:?}"
+    );
 }
 
 /// Off (`LAMP_KEEP_CLAIM_WHOLE` unset): e82d's reply is said as before,
@@ -191,14 +220,20 @@ fn a_change_said_beside_another_call_is_that_calls() {
     );
 }
 
-/// A long reply that opens with an acknowledgement and claims nothing is
-/// let go after three sentences, said whole, with no note.
+/// A long story is said sentence by sentence, its first after one sentence,
+/// whole and with no note.
 #[test]
-fn a_long_acknowledged_reply_with_no_claim_is_let_go() {
+fn a_long_story_is_said_sentence_by_sentence() {
     let reply = "Okay. Here's a short one. A lamp once lit a room. Everyone smiled. The end.";
     let went = went("I'm bored, tell me a story.", true, vec![saying(reply)]);
     assert!(!went.noted, "{went:?}");
     assert_eq!(went.rounds, 1, "{went:?}");
+    assert!(
+        went.said
+            .first()
+            .is_some_and(|said| said.trim_start_matches("said:").trim() == "Okay."),
+        "{went:?}"
+    );
     assert!(
         went.said.iter().any(|said| said.contains("The end")),
         "{went:?}"
