@@ -1016,4 +1016,77 @@ mod tests {
         assert!(error.contains("Unrecognized key"), "{error}");
         assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
     }
+
+    /// #7268's FINDING on b958d31455 (lamp-52e6, lamp-tasks and the gateway
+    /// restarted together): the check raced the gateway's own start and was
+    /// killed, "status killed", with no verdict from OpenClaw. A killed check
+    /// is tried again over the same bounded waits, each said with no value;
+    /// a text OpenClaw refuses still is not.
+    #[test]
+    fn a_killed_check_is_tried_again_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let verdict = dir.path().join("verdict");
+        let killed = dir.path().join("killed");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {killed} ] && kill -9 $$\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                killed = killed.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&verdict, "0").unwrap();
+        let waits = [Duration::from_millis(1); 3];
+        let write = |say: &mut dyn FnMut(&str)| {
+            write_waiting(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &wrapper,
+                &waits,
+                say,
+            )
+        };
+
+        // Killed once, then a good check: written on the retry.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&killed, "").unwrap();
+        let mut said = Vec::new();
+        let written = write(&mut |line| {
+            assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+            said.push(line.to_owned());
+            fs::remove_file(&killed).unwrap();
+        });
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(said[0].contains("tried again in"), "{said:?}");
+        assert!(!said[0].contains("kept-gateway-token"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Killed every time: bounded, not written, a clear final line.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&killed, "").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, waits.len());
+        assert!(error.contains("status killed"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // A text refusal is never tried again.
+        fs::remove_file(&killed).unwrap();
+        fs::write(&verdict, "1").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, 0);
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+    }
 }
