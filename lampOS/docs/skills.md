@@ -1739,7 +1739,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
 
 - **The step.** `task = { task, run }`, alone in its `[[do]]` table (no
   `on`, `after` or `if_choice`), one a skill, in an installable skill only.
-  `task` is 1 to 500 bytes of words; `run` a plain file inside the skill's
+  `task` is 1 to 500 bytes of words (a new skill packs only with one plain
+  sentence of at most 120 characters, `Skill::made_refuses`, #7874); `run` a plain file inside the skill's
   own `scripts/` (relative, at most four parts, no `..`, no hidden part, no
   link anywhere on it). Its `[permissions]` do not hold it: its reach is its
   `grants`.
@@ -4008,7 +4009,9 @@ gone ([switches.md](switches.md)). What happens:
    (`cloud.md`, "Skills, counted"). Then `lamp-skills pack` (#1698) checks the folder:
    every check a load makes, its permissions among them, and the package
    read back as an install reads one. A skill that does more than it
-   declares is refused there. When it fails, the voice's journal has the
+   declares is refused there, and so is a `do.task` whose words are empty,
+   longer than 120 characters or not plain (control or format characters),
+   the voice's own rule (`made_skill::task_words_plain`, #7874). When it fails, the voice's journal has the
    check's exit code and its first line, without the skill's own words:
    anything in quotes, the skill's name and its folder are left out, and
    the line is at most 200 characters (`made_skill::check_reason`; #2813's

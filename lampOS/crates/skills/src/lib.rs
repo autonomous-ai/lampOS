@@ -1339,6 +1339,11 @@ const COUNT_IN_A_TABLE: &str =
 const NOTE_BRACES: &str = "a note's braces are one {field} that every trigger running it tests \
                            as a number with above, below or rise; any other brace is said as written";
 
+/// Why a new skill's `do.task` whose words are empty, too long or not plain
+/// is not made ([`Skill::made_refuses`], #7874).
+const TASK_WORDS_NOT_PLAIN: &str = "a task's words: one plain sentence of at most 120 characters, \
+                                    read back whole to the owner for their yes";
+
 /// The longest field name a note's `{field}` may give.
 const MOST_COUNT_FIELD_BYTES: usize = 64;
 
@@ -2450,7 +2455,18 @@ impl Skill {
     /// as written ([`Count`]), and a new one is told its slot is never
     /// filled.
     pub fn made_refuses(&self) -> Option<&'static str> {
-        self.read_refuses().or_else(|| self.note_refuses())
+        self.read_refuses()
+            .or_else(|| self.note_refuses())
+            .or_else(|| self.task_refuses())
+    }
+
+    /// [`Skill::made_refuses`]'s `do.task` whose words are not one plain
+    /// sentence the owner hears whole (#7874): the voice's own rule
+    /// (`lamp_voice::made_skill::task_words_plain`).
+    fn task_refuses(&self) -> Option<&'static str> {
+        self.task_step()
+            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.task))
+            .map(|_| TASK_WORDS_NOT_PLAIN)
     }
 
     /// [`Skill::made_refuses`]'s read's `query` that is an order alone.
@@ -13306,6 +13322,48 @@ mod tests {
         assert_eq!(skill.task_step().unwrap().quiet, skill.quiet);
         let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
         assert_eq!(load(&folder).unwrap().task_step().unwrap().quiet, None);
+    }
+
+    /// #7874: `lamp-skills pack` holds a made skill's `do.task` words to the
+    /// voice's rule (`lamp_voice::made_skill::task_words_plain`): 120
+    /// characters pack, 121 do not, counted in characters, not bytes, and a
+    /// format character (U+200B) is refused.
+    #[test]
+    fn pack_refuses_a_task_whose_words_are_longer_than_the_voice_reads_back() {
+        assert_eq!(lamp_voice::made_skill::MOST_TASK_CHARS, 120);
+        assert!(TASK_WORDS_NOT_PLAIN.contains(&format!(
+            "at most {} characters",
+            lamp_voice::made_skill::MOST_TASK_CHARS
+        )));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out");
+        let with_words = |name: &str, words: &str| {
+            task_skill(
+                &dir.path().join(name),
+                "photo-booth",
+                &PHOTO_BOOTH.replace("Take a photo and send it to my phone", words),
+            )
+        };
+        // 120 characters, each two bytes: 240 bytes, still one sentence.
+        let most = "é".repeat(lamp_voice::made_skill::MOST_TASK_CHARS);
+        let folder = with_words("most", &most);
+        assert_eq!(load(&folder).unwrap().made_refuses(), None);
+        package::pack(&folder, &out).unwrap();
+        let over = format!("{most}é");
+        let folder = with_words("over", &over);
+        assert_eq!(
+            load(&folder).unwrap().made_refuses(),
+            Some(TASK_WORDS_NOT_PLAIN)
+        );
+        assert_eq!(
+            package::pack(&folder, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
+        let hidden = with_words("hidden", "Take a\u{200B} photo");
+        assert_eq!(
+            package::pack(&hidden, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
     }
 
     const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\
