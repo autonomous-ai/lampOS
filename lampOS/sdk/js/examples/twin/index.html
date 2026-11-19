@@ -25,6 +25,8 @@
   /* What the real body will do (reach.js): the lamp's reach as a band under the slider, amber past it, and the lamp's own word after a move. */
   .joint .track { position: relative; }
   .joint .band { position: absolute; top: 50%; height: 6px; margin-top: -3px; min-width: 3px; border-radius: 3px; background: #4caf50; opacity: .55; pointer-events: none; display: none; }
+  /* Above the stand the body takes nothing yet (an arm joint on a standing lamp): hatched, over the map's upper half. */
+  .joint .notyet { position: absolute; top: 50%; height: 14px; margin-top: -7px; border-radius: 3px; pointer-events: none; display: none; background: repeating-linear-gradient(45deg, rgba(150,150,150,.45) 0 4px, rgba(150,150,150,.12) 4px 8px); }
   .joint .servo-reach { color: var(--soft); font-size: 12px; min-height: 1.2em; }
   .joint.past .servo-reach { color: #c77700; font-weight: 600; }
   .joint.past input[type=range] { accent-color: #e08a00; }
@@ -272,11 +274,17 @@ const showServoReach = (name) => {
   const past = bodyReach.pastReach(limit, asked[name]);
   row.row.classList.toggle('past', past);
   if (!row.saying) row.servoReach.textContent = bodyReach.reachText(limit, asked[name]);
-  row.band.style.display = limit ? 'block' : 'none';
-  if (limit) {
+  const own = bodyReach.reachOf(limit);
+  row.band.style.display = own ? 'block' : 'none';
+  row.notyet.style.display = limit?.pose ? 'block' : 'none';
+  if (own) {
     const at = (deg) => `${((Math.max(-180, Math.min(180, deg)) + 180) / 360) * 100}%`;
-    row.band.style.left = at(limit.min);
-    row.band.style.width = `calc(${at(limit.max)} - ${at(limit.min)})`;
+    row.band.style.left = at(own.min);
+    row.band.style.width = `calc(${at(own.max)} - ${at(own.min)})`;
+    if (limit.pose) {
+      row.notyet.style.left = at(limit.pose.max);
+      row.notyet.style.width = `calc(${at(180)} - ${at(limit.pose.max)})`;
+    }
   }
 };
 // The panel: one row per joint, from the base out.
@@ -287,7 +295,7 @@ for (const name of model.chain) {
   const row = document.createElement('div');
   row.className = 'joint';
   row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
-    <div class="track"><div class="band"></div><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
+    <div class="track"><div class="band"></div><div class="notyet" title="not yet: the body takes no arm pose above its stand"></div><input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}"><span class="shade" hidden></span><span class="shade" hidden></span></div>
     <div class="reach"></div>
     <div class="load" title="load the body reads on this joint"><i></i></div>
     <div class="facts">servo ${joint.servo} · ${joint.bus}</div>
@@ -315,7 +323,7 @@ for (const name of model.chain) {
     send({ type: 'drag', joint: name, deg });
   });
   slider.addEventListener('change', () => { const deg = held(); asked[name] = deg; wanted[name] = body(name, deg); showServoReach(name); send({ type: 'drag', joint: name, deg, final: true }); });
-  rows[name] = { row, slider, band: row.querySelector('.band'), reach: row.querySelector('.reach'), servoReach: row.querySelector('.servo-reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
+  rows[name] = { row, slider, band: row.querySelector('.band'), notyet: row.querySelector('.notyet'), reach: row.querySelector('.reach'), servoReach: row.querySelector('.servo-reach'), shades: [...row.querySelectorAll('.shade')], heldTimer: null, now: row.querySelector('.now'), facts: row.querySelector('.facts'), load: row.querySelector('.load'), dragging: () => dragging };
   panel.append(row);
 }
 
@@ -553,7 +561,7 @@ function connect() {
     }
     if (data.type === 'joint_done') {
       const row = rows[data.joint];
-      const words = row && bodyReach ? bodyReach.doneWords(data, data.joint) : '';
+      const words = row && bodyReach ? bodyReach.doneWords(data, data.joint, limits[data.joint]) : '';
       if (!words) return;
       row.saying = true;
       row.servoReach.textContent = words;
