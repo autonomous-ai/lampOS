@@ -384,10 +384,20 @@ long story …" line on "want" alone. A fact of nothing but such verbs
 keeps them, so the walk is never wider than before; search and the copy
 rule below keep them too. An unlinked
 row needs every word, or "favourite colour is violet" would take every
-"favourite" the person said. A fact with no distinctive word takes the old
-broad walk, plus its literal copies (whole words; a text under three
-characters, such as "B2", only as a whole field, so "B22" and "Seat B2 is
-free" stay). The walk goes on
+"favourite" the person said. A fact with no distinctive word ("Stop.")
+takes no walk: it goes with its evidence exchanges and its literal copies
+(whole words; a text under three characters, such as "B2", only as a whole
+field, so "B22" and "Seat B2 is free" stay), with every version it
+replaced back to the first (the same kept thing at an earlier time), and no
+other kept thing (#8031: on lamp-06c1, 20 Nov, the old broad walk took 28 rows for one kept
+"Stop.", four of them other things the person kept). In any forget the
+named row's own replaced versions go, of any kind (the same thing at an
+earlier time: forgetting a tidy observation that corrected a kept thing,
+finding N11, takes that kept thing too). No other kept thing goes: the walk
+never adds one, and a kept thing reached only as the version of a walked
+row that wasn't named stays, hidden, never current again (a worded forget
+whose walk takes that observation leaves the kept thing it corrected
+inactive; `days::walk_versions`). The walk goes on
 through linked rows that stay, so a wordless turn in between does not stop
 it; and a copy matches one version's own words, so a copy of the newer
 "violet" goes without the older "teal" (Reviewer-two, 03:15). The voice
