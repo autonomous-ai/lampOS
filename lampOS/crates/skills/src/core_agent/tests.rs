@@ -498,3 +498,89 @@ fn an_empty_answer_says_the_skills_own_line_at_once() {
     let long = answer(&"water ".repeat(60));
     assert_eq!(heard(task::told(&long)), Heard::Nothing(TOO_LONG));
 }
+
+/// A copy of `name`'s whole folder, its variant beside it.
+fn whole(name: &str) -> (tempfile::TempDir, PathBuf) {
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join(name);
+    copy_folder(&skills_root().join(name), &folder);
+    (root, folder)
+}
+
+fn copy_folder(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            copy_folder(&path, &to.join(entry.file_name()));
+        } else {
+            fs::copy(&path, to.join(entry.file_name())).unwrap();
+        }
+    }
+}
+
+/// The core variants' tasks are pre-approved (the first builder, 19 Nov
+/// 08:57: "They're ours and have no grants"): the first fire, and the ones
+/// after it, hand the task over with no yes asked aloud and none asked of
+/// lamp-control; a folder that is not exactly a variant is never
+/// pre-approved, whatever the switch.
+#[test]
+fn the_first_fire_asks_nothing() {
+    let _on = On::new(true);
+    task::set_on_here(Some(true));
+    for pilot in &PILOTS {
+        let (root, folder) = whole(pilot.name);
+        assert!(pre_approved(&folder), "{}", pilot.name);
+        let state = root.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        // No lamp-control here: asked, it could only say it can't say.
+        let control = root.path().join("no-control.sock");
+        let tasks = root.path().join("tasks.sock");
+        let skill = load_with(&folder, false).unwrap();
+        let step = skill.task_step().unwrap();
+        for fire in 0..3 {
+            let place = task::Place {
+                state: Some(&state),
+                control: &control,
+                socket: Some(&tasks),
+            };
+            let mut sent = None;
+            let said = task::hand(
+                pilot.name,
+                step,
+                &folder,
+                &skill.grants,
+                place,
+                1 + fire * 3_600_000,
+                |_, line| {
+                    sent = Some(line.to_owned());
+                    crate::service_write::agent_answered("{\"ok\":true,\"id\":9}")
+                },
+                || -> String { panic!("{}: a yes asked aloud", pilot.name) },
+            );
+            assert!(said.starts_with("do.task: handed to lamp-tasks"), "{said}");
+            let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
+            assert_eq!(line["grants"], serde_json::json!([]));
+        }
+        assert!(!state.join(task::ASKS_FILE).exists(), "{}", pilot.name);
+    }
+    // Pre-approval is the folder's own, never the switch's.
+    let (_root, folder) = whole("sip-of-water");
+    set_on_here(Some(false));
+    assert!(pre_approved(&folder));
+    set_on_here(Some(true));
+    // Not exactly a variant: the core skill alone, a changed brief, a skill
+    // that is no pilot, or a pilot's variant under another name.
+    let root = core_only("sip-of-water");
+    assert!(!pre_approved(&root.path().join("sip-of-water")));
+    let (_root, folder) = whole("stretch-break");
+    fs::write(folder.join(RUN), "print(\"Say what you like.\")\n").unwrap();
+    assert!(!pre_approved(&folder));
+    let (_root, folder) = whole("head-pat");
+    assert!(!pre_approved(&folder));
+    let (root, folder) = whole("sip-of-water");
+    let renamed = root.path().join("photo-booth");
+    fs::rename(&folder, &renamed).unwrap();
+    assert!(!pre_approved(&renamed));
+    task::set_on_here(None);
+}
