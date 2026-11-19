@@ -130,8 +130,9 @@ A speaker held up while the coordinator kept renewing its authority finds
 those renewals queued when it comes back (#7804: lamp-0c89 in an update's
 restart, 18 Nov). Its tick read at most 8 control messages, so the ninth
 ended the worker ("speaker control tick bound"), lamp-voice with it, and the
-update's watch rolled the update back. A tick that comes more than 50 ms
-after the last now reads up to 256, as a held-up capture worker always has
+update's watch rolled the update back. A tick held up more than 50 ms,
+since the last tick or within itself (an install's look at the device), now
+reads up to 256, as a held-up capture worker has since #784
 (`control_bound`, `HELD_UP_CONTROL`: a renewal a capture block leaves at
 most 150 in 1.5 s), so the newest renewal is the fresh authority and the
 speaker goes on (`a_speaker_held_up_past_its_authority_goes_on_with_the_renewals_queued_meanwhile`).
