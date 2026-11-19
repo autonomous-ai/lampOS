@@ -246,6 +246,16 @@ Louvre in May" is no call.
 line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 …" and was held as said to someone it calls by name.
 
+On both routes, a set-off word of three letters or more one letter from
+"Lamp" (a Levenshtein distance of 1 once repeated letters are taken once:
+"Lap", "Lamps", "Clamp", "Laam", "Limp", "Ramp";
+`attention::near_the_lamps_name`) is never someone else's name (#7698). On
+lamp-06c1 on 18 Nov (14072) the owner's "Lamp, what's my name?" and "Lamp,
+did you keep that?", seen speaking with their own face, came back so and
+were held six times as said to someone it calls by name. Such a word is
+not counted as the lamp's call either: the line is judged as any line
+without the name (`a_spelling_one_letter_from_lamp_is_no_ones_name`).
+
 "One" joins them with `LAMP_ONE_AS_LAMP=on` only (#4710; off by default,
 on in the product since 3 Nov, [switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
 came back mostly as "One, …" ("One, how do I make a pour over coffee?",

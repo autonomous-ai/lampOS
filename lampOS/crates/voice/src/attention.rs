@@ -484,6 +484,35 @@ pub fn addresses_someone_else_on(heard: &str, stand_alone_ins: bool) -> bool {
     addresses_someone_else_among(heard, stand_alone(stand_alone_ins))
 }
 
+/// Whether `word` is the lamp's name misheard: three letters or more, one
+/// edit from "lamp" once repeated letters are taken once ("Lap", "Lamps",
+/// "Clamp", "Laam", "Limp", "Ramp"). Never a person's name: on lamp-06c1
+/// on 18 Nov (14072) the owner's "Lamp, …", seen speaking with their own
+/// face, came back so and was held six times as said to someone it calls
+/// by name (#7698).
+fn near_the_lamps_name(word: &str) -> bool {
+    let mut letters: Vec<char> = word.chars().map(|c| c.to_ascii_lowercase()).collect();
+    if letters.len() < 3 {
+        return false;
+    }
+    letters.dedup();
+    // One edit (Levenshtein) from "lamp", by a single row of distances.
+    let lamp = ['l', 'a', 'm', 'p'];
+    let mut row: Vec<usize> = (0..=lamp.len()).collect();
+    for (i, &c) in letters.iter().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, &l) in lamp.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(c != l));
+            diagonal = above;
+        }
+    }
+    row[lamp.len()] <= 1
+}
+
 /// [`addresses_someone_else`], with the words in `alone` taken as the
 /// lamp's, never as a person's name.
 fn addresses_someone_else_among(heard: &str, alone: &[&str]) -> bool {
@@ -498,6 +527,7 @@ fn addresses_someone_else_among(heard: &str, alone: &[&str]) -> bool {
                 .iter()
                 .chain(alone)
                 .any(|not| word.eq_ignore_ascii_case(not))
+            && !near_the_lamps_name(word)
     };
     let words: Vec<&str> = heard.split_whitespace().collect();
     let opening = words
