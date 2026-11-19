@@ -4755,6 +4755,7 @@ mod tests {
                     "LAMP_NAME_WORDLESS_BAR=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
+                    "LAMP_NUDGE_CLAIM_CHECKED=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_OPENS_FURTHER=on",
