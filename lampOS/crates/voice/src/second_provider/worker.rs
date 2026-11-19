@@ -4202,8 +4202,11 @@ pub fn serve(
         }));
     }
     if let Some(settings) = skills_named {
-        let named = crate::skill_named::Heard::new(settings);
-        engine = engine.calling_skills_named(Arc::new(move |heard: &str| named.heard(heard)));
+        let named = Arc::new(crate::skill_named::Heard::new(settings));
+        let made = named.clone();
+        engine = engine
+            .calling_skills_named(Arc::new(move |heard: &str| named.heard(heard)))
+            .knowing_made_names(Arc::new(move |said: &str| made.names_made(said)));
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
