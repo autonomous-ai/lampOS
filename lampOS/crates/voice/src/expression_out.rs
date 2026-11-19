@@ -25,6 +25,27 @@ use lamp_msgs::{
     VoiceTiming,
 };
 use std::io;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// How many times this process has made its publishers. A mute ends the
+/// conversation and the next one makes them again, with every sequence
+/// counting from 1 once more (#7955).
+static STARTS: AtomicU64 = AtomicU64::new(0);
+
+/// The session the `n`th publishers of this process say: the first the
+/// service's own `INVOCATION_ID`, each later one that and its number. A
+/// publisher whose counts start again under the session of the one before
+/// is refused by Expression as "duplicate or out of order" until it passes
+/// the old count, which after a software mute was never (2,644 refusals in
+/// 3.5 minutes on lamp-06c1, `asleep` gone until the voice restarted). A new
+/// session starts Expression's marks again, never its time.
+pub fn session_named(base: &str, n: u64) -> String {
+    if n == 0 {
+        base.to_owned()
+    } else {
+        format!("{base}-{n}")
+    }
+}
 
 /// `on` for the three to be published. Anything else: nothing.
 pub const ENVIRONMENT: &str = "LAMP_EXPRESSION_OUT";
@@ -635,9 +656,10 @@ impl ExpressionOut {
         }
         let made = Bus::from_environment().and_then(|bus| {
             let clock_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
-            let session_id = std::env::var("INVOCATION_ID").unwrap_or_else(|_| {
+            let base = std::env::var("INVOCATION_ID").unwrap_or_else(|_| {
                 format!("voice-{}-{}", std::process::id(), lamp_ipc::monotonic_us())
             });
+            let session_id = session_named(&base, STARTS.fetch_add(1, Ordering::Relaxed));
             Self::on(&bus, clock_id.trim(), &session_id)
         });
         match made {
@@ -823,6 +845,20 @@ pub fn sounds(frames: usize, queued_frames: usize, queue_observed_at_us: u64) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_publisher_of_a_process_says_a_session_of_its_own() {
+        // After a software mute the conversation is made again, and its
+        // sequences count from 1 under the session of the one before: Expression
+        // refused every timing until the voice restarted (#7955).
+        let ids: Vec<String> = (0..4).map(|n| session_named("abc123", n)).collect();
+        assert_eq!(ids[0], "abc123", "the first is the service's invocation");
+        let mut sorted = ids.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), ids.len(), "no two are the same: {ids:?}");
+        assert!(ids.iter().all(|id| id.len() <= 128));
+    }
 
     const MS: u64 = 1_000;
     const SECOND: u64 = 1_000_000;
