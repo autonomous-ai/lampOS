@@ -5214,10 +5214,17 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     `wait` (`TURN_WATCH`, `harness::openclaw_turn_at`, the same key): the
     record not past the hand-over 60 s after Harness's `taken`
     (`TURN_START_WITHIN`, 4a); the session `running` with its highest
-    `seq` unmoved for 3 min and its last row a `user` or `toolResult` the
-    model never answered (`TURN_STALL`, 4b, which also bounds a `NOT_IDLE`
-    hand-over); or the turn open while the session's status is `killed`,
-    `failed` or `timeout` for 15 s (`DEAD_WORKING`). A tool call still
+    `seq` unmoved for 3 min and its last row the `user`'s, the model's
+    answer never begun (`TURN_STALL`, 4b, which also bounds a `NOT_IDLE`
+    hand-over), or unmoved for 10 min with a `toolResult` last
+    (`TOOL_RESULT_STALL`: the Gateway writes the assistant's row only once a
+    whole message is done, so a make writing a long SKILL.md, a slow model
+    or long thinking shows no move for minutes); or the turn open while the
+    session's status is `killed`, `failed` or `timeout` (`DEAD_STATUSES`;
+    never `done`, none or another) for 15 s (`DEAD_WORKING`). A turn that
+    ended idle keeps its answer even if a verdict came at the same moment.
+    The watcher sleeps until its next read or the wait's end, looking at
+    the run's cancel every 100 ms. A tool call still
     unanswered (a long exec) is never cut and is left to the run's
     deadline; `show`'s tools, `ps`'s `lastActive` and pane text are never
     read for it.
@@ -5266,7 +5273,12 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     longer holds, our own deadline close, or still `starting`: a fresh
     conversation (`replace_kept`, then `ensure --fresh`, the same name and
     token).
-  - **(c)** From the second replacement in a row, the backoff above.
+  - **(c)** From the second replacement in a row, the backoff above. The
+    resume is once per kept session (its name and token, never its agent
+    id, so one that comes back with a new id is the same) until a turn is
+    answered, and counts as a reopen in a row: after it, the backoff starts
+    at the third reopen, so (a) then (b) is not slowed but nothing loops
+    without one.
 
   A skill run whose session dies under its turn (`wait` reads a plain
   shell idle), or whose handed-over turn is not moving (sign 4, replaced
@@ -5288,7 +5300,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   its task waited at the hand-over or was in flight, and that then went on
   in the new session, has `Turn::restarted`; its answer is told with
   `RESTARTED_LINE` ("The agent got stuck, so I restarted it and did your
-  request again.") once in front of it, on the path its answer is told by
+  request.") once in front of it, on the path its answer is told by
   already. One line per task however many replacements. A run given up (a
   tool had run, or a second death) is told its own failed line only. A
   replacement with no task waiting (the one-session thread's open, a
