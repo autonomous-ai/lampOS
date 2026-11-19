@@ -10,8 +10,8 @@
 //! - **The socket** ([`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if unset),
 //!   for `lamp-cloud`: one JSON line in, one out, then closed.
 //!   - `{"make": {"words", "request_id"}}`: the words become the voice's
-//!     own brief ([`crate::made_skill::brief`], at most 2,000 bytes,
-//!     [`crate::made_skill::MOST_REQUEST_BYTES`]) and are
+//!     own brief ([`crate::made_skill::brief`], at most 2,000 characters,
+//!     [`crate::made_skill::MOST_REQUEST_CHARS`]) and are
 //!     made at once on a thread of their own: typing them in the app is the
 //!     person's ask. The answer is `{"making": true}` once the ask is
 //!     recorded, before it is made, or `{"refused": WHY}` in plain words.
@@ -1234,21 +1234,17 @@ mod tests {
         written: false,
     };
 
-    /// Vietnamese words of exactly `bytes` bytes, 1 to 3 bytes a letter,
+    /// Vietnamese words of exactly `chars` letters, 1 to 3 bytes each,
     /// spaced singly, with no space at either end: the app's longest ask.
-    pub(crate) fn vietnamese(bytes: usize) -> String {
+    pub(crate) fn vietnamese(chars: usize) -> String {
         const LINE: &str = "Mỗi sáng lúc bảy giờ, khi tôi ngồi vào bàn, hãy bật đèn ấm dịu \
                             và nhắc tôi uống một cốc nước.";
-        let mut words = String::new();
-        for letter in LINE.chars().chain(" ".chars()).cycle() {
-            if words.len() + letter.len_utf8() > bytes {
-                break;
-            }
-            words.push(letter);
-        }
-        while words.len() < bytes {
-            words.push('a');
-        }
+        let mut words: String = LINE
+            .chars()
+            .chain(" ".chars())
+            .cycle()
+            .take(chars)
+            .collect();
         if words.ends_with(' ') {
             words.pop();
             words.push('a');
@@ -1607,7 +1603,7 @@ mod tests {
         let dir = folder("bounded");
         let made = dir.as_path();
         assert!(begin(made, "make me a skill", "", NOW).is_err());
-        let long = "a".repeat(made_skill::MOST_REQUEST_BYTES + 1);
+        let long = "a".repeat(made_skill::MOST_REQUEST_CHARS + 1);
         assert!(begin(made, &long, "r0", NOW).is_err());
         begin(made, "make me a skill that dims the light", "r1", NOW).unwrap();
         assert_eq!(
@@ -1738,14 +1734,15 @@ mod tests {
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
-    /// The app's MAKE IT with 2,000 bytes of Vietnamese (18 Nov: at 480 a
-    /// Vietnamese ask was cut at 160 to 240 letters): through the socket, as
-    /// lamp-cloud's `skills.make` sends it, the words reach the lamp's own
-    /// model whole in its brief, and the skill it writes is kept and put on
-    /// at once, the app told `on`. One byte more is refused at once, the
-    /// model never asked.
+    /// The app's MAKE IT with 2,000 letters of Vietnamese, about 2,750
+    /// bytes (18 Nov: at 480 bytes a Vietnamese ask was cut at 160 to 240
+    /// letters; #7245, 19 Nov: counted in letters, not bytes): through the
+    /// socket, as lamp-cloud's `skills.make` sends it, the words reach the
+    /// lamp's own model whole in its brief, and the skill it writes is kept
+    /// and put on at once, the app told `on`. One letter more is refused at
+    /// once, the bound named, the model never asked.
     #[test]
-    fn through_the_socket_two_thousand_bytes_of_vietnamese_make_a_kept_skill() {
+    fn through_the_socket_two_thousand_letters_of_vietnamese_make_a_kept_skill() {
         use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service_sent};
         static URL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
         fn scripted() -> Result<Chat, String> {
@@ -1776,12 +1773,12 @@ mod tests {
             serde_json::from_str::<Value>(&told).unwrap()
         };
         let words = vietnamese(2_000);
-        assert_eq!(words.len(), 2_000);
-        assert!(words.chars().count() < 1_700, "{}", words.chars().count());
+        assert_eq!(words.chars().count(), 2_000);
+        assert!(words.len() > 2_700, "{}", words.len());
         let over = format!("{words}a");
         assert_eq!(
             ask(&json!({"make": {"words": over, "request_id": "r0"}})),
-            json!({"refused": "That is too long to ask for as one skill: say it more shortly."})
+            json!({"refused": "That is too long to ask for as one skill, past 2,000 characters: say it more shortly."})
         );
         assert_eq!(
             ask(&json!({"make": {"words": words, "request_id": "r1"}})),
