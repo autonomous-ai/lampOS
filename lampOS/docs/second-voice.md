@@ -5556,6 +5556,23 @@ after a take-over, but now for every turn:
     name said close to it", "said to the lamp from close to it", "its
     words calling it", "a conversation going on" and "its hearing at the
     line's start" that held (`Attention::second_signs`), never the words.
+  - **A short line without the name is not answered on its sound**
+    (#7891, the first builder at 11:16). On lamp-74ff on 19 Nov, in a
+    meeting, "Yeah." (heard as the name at 0.939, "the name said close to
+    it") and "Okay." (0.973, "its hearing at the line's start") were
+    answered, where real "Hey Lamp" calls score 0.90 to 1.00, so no bar
+    parts them. With `LAMP_NAME_SECOND_SIGN=on`, out of a conversation
+    (`Signs::going_on`), a line of one or two words, not a question (no
+    `?`), none of its words the lamp's name or one written for it
+    (`attention::written_for_the_name`: "lamp", "lamb", `STAND_INS`,
+    `STAND_ALONE_INS`) counts the hearing for nothing, whatever its second
+    sign (`attention::short_line_without_the_name`); the journal says `its
+    name, heard only in the room's sound (began N ms into the line),
+    counts for nothing on a line of one or two words, not a question, with
+    no word written for the name and no conversation going on; the model
+    is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)`. "Lamp?",
+    "Hey Lamp.", "Hey, Lynn.", "Lamp, put it back.", "Okay?", a longer
+    line and a line in a conversation's window are weighed as before.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
@@ -5987,8 +6004,12 @@ after a take-over, but now for every turn:
   asked for (a held rename, forget or setup save, a read-back's send, a
   skill's yes: the engine's `a_yes_held`, told to the judging by
   `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
-  reaches `held_rename::take` and the other holds; when its name is heard
-  or written in it;
+  reaches `held_rename::take` and the other holds; when its name is
+  written in it, or heard in its sound with a word of its words the name or
+  one written for it (`attention::names_it_in_words`) or in the window (out
+  of the window a name heard only by `lamp-name` is none, #7891: on
+  lamp-74ff on 19 Nov "Is it after all?" was let through so and played as
+  `someone is turned to the lamp`, no face seen speaking it);
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking while a face in view was read silent
   (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never

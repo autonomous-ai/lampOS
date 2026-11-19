@@ -9,7 +9,9 @@
 //! subset of what it holds.
 //!
 //! A line is let out when:
-//! 1. **named:** the lamp's name is heard or written in it;
+//! 1. **named:** the lamp's name is written in it, or heard in its sound
+//!    with a word for the name in its words or in the window (a name
+//!    heard only by lamp-name, out of the window, is none: #7891);
 //! 2. **in a live conversation** (its window): unless it is 0 to
 //!    [`SHORT_WORDS`] words, no face seen speaking it and a face in view
 //!    read silent (no face, no eyes or a mouth never read is unknown, and
@@ -370,9 +372,15 @@ fn bare_yes_or_no(heard: &str) -> bool {
         && (crate::services::plain_yes(heard) || crate::services::plain_no(heard))
 }
 
-/// The lamp's name heard in the line's sound or written in its words.
+/// The lamp's name written in the line's words, or heard in its sound with
+/// a word of its words the name or one written for it
+/// (`attention::names_it_in_words`: "Lamp?", "Hey, Lynn."), or in a live
+/// conversation's window. Out of the window, a name heard only by
+/// lamp-name, its words carrying none, is no name here: on lamp-74ff on
+/// 19 Nov meeting talk ("Is it after all?") let through as named was played
+/// as "someone is turned to the lamp" with no face seen speaking it (#7891).
 fn named(line: Line<'_>) -> bool {
-    line.name_heard
+    line.name_heard && (line.going_on || crate::attention::names_it_in_words(line.heard))
         || crate::attention::called(line.heard)
         || crate::attention::called_by_name_on(line.heard, true)
 }
