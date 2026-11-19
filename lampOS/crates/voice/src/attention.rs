@@ -5728,7 +5728,8 @@ mod tests {
     /// speaking with their own face, was written with a word one letter
     /// from "Lamp" ("Lap,", "Lamps,", "Clamp,", "Laam,") and held six times
     /// as said to someone it calls by name. Such a word is nobody's name,
-    /// on either route; a real name set off ("Bea, …") still is.
+    /// on either route; a real name set off ("Bea, …", "Lama, …": "lam"
+    /// and a letter other than "p", the Reviewer-lead's P2 on #7999) still is.
     #[test]
     fn a_spelling_one_letter_from_lamp_is_no_ones_name() {
         for heard in [
@@ -5745,12 +5746,14 @@ mod tests {
                 "{heard}"
             );
         }
-        let other = "Bea, can you pass me that?";
-        assert!(addresses_someone_else(other));
-        assert_eq!(
-            judged_run(false, Room::Quiet, &[(other, true)])[0],
-            Verdict::Hold(TO_ANOTHER)
-        );
+        for other in ["Bea, can you pass me that?", "Lama, can you pass me that?"] {
+            assert!(addresses_someone_else(other), "{other}");
+            assert_eq!(
+                judged_run(false, Room::Quiet, &[(other, true)])[0],
+                Verdict::Hold(TO_ANOTHER),
+                "{other}"
+            );
+        }
     }
 
     /// #7698, with #7891's meeting cut-ins in mind: a word one letter from
