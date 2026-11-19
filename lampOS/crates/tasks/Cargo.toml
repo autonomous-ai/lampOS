@@ -7,6 +7,9 @@ publish.workspace = true
 
 [dependencies]
 lamp-ipc = { path = "../ipc" }
+# The one checked replace of a settings file, shared with lamp-update and
+# lamp-setup (#7868): openclaw.json checked by OpenClaw before the rename.
+lamp-checked-replace = { path = "../checked-replace" }
 serde.workspace = true
 # `raw_value`: the stored receipt is read as its own text, so a field
 # written twice in it is refused, never kept as the last (#1570).

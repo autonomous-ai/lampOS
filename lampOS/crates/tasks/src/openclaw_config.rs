@@ -70,10 +70,9 @@
 //! [`write`] must run as OpenClaw's own user (`lampos`), so the file it
 //! writes is OpenClaw's and no one else's; never through a link.
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Map, Value, json};
 
@@ -85,10 +84,8 @@ use crate::hermes_config::{read_or_empty, replace_checked};
 /// on the lamp; [`validate`] runs its own config check through it.
 pub const VALIDATOR: &str = "/usr/local/bin/openclaw";
 /// The longest OpenClaw's config check runs before it counts as a
-/// refusal: a cold start of its Node CLI on a lamp.
-// ponytail: a fixed bound, unmeasured on a lamp; tune once a lamp's check
-// is timed.
-pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
+/// refusal (`lamp_checked_replace::VALIDATE_WITHIN`).
+pub use lamp_checked_replace::VALIDATE_WITHIN;
 
 /// OpenClaw's settings file, in its state folder.
 pub const CONFIG_FILE: &str = "openclaw.json";
@@ -419,13 +416,13 @@ pub fn write_checked(
     }
     fs::create_dir_all(state_dir)?;
     if validator.exists() {
-        replace_checked(&path, &merged, &|file| validate(validator, file))?;
+        replace_checked(&path, &merged, &mut |file| validate(validator, file))?;
     } else {
         eprintln!(
             "[lamp-tasks] OpenClaw's {CONFIG_FILE} written unchecked: no OpenClaw at {}",
             validator.display()
         );
-        replace_checked(&path, &merged, &|_| Ok(()))?;
+        replace_checked(&path, &merged, &mut |_| Ok(()))?;
     }
     Ok(true)
 }
@@ -442,69 +439,16 @@ pub fn write_checked(
 /// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
 /// what OpenClaw said, on one line and short.
 pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
-    use std::os::unix::process::CommandExt;
-    let (mut said_rx, said_tx) =
-        io::pipe().map_err(|error| format!("OpenClaw's config check: no pipe: {error}"))?;
-    let mut child = Command::new(validator)
-        .args(["config", "validate", "--json"])
-        .env_clear()
-        .envs(crate::gateway::APPROVALS_ENV)
-        .env("OPENCLAW_CONFIG_PATH", file)
-        .current_dir("/")
-        .stdin(Stdio::null())
-        .stdout(
-            said_tx
-                .try_clone()
-                .map_err(|error| format!("OpenClaw's config check: no pipe: {error}"))?,
-        )
-        .stderr(said_tx)
-        .process_group(0)
-        .spawn()
-        .map_err(|error| format!("OpenClaw's config check did not start: {error}"))?;
-    let (sent, said) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut text = String::new();
-        let _ = said_rx.read_to_string(&mut text);
-        let _ = sent.send(text);
-    });
-    let began = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if began.elapsed() < VALIDATE_WITHIN => {
-                std::thread::sleep(Duration::from_millis(20))
-            }
-            _ => {
-                let pid = rustix::process::Pid::from_child(&child);
-                let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
-                let _ = child.wait();
-                break None;
-            }
-        }
-    };
-    // Bounded: a pipe still held by a process outside the group is given
-    // up, never waited on.
-    let said = said
-        .recv_timeout(Duration::from_secs(2))
-        .unwrap_or_default();
-    let said: String = said
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(400)
-        .collect();
-    match status.map(|status| status.code()) {
-        Some(Some(0)) => Ok(()),
-        Some(code) => Err(format!(
-            "OpenClaw's own config check refused it (status {}): {said}",
-            code.map_or("killed".into(), |code| code.to_string())
-        )),
-        None => Err(format!(
-            "OpenClaw's own config check ran past {} s",
-            VALIDATE_WITHIN.as_secs()
-        )),
-    }
+    let file = file
+        .to_str()
+        .ok_or("OpenClaw's config check: the new file's path is not UTF-8")?;
+    let mut env = crate::gateway::APPROVALS_ENV.to_vec();
+    env.push(("OPENCLAW_CONFIG_PATH", file));
+    let argv = [validator.to_string_lossy().into_owned()]
+        .into_iter()
+        .chain(["config", "validate", "--json"].map(str::to_owned))
+        .collect::<Vec<_>>();
+    lamp_checked_replace::validate(&argv, &env, VALIDATE_WITHIN)
 }
 
 /// What lamp-update's wrapper says when it finds no running gateway to
