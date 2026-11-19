@@ -17,12 +17,15 @@ use std::time::Duration;
 pub const ENVIRONMENT: &str = "LAMP_DID_KEEP";
 /// The publishers whose dids are kept, by the name they publish under, each
 /// added with its own part's PR (#7757): lamp-skills, the body
-/// (`LAMP_DID_BODY`) and the ring (`LAMP_DID_RING`). Never "any".
-pub const TELLERS: [&str; 3] = ["skills", BODY, RING];
+/// (`LAMP_DID_BODY`), the ring (`LAMP_DID_RING`) and the voice
+/// (`LAMP_DID_VOICE`). Never "any".
+pub const TELLERS: [&str; 4] = ["skills", BODY, RING, VOICE];
 /// The body's publishing name, whose dids have a share of their own.
 const BODY: &str = "body";
 /// The ring's publishing name ([`crate::did_ring::SOURCE`]).
 const RING: &str = "ring";
+/// The voice's publishing name ([`crate::did_voice::SOURCE`]).
+const VOICE: &str = "voice";
 /// The most actions kept.
 pub const MOST: usize = 200;
 /// The most of them the body's own may be (#7757): with `LAMP_BODY_PRESENCE`
@@ -32,6 +35,9 @@ pub const MOST: usize = 200;
 pub const BODY_MOST: usize = 100;
 /// The most of them the ring's own may be: it tells a few faces a day.
 pub const RING_MOST: usize = 20;
+/// The most of them the voice's own may be: it tells the lines it begins
+/// itself (a few news, the walk's steps, one update line).
+pub const VOICE_MOST: usize = 20;
 
 /// Which part told a did: the share it is kept under.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,6 +45,7 @@ pub enum Part {
     Skills,
     Body,
     Ring,
+    Voice,
 }
 
 impl Part {
@@ -48,6 +55,7 @@ impl Part {
             "skills" => Some(Self::Skills),
             BODY => Some(Self::Body),
             RING => Some(Self::Ring),
+            VOICE => Some(Self::Voice),
             _ => None,
         }
     }
@@ -74,17 +82,21 @@ impl DidHistory {
     }
 
     /// The same, saying which part told it: the body's share is at most
-    /// [`BODY_MOST`] and the ring's [`RING_MOST`], each part's own oldest
+    /// [`BODY_MOST`] and the ring's [`RING_MOST`], the voice's [`VOICE_MOST`], each part's own oldest
     /// dropped first; the parts that are not skills hold at most
     /// `BODY_MOST` of the whole between them, so past [`MOST`] their oldest
-    /// goes (the body's before the ring's) and the skills keep at least
+    /// goes (the body's, then the ring's, then the voice's) and the skills keep at least
     /// `MOST - BODY_MOST`: no part can push another out.
     pub fn keep_part(&mut self, did: LampDid, part: Part, now_us: u64) {
         if did.check().is_err() {
             return;
         }
         self.entries.push_back((did, part));
-        for (own, most) in [(Part::Body, BODY_MOST), (Part::Ring, RING_MOST)] {
+        for (own, most) in [
+            (Part::Body, BODY_MOST),
+            (Part::Ring, RING_MOST),
+            (Part::Voice, VOICE_MOST),
+        ] {
             while self.count(own) > most {
                 if let Some(oldest) = self.entries.iter().position(|(_, kept)| *kept == own) {
                     self.entries.remove(oldest);
@@ -105,13 +117,12 @@ impl DidHistory {
         while self.entries.len() > MOST {
             let others = self.entries.len() - self.count(Part::Skills);
             // Past their share together, the body's oldest goes, then the
-            // ring's; else the skills'.
+            // ring's, then the voice's; else the skills'.
             let drop = if others > BODY_MOST {
-                if self.count(Part::Body) > 0 {
-                    Part::Body
-                } else {
-                    Part::Ring
-                }
+                [Part::Body, Part::Ring, Part::Voice]
+                    .into_iter()
+                    .find(|part| self.count(*part) > 0)
+                    .unwrap_or(Part::Skills)
             } else {
                 Part::Skills
             };
