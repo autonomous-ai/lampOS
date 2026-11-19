@@ -1,16 +1,17 @@
-//! A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, a
-//! pilot: `on` exactly, off unless set, in no unit; the first builder's
-//! ruling of 19 Nov 05:42 on its scope and fallback). Only
-//! [`PILOTS`]: Sip of water and Stretch break, the two that say a line at
-//! each fire. Off, nothing here is read and both load and run byte for byte
-//! as before.
+//! A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`:
+//! `on` for every group, or a list of [`Group`]s, `pilot,nudges`; off unless
+//! set, in no unit; the first builder's ruling of 19 Nov 05:42 on the
+//! pilot's scope and fallback, and 06:05: quick reactions stay DeepSeek's,
+//! and every other model-worded core line goes to the agent, group by
+//! group). Only [`PILOTS`]. Off, nothing here is read and they load and run
+//! byte for byte as before.
 //!
 //! - **The middle form, for a core skill.** lamp-skills keeps the skill's
 //!   trigger, `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`,
 //!   `cooldown`, `rearm`, `wait`, budget, rest and stop exactly: they are
 //!   `skill.toml`'s own and never copied. Only what each fire says becomes
 //!   a `do.task` for the lamp's agent, the skill's own plain intent from its
-//!   `SKILL.md` ([`Pilot::task`]), with a run-time brief in its
+//!   `SKILL.md` ([`Task::task`]), with a run-time brief in its
 //!   `scripts/agent.py` ([`script`], the form of a voice make's
 //!   `lamp_voice::make_no_cannot` brief: one plain Python string).
 //! - **The variant** ([`OVERLAY`], `agent.toml` beside `skill.toml`): it
@@ -35,8 +36,49 @@
 use crate::{Call, SAY_EXPIRES_MS, SAY_PRIORITY, Words};
 use std::{fs, path::Path, sync::mpsc, time::Duration};
 
-/// The switch, in lamp-skills and its manage helper: `on` exactly.
+/// The switch, in lamp-skills and its manage helper: `on` for every
+/// [`Group`], or the groups' names with commas between (`pilot,nudges`).
 pub const ENVIRONMENT: &str = "LAMP_CORE_VIA_AGENT";
+
+/// The groups the skills go on by, each by its own switch-on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Group {
+    /// Sip of water and Stretch break.
+    Pilot,
+    /// The other wellbeing and room nudges.
+    Nudges,
+}
+
+impl Group {
+    /// Its name in [`ENVIRONMENT`].
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Pilot => "pilot",
+            Self::Nudges => "nudges",
+        }
+    }
+}
+
+/// Whether [`ENVIRONMENT`]'s `value` turns `group` on: `on`, or a list
+/// naming it. Anything else, a typo or an unknown name, turns on nothing
+/// more.
+pub fn turns_on(value: Option<&str>, group: Group) -> bool {
+    match value {
+        Some("on") => true,
+        Some(list) => list.split(',').any(|name| name.trim() == group.name()),
+        None => false,
+    }
+}
+
+/// One `do.task` of a pilot: for the line of its trigger `on` (a skill whose
+/// steps name their triggers), or of every fire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Task {
+    pub on: Option<&'static str>,
+    /// The skill's own plain intent for that line, from its `SKILL.md` and
+    /// its say's note, never a guess at a person's words.
+    pub task: &'static str,
+}
 
 /// The variant beside a pilot's `skill.toml`.
 pub const OVERLAY: &str = "agent.toml";
@@ -63,28 +105,162 @@ pub const MOST_LINE_SENTENCES: usize = 2;
 pub struct Pilot {
     /// Its folder's name.
     pub name: &'static str,
+    /// The switch-on it goes on by.
+    pub group: Group,
     /// What fires it, in plain words, for the brief.
     pub fire: &'static str,
-    /// Its `do.task`: the skill's own plain intent, from its `SKILL.md`,
-    /// never a guess at a person's words.
-    pub task: &'static str,
+    /// What the lamp says now, in plain words, for the brief.
+    pub says: &'static str,
+    /// Its `do.task`s, in the order of its steps.
+    pub tasks: &'static [Task],
 }
 
-/// The pilots: only these two (the first builder, 05:42). A quick
-/// reaction, or a skill whose fire is only light, a fixed sound or a move,
-/// never goes through the agent.
-pub const PILOTS: [Pilot; 2] = [
+/// What a brief says the lamp says now, for a skill of more than one task.
+const THIS_TASKS_LINE: &str = "the line this run's task names, for this moment";
+
+/// The skills whose line goes through the agent. A quick reaction, a skill
+/// whose fire is only light, a fixed sound or a move, a fixed line, a
+/// `do.read`, or a skill a conversation calls (its line is the
+/// conversation's reply) never does.
+pub const PILOTS: [Pilot; 10] = [
     Pilot {
         name: "sip-of-water",
+        group: Group::Pilot,
         fire: "someone has sat at the desk a while, half an hour or more",
-        task: "One short, friendly line suggesting a sip of water; no lecture, nothing about health.",
+        says: "one short, friendly line suggesting a sip of water; no lecture, nothing about \
+               health",
+        tasks: &[Task {
+            on: None,
+            task: "One short, friendly line suggesting a sip of water; no lecture, nothing about \
+                   health.",
+        }],
     },
     Pilot {
         name: "stretch-break",
+        group: Group::Pilot,
         fire: "someone has been at the desk about fifty minutes without getting up, and the lamp \
                stretches",
-        task: "One short, playful line, as an invitation to take a break, as the lamp stretches \
-               too; never a lecture.",
+        says: "one short, playful line, as an invitation to take a break, as the lamp stretches \
+               too; never a lecture",
+        tasks: &[Task {
+            on: None,
+            task: "One short, playful line, as an invitation to take a break, as the lamp \
+                   stretches too; never a lecture.",
+        }],
+    },
+    Pilot {
+        name: "stand-up",
+        group: Group::Nudges,
+        fire: "someone has sat at the desk over an hour and a half without getting up, and the \
+               lamp tilts toward them",
+        says: "one short, friendly line inviting them to stand up and move about for a minute; \
+               never a word about posture",
+        tasks: &[Task {
+            on: None,
+            task: "One short, friendly line inviting them to stand up and move about for a \
+                   minute; never a word about posture.",
+        }],
+    },
+    Pilot {
+        name: "rest-your-eyes",
+        group: Group::Nudges,
+        fire: "someone has looked at the screen about three quarters of an hour, and the lamp \
+               tilts and softens its light",
+        says: "one short, light line suggesting a rest for the eyes, perhaps looking at \
+               something far away",
+        tasks: &[Task {
+            on: None,
+            task: "One short, light line suggesting a rest for the eyes, perhaps looking at \
+                   something far away.",
+        }],
+    },
+    Pilot {
+        name: "sit-back",
+        group: Group::Nudges,
+        fire: "someone has leaned in toward the desk a while, or sat back after the lamp's word",
+        says: THIS_TASKS_LINE,
+        tasks: &[
+            Task {
+                on: Some("leaned_in"),
+                task: "One short, kind line, the way a friend would, that it might be a good \
+                       moment to sit back for a bit; nothing about their body, back, neck or \
+                       looks, and nothing about health.",
+            },
+            Task {
+                on: Some("sat_well"),
+                task: "They sat back after the lamp's word: a warm thanks or that's better, in \
+                       two or three words; nothing about their body or looks.",
+            },
+        ],
+    },
+    Pilot {
+        name: "wind-down",
+        group: Group::Nudges,
+        fire: "it is the hour before bedtime and someone has been at the desk twenty minutes, \
+               and the lamp droops sleepily",
+        says: "one short, gentle line suggesting they start to wind down for the night",
+        tasks: &[Task {
+            on: None,
+            task: "One short, gentle line suggesting they start to wind down for the night.",
+        }],
+    },
+    Pilot {
+        name: "comfort-break",
+        group: Group::Nudges,
+        fire: "someone has sat at the desk a long while, an hour and a half or more, with nobody \
+               else in view",
+        says: "one short, light line, the way a friend would, that it is a good moment for a \
+               short break; name no place and no reason, and nothing about health",
+        tasks: &[Task {
+            on: None,
+            task: "One short, light line, the way a friend would, that it is a good moment for a \
+                   short break; name no place and no reason, and nothing about health.",
+        }],
+    },
+    Pilot {
+        name: "meal-check",
+        group: Group::Nudges,
+        fire: "someone has been at the desk through most of lunchtime or dinnertime, with nobody \
+               else in view",
+        says: THIS_TASKS_LINE,
+        tasks: &[
+            Task {
+                on: Some("lunch"),
+                task: "Ask once, warmly and in a few words, the way a friend would, whether they \
+                       have had lunch yet; one open question, suggest no food, no menu and no \
+                       place, and nothing about health.",
+            },
+            Task {
+                on: Some("dinner"),
+                task: "Ask once, warmly and in a few words, the way a friend would, whether they \
+                       have had dinner yet; one open question, suggest no food, no menu and no \
+                       place, and nothing about health.",
+            },
+        ],
+    },
+    Pilot {
+        name: "quiet-focus",
+        group: Group::Nudges,
+        fire: "someone has just looked up after working quietly head down a good while",
+        says: "one short, warm line of a few words, the way a friend would, that you noticed \
+               their focus and it is nicely done; ask nothing, suggest nothing, and nothing about \
+               their body or looks, the time, or health",
+        tasks: &[Task {
+            on: Some("looked_up"),
+            task: "One short, warm line of a few words, the way a friend would, that you noticed \
+                   their focus and it is nicely done; ask nothing, suggest nothing, and nothing \
+                   about their body or looks, the time, or health.",
+        }],
+    },
+    Pilot {
+        name: "stuffy-air",
+        group: Group::Nudges,
+        fire: "the air at the desk has been stuffy for ten minutes, and the lamp droops and dims",
+        says: "one short line suggesting some fresh air, such as opening a window or a door",
+        tasks: &[Task {
+            on: None,
+            task: "One short line suggesting some fresh air, such as opening a window or a door.",
+        }],
     },
 ];
 
@@ -97,30 +273,28 @@ pub fn pilot(name: &str) -> Option<&'static Pilot> {
 /// naming what fired it and what the lamp says now, asking for that one
 /// line alone and `-` when nothing fits. One plain Python string.
 pub fn script(pilot: &Pilot) -> String {
-    let task = pilot.task.trim_end_matches('.');
-    let task = format!("{}{}", task[..1].to_lowercase(), &task[1..]);
     format!(
         "print(\"A skill that comes with the lamp, {}, has fired ({}). What the lamp says now: \
-         {task}. Answer with that one line alone, the very words the lamp will say, in the \
+         {}. Answer with that one line alone, the very words the lamp will say, in the \
          language the owner speaks with the lamp: nothing else, no tool, never making, changing \
          or removing a skill. If nothing fitting comes to mind, answer -.\")\n",
-        pilot.name, pilot.fire
+        pilot.name, pilot.fire, pilot.says
     )
 }
 
 #[cfg(test)]
 thread_local! {
-    /// The switch as a test of this thread sets it.
+    /// The switch as a test of this thread sets it, for every group.
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
-/// Whether the switch is on in this process.
-pub fn on() -> bool {
+/// Whether the switch turns `group` on in this process.
+pub fn on(group: Group) -> bool {
     #[cfg(test)]
     if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
         return on;
     }
-    std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+    turns_on(std::env::var(ENVIRONMENT).ok().as_deref(), group)
 }
 
 /// The switch for this test's thread alone.
@@ -139,7 +313,7 @@ pub fn overlaid(
     dir: &Path,
     table: &toml::Table,
 ) -> Result<Option<toml::Table>, String> {
-    let Some(pilot) = pilot(name).filter(|_| on()) else {
+    let Some(pilot) = pilot(name).filter(|pilot| on(pilot.group)) else {
         return Ok(None);
     };
     let text = match fs::read_to_string(dir.join(OVERLAY)) {
@@ -148,8 +322,12 @@ pub fn overlaid(
         Err(error) => return Err(error.to_string()),
     };
     let mut overlay: toml::Table = toml::from_str(&text).map_err(|error| error.to_string())?;
-    if table.get("kind").and_then(toml::Value::as_str) != Some("core") {
-        return Err("only a core skill's line goes through the agent so".into());
+    // Meal check and Quiet focus come from the Store: installable.
+    if !matches!(
+        table.get("kind").and_then(toml::Value::as_str),
+        Some("core" | "installable")
+    ) {
+        return Err("only a core or installable skill's line goes through the agent so".into());
     }
     if let Some(key) = overlay
         .keys()
@@ -201,9 +379,10 @@ pub fn overlaid(
     Ok(Some(with))
 }
 
-/// `steps` checked as the variant's: one task, the pilot's words running
-/// [`RUN`], alone in its table, and every other step `own`'s, in order,
-/// word for word (the fallback is the skill's own say).
+/// `steps` checked as the variant's: the pilot's tasks in order, each its
+/// words running [`RUN`], alone in its table but for its `on`, and every
+/// other step `own`'s, in order, word for word (the fallback is the
+/// skill's own say).
 fn task_beside(
     pilot: &Pilot,
     steps: &toml::Value,
@@ -216,16 +395,27 @@ fn task_beside(
         step.as_table()
             .is_some_and(|step| step.contains_key("task"))
     };
-    let tasks: Vec<&toml::Value> = list.iter().filter(|step| task(step)).collect();
-    let mut wanted = toml::Table::new();
-    wanted.insert("task".into(), toml::Value::String(pilot.task.into()));
-    wanted.insert("run".into(), toml::Value::String(RUN.into()));
-    let mut alone = toml::Table::new();
-    alone.insert("task".into(), toml::Value::Table(wanted));
-    if tasks != [&toml::Value::Table(alone)] {
+    let tasks: Vec<toml::Value> = list.iter().filter(|step| task(step)).cloned().collect();
+    let wanted: Vec<toml::Value> = pilot
+        .tasks
+        .iter()
+        .map(|task| {
+            let mut words = toml::Table::new();
+            words.insert("task".into(), toml::Value::String(task.task.into()));
+            words.insert("run".into(), toml::Value::String(RUN.into()));
+            let mut alone = toml::Table::new();
+            alone.insert("task".into(), toml::Value::Table(words));
+            if let Some(on) = task.on {
+                alone.insert("on".into(), toml::Value::String(on.into()));
+            }
+            toml::Value::Table(alone)
+        })
+        .collect();
+    if tasks != wanted {
         return Err(format!(
-            "its one task is {{ task = {:?}, run = {RUN:?} }}, alone in its [[do]]",
-            pilot.task
+            "its tasks are the lamp's own for {}, each {{ task, run = {RUN:?} }} alone in its \
+             [[do]] but for its on",
+            pilot.name
         ));
     }
     let rest: Vec<toml::Value> = list.iter().filter(|step| !task(step)).cloned().collect();

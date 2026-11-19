@@ -2200,19 +2200,40 @@ model-worded line at each fire: lamp-skills keeps the trigger, the
 `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`,
 `wait`, `[budget]`, `[rest]` and `[stop]` exactly, and only the fire's line
 becomes a `do.task` for the lamp's agent (Hermes or OpenClaw, through
-lamp-tasks). Off unless `LAMP_CORE_VIA_AGENT=on`, in lamp-skills and its
-manage helper; set in no unit (the first builder's ruling, 19 Nov 05:42:
-behind a new switch, off). Off, nothing below is read: the skills load and
-run byte for byte as before. `lamp_skills::core_agent`.
+lamp-tasks). Off unless set, in lamp-skills and its manage helper; set in
+no unit (the first builder's rulings, 19 Nov 05:42: behind a new switch,
+off; 06:05: quick reactions stay DeepSeek's, and every other model-worded
+core line goes to the agent, group by group). `LAMP_CORE_VIA_AGENT=on`
+turns on every group; a list turns on those it names
+(`LAMP_CORE_VIA_AGENT=pilot,nudges`, `core_agent::turns_on`), so each
+group goes on by its own switch-on. Off, nothing below is read: the skills
+load and run byte for byte as before. `lamp_skills::core_agent`.
 
-- **Which skills** (`core_agent::PILOTS`): Sip of water and Stretch break.
-  A quick reaction, or a skill whose fire is only light, a fixed sound or a
-  move, never goes through the agent.
+- **Which skills** (`core_agent::PILOTS`), by group:
+  - `pilot`: Sip of water and Stretch break.
+  - `nudges`: Stand up, Rest your eyes, Sit back (its nudge and its thanks,
+    a task for each trigger, `on = "leaned_in"` and `on = "sat_well"`),
+    Wind down, Comfort break, Meal check (lunch and dinner, a task each),
+    Quiet focus and Stuffy air. Meal check and Quiet focus are installable
+    (from the Store): their variant ships only in their package.
+  - Never: a quick reaction; a skill whose fire is only light, a fixed sound
+    or a move; a fixed line (Head pat, Smoky air, Dusty air); a `do.read`
+    (Morning agenda, Morning mail, Tomorrow's plan); a skill a conversation
+    calls (Dance, Pose, Light scenes, Light show, Prepare to unplug: its
+    line is the conversation's own reply). Welcome back and Reminders stay
+    as they are: a task's words are fixed in its file, so it can't carry
+    who came back (the voice's `who`) or the person's own reminder text,
+    which each fire's line needs.
+- **One task a trigger.** A variant's task may name its trigger (`on`), as
+  its say does, for a skill whose steps name theirs: one task for each such
+  line, each alone in its table but for its `on` (only in a variant; any
+  other skill keeps one `do.task`). The read-back for the yes says the
+  first.
 - **The variant** (`agent.toml` beside `skill.toml`, and
   `scripts/agent.py`): it stands in for `grants`, `[[do]]` and
   `[[present.do]]` alone (`core_agent::overlaid`), so the trigger and the
   guards are never copied. It is read only while it is exactly the pilot's:
-  `grants = []`; one `task = { task, run = "scripts/agent.py" }`, the
+  `grants = []`; its `task = { task, run = "scripts/agent.py" }`s, the
   skill's own plain intent from its `SKILL.md` ("One short, friendly line
   suggesting a sip of water; no lecture, nothing about health."), never a
   guess at a person's words; every other step `skill.toml`'s own, word for
